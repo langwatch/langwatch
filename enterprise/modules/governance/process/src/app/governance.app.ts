@@ -68,6 +68,9 @@ import {
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
   type OttlStarterTemplate,
+  type PersonaResolution,
+  type GovernanceOttlGateway,
+  type OttlValidationResult,
   type IssuedIngestionKey,
   type PersonalIngestionKeyListing,
   type PersonalIngestionKeyMint,
@@ -154,6 +157,7 @@ import { governanceListingChannels } from "../channels/governance-listing-channe
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
+import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
@@ -227,6 +231,7 @@ import { OpenAiComplianceReferencePullerService } from "../services/openai-compl
 import type { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
 import { PersonDiscoveryService } from "../services/person-discovery.service.ts";
 import { PersonListingService } from "../services/person-listing.service.ts";
+import { PersonaHomeService } from "../services/persona-home.service.ts";
 import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.service.ts";
 import {
   PersonalUsageDashboardService,
@@ -328,6 +333,7 @@ export interface GovernanceAppDependencies {
     | "getOrganizationId"
     | "findInternal"
     | "countWithTraces"
+    | "findSharedProjectSlugs"
     | "listActiveByScopes"
     | "findWithTeam"
     | "ensureInternal"
@@ -353,7 +359,7 @@ export interface GovernanceAppDependencies {
     "createVirtualKey" | "revokeVirtualKey" | "findPersonalVirtualKeys" | "findVirtualKeyById"
   >;
   modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
-  users: Pick<UserApi, "findById" | "findByEmail">;
+  users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
   auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
   /** Auth owns CLI bearer validation and revocation. */
@@ -382,6 +388,7 @@ export interface GovernanceAppDependencies {
       | "findOpenMemberDepartmentLinks"
       | "findTeamsWithDepartments"
       | "assignTeamDepartment"
+      | "findPrimaryIntent"
       | "getTeam"
       | "getTeamWithMembers"
     >;
@@ -495,7 +502,12 @@ export class GovernanceApp implements GovernanceRestApi {
     const ingestionSecrets = await secrets.into(governanceSecrets.ingestionSecretPepper, (pepper) =>
       IngestionSecretService.create(IngestionSecretConfiguration.create({ pepper: pepper ?? "" })),
     );
+    // Main posted OTTL to LW_GATEWAY_INTERNAL_URL, then LW_GATEWAY_BASE_URL; only the legacy leaf is shared today.
+    const ottl = await secrets.into(governanceSecrets.ottlSigningSecret, (secret) =>
+      HttpOttlTransformChannel.create({ baseUrl: config?.gatewayLegacyUrl ?? null, secret }),
+    );
     return new GovernanceApp({
+      ottl,
       ingestionSecrets,
       dependencies: {
         governance: members.governance,
@@ -523,6 +535,7 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   private constructor({
+    ottl,
     ingestionSecrets,
     dependencies,
     repositories,
@@ -530,6 +543,7 @@ export class GovernanceApp implements GovernanceRestApi {
     encryption,
     gatewayBaseUrl,
   }: {
+    ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
     dependencies: GovernanceAppDependencies;
     repositories: GovernanceRepositories;
@@ -593,6 +607,15 @@ export class GovernanceApp implements GovernanceRestApi {
       projects: dependencies.projects,
       activity: repositories.traceActivity,
     });
+    this.personaHome = PersonaHomeService.create({
+      setupState: this.setupState,
+      projects: dependencies.projects,
+      entitlements: dependencies.entitlements,
+      permissions: dependencies.permissions,
+      users: dependencies.users,
+      featureFlags: dependencies.featureFlags,
+      organizations: dependencies.organizations,
+    });
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       auditLog: dependencies.auditLog,
       teams: dependencies.organizations,
@@ -642,6 +665,7 @@ export class GovernanceApp implements GovernanceRestApi {
       providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
+    this.ottl = ottl;
     this.sourceReads = IngestionSourceReadService.create({
       sources: this.ingestionSources,
       pullRuns: repositories.ingestionPullRuns,
@@ -748,6 +772,8 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly pullLifecycle: IngestionPullLifecycleService;
   private readonly ingestionSources: IngestionSourceService;
   private readonly sourceReads: IngestionSourceReadService;
+  private readonly personaHome: PersonaHomeService;
+  private readonly ottl: GovernanceOttlGateway;
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
   private readonly quarantineFill: QuarantineFillEvaluatorService;
   private readonly erasureSuppression: ErasureSuppressionService;
@@ -1193,12 +1219,23 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.sourceReads.present(await this.ingestionSources.archive(input));
   }
 
+  ingestionSourceValidateOttl(input: { statements: string[] }): Promise<OttlValidationResult> {
+    return this.ottl.validate(input.statements);
+  }
+
   ingestionSourceOttlStarter({ sourceType }: { sourceType: string }): OttlStarterTemplate {
     return {
       enabled: isOttlEnabledSourceType(sourceType),
       statements: [...getStarterTemplate(sourceType)],
       enabledSourceTypes: [...OTTL_ENABLED_SOURCE_TYPES],
     };
+  }
+
+  governanceResolveHome(
+    input: { organizationId: string },
+    by: { id: string },
+  ): Promise<PersonaResolution> {
+    return this.personaHome.resolve({ organizationId: input.organizationId, userId: by.id });
   }
 
   async governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState> {

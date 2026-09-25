@@ -9,6 +9,7 @@ import {
   ingestionSourceWithSecretSchema,
   ottlStarterTemplateSchema,
 } from "./ingestion-source.ts";
+import { ottlValidationResultSchema } from "./ottl.ts";
 
 const organizationScope = z.object({ organizationId: z.string() });
 const sourceInOrganization = z.object({ ...organizationScope.shape, id: z.string() });
@@ -67,6 +68,12 @@ export const ingestionSourcesTrpc = defineTrpcContract("ingestionSources")
   .mutation("archive")
   .withInput(sourceInOrganization)
   .withOutput(ingestionSourceDtoSchema)
+
+  .mutation("validateOttl")
+  .withInput(
+    z.object({ ...organizationScope.shape, statements: z.array(z.string()).min(0).max(64) }),
+  )
+  .withOutput(ottlValidationResultSchema)
 
   .query("ottlStarter")
   .withInput(z.object({ ...organizationScope.shape, sourceType: z.string() }))

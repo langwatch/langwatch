@@ -144,6 +144,12 @@ export interface ProjectApi {
   }): Promise<ProjectUsageCount>;
   /** Live application projects that have received a trace; internal projects excluded. */
   countWithTraces(input: { organizationId: string }): Promise<number>;
+  /** Live shared-team projects, oldest first; with a member, only theirs (main `resolveHome`). */
+  findSharedProjectSlugs(input: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>()("project");

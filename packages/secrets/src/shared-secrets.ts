@@ -7,6 +7,9 @@ import { Secret } from "./secret.ts";
 /** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
 export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 
+/** Signs calls to the gateway's internal surface: gateway checks, governance's OTTL signs. */
+export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true });
+
 /** The hash pepper: gateway peppers virtual keys with it, governance its ingestion secrets. */
 export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true });
 

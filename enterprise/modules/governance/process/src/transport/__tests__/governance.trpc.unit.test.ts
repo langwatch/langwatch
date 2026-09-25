@@ -32,6 +32,14 @@ const setupState = {
   hasApplicationTraces: false,
   governanceActive: true,
 };
+const home = {
+  persona: "project_only" as const,
+  destination: "/acme",
+  isOverride: false,
+  governanceUiEnabled: false,
+  intentPinned: false,
+  firstProjectSlug: "acme",
+};
 const emptyPage = { events: [], nextCursor: null, nextCursorCompound: null };
 
 function mount(answer: typeof workspace | null) {
@@ -39,6 +47,10 @@ function mount(answer: typeof workspace | null) {
   const calls: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
     findActorWorkspace: async () => answer,
+    governanceResolveHome: async (input, by) => {
+      calls.push([input, by]);
+      return home;
+    },
     governanceSetupState: async (input) => {
       calls.push(input);
       return setupState;
@@ -75,11 +87,19 @@ describe("the governance tRPC namespace", () => {
   it("serves main's procedures as queries", () => {
     expect(procedureKinds(mount(null).router._def.procedures)).toEqual({
       resolveActorPersonalProject: "query",
+      resolveHome: "query",
       setupState: "query",
       ocsfExport: "query",
       quarantineFillStats: "query",
       recordWorkspaceView: "mutation",
     });
+  });
+
+  it("resolves the caller's home under organization:view", async () => {
+    const { caller, asked, calls } = mount(null);
+    await expect(caller.resolveHome({ organizationId: "org_1" })).resolves.toEqual(home);
+    expect(asked).toEqual(["organization:view"]);
+    expect(calls).toEqual([[{ organizationId: "org_1" }, { id: "user_1" }]]);
   });
 
   it("answers the setup state under governance:view", async () => {

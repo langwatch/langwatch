@@ -338,6 +338,31 @@ export class MemoryProjectRepository implements ProjectRepository {
       ).length;
   }
 
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter((project) => {
+        const team = this.#database.findTeam(project.teamId);
+        return (
+          team?.organizationId === organizationId &&
+          !team.isPersonal &&
+          project.archivedAt === null &&
+          (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
+        );
+      })
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .slice(0, limit)
+      .map((project) => project.slug);
+  }
+
   async findIdsByOrganization(organizationId: string): Promise<string[]> {
     return this.#database
       .projects()

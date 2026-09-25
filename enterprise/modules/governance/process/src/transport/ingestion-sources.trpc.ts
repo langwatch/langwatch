@@ -34,6 +34,10 @@ export const ingestionSourcesTrpcTransport = defineTrpcRouter(
   .withPermission("ingestionSources:manage")
   .handle(({ app, input }) => app.ingestionSourceArchive(input))
 
+  .procedure("validateOttl")
+  .withPermission("ingestionSources:manage")
+  .handle(({ app, input }) => app.ingestionSourceValidateOttl(input))
+
   .procedure("ottlStarter")
   .withPermission("ingestionSources:view")
   .handle(({ app, input }) => app.ingestionSourceOttlStarter(input))

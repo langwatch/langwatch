@@ -59,6 +59,7 @@ function mount() {
     ingestionSourceRotateSecret: async (input) =>
       record(input, { source, ingestSecret: "lw_is_2" }),
     ingestionSourceArchive: async (input) => record(input, source),
+    ingestionSourceValidateOttl: async (input) => record(input, { status: "valid" as const }),
     ingestionSourceOttlStarter: (input) =>
       record(input, { enabled: true, statements: [], enabledSourceTypes: ["otel_generic"] }),
   });
@@ -80,6 +81,7 @@ describe("the ingestionSources tRPC namespace", () => {
       update: "mutation",
       rotateSecret: "mutation",
       archive: "mutation",
+      validateOttl: "mutation",
       ottlStarter: "query",
     });
   });
@@ -119,15 +121,26 @@ describe("the ingestionSources tRPC namespace", () => {
     ).rejects.toThrow();
   });
 
-  it("updates, rotates and archives under ingestionSources:manage", async () => {
+  it("updates, rotates, archives and validates OTTL under ingestionSources:manage", async () => {
     const { caller, asked } = mount();
     await caller.update({ ...target, status: "disabled" });
     await expect(caller.rotateSecret(target)).resolves.toEqual({ source, ingestSecret: "lw_is_2" });
     await caller.archive(target);
+    await expect(
+      caller.validateOttl({ organizationId: "org_1", statements: ['set(name, "x")'] }),
+    ).resolves.toEqual({ status: "valid" });
     expect(asked).toEqual([
       "ingestionSources:manage",
       "ingestionSources:manage",
       "ingestionSources:manage",
+      "ingestionSources:manage",
     ]);
+  });
+
+  it("refuses more than main's 64 OTTL statements", async () => {
+    const { caller } = mount();
+    await expect(
+      caller.validateOttl({ organizationId: "org_1", statements: Array(65).fill("x") }),
+    ).rejects.toThrow();
   });
 });

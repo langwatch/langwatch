@@ -127,6 +127,31 @@ export class PrismaProjectRepository
     });
   }
 
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        team: {
+          organizationId,
+          isPersonal: false,
+          ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
+        },
+        archivedAt: null,
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      select: { slug: true },
+    });
+    return projects.map((project) => project.slug);
+  }
+
   async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({

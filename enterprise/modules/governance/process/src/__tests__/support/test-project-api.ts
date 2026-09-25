@@ -18,6 +18,10 @@ export class TestProjectApi implements ProjectApi {
     return Promise.resolve(0);
   }
 
+  findSharedProjectSlugs(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
   countUsage(): Promise<{ projects: number; updatedProjects: number }> {
     return Promise.resolve({ projects: 0, updatedProjects: 0 });
   }

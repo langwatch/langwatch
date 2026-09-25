@@ -110,4 +110,9 @@ export interface ProjectRepository {
     since?: number;
   }): Promise<ProjectUsageCount>;
   countWithTraces(input: { organizationId: string }): Promise<number>;
+  findSharedProjectSlugs(input: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]>;
 }

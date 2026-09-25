@@ -10,6 +10,7 @@ import {
 import { governanceActorWorkspaceSchema } from "./governance.responses.ts";
 import { governanceSetupStateSchema } from "./governance.ts";
 import { governanceOcsfExportPageSchema } from "./ocsf-export.ts";
+import { personaResolutionSchema } from "./persona-home.ts";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
@@ -23,6 +24,11 @@ export const governanceTrpc = defineTrpcContract("governance")
   .query("resolveActorPersonalProject")
   .withInput(z.object({ organizationId: z.string(), actor: z.string().min(1).max(512) }))
   .withOutput(governanceActorWorkspaceSchema.nullable())
+
+  /** Where the caller lands in this organization: main's persona home. */
+  .query("resolveHome")
+  .withInput(organizationScope)
+  .withOutput(personaResolutionSchema)
 
   /** The persona-detection signal: whether this organization has any governance state. */
   .query("setupState")

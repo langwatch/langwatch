@@ -71,7 +71,7 @@ import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
-import { Secret, virtualKeyPepper } from "@langwatch/secrets";
+import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
 import { toDate, type Instant } from "@langwatch/time";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
@@ -655,7 +655,7 @@ export class GatewayApp implements GatewayApi {
    * runs no gateway needs none.
    */
   static readonly secrets = {
-    internalSecret: Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true }),
+    internalSecret: gatewayInternalSecret,
     jwtSecret: Secret.load("LW_GATEWAY_JWT_SECRET", { optional: true }),
     virtualKeyPepper,
   } as const;

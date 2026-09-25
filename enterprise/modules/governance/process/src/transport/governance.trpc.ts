@@ -11,6 +11,10 @@ export const governanceTrpcTransport = defineTrpcRouter(GovernanceRestApi, gover
   .withPermission("governance:view")
   .handle(({ app, input }) => app.findActorWorkspace(input))
 
+  .procedure("resolveHome")
+  .withPermission("organization:view")
+  .handle(({ app, input, actor }) => app.governanceResolveHome(input, { id: actor.id }))
+
   .procedure("setupState")
   .withPermission("governance:view")
   .handle(({ app, input }) => app.governanceSetupState(input))

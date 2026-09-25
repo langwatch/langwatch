@@ -150,6 +150,8 @@ function mountCli(world: World = {}) {
     ingestionSourceUpdate: unavailable,
     ingestionSourceRotateSecret: unavailable,
     ingestionSourceArchive: unavailable,
+    ingestionSourceValidateOttl: unavailable,
+    governanceResolveHome: unavailable,
     ingestionSourceOttlStarter: () => {
       throw new Error("not reachable through this door");
     },

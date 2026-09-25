@@ -7,22 +7,9 @@
  */
 import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
-import { virtualKeyPepper } from "@langwatch/secrets";
+import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
-
-/**
- * Where the aigateway's OTTL endpoints are, and the shared secret every call
- * to them is signed with. Both nullable together: a deployment with no
- * gateway folds OTTL nowhere, and the channel answers "unconfigured" rather
- * than pretending to transform.
- */
-const governanceOttlConfigSchema = z
-  .object({
-    baseUrl: z.string().min(1).nullable().default(null),
-    secret: z.string().min(1).nullable().default(null),
-  })
-  .default({ baseUrl: null, secret: null });
 
 /** The governance module's configuration slice. */
 export const governanceAppConfigSchema = z.object({
@@ -30,7 +17,6 @@ export const governanceAppConfigSchema = z.object({
   gatewayBaseUrl: z.string().min(1),
   /** This deployment's public origin; the CLI family's links are built on it. */
   publicBaseUrl: z.string().min(1),
-  ottl: governanceOttlConfigSchema,
 });
 
 export type GovernanceAppConfig = z.infer<typeof governanceAppConfigSchema>;
@@ -40,6 +26,8 @@ export const governanceSecrets = {
   erasurePseudonymSecret: Secret.load("GOVERNANCE_ERASURE_PSEUDONYM_SECRET", { optional: true }),
   /** Prefixed into an ingestion secret's hash, so a database-only leak is inert. */
   ingestionSecretPepper: virtualKeyPepper,
+  /** Signs OTTL validate and transform calls to the gateway's internal surface. */
+  ottlSigningSecret: gatewayInternalSecret,
 } as const;
 
 /** The deployment facts governance reads: where issued personal keys send traffic. */

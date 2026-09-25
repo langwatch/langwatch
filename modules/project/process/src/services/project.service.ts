@@ -461,6 +461,14 @@ export class ProjectService {
     return this.repository.countWithTraces(input);
   }
 
+  findSharedProjectSlugs(input: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.repository.findSharedProjectSlugs(input);
+  }
+
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
     const parsed = projectIdsByOrganizationInputSchema.parse(input);
 

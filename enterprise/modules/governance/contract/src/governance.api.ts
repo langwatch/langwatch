@@ -117,6 +117,7 @@ import type {
   GovernanceOtlpReceiverPolicies,
 } from "./otlp-receiver-policy.ts";
 import type { OttlTransformInput, OttlTransformResult, OttlValidationResult } from "./ottl.ts";
+import type { PersonaResolution } from "./persona-home.ts";
 import type {
   GovernanceBudgetOverviewForUser,
   GovernanceBudgetOverviewInput,
@@ -519,8 +520,13 @@ export interface GovernanceRestApi {
     id: string;
     organizationId: string;
   }): Promise<IngestionSourceDto>;
+  ingestionSourceValidateOttl(input: { statements: string[] }): Promise<OttlValidationResult>;
   ingestionSourceOttlStarter(input: { sourceType: string }): OttlStarterTemplate;
   governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState>;
+  governanceResolveHome(
+    input: { organizationId: string },
+    by: { id: string },
+  ): Promise<PersonaResolution>;
   governanceOcsfExport(
     input: GovernanceOcsfExportInput,
     by: EntitlementOperator,

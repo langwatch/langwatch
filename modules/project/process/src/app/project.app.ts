@@ -404,6 +404,14 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#projectService.countWithTraces(input);
   }
 
+  findSharedProjectSlugs(input: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    return this.#projectService.findSharedProjectSlugs(input);
+  }
+
   listIdsByOrganization(
     input: projectContractModule.ProjectIdsByOrganizationInput,
   ): Promise<string[]> {

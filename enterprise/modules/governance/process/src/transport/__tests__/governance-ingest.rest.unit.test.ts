@@ -137,6 +137,8 @@ function mountIngest(world: World = {}) {
     ingestionSourceUpdate: unsupportedRestOperation,
     ingestionSourceRotateSecret: unsupportedRestOperation,
     ingestionSourceArchive: unsupportedRestOperation,
+    ingestionSourceValidateOttl: unsupportedRestOperation,
+    governanceResolveHome: unsupportedRestOperation,
     ingestionSourceOttlStarter: () => {
       throw new Error("not reachable through this door");
     },
