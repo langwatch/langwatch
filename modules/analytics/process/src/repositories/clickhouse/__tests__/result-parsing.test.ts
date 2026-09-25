@@ -281,108 +281,6 @@ describe("result-parsing", () => {
   });
 
   describe("when parsing grouped results for summary charts", () => {
-    /**
-     * Simulates the groupBy branch of parseTimeseriesResults (lines 242-270 in the service).
-     * For timeScale="full", ClickHouse returns rows with `period` and `group_key`.
-     * The parser nests values as: bucket[groupBy][groupKey][seriesName]
-     */
-    function simulateGroupedParsing(
-      rows: Record<string, unknown>[],
-      series: AnalyticsSeries[],
-      groupBy: string | undefined,
-    ) {
-      type NestedBucket = {
-        date: string;
-        [key: string]: unknown;
-      };
-
-      const bucketMap: {
-        previous: Map<string, NestedBucket>;
-        current: Map<string, NestedBucket>;
-      } = {
-        previous: new Map(),
-        current: new Map(),
-      };
-
-      for (const row of rows) {
-        const period = row.period as string;
-        const dateKey = "full";
-
-        const targetMap = period === "current" ? bucketMap.current : bucketMap.previous;
-
-        let bucket = targetMap.get(dateKey);
-        if (!bucket) {
-          bucket = { date: dateKey };
-          targetMap.set(dateKey, bucket);
-        }
-
-        if (groupBy && row.group_key !== undefined && row.group_key !== null) {
-          // Grouped results — mirrors parseTimeseriesResults lines 242-270
-          const groupKey =
-            typeof row.group_key === "string" ? row.group_key : JSON.stringify(row.group_key);
-          if (!bucket[groupBy]) {
-            bucket[groupBy] = {};
-          }
-          const groupData = bucket[groupBy] as Record<string, Record<string, number>>;
-          if (!groupData[groupKey]) {
-            groupData[groupKey] = {};
-          }
-
-          for (let i = 0; i < series.length; i++) {
-            const seriesItem = series[i]!;
-            const alias = buildMetricAlias({
-              index: i,
-              metric: seriesItem.metric,
-              aggregation: seriesItem.aggregation,
-              key: seriesItem.key,
-              subkey: seriesItem.subkey,
-            });
-            const aggregation =
-              seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
-            const keyedName = seriesItem.key
-              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
-              : `${i}/${seriesItem.metric}/${aggregation}`;
-            const seriesName = seriesItem.pipeline
-              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
-              : keyedName;
-            const value = row[alias];
-            if (value !== undefined && value !== null) {
-              groupData[groupKey]![seriesName] = Number(value);
-            }
-          }
-        } else {
-          // Non-grouped results — mirrors parseTimeseriesResults lines 271-288
-          for (let i = 0; i < series.length; i++) {
-            const seriesItem = series[i]!;
-            const alias = buildMetricAlias({
-              index: i,
-              metric: seriesItem.metric,
-              aggregation: seriesItem.aggregation,
-              key: seriesItem.key,
-              subkey: seriesItem.subkey,
-            });
-            const aggregation =
-              seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
-            const keyedName = seriesItem.key
-              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
-              : `${i}/${seriesItem.metric}/${aggregation}`;
-            const seriesName = seriesItem.pipeline
-              ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`
-              : keyedName;
-            const value = row[alias];
-            if (value !== undefined && value !== null) {
-              bucket[seriesName] = Number(value);
-            }
-          }
-        }
-      }
-
-      const currentPeriod = Array.from(bucketMap.current.values());
-      const previousPeriod = Array.from(bucketMap.previous.values());
-
-      return { currentPeriod, previousPeriod };
-    }
-
     it("produces nested structure from grouped summary rows", () => {
       // Simulate ClickHouse rows for timeScale="full" with group_key
       const simulatedRows = [
@@ -558,3 +456,99 @@ describe("result-parsing", () => {
     });
   });
 });
+
+type NestedBucket = { date: string; [key: string]: unknown };
+
+type GroupedValues = Record<string, Record<string, number>>;
+
+/**
+ * Simulates the groupBy branch of parseTimeseriesResults. For timeScale="full", ClickHouse
+ * returns rows with `period` and `group_key`; values nest as bucket[groupBy][groupKey][seriesName].
+ */
+function simulateGroupedParsing(
+  rows: Record<string, unknown>[],
+  series: AnalyticsSeries[],
+  groupBy: string | undefined,
+) {
+  const buckets = {
+    previous: new Map<string, NestedBucket>(),
+    current: new Map<string, NestedBucket>(),
+  };
+  const groupsByBucket = new Map<NestedBucket, GroupedValues>();
+
+  for (const row of rows) {
+    const bucket = bucketFor(row.period === "current" ? buckets.current : buckets.previous);
+    const values = readSeriesValues(row, series);
+    if (groupBy && row.group_key !== undefined && row.group_key !== null) {
+      const groupKey =
+        typeof row.group_key === "string" ? row.group_key : JSON.stringify(row.group_key);
+      const groups = groupsFor({ bucket, groupBy, groupsByBucket });
+      Object.assign((groups[groupKey] ??= {}), values);
+    } else {
+      Object.assign(bucket, values);
+    }
+  }
+
+  return {
+    currentPeriod: Array.from(buckets.current.values()),
+    previousPeriod: Array.from(buckets.previous.values()),
+  };
+}
+
+/** Summary charts have one bucket per period, keyed "full". */
+function bucketFor(periodBuckets: Map<string, NestedBucket>): NestedBucket {
+  const existing = periodBuckets.get("full");
+  if (existing) return existing;
+  const bucket: NestedBucket = { date: "full" };
+  periodBuckets.set("full", bucket);
+  return bucket;
+}
+
+function groupsFor({
+  bucket,
+  groupBy,
+  groupsByBucket,
+}: {
+  bucket: NestedBucket;
+  groupBy: string;
+  groupsByBucket: Map<NestedBucket, GroupedValues>;
+}): GroupedValues {
+  const existing = groupsByBucket.get(bucket);
+  if (existing) return existing;
+  const groups: GroupedValues = {};
+  groupsByBucket.set(bucket, groups);
+  bucket[groupBy] = groups;
+  return groups;
+}
+
+/** Each series' value in the row, under the series name the parser reports it by. */
+function readSeriesValues(
+  row: Record<string, unknown>,
+  series: AnalyticsSeries[],
+): Record<string, number> {
+  const values: Record<string, number> = {};
+  series.forEach((seriesItem, i) => {
+    const alias = buildMetricAlias({
+      index: i,
+      metric: seriesItem.metric,
+      aggregation: seriesItem.aggregation,
+      key: seriesItem.key,
+      subkey: seriesItem.subkey,
+    });
+    const value = row[alias];
+    if (value !== undefined && value !== null) {
+      values[seriesNameOf(seriesItem, i)] = Number(value);
+    }
+  });
+  return values;
+}
+
+function seriesNameOf(seriesItem: AnalyticsSeries, i: number): string {
+  const aggregation = seriesItem.aggregation === "terms" ? "cardinality" : seriesItem.aggregation;
+  if (seriesItem.pipeline) {
+    return `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.pipeline.field}/${seriesItem.pipeline.aggregation}`;
+  }
+  return seriesItem.key
+    ? `${i}/${seriesItem.metric}/${aggregation}/${seriesItem.key}`
+    : `${i}/${seriesItem.metric}/${aggregation}`;
+}

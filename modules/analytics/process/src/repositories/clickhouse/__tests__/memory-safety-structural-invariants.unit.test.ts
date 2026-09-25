@@ -265,24 +265,7 @@ describe("memory-safety", () => {
         const servicePath = path.resolve(__dirname, "../clickhouse.analytics.repository.ts");
         const source = fs.readFileSync(servicePath, "utf-8");
 
-        // Find all .query({ ... }) blocks
-        const queryCallPattern = /\.query\(\s*\{/g;
-        const queryBlocks: string[] = [];
-
-        let match = queryCallPattern.exec(source);
-        while (match !== null) {
-          // Extract the block from the opening { to its matching }
-          const startIdx = match.index + match[0].length - 1;
-          let depth = 1;
-          let i = startIdx + 1;
-          while (i < source.length && depth > 0) {
-            if (source[i] === "{") depth++;
-            else if (source[i] === "}") depth--;
-            i++;
-          }
-          queryBlocks.push(source.slice(startIdx, i));
-          match = queryCallPattern.exec(source);
-        }
+        const queryBlocks = findQueryCallBlocks(source);
 
         expect(queryBlocks.length).toBeGreaterThan(0);
 
@@ -368,3 +351,27 @@ describe("memory-safety", () => {
     });
   });
 });
+
+/** Every `.query({ ... })` argument object in the source, braces balanced. */
+function findQueryCallBlocks(source: string): string[] {
+  const queryCallPattern = /\.query\(\s*\{/g;
+  const queryBlocks: string[] = [];
+  let match = queryCallPattern.exec(source);
+  while (match !== null) {
+    const startIdx = match.index + match[0].length - 1;
+    queryBlocks.push(source.slice(startIdx, closingBraceEnd(source, startIdx)));
+    match = queryCallPattern.exec(source);
+  }
+  return queryBlocks;
+}
+
+function closingBraceEnd(source: string, openIdx: number): number {
+  let depth = 1;
+  let i = openIdx + 1;
+  while (i < source.length && depth > 0) {
+    if (source[i] === "{") depth++;
+    else if (source[i] === "}") depth--;
+    i++;
+  }
+  return i;
+}

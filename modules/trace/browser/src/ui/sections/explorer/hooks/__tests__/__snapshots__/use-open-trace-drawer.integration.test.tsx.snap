@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`useOpenTraceDrawer > seeds every read of a preview trace, prefetches nothing, and opens on the waterfall 1`] = `
+[
+  "set header {"projectId":"project-1","traceId":"lw-preview-sample","full":true} seed:lw-preview-sample",
+  "set header {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000,"full":true} seed:lw-preview-sample",
+  "set header {"projectId":"project-1","traceId":"lw-preview-sample","full":true} value",
+  "set header {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000,"full":true} value",
+  "set spanTree {"projectId":"project-1","traceId":"lw-preview-sample"} list:1",
+  "set spanTree {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000} list:1",
+  "set spansFull {"projectId":"project-1","traceId":"lw-preview-sample"} list:1",
+  "set spansFull {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000} list:1",
+  "set spanDetail {"projectId":"project-1","traceId":"lw-preview-sample","spanId":"lw-preview-sample-root"} value",
+  "set spanDetail {"projectId":"project-1","traceId":"lw-preview-sample","spanId":"lw-preview-sample-root","occurredAtMs":1000} value",
+  "set spanLangwatchSignals {"projectId":"project-1","traceId":"lw-preview-sample"} list:0",
+  "set spanLangwatchSignals {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000} list:0",
+  "set traceEvents {"projectId":"project-1","traceId":"lw-preview-sample"} list:0",
+  "set traceEvents {"projectId":"project-1","traceId":"lw-preview-sample","occurredAtMs":1000} list:0",
+  "set evals {"projectId":"project-1","traceId":"lw-preview-sample"} list:0",
+  "set conversationContext {"projectId":"project-1","conversationId":"conv-1"} value",
+  "open traceV2Details {"traceId":"lw-preview-sample","t":"1000"}",
+]
+`;
+
+exports[`useOpenTraceDrawer > seeds the header from the row, prefetches the heavy reads, then opens the drawer 1`] = `
+[
+  "set header {"projectId":"project-1","traceId":"trace-1","full":true} seed:trace-1",
+  "set header {"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000,"full":true} seed:trace-1",
+  "prefetch header {"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000,"full":true} {"staleTime":0}",
+  "prefetch spanTreePaged ["spanTree",{"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000}]",
+  "prefetch spanLangwatchSignals {"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000} {"staleTime":300000}",
+  "prefetch traceEvents {"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000} {"staleTime":300000}",
+  "prefetch resourceInfo {"projectId":"project-1","traceId":"trace-1","occurredAtMs":1000} {"staleTime":300000}",
+  "open traceV2Details {"traceId":"trace-1","t":"1000"}",
+]
+`;

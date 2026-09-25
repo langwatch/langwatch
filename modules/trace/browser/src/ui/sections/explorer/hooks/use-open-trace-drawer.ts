@@ -1,5 +1,5 @@
 import type { TraceHeader } from "@langwatch/trace-contract";
-import { useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
@@ -66,155 +66,15 @@ export function useOpenTraceDrawer() {
   return useCallback(
     (trace: TraceListItem) => {
       if (project?.id) {
-        // Seed both keyed-with-timestamp and keyed-without: some entry points don't send
-        // `occurredAtMs`. `full: true` matches useTraceHeader's own query key, so the seed must
-        // land under the same key or the drawer's mount sees a cache miss and reloads anyway.
-        const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
-        utils.traces.header.setData(
-          { projectId: project.id, traceId: trace.traceId, full: true },
-          seed,
-        );
-        utils.traces.header.setData(
-          {
-            projectId: project.id,
-            traceId: trace.traceId,
-            occurredAtMs: trace.timestamp,
-            full: true,
-          },
-          seed,
-        );
-
-        // Preview-mode seeding.
+        seedRowHeader({ utils, projectId: project.id, trace });
         if (isPreviewTraceId(trace.traceId)) {
-          const detail =
-            trace.traceId === RICH_ARRIVAL_TRACE_ID
-              ? buildRichArrivalTraceDetail()
-              : buildPreviewTraceDetail(trace);
-
-          utils.traces.header.setData(
-            { projectId: project.id, traceId: trace.traceId, full: true },
-            detail.header,
-          );
-          utils.traces.header.setData(
-            {
-              projectId: project.id,
-              traceId: trace.traceId,
-              occurredAtMs: trace.timestamp,
-              full: true,
-            },
-            detail.header,
-          );
-
-          utils.traces.spanTree.setData(
-            { projectId: project.id, traceId: trace.traceId },
-            detail.spanTree,
-          );
-          utils.traces.spanTree.setData(
-            {
-              projectId: project.id,
-              traceId: trace.traceId,
-              occurredAtMs: trace.timestamp,
-            },
-            detail.spanTree,
-          );
-
-          utils.traces.spansFull.setData(
-            { projectId: project.id, traceId: trace.traceId },
-            detail.spansFull,
-          );
-          utils.traces.spansFull.setData(
-            {
-              projectId: project.id,
-              traceId: trace.traceId,
-              occurredAtMs: trace.timestamp,
-            },
-            detail.spansFull,
-          );
-
-          for (const span of detail.spanDetails) {
-            utils.traces.spanDetail.setData(
-              {
-                projectId: project.id,
-                traceId: trace.traceId,
-                spanId: span.spanId,
-              },
-              span,
-            );
-            utils.traces.spanDetail.setData(
-              {
-                projectId: project.id,
-                traceId: trace.traceId,
-                spanId: span.spanId,
-                occurredAtMs: trace.timestamp,
-              },
-              span,
-            );
-          }
-
-          // No LangWatch-instrumentation signals on the synthetic spans —
-          // seed an empty array so the badges UI doesn't spin while the
-          // disabled query "loads".
-          utils.traces.spanLangwatchSignals.setData(
-            { projectId: project.id, traceId: trace.traceId },
-            [],
-          );
-          utils.traces.spanLangwatchSignals.setData(
-            {
-              projectId: project.id,
-              traceId: trace.traceId,
-              occurredAtMs: trace.timestamp,
-            },
-            [],
-          );
-
-          utils.traces.traceEvents.setData({ projectId: project.id, traceId: trace.traceId }, []);
-          utils.traces.traceEvents.setData(
-            {
-              projectId: project.id,
-              traceId: trace.traceId,
-              occurredAtMs: trace.timestamp,
-            },
-            [],
-          );
-
-          utils.traces.evals.setData(
-            { projectId: project.id, traceId: trace.traceId },
-            detail.evaluations,
-          );
-
-          if (trace.conversationId) {
-            utils.traces.conversationContext.setData(
-              {
-                projectId: project.id,
-                conversationId: trace.conversationId,
-              },
-              detail.conversation,
-            );
-          }
+          seedPreviewTrace({ utils, projectId: project.id, trace });
         }
       }
       // Kick off the heavier per-trace fetches in parallel with the route change so the
       // waterfall + header render against real data by the time the drawer finishes mounting.
       if (project?.id && !isPreviewTraceId(trace.traceId)) {
-        const input = {
-          projectId: project.id,
-          traceId: trace.traceId,
-          occurredAtMs: trace.timestamp,
-        };
-        const opts = { staleTime: 300_000 };
-        // The row seed above paints the header instantly, but the list row carries no attribute
-        // map, so everything the header reads from attributes stays blank until this resolves.
-        void utils.traces.header.prefetch({ ...input, full: true }, { staleTime: 0 });
-        // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
-        // this in-flight paged fetch instead of firing a second one.
-        void queryClient.prefetchQuery({
-          queryKey: spanTreeQueryKey(input),
-          queryFn: spanTreeQueryFn({ utils, queryClient, input }),
-          ...opts,
-        });
-        void utils.traces.spanLangwatchSignals.prefetch(input, opts);
-        void utils.traces.traceEvents.prefetch(input, opts);
-        void utils.traces.resourceInfo.prefetch(input, opts);
+        prefetchTraceReads({ utils, queryClient, projectId: project.id, trace });
       }
       // Push into the store before route change so drawer hooks render with the right
       // traceId/occurredAtMs on the very next frame.
@@ -236,4 +96,152 @@ export function useOpenTraceDrawer() {
     },
     [openDrawer, project?.id, utils, queryClient],
   );
+}
+
+type TraceUtils = ReturnType<typeof api.useUtils>;
+
+type SeedInput = { utils: TraceUtils; projectId: string; trace: TraceListItem };
+
+function seedRowHeader({ utils, projectId, trace }: SeedInput): void {
+  // Seed both keyed-with-timestamp and keyed-without: some entry points don't send
+  // `occurredAtMs`. `full: true` matches useTraceHeader's own query key, so the seed must
+  // land under the same key or the drawer's mount sees a cache miss and reloads anyway.
+  const seed = (prev?: TraceHeader) => prev ?? listItemToHeader(trace);
+  utils.traces.header.setData({ projectId: projectId, traceId: trace.traceId, full: true }, seed);
+  utils.traces.header.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+      full: true,
+    },
+    seed,
+  );
+}
+
+/** A preview trace exists only in the tour's fixtures, so every read the drawer makes is seeded. */
+function seedPreviewTrace({ utils, projectId, trace }: SeedInput): void {
+  const detail =
+    trace.traceId === RICH_ARRIVAL_TRACE_ID
+      ? buildRichArrivalTraceDetail()
+      : buildPreviewTraceDetail(trace);
+
+  utils.traces.header.setData(
+    { projectId: projectId, traceId: trace.traceId, full: true },
+    detail.header,
+  );
+  utils.traces.header.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+      full: true,
+    },
+    detail.header,
+  );
+
+  utils.traces.spanTree.setData({ projectId: projectId, traceId: trace.traceId }, detail.spanTree);
+  utils.traces.spanTree.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+    },
+    detail.spanTree,
+  );
+
+  utils.traces.spansFull.setData(
+    { projectId: projectId, traceId: trace.traceId },
+    detail.spansFull,
+  );
+  utils.traces.spansFull.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+    },
+    detail.spansFull,
+  );
+
+  for (const span of detail.spanDetails) {
+    utils.traces.spanDetail.setData(
+      {
+        projectId: projectId,
+        traceId: trace.traceId,
+        spanId: span.spanId,
+      },
+      span,
+    );
+    utils.traces.spanDetail.setData(
+      {
+        projectId: projectId,
+        traceId: trace.traceId,
+        spanId: span.spanId,
+        occurredAtMs: trace.timestamp,
+      },
+      span,
+    );
+  }
+
+  // No LangWatch-instrumentation signals on the synthetic spans —
+  // seed an empty array so the badges UI doesn't spin while the
+  // disabled query "loads".
+  utils.traces.spanLangwatchSignals.setData({ projectId: projectId, traceId: trace.traceId }, []);
+  utils.traces.spanLangwatchSignals.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+    },
+    [],
+  );
+
+  utils.traces.traceEvents.setData({ projectId: projectId, traceId: trace.traceId }, []);
+  utils.traces.traceEvents.setData(
+    {
+      projectId: projectId,
+      traceId: trace.traceId,
+      occurredAtMs: trace.timestamp,
+    },
+    [],
+  );
+
+  utils.traces.evals.setData({ projectId: projectId, traceId: trace.traceId }, detail.evaluations);
+
+  if (trace.conversationId) {
+    utils.traces.conversationContext.setData(
+      {
+        projectId: projectId,
+        conversationId: trace.conversationId,
+      },
+      detail.conversation,
+    );
+  }
+}
+
+function prefetchTraceReads({
+  utils,
+  queryClient,
+  projectId,
+  trace,
+}: SeedInput & { queryClient: QueryClient }): void {
+  const input = {
+    projectId: projectId,
+    traceId: trace.traceId,
+    occurredAtMs: trace.timestamp,
+  };
+  const opts = { staleTime: 300_000 };
+  // The row seed above paints the header instantly, but the list row carries no attribute
+  // map, so everything the header reads from attributes stays blank until this resolves.
+  void utils.traces.header.prefetch({ ...input, full: true }, { staleTime: 0 });
+  // Same key + queryFn as `useSpanTree`, so the drawer's mount joins
+  // this in-flight paged fetch instead of firing a second one.
+  void queryClient.prefetchQuery({
+    queryKey: spanTreeQueryKey(input),
+    queryFn: spanTreeQueryFn({ utils, queryClient, input }),
+    ...opts,
+  });
+  void utils.traces.spanLangwatchSignals.prefetch(input, opts);
+  void utils.traces.traceEvents.prefetch(input, opts);
+  void utils.traces.resourceInfo.prefetch(input, opts);
 }

@@ -83,20 +83,11 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
   };
 
   const handleMoveDashboard = (dashboardId: string, direction: "up" | "down") => {
-    const currentIndex = dashboards.findIndex((p) => p.id === dashboardId);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= dashboards.length) return;
-
-    // Create new order by swapping
-    const newOrder = [...dashboards];
-    const temp = newOrder[currentIndex];
-    newOrder[currentIndex] = newOrder[newIndex]!;
-    newOrder[newIndex] = temp!;
+    const reorder = swapWithNeighbour({ ids: dashboards.map((p) => p.id), dashboardId, direction });
+    if (!reorder.moved) return;
 
     reorderDashboards.mutate(
-      { projectId, dashboardIds: newOrder.map((p) => p.id) },
+      { projectId, dashboardIds: reorder.ids },
       {
         onSuccess: () => {
           void dashboardsQuery.refetch();
@@ -166,13 +157,11 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
                 // than a string that silently stops matching.
                 void utils.licenseEnforcement.checkLimit.invalidate();
                 // If we deleted the current dashboard, redirect to the first dashboard
-                if (currentDashboardId === dashboardId) {
-                  const remainingDashboards = dashboards.filter((d) => d.id !== dashboardId);
-                  if (remainingDashboards[0]) {
-                    host.navigate(
-                      `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`,
-                    );
-                  }
+                const remainingDashboards = dashboards.filter((d) => d.id !== dashboardId);
+                if (currentDashboardId === dashboardId && remainingDashboards[0]) {
+                  host.navigate(
+                    `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`,
+                  );
                 }
               },
               onError: (error) => {
@@ -198,23 +187,15 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
             _hover={{ background: "bg.muted", "& .menu-btn": { opacity: 1 } }}
           >
             {isEditing ? (
-              <Input
-                ref={inputRef}
-                size="xs"
+              <DashboardNameInput
+                inputRef={inputRef}
                 value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={handleFinishRename}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleFinishRename();
-                  if (e.key === "Escape") {
-                    setEditingDashboardId(null);
-                    setEditingName("");
-                  }
+                onChange={setEditingName}
+                onCommit={handleFinishRename}
+                onCancel={() => {
+                  setEditingDashboardId(null);
+                  setEditingName("");
                 }}
-                marginLeft={4}
-                marginRight={2}
-                marginY={1}
-                fontSize="14px"
               />
             ) : (
               <>
@@ -224,59 +205,14 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
                 >
                   {dashboard.name}
                 </MenuLink>
-                <Menu.Root>
-                  <Menu.Trigger asChild>
-                    <Box
-                      as="button"
-                      className="menu-btn"
-                      position="absolute"
-                      right={1}
-                      top="50%"
-                      transform="translateY(-50%)"
-                      opacity={0}
-                      transition="opacity 0.2s"
-                      padding={1}
-                      cursor="pointer"
-                      color="fg.muted"
-                      _hover={{ color: "fg.default" }}
-                    >
-                      <MoreVertical size={14} />
-                    </Box>
-                  </Menu.Trigger>
-                  <Menu.Content>
-                    <Menu.Item
-                      value="rename"
-                      onClick={() => handleStartRename(dashboard.id, dashboard.name)}
-                    >
-                      <Edit2 size={14} /> Rename
-                    </Menu.Item>
-                    {canMoveUp && (
-                      <Menu.Item
-                        value="move-up"
-                        onClick={() => handleMoveDashboard(dashboard.id, "up")}
-                      >
-                        <ArrowUp size={14} /> Move Up
-                      </Menu.Item>
-                    )}
-                    {canMoveDown && (
-                      <Menu.Item
-                        value="move-down"
-                        onClick={() => handleMoveDashboard(dashboard.id, "down")}
-                      >
-                        <ArrowDown size={14} /> Move Down
-                      </Menu.Item>
-                    )}
-                    {dashboards.length > 1 && (
-                      <Menu.Item
-                        value="delete"
-                        color="red.600"
-                        onClick={(e: React.MouseEvent) => handleDeleteDashboard(e, dashboard.id)}
-                      >
-                        <Trash2 size={14} /> Delete
-                      </Menu.Item>
-                    )}
-                  </Menu.Content>
-                </Menu.Root>
+                <DashboardRowMenu
+                  canMoveUp={canMoveUp}
+                  canMoveDown={canMoveDown}
+                  canDelete={dashboards.length > 1}
+                  onRename={() => handleStartRename(dashboard.id, dashboard.name)}
+                  onMove={(direction) => handleMoveDashboard(dashboard.id, direction)}
+                  onDelete={(e) => handleDeleteDashboard(e, dashboard.id)}
+                />
               </>
             )}
           </Box>
@@ -286,5 +222,116 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
         <Plus size={14} /> Add Dashboard
       </Button>
     </>
+  );
+}
+
+/** Swaps a dashboard with its neighbour; `moved` is false at either end of the list. */
+function swapWithNeighbour({
+  ids,
+  dashboardId,
+  direction,
+}: {
+  ids: string[];
+  dashboardId: string;
+  direction: "up" | "down";
+}): { moved: true; ids: string[] } | { moved: false } {
+  const currentIndex = ids.indexOf(dashboardId);
+  if (currentIndex === -1) return { moved: false };
+  const newIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  if (newIndex < 0 || newIndex >= ids.length) return { moved: false };
+  const reordered = [...ids];
+  reordered[currentIndex] = ids[newIndex]!;
+  reordered[newIndex] = ids[currentIndex]!;
+  return { moved: true, ids: reordered };
+}
+
+function DashboardRowMenu({
+  canMoveUp,
+  canMoveDown,
+  canDelete,
+  onRename,
+  onMove,
+  onDelete,
+}: {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canDelete: boolean;
+  onRename: () => void;
+  onMove: (direction: "up" | "down") => void;
+  onDelete: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Box
+          as="button"
+          className="menu-btn"
+          position="absolute"
+          right={1}
+          top="50%"
+          transform="translateY(-50%)"
+          opacity={0}
+          transition="opacity 0.2s"
+          padding={1}
+          cursor="pointer"
+          color="fg.muted"
+          _hover={{ color: "fg.default" }}
+        >
+          <MoreVertical size={14} />
+        </Box>
+      </Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item value="rename" onClick={onRename}>
+          <Edit2 size={14} /> Rename
+        </Menu.Item>
+        {canMoveUp && (
+          <Menu.Item value="move-up" onClick={() => onMove("up")}>
+            <ArrowUp size={14} /> Move Up
+          </Menu.Item>
+        )}
+        {canMoveDown && (
+          <Menu.Item value="move-down" onClick={() => onMove("down")}>
+            <ArrowDown size={14} /> Move Down
+          </Menu.Item>
+        )}
+        {canDelete && (
+          <Menu.Item value="delete" color="red.600" onClick={onDelete}>
+            <Trash2 size={14} /> Delete
+          </Menu.Item>
+        )}
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+function DashboardNameInput({
+  inputRef,
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+}: {
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <Input
+      ref={inputRef}
+      size="xs"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onBlur={onCommit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") onCommit();
+        if (e.key === "Escape") onCancel();
+      }}
+      marginLeft={4}
+      marginRight={2}
+      marginY={1}
+      fontSize="14px"
+    />
   );
 }

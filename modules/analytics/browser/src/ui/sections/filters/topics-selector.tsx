@@ -8,6 +8,18 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { keepPreviousData } from "@tanstack/react-query";
 import React, { useEffect, useRef, useState } from "react";
 
+import type {
+  AnalyticsSubtopicCount,
+  AnalyticsTopicCount,
+} from "../../../behavior/analytics-api.ts";
+import {
+  orderByCountThenName,
+  readListParam,
+  toggleSubtopic,
+  toggleTopic,
+  toListParam,
+} from "../../../model/topic-selection.ts";
+
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -15,21 +27,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const { filterParams, queryOpts } = useFilterParams();
 
   useEffect(() => {
-    const topics = router.query.topics;
-    if (topics) {
-      setSelectedTopics(Array.isArray(topics) ? topics : topics.split(","));
-    } else {
-      setSelectedTopics([]);
-    }
+    setSelectedTopics(readListParam(router.query.topics));
   }, [router.query.topics]);
 
   useEffect(() => {
-    const subtopics = router.query.subtopics;
-    if (subtopics) {
-      setSelectedSubtopics(Array.isArray(subtopics) ? subtopics : subtopics.split(","));
-    } else {
-      setSelectedSubtopics([]);
-    }
+    setSelectedSubtopics(readListParam(router.query.subtopics));
   }, [router.query.subtopics]);
 
   const topicCountsQuery = api.traces.getTopicCounts.useQuery(
@@ -47,58 +49,25 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     },
   );
 
+  const pushQuery = (query: Record<string, string | undefined>) =>
+    void router.push({ query: { ...router.query, ...query } }, undefined, { shallow: true });
+
   const handleTopicChange = (topicId: string, checked: boolean) => {
-    const newTopics = checked
-      ? [...selectedTopics, topicId]
-      : selectedTopics.filter((t) => t !== topicId);
-
-    let newSubtopics = selectedSubtopics;
-    if (!checked) {
-      const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
-        (subtopic: any) => subtopic.parentId === topicId,
-      );
-      if (subtopics) {
-        newSubtopics = selectedSubtopics.filter(
-          (t) => !subtopics.map((s: any) => s.id).includes(t),
-        );
-      }
-    }
-
-    setSelectedTopics(newTopics);
-    setSelectedSubtopics(newSubtopics);
-
-    const topicsQuery = newTopics.length > 0 ? newTopics.join(",") : undefined;
-    const subtopicsQuery = newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
-    void router.push(
-      {
-        query: {
-          ...router.query,
-          topics: topicsQuery,
-          subtopics: subtopicsQuery,
-        },
-      },
-      undefined,
-      { shallow: true },
-    );
+    const next = toggleTopic({
+      selection: { topics: selectedTopics, subtopics: selectedSubtopics },
+      topicId,
+      checked,
+      subtopicCounts: topicCountsQuery.data?.subtopicCounts,
+    });
+    setSelectedTopics(next.topics);
+    setSelectedSubtopics(next.subtopics);
+    pushQuery({ topics: toListParam(next.topics), subtopics: toListParam(next.subtopics) });
   };
 
   const handleSubtopicChange = (subtopicId: string, checked: boolean) => {
-    const newSubtopics = checked
-      ? [...selectedSubtopics, subtopicId]
-      : selectedSubtopics.filter((t) => t !== subtopicId);
-    const subtopicsQuery = newSubtopics.length > 0 ? newSubtopics.join(",") : undefined;
+    const newSubtopics = toggleSubtopic({ subtopics: selectedSubtopics, subtopicId, checked });
     setSelectedSubtopics(newSubtopics);
-
-    void router.push(
-      {
-        query: {
-          ...router.query,
-          subtopics: subtopicsQuery,
-        },
-      },
-      undefined,
-      { shallow: true },
-    );
+    pushQuery({ subtopics: toListParam(newSubtopics) });
   };
 
   const topicSelectorRef = useRef<HTMLDivElement>(null);
@@ -113,8 +82,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   }, [topicCountsQuery.data]);
 
   const topicData = topicCountsQuery.data;
-  const topicCounts = topicData?.topicCounts ?? [];
-  const subtopicCounts = topicData?.subtopicCounts ?? [];
+  const topicCounts: AnalyticsTopicCount[] = topicData?.topicCounts ?? [];
+  const subtopicCounts: AnalyticsSubtopicCount[] = topicData?.subtopicCounts ?? [];
   const isLoadingTopics = topicCountsQuery.isLoading;
 
   return (
@@ -140,75 +109,28 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         )}
         {!isLoadingTopics && topicData && topicCounts.length > 0 && (
           <>
-            {topicCounts
-              .toSorted((a: any, b: any) => (a.name > b.name ? 1 : -1))
-              .toSorted((a: any, b: any) => (a.count > b.count ? -1 : 1))
-              .map((topic: any) => (
-                <React.Fragment key={topic.id}>
-                  <HStack
-                    gap={1}
-                    width="full"
-                    paddingX={2}
-                    cursor="pointer"
-                    fontWeight={selectedTopics.includes(topic.id) ? "500" : "normal"}
-                  >
-                    <Checkbox
-                      borderColor="border.emphasized"
-                      gap={3}
-                      flexGrow={1}
-                      checked={selectedTopics.includes(topic.id)}
-                      onChange={(e) => handleTopicChange(topic.id, e.target.checked)}
-                      size="sm"
-                    >
-                      <OverflownTextWithTooltip
-                        lineClamp={1}
-                        wordBreak="break-all"
-                        maxWidth="300px"
-                      >
-                        {topic.name}
-                      </OverflownTextWithTooltip>
-                    </Checkbox>
-                    <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
-                      {topic.count}
-                    </Text>
-                  </HStack>
-                  {selectedTopics.includes(topic.id) &&
-                    subtopicCounts
-                      .toSorted((a: any, b: any) => (a.name > b.name ? 1 : -1))
-                      .toSorted((a: any, b: any) => (a.count > b.count ? -1 : 1))
-                      .filter((subtopic: any) => subtopic.parentId === topic.id)
-                      .map((subtopic: any) => (
-                        <HStack
-                          key={subtopic.id}
-                          gap={1}
-                          width="full"
-                          paddingX={2}
-                          paddingLeft={8}
-                          cursor="pointer"
-                          fontWeight="normal"
-                        >
-                          <Checkbox
-                            borderColor="border.emphasized"
-                            gap={3}
-                            flexGrow={1}
-                            checked={selectedSubtopics.includes(subtopic.id)}
-                            onChange={(e) => handleSubtopicChange(subtopic.id, e.target.checked)}
-                          >
-                            <OverflownTextWithTooltip
-                              lineClamp={1}
-                              wordBreak="break-all"
-                              maxWidth="300px"
-                            >
-                              {subtopic.name}
-                            </OverflownTextWithTooltip>
-                          </Checkbox>
-                          <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
-                            {subtopic.count}
-                          </Text>
-                        </HStack>
-                      ))}
-                </React.Fragment>
-              ))}
+            {orderByCountThenName(topicCounts).map((topic) => (
+              <React.Fragment key={topic.id}>
+                <TopicRow
+                  name={topic.name}
+                  count={topic.count}
+                  checked={selectedTopics.includes(topic.id)}
+                  onToggle={(checked) => handleTopicChange(topic.id, checked)}
+                />
+                {selectedTopics.includes(topic.id) &&
+                  orderByCountThenName(subtopicCounts)
+                    .filter((subtopic) => subtopic.parentId === topic.id)
+                    .map((subtopic) => (
+                      <SubtopicRow
+                        key={subtopic.id}
+                        name={subtopic.name}
+                        count={subtopic.count}
+                        checked={selectedSubtopics.includes(subtopic.id)}
+                        onToggle={(checked) => handleSubtopicChange(subtopic.id, checked)}
+                      />
+                    ))}
+              </React.Fragment>
+            ))}
           </>
         )}
         {!isLoadingTopics && topicData && topicCounts.length === 0 && (
@@ -232,5 +154,61 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         )}
       </VStack>
     </VStack>
+  );
+}
+
+type TopicRowProps = {
+  name: string;
+  count: number;
+  checked: boolean;
+  onToggle: (checked: boolean) => void;
+};
+
+function TopicRow({ name, count, checked, onToggle }: TopicRowProps) {
+  return (
+    <HStack
+      gap={1}
+      width="full"
+      paddingX={2}
+      cursor="pointer"
+      fontWeight={checked ? "500" : "normal"}
+    >
+      <Checkbox
+        borderColor="border.emphasized"
+        gap={3}
+        flexGrow={1}
+        checked={checked}
+        onChange={(e) => onToggle(e.target.checked)}
+        size="sm"
+      >
+        <OverflownTextWithTooltip lineClamp={1} wordBreak="break-all" maxWidth="300px">
+          {name}
+        </OverflownTextWithTooltip>
+      </Checkbox>
+      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+        {count}
+      </Text>
+    </HStack>
+  );
+}
+
+function SubtopicRow({ name, count, checked, onToggle }: TopicRowProps) {
+  return (
+    <HStack gap={1} width="full" paddingX={2} paddingLeft={8} cursor="pointer" fontWeight="normal">
+      <Checkbox
+        borderColor="border.emphasized"
+        gap={3}
+        flexGrow={1}
+        checked={checked}
+        onChange={(e) => onToggle(e.target.checked)}
+      >
+        <OverflownTextWithTooltip lineClamp={1} wordBreak="break-all" maxWidth="300px">
+          {name}
+        </OverflownTextWithTooltip>
+      </Checkbox>
+      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+        {count}
+      </Text>
+    </HStack>
   );
 }
