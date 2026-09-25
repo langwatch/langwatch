@@ -1246,6 +1246,275 @@ function replaceColumnWithAlias(expression: string, column: string, alias: strin
   return expression.replace(new RegExp(`(?<![\\w.])${escaped}(?![\\w.])`, "g"), alias);
 }
 
+const TRACE_ID_PIPELINE_SAFE_AGGS = new Set<string>(["sum", "avg", "min", "max"]);
+
+function traceIdPipelinesAsSimpleMetrics({
+  input,
+  metricTranslations,
+}: {
+  input: TimeseriesQueryInput;
+  metricTranslations: MetricTranslation[];
+}): MetricTranslation[] {
+  const retranslated: MetricTranslation[] = [];
+  for (let i = 0; i < input.series.length; i++) {
+    const series = input.series[i]!;
+    const translation = metricTranslations[i]!;
+    if (!translation.requiresSubquery || !series.pipeline) continue;
+
+    if (
+      series.pipeline.field === "trace_id" &&
+      TRACE_ID_PIPELINE_SAFE_AGGS.has(series.pipeline.aggregation)
+    ) {
+      const innerTranslation = translateMetric({
+        metric: series.metric,
+        aggregation: series.aggregation,
+        index: i,
+        key: series.key,
+        subkey: series.subkey,
+      });
+      // Swap alias to match the pipeline translation's alias (they're identical
+      // for trace_id pipelines, but be explicit for clarity)
+      const escapedAlias = innerTranslation.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      retranslated.push({
+        ...innerTranslation,
+        alias: translation.alias,
+        selectExpression: innerTranslation.selectExpression.replace(
+          new RegExp(` AS ${escapedAlias}$`),
+          ` AS ${translation.alias}`,
+        ),
+      });
+    }
+  }
+  return retranslated;
+}
+
+function buildTraceColumnSelects({
+  ts,
+  simpleMetrics,
+  hasEvalMixWithTrace,
+  spanModelPartitioned,
+}: {
+  ts: string;
+  simpleMetrics: MetricTranslation[];
+  hasEvalMixWithTrace: boolean;
+  spanModelPartitioned: boolean;
+}): string[] {
+  const traceColumnSelects: string[] = [];
+  const traceColumnWrapper = (col: string) => (hasEvalMixWithTrace ? `any(${col})` : col);
+  // IMPORTANT: a new trace-level column in metric-translator.ts must also be added to this CTE
+  // select list AND to dedupSubstitutions() (consumed by transformMetricForDedup below), or it
+  // silently returns null (or throws) when combined with an arrayJoin groupBy. The simple path
+  // (buildMixedEvalTimeseriesQuery) does this dynamically via extractTraceAggregationColumn.
+  // TODO(#3115): port this arrayJoin path to the same helper for parity.
+
+  // For span-partitioned model grouping, additive columns carry the (trace, model) bucket's own
+  // share from the `smd` join instead of the whole-trace value. Traces with no joined smd row
+  // keep the trace-level value (their group-by gives exactly one bucket, so this still partitions).
+  // Non-additive columns (duration, TTFT, tokens/second) keep whole-trace attribution in every
+  // bucket the trace touches.
+  const smdMiss = spanModelPartitionMissExpr();
+  const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
+    spanModelPartitioned ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})` : traceExpr;
+  // The effective non-billed cost (column + legacy-marker fallback) is only
+  // materialized when a requested metric reads it, because the fallback reads
+  // the wide ts.Attributes map and would otherwise widen the dedup subquery
+  // for every grouped query.
+  const needsNonBilledCost = simpleMetrics.some((m) =>
+    m.selectExpression.includes("NonBilledCost"),
+  );
+  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence: the fold-time
+  // per-span split wins; the legacy all-or-nothing `langwatch.cost.non_billable` trace marker
+  // only applies when the trace-level NonBilledCost column is NULL (rows folded before the
+  // column existed). The marker treats the WHOLE trace as bundled, so every bucket's non-billed
+  // share equals its cost, keeping the buckets an exact partition of the trace expression.
+  const bucketNonBilledExpr = needsNonBilledCost
+    ? `if(${ts}.NonBilledCost IS NULL AND ${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${SPAN_MODEL_ALIAS}.SpanModelCost, ${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost)`
+    : `${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost`;
+  const needsCacheTokenColumns = simpleMetrics.some(
+    (m) =>
+      m.selectExpression.includes("langwatch.reserved.cache_read_tokens") ||
+      m.selectExpression.includes("langwatch.reserved.cache_creation_tokens") ||
+      m.selectExpression.includes("langwatch.reserved.reasoning_tokens"),
+  );
+  traceColumnSelects.push(
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCost`, `${ts}.TotalCost`))} AS trace_total_cost`,
+  );
+  traceColumnSelects.push(
+    `${traceColumnWrapper(
+      partitionedOrTrace(
+        bucketNonBilledExpr,
+        needsNonBilledCost ? nonBilledCostExpression(ts) : `${ts}.NonBilledCost`,
+      ),
+    )} AS trace_non_billed_cost`,
+  );
+  traceColumnSelects.push(`${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`);
+  traceColumnSelects.push(
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelPromptTokens`, `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
+  );
+  traceColumnSelects.push(
+    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCompletionTokens`, `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
+  );
+  traceColumnSelects.push(
+    `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
+  );
+  traceColumnSelects.push(
+    `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
+  );
+  // Hoist only the attribute reads a requested metric actually aggregates.
+  // Pushing all of them would widen the dedup subquery with the wide
+  // Attributes map for every grouped query — the same cost the conditional
+  // cache-token hoist below exists to avoid.
+  for (const { attributeKey, cteColumn } of TRACE_ATTRIBUTE_METRIC_COLUMNS) {
+    const source = traceAttributeSource(attributeKey);
+    const isRead = simpleMetrics.some((m) => m.selectExpression.includes(source));
+    if (!isRead) continue;
+    traceColumnSelects.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
+  }
+  if (needsCacheTokenColumns) {
+    // toFloat64 wraps the UInt64 attribute read so both if() branches share a
+    // supertype with the smd join's Float64 sums.
+    traceColumnSelects.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheReadTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']))`,
+        ),
+      )} AS trace_cache_read_tokens`,
+    );
+    traceColumnSelects.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelCacheWriteTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
+        ),
+      )} AS trace_cache_write_tokens`,
+    );
+    traceColumnSelects.push(
+      `${traceColumnWrapper(
+        partitionedOrTrace(
+          `${SPAN_MODEL_ALIAS}.SpanModelReasoningTokens`,
+          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens']))`,
+        ),
+      )} AS trace_reasoning_tokens`,
+    );
+  }
+  return traceColumnSelects;
+}
+
+function buildOuterMetricSelects({
+  simpleMetrics,
+  evalPerTraceAliases,
+}: {
+  simpleMetrics: MetricTranslation[];
+  evalPerTraceAliases: Map<string, string>;
+}): string[] {
+  const outerMetricSelects: string[] = [];
+  for (const metric of simpleMetrics) {
+    const perTraceAlias = evalPerTraceAliases.get(metric.alias);
+    if (perTraceAlias !== undefined) {
+      // Eval metric: outer query re-aggregates the per-trace value across traces.
+      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
+      if (!outerAgg) {
+        throw new Error(
+          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
+            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
+            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
+        );
+      }
+      outerMetricSelects.push(`${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`);
+      continue;
+    }
+    // Transform the metric expression for the deduplicated context
+    const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
+    outerMetricSelects.push(transformedExpr);
+  }
+  return outerMetricSelects;
+}
+
+function buildGroupKeyFilter({
+  input,
+  groupByColumn,
+}: {
+  input: TimeseriesQueryInput;
+  groupByColumn: string;
+}): { groupKeyFilter: string; groupKeyFilterParams: Record<string, unknown> } {
+  const none = { groupKeyFilter: "", groupKeyFilterParams: {} };
+  if (!input.groupBy || !input.filters || !groupByColumn.includes("arrayJoin")) return none;
+  const filterValues = input.filters[input.groupBy as keyof typeof input.filters];
+  if (!Array.isArray(filterValues) || filterValues.length === 0) return none;
+  const paramName = "groupByFilterValues";
+  return {
+    groupKeyFilter: `AND group_key IN ({${paramName}:Array(String)})`,
+    groupKeyFilterParams: { [paramName]: filterValues },
+  };
+}
+
+function buildEvaluationColumnSelects({
+  simpleMetrics,
+  hasEvalMixWithTrace,
+}: {
+  simpleMetrics: MetricTranslation[];
+  hasEvalMixWithTrace: boolean;
+}): string[] {
+  const es = tableAliases.evaluation_runs;
+  const metricExprs = simpleMetrics.map((m) => m.selectExpression);
+  return Array.from(extractReferencedEvaluationColumns(metricExprs), (col) => {
+    const colExpr = `${es}.${col}`;
+    return `${hasEvalMixWithTrace ? `any(${colExpr})` : colExpr} AS eval_${snakeCase(col)}`;
+  });
+}
+
+function evalPerTraceAliasesFor(simpleMetrics: MetricTranslation[]): Map<string, string> {
+  const evalPerTraceAliases = new Map<string, string>();
+  for (const metric of simpleMetrics) {
+    if (!metric.requiredJoins.includes("evaluation_runs")) continue;
+    evalPerTraceAliases.set(metric.alias, quoteIdentifier(`${metric.alias}__per_trace`));
+  }
+  return evalPerTraceAliases;
+}
+
+function buildDedupCteBody({
+  ts,
+  cteSelectExprs,
+  traceColumns,
+  cteJoinClauses,
+  baseWhere,
+  filterWhere,
+  hasEvalMixWithTrace,
+  hasDate,
+}: {
+  ts: string;
+  cteSelectExprs: string[];
+  traceColumns: readonly string[];
+  cteJoinClauses: string;
+  baseWhere: string;
+  filterWhere: string;
+  hasEvalMixWithTrace: boolean;
+  hasDate: boolean;
+}): string {
+  if (hasEvalMixWithTrace) {
+    const cteGroupByCols: string[] = ["trace_id", "group_key", "period"];
+    if (hasDate) cteGroupByCols.push("date");
+    return `
+      SELECT
+        ${cteSelectExprs.join(",\n        ")}
+      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
+      ${cteJoinClauses}
+      WHERE (${baseWhere}
+        ${filterWhere})
+      GROUP BY ${cteGroupByCols.join(", ")}
+    `;
+  }
+  return `
+      SELECT DISTINCT
+        ${cteSelectExprs.join(",\n        ")}
+      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
+      ${cteJoinClauses}
+      WHERE (${baseWhere}
+        ${filterWhere})
+    `;
+}
+
 /**
  * Build a timeseries query using CTE for arrayJoin grouping (labels, events)
  * or span-level grouping (model, span_type).
@@ -1307,36 +1576,7 @@ function buildArrayJoinTimeseriesQuery({
   // simple metrics so they reach the outer SELECT instead of being silently dropped — the bug
   // `avgCostPerModel` / `avgTokensPerModel` widgets hit. Safe only for sum/avg/min/max, which
   // collapse to the deduped scalar; quantile/uniq stay pipeline since they need separate reasoning.
-  const TRACE_ID_PIPELINE_SAFE_AGGS = new Set<string>(["sum", "avg", "min", "max"]);
-  for (let i = 0; i < input.series.length; i++) {
-    const series = input.series[i]!;
-    const translation = metricTranslations[i]!;
-    if (!translation.requiresSubquery || !series.pipeline) continue;
-
-    if (
-      series.pipeline.field === "trace_id" &&
-      TRACE_ID_PIPELINE_SAFE_AGGS.has(series.pipeline.aggregation)
-    ) {
-      const innerTranslation = translateMetric({
-        metric: series.metric,
-        aggregation: series.aggregation,
-        index: i,
-        key: series.key,
-        subkey: series.subkey,
-      });
-      // Swap alias to match the pipeline translation's alias (they're identical
-      // for trace_id pipelines, but be explicit for clarity)
-      const escapedAlias = innerTranslation.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      simpleMetrics.push({
-        ...innerTranslation,
-        alias: translation.alias,
-        selectExpression: innerTranslation.selectExpression.replace(
-          new RegExp(` AS ${escapedAlias}$`),
-          ` AS ${translation.alias}`,
-        ),
-      });
-    }
-  }
+  simpleMetrics.push(...traceIdPipelinesAsSimpleMetrics({ input, metricTranslations }));
   const hasEvalMixWithTrace = hasEvalMixedWithTraceMetrics(simpleMetrics);
 
   // When eval metrics are mixed with trace metrics, switch from SELECT DISTINCT
@@ -1358,117 +1598,23 @@ function buildArrayJoinTimeseriesQuery({
   // Include metric base columns in CTE for aggregation in outer query.
   // When using the grouped CTE, wrap trace-level columns in any() since they
   // are constant per (trace_id, group_key) combination.
-  const traceColumnWrapper = (col: string) => (hasEvalMixWithTrace ? `any(${col})` : col);
-  // IMPORTANT: a new trace-level column in metric-translator.ts must also be added to this CTE
-  // select list AND to dedupSubstitutions() (consumed by transformMetricForDedup below), or it
-  // silently returns null (or throws) when combined with an arrayJoin groupBy. The simple path
-  // (buildMixedEvalTimeseriesQuery) does this dynamically via extractTraceAggregationColumn.
-  // TODO(#3115): port this arrayJoin path to the same helper for parity.
-
-  // For span-partitioned model grouping, additive columns carry the (trace, model) bucket's own
-  // share from the `smd` join instead of the whole-trace value. Traces with no joined smd row
-  // keep the trace-level value (their group-by gives exactly one bucket, so this still partitions).
-  // Non-additive columns (duration, TTFT, tokens/second) keep whole-trace attribution in every
-  // bucket the trace touches.
-  const smdMiss = spanModelPartitionMissExpr();
-  const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
-    spanModelPartitioned ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})` : traceExpr;
-  // The effective non-billed cost (column + legacy-marker fallback) is only
-  // materialized when a requested metric reads it, because the fallback reads
-  // the wide ts.Attributes map and would otherwise widen the dedup subquery
-  // for every grouped query.
-  const needsNonBilledCost = simpleMetrics.some((m) =>
-    m.selectExpression.includes("NonBilledCost"),
-  );
-  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence: the fold-time
-  // per-span split wins; the legacy all-or-nothing `langwatch.cost.non_billable` trace marker
-  // only applies when the trace-level NonBilledCost column is NULL (rows folded before the
-  // column existed). The marker treats the WHOLE trace as bundled, so every bucket's non-billed
-  // share equals its cost, keeping the buckets an exact partition of the trace expression.
-  const bucketNonBilledExpr = needsNonBilledCost
-    ? `if(${ts}.NonBilledCost IS NULL AND ${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${SPAN_MODEL_ALIAS}.SpanModelCost, ${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost)`
-    : `${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost`;
-  const needsCacheTokenColumns = simpleMetrics.some(
-    (m) =>
-      m.selectExpression.includes("langwatch.reserved.cache_read_tokens") ||
-      m.selectExpression.includes("langwatch.reserved.cache_creation_tokens") ||
-      m.selectExpression.includes("langwatch.reserved.reasoning_tokens"),
-  );
   cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCost`, `${ts}.TotalCost`))} AS trace_total_cost`,
+    ...buildTraceColumnSelects({ ts, simpleMetrics, hasEvalMixWithTrace, spanModelPartitioned }),
   );
-  cteSelectExprs.push(
-    `${traceColumnWrapper(
-      partitionedOrTrace(
-        bucketNonBilledExpr,
-        needsNonBilledCost ? nonBilledCostExpression(ts) : `${ts}.NonBilledCost`,
-      ),
-    )} AS trace_non_billed_cost`,
-  );
-  cteSelectExprs.push(`${traceColumnWrapper(`${ts}.TotalDurationMs`)} AS trace_duration_ms`);
-  cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelPromptTokens`, `${ts}.TotalPromptTokenCount`))} AS trace_prompt_tokens`,
-  );
-  cteSelectExprs.push(
-    `${traceColumnWrapper(partitionedOrTrace(`${SPAN_MODEL_ALIAS}.SpanModelCompletionTokens`, `${ts}.TotalCompletionTokenCount`))} AS trace_completion_tokens`,
-  );
-  cteSelectExprs.push(`${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`);
-  cteSelectExprs.push(
-    `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
-  );
-  // Hoist only the attribute reads a requested metric actually aggregates.
-  // Pushing all of them would widen the dedup subquery with the wide
-  // Attributes map for every grouped query — the same cost the conditional
-  // cache-token hoist below exists to avoid.
-  for (const { attributeKey, cteColumn } of TRACE_ATTRIBUTE_METRIC_COLUMNS) {
-    const source = traceAttributeSource(attributeKey);
-    const isRead = simpleMetrics.some((m) => m.selectExpression.includes(source));
-    if (!isRead) continue;
-    cteSelectExprs.push(`${traceColumnWrapper(source)} AS ${cteColumn}`);
-  }
-  if (needsCacheTokenColumns) {
-    // toFloat64 wraps the UInt64 attribute read so both if() branches share a
-    // supertype with the smd join's Float64 sums.
-    cteSelectExprs.push(
-      `${traceColumnWrapper(
-        partitionedOrTrace(
-          `${SPAN_MODEL_ALIAS}.SpanModelCacheReadTokens`,
-          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']))`,
-        ),
-      )} AS trace_cache_read_tokens`,
-    );
-    cteSelectExprs.push(
-      `${traceColumnWrapper(
-        partitionedOrTrace(
-          `${SPAN_MODEL_ALIAS}.SpanModelCacheWriteTokens`,
-          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
-        ),
-      )} AS trace_cache_write_tokens`,
-    );
-    cteSelectExprs.push(
-      `${traceColumnWrapper(
-        partitionedOrTrace(
-          `${SPAN_MODEL_ALIAS}.SpanModelReasoningTokens`,
-          `toFloat64(toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens']))`,
-        ),
-      )} AS trace_reasoning_tokens`,
-    );
-  }
 
   // When pre-aggregating eval metrics per-trace, emit each eval metric's full
   // expression (without its alias) as a `<alias>__per_trace` column inside the
   // CTE. In the outer query, we'll wrap this per-trace column in the cross-trace
   // aggregation returned by mapEvalAggregationToOuter(). Per-trace aliases are
   // quoted because they start with the metric index digit.
-  const evalPerTraceAliases = new Map<string, string>();
-  if (hasEvalMixWithTrace) {
-    for (const metric of simpleMetrics) {
-      if (!metric.requiredJoins.includes("evaluation_runs")) continue;
-      const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
-      const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
-      cteSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
-      evalPerTraceAliases.set(metric.alias, perTraceAlias);
-    }
+  const evalPerTraceAliases = hasEvalMixWithTrace
+    ? evalPerTraceAliasesFor(simpleMetrics)
+    : new Map<string, string>();
+  for (const metric of simpleMetrics) {
+    const perTraceAlias = evalPerTraceAliases.get(metric.alias);
+    if (perTraceAlias === undefined) continue;
+    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
+    cteSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
   }
 
   // Include evaluation columns in CTE when evaluation metrics are used.
@@ -1476,51 +1622,18 @@ function buildArrayJoinTimeseriesQuery({
   // so non-grouped columns must be wrapped in any(). The raw eval columns are
   // only consumed by the non-mixed transformMetricForDedup path, but wrapping
   // them keeps the CTE valid for both modes.
-  const es = tableAliases.evaluation_runs;
-  const metricExprs = simpleMetrics.map((m) => m.selectExpression);
-  const referencedEvalCols = extractReferencedEvaluationColumns(metricExprs);
-  for (const col of referencedEvalCols) {
-    const colExpr = `${es}.${col}`;
-    cteSelectExprs.push(
-      `${hasEvalMixWithTrace ? `any(${colExpr})` : colExpr} AS eval_${snakeCase(col)}`,
-    );
-  }
+  cteSelectExprs.push(...buildEvaluationColumnSelects({ simpleMetrics, hasEvalMixWithTrace }));
 
   // Build outer SELECT expressions
-  const outerSelectExprs: string[] = ["period"];
-  if (dateTrunc) {
-    outerSelectExprs.push("date");
-  }
-  outerSelectExprs.push("group_key");
+  const outerKeys = dateTrunc ? ["period", "date", "group_key"] : ["period", "group_key"];
+  const outerSelectExprs: string[] = [...outerKeys];
 
   // Transform metrics to work on deduplicated data
   // count() becomes uniqExact(trace_id), sum/avg work on first value per trace
-  for (const metric of simpleMetrics) {
-    const perTraceAlias = evalPerTraceAliases.get(metric.alias);
-    if (perTraceAlias !== undefined) {
-      // Eval metric: outer query re-aggregates the per-trace value across traces.
-      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
-      if (!outerAgg) {
-        throw new Error(
-          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
-            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
-            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
-        );
-      }
-      outerSelectExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quoteIdentifier(metric.alias)}`);
-      continue;
-    }
-    // Transform the metric expression for the deduplicated context
-    const transformedExpr = transformMetricForDedup(metric.selectExpression, metric.alias);
-    outerSelectExprs.push(transformedExpr);
-  }
+  outerSelectExprs.push(...buildOuterMetricSelects({ simpleMetrics, evalPerTraceAliases }));
 
   // Build GROUP BY for outer query
-  const outerGroupBy: string[] = ["period"];
-  if (dateTrunc) {
-    outerGroupBy.push("date");
-  }
-  outerGroupBy.push("group_key");
+  const outerGroupBy: string[] = [...outerKeys];
 
   // Build HAVING clause - only apply for string-type fields that don't handle unknown
   // Skip for boolean fields like evaluations.evaluation_passed (which use 0/1, not empty strings)
@@ -1546,45 +1659,23 @@ function buildArrayJoinTimeseriesQuery({
 
   // CTE body: use GROUP BY when pre-aggregating eval metrics per trace,
   // otherwise fall back to SELECT DISTINCT for backward-compatible behavior.
-  let cteBody: string;
-  if (hasEvalMixWithTrace) {
-    const cteGroupByCols: string[] = ["trace_id", "group_key", "period"];
-    if (dateTrunc) cteGroupByCols.push("date");
-    cteBody = `
-      SELECT
-        ${cteSelectExprs.join(",\n        ")}
-      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
-      ${cteJoinClauses}
-      WHERE (${baseWhere}
-        ${filterWhere})
-      GROUP BY ${cteGroupByCols.join(", ")}
-    `;
-  } else {
-    cteBody = `
-      SELECT DISTINCT
-        ${cteSelectExprs.join(",\n        ")}
-      FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_BOTH_PERIODS)}
-      ${cteJoinClauses}
-      WHERE (${baseWhere}
-        ${filterWhere})
-    `;
-  }
+  const cteBody = buildDedupCteBody({
+    ts,
+    cteSelectExprs,
+    traceColumns,
+    cteJoinClauses,
+    baseWhere,
+    filterWhere,
+    hasEvalMixWithTrace,
+    hasDate: dateTrunc !== null,
+  });
 
   // When the groupBy field uses arrayJoin (e.g. metadata.labels) and a filter
   // exists for the same field, the trace-level filter (hasAny) only selects
   // traces that have at least one matching value. But arrayJoin then expands
   // ALL values from those traces, so unfiltered values leak into the results.
   // Add a group_key restriction in the outer query to show only the filtered values.
-  let groupKeyFilter = "";
-  const groupKeyFilterParams: Record<string, unknown> = {};
-  if (input.groupBy && input.filters && groupByColumn.includes("arrayJoin")) {
-    const filterValues = input.filters[input.groupBy as keyof typeof input.filters];
-    if (Array.isArray(filterValues) && filterValues.length > 0) {
-      const paramName = "groupByFilterValues";
-      groupKeyFilter = `AND group_key IN ({${paramName}:Array(String)})`;
-      groupKeyFilterParams[paramName] = filterValues;
-    }
-  }
+  const { groupKeyFilter, groupKeyFilterParams } = buildGroupKeyFilter({ input, groupByColumn });
 
   const sql = `
     WITH deduped_traces AS (${cteBody})
@@ -1745,6 +1836,125 @@ function buildGroupByUnionAllQuery({
   };
 }
 
+function buildSubqueryMetricCtes({
+  metric,
+  ts,
+  traceColumns,
+  joinClauses,
+  filterWhere,
+  groupByColumn,
+  groupKeyExpr,
+}: {
+  metric: MetricTranslation;
+  ts: string;
+  traceColumns: readonly string[];
+  joinClauses: string;
+  filterWhere: string;
+  groupByColumn: string | null;
+  groupKeyExpr: string | null;
+}): string[] {
+  const subquery = metric.subquery;
+  if (!subquery) return [];
+  const cteName = `cte_${metric.alias}`;
+  const ctes: string[] = [];
+
+  // When groupByColumn is set, propagate group_key into the CTE so the outer query
+  // can group results by it. The group_key is added to both the inner SELECT and
+  // inner GROUP BY of the subquery.
+  const groupKeyInnerSelect = groupKeyExpr ? `, ${groupKeyExpr}` : "";
+  const groupKeyInnerGroupBy = groupByColumn ? `, group_key` : "";
+
+  // Check if this is a nested subquery (3-level aggregation)
+  if (subquery.nestedSubquery) {
+    const nested = subquery.nestedSubquery;
+    const havingClause = nested.having ? `HAVING ${nested.having}` : "";
+
+    // CTE for current period with nested subquery
+    ctes.push(`
+      ${cteName}_current AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
+        FROM (
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
+          FROM (
+            SELECT ${nested.select}
+            FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_CURRENT)}
+            ${joinClauses}
+            WHERE ${ts}.TenantId = {tenantId:String}
+              AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
+              AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+              ${filterWhere}
+            GROUP BY ${nested.groupBy}
+            ${havingClause}
+          ) thread_data
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+      )`);
+
+    // CTE for previous period with nested subquery
+    ctes.push(`
+      ${cteName}_previous AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
+        FROM (
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
+          FROM (
+            SELECT ${nested.select}
+            FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_PREVIOUS)}
+            ${joinClauses}
+            WHERE ${ts}.TenantId = {tenantId:String}
+              AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
+              AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+              ${filterWhere}
+            GROUP BY ${nested.groupBy}
+            ${havingClause}
+          ) thread_data
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+      )`);
+  } else {
+    // Standard 2-level aggregation
+    // CTE for current period
+    ctes.push(`
+      ${cteName}_current AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
+        FROM (
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
+          FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_CURRENT)}
+          ${joinClauses}
+          WHERE ${ts}.TenantId = {tenantId:String}
+            AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
+            AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
+            ${filterWhere}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+      )`);
+
+    // CTE for previous period
+    ctes.push(`
+      ${cteName}_previous AS (
+        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
+        FROM (
+          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
+          FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_PREVIOUS)}
+          ${joinClauses}
+          WHERE ${ts}.TenantId = {tenantId:String}
+            AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
+            AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
+            ${filterWhere}
+          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
+          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
+        ) sub
+        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
+      )`);
+  }
+  return ctes;
+}
+
 /**
  * Build a timeseries query using CTEs for subquery (pipeline) metrics.
  * This handles metrics that require two-level aggregation (e.g., avg threads per user).
@@ -1783,104 +1993,17 @@ function buildSubqueryTimeseriesQuery({
   // Build CTEs for each subquery metric, one for current and one for previous period
   // Use 'cte_' prefix to ensure CTE names don't start with a digit (which is invalid SQL)
   for (const metric of subqueryMetrics) {
-    if (!metric.subquery) continue;
-    const subquery = metric.subquery;
-    const cteName = `cte_${metric.alias}`;
-
-    // When groupByColumn is set, propagate group_key into the CTE so the outer query
-    // can group results by it. The group_key is added to both the inner SELECT and
-    // inner GROUP BY of the subquery.
-    const groupKeyInnerSelect = groupKeyExpr ? `, ${groupKeyExpr}` : "";
-    const groupKeyInnerGroupBy = groupByColumn ? `, group_key` : "";
-
-    // Check if this is a nested subquery (3-level aggregation)
-    if (subquery.nestedSubquery) {
-      const nested = subquery.nestedSubquery;
-      const havingClause = nested.having ? `HAVING ${nested.having}` : "";
-
-      // CTE for current period with nested subquery
-      ctes.push(`
-      ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
-        FROM (
-          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
-          FROM (
-            SELECT ${nested.select}
-            FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_CURRENT)}
-            ${joinClauses}
-            WHERE ${ts}.TenantId = {tenantId:String}
-              AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
-              AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
-              ${filterWhere}
-            GROUP BY ${nested.groupBy}
-            ${havingClause}
-          ) thread_data
-          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
-          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
-      )`);
-
-      // CTE for previous period with nested subquery
-      ctes.push(`
-      ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
-        FROM (
-          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
-          FROM (
-            SELECT ${nested.select}
-            FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_PREVIOUS)}
-            ${joinClauses}
-            WHERE ${ts}.TenantId = {tenantId:String}
-              AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
-              AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
-              ${filterWhere}
-            GROUP BY ${nested.groupBy}
-            ${havingClause}
-          ) thread_data
-          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
-          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
-      )`);
-    } else {
-      // Standard 2-level aggregation
-      // CTE for current period
-      ctes.push(`
-      ${cteName}_current AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
-        FROM (
-          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
-          FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_CURRENT)}
-          ${joinClauses}
-          WHERE ${ts}.TenantId = {tenantId:String}
-            AND ${ts}.OccurredAt >= {currentStart:DateTime64(3)}
-            AND ${ts}.OccurredAt < {currentEnd:DateTime64(3)}
-            ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
-          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
-      )`);
-
-      // CTE for previous period
-      ctes.push(`
-      ${cteName}_previous AS (
-        SELECT '${metric.alias}' AS metric_name, ${subquery.outerAggregation.replace(` AS ${metric.alias}`, "")} AS metric_value${groupKeyInnerSelect}
-        FROM (
-          SELECT ${subquery.innerSelect}${groupKeyInnerSelect}
-          FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_PREVIOUS)}
-          ${joinClauses}
-          WHERE ${ts}.TenantId = {tenantId:String}
-            AND ${ts}.OccurredAt >= {previousStart:DateTime64(3)}
-            AND ${ts}.OccurredAt < {previousEnd:DateTime64(3)}
-            ${filterWhere}
-          GROUP BY ${subquery.innerGroupBy}${groupKeyInnerGroupBy}
-          HAVING ${subquery.innerGroupBy} IS NOT NULL AND toString(${subquery.innerGroupBy}) != ''
-        ) sub
-        ${groupByColumn ? `GROUP BY metric_name, group_key` : ""}
-      )`);
-    }
+    ctes.push(
+      ...buildSubqueryMetricCtes({
+        metric,
+        ts,
+        traceColumns,
+        joinClauses,
+        filterWhere,
+        groupByColumn,
+        groupKeyExpr,
+      }),
+    );
   }
 
   // Build simple metrics query for current period
@@ -2022,6 +2145,138 @@ function buildSubqueryTimeseriesQuery({
   };
 }
 
+function buildSimpleMetricsCte({
+  input,
+  simpleMetrics,
+  ts,
+  periodCase,
+  dateTrunc,
+  groupByColumn,
+  groupKeyExpr,
+  groupKeyHaving,
+  baseWhere,
+  fullFilterWhere,
+}: {
+  input: TimeseriesQueryInput;
+  simpleMetrics: MetricTranslation[];
+  ts: string;
+  periodCase: string;
+  dateTrunc: string;
+  groupByColumn: string | null;
+  groupKeyExpr: string | null;
+  groupKeyHaving: string;
+  baseWhere: string;
+  fullFilterWhere: string;
+}): string {
+  const simpleSelectExprs = [
+    `${periodCase} AS period`,
+    `${dateTrunc} AS date`,
+    ...(groupKeyExpr ? [groupKeyExpr] : []),
+    ...simpleMetrics.map((m) => {
+      const quotedAlias = quoteIdentifier(m.alias);
+      return m.selectExpression.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
+    }),
+  ];
+  const simpleGroupByCols = ["period", "date"];
+  if (groupByColumn) simpleGroupByCols.push("group_key");
+
+  // Build minimal join clauses: only joins needed by simple metrics, the
+  // groupBy column, and filters — not pipeline metrics.
+  const simpleJoins = new Set<CHTable>();
+  for (const m of simpleMetrics) {
+    for (const j of m.requiredJoins) simpleJoins.add(j);
+  }
+  if (input.groupBy) {
+    const gExpr = getGroupByExpression(input.groupBy, input.groupByKey);
+    for (const j of gExpr.requiredJoins) simpleJoins.add(j);
+  }
+  // Include filter joins by re-translating (idempotent, no side effects
+  // that affect query correctness — param names are already in filterParams)
+  if (input.filters) {
+    const filterJoins = translateAllFilters(input.filters).requiredJoins;
+    for (const j of filterJoins) simpleJoins.add(j);
+  }
+  const allSimpleExprs = [
+    ...simpleMetrics.map((m) => m.selectExpression),
+    fullFilterWhere,
+    groupByColumn ?? "",
+  ];
+  const simpleJoinClauses = Array.from(simpleJoins)
+    .map((table) => {
+      const requiredColumns = deriveRequiredColumns(table, allSimpleExprs);
+      // Both-periods regime: bound the stored_spans / evaluation_runs JOINs
+      // to the date envelope.
+      return buildJoinClause({
+        table,
+        requiredColumns,
+        spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
+        evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
+      });
+    })
+    .join("\n");
+
+  return `
+      simple_metrics AS (
+        SELECT
+          ${simpleSelectExprs.join(",\n          ")}
+        FROM ${dedupedTraceSummaries(ts)}
+        ${simpleJoinClauses}
+        WHERE (${baseWhere}
+          ${fullFilterWhere})
+        GROUP BY ${simpleGroupByCols.join(", ")}
+        ${groupKeyHaving}
+      )`;
+}
+
+function buildPipelineFinalSelect({
+  simpleMetrics,
+  pipelineMetrics,
+  groupByColumn,
+}: {
+  simpleMetrics: MetricTranslation[];
+  pipelineMetrics: MetricTranslation[];
+  groupByColumn: string | null;
+}): string {
+  const hasSimple = simpleMetrics.length > 0;
+  // Build final SELECT — join all CTEs on (period, date[, group_key])
+  const joinKeys = groupByColumn ? ["period", "date", "group_key"] : ["period", "date"];
+
+  // Determine the anchor CTE (first source in the FROM/JOIN chain)
+  const firstPipelineCteName = `cte_${pipelineMetrics[0]!.alias}`;
+  const anchorCte = hasSimple ? "simple_metrics" : firstPipelineCteName;
+
+  if (!hasSimple && pipelineMetrics.length === 1) {
+    // Single pipeline metric, no simple metrics — simple path
+    return `SELECT * FROM ${firstPipelineCteName} WHERE period IS NOT NULL ORDER BY period, date`;
+  }
+
+  // Multiple sources: FULL OUTER JOIN on (period, date[, group_key])
+  let joinSql = anchorCte;
+  const selectCols = joinKeys.map((k) => `${anchorCte}.${k}`);
+
+  // Add simple metric columns from anchor
+  for (const m of simpleMetrics) {
+    selectCols.push(`${anchorCte}.${quoteIdentifier(m.alias)}`);
+  }
+
+  // Determine which pipeline CTEs need joining (skip anchor if it's the first pipeline CTE)
+  const pipelineCTEsToJoin = hasSimple ? pipelineMetrics : pipelineMetrics.slice(1);
+
+  // If anchor is the first pipeline CTE, add its column
+  if (!hasSimple) {
+    selectCols.push(`${firstPipelineCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`);
+  }
+
+  for (const metric of pipelineCTEsToJoin) {
+    const cteName = `cte_${metric.alias}`;
+    const onClause = joinKeys.map((k) => `${anchorCte}.${k} = ${cteName}.${k}`).join(" AND ");
+    joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
+    selectCols.push(`${cteName}.${quoteIdentifier(metric.alias)}`);
+  }
+
+  return `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${anchorCte}.period IS NOT NULL ORDER BY ${anchorCte}.period, ${anchorCte}.date`;
+}
+
 /**
  * Build a date-bucketed pipeline query for pipeline metrics with numeric
  * timeScale. Uses CTE-based two-level (or three-level for nested) aggregation
@@ -2091,106 +2346,23 @@ function buildDateBucketedPipelineQuery({
   // only needed by pipeline metrics.
   const hasSimple = simpleMetrics.length > 0;
   if (hasSimple) {
-    const simpleSelectExprs = [
-      `${periodCase} AS period`,
-      `${dateTrunc} AS date`,
-      ...(groupKeyExpr ? [groupKeyExpr] : []),
-      ...simpleMetrics.map((m) => {
-        const quotedAlias = quoteIdentifier(m.alias);
-        return m.selectExpression.replace(` AS ${m.alias}`, ` AS ${quotedAlias}`);
+    ctes.push(
+      buildSimpleMetricsCte({
+        input,
+        simpleMetrics,
+        ts,
+        periodCase,
+        dateTrunc,
+        groupByColumn,
+        groupKeyExpr,
+        groupKeyHaving,
+        baseWhere,
+        fullFilterWhere,
       }),
-    ];
-    const simpleGroupByCols = ["period", "date"];
-    if (groupByColumn) simpleGroupByCols.push("group_key");
-
-    // Build minimal join clauses: only joins needed by simple metrics, the
-    // groupBy column, and filters — not pipeline metrics.
-    const simpleJoins = new Set<CHTable>();
-    for (const m of simpleMetrics) {
-      for (const j of m.requiredJoins) simpleJoins.add(j);
-    }
-    if (input.groupBy) {
-      const gExpr = getGroupByExpression(input.groupBy, input.groupByKey);
-      for (const j of gExpr.requiredJoins) simpleJoins.add(j);
-    }
-    // Include filter joins by re-translating (idempotent, no side effects
-    // that affect query correctness — param names are already in filterParams)
-    if (input.filters) {
-      const filterJoins = translateAllFilters(input.filters).requiredJoins;
-      for (const j of filterJoins) simpleJoins.add(j);
-    }
-    const allSimpleExprs = [
-      ...simpleMetrics.map((m) => m.selectExpression),
-      fullFilterWhere,
-      groupByColumn ?? "",
-    ];
-    const simpleJoinClauses = Array.from(simpleJoins)
-      .map((table) => {
-        const requiredColumns = deriveRequiredColumns(table, allSimpleExprs);
-        // Both-periods regime: bound the stored_spans / evaluation_runs JOINs
-        // to the date envelope.
-        return buildJoinClause({
-          table,
-          requiredColumns,
-          spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
-          evalTimeFilter: EVAL_TIME_FILTER_BOTH_PERIODS,
-        });
-      })
-      .join("\n");
-
-    ctes.push(`
-      simple_metrics AS (
-        SELECT
-          ${simpleSelectExprs.join(",\n          ")}
-        FROM ${dedupedTraceSummaries(ts)}
-        ${simpleJoinClauses}
-        WHERE (${baseWhere}
-          ${fullFilterWhere})
-        GROUP BY ${simpleGroupByCols.join(", ")}
-        ${groupKeyHaving}
-      )`);
+    );
   }
 
-  // Build final SELECT — join all CTEs on (period, date[, group_key])
-  const joinKeys = groupByColumn ? ["period", "date", "group_key"] : ["period", "date"];
-
-  // Determine the anchor CTE (first source in the FROM/JOIN chain)
-  const firstPipelineCteName = `cte_${pipelineMetrics[0]!.alias}`;
-  const anchorCte = hasSimple ? "simple_metrics" : firstPipelineCteName;
-
-  let finalSelect: string;
-  if (!hasSimple && pipelineMetrics.length === 1) {
-    // Single pipeline metric, no simple metrics — simple path
-    finalSelect = `SELECT * FROM ${firstPipelineCteName} WHERE period IS NOT NULL ORDER BY period, date`;
-  } else {
-    // Multiple sources: FULL OUTER JOIN on (period, date[, group_key])
-    let joinSql = anchorCte;
-    const selectCols = joinKeys.map((k) => `${anchorCte}.${k}`);
-
-    // Add simple metric columns from anchor
-    if (hasSimple) {
-      for (const m of simpleMetrics) {
-        selectCols.push(`${anchorCte}.${quoteIdentifier(m.alias)}`);
-      }
-    }
-
-    // Determine which pipeline CTEs need joining (skip anchor if it's the first pipeline CTE)
-    const pipelineCTEsToJoin = hasSimple ? pipelineMetrics : pipelineMetrics.slice(1);
-
-    // If anchor is the first pipeline CTE, add its column
-    if (!hasSimple) {
-      selectCols.push(`${firstPipelineCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`);
-    }
-
-    for (const metric of pipelineCTEsToJoin) {
-      const cteName = `cte_${metric.alias}`;
-      const onClause = joinKeys.map((k) => `${anchorCte}.${k} = ${cteName}.${k}`).join(" AND ");
-      joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
-      selectCols.push(`${cteName}.${quoteIdentifier(metric.alias)}`);
-    }
-
-    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${anchorCte}.period IS NOT NULL ORDER BY ${anchorCte}.period, ${anchorCte}.date`;
-  }
+  const finalSelect = buildPipelineFinalSelect({ simpleMetrics, pipelineMetrics, groupByColumn });
 
   const sql = `
     WITH

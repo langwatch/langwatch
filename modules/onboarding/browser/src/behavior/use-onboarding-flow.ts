@@ -18,6 +18,35 @@ import {
 import { useFeatureFlag } from "./use-feature-flag.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
 
+function isBasicInfoComplete({
+  usageStyle,
+  guided,
+  companySize,
+  solutionType,
+  phoneHasValue,
+  phoneIsValid,
+}: {
+  usageStyle: UsageStyle | undefined;
+  guided: boolean;
+  companySize: CompanySize | undefined;
+  solutionType: SolutionType | undefined;
+  phoneHasValue: boolean;
+  phoneIsValid: boolean;
+}): boolean {
+  if (usageStyle === void 0) return false;
+
+  const showFields = usageStyle !== "For myself";
+  if (!showFields) return true;
+
+  // The guided variant asks a company for its size and its deploy
+  // plan before Langy takes over; the phone number stays optional.
+  if (guided && (companySize === void 0 || solutionType === void 0)) {
+    return false;
+  }
+
+  return !(phoneHasValue && !phoneIsValid);
+}
+
 export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
@@ -89,20 +118,15 @@ export const useOnboardingFlow = () => {
       case OnboardingScreenIndex.INTENT:
         return intent !== void 0;
 
-      case OnboardingScreenIndex.BASIC_INFO: {
-        if (usageStyle === void 0) return false;
-
-        const showFields = usageStyle !== "For myself";
-        if (!showFields) return true;
-
-        // The guided variant asks a company for its size and its deploy
-        // plan before Langy takes over; the phone number stays optional.
-        if (guided && (companySize === void 0 || solutionType === void 0)) {
-          return false;
-        }
-
-        return !(phoneHasValue && !phoneIsValid);
-      }
+      case OnboardingScreenIndex.BASIC_INFO:
+        return isBasicInfoComplete({
+          usageStyle,
+          guided,
+          companySize,
+          solutionType,
+          phoneHasValue,
+          phoneIsValid,
+        });
 
       case OnboardingScreenIndex.DESIRES:
         return true;

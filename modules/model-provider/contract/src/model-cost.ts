@@ -172,28 +172,50 @@ export const findMatchingModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate[] => {
-  const cascade = (): ModelCostRate | undefined => {
-    const matching = (candidate: string): ModelCostRate | undefined => {
-      const raw = findModelCost(candidate, costs);
-      if (raw) return raw;
-      const normalized = normalizeModelName(candidate);
-      return normalized === candidate ? undefined : findModelCost(normalized, costs);
-    };
-    const raw = matching(model);
-    if (raw) return raw;
-    const slash = model.indexOf("/");
-    const provider = slash === -1 ? undefined : model.slice(0, slash);
-    if (provider?.includes(".")) {
-      const strippedSubtype = provider.split(".")[0] + model.slice(slash);
-      const subtypeMatch = matching(strippedSubtype);
-      if (subtypeMatch) return subtypeMatch;
-    }
-    const bedrock = normalizeBedrockModelId(model);
-    return bedrock === model ? undefined : matching(bedrock);
-  };
-  const match = cascade();
+  const match =
+    findCandidateModelCost({ candidate: model, costs }) ??
+    findSubtypeStrippedModelCost({ model, costs }) ??
+    findBedrockModelCost({ model, costs });
   return match ? [match] : [];
 };
+
+function findCandidateModelCost({
+  candidate,
+  costs,
+}: {
+  candidate: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
+  const raw = findModelCost(candidate, costs);
+  if (raw) return raw;
+  const normalized = normalizeModelName(candidate);
+  return normalized === candidate ? undefined : findModelCost(normalized, costs);
+}
+
+function findSubtypeStrippedModelCost({
+  model,
+  costs,
+}: {
+  model: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
+  const slash = model.indexOf("/");
+  if (slash === -1) return undefined;
+  const provider = model.slice(0, slash);
+  if (!provider.includes(".")) return undefined;
+  return findCandidateModelCost({ candidate: provider.split(".")[0] + model.slice(slash), costs });
+}
+
+function findBedrockModelCost({
+  model,
+  costs,
+}: {
+  model: string;
+  costs: readonly ModelCostRate[];
+}): ModelCostRate | undefined {
+  const bedrock = normalizeBedrockModelId(model);
+  return bedrock === model ? undefined : findCandidateModelCost({ candidate: bedrock, costs });
+}
 
 /**
  * The one canonical priority cascade used by every model-priced span.

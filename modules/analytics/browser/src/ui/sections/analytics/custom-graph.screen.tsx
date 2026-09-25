@@ -575,6 +575,29 @@ const customAPIinput = (
   };
 };
 
+function suggestedGraphTitle({
+  joinedSeriesNames,
+  groupBy,
+}: {
+  joinedSeriesNames: string;
+  groupBy: CustomGraphFormData["groupBy"];
+}): string {
+  const seriesTitle = joinedSeriesNames.replace(/,([^,]*)$/, " and$1");
+  const suggestedTitle = groupBy ? `${seriesTitle} per ${getGroup(groupBy).label}` : seriesTitle;
+  return uppercaseFirstLetterLowerCaseRest(suggestedTitle);
+}
+
+function reportsPath({
+  projectSlug,
+  dashboardId,
+}: {
+  projectSlug: string | undefined;
+  dashboardId: string | undefined;
+}): string {
+  if (!dashboardId) return `/${projectSlug}/analytics/reports`;
+  return `/${projectSlug}/analytics/reports?dashboard=${dashboardId}`;
+}
+
 function CustomGraphForm({
   form,
   seriesFields,
@@ -595,17 +618,13 @@ function CustomGraphForm({
   const { showFilters, setShowFilters } = useFilterToggle();
 
   const joinedSeriesNames = series.map((s) => s.name).join(", ");
+  const showsTimeScale = !graphType || !summaryGraphTypes.includes(graphType.value);
+  const groupKeyRequirement = groupBy ? getGroup(groupBy).requiresKey : undefined;
 
   useEffect(() => {
     if (!form.getFieldState("title")?.isTouched || !title) {
-      let suggestedTitle = joinedSeriesNames.replace(/,([^,]*)$/, " and$1");
-
-      if (groupBy) {
-        suggestedTitle += ` per ${getGroup(groupBy).label}`;
-      }
-
       form.resetField("title", {
-        defaultValue: uppercaseFirstLetterLowerCaseRest(suggestedTitle),
+        defaultValue: suggestedGraphTitle({ joinedSeriesNames, groupBy }),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -642,10 +661,7 @@ function CustomGraphForm({
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
           // Navigate back to the same page we came from
-          const dashboardUrl = dashboardId
-            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
-            : `/${project?.slug}/analytics/reports`;
-          host.navigate(dashboardUrl);
+          host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },
       },
     );
@@ -671,10 +687,7 @@ function CustomGraphForm({
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
           // Navigate back to the same dashboard we came from
-          const dashboardUrl = dashboardId
-            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
-            : `/${project?.slug}/analytics/reports`;
-          host.navigate(dashboardUrl);
+          host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }));
         },
       },
     );
@@ -686,7 +699,7 @@ function CustomGraphForm({
         <Field.Label>Graph Type</Field.Label>
         <GraphTypeField form={form} />
       </Field.Root>
-      {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
+      {showsTimeScale && (
         <Field.Root>
           <Tooltip
             content="If minutes are chosen when the duration is long, it will automatically adjust to the appropriate time scale."
@@ -795,11 +808,7 @@ function CustomGraphForm({
       </Field.Root>
       <Field.Root>
         <Field.Label>Group by</Field.Label>
-        <Grid
-          width="full"
-          gap={3}
-          templateColumns={groupBy && getGroup(groupBy).requiresKey ? "repeat(2, 1fr)" : "1fr"}
-        >
+        <Grid width="full" gap={3} templateColumns={groupKeyRequirement ? "repeat(2, 1fr)" : "1fr"}>
           <NativeSelect.Root>
             <NativeSelect.Field
               {...groupByField}
@@ -822,15 +831,15 @@ function CustomGraphForm({
             </NativeSelect.Field>
             <NativeSelect.Indicator />
           </NativeSelect.Root>
-          {groupBy && getGroup(groupBy).requiresKey && (
+          {groupKeyRequirement && (
             <Controller
               control={form.control}
               name="groupByKey"
               render={({ field }) => (
                 <FilterSelectField
                   field={field}
-                  filter={getGroup(groupBy).requiresKey!.filter}
-                  emptyOption={getGroup(groupBy).requiresKey!.optional ? "all" : undefined}
+                  filter={groupKeyRequirement.filter}
+                  emptyOption={groupKeyRequirement.optional ? "all" : undefined}
                   currentSelected={field.value}
                 />
               )}
@@ -838,7 +847,7 @@ function CustomGraphForm({
           )}
         </Grid>
       </Field.Root>
-      {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
+      {showsTimeScale && (
         <Field.Root>
           <Controller
             control={form.control}
@@ -869,12 +878,7 @@ function CustomGraphForm({
         <Spacer />
         <Button
           variant="outline"
-          onClick={() => {
-            const dashboardUrl = dashboardId
-              ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
-              : `/${project?.slug}/analytics/reports`;
-            host.navigate(dashboardUrl);
-          }}
+          onClick={() => host.navigate(reportsPath({ projectSlug: project?.slug, dashboardId }))}
         >
           Cancel
         </Button>

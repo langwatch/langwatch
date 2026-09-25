@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { type RefObject, useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 const POPUP_WIDTH = 600;
@@ -33,8 +33,12 @@ function popupFeatures(): string {
   ].join(",");
 }
 
-function tryReadConnectResult(data: unknown): ConnectResult | null {
-  const parsed = incomingMessageSchema.safeParse(data);
+function tryReadConnectResult(event: MessageEvent): ConnectResult | null {
+  if (event.origin !== window.location.origin) {
+    return null;
+  }
+
+  const parsed = incomingMessageSchema.safeParse(event.data);
   if (!parsed.success) {
     return null;
   }
@@ -48,6 +52,24 @@ function tryReadConnectResult(data: unknown): ConnectResult | null {
     reason: "failed",
     error: parsed.data.message,
   };
+}
+
+function supersedePendingAttempt({
+  popup,
+  resolverRef,
+  resolve,
+}: {
+  popup: Window;
+  resolverRef: RefObject<((result: ConnectResult) => void) | null>;
+  resolve: (result: ConnectResult) => void;
+}): void {
+  popup.focus();
+  resolverRef.current?.({
+    ok: false,
+    reason: "failed",
+    error: "Superseded by a new connect attempt",
+  });
+  resolverRef.current = resolve;
 }
 
 /** Opens the GitHub App installation without discarding the current page. */
@@ -68,11 +90,7 @@ export function useGitHubConnectPopup() {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      if (event.origin !== window.location.origin) {
-        return;
-      }
-
-      const result = tryReadConnectResult(event.data);
+      const result = tryReadConnectResult(event);
       if (!result) {
         return;
       }
@@ -89,17 +107,21 @@ export function useGitHubConnectPopup() {
     };
   }, [cleanup]);
 
+  const settleIfClosed = useCallback(() => {
+    if (!popupRef.current?.closed) return;
+    resolverRef.current?.({
+      ok: false,
+      reason: "cancelled",
+      error: "Cancelled",
+    });
+    cleanup();
+  }, [cleanup]);
+
   const connect = useCallback(
     (organizationId: string): Promise<ConnectResult> =>
       new Promise((resolve) => {
         if (popupRef.current && !popupRef.current.closed) {
-          popupRef.current.focus();
-          resolverRef.current?.({
-            ok: false,
-            reason: "failed",
-            error: "Superseded by a new connect attempt",
-          });
-          resolverRef.current = resolve;
+          supersedePendingAttempt({ popup: popupRef.current, resolverRef, resolve });
           return;
         }
 
@@ -117,18 +139,9 @@ export function useGitHubConnectPopup() {
 
         popupRef.current = popup;
         resolverRef.current = resolve;
-        pollRef.current = window.setInterval(() => {
-          if (popupRef.current?.closed) {
-            resolverRef.current?.({
-              ok: false,
-              reason: "cancelled",
-              error: "Cancelled",
-            });
-            cleanup();
-          }
-        }, 500);
+        pollRef.current = window.setInterval(settleIfClosed, 500);
       }),
-    [cleanup],
+    [settleIfClosed],
   );
 
   return { connect };

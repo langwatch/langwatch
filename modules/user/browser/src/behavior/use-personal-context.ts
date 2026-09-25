@@ -1,3 +1,4 @@
+import type { UserPersonalBudget } from "@langwatch/user-contract";
 import { useMemo } from "react";
 
 import { readableDate } from "../model/display-formatters.ts";
@@ -74,6 +75,22 @@ export type PersonalContext = {
   apiKeys: PersonalApiKeyRow[];
 };
 
+function budgetStateFrom(raw: UserPersonalBudget): PersonalBudgetState {
+  if (!("limitUsd" in raw)) return { status: "ok" };
+  return {
+    status: raw.status,
+    spentUsd: Number(raw.spentUsd),
+    limitUsd: Number(raw.limitUsd),
+    // Server returns lowercase window slug (e.g. "monthly" from
+    // `topScope.window.toLowerCase()`); coerce missing to empty so
+    // the strict consumer type holds. Same for `scope`.
+    period: raw.period ?? "",
+    scope: raw.scope ?? "",
+    requestIncreaseUrl: "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
+    adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
+  };
+}
+
 /** Personal-context data source: workspace identity + routing policy + API keys. */
 export function usePersonalContext(): PersonalContext {
   const currentUser = useCurrentUser();
@@ -121,19 +138,7 @@ export function usePersonalContext(): PersonalContext {
   const budget = useMemo<PersonalBudgetState>(() => {
     const raw = personalBudgetQuery.data;
     if (!raw) return { status: "ok" };
-    if (!("limitUsd" in raw)) return { status: "ok" };
-    return {
-      status: raw.status,
-      spentUsd: Number(raw.spentUsd),
-      limitUsd: Number(raw.limitUsd),
-      // Server returns lowercase window slug (e.g. "monthly" from
-      // `topScope.window.toLowerCase()`); coerce missing to empty so
-      // the strict consumer type holds. Same for `scope`.
-      period: raw.period ?? "",
-      scope: raw.scope ?? "",
-      requestIncreaseUrl: "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
-      adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
-    };
+    return budgetStateFrom(raw);
   }, [personalBudgetQuery.data]);
 
   const apiKeys = useMemo<PersonalApiKeyRow[]>(() => {

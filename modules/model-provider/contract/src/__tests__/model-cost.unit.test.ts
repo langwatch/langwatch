@@ -370,6 +370,27 @@ describe("matchModelCostWithFallbacks", () => {
     });
   });
 
+  describe("when the provider carries a subtype", () => {
+    const prefixOnlyCosts: ModelCostRate[] = [
+      {
+        model: "custom/foo-model",
+        regex: "^custom\\/foo-model$",
+        inputCostPerToken: 0.000001,
+        outputCostPerToken: 0.000002,
+      },
+    ];
+
+    it("matches the rate stated for the provider without its subtype", () => {
+      expect(matchModelCostWithFallbacks("custom.eu/foo-model", prefixOnlyCosts)?.model).toBe(
+        "custom/foo-model",
+      );
+    });
+
+    it("finds nothing when the stripped name matches no rate either", () => {
+      expect(matchModelCostWithFallbacks("other.eu/foo-model", prefixOnlyCosts)).toBeUndefined();
+    });
+  });
+
   describe("when model name uses uppercase letters", () => {
     it("normalizes to lowercase before matching", () => {
       expect(matchModelCostWithFallbacks("GPT-4O", fakeModelCosts)?.model).toBe("openai/gpt-4o");
