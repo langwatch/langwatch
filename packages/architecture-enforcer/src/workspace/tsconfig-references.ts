@@ -98,40 +98,30 @@ function workspaceGlobs(root: string): string[] {
   return globs;
 }
 
+/** The child directories a `*` segment matches: no dot directories, no node_modules. */
+function wildcardChildren(directory: string): string[] {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true })
+    .filter(
+      (entry) =>
+        entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules",
+    )
+    .map((entry) => join(directory, entry.name));
+}
+
+function namedChild(directory: string, segment: string): string[] {
+  const candidate = join(directory, segment);
+  if (!existsSync(candidate)) return [];
+  return statSync(candidate).isDirectory() ? [candidate] : [];
+}
+
 function expandGlob(root: string, pattern: string): string[] {
   let directories = [root];
-
   for (const segment of pattern.split("/")) {
-    const next: string[] = [];
-
-    for (const directory of directories) {
-      if (segment !== "*") {
-        const candidate = join(directory, segment);
-        if (!existsSync(candidate)) continue;
-
-        const candidateStat = statSync(candidate);
-        if (!candidateStat.isDirectory()) continue;
-
-        next.push(candidate);
-        continue;
-      }
-
-      if (!existsSync(directory)) continue;
-
-      for (const entry of readdirSync(directory, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-
-        if (entry.name.startsWith(".")) continue;
-
-        if (entry.name === "node_modules") continue;
-
-        next.push(join(directory, entry.name));
-      }
-    }
-
-    directories = next;
+    directories = directories.flatMap((directory) =>
+      segment === "*" ? wildcardChildren(directory) : namedChild(directory, segment),
+    );
   }
-
   return directories;
 }
 
@@ -292,36 +282,37 @@ function droppedEdges(edges: ReadonlyMap<string, readonly string[]>): Set<string
   return dropped;
 }
 
-export function deriveProjects(
-  root: string,
-  members: readonly WorkspaceMember[],
-): DerivedProject[] {
-  const groupMembers = groupMemberDirectories(root);
-  const groupSolution = join(root, GROUP_SOLUTION);
-  const byName = new Map(members.map((member) => [member.name, member]));
+/**
+ * The group compiles its members together, so no member's own build config is
+ * composite and nothing may reference one directly. Every consumer of a
+ * member, inside the group or outside it, produces through the solution.
+ */
+function groupProducerOf({
+  member,
+  groupMembers,
+  groupSolution,
+}: {
+  member: WorkspaceMember | undefined;
+  groupMembers: ReadonlySet<string>;
+  groupSolution: string;
+}): string | undefined {
+  if (!member) return void 0;
+  const producer = producerFile(member.directory);
+  if (!producer) return void 0;
+  return groupMembers.has(member.directory) ? groupSolution : producer;
+}
 
-  const producerOf = (name: string): string | undefined => {
-    const member = byName.get(name);
-    if (!member) return void 0;
-
-    const producer = producerFile(member.directory);
-    if (!producer) return void 0;
-
-    // The group compiles its members together, so no member's own build config
-    // is composite and nothing may reference one directly. Every consumer of a
-    // member, inside the group or outside it, produces through the solution.
-    if (groupMembers.has(member.directory)) return groupSolution;
-
-    return producer;
-  };
-
-  const targetsFor = (names: readonly string[]): string[] =>
-    names.flatMap((name) => {
-      const producer = producerOf(name);
-
-      return producer ? [producer] : [];
-    });
-
+function declarationGraph({
+  members,
+  groupMembers,
+  groupSolution,
+  targetsFor,
+}: {
+  members: readonly WorkspaceMember[];
+  groupMembers: ReadonlySet<string>;
+  groupSolution: string;
+  targetsFor: (names: readonly string[]) => string[];
+}): Map<string, string[]> {
   // The declaration graph as the manifests describe it, the group's own
   // references included, so a cycle is found wherever it runs.
   const buildEdges = new Map<string, string[]>();
@@ -347,6 +338,125 @@ export function deriveProjects(
       unique(edges).filter((edge) => edge !== producer),
     );
   }
+  return buildEdges;
+}
+
+/** The references one config should carry, or none when the config does not exist. */
+function derivedProject(kind: { file: string; targets: string[] }): DerivedProject[] {
+  if (!existsSync(kind.file)) return [];
+  const directory = dirname(kind.file);
+  const config = readJsonc(kind.file);
+  const extras = referencePaths(config, "langwatchExtraReferences");
+
+  const derived = kind.targets
+    .filter((target) => target !== kind.file)
+    .map((target) => relativeReference(directory, target));
+
+  const references = unique([...derived, ...extras.map(normalise)]);
+  const current = referencePaths(config, "references").map(normalise);
+
+  return [
+    {
+      file: kind.file,
+      references,
+      undeducible: current.filter((entry) => !references.includes(entry)),
+      current,
+    },
+  ];
+}
+
+/** The root solution names every check root the workspace members carry. */
+function rootSolutionProject({
+  root,
+  members,
+}: {
+  root: string;
+  members: readonly WorkspaceMember[];
+}): DerivedProject[] {
+  const solution = join(root, ROOT_SOLUTION);
+  if (!existsSync(solution)) return [];
+  const config = readJsonc(solution);
+
+  const derived = unique(
+    members.filter((member) => member.checks).flatMap((member) => checkRootsOf(member.directory)),
+  ).map((file) => relativeReference(root, file));
+
+  // A check root that is not a workspace member of its own -- the mail
+  // preview studio is the one -- is named here rather than derived.
+  const references = unique([
+    ...derived,
+    ...referencePaths(config, "langwatchExtraReferences").map(normalise),
+  ]);
+
+  return [
+    {
+      file: solution,
+      references,
+      undeducible: [],
+      current: referencePaths(config, "references").map(normalise),
+    },
+  ];
+}
+
+// Every config a check runs against carries the graph itself: `extends` does not inherit
+// `references`, so a test config restates what its package's tsconfig.json says, and an
+// application owning no build config still carries them — they are what `tsc -b` walks to reach
+// its dependencies. A build config that emits JavaScript is not in the declaration graph at
+// all, so its references stay as its owner wrote them.
+function configTargets({
+  member,
+  isGroupMember,
+  ownProducer,
+  buildTargets,
+  dependencyTargets,
+  consumerTargets,
+}: {
+  member: WorkspaceMember;
+  isGroupMember: boolean;
+  ownProducer: string | undefined;
+  buildTargets: string[];
+  dependencyTargets: string[];
+  consumerTargets: string[];
+}): { file: string; targets: string[] }[] {
+  const build = join(member.directory, "tsconfig.build.json");
+
+  return [
+    ...(ownProducer === build || isGroupMember
+      ? [{ file: build, targets: unique(buildTargets) }]
+      : []),
+    ...CHECK_ROOTS.map((name) => ({
+      file: join(member.directory, name),
+      targets: consumerTargets,
+    })),
+    ...(ownProducer && ownProducer !== build && !isGroupMember
+      ? [
+          {
+            file: ownProducer,
+            targets: dependencyTargets.filter((target) => target !== ownProducer),
+          },
+        ]
+      : []),
+  ];
+}
+
+export function deriveProjects(
+  root: string,
+  members: readonly WorkspaceMember[],
+): DerivedProject[] {
+  const groupMembers = groupMemberDirectories(root);
+  const groupSolution = join(root, GROUP_SOLUTION);
+  const byName = new Map(members.map((member) => [member.name, member]));
+
+  const producerOf = (name: string): string | undefined =>
+    groupProducerOf({ member: byName.get(name), groupMembers, groupSolution });
+  const targetsFor = (names: readonly string[]): string[] =>
+    names.flatMap((name) => {
+      const producer = producerOf(name);
+
+      return producer ? [producer] : [];
+    });
+
+  const buildEdges = declarationGraph({ members, groupMembers, groupSolution, targetsFor });
 
   const dropped = droppedEdges(buildEdges);
 
@@ -368,77 +478,19 @@ export function deriveProjects(
 
     const consumerTargets = unique([...(ownProducer ? [ownProducer] : []), ...dependencyTargets]);
 
-    // Every config a check runs against carries the graph itself: `extends` does not inherit
-    // `references`, so a test config restates what its package's tsconfig.json says, and an
-    // application owning no build config still carries them — they are what `tsc -b` walks to reach
-    // its dependencies. A build config that emits JavaScript is not in the declaration graph at
-    // all, so its references stay as its owner wrote them.
-    const build = join(member.directory, "tsconfig.build.json");
-
-    const kinds: readonly { file: string; targets: string[] }[] = [
-      ...(ownProducer === build || isGroupMember
-        ? [{ file: build, targets: unique(buildTargets) }]
-        : []),
-      ...CHECK_ROOTS.map((name) => ({
-        file: join(member.directory, name),
-        targets: consumerTargets,
-      })),
-      ...(ownProducer && ownProducer !== build && !isGroupMember
-        ? [
-            {
-              file: ownProducer,
-              targets: dependencyTargets.filter((target) => target !== ownProducer),
-            },
-          ]
-        : []),
-    ];
-
-    for (const kind of kinds) {
-      if (!existsSync(kind.file)) continue;
-
-      const directory = dirname(kind.file);
-      const config = readJsonc(kind.file);
-      const extras = referencePaths(config, "langwatchExtraReferences");
-
-      const derived = kind.targets
-        .filter((target) => target !== kind.file)
-        .map((target) => relativeReference(directory, target));
-
-      const references = unique([...derived, ...extras.map(normalise)]);
-      const current = referencePaths(config, "references").map(normalise);
-
-      projects.push({
-        file: kind.file,
-        references,
-        undeducible: current.filter((entry) => !references.includes(entry)),
-        current,
-      });
-    }
-  }
-
-  const solution = join(root, ROOT_SOLUTION);
-
-  if (existsSync(solution)) {
-    const config = readJsonc(solution);
-
-    const derived = unique(
-      members.filter((member) => member.checks).flatMap((member) => checkRootsOf(member.directory)),
-    ).map((file) => relativeReference(root, file));
-
-    // A check root that is not a workspace member of its own -- the mail
-    // preview studio is the one -- is named here rather than derived.
-    const references = unique([
-      ...derived,
-      ...referencePaths(config, "langwatchExtraReferences").map(normalise),
-    ]);
-
-    projects.push({
-      file: solution,
-      references,
-      undeducible: [],
-      current: referencePaths(config, "references").map(normalise),
+    const kinds = configTargets({
+      member,
+      isGroupMember,
+      ownProducer,
+      buildTargets,
+      dependencyTargets,
+      consumerTargets,
     });
+
+    projects.push(...kinds.flatMap(derivedProject));
   }
+
+  projects.push(...rootSolutionProject({ root, members }));
 
   return projects;
 }

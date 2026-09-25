@@ -106,6 +106,29 @@ export function forgetFileListings(): void {
   listings.clear();
 }
 
+function collectFiles({
+  directory,
+  accept,
+  ignored,
+  found,
+}: {
+  directory: string;
+  accept: (path: string) => boolean;
+  ignored: ReadonlySet<string> | undefined;
+  found: string[];
+}): void {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (!isIgnoredDirectory({ name: entry.name, ignored })) {
+        collectFiles({ directory: path, accept, ignored, found });
+      }
+      continue;
+    }
+    if (entry.isFile() && accept(path)) found.push(path);
+  }
+}
+
 /**
  * Every file under `root` the filter accepts, sorted. The raw walk, behind
  * `listFiles`: a caller with its own tree — a test fixture, a migration tool —
@@ -117,30 +140,11 @@ export function walkFiles(
   options?: { ignoredDirectories?: ReadonlySet<string> },
 ): string[] {
   const found: string[] = [];
-
-  const visit = (directory: string) => {
-    for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      const path = join(directory, entry.name);
-
-      if (entry.isDirectory()) {
-        if (isIgnoredDirectory({ name: entry.name, ignored: options?.ignoredDirectories }))
-          continue;
-
-        visit(path);
-        continue;
-      }
-
-      if (!entry.isFile()) continue;
-
-      if (!accept(path)) continue;
-
-      found.push(path);
-    }
-  };
+  const ignored = options?.ignoredDirectories;
 
   if (existsSync(root)) {
     const stat = statSync(root);
-    if (stat.isDirectory()) visit(root);
+    if (stat.isDirectory()) collectFiles({ directory: root, accept, ignored, found });
   }
 
   return found.toSorted();

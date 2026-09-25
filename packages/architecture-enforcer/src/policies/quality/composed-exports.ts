@@ -122,6 +122,54 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
 
 type ExportedName = { name: string; declaringFile: string };
 
+type SpecifierResolver = (options: { specifier: string; file: string }) => string | undefined;
+
+/** The value names one `export … from` or `export { … }` statement publishes. */
+function reExportedNames({
+  statement,
+  file,
+  resolveSpecifier,
+  seen,
+}: {
+  statement: ts.ExportDeclaration;
+  file: string;
+  resolveSpecifier: SpecifierResolver;
+  seen: Set<string>;
+}): ExportedName[] {
+  if (statement.isTypeOnly) return [];
+
+  const target =
+    statement.moduleSpecifier !== void 0 && ts.isStringLiteralLike(statement.moduleSpecifier)
+      ? resolveSpecifier({ specifier: statement.moduleSpecifier.text, file })
+      : void 0;
+
+  if (statement.exportClause === void 0) {
+    return target === void 0 ? [] : exportedNames({ file: target, resolveSpecifier, seen });
+  }
+  if (!ts.isNamedExports(statement.exportClause)) return [];
+
+  return statement.exportClause.elements
+    .filter((element) => !element.isTypeOnly)
+    .map((element) => ({ name: element.name.text, declaringFile: target ?? file }));
+}
+
+/** An exported class or function declared in `file` itself. */
+function declaredExportNames({
+  statement,
+  file,
+}: {
+  statement: ts.Statement;
+  file: string;
+}): ExportedName[] {
+  const exported = ts.canHaveModifiers(statement)
+    ? ts.getModifiers(statement)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    : false;
+  if (exported !== true) return [];
+  const declares = ts.isClassDeclaration(statement) || ts.isFunctionDeclaration(statement);
+  if (!declares || !statement.name) return [];
+  return [{ name: statement.name.text, declaringFile: file }];
+}
+
 /**
  * Every value name an index publishes, mapped to the module that declares it.
  * Type-only clauses and specifiers are skipped: an erased export composes.
@@ -143,46 +191,10 @@ function exportedNames({
 
   for (const statement of source.statements) {
     if (ts.isExportDeclaration(statement)) {
-      if (statement.isTypeOnly) continue;
-
-      const target =
-        statement.moduleSpecifier !== void 0 && ts.isStringLiteralLike(statement.moduleSpecifier)
-          ? resolveSpecifier({ specifier: statement.moduleSpecifier.text, file })
-          : void 0;
-
-      if (statement.exportClause === void 0) {
-        if (target !== void 0)
-          names.push(...exportedNames({ file: target, resolveSpecifier, seen }));
-
-        continue;
-      }
-
-      if (!ts.isNamedExports(statement.exportClause)) continue;
-
-      for (const element of statement.exportClause.elements) {
-        if (element.isTypeOnly) continue;
-
-        names.push({ name: element.name.text, declaringFile: target ?? file });
-      }
-
+      names.push(...reExportedNames({ statement, file, resolveSpecifier, seen }));
       continue;
     }
-
-    const exported = ts.canHaveModifiers(statement)
-      ? ts
-          .getModifiers(statement)
-          ?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
-      : false;
-
-    if (exported !== true) continue;
-
-    if (ts.isClassDeclaration(statement)) {
-      if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
-    }
-
-    if (ts.isFunctionDeclaration(statement)) {
-      if (statement.name) names.push({ name: statement.name.text, declaringFile: file });
-    }
+    names.push(...declaredExportNames({ statement, file }));
   }
 
   return names;
@@ -304,6 +316,30 @@ function isDeclarationName(node: ts.Identifier): boolean {
   return parent?.name === node && !ts.isPropertyAccessExpression(parent);
 }
 
+/** Imports, exports, type aliases, interfaces and type nodes: none of them is a runtime value. */
+function isErasedAtRuntime(node: ts.Node): boolean {
+  return (
+    ts.isImportDeclaration(node) ||
+    ts.isExportDeclaration(node) ||
+    ts.isImportEqualsDeclaration(node) ||
+    ts.isTypeAliasDeclaration(node) ||
+    ts.isInterfaceDeclaration(node) ||
+    ts.isTypeNode(node)
+  );
+}
+
+function isWantedValueName({
+  node,
+  wanted,
+  declaredHere,
+}: {
+  node: ts.Identifier;
+  wanted: ReadonlySet<string>;
+  declaredHere: ReadonlySet<string>;
+}): boolean {
+  return wanted.has(node.text) && !declaredHere.has(node.text) && !isDeclarationName(node);
+}
+
 /** Wanted names used as VALUES only (new X(, X.create(, X composed); skips imports/exports,
  * types, declaring module; AST parse to skip comments */
 function valueReferences({
@@ -331,27 +367,10 @@ function valueReferences({
       return;
     }
 
-    if (ts.isImportDeclaration(node)) return;
-
-    if (ts.isExportDeclaration(node)) return;
-
-    if (ts.isImportEqualsDeclaration(node)) return;
-
-    if (ts.isTypeAliasDeclaration(node)) return;
-
-    if (ts.isInterfaceDeclaration(node)) return;
-
-    if (ts.isTypeNode(node)) return;
+    if (isErasedAtRuntime(node)) return;
 
     if (ts.isIdentifier(node)) {
-      if (!wanted.has(node.text)) return;
-
-      if (declaredHere.has(node.text)) return;
-
-      if (isDeclarationName(node)) return;
-
-      found.push(node.text);
-
+      if (isWantedValueName({ node, wanted, declaredHere })) found.push(node.text);
       return;
     }
 

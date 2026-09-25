@@ -948,6 +948,8 @@ export interface CollectedBinding {
   ref: BindingRef;
 }
 
+const GHERKIN_BODY_PREFIXES = ["Given", "When", "Then", "And", "But", "|"] as const;
+
 function parseFeature(absPath: string): Scenario[] {
   const raw = readFileSync(absPath, "utf8");
   const lines = raw.split("\n");
@@ -990,19 +992,8 @@ function parseFeature(absPath: string): Scenario[] {
       continue;
     }
 
-    if (trimmed.startsWith("Given")) continue;
-
-    if (trimmed.startsWith("When")) continue;
-
-    if (trimmed.startsWith("Then")) continue;
-
-    if (trimmed.startsWith("And")) continue;
-
-    if (trimmed.startsWith("But")) continue;
-
-    if (trimmed.startsWith("|")) continue;
-
-    pendingTags = [];
+    // A step or table row keeps the pending tags; anything else drops them.
+    if (!GHERKIN_BODY_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) pendingTags = [];
   }
 
   return scenarios;
@@ -1177,6 +1168,26 @@ export function findScenarioAnnotations(
 }
 
 /**
+ * The index past the comment text at `at`: a fresh comment, or the rest of a
+ * JSDoc block the annotation sat inside (` *` lines and the ` *\/` closer).
+ * `at` itself when no comment is there, -1 when one never ends.
+ */
+function pastTsComment({ src, at }: { src: string; at: number }): number {
+  const ch = src[at];
+  const next = src[at + 1];
+  if (ch === "*" && next === "/") return at + 2;
+  if (ch === "*" || (ch === "/" && next === "/")) {
+    const nl = src.indexOf("\n", at);
+    return nl === -1 ? -1 : nl + 1;
+  }
+  if (ch === "/" && next === "*") {
+    const close = src.indexOf("*/", at + 2);
+    return close === -1 ? -1 : close + 2;
+  }
+  return at;
+}
+
+/**
  * Whether a test call follows `start` — the proximity half of a binding. Oxlint's `RuleTester`
  * (`tests/*.test.mjs`) registers its cases through `tester.run(name, rule, { valid, invalid
  * })`, with `RuleTester.it = it` underneath, so that call is the test call for a fixture suite.
@@ -1188,56 +1199,15 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
   while (i < len) {
     const ch = src[i];
 
-    if (ch === " ") {
+    if (SOURCE_WHITESPACE.has(ch ?? "")) {
       i++;
       continue;
     }
 
-    if (ch === "\t") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\n") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\r") {
-      i++;
-      continue;
-    }
-
-    // The annotation may sit on any line of a JSDoc block, not only its last.
-    // What follows it is then the rest of that block: ` *` continuation lines
-    // and the ` */` closer. Both are comment, not code, so the scan steps over
-    // them the same way it steps over a fresh comment below.
-    if (ch === "*" && src[i + 1] === "/") {
-      i += 2;
-      continue;
-    }
-
-    if (ch === "*") {
-      const nl = src.indexOf("\n", i);
-      if (nl === -1) return false;
-
-      i = nl + 1;
-      continue;
-    }
-
-    if (ch === "/" && src[i + 1] === "*") {
-      const close = src.indexOf("*/", i + 2);
-      if (close === -1) return false;
-
-      i = close + 2;
-      continue;
-    }
-
-    if (ch === "/" && src[i + 1] === "/") {
-      const nl = src.indexOf("\n", i);
-      if (nl === -1) return false;
-
-      i = nl + 1;
+    const next = pastTsComment({ src, at: i });
+    if (next === -1) return false;
+    if (next !== i) {
+      i = next;
       continue;
     }
 
@@ -1385,49 +1355,59 @@ const GO_SUBTEST_SCAN_BUDGET = 4096;
  */
 function skipGoSpaceAndComments(src: string, start: number, limit: number): number {
   let i = start;
-
   while (i < limit) {
-    const ch = src[i];
-
-    if (ch === " ") {
+    if (SOURCE_WHITESPACE.has(src[i] ?? "")) {
       i++;
       continue;
     }
-
-    if (ch === "\t") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\n") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\r") {
-      i++;
-      continue;
-    }
-
-    if (ch === "/" && src[i + 1] === "*") {
-      const close = src.indexOf("*/", i + 2);
-      if (close === -1 || close + 2 > limit) return -1;
-
-      i = close + 2;
-      continue;
-    }
-
-    if (ch === "/" && src[i + 1] === "/") {
-      const nl = src.indexOf("\n", i);
-      if (nl === -1 || nl + 1 > limit) return -1;
-
-      i = nl + 1;
-      continue;
-    }
-
-    return i;
+    const next = pastGoComment({ src, at: i, limit });
+    if (next === i || next === -1) return next;
+    i = next;
   }
+  return -1;
+}
 
+/** Past a Go comment at `at`; `at` when none starts there, -1 when it runs past `limit`. */
+function pastGoComment({ src, at, limit }: { src: string; at: number; limit: number }): number {
+  if (src[at] !== "/") return at;
+  if (src[at + 1] === "*") {
+    const close = src.indexOf("*/", at + 2);
+    return close === -1 || close + 2 > limit ? -1 : close + 2;
+  }
+  if (src[at + 1] === "/") {
+    const nl = src.indexOf("\n", at);
+    return nl === -1 || nl + 1 > limit ? -1 : nl + 1;
+  }
+  return at;
+}
+
+const SOURCE_WHITESPACE: ReadonlySet<string> = new Set([" ", "\t", "\n", "\r"]);
+
+/**
+ * The index just past an interpreted string or rune literal starting at
+ * `start`, or -1 when it never closes: backslash escapes, never spans a line.
+ */
+function pastGoQuotedLiteral({
+  rest,
+  start,
+  limit,
+}: {
+  rest: string;
+  start: number;
+  limit: number;
+}): number {
+  const quote = rest[start];
+  let i = start + 1;
+  while (i < limit) {
+    const c = rest[i];
+    if (c === "\\") {
+      i += 2;
+      continue;
+    }
+    if (c === "\n") return -1;
+    i++;
+    if (c === quote) return i;
+  }
   return -1;
 }
 
@@ -1440,88 +1420,63 @@ function isGoSubtestDeclaration(rest: string): boolean {
 
   const headLength = head[0]!.length;
   const limit = Math.min(rest.length, headLength + GO_SUBTEST_SCAN_BUDGET);
-  let depth = 0;
-  let i = headLength;
-  let commaAt = -1;
-
-  while (i < limit) {
-    const ch = rest[i];
-
-    if (ch === '"' || ch === "'") {
-      // Interpreted string / rune literal: backslash escapes, never spans a line.
-      const quote = ch;
-      i++;
-      let closed = false;
-
-      while (i < limit) {
-        const c = rest[i];
-
-        if (c === "\\") {
-          i += 2;
-          continue;
-        }
-
-        if (c === "\n") return false;
-
-        i++;
-
-        if (c === quote) {
-          closed = true;
-          break;
-        }
-      }
-
-      if (!closed) return false;
-
-      continue;
-    }
-
-    if (ch === "`") {
-      // Raw string literal: no escapes, may span lines.
-      const close = rest.indexOf("`", i + 1);
-      if (close === -1 || close >= limit) return false;
-
-      i = close + 1;
-      continue;
-    }
-
-    if (ch === "/" && (rest[i + 1] === "/" || rest[i + 1] === "*")) {
-      const next = skipGoSpaceAndComments(rest, i, limit);
-      if (next === -1) return false;
-
-      i = next;
-      continue;
-    }
-
-    if (ch === "(" || ch === "[" || ch === "{") {
-      depth++;
-      i++;
-      continue;
-    }
-
-    if (ch === ")" || ch === "]" || ch === "}") {
-      // The call closed before any top-level comma: `t.Run(name)` is not a subtest.
-      if (depth === 0) return false;
-
-      depth--;
-      i++;
-      continue;
-    }
-
-    if (ch === "," && depth === 0) {
-      commaAt = i;
-      break;
-    }
-
-    i++;
-  }
-
+  const commaAt = topLevelCommaAt({ rest, start: headLength, limit });
   if (commaAt === -1) return false;
 
   const closureAt = skipGoSpaceAndComments(rest, commaAt + 1, limit);
   if (closureAt === -1) return false;
 
   return GO_SUBTEST_CLOSURE_RE.test(rest.slice(closureAt));
+}
+
+/**
+ * Past a Go string, rune, raw string or comment at `i`: `i` when none starts
+ * there, -1 when it is unterminated inside `limit`.
+ */
+function pastGoOpaque({ rest, i, limit }: { rest: string; i: number; limit: number }): number {
+  const ch = rest[i];
+  if (ch === '"' || ch === "'") return pastGoQuotedLiteral({ rest, start: i, limit });
+  if (ch === "`") {
+    // Raw string literal: no escapes, may span lines.
+    const close = rest.indexOf("`", i + 1);
+    return close === -1 || close >= limit ? -1 : close + 1;
+  }
+  if (ch === "/" && (rest[i + 1] === "/" || rest[i + 1] === "*")) {
+    return skipGoSpaceAndComments(rest, i, limit);
+  }
+  return i;
+}
+
+/** The first comma outside any bracket, or -1 when the call closes first or the budget runs out. */
+function topLevelCommaAt({
+  rest,
+  start,
+  limit,
+}: {
+  rest: string;
+  start: number;
+  limit: number;
+}): number {
+  let depth = 0;
+  let i = start;
+  while (i < limit) {
+    const next = pastGoOpaque({ rest, i, limit });
+    if (next === -1) return -1;
+    if (next !== i) {
+      i = next;
+      continue;
+    }
+    const ch = rest[i] ?? "";
+    if ("([{".includes(ch)) depth++;
+    if (")]}".includes(ch)) {
+      // The call closed before any top-level comma: `t.Run(name)` is not a subtest.
+      if (depth === 0) return -1;
+      depth--;
+    }
+    if (ch === "," && depth === 0) return i;
+    i++;
+  }
+  return -1;
 }
 
 function isFollowedByGoTestFunc(src: string, start: number): boolean {
@@ -1613,22 +1568,7 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
   while (i < len) {
     const ch = src[i];
 
-    if (ch === " ") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\t") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\n") {
-      i++;
-      continue;
-    }
-
-    if (ch === "\r") {
+    if (SOURCE_WHITESPACE.has(ch ?? "")) {
       i++;
       continue;
     }
@@ -1657,6 +1597,32 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
 const PYTHON_HASH_ANNOTATION_RE =
   /^[ \t]*#[ \t]*@scenario[ \t]+(?:"([^"\r\n]+)"|'([^'\r\n]+)')[ \t\r]*$/;
 
+/** The `# @scenario "..."` bindings in one Python file (mirrors Bats). */
+function pythonHashBindings({ file, src }: { file: string; src: string }): CollectedBinding[] {
+  const bindings: CollectedBinding[] = [];
+  const lines = src.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const hm = line.match(PYTHON_HASH_ANNOTATION_RE);
+    if (!hm) continue;
+
+    const title = (hm[1] ?? hm[2] ?? "").trim();
+    if (!title) continue;
+
+    // Use the same proximity check as the block form. Walk from the
+    // start of the next line.
+    const lineStartOffset = lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
+    if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
+
+    bindings.push({
+      title,
+      ref: { file: relative(REPO_ROOT, file), line: i + 1 },
+    });
+  }
+  return bindings;
+}
+
 function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   const files: string[] = [];
@@ -1680,27 +1646,7 @@ function collectPythonBindings(testRoots: string[]): CollectedBinding[] {
       });
     }
 
-    // Hash-comment form (mirrors Bats).
-    const lines = src.split("\n");
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i] ?? "";
-      const hm = line.match(PYTHON_HASH_ANNOTATION_RE);
-      if (!hm) continue;
-
-      const title = (hm[1] ?? hm[2] ?? "").trim();
-      if (!title) continue;
-
-      // Use the same proximity check as the block form. Walk from the
-      // start of the next line.
-      const lineStartOffset = lines.slice(0, i + 1).reduce((acc, l) => acc + l.length + 1, 0);
-      if (!isFollowedByPythonTestFunc(src, lineStartOffset)) continue;
-
-      bindings.push({
-        title,
-        ref: { file: relative(REPO_ROOT, file), line: i + 1 },
-      });
-    }
+    bindings.push(...pythonHashBindings({ file, src }));
   }
 
   return bindings;

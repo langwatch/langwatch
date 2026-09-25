@@ -79,104 +79,136 @@ function isContractOnlyCoreEntry({
   );
 }
 
-export function discoverClassifiedPackages(root: string): {
-  packages: ClassifiedPackage[];
+type Discovery = {
+  root: string;
   catalogue: FeatureCatalogueEntry[];
+  catalogueByRoot: Map<string, FeatureCatalogueEntry>;
+  packages: ClassifiedPackage[];
   violations: ArchitectureViolation[];
-} {
-  const packages: ClassifiedPackage[] = [];
-  const violations: ArchitectureViolation[] = [];
-  const catalogue = readFeatureCatalogue(root, violations);
-  const catalogueByRoot = new Map(catalogue.map((entry) => [join(root, entry.root), entry]));
+};
 
-  const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
-    for (const feature of directories(featuresRoot)) {
-      const featureRoot = join(featuresRoot, feature);
-      const catalogueEntry = catalogueByRoot.get(featureRoot);
-      // An Enterprise provider of a core port is unregistered by design:
-      // modules/audit-log/adrs/002-audit-log-port-boundary.md.
-      const providesCorePort =
-        enterprise && !catalogueEntry && isContractOnlyCoreEntry({ root, catalogue, id: feature });
+function checkFeatureRoot({
+  discovery,
+  feature,
+  featureRoot,
+  enterprise,
+}: {
+  discovery: Discovery;
+  feature: string;
+  featureRoot: string;
+  enterprise: boolean;
+}): void {
+  const { root, catalogue, violations } = discovery;
+  const catalogueEntry = discovery.catalogueByRoot.get(featureRoot);
+  // An Enterprise provider of a core port is unregistered by design:
+  // modules/audit-log/adrs/002-audit-log-port-boundary.md.
+  const providesCorePort =
+    enterprise && !catalogueEntry && isContractOnlyCoreEntry({ root, catalogue, id: feature });
 
-      if (!catalogueEntry && !providesCorePort) {
-        violations.push({
-          policy: "feature-catalogue",
-          file: featureRoot,
-          message: `Feature root ${JSON.stringify(feature)} is not registered in modules/catalogue.json.`,
-          allowed:
-            "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
-        });
-      } else if (
-        catalogueEntry &&
-        (catalogueEntry.classification === "enterprise") !== enterprise
-      ) {
-        violations.push({
-          policy: "feature-catalogue",
-          file: featureRoot,
-          message: `Feature ${JSON.stringify(feature)} is in the wrong core/Enterprise tree for its catalogue classification.`,
-        });
-      }
+  if (!catalogueEntry && !providesCorePort) {
+    violations.push({
+      policy: "feature-catalogue",
+      file: featureRoot,
+      message: `Feature root ${JSON.stringify(feature)} is not registered in modules/catalogue.json.`,
+      allowed:
+        "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
+    });
+  } else if (catalogueEntry && (catalogueEntry.classification === "enterprise") !== enterprise) {
+    violations.push({
+      policy: "feature-catalogue",
+      file: featureRoot,
+      message: `Feature ${JSON.stringify(feature)} is in the wrong core/Enterprise tree for its catalogue classification.`,
+    });
+  }
 
-      const featureManifest = join(featureRoot, "package.json");
+  const featureManifest = join(featureRoot, "package.json");
 
-      if (existsSync(featureManifest)) {
-        violations.push({
-          policy: "feature-layout",
-          file: featureManifest,
-          message: "A feature ownership directory cannot itself be a package.",
-          allowed: "Put package.json inside contract, process, browser, or browser-kit.",
-        });
-      }
+  if (existsSync(featureManifest)) {
+    violations.push({
+      policy: "feature-layout",
+      file: featureManifest,
+      message: "A feature ownership directory cannot itself be a package.",
+      allowed: "Put package.json inside contract, process, browser, or browser-kit.",
+    });
+  }
+}
 
-      for (const roleName of directories(featureRoot)) {
-        const manifestPath = join(featureRoot, roleName, "package.json");
-        if (!existsSync(manifestPath)) continue;
+function discoverFeatureRoles({
+  discovery,
+  feature,
+  featureRoot,
+  enterprise,
+}: {
+  discovery: Discovery;
+  feature: string;
+  featureRoot: string;
+  enterprise: boolean;
+}): void {
+  const { packages, violations } = discovery;
+  const catalogueEntry = discovery.catalogueByRoot.get(featureRoot);
+  for (const roleName of directories(featureRoot)) {
+    const manifestPath = join(featureRoot, roleName, "package.json");
+    if (!existsSync(manifestPath)) continue;
 
-        if (!FEATURE_ROLES.has(roleName as FeaturePackageRole)) {
-          violations.push({
-            policy: "feature-layout",
-            file: manifestPath,
-            message: `Unknown feature package role "${roleName}".`,
-            allowed:
-              "Use contract, process, browser, or browser-kit; documentation belongs at the feature root.",
-          });
+    if (!FEATURE_ROLES.has(roleName as FeaturePackageRole)) {
+      violations.push({
+        policy: "feature-layout",
+        file: manifestPath,
+        message: `Unknown feature package role "${roleName}".`,
+        allowed:
+          "Use contract, process, browser, or browser-kit; documentation belongs at the feature root.",
+      });
 
-          continue;
-        }
-
-        const role = roleName as FeaturePackageRole;
-        const manifest = readManifest(manifestPath);
-
-        const expectedName = enterprise
-          ? `@langwatch/enterprise-${feature}-${role}`
-          : `@langwatch/${feature}-${role}`;
-
-        if (manifest.name !== expectedName) {
-          violations.push({
-            policy: "feature-layout",
-            file: manifestPath,
-            message: `Package name must be "${expectedName}", found ${JSON.stringify(manifest.name)}.`,
-          });
-        }
-
-        packages.push({
-          name: manifest.name ?? expectedName,
-          root: join(featureRoot, role),
-          manifestPath,
-          manifest,
-          kind: role,
-          feature,
-          featureRoot,
-          subjects: catalogueEntry?.subjects,
-          enterprise,
-        });
-      }
+      continue;
     }
-  };
 
-  discoverFeatures(join(root, "modules"), false);
-  discoverFeatures(join(root, "enterprise", "modules"), true);
+    const role = roleName as FeaturePackageRole;
+    const manifest = readManifest(manifestPath);
 
+    const expectedName = enterprise
+      ? `@langwatch/enterprise-${feature}-${role}`
+      : `@langwatch/${feature}-${role}`;
+
+    if (manifest.name !== expectedName) {
+      violations.push({
+        policy: "feature-layout",
+        file: manifestPath,
+        message: `Package name must be "${expectedName}", found ${JSON.stringify(manifest.name)}.`,
+      });
+    }
+
+    packages.push({
+      name: manifest.name ?? expectedName,
+      root: join(featureRoot, role),
+      manifestPath,
+      manifest,
+      kind: role,
+      feature,
+      featureRoot,
+      subjects: catalogueEntry?.subjects,
+      enterprise,
+    });
+  }
+}
+
+function discoverFeatureTree({
+  discovery,
+  featuresRoot,
+  enterprise,
+}: {
+  discovery: Discovery;
+  featuresRoot: string;
+  enterprise: boolean;
+}): void {
+  for (const feature of directories(featuresRoot)) {
+    const featureRoot = join(featuresRoot, feature);
+    checkFeatureRoot({ discovery, feature, featureRoot, enterprise });
+    discoverFeatureRoles({ discovery, feature, featureRoot, enterprise });
+  }
+}
+
+function discoverApplications(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
   const sharedApplicationRoot = join(root, "apps", "shared");
 
   if (existsSync(sharedApplicationRoot)) {
@@ -230,7 +262,10 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: false,
     });
   }
+}
 
+function discoverDevRuntime(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
   const devRuntimeRoot = join(root, "tools", "dev-runtime");
   const devRuntimeManifest = join(devRuntimeRoot, "package.json");
 
@@ -255,7 +290,11 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: false,
     });
   }
+}
 
+/** The Enterprise tree is governed by its own license and README before any source lands. */
+function checkEnterpriseGovernance(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
   const enterpriseRoot = join(root, "enterprise");
   const enterpriseLicense = join(enterpriseRoot, "LICENSE.md");
   const enterpriseReadme = join(enterpriseRoot, "README.md");
@@ -296,6 +335,12 @@ export function discoverClassifiedPackages(root: string): {
       });
     }
   }
+}
+
+function discoverEnterpriseRoot(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
+  const enterpriseRoot = join(root, "enterprise");
+  const enterpriseManifest = join(enterpriseRoot, "package.json");
 
   if (existsSync(enterpriseManifest)) {
     const manifest = readManifest(enterpriseManifest);
@@ -343,6 +388,11 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: true,
     });
   }
+}
+
+function discoverEnterpriseCompositions(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
+  const enterpriseRoot = join(root, "enterprise");
 
   for (const composition of ENTERPRISE_COMPOSITION_PACKAGES) {
     const compositionRoot = join(enterpriseRoot, "packages", "composition", composition.role);
@@ -369,42 +419,66 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: true,
     });
   }
+}
 
-  if (existsSync(enterpriseRoot)) {
-    for (const directory of directories(enterpriseRoot)) {
-      if (directory === "packages" || directory === "modules") continue;
+function checkStrayEnterpriseManifests(discovery: Discovery): void {
+  const enterpriseRoot = join(discovery.root, "enterprise");
+  if (!existsSync(enterpriseRoot)) return;
+  checkEnterpriseAggregateDirectories({ violations: discovery.violations, enterpriseRoot });
+  checkEnterpriseCompositionRoles({ violations: discovery.violations, enterpriseRoot });
+}
 
-      const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
-      if (!existsSync(unexpectedManifest)) continue;
+function checkEnterpriseAggregateDirectories({
+  violations,
+  enterpriseRoot,
+}: {
+  violations: ArchitectureViolation[];
+  enterpriseRoot: string;
+}): void {
+  for (const directory of directories(enterpriseRoot)) {
+    if (directory === "packages" || directory === "modules") continue;
 
-      violations.push({
-        policy: "enterprise-layout",
-        file: unexpectedManifest,
-        message: `Enterprise aggregate package at enterprise/${directory} is outside the fixed package layout.`,
-        allowed:
-          "Use the portable root, packages/composition/{api,worker,web}, or modules/<module>/{contract,server,web}.",
-      });
-    }
+    const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
+    if (!existsSync(unexpectedManifest)) continue;
 
-    const compositionRoot = join(enterpriseRoot, "packages", "composition");
-
-    for (const directory of directories(compositionRoot)) {
-      if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
-        continue;
-      }
-
-      const unexpectedManifest = join(compositionRoot, directory, "package.json");
-      if (!existsSync(unexpectedManifest)) continue;
-
-      violations.push({
-        policy: "enterprise-layout",
-        file: unexpectedManifest,
-        message: `Unknown Enterprise composition role "${directory}".`,
-        allowed: "Use api, worker, or web.",
-      });
-    }
+    violations.push({
+      policy: "enterprise-layout",
+      file: unexpectedManifest,
+      message: `Enterprise aggregate package at enterprise/${directory} is outside the fixed package layout.`,
+      allowed:
+        "Use the portable root, packages/composition/{api,worker,web}, or modules/<module>/{contract,server,web}.",
+    });
   }
+}
 
+function checkEnterpriseCompositionRoles({
+  violations,
+  enterpriseRoot,
+}: {
+  violations: ArchitectureViolation[];
+  enterpriseRoot: string;
+}): void {
+  const compositionRoot = join(enterpriseRoot, "packages", "composition");
+
+  for (const directory of directories(compositionRoot)) {
+    if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
+      continue;
+    }
+
+    const unexpectedManifest = join(compositionRoot, directory, "package.json");
+    if (!existsSync(unexpectedManifest)) continue;
+
+    violations.push({
+      policy: "enterprise-layout",
+      file: unexpectedManifest,
+      message: `Unknown Enterprise composition role "${directory}".`,
+      allowed: "Use api, worker, or web.",
+    });
+  }
+}
+
+function checkEnterpriseAggregates(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
   for (const directory of directories(join(root, "packages"))) {
     const manifestPath = join(root, "packages", directory, "package.json");
     if (!existsSync(manifestPath)) continue;
@@ -433,7 +507,10 @@ export function discoverClassifiedPackages(root: string): {
       });
     }
   }
+}
 
+function discoverToolingPackages(discovery: Discovery): void {
+  const { root, packages, violations } = discovery;
   const designSystemRoot = join(root, "packages", "design-system");
   const designSystemManifest = join(designSystemRoot, "package.json");
 
@@ -489,7 +566,10 @@ export function discoverClassifiedPackages(root: string): {
       enterprise: false,
     });
   }
+}
 
+function checkDuplicateNames(discovery: Discovery): void {
+  const { packages, violations } = discovery;
   const names = new Map<string, string>();
 
   for (const pkg of packages) {
@@ -505,8 +585,40 @@ export function discoverClassifiedPackages(root: string): {
       names.set(pkg.name, pkg.manifestPath);
     }
   }
+}
 
-  return { packages, catalogue, violations };
+export function discoverClassifiedPackages(root: string): {
+  packages: ClassifiedPackage[];
+  catalogue: FeatureCatalogueEntry[];
+  violations: ArchitectureViolation[];
+} {
+  const violations: ArchitectureViolation[] = [];
+  const catalogue = readFeatureCatalogue(root, violations);
+  const discovery: Discovery = {
+    root,
+    catalogue,
+    catalogueByRoot: new Map(catalogue.map((entry) => [join(root, entry.root), entry])),
+    packages: [],
+    violations,
+  };
+
+  discoverFeatureTree({ discovery, featuresRoot: join(root, "modules"), enterprise: false });
+  discoverFeatureTree({
+    discovery,
+    featuresRoot: join(root, "enterprise", "modules"),
+    enterprise: true,
+  });
+  discoverApplications(discovery);
+  discoverDevRuntime(discovery);
+  checkEnterpriseGovernance(discovery);
+  discoverEnterpriseRoot(discovery);
+  discoverEnterpriseCompositions(discovery);
+  checkStrayEnterpriseManifests(discovery);
+  checkEnterpriseAggregates(discovery);
+  discoverToolingPackages(discovery);
+  checkDuplicateNames(discovery);
+
+  return { packages: discovery.packages, catalogue, violations };
 }
 
 /**

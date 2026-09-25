@@ -84,6 +84,18 @@ const LIVE_DISPATCH_IS_REPLAY = false;
  */
 type SubscriberDelivery<E extends Event> = { event: E; foldState: unknown };
 
+/** The delivery attempt a queue context carries, when it carries one. */
+function deliveryAttemptOf(context: { deliveryAttempt?: number }): { deliveryAttempt?: number } {
+  return context.deliveryAttempt !== undefined ? { deliveryAttempt: context.deliveryAttempt } : {};
+}
+
+/** A fold ordered by acceptance scores each event by when it was accepted. */
+function acceptedAtScore(
+  eventOrdering: string | undefined,
+): ((event: { createdAt: number }) => number) | undefined {
+  return eventOrdering === "acceptedAt" ? (event) => event.createdAt : undefined;
+}
+
 /**
  * Registers fold and map projections and dispatches events. Folds enqueue to
  * GroupQueue (per-aggregate ordering); maps enqueue to SimpleQueue (per-event).
@@ -517,8 +529,7 @@ export class ProjectionRouter<
       projectionDefs[name] = {
         name,
         groupKeyFn: fold.key,
-        scoreFn:
-          fold.options?.eventOrdering === "acceptedAt" ? (event) => event.createdAt : undefined,
+        scoreFn: acceptedAtScore(fold.options?.eventOrdering),
         // Coalesces a backed-up group into one load/apply/store cycle — safe
         // since a pure left-fold gives the same result either way, and
         // subscribers still fire per event, just observing the final batch
@@ -531,14 +542,7 @@ export class ProjectionRouter<
     this.queueManager.initializeProjectionQueues(
       projectionDefs,
       async (projectionName, triggerEvent, context) => {
-        const fold = this.foldProjections.get(projectionName);
-        if (!fold) {
-          throw new ConfigurationError(
-            "ProjectionRouter",
-            `Fold projection "${projectionName}" not found`,
-            { projectionName },
-          );
-        }
+        const fold = this.getFoldProjection(projectionName);
 
         await fold.open((definition) =>
           this.processFoldProjectionEvent({
@@ -547,22 +551,13 @@ export class ProjectionRouter<
             event: triggerEvent,
             context: {
               tenantId: triggerEvent.tenantId,
-              ...(context.deliveryAttempt !== undefined
-                ? { deliveryAttempt: context.deliveryAttempt }
-                : {}),
+              ...deliveryAttemptOf(context),
             },
           }),
         );
       },
       async (projectionName, events, context) => {
-        const fold = this.foldProjections.get(projectionName);
-        if (!fold) {
-          throw new ConfigurationError(
-            "ProjectionRouter",
-            `Fold projection "${projectionName}" not found`,
-            { projectionName },
-          );
-        }
+        const fold = this.getFoldProjection(projectionName);
 
         await fold.open((definition) =>
           this.processFoldProjectionBatch({
@@ -571,9 +566,7 @@ export class ProjectionRouter<
             events,
             context: {
               tenantId: events[0]!.tenantId,
-              ...(context.deliveryAttempt !== undefined
-                ? { deliveryAttempt: context.deliveryAttempt }
-                : {}),
+              ...deliveryAttemptOf(context),
               // A bisected sub-batch after the first commit of its dispatch: the
               // fold commit must extend the applied-id set, not replace it
               // (#6578). Dropping this here silently re-enables the double-apply
@@ -591,6 +584,18 @@ export class ProjectionRouter<
   /**
    * Initialize queue processors for map projections.
    */
+  private getFoldProjection(projectionName: string) {
+    const fold = this.foldProjections.get(projectionName);
+    if (!fold) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Fold projection "${projectionName}" not found`,
+        { projectionName },
+      );
+    }
+    return fold;
+  }
+
   initializeMapQueues(): void {
     if (this.mapProjections.size === 0) return;
 

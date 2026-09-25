@@ -20,6 +20,34 @@ const FORBIDDEN_DECLARATION = [
   },
 ] as const;
 
+/** Blanks the comment at `index` in `out`; answers where it ends, or `index` when none starts. */
+function blankCommentAt({
+  source,
+  out,
+  index,
+}: {
+  source: string;
+  out: string[];
+  index: number;
+}): number {
+  if (source[index] !== "/") return index;
+  if (source[index + 1] === "/") {
+    let at = index;
+    while (at < source.length && source[at] !== "\n") {
+      out[at] = " ";
+      at += 1;
+    }
+    return at;
+  }
+  if (source[index + 1] !== "*") return index;
+  const end = source.indexOf("*/", index + 2);
+  const stop = end === -1 ? source.length : end + 2;
+  for (let at = index; at < stop; at += 1) {
+    if (source[at] !== "\n") out[at] = " ";
+  }
+  return stop;
+}
+
 /**
  * The declaration text with comments blanked to spaces (offsets kept): JSDoc copied into `.d.ts`
  * mentioning a forbidden path was 40 of 310 false findings. Strings are kept; import specifiers are
@@ -32,7 +60,6 @@ function withoutComments(source: string): string {
 
   while (index < source.length) {
     const char = source[index];
-    const next = source[index + 1];
 
     if (quote) {
       if (char === "\\") index += 1;
@@ -48,24 +75,9 @@ function withoutComments(source: string): string {
       continue;
     }
 
-    if (char === "/" && next === "/") {
-      while (index < source.length && source[index] !== "\n") {
-        out[index] = " ";
-        index += 1;
-      }
-
-      continue;
-    }
-
-    if (char === "/" && next === "*") {
-      const end = source.indexOf("*/", index + 2);
-      const stop = end === -1 ? source.length : end + 2;
-
-      for (let at = index; at < stop; at += 1) {
-        if (source[at] !== "\n") out[at] = " ";
-      }
-
-      index = stop;
+    const past = blankCommentAt({ source, out, index });
+    if (past !== index) {
+      index = past;
       continue;
     }
 

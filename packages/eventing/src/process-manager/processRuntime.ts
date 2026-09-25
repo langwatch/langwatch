@@ -203,6 +203,40 @@ export function buildProcessDefinition(
 }
 
 /**
+ * The envelope a process manager consumes for one event. The inbox keys on the
+ * command's deterministic key, since the event log can briefly hold two rows.
+ */
+function processEnvelopeFor<E extends Event>({
+  definition,
+  event,
+  context,
+}: {
+  definition: ProcessManagerDefinition;
+  event: E;
+  context: Parameters<EventSubscriberDefinition<E>["handle"]>[1];
+}): ProcessEventEnvelope {
+  const processKey = definition.config.keyBy?.(event) ?? context.aggregateId;
+  if (processKey.trim().length === 0) {
+    throw new Error(
+      `Process manager "${definition.config.name}" derived an empty process key for event ${event.id}`,
+    );
+  }
+  return {
+    eventId: event.idempotencyKey ?? event.id,
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    tenantId: context.tenantId,
+    projectId: context.tenantId,
+    processKey,
+    // `toPayload` is the content boundary. Without one the raw event
+    // data is persisted into process state and outbox rows verbatim.
+    payload: definition.config.toPayload
+      ? definition.config.toPayload(event)
+      : (event.data as ProcessEventEnvelope["payload"]),
+  };
+}
+
+/**
  * Owns process managers mounted on event-sourced pipelines. A generated live
  * subscriber hands committed events straight to the transactional inbox; no
  * feed, fact port, or second delivery mechanism exists between them.
@@ -239,29 +273,7 @@ export class ProcessRuntime {
         // would fight over the instance revision.
         ...(keyBy ? { options: { groupKeyFn: keyBy } } : {}),
         handle: async (event, context) => {
-          const processKey = keyBy?.(event) ?? context.aggregateId;
-          if (processKey.trim().length === 0) {
-            throw new Error(
-              `Process manager "${definition.config.name}" derived an empty process key for event ${event.id}`,
-            );
-          }
-          const envelope: ProcessEventEnvelope = {
-            // The event log can briefly expose two physical rows before its
-            // ReplacingMergeTree merges a redelivered command. The inbox owns
-            // logical consumption, so use the command's deterministic key
-            // when present and fall back to the physical event id otherwise.
-            eventId: event.idempotencyKey ?? event.id,
-            eventType: event.type,
-            occurredAt: event.occurredAt,
-            tenantId: context.tenantId,
-            projectId: context.tenantId,
-            processKey,
-            // `toPayload` is the content boundary. Without one the raw event
-            // data is persisted into process state and outbox rows verbatim.
-            payload: definition.config.toPayload
-              ? definition.config.toPayload(event)
-              : (event.data as ProcessEventEnvelope["payload"]),
-          };
+          const envelope = processEnvelopeFor({ definition, event, context });
           const result = await registered.manager.handleEvent({
             envelope,
             now: nowInstant().epochMilliseconds,

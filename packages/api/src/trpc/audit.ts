@@ -128,41 +128,42 @@ function findIdInArrayEntry(item: unknown): string | undefined {
   return undefined;
 }
 
+/** The first id any entry yields, in order. */
+function firstIdAmong(
+  items: readonly unknown[],
+  idOf: (item: unknown) => string | undefined,
+): string | undefined {
+  for (const item of items) {
+    const id = idOf(item);
+    if (id) return id;
+  }
+  return undefined;
+}
+
+/**
+ * One level of named-field walk into objects and arrays. The audit Target
+ * column is best-effort, and an unbounded walk would surface unrelated ids
+ * buried in nested payloads.
+ */
+function idOfNamedField(child: unknown): string | undefined {
+  if (Array.isArray(child)) return firstIdAmong(child, findIdInArrayEntry);
+  if (!child || typeof child !== "object") return undefined;
+  const childId = (child as Record<string, unknown>).id;
+  return typeof childId === "string" ? childId : undefined;
+}
+
 function findFirstId(value: unknown): string | undefined {
   if (!value) return undefined;
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const id = findFirstId(item);
-      if (id) return id;
-    }
-
-    return undefined;
-  }
-
+  if (Array.isArray(value)) return firstIdAmong(value, findFirstId);
   if (typeof value !== "object") return undefined;
 
   const obj = value as Record<string, unknown>;
   if (typeof obj.id === "string") return obj.id;
 
-  // One level of named-field walk into objects + arrays. We don't
-  // recurse arbitrarily deep - the audit Target column is best-effort,
-  // and an unbounded walk would surface unrelated ids buried in nested
-  // payloads.
   for (const key of Object.keys(obj)) {
-    const child = obj[key];
-
-    if (Array.isArray(child)) {
-      for (const item of child) {
-        const id = findIdInArrayEntry(item);
-        if (id) return id;
-      }
-    } else if (child && typeof child === "object") {
-      const childId = (child as Record<string, unknown>).id;
-      if (typeof childId === "string") return childId;
-    }
+    const id = idOfNamedField(obj[key]);
+    if (id !== undefined) return id;
   }
-
   return undefined;
 }
 
@@ -233,42 +234,45 @@ const MAX_SCAN_DEPTH = 8;
  */
 function redactSensitiveNames(value: unknown, depth = 0): unknown {
   if (depth >= MAX_SCAN_DEPTH || typeof value !== "object" || value === null) return undefined;
-
-  if (Array.isArray(value)) {
-    let changed = false;
-
-    const next = value.map((entry) => {
-      const redacted = redactSensitiveNames(entry, depth + 1);
-      if (redacted === undefined) return entry;
-
-      changed = true;
-
-      return redacted;
-    });
-
-    return changed ? next : undefined;
-  }
+  if (Array.isArray(value)) return redactSensitiveEntries(value, depth);
 
   const record = value as Record<string, unknown>;
   let next: Record<string, unknown> | undefined;
 
   for (const [name, field] of Object.entries(record)) {
-    if (isSensitiveFieldName(name)) {
-      if (field === "") continue;
-      next ??= { ...record };
-      next[name] = redactObjectField(field) ?? "[redacted]";
-      continue;
-    }
-
-    const redacted = redactSensitiveNames(field, depth + 1);
-
-    if (redacted !== undefined) {
-      next ??= { ...record };
-      next[name] = redacted;
-    }
+    const redacted = redactedField({ name, field, depth });
+    if (redacted === undefined) continue;
+    next ??= { ...record };
+    next[name] = redacted;
   }
 
   return next;
+}
+
+function redactSensitiveEntries(value: unknown[], depth: number): unknown[] | undefined {
+  let changed = false;
+  const next = value.map((entry) => {
+    const redacted = redactSensitiveNames(entry, depth + 1);
+    if (redacted === undefined) return entry;
+    changed = true;
+    return redacted;
+  });
+  return changed ? next : undefined;
+}
+
+/** A field's redacted value, or undefined when it keeps its own. An empty secret stays empty. */
+function redactedField({
+  name,
+  field,
+  depth,
+}: {
+  name: string;
+  field: unknown;
+  depth: number;
+}): unknown {
+  if (!isSensitiveFieldName(name)) return redactSensitiveNames(field, depth + 1);
+  if (field === "") return undefined;
+  return redactObjectField(field) ?? "[redacted]";
 }
 
 /** Keeps an object's field names, drops every value. */
