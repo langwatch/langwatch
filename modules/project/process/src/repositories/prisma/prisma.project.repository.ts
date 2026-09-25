@@ -468,6 +468,28 @@ export class PrismaProjectRepository
     return projects.map((project) => project.id);
   }
 
+  async findLiveByIdInOrganization(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { id: input.id, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
+  async findLiveBySlugInOrganization(input: {
+    slug: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { slug: input.slug, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({
       where: {

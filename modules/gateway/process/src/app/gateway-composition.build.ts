@@ -246,6 +246,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     virtualKeys,
     budgetDecisions,
     budgetSpend,
+    changeEvents: changes,
     virtualKeySpend,
     spendEvents,
     projects,

@@ -28,6 +28,10 @@ import {
   type CreateGatewayGuardrailInput,
   type GatewayApplicableBudget,
   type GatewayAgentCacheWriteInput,
+  type GatewayBudgetChangeInput,
+  type GatewayBudgetCheckInput,
+  type GatewayBudgetCheckResult,
+  type GatewayBudgetDebitRow,
   type GatewayBudgetResolutionTarget,
   type GatewayElevenLabsWebhookAnswer,
   type GatewayVirtualKeyDirectBudget,
@@ -68,6 +72,7 @@ import {
 } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
@@ -103,6 +108,7 @@ import {
   GatewayAgentCacheService,
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
+import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
@@ -141,6 +147,7 @@ import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
   type GatewayBudgetSpend,
+  type GatewayChangeEvents,
   type GatewayConfigAssembly,
   type GatewayModelProviderCredentials,
   type GatewayVirtualKeySpend,
@@ -352,6 +359,8 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
    * confident zero.
    */
   budgetSpend: GatewayBudgetSpend | undefined;
+  /** The change feed the Go data plane long-polls for budget and key revisions. */
+  changeEvents: GatewayChangeEvents;
   /** The ClickHouse per-key spend source. Absent likewise. */
   virtualKeySpend: GatewayVirtualKeySpend | undefined;
   /** The spend-event ledger reader. Absent likewise. */
@@ -586,6 +595,7 @@ export type GatewaySpendCollaborators = Readonly<{
 export type GatewayBudgetOverviewDeps = Readonly<{
   organizations: OrganizationApi;
   featureFlags: FeatureFlagApi;
+  traces: Pick<TraceApi, "findModelSpend">;
 }>;
 
 /** Unread by `overviewForUser`; only the budget's own `findBudgetOverview` uses this port. */
@@ -648,6 +658,8 @@ export class GatewayApp implements GatewayApi {
     featureFlags: FeatureFlagApi,
     /** The deployment's own providers, the only chain a license's managed key may dispatch on. */
     modelProviders: ModelProviderApi,
+    /** The per-model spend a personal budget lists its top models from. */
+    traces: TraceApi,
   };
   static readonly config = gatewayConfig;
   /**
@@ -775,6 +787,7 @@ export class GatewayApp implements GatewayApi {
       budgetOverviewDeps: {
         organizations: setup.dependencies.organizations,
         featureFlags: setup.dependencies.featureFlags,
+        traces: setup.dependencies.traces,
       },
       addresses: {
         baseUrl: setup.config?.internalUrl ?? setup.config?.baseUrl,
@@ -795,6 +808,7 @@ export class GatewayApp implements GatewayApi {
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
+  #budgetLedger: GatewayBudgetLedgerService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalDoor: RestIdentity;
   #connectUpstream: GatewayConnectUpstreamService | undefined;
@@ -1180,12 +1194,14 @@ export class GatewayApp implements GatewayApi {
         resolveProviderLabels: (budgets) => this.#dependencies.resolveProviderLabels(budgets),
       },
       budgetRepository: this.#dependencies.budgetSpend,
+      modelSpend: deps.traces,
     }));
   }
 
   budgetOverviewForUser(input: {
     organizationId: string;
     userId: string;
+    includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser> {
     return this.#budgetOverviewService.overviewForUser(input);
   }
@@ -1657,6 +1673,25 @@ export class GatewayApp implements GatewayApi {
 
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]> {
     return this.#dependencies.budgetDecisions.resolveApplicableBudgets(input);
+  }
+
+  checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult> {
+    return this.#dependencies.budgetDecisions.checkBudget(input);
+  }
+
+  insertSpendDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void> {
+    return this.#budgetLedgerService.insertDebit(rows);
+  }
+
+  appendBudgetChange(input: GatewayBudgetChangeInput): Promise<void> {
+    return this.#budgetLedgerService.appendBudgetChange(input);
+  }
+
+  get #budgetLedgerService(): GatewayBudgetLedgerService {
+    return (this.#budgetLedger ??= GatewayBudgetLedgerService.create({
+      spend: this.#dependencies.budgetSpend,
+      changes: this.#dependencies.changeEvents,
+    }));
   }
 
   loadDirectBudgetsForKeys(input: {

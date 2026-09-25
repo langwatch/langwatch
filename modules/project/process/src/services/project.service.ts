@@ -469,6 +469,23 @@ export class ProjectService {
     return this.repository.findLiveNonGovernanceIds(parsed.organizationId);
   }
 
+  findLiveBySlug(input: { slug: string; organizationId: string }): Promise<Project[]> {
+    return this.repository.findLiveBySlugInOrganization(input);
+  }
+
+  async findLiveByRef(input: { projectRef: string; organizationId: string }): Promise<Project[]> {
+    const byId = await this.repository.findLiveByIdInOrganization({
+      id: input.projectRef,
+      organizationId: input.organizationId,
+    });
+    if (byId.length > 0) return byId;
+
+    return this.repository.findLiveBySlugInOrganization({
+      slug: input.projectRef,
+      organizationId: input.organizationId,
+    });
+  }
+
   async listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {
     const parsed = activeProjectsByScopesInputSchema.parse(input);
     if (!parsed.organizationWide && parsed.teamIds.length === 0 && parsed.projectIds.length === 0) {

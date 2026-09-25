@@ -382,6 +382,44 @@ export class MemoryProjectRepository implements ProjectRepository {
       .map((project) => project.id);
   }
 
+  async findLiveByIdInOrganization(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    return this.#findLiveInOrganization({
+      organizationId: input.organizationId,
+      matches: (project) => project.id === input.id,
+    });
+  }
+
+  async findLiveBySlugInOrganization(input: {
+    slug: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    return this.#findLiveInOrganization({
+      organizationId: input.organizationId,
+      matches: (project) => project.slug === input.slug,
+    });
+  }
+
+  #findLiveInOrganization({
+    organizationId,
+    matches,
+  }: {
+    organizationId: string;
+    matches: (project: Project) => boolean;
+  }): Project[] {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          matches(project) &&
+          this.#database.isInOrganization(project, organizationId),
+      )
+      .slice(0, 1);
+  }
+
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
     return this.#database
       .projects()

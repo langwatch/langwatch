@@ -424,6 +424,18 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#projectService.findLiveNonGovernanceIdsByOrganization(input);
   }
 
+  findLiveBySlug(
+    input: Readonly<{ slug: string; organizationId: string }>,
+  ): Promise<projectContractModule.Project[]> {
+    return this.#projectService.findLiveBySlug(input);
+  }
+
+  findLiveByRef(
+    input: Readonly<{ projectRef: string; organizationId: string }>,
+  ): Promise<projectContractModule.Project[]> {
+    return this.#projectService.findLiveByRef(input);
+  }
+
   create(
     input: Readonly<{
       organizationId: string;

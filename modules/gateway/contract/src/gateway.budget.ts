@@ -77,6 +77,36 @@ export type GatewayBudgetLedgerStatus =
   | "BLOCKED_BY_GUARDRAIL"
   | "CANCELLED";
 
+/** One budget-ledger debit row, as main's ClickHouse `insertDebit` takes it. */
+export type GatewayBudgetDebitRow = {
+  tenantId: string;
+  budgetId: string;
+  scope: GatewayBudgetScopeType;
+  scopeId: string;
+  window: GatewayBudgetWindow;
+  virtualKeyId: string;
+  providerCredentialId?: string | null;
+  providerKey?: string | null;
+  gatewayRequestId: string;
+  amountNanoUsd: number;
+  tokensInput: number;
+  tokensOutput: number;
+  tokensCacheRead: number;
+  tokensCacheWrite: number;
+  model: string;
+  providerSlot?: string | null;
+  durationMs?: number | null;
+  status: GatewayBudgetLedgerStatus;
+  occurredAt: Instant;
+};
+
+/** A spend landed outside the gateway pipeline, announced so the data plane re-reads budgets. */
+export type GatewayBudgetChangeInput = Readonly<{
+  organizationId: string;
+  projectId: string;
+  payload: Record<string, unknown>;
+}>;
+
 /** Decimal values stay portable without leaking a database client type. */
 export type GatewayMoney = {
   toString(): string;

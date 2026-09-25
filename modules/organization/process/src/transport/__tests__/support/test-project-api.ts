@@ -61,6 +61,8 @@ export class TestProjectApi implements ProjectApi {
   findLiveNonGovernanceIdsByOrganization = unsupported<
     ProjectApi["findLiveNonGovernanceIdsByOrganization"]
   >("findLiveNonGovernanceIdsByOrganization");
+  findLiveBySlug = unsupported<ProjectApi["findLiveBySlug"]>("findLiveBySlug");
+  findLiveByRef = unsupported<ProjectApi["findLiveByRef"]>("findLiveByRef");
   create = unsupported<ProjectApi["create"]>("create");
   updateSettings = unsupported<ProjectApi["updateSettings"]>("updateSettings");
   archive = unsupported<ProjectApi["archive"]>("archive");

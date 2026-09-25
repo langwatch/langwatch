@@ -29,6 +29,10 @@ import type {
 import type {
   ArchiveGatewayBudgetInput,
   CreateGatewayBudgetInput,
+  GatewayBudgetChangeInput,
+  GatewayBudgetCheckInput,
+  GatewayBudgetCheckResult,
+  GatewayBudgetDebitRow,
   GatewayBudgetDetail,
   GatewayBudgetListWithHealth,
   GatewayBudgetPageWithHealth,
@@ -475,6 +479,12 @@ export interface GatewayApi extends GatewayInternalProtocol {
   ): Promise<Map<string, number>>;
   /** The budgets one debit lands on, as the spend graph resolves them. */
   resolveApplicableBudgets(input: GatewayBudgetResolutionTarget): Promise<GatewayResolvedBudget[]>;
+  /** Main's `GatewayBudgetService.check` (budget.service.ts:1241), read by the CLI. */
+  checkBudget(input: GatewayBudgetCheckInput): Promise<GatewayBudgetCheckResult>;
+  /** Main's ClickHouse budget `insertDebit` (budget.clickhouse.repository.ts:615). */
+  insertSpendDebit(rows: readonly GatewayBudgetDebitRow[]): Promise<void>;
+  /** Main's ingest `BUDGET_UPDATED` append (ingestionRoutes.ts:825). */
+  appendBudgetChange(input: GatewayBudgetChangeInput): Promise<void>;
 
   listCacheRules(organizationId: string): Promise<GatewayCacheRuleResource[]>;
   /** Cursor page of org cache rules, priority-ordered. */
@@ -699,6 +709,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
   budgetOverviewForUser(input: {
     organizationId: string;
     userId: string;
+    /** Adds up to three top models to each personal budget. */
+    includeTopModels?: boolean;
   }): Promise<GatewayBudgetOverviewForUser>;
   spendByVirtualKey(input: {
     organizationId: string;

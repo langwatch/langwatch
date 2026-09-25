@@ -7,7 +7,7 @@ import {
   PROVIDER_BUCKET_SEPARATOR,
   bucketScopeIdFor,
   computeBudgetPeriodFloorMs,
-  type GatewayBudgetLedgerStatus,
+  type GatewayBudgetDebitRow,
   type GatewayBudgetResource,
   type GatewayBudgetScopeType,
   type GatewayBudgetWindow,
@@ -118,27 +118,7 @@ export type LedgerEventRow = {
   occurredAt: Instant;
 };
 
-export type BudgetDebitRow = {
-  tenantId: string;
-  budgetId: string;
-  scope: GatewayBudgetScopeType;
-  scopeId: string;
-  window: GatewayBudgetWindow;
-  virtualKeyId: string;
-  providerCredentialId?: string | null;
-  providerKey?: string | null;
-  gatewayRequestId: string;
-  amountNanoUsd: number;
-  tokensInput: number;
-  tokensOutput: number;
-  tokensCacheRead: number;
-  tokensCacheWrite: number;
-  model: string;
-  providerSlot?: string | null;
-  durationMs?: number | null;
-  status: GatewayBudgetLedgerStatus;
-  occurredAt: Instant;
-};
+export type BudgetDebitRow = GatewayBudgetDebitRow;
 
 export type PulledUsageRow = {
   tenantId: string;

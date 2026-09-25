@@ -106,6 +106,18 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ?? Promise.resolve([]);
   }
 
+  findLiveBySlug(
+    input: Parameters<ProjectApi["findLiveBySlug"]>[0],
+  ): ReturnType<ProjectApi["findLiveBySlug"]> {
+    return this.overrides.findLiveBySlug?.(input) ?? this.unimplemented("findLiveBySlug");
+  }
+
+  findLiveByRef(
+    input: Parameters<ProjectApi["findLiveByRef"]>[0],
+  ): ReturnType<ProjectApi["findLiveByRef"]> {
+    return this.overrides.findLiveByRef?.(input) ?? this.unimplemented("findLiveByRef");
+  }
+
   create(
     input: Parameters<ProjectApi["create"]>[0],
     by: Parameters<ProjectApi["create"]>[1],

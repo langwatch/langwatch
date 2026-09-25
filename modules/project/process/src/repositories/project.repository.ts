@@ -84,6 +84,8 @@ export interface ProjectRepository {
   findIdentity(id: string): Promise<ProjectIdentity | null>;
   findIdsByOrganization(organizationId: string): Promise<string[]>;
   findLiveNonGovernanceIds(organizationId: string): Promise<string[]>;
+  findLiveByIdInOrganization(input: { id: string; organizationId: string }): Promise<Project[]>;
+  findLiveBySlugInOrganization(input: { slug: string; organizationId: string }): Promise<Project[]>;
   findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
   findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
   findLiveTraceDestination(input: {
