@@ -87,7 +87,9 @@ describe("writeVoiceCallRun", () => {
     });
 
     describe("when the write is a first attempt", () => {
-      /** @scenario "A re-driven finish refreshes the run's metadata to the second attempt" */
+      // Not bound to the re-drive scenario: this test asserts the refresh does
+      // NOT happen, so it does not cover that scenario — the re-drive test
+      // below carries the @scenario binding.
       it("emits no metadata refresh — the started event already carries it", async () => {
         await writeVoiceCallRun({
           projectId: "project_1",

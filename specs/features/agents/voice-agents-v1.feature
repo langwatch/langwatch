@@ -673,6 +673,17 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When a metadata refresh is folded onto it
     Then the run stays finished and takes the refreshed metadata
 
+  # 8032 AC3
+  # The refresh always carries audioUrl, as null when this attempt has no
+  # recording, so the fold overwrites a stale url rather than keeping the key
+  # the refresh omitted: a first attempt that had audio then a retry that does
+  # not must lose the Play link, not keep offering a recording that is gone.
+  @unit @regression
+  Scenario: A re-drive that lost its recording clears the run's audio link
+    Given a run whose first attempt carried a recording url
+    When a metadata refresh carrying a null audio url is folded onto it
+    Then the run's audio url is cleared while its other refreshed fields win
+
   # ---------------------------------------------------------------------------
   # Talk to it authorization and the cutoff marker (#8021)
   # ---------------------------------------------------------------------------
