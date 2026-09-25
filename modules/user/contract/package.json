@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

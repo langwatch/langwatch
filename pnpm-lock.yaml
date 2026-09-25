@@ -13388,6 +13388,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../packages/error-presentation
@@ -13488,6 +13491,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -13525,6 +13531,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error

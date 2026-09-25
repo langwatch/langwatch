@@ -42,6 +42,9 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {

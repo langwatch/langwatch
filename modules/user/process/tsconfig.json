@@ -25,6 +25,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
