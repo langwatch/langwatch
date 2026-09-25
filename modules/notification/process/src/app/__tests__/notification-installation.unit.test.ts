@@ -1,13 +1,29 @@
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { notificationServer } from "../../notification.server.ts";
+import { NotificationApp } from "../notification.app.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";
 
-function process(role: "api" | "worker") {
+/** Secrets come from an empty environment, as data-privacy's installation fixture does. */
+function installableNotification(resolver: SecretsResolver) {
+  const server = withMemoryRepositories(notificationServer);
+  const secrets = resolver.scopeTo("notification", Object.values(NotificationApp.secrets));
+  const installable: typeof server = {
+    ...server,
+    install: (args) => server.install({ ...args, secrets }),
+  };
+  return installable;
+}
+
+function process(
+  role: "api" | "worker",
+  resolver = SecretsResolver.over(SecretsChain.start({ environment: {} })),
+) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(notificationServer)])
+    .withModules([installableNotification(resolver)])
     .withConfig({
       notification: {
         defaultFrom: undefined,
@@ -44,6 +60,20 @@ describe("notification app installation", () => {
     }
   });
 
+  it("reports how mail leaves the install after boot has sealed the secrets", async () => {
+    const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
+    const runtime = await process("api", resolver).boot();
+    resolver.seal();
+
+    try {
+      await expect(runtime.service(NotificationApi).getMailDelivery()).resolves.toMatchObject({
+        smtpConfigured: false,
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
   it("allocates independent memory repositories for each installation", async () => {
     const first = await process("api").boot();
     const second = await process("api").boot();
@@ -63,7 +93,7 @@ describe("notification app installation", () => {
 
   describe("when the app is built directly over memory repositories", () => {
     it("answers nothing for an organization that was never written to", async () => {
-      const app = createNotificationTestApp();
+      const app = await createNotificationTestApp();
 
       await expect(
         app.listRecentByOrganization({ organizationId: "organization-2", since }),

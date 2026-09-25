@@ -27,7 +27,7 @@ export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
   static readonly config = notificationConfig;
-  /** Resolved on first ask, for the checkup's view of how mail leaves the install. */
+  /** Resolved while the module constructs, before boot seals them. */
   static readonly secrets = {
     sendgrid: Secret.load("SENDGRID_API_KEY", { optional: true }),
     smtpUrl: Secret.load("SMTP_URL", { optional: true }),
@@ -43,11 +43,13 @@ export class NotificationApp implements NotificationApiContract {
     this.#mailDelivery = mailDelivery;
   }
 
-  static create({ repositories, config, secrets }: NotificationSetup): NotificationApp {
-    let settings: Promise<MailGatewaySettings> | undefined;
-    const mailDelivery = MailDeliveryService.create({
-      settings: () => (settings ??= mailGatewaySettings({ config, secrets })),
-    });
+  static async create({
+    repositories,
+    config,
+    secrets,
+  }: NotificationSetup): Promise<NotificationApp> {
+    const settings = await mailGatewaySettings({ config, secrets });
+    const mailDelivery = MailDeliveryService.create({ settings: async () => settings });
     return new NotificationApp(repositories, mailDelivery);
   }
 

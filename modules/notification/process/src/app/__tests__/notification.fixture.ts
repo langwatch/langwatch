@@ -8,7 +8,7 @@ import { NotificationApp } from "../notification.app.ts";
 /** The notification app over memory repositories, for tests that need no database. */
 export function createNotificationTestApp(
   input: Readonly<{ repositories?: NotificationRepositories }> = {},
-): NotificationApp {
+): Promise<NotificationApp> {
   const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
     "notification",
     Object.values(NotificationApp.secrets),
