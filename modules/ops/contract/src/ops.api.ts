@@ -646,6 +646,7 @@ export interface OpsApi {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the term ends. */
     expiresAt: string;
     terms?: LicenseTermsInput;
@@ -665,6 +666,7 @@ export interface OpsApi {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     /** ISO 8601. The instant the new term ends. */
     expiresAt: string;
     operator: OpsOperator | null;
@@ -692,6 +694,7 @@ export interface OpsApi {
   listActivationCodes(input: {
     page: number;
     pageSize: number;
+    organizationId?: string;
     operator: OpsOperator | null;
   }): Promise<ActivationCodePage>;
   issueActivationCode(input: {

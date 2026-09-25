@@ -55,8 +55,8 @@ export const issuedLicensePageSchema = z.object({
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
 export const listIssuedLicensesInputSchema = z.object({
-  page: z.number().int().min(0),
-  pageSize: z.number().int().min(1).max(200),
+  page: z.number().int().min(0).default(0),
+  pageSize: z.number().int().min(1).max(200).default(25),
   search: z.string().optional(),
 });
 
@@ -85,6 +85,7 @@ export const issueLicenseInputSchema = z.object({
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
   maxMembersLite: z.number().int().min(0).optional(),
+  maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
   terms: licenseTermsInputSchema.optional(),
@@ -104,6 +105,7 @@ export const reissueLicenseInputSchema = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
   maxMembersLite: z.number().int().min(0).optional(),
+  maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),
 });

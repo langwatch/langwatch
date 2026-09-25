@@ -505,6 +505,7 @@ export interface OpsLicenseRegistry {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     expiresAt: string;
     terms?: LicenseTermsInput;
     operatorId: string;
@@ -519,6 +520,7 @@ export interface OpsLicenseRegistry {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;
   }): Promise<SignedIssuedLicense>;
@@ -537,7 +539,11 @@ export interface OpsLicenseRegistry {
     operatorId: string;
   }): Promise<IssuedLicenseView>;
   /** Minting and revoking are the backoffice's; redeeming is a public route. */
-  activationCodes(input: { page: number; pageSize: number }): Promise<ActivationCodePage>;
+  activationCodes(input: {
+    page: number;
+    pageSize: number;
+    organizationId?: string;
+  }): Promise<ActivationCodePage>;
   issueActivationCode(input: {
     organizationId: string;
     organizationName: string;
@@ -1672,6 +1678,7 @@ export class OpsApp implements OpsApi {
     planType: string;
     maxMembers: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     expiresAt: string;
     terms?: LicenseTermsInput;
     operator: OpsOperator | null;
@@ -1711,6 +1718,7 @@ export class OpsApp implements OpsApi {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMessagesPerMonth?: number;
     expiresAt: string;
     operator: OpsOperator | null;
   }): Promise<SignedIssuedLicense> {
@@ -1767,6 +1775,7 @@ export class OpsApp implements OpsApi {
   listActivationCodes(input: {
     page: number;
     pageSize: number;
+    organizationId?: string;
     operator: OpsOperator | null;
   }): Promise<ActivationCodePage> {
     const staff = this.admitBackOfficeStaff(input.operator);

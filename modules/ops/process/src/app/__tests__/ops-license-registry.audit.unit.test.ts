@@ -9,6 +9,7 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import {
   type IssuedLicenseView,
   issueLicenseInputSchema,
+  listActivationCodesInputSchema,
   type OpsOperator,
 } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
@@ -169,6 +170,40 @@ describe("the backoffice license registry", () => {
           targetId: "lic_row_1",
         }),
       ]);
+    });
+
+    it("forwards a monthly message cap to the registry on issue", async () => {
+      let sent: unknown;
+      const { app } = build({
+        issue: async (input) => {
+          sent = input;
+          return { licenseKey: "signed-license", license };
+        },
+      });
+
+      await app.issueLicense({
+        ...issueLicenseInputSchema.parse({ ...issueInput, maxMessagesPerMonth: 5000 }),
+        operator,
+      });
+
+      expect(sent).toMatchObject({ maxMessagesPerMonth: 5000 });
+    });
+
+    it("filters activation codes by organization", async () => {
+      let sent: unknown;
+      const { app } = build({
+        activationCodes: async (input) => {
+          sent = input;
+          return { codes: [], total: 0 };
+        },
+      });
+
+      await app.listActivationCodes({
+        ...listActivationCodesInputSchema.parse({ organizationId: "org_acme" }),
+        operator,
+      });
+
+      expect(sent).toEqual({ page: 0, pageSize: 25, organizationId: "org_acme" });
     });
 
     it("drops a signing key smuggled into the input before it reaches the registry", () => {

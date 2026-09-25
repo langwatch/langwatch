@@ -36,8 +36,9 @@ export const activationCodePageSchema = z.object({
 export type ActivationCodePage = z.infer<typeof activationCodePageSchema>;
 
 export const listActivationCodesInputSchema = z.object({
-  page: z.number().int().min(0),
-  pageSize: z.number().int().min(1).max(200),
+  page: z.number().int().min(0).default(0),
+  pageSize: z.number().int().min(1).max(200).default(25),
+  organizationId: z.string().min(1).optional(),
 });
 
 /** What an operator supplies when minting a code from the backoffice. */

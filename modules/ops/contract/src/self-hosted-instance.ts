@@ -39,8 +39,8 @@ export const selfHostedInstancePageSchema = z.object({
 export type SelfHostedInstancePage = z.infer<typeof selfHostedInstancePageSchema>;
 
 export const listSelfHostedInstancesInputSchema = z.object({
-  page: z.number().int().min(0),
-  pageSize: z.number().int().min(1).max(200),
+  page: z.number().int().min(0).default(0),
+  pageSize: z.number().int().min(1).max(200).default(25),
   search: z.string().optional(),
 });
 

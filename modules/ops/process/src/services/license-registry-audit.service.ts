@@ -182,7 +182,7 @@ export class LicenseRegistryAuditService {
   }
 
   async activationCodes(
-    input: Staff & { page: number; pageSize: number },
+    input: Staff & { page: number; pageSize: number; organizationId?: string },
   ): Promise<ActivationCodePage> {
     const { operatorId, ...query } = input;
     await this.record(operatorId, "activationCodes", {
