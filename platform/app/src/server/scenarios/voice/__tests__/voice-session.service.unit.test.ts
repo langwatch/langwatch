@@ -605,6 +605,74 @@ describe("finishVoiceSession", () => {
         expect(result.agentId).toBe("agent_existing");
       });
 
+      /** @scenario "Concurrent finish retries create exactly one agent" */
+      it("two racing finishes with an agent-less token create exactly one agent row", async () => {
+        // Both racers pass the existence check before either write lands —
+        // the fake answers null for BOTH, exactly what the projection says
+        // during the window (#8027). The gated create keeps both finishes
+        // genuinely in flight at once, so the claim, not request ordering,
+        // must decide who creates.
+        let releaseCreate = (_: { id: string }) => {};
+        const createGate = new Promise<{ id: string }>((resolve) => {
+          releaseCreate = resolve;
+        });
+        const createVoiceAgent = vi.fn(() => createGate);
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            createVoiceAgent,
+            writeCallRun,
+            findExistingRun: vi.fn(async () => null),
+          },
+        });
+
+        const finish = {
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: null },
+          scenarioId: "scenario_1",
+          name: "Support line",
+        };
+        const racers = [finishVoiceSession(finish), finishVoiceSession(finish)];
+        releaseCreate({ id: "agent_created" });
+        const [first, second] = await Promise.all(racers);
+
+        expect(createVoiceAgent).toHaveBeenCalledTimes(1);
+        // Both finishes settle on the one row, and on the same deterministic
+        // run id — one agent, one run, whoever came second.
+        expect(first?.agentId).toBe("agent_created");
+        expect(second?.agentId).toBe("agent_created");
+        expect(first?.runId).toBe(second?.runId);
+      });
+
+      /** @scenario "Concurrent finish retries create exactly one agent" */
+      it("two racing drawer finishes share the one create too", async () => {
+        // The drawer path never consults findExistingRun (there is never a
+        // run to find, #8020), so the conversation-keyed claim is all that
+        // stands between a double click and a duplicate agent.
+        let releaseCreate = (_: { id: string }) => {};
+        const createGate = new Promise<{ id: string }>((resolve) => {
+          releaseCreate = resolve;
+        });
+        const createVoiceAgent = vi.fn(() => createGate);
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: { createVoiceAgent },
+        });
+
+        const finish = { ports, ...FINISH_BASE, name: "Support line" };
+        const racers = [finishVoiceSession(finish), finishVoiceSession(finish)];
+        releaseCreate({ id: "agent_created" });
+        const [first, second] = await Promise.all(racers);
+
+        expect(createVoiceAgent).toHaveBeenCalledTimes(1);
+        expect(first?.agentId).toBe("agent_created");
+        expect(second?.agentId).toBe("agent_created");
+      });
+
       /** @scenario "A retried hang-up completes a half-written run" */
       it("re-drives when the run was cancelled rather than dropping the transcript", async () => {
         const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
