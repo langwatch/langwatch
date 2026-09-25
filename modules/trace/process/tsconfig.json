@@ -86,9 +86,6 @@
       "path": "../../log/contract/tsconfig.build.json"
     },
     {
-      "path": "../../metric/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {

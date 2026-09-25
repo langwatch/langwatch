@@ -92,7 +92,6 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
-    "@langwatch/metric-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
