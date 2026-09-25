@@ -1,4 +1,5 @@
 import { MenuItem } from "@langwatch/design-system/menu";
+import { type AgentSource } from "@langwatch/enterprise-governance-contract";
 import { Plug, UserRoundX } from "lucide-react";
 
 import { FilterChip, FilterChipRow, SortChip } from "../../ui/elements/governance-filter-chip.tsx";
@@ -11,7 +12,7 @@ import {
   OWNERSHIP_LABELS,
   sourceLabel,
 } from "./agent-filters";
-import { AGENT_SOURCE_LABELS, type AgentSource } from "./agent-rows";
+import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /**
  * The Agents filter row: source, ownership, sort, on the section's `FilterChip`. `sources` lists

@@ -139,6 +139,7 @@ function mountIngest(world: World = {}) {
     sessionPolicySetMaxDuration: unsupportedRestOperation,
     governanceAgentsSyncSources: unsupportedRestOperation,
     governanceAgentsRequestListing: unsupportedRestOperation,
+    governanceAgentsList: unsupportedRestOperation,
     governancePeopleList: unsupportedRestOperation,
     governancePeopleSuggestions: unsupportedRestOperation,
     governancePeopleRunMatch: unsupportedRestOperation,

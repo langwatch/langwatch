@@ -64,20 +64,6 @@ export type GovernanceDepartmentView = Omit<Department, "createdAt" | "updatedAt
   updatedAt: string;
 };
 
-export type GovernanceAgentView = {
-  id: string;
-  name: string;
-  environment: string | null;
-  owner: string | null;
-  models: string[];
-  source: "copilot_studio" | "custom" | "databricks";
-  costUsd30d: number | null;
-  requests30d: number | null;
-  lastActiveMinutesAgo: number | null;
-  health: "responding" | "idle" | "erroring" | null;
-  registeredDaysAgo: number | null;
-};
-
 /**
  * A source together with its ingest secret, which the two mutations that mint
  * one return exactly once. Nothing reads the secret back afterwards, so the UI
@@ -215,9 +201,6 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
           output: { modelsAllowed: string[] };
         };
       };
-    };
-    governanceAgents: {
-      list: { query: { input: { organizationId: string }; output: GovernanceAgentView[] } };
     };
     aiTools: {
       adminList: {

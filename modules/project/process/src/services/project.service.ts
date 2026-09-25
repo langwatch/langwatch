@@ -463,6 +463,12 @@ export class ProjectService {
     return this.repository.findIdsByOrganization(parsed.organizationId);
   }
 
+  findLiveNonGovernanceIdsByOrganization(input: { organizationId: string }): Promise<string[]> {
+    const parsed = projectIdsByOrganizationInputSchema.parse(input);
+
+    return this.repository.findLiveNonGovernanceIds(parsed.organizationId);
+  }
+
   async listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {
     const parsed = activeProjectsByScopesInputSchema.parse(input);
     if (!parsed.organizationWide && parsed.teamIds.length === 0 && parsed.projectIds.length === 0) {

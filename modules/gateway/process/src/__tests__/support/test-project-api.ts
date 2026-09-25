@@ -100,6 +100,12 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.listIdsByOrganization?.(input) ?? Promise.resolve([]);
   }
 
+  findLiveNonGovernanceIdsByOrganization(
+    input: Parameters<ProjectApi["findLiveNonGovernanceIdsByOrganization"]>[0],
+  ): ReturnType<ProjectApi["findLiveNonGovernanceIdsByOrganization"]> {
+    return this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ?? Promise.resolve([]);
+  }
+
   create(
     input: Parameters<ProjectApi["create"]>[0],
     by: Parameters<ProjectApi["create"]>[1],

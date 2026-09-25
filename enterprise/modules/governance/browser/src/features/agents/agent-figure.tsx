@@ -1,8 +1,9 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 import numeral from "numeral";
 
-import { formatLastActive, type GovernanceAgentRow } from "./agent-rows";
+import { formatLastActive } from "./agent-rows";
 
 /**
  * One figure of an agent row and the single way a missing one is drawn, shared by card and table

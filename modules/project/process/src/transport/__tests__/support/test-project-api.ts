@@ -40,6 +40,12 @@ export class TestProjectApi implements ProjectApi {
   listIdsByOrganization: ProjectApi["listIdsByOrganization"] = (input) =>
     this.overrides.listIdsByOrganization?.(input) ?? this.unimplemented("listIdsByOrganization");
 
+  findLiveNonGovernanceIdsByOrganization: ProjectApi["findLiveNonGovernanceIdsByOrganization"] = (
+    input,
+  ) =>
+    this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ??
+    this.unimplemented("findLiveNonGovernanceIdsByOrganization");
+
   listPaths: ProjectApi["listPaths"] = (input) =>
     this.overrides.listPaths?.(input) ?? this.unimplemented("listPaths");
 

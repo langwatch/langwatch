@@ -455,6 +455,19 @@ export class PrismaProjectRepository
     return projects.map((project) => project.id);
   }
 
+  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+      },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
+  }
+
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
     const rows = await this.prisma.project.findMany({
       where: {

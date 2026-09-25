@@ -1,3 +1,4 @@
+import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 /**
  * The Agents page's four figures, asserted without rendering. Runs against `SAMPLE_AGENT_ROWS` so
  * the rows a reader sees cannot drift incoherent; placement is in
@@ -6,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { type GovernanceAgentRow, SAMPLE_AGENT_ROWS } from "../agent-rows";
+import { SAMPLE_AGENT_ROWS } from "../agent-rows";
 import { summarizeAgentFleet } from "../agent-summary";
 
 /** One row, with everything the caller does not care about held still. */

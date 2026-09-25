@@ -1,3 +1,8 @@
+import {
+  AGENT_SOURCES,
+  type AgentSource,
+  type GovernanceAgentRow,
+} from "@langwatch/enterprise-governance-contract";
 /**
  * The Agents page's three choices (source, ownership, sort) live in the address, so a shared link
  * keeps its filter; defaults stay out of the URL. Sorting and filtering are pure functions over
@@ -7,12 +12,7 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
 
-import {
-  AGENT_SOURCE_LABELS,
-  AGENT_SOURCES,
-  type AgentSource,
-  type GovernanceAgentRow,
-} from "./agent-rows";
+import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /** The source chip's "no filter" value, and the value left out of the URL. */
 export const ALL_SOURCES = "all";

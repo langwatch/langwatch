@@ -108,6 +108,7 @@ class StubRepository implements ProjectRepository {
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
   findIdentity = vi.fn<(id: string) => Promise<ProjectIdentity | null>>(async () => null);
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
+  findLiveNonGovernanceIds = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
   countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
   countWithTraces = vi.fn(async () => 0);
   findSharedProjectSlugs = vi.fn(async () => []);

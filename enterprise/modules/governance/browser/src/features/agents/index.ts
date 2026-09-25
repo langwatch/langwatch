@@ -38,14 +38,9 @@ export {
 } from "./agent-filters";
 export {
   AGENT_HEALTH_LABELS,
-  AGENT_HEALTH_STATES,
   AGENT_SOURCE_LABELS,
-  AGENT_SOURCES,
-  type AgentHealth,
-  type AgentSource,
   formatLastActive,
   formatRegistered,
-  type GovernanceAgentRow,
   SAMPLE_AGENT_ROWS,
 } from "./agent-rows";
 export {

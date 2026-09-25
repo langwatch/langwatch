@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
@@ -149,6 +150,7 @@ import {
   type IdentityMatchConfirmed,
   type IdentityMatchRun,
   type OrganizationSessionPolicyShape,
+  type GovernanceAgentRow,
   type PeopleScreenPerson,
   type PeopleScreenSuggestion,
   type SessionCeilingApplied,
@@ -206,6 +208,7 @@ import { DepartmentService } from "../services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../services/erasure-suppression.service.ts";
 import { GovernanceAgentSyncService } from "../services/governance-agent-sync.service.ts";
+import { GovernanceAgentsScreenService } from "../services/governance-agents-screen.service.ts";
 import {
   GovernanceCliAccessService,
   type GovernanceCliAccessApi,
@@ -374,7 +377,10 @@ export interface GovernanceAppDependencies {
     | "findInternalIds"
     | "findProjectsWithDepartments"
     | "assignProjectDepartment"
+    | "findLiveNonGovernanceIdsByOrganization"
   >;
+  /** Agent owns the Agent table: the organization's connected agents, read by project. */
+  agents: Pick<AgentApi, "findConnectedInProjects">;
   /** The release flag that decides whether an organization's pulled usage carries a cost. */
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   /** Where a pulled Genie/Copilot conversation lands as a trace: the OTLP door main routed through. */
@@ -506,6 +512,7 @@ export class GovernanceApp implements GovernanceRestApi {
    * whichever composition root happened to build it.
    */
   static readonly dependencies = {
+    agents: AgentApi,
     projects: ProjectApi,
     auth: AuthApi,
     entitlements: EntitlementApi,
@@ -556,6 +563,7 @@ export class GovernanceApp implements GovernanceRestApi {
         governance: members.governance,
         cli: members.cli,
         ingest: members.ingest,
+        agents: dependencies.agents,
         projects: dependencies.projects,
         auth: dependencies.auth,
         entitlements: dependencies.entitlements,
@@ -640,6 +648,12 @@ export class GovernanceApp implements GovernanceRestApi {
       projects: dependencies.projects,
       listings: repositories.ingestionPullRuns,
       dispatch: (command) => this.agentListingSender().send(command),
+    });
+    this.agentsScreen = GovernanceAgentsScreenService.create({
+      agents: dependencies.agents,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      discoveredAgents: repositories.discoveredAgents,
     });
     this.people = GovernancePeopleScreenService.create({
       discoveredPeople: repositories.discoveredPeople,
@@ -826,6 +840,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
   private readonly people: GovernancePeopleScreenService;
+  private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly agentSync: GovernanceAgentSyncService;
   private readonly departments: DepartmentService;
   private readonly agentDiscovery: AgentDiscoveryService;
@@ -1386,6 +1401,10 @@ export class GovernanceApp implements GovernanceRestApi {
   }): Promise<AgentListingRequestResult> {
     this.agentListingSender();
     return this.agentSync.requestListing(input);
+  }
+
+  governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]> {
+    return this.agentsScreen.listAgents(input);
   }
 
   governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]> {

@@ -19,11 +19,28 @@ import {
 } from "./support/governance-trpc.fixture.ts";
 
 const SOURCE = { id: "src_1", name: "Anthropic", sourceType: "anthropic_admin" };
+const ROW = {
+  id: "registered:agent_1",
+  name: "support-copilot",
+  environment: "production",
+  owner: null,
+  models: [],
+  source: "custom" as const,
+  costUsd30d: null,
+  requests30d: null,
+  lastActiveMinutesAgo: 60,
+  health: null,
+  registeredDaysAgo: 90,
+};
 
 function mount(options: { permits?: (permission: string) => boolean; unavailable?: boolean } = {}) {
   const asked: string[] = [];
   const calls: unknown[] = [];
   const app = createApiFixture<GovernanceRestApi>({
+    governanceAgentsList: async (input) => {
+      calls.push(input);
+      return [ROW];
+    },
     governanceAgentsSyncSources: async (input) => {
       calls.push(input);
       return [{ ...SOURCE, lastListing: { outcome: "refused", cause: "access" } }];
@@ -45,9 +62,18 @@ function mount(options: { permits?: (permission: string) => boolean; unavailable
 describe("the governanceAgents tRPC namespace", () => {
   it("serves main's sync procedures", () => {
     expect(procedureKinds(mount().router._def.procedures)).toEqual({
+      list: "query",
       syncSources: "query",
       requestListing: "mutation",
     });
+  });
+
+  it("lists the organization's agents under governance:view", async () => {
+    const { caller, asked, calls } = mount();
+
+    await expect(caller.list({ organizationId: "org_1" })).resolves.toEqual([ROW]);
+    expect(asked).toEqual(["governance:view"]);
+    expect(calls).toEqual([{ organizationId: "org_1" }]);
   });
 
   it("reads the listable sources and their last listing under governance:view", async () => {

@@ -1,5 +1,6 @@
 import { Badge, HStack, Table, Text } from "@chakra-ui/react";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {
   AGENT_NEVER_RUN,
@@ -10,12 +11,7 @@ import {
   formatAgentLastActive,
   formatAgentRequests,
 } from "./agent-figure";
-import {
-  AGENT_HEALTH_LABELS,
-  AGENT_SOURCE_LABELS,
-  formatRegistered,
-  type GovernanceAgentRow,
-} from "./agent-rows";
+import { AGENT_HEALTH_LABELS, AGENT_SOURCE_LABELS, formatRegistered } from "./agent-rows";
 
 /**
  * The fleet as a list, the page's default: comparing agents is the question. All ten attributes,

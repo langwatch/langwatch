@@ -1,6 +1,7 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import type { GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
@@ -25,7 +26,6 @@ import {
   agentsUnlistedCopy,
   applyAgentFilters,
   DEFAULT_AGENTS_LAYOUT,
-  type GovernanceAgentRow,
   type GovernanceEmptyStateCopy,
   isAgentsLayout,
   NO_MATCHING_AGENTS_COPY,

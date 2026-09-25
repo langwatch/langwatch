@@ -102,6 +102,15 @@ export class TestProjectApi implements ProjectApi {
     );
   }
 
+  findLiveNonGovernanceIdsByOrganization(
+    input: Parameters<ProjectApi["findLiveNonGovernanceIdsByOrganization"]>[0],
+  ): ReturnType<ProjectApi["findLiveNonGovernanceIdsByOrganization"]> {
+    return (
+      this.overrides.findLiveNonGovernanceIdsByOrganization?.(input) ??
+      this.unimplemented("findLiveNonGovernanceIdsByOrganization")
+    );
+  }
+
   create(
     input: Parameters<ProjectApi["create"]>[0],
     by: Parameters<ProjectApi["create"]>[1],

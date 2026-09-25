@@ -73,6 +73,8 @@ export interface ProjectApi {
   listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
   listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]>;
   listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
+  /** Unarchived, non-governance project ids, unpaged: main's `findAllByOrganization` filter. */
+  findLiveNonGovernanceIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]>;
   create(
     input: Readonly<{
       organizationId: string;

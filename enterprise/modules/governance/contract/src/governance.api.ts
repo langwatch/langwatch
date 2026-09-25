@@ -37,7 +37,11 @@ import type {
   RevokeCliSessionInput,
 } from "./cli-sessions.ts";
 import type { TraceDepartmentInput, Department, DepartmentAssignments } from "./department.ts";
-import type { AgentListingRequestResult, AgentSyncSourceListing } from "./governance-agents.ts";
+import type {
+  AgentListingRequestResult,
+  AgentSyncSourceListing,
+  GovernanceAgentRow,
+} from "./governance-agents.ts";
 import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type {
   GovernanceCliBudgetStatusAnswer,
@@ -565,6 +569,7 @@ export interface GovernanceRestApi {
   governanceAgentsRequestListing(input: {
     organizationId: string;
   }): Promise<AgentListingRequestResult>;
+  governanceAgentsList(input: { organizationId: string }): Promise<GovernanceAgentRow[]>;
   governancePeopleList(input: { organizationId: string }): Promise<PeopleScreenPerson[]>;
   governancePeopleSuggestions(input: { organizationId: string }): Promise<PeopleScreenSuggestion[]>;
   governancePeopleRunMatch(input: { organizationId: string }): Promise<IdentityMatchRun>;

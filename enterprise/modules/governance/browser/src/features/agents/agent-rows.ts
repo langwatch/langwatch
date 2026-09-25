@@ -1,13 +1,9 @@
-/**
- * One agent as the Agents page shows it, filled by `buildAgentInventory` from code-registered
- * (ADR-128) and provider-listed agents. Spend, requests and health are nullable: unmeasured reads
- * as a dash.
- * @see specs/ai-governance/dashboard/agents-page.feature
- */
-
-/** Where an agent came to us from. The list the source chip offers. */
-export const AGENT_SOURCES = ["custom", "databricks", "copilot_studio"] as const;
-export type AgentSource = (typeof AGENT_SOURCES)[number];
+/** The Agents page's labels, samples and formatting; the row type lives in the contract. */
+import type {
+  AgentHealth,
+  AgentSource,
+  GovernanceAgentRow,
+} from "@langwatch/enterprise-governance-contract";
 
 /** Spelled out, never abbreviated — the words a reader would say out loud. */
 export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
@@ -16,53 +12,12 @@ export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
   copilot_studio: "Copilot Studio",
 };
 
-/**
- * What an agent is doing now, in three words. Stored, not derived: "erroring" cannot be read off
- * `lastActiveMinutesAgo`, and a half-derived field is one two readers disagree about.
- */
-export const AGENT_HEALTH_STATES = ["responding", "idle", "erroring"] as const;
-export type AgentHealth = (typeof AGENT_HEALTH_STATES)[number];
-
 /** Spelled out, never abbreviated — the words the summary strip says. */
 export const AGENT_HEALTH_LABELS: Record<AgentHealth, string> = {
   responding: "responding",
   idle: "idle",
   erroring: "erroring",
 };
-
-export interface GovernanceAgentRow {
-  id: string;
-  name: string;
-  /**
-   * Part of the agent's identity (ADR-128 keys on it); `null` where no stage was declared. Provider
-   * agents are always null: an environment address names a PLACE, not a stage.
-   */
-  environment: string | null;
-  /** `null` is the unclaimed case, which is the whole point of the filter. */
-  owner: string | null;
-  models: string[];
-  source: AgentSource;
-  /** United States dollars over the last 30 days, or `null` if not measured. */
-  costUsd30d: number | null;
-  requests30d: number | null;
-  /**
-   * Minutes since the agent last did anything, rather than a timestamp: a
-   * fixed date in invented data goes stale the week after it is written and
-   * starts reading as an outage.
-   */
-  lastActiveMinutesAgo: number | null;
-  /**
-   * See `AgentHealth`. `null` is an agent whose health nothing has measured,
-   * which is a different fact from being idle and is counted as neither — so
-   * the strip's three health counts need not add up to the fleet.
-   */
-  health: AgentHealth | null;
-  /**
-   * Days since registration, or `null` if never recorded. Days rather than a date so invented data
-   * does not go stale; the fleet card draws its registration line from this.
-   */
-  registeredDaysAgo: number | null;
-}
 
 /**
  * The invented set: ten generic agents over three sources, including one never run (a missing

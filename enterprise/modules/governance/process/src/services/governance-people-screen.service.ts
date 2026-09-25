@@ -9,6 +9,7 @@ import { toDate } from "@langwatch/time";
 import type { DiscoveredPersonRepository } from "../repositories/discovered-person.repository.ts";
 import type { IdentityMatchSuggestionRepository } from "../repositories/identity-match-suggestion.repository.ts";
 import type { IdentityMatchRepository } from "../repositories/identity-match.repository.ts";
+import { memberNames } from "../rules/member-names.rules.ts";
 import type { DepartmentService } from "./department.service.ts";
 
 type Members = Pick<OrganizationApi, "findMembersWithDepartments">;
@@ -106,16 +107,4 @@ export class GovernancePeopleScreenService {
       ];
     });
   }
-}
-
-/** Main's `findMemberNames`: the display name, else the address, else nothing. */
-function memberNames(
-  members: Awaited<ReturnType<Members["findMembersWithDepartments"]>>,
-): Map<string, string> {
-  const names = new Map<string, string>();
-  for (const member of members) {
-    const name = member.user.name ?? member.user.email;
-    if (name) names.set(member.userId, name);
-  }
-  return names;
 }

@@ -1,3 +1,4 @@
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
@@ -128,6 +129,7 @@ async function buildApi(
     config: void 0,
     repositories,
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>(),

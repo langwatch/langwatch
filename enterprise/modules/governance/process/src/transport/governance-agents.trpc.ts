@@ -7,6 +7,10 @@ export const governanceAgentsTrpcTransport = defineTrpcRouter(
   GovernanceRestApi,
   governanceAgentsTrpc,
 )
+  .procedure("list")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceAgentsList(input))
+
   .procedure("syncSources")
   .withPermission("governance:view")
   .handle(({ app, input }) => app.governanceAgentsSyncSources(input))

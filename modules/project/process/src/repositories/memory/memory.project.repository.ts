@@ -370,6 +370,18 @@ export class MemoryProjectRepository implements ProjectRepository {
       .map((project) => project.id);
   }
 
+  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+    return this.#database
+      .projects()
+      .filter(
+        (project) =>
+          project.archivedAt === null &&
+          project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          this.#database.isInOrganization(project, organizationId),
+      )
+      .map((project) => project.id);
+  }
+
   async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
     return this.#database
       .projects()

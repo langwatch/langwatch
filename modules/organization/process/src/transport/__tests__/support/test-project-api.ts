@@ -58,6 +58,9 @@ export class TestProjectApi implements ProjectApi {
   listByOrganization = unsupported<ProjectApi["listByOrganization"]>("listByOrganization");
   listNamesByIds = unsupported<ProjectApi["listNamesByIds"]>("listNamesByIds");
   listIdsByOrganization = unsupported<ProjectApi["listIdsByOrganization"]>("listIdsByOrganization");
+  findLiveNonGovernanceIdsByOrganization = unsupported<
+    ProjectApi["findLiveNonGovernanceIdsByOrganization"]
+  >("findLiveNonGovernanceIdsByOrganization");
   create = unsupported<ProjectApi["create"]>("create");
   updateSettings = unsupported<ProjectApi["updateSettings"]>("updateSettings");
   archive = unsupported<ProjectApi["archive"]>("archive");

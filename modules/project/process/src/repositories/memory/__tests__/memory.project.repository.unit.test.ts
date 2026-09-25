@@ -374,4 +374,25 @@ describe("MemoryProjectRepository", () => {
       ).toEqual([{ id: "project_1", name: "Checkout assistant", departmentId: "dept_eng" }]);
     });
   });
+
+  describe("when the organization's live, non-governance project ids are read", () => {
+    /** @scenario "The organization's agents read leaves out what does not belong on it" */
+    it("leaves archived projects and the hidden governance project out, unpaged", async () => {
+      const { database, repository } = seeded();
+      await repository.create(creation);
+      await repository.create({ ...creation, id: "project_old", slug: "old" });
+      await repository.archive({ id: "project_old", organizationId: ORGANIZATION_ID });
+      const internal = await repository.create({ ...creation, id: "project_gov", slug: "gov" });
+      database.putProject({ ...internal, kind: PROJECT_KIND.INTERNAL_GOVERNANCE });
+      database.putTeam(team({ id: "team_other", organizationId: "organization_2" }));
+      await repository.create({
+        ...creation,
+        id: "project_elsewhere",
+        slug: "x",
+        teamId: "team_other",
+      });
+
+      expect(await repository.findLiveNonGovernanceIds(ORGANIZATION_ID)).toEqual(["project_1"]);
+    });
+  });
 });

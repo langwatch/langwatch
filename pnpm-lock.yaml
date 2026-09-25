@@ -2463,6 +2463,9 @@ importers:
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.1108.0
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/agent/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api

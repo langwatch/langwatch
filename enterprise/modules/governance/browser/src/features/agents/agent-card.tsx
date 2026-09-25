@@ -1,4 +1,5 @@
 import { Badge, Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { type GovernanceAgentRow } from "@langwatch/enterprise-governance-contract";
 
 import {
   AGENT_NEVER_RUN,
@@ -9,7 +10,7 @@ import {
   formatAgentLastActive,
   formatAgentRequests,
 } from "./agent-figure";
-import { AGENT_SOURCE_LABELS, type GovernanceAgentRow } from "./agent-rows";
+import { AGENT_SOURCE_LABELS } from "./agent-rows";
 
 /**
  * One agent as a card, the page's optional layout. Figures go through `AgentFigure` like the list;

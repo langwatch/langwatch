@@ -1,3 +1,4 @@
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -51,6 +52,7 @@ async function buildApp() {
     config: void 0,
     repositories,
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>({ getOrganizationId }),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
@@ -96,6 +98,7 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
     config: void 0,
     repositories,
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>({ findCliAccessSession }),
       entitlements: createApiFixture<EntitlementApi>({ getActivePlan }),

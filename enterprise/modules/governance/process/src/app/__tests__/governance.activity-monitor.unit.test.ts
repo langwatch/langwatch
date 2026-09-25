@@ -3,6 +3,7 @@
  * The activity monitor's reads over the memory twin: main's Enterprise gate is a
  * per-organization refusal here, and an Enterprise organization reads its dashboard.
  */
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -49,6 +50,7 @@ async function buildApp(planType: string) {
     config: void 0,
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
     dependencies: {
+      agents: createApiFixture<AgentApi>(),
       projects: createApiFixture<ProjectApi>(),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>({

@@ -190,6 +190,7 @@ function mountCli(world: World = {}) {
     sessionPolicySetMaxDuration: unavailable,
     governanceAgentsSyncSources: unavailable,
     governanceAgentsRequestListing: unavailable,
+    governanceAgentsList: unavailable,
     governancePeopleList: unavailable,
     governancePeopleSuggestions: unavailable,
     governancePeopleRunMatch: unavailable,
