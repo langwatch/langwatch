@@ -115,7 +115,7 @@ export const assignTagInputSchema = z.object({ versionId: z.string() });
 export const tagDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  createdAt: z.coerce.date().optional(),
+  createdAt: z.coerce.date(),
 });
 export const createTagInputSchema = z.object({ name: z.string() });
 export const renameTagInputSchema = z.object({ name: z.string() });

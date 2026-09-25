@@ -46,4 +46,30 @@ describe("the prompts REST declaration", () => {
     expect(declaration.addressing).toBe("literal");
     expect(declaration.v1Twin).toBe(true);
   });
+
+  it("publishes each success body as a caller receives it, defaulted fields required", async () => {
+    const declaration = promptRest.router();
+    const published = await Promise.all(
+      declaration.routes.map(async (route) => {
+        const schema = route.docs?.responses?.[200]?.content?.["application/json"]?.schema;
+        if (
+          !schema ||
+          !("toOpenAPISchema" in schema) ||
+          typeof schema.toOpenAPISchema !== "function"
+        ) {
+          return [route.operation, undefined];
+        }
+        const { schema: body } = await schema.toOpenAPISchema();
+        return [route.operation, body.items?.required ?? body.required];
+      }),
+    );
+    const required = Object.fromEntries(published);
+
+    for (const operation of ["getApiPrompts", "getApiPromptsById", "putApiPromptsById"]) {
+      expect(required[operation]).toEqual(
+        expect.arrayContaining(["messages", "inputs", "tags", "parameters"]),
+      );
+    }
+    expect(required.getApiPromptsTags).toEqual(["id", "name", "createdAt"]);
+  });
 });
