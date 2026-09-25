@@ -67,8 +67,13 @@ function syncVersionFromParent(methods: PromptConfigForm, parsed: PromptConfigFo
   if (!isEqual(methods.getValues("version.parameters"), nextRuntimeParameters)) {
     methods.setValue("version.parameters", nextRuntimeParameters);
   }
-  const nextConfigData = parsed?.version?.configData;
-  if (nextConfigData && !isEqual(methods.getValues("version.configData"), nextConfigData)) {
+  const parentConfigData = parsed?.version?.configData;
+  if (!parentConfigData) return;
+  // Only the keys the parent carries: replacing the whole object erased form-derived keys
+  // (demonstrations) and re-rendered forever against the demonstration-columns sync.
+  const currentConfigData = methods.getValues("version.configData");
+  const nextConfigData = { ...currentConfigData, ...parentConfigData };
+  if (!isEqual(currentConfigData, nextConfigData)) {
     methods.setValue("version.configData", nextConfigData);
   }
 }

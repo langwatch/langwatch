@@ -682,12 +682,9 @@ describe("PromptTabbedSection Layout Modes", () => {
       );
 
       await user.click(screen.getByRole("tab", { name: /variables/i }));
-      const textboxes = await screen.findAllByRole("textbox");
-      const valueInput = textboxes.find(
-        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
-      );
-      expect(valueInput).toBeDefined();
-      await user.type(valueInput!, "flushed");
+      const valueInput = await screen.findByTestId("variable-value-input-topic");
+      expect(valueInput).toHaveValue("");
+      await user.type(valueInput, "flushed");
 
       // The 300ms debounce has NOT fired yet (test is faster). Unmounting the
       // tab (as switching prompt tabs does) must flush the pending write rather
@@ -719,20 +716,16 @@ describe("PromptTabbedSection Layout Modes", () => {
       // Mount, type a value, then unmount - this is "switch away".
       const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
       await user.click(screen.getByRole("tab", { name: /variables/i }));
-      const emptyInput = (await screen.findAllByRole("textbox")).find(
-        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
-      );
-      await user.type(emptyInput!, "kept");
+      const emptyInput = await screen.findByTestId("variable-value-input-topic");
+      expect(emptyInput).toHaveValue("");
+      await user.type(emptyInput, "kept");
       first.unmount();
 
       // "Switch back": a fresh mount of the same tab must show the value again,
       // proving the full round-trip (flush on unmount -> restore from store).
       renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
       await user.click(screen.getByRole("tab", { name: /variables/i }));
-      const restored = (await screen.findAllByRole("textbox")).find(
-        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "kept",
-      );
-      expect(restored).toBeDefined();
+      expect(await screen.findByTestId("variable-value-input-topic")).toHaveValue("kept");
     });
   });
 });

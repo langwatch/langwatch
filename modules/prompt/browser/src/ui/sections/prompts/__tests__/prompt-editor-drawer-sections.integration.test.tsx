@@ -165,8 +165,8 @@ describe("given a prompt open in the prompt editor", () => {
       await user.click(screen.getByRole("menuitem", { name: /Text/ }));
 
       // The default "input" variable already exists, so the new one dedupes
-      // to input_1 and shows as a variable row.
-      expect(await screen.findByText("input_1")).toBeTruthy();
+      // to input_1 and opens with its name field in edit, ready to rename.
+      expect(await screen.findByTestId("variable-name-input-input_1")).toHaveValue("input_1");
     });
   });
 });

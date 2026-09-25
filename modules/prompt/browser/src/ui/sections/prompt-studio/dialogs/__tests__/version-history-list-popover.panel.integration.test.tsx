@@ -63,7 +63,7 @@ const mockVersions: WireVersionedPrompt[] = [
     commitMessage: "Second version",
     versionCreatedAt: "2026-08-19T09:00:00.000Z",
   }),
-  versionedPrompt({}),
+  versionedPrompt({ model: "anthropic/claude-haiku-4-5" }),
 ];
 
 const { mockUseQuery } = vi.hoisted(() => ({
@@ -348,7 +348,7 @@ describe("VersionHistoryListPopover", () => {
 
       const changes = await screen.findByTestId("version-changes-2");
       expect(changes).toHaveTextContent("Model");
-      expect(changes).toHaveTextContent("openai/gpt-5-mini");
+      expect(changes).toHaveTextContent("anthropic/claude-haiku-4-5");
       expect(changes).toHaveTextContent("openai/gpt-5-mini");
     });
 
