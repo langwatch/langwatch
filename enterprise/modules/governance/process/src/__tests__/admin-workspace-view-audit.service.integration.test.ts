@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
+import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 /**
@@ -48,10 +49,39 @@ const projects = createApiFixture<ProjectApi>({
   }),
 });
 
+/** Organization's team reads, answered from the rows this suite seeds. */
+const teams = createApiFixture<OrganizationApi>({
+  getTeam: async ({ organizationId, teamId }) => {
+    const team = await prisma.team.findFirst({ where: { id: teamId, organizationId } });
+    if (!team) throw new TeamNotFoundError(teamId);
+    return team;
+  },
+  getTeamWithMembers: async ({ organizationId, slug }) => {
+    const team = await prisma.team.findFirstOrThrow({
+      where: { slug, organizationId },
+      include: { members: true },
+    });
+    return {
+      ...team,
+      members: team.members.map((member) => ({
+        userId: member.userId,
+        teamId: member.teamId,
+        role: "MEMBER" as const,
+        assignedRoleId: null,
+        assignedRole: null,
+        createdAt: member.createdAt,
+        updatedAt: member.updatedAt,
+        user: { id: member.userId, name: null, email: null, image: null },
+      })),
+    };
+  },
+});
+
 describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
   const service = () =>
     DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: PrismaAdminWorkspaceViewAuditRepository.create(prisma),
+      teams,
       projects,
       events: new SpyOcsf(),
     });

@@ -6,6 +6,8 @@ import {
   type RecordWorkspaceViewResult,
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
+import { HandledError } from "@langwatch/handled-error";
+import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 
@@ -17,6 +19,8 @@ import {
 } from "../app/governance.members.ts";
 import type { AdminWorkspaceViewAuditRepository } from "../repositories/admin-workspace-view-audit.repository.ts";
 
+type WorkspaceTeams = Pick<OrganizationApi, "getTeam" | "getTeamWithMembers">;
+
 const skipped = (): RecordWorkspaceViewResult => ({
   recorded: false,
   auditLogId: null,
@@ -26,6 +30,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(
     private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
+      teams: WorkspaceTeams;
       projects?: Pick<ProjectApi, "ensureInternal">;
       events?: GovernanceOcsfEventWriter;
       diagnostics?: GovernanceDiagnosticsSink;
@@ -35,6 +40,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
 
   static create(options: {
     repository: AdminWorkspaceViewAuditRepository;
+    teams: WorkspaceTeams;
     projects?: Pick<ProjectApi, "ensureInternal">;
     events?: GovernanceOcsfEventWriter;
     diagnostics?: GovernanceDiagnosticsSink;
@@ -48,15 +54,15 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
 
   async recordView(input: RecordWorkspaceViewInput): Promise<RecordWorkspaceViewResult> {
     const parsed = recordWorkspaceViewInputSchema.parse(input);
-    const team = await this.repository.findTarget({
-      teamId: parsed.targetTeamId,
-      actorUserId: parsed.actorUserId,
-    });
+    const [team] = await this.findTargets(parsed);
     if (!team || team.organizationId !== parsed.organizationId) {
       return skipped();
     }
 
-    if ((team.isPersonal && team.ownerUserId === parsed.actorUserId) || team.actorIsMember) {
+    if (team.isPersonal && team.ownerUserId === parsed.actorUserId) {
+      return skipped();
+    }
+    if (await this.isMember(team, parsed.actorUserId)) {
       return skipped();
     }
 
@@ -82,6 +88,27 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
     await this.mirrorBestEffort(parsed, label, row);
 
     return { recorded: true, auditLogId: row.id };
+  }
+
+  private async findTargets(input: RecordWorkspaceViewInput): Promise<OrganizationTeam[]> {
+    try {
+      const team = await this.options.teams.getTeam({
+        organizationId: input.organizationId,
+        teamId: input.targetTeamId,
+      });
+      return [team];
+    } catch (error) {
+      if (HandledError.isHandled(error) && error.code === "team_not_found") return [];
+      throw error;
+    }
+  }
+
+  private async isMember(team: OrganizationTeam, actorUserId: string): Promise<boolean> {
+    const withMembers = await this.options.teams.getTeamWithMembers(
+      { organizationId: team.organizationId, slug: team.slug, callerCanManage: true },
+      { id: actorUserId },
+    );
+    return withMembers.members.some((member) => member.userId === actorUserId);
   }
 
   private async mirrorBestEffort(

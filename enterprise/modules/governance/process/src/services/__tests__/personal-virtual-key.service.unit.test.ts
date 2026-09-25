@@ -3,12 +3,12 @@ import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
-import type { GatewayApi, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
-import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { gatewayKey } from "../../__tests__/support/gateway-virtual-key.fixture.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import type { PersonalVirtualKeyIssuer } from "../../app/governance.members.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../governance-personal-key.service.ts";
@@ -27,44 +27,6 @@ const key: PersonalVirtualKey = {
   lastUsedAtMs: null,
   scopes: [{ scopeType: "PROJECT", scopeId: "project" }],
 };
-
-const at = Temporal.Instant.fromEpochMilliseconds(1);
-
-function gatewayKey(overrides: Partial<GatewayVirtualKeyRecord> = {}): GatewayVirtualKeyRecord {
-  return {
-    id: "key",
-    organizationId: "organization",
-    name: "default",
-    description: "Personal virtual key",
-    status: "ACTIVE",
-    purpose: "USER",
-    externalId: null,
-    metadata: null,
-    disabledAt: null,
-    disabledReason: null,
-    expiresAt: null,
-    hashedSecret: "hashed",
-    displayPrefix: "vk-lw-test",
-    principalUserId: "user",
-    traceProjectId: null,
-    config: null,
-    revision: 1n,
-    previousHashedSecret: null,
-    previousSecretValidUntil: null,
-    revokedAt: null,
-    revokedById: null,
-    createdAt: at,
-    updatedAt: at,
-    createdById: "user",
-    lastUsedAt: null,
-    routingPolicyId: null,
-    routingMode: "NONE",
-    scopes: [{ scopeType: "PROJECT", scopeId: "project" }],
-    principalUser: null,
-    routingPolicy: null,
-    ...overrides,
-  };
-}
 
 class MemoryIssuer implements PersonalVirtualKeyIssuer {
   issue = vi.fn(async () => ({ virtualKey: key, secret: "secret" }));

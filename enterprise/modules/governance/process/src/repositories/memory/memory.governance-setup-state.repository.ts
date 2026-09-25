@@ -6,12 +6,10 @@ import {
 } from "../governance-setup-state.repository.ts";
 
 const NOTHING_SET_UP: GovernanceSetupCounts = {
-  personalVirtualKeys: 0,
   routingPolicies: 0,
   ingestionSources: 0,
   anomalyRules: 0,
   applicationProjectsWithTraces: 0,
-  governanceTenantId: null,
 };
 
 /**

@@ -360,6 +360,8 @@ export interface GovernanceAppDependencies {
       | "findOpenMemberDepartmentLinks"
       | "findTeamsWithDepartments"
       | "assignTeamDepartment"
+      | "getTeam"
+      | "getTeamWithMembers"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -557,10 +559,13 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.setupState = DefaultGovernanceSetupStateService.create({
       repository: repositories.setupState,
+      keys: dependencies.gateway,
+      projects: dependencies.projects,
       activity: repositories.traceActivity,
     });
     this.workspaceViews = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: repositories.adminWorkspaceViewAudit,
+      teams: dependencies.organizations,
       projects: dependencies.projects,
       events: repositories.ocsfEvents,
       diagnostics: { warn: (message, context) => logger.warn(context, message) },

@@ -213,6 +213,7 @@ export class GovernanceInstallationComposition {
     });
     const adminWorkspaceViewAudit = DefaultGovernanceAdminWorkspaceViewAuditService.create({
       repository: PrismaAdminWorkspaceViewAuditRepository.create(this.options.database),
+      teams: this.options.organizations,
       projects: this.options.projects,
       diagnostics: this.options.adminWorkspaceDiagnostics,
     });
@@ -223,6 +224,8 @@ export class GovernanceInstallationComposition {
     });
     const setupState = DefaultGovernanceSetupStateService.create({
       repository: PrismaGovernanceSetupStateRepository.create(this.options.database),
+      keys: this.options.gateway,
+      projects: this.options.projects,
       activity: this.options.setupActivity,
     });
 

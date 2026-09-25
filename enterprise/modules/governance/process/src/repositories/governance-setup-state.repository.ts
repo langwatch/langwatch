@@ -1,10 +1,8 @@
 export type GovernanceSetupCounts = {
-  personalVirtualKeys: number;
   routingPolicies: number;
   ingestionSources: number;
   anomalyRules: number;
   applicationProjectsWithTraces: number;
-  governanceTenantId: string | null;
 };
 
 export abstract class GovernanceSetupStateRepository {

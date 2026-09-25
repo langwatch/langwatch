@@ -1,39 +1,44 @@
 import { type GovernanceSetupState } from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 
 import type { GovernanceSetupActivityReader } from "../app/governance.members.ts";
 import type { GovernanceSetupStateRepository } from "../repositories/governance-setup-state.repository.ts";
 
 const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 
-export class DefaultGovernanceSetupStateService {
-  private constructor(
-    private readonly repository: GovernanceSetupStateRepository,
-    private readonly activity: GovernanceSetupActivityReader | undefined,
-    private readonly now: () => number,
-  ) {}
+type SetupStateOptions = {
+  repository: GovernanceSetupStateRepository;
+  keys: Pick<GatewayApi, "findPersonalVirtualKeys">;
+  projects: Pick<ProjectApi, "findInternal">;
+  activity?: GovernanceSetupActivityReader;
+  now: () => number;
+};
 
-  static create(options: {
-    repository: GovernanceSetupStateRepository;
-    activity?: GovernanceSetupActivityReader;
-    now?: () => number;
-  }): DefaultGovernanceSetupStateService {
-    return new DefaultGovernanceSetupStateService(
-      options.repository,
-      options.activity,
-      options.now ?? Date.now,
-    );
+export class DefaultGovernanceSetupStateService {
+  private constructor(private readonly options: SetupStateOptions) {}
+
+  static create(
+    options: Omit<SetupStateOptions, "now"> & { now?: () => number },
+  ): DefaultGovernanceSetupStateService {
+    return new DefaultGovernanceSetupStateService({ ...options, now: options.now ?? Date.now });
   }
 
   async resolve(organizationId: string): Promise<GovernanceSetupState> {
-    const counts = await this.repository.counts(organizationId);
+    const { repository, keys, projects, activity, now } = this.options;
+    const [counts, personalKeys, governanceProject] = await Promise.all([
+      repository.counts(organizationId),
+      keys.findPersonalVirtualKeys({ organizationId }),
+      projects.findInternal({ organizationId, kind: PROJECT_KIND.INTERNAL_GOVERNANCE }),
+    ]);
     const hasRecentActivity =
-      counts.governanceTenantId && this.activity
-        ? await this.activity.hasRecentActivity({
-            tenantId: counts.governanceTenantId,
-            sinceMs: this.now() - RECENT_ACTIVITY_WINDOW_MS,
+      governanceProject && activity
+        ? await activity.hasRecentActivity({
+            tenantId: governanceProject.id,
+            sinceMs: now() - RECENT_ACTIVITY_WINDOW_MS,
           })
         : false;
-    const hasPersonalVKs = counts.personalVirtualKeys > 0;
+    const hasPersonalVKs = personalKeys.length > 0;
     const hasRoutingPolicies = counts.routingPolicies > 0;
     const hasIngestionSources = counts.ingestionSources > 0;
     const hasAnomalyRules = counts.anomalyRules > 0;

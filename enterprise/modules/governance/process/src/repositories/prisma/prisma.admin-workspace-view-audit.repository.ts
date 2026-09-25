@@ -4,14 +4,13 @@ import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,
-  type AdminWorkspaceTarget,
 } from "../admin-workspace-view-audit.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-export type AdminWorkspaceViewAuditDatabase = Pick<PrismaClient, "auditLog" | "team">;
+export type AdminWorkspaceViewAuditDatabase = Pick<PrismaClient, "auditLog">;
 
 export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
   private constructor(private readonly prisma: AdminWorkspaceViewAuditDatabase) {
@@ -22,36 +21,6 @@ export class PrismaAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
     database: AdminWorkspaceViewAuditDatabase,
   ): PrismaAdminWorkspaceViewAuditRepository {
     return new PrismaAdminWorkspaceViewAuditRepository(database);
-  }
-
-  async findTarget(input: {
-    teamId: string;
-    actorUserId: string;
-  }): Promise<AdminWorkspaceTarget | null> {
-    const team = await this.prisma.team.findUnique({
-      where: { id: input.teamId },
-      select: {
-        id: true,
-        organizationId: true,
-        ownerUserId: true,
-        isPersonal: true,
-        name: true,
-        members: {
-          where: { userId: input.actorUserId },
-          select: { userId: true },
-        },
-      },
-    });
-    return team
-      ? {
-          id: team.id,
-          organizationId: team.organizationId,
-          ownerUserId: team.ownerUserId,
-          isPersonal: team.isPersonal,
-          name: team.name,
-          actorIsMember: team.members.length > 0,
-        }
-      : null;
   }
 
   async findRecent(input: {

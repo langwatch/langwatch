@@ -5,7 +5,6 @@ import { nowInstant } from "@langwatch/time";
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,
-  type AdminWorkspaceTarget,
 } from "../admin-workspace-view-audit.repository.ts";
 
 let sequence = 0;
@@ -15,7 +14,6 @@ let sequence = 0;
  * reads by the same fields the query filters.
  */
 export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewAuditRepository {
-  private readonly targets = new Map<string, AdminWorkspaceTarget>();
   private readonly rows: {
     actorUserId: string;
     targetKind: string;
@@ -26,13 +24,6 @@ export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
 
   static create(): MemoryAdminWorkspaceViewAuditRepository {
     return new MemoryAdminWorkspaceViewAuditRepository();
-  }
-
-  async findTarget(input: {
-    teamId: string;
-    actorUserId: string;
-  }): Promise<AdminWorkspaceTarget | null> {
-    return this.targets.get(input.teamId) ?? null;
   }
 
   async findRecent(input: {
