@@ -76,28 +76,9 @@ import {
   type GatewayPrincipalModelSpend,
   type GatewayPrincipalSpendSummary,
   type GatewayPrincipalSpendWindow,
-  type CreateRoutingPolicyInput,
-  type DeleteRoutingPolicyInput,
-  type EnsureDefaultPersonalVirtualKeyInput,
-  type FindRoutingPolicyInput,
-  gatewayPublicBaseUrl,
-  type IssuedPersonalVirtualKey,
-  type IssuedPersonalVirtualKeyAnswer,
-  type IssuePersonalVirtualKeyInput,
-  type ListPersonalVirtualKeysInput,
-  type ListRoutingPoliciesInput,
-  type PersonalVirtualKey,
-  type RoutingPolicy,
-  type SetDefaultRoutingPolicyInput,
-  type UpdateRoutingPolicyInput,
 } from "@langwatch/gateway-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import {
-  ModelProviderApi,
-  suggestTierTargets,
-  type SuggestTierTargetsInput,
-  type TierTargetSuggestion,
-} from "@langwatch/model-provider-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
@@ -129,7 +110,6 @@ import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/p
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.routing-policy.repository.ts";
 import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
@@ -172,11 +152,6 @@ import type {
 } from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
-import { PersonalVirtualKeyAccessService } from "../services/personal-virtual-key-access.service.ts";
-import { PersonalVirtualKeyIssuerService } from "../services/personal-virtual-key-issuer.service.ts";
-import { PersonalVirtualKeyService } from "../services/personal-virtual-key.service.ts";
-import { RoutingPolicyService } from "../services/routing-policy.service.ts";
-import { asHandledRoutingPolicyError } from "../rules/routing-policy.rules.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
@@ -660,12 +635,6 @@ export type GatewayInternalProtocolCollaborators = Readonly<{
   realtimeSessions?: GatewayRealtimeSessionCollaborators | undefined;
 }>;
 
-type GatewayRouting = Readonly<{
-  policies: RoutingPolicyService;
-  personalKeys: PersonalVirtualKeyService;
-  personalKeyDoors: PersonalVirtualKeyAccessService;
-}>;
-
 export class GatewayApp implements GatewayApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
@@ -806,30 +775,7 @@ export class GatewayApp implements GatewayApi {
         internalCollaborators.realtimeSessions ?? setup.members.elevenLabsWebhook?.sessions,
     });
 
-    const routingPolicies = RoutingPolicyService.create({
-      repository: PrismaRoutingPolicyRepository.create(setup.members.prisma),
-      providers: setup.dependencies.modelProviders,
-      projects: setup.dependencies.projects,
-    });
-    const personalKeys = PersonalVirtualKeyService.create({
-      keys: controlPlane.virtualKeys,
-      providers: setup.dependencies.modelProviders,
-      issuer: PersonalVirtualKeyIssuerService.create(controlPlane.virtualKeys),
-      organizations: setup.dependencies.organizations,
-      policies: routingPolicies,
-      gatewayBaseUrl: gatewayPublicBaseUrl({ config: setup.config, isSaas: setup.members.isSaas }),
-    });
-
     return new GatewayApp({
-      routing: {
-        policies: routingPolicies,
-        personalKeys,
-        personalKeyDoors: PersonalVirtualKeyAccessService.create({
-          keys: personalKeys,
-          members: setup.dependencies.organizations,
-          permissions: setup.dependencies.authz,
-        }),
-      },
       members: {
         ...controlPlane,
         ...(setup.members.elevenLabsWebhook
@@ -884,7 +830,6 @@ export class GatewayApp implements GatewayApi {
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
   #oneTimeReveals: SecretApi | undefined;
-  #routing: GatewayRouting | undefined;
 
   private constructor({
     members,
@@ -900,9 +845,7 @@ export class GatewayApp implements GatewayApi {
     },
     connectUpstream,
     oneTimeReveals,
-    routing,
   }: {
-    routing?: GatewayRouting;
     members: GatewayInfrastructure;
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
@@ -914,7 +857,6 @@ export class GatewayApp implements GatewayApi {
     oneTimeReveals?: SecretApi;
   }) {
     this.#addresses = addresses;
-    this.#routing = routing;
     this.#oneTimeReveals = oneTimeReveals;
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
@@ -1525,85 +1467,6 @@ export class GatewayApp implements GatewayApi {
       virtualKeyNames,
       clickHouseDisabled: false,
     };
-  }
-
-  listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]> {
-    return this.#routingParts().policies.list(input);
-  }
-
-  getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
-    return this.#routingParts().policies.getById(input);
-  }
-
-  countRoutingPolicies(input: { organizationId: string }): Promise<number> {
-    return this.#routingParts().policies.count(input);
-  }
-
-  routingPolicyTierSuggestions(
-    input: Omit<SuggestTierTargetsInput, "limit">,
-  ): TierTargetSuggestion[] {
-    return suggestTierTargets({ tier: input.tier, boundProviderTypes: input.boundProviderTypes });
-  }
-
-  async createRoutingPolicy(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
-    try {
-      return await this.#routingParts().policies.create(input);
-    } catch (error) {
-      throw asHandledRoutingPolicyError(error);
-    }
-  }
-
-  async updateRoutingPolicy(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
-    try {
-      return await this.#routingParts().policies.update(input);
-    } catch (error) {
-      throw asHandledRoutingPolicyError(error);
-    }
-  }
-
-  setDefaultRoutingPolicy(input: SetDefaultRoutingPolicyInput): Promise<RoutingPolicy> {
-    return this.#routingParts().policies.setDefault(input);
-  }
-
-  deleteRoutingPolicy(input: DeleteRoutingPolicyInput): Promise<void> {
-    return this.#routingParts().policies.delete(input);
-  }
-
-  listPersonalVirtualKeys(
-    input: Parameters<GatewayApi["listPersonalVirtualKeys"]>[0],
-  ): Promise<PersonalVirtualKey[]> {
-    return this.#routingParts().personalKeyDoors.list(input);
-  }
-
-  issuePersonalVirtualKey(
-    input: Parameters<GatewayApi["issuePersonalVirtualKey"]>[0],
-  ): Promise<IssuedPersonalVirtualKeyAnswer> {
-    return this.#routingParts().personalKeyDoors.issue(input);
-  }
-
-  revokePersonalVirtualKey(
-    input: Parameters<GatewayApi["revokePersonalVirtualKey"]>[0],
-  ): Promise<void> {
-    return this.#routingParts().personalKeyDoors.revoke(input);
-  }
-
-  personalVirtualKeyList(input: ListPersonalVirtualKeysInput): Promise<PersonalVirtualKey[]> {
-    return this.#routingParts().personalKeys.list(input);
-  }
-
-  personalVirtualKeyEnsureDefault(
-    input: EnsureDefaultPersonalVirtualKeyInput,
-  ): Promise<IssuedPersonalVirtualKey> {
-    return this.#routingParts().personalKeys.ensureDefault(input);
-  }
-
-  personalVirtualKeyIssue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey> {
-    return this.#routingParts().personalKeys.issue(input);
-  }
-
-  #routingParts(): GatewayRouting {
-    if (!this.#routing) throw new Error("Routing policies need the gateway control plane");
-    return this.#routing;
   }
 
   findPersonalVirtualKeys(input: {

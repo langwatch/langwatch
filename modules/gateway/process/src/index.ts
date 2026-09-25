@@ -33,8 +33,6 @@ export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenla
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 export { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 export { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
-export { personalVirtualKeysTrpcTransport } from "./transport/personal-virtual-keys.trpc.ts";
-export { routingPolicyTrpcTransport } from "./transport/routing-policy.trpc.ts";
 export { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 export { gatewaySessionFact, virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 export { PrismaGatewayAdapter, type GatewayPersistence } from "./app/prisma.gateway.composition.ts";
