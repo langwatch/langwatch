@@ -35504,226 +35504,104 @@ Also check: [Write scenarios in code](/agent-testing/scenarios-in-code), [Scenar
 title: Voice Agents
 sidebarTitle: Voice Agents
 keywords: langwatch, agent testing, voice agents, voice testing, elevenlabs, twilio, phone, openai realtime, pipecat, gemini live, audio testing, caller voice
-description: Test a voice agent over real audio, with the same simulated user and the same judge as a text agent, from the platform or from code.
+description: Test a voice agent over real audio. A simulated caller talks to your agent, and a judge scores the call against your criteria.
 ---
 
-## What a voice test is
-
-A voice test is a [scenario](/agent-testing/scenarios) played out over audio. A simulated caller speaks the situation to your agent, listens to the reply, and answers turn after turn. The judge scores the conversation against your criteria, and the run keeps the recording and a transcript of every turn.
-
-You write the scenario the same way as for a text agent: a situation and criteria. What changes is the caller, which now has a voice, and the agent, which now answers with audio.
+A voice test is a [scenario](/agent-testing/scenarios) played out over audio. A simulated caller speaks to your agent, listens to each reply and answers, turn by turn. A judge then scores the call against your criteria. You write the scenario the same way as for a text agent.
 
 <img src="/images/scenario-voice.webp" alt="A voice scenario: a simulated caller, the agent under test and the judge" width="100%" />
 
-| Part | What it does |
-|---|---|
-| Simulated caller | Speaks the situation with a synthesized voice, listens, reacts, and can interrupt the agent. |
-| Your agent | Answers each turn in audio, through the transport it runs on in production. |
-| Judge | Reads the transcript and passes or fails each criterion, with its reasoning. |
+This page gets one voice test running from the platform, against an ElevenLabs agent or a phone number. To test another transport, or to run voice tests in CI, see [Test from code](#test-from-code).
 
-## Two ways to run
+## Before you start
 
-Both use the same simulated caller, the same judge and the same results pages. The difference is where your agent runs, and where you write the scenarios.
+<Note>
+  Voice agents are in private beta. On cloud, write to support@langwatch.ai to enable them for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app.
+</Note>
+
+Add two providers under **Settings > Model Providers**:
+
+- **ElevenLabs**, with a key in the same ElevenLabs workspace as your agent. The key needs `convai_read`, `convai_write` and conversation read.
+- **OpenAI**. The simulated caller speaks with OpenAI text-to-speech, and the judge reads an OpenAI transcript of the call.
+
+To call a phone number instead, also add a **Twilio** provider. See [Model Providers](/platform/model-providers).
+
+## Add your voice agent
+
+1. Open **Agents** in the sidebar and press **New Agent**.
+2. Pick **Voice Agent** and give it a **Name**.
+3. Under **Reached via**, pick **ElevenLabs agent** and paste the **Agent id** from ElevenLabs. For a phone number, pick **Phone number** and enter it in international format, for example `+14155550123`.
+4. Press **Create Agent**.
+
+LangWatch tests the agent as ElevenLabs has it configured. It does not send prompt overrides.
+
+For an ElevenLabs agent, press **Talk to it** to hear the agent from your browser before you write a scenario. This call is not scored.
+
+## Run a scenario against it
+
+Open **Agent Testing**, create a scenario the way you would for a text agent, and press **Run**. In the run dialog, pick your voice agent as the **Agent to be tested**. See [Test from the platform](/agent-testing/test-from-the-platform) for writing scenarios and the run dialog.
+
+A voice run takes one to two minutes per scenario, because every turn is spoken, then transcribed.
+
+## Read the result
+
+The run shows the same verdict as a text run: each criterion passed or failed, with the judge's reasoning. The conversation drawer adds the recording of the call, with the transcript per turn. See [Results](/agent-testing/results).
+
+## Test from code
+
+The [Scenario](https://langwatch.ai/scenario/) SDK runs voice tests from your own test runner, in Python or TypeScript. It has adapters for ElevenLabs, OpenAI Realtime, Gemini Live, Pipecat and Twilio, and can add background noise and interruptions. With `LANGWATCH_API_KEY` set, each run appears in **Agent Testing** with its recording and transcript.
 
 <CardGroup cols={2}>
-  <Card title="Test from the platform" icon="globe" href="#test-from-the-platform">
-    Register an ElevenLabs agent or a phone number as an agent, then write and run scenarios in the LangWatch interface. No test code.
+  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started/">
+    Install, set up keys and run your first voice scenario.
   </Card>
-  <Card title="Write voice scenarios in code" icon="code" href="#write-voice-scenarios-in-code">
-    Any transport: Pipecat, OpenAI Realtime, Gemini Live, Twilio, ElevenLabs. The Scenario SDK runs the call from your test runner and in CI.
+  <Card title="Choose an adapter" icon="plug" href="https://langwatch.ai/scenario/voice/choosing-an-adapter/">
+    Pick the adapter for your transport.
+  </Card>
+  <Card title="Voice recipes" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes/">
+    Audio effects, interruptions, multi-turn calls and observability.
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="https://langwatch.ai/scenario/voice/troubleshooting/">
+    The failures that come up most often in voice scenarios.
   </Card>
 </CardGroup>
 
-## Test from the platform
+## Reference
 
-<Note>
-  Voice agents in the platform are in private beta, behind the `release_voice_agents_enabled` flag. On cloud, write to support@langwatch.ai to enable it for your organization. Self-hosted, set `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled` on the app. With the flag off, the Voice agent type is hidden and the server refuses voice runs.
-</Note>
+<AccordionGroup>
+  <Accordion title="Caller voice">
+    The caller voice is part of the scenario, so every run of it uses the same caller. In the scenario editor, open **Customize scenario**, then **Caller voice**.
 
-### Before you start
+    | Field | Values |
+    |---|---|
+    | **Voice** | An OpenAI text-to-speech voice. Default `nova`. |
+    | **Interrupts** | How often the caller talks over the agent, from 0% to 100%. |
+    | **Effects** | None, phone line, or background noise. |
+  </Accordion>
+  <Accordion title="Score a call you make yourself">
+    Run a single scenario and, in the run dialog, pick **Call it myself** to talk to an ElevenLabs agent from your browser. The call is saved as a run of the scenario, and the judge scores it like a simulated call.
 
-Add the credentials under **Settings > Model Providers**. See [Model Providers](/platform/model-providers).
+    The browser needs HTTPS or localhost and microphone permission.
+  </Accordion>
+  <Accordion title="Limits and cost">
+    A call is cut after 5 minutes. The run is marked "Cut at the call limit", and the judge scores what was said. Each project runs 2 voice calls at a time per worker process, and more voice runs wait in the queue. Self-hosted, change these limits with the voice variables in [Environment Variables](/self-hosting/configuration/environment-variables#voice-agents).
 
-| Provider | Needed for | Notes |
-|---|---|---|
-| **ElevenLabs** | An ElevenLabs agent | The key needs `convai_read`, `convai_write` and conversation read. The agent must be in the same ElevenLabs workspace as the key. |
-| **OpenAI** | Every scenario run | The caller's speech is synthesized with OpenAI text-to-speech, and the agent's audio is transcribed with OpenAI for the judge. |
-| **Twilio** | A phone number | Account SID, auth token and a from-number. The run dials out from that number. |
+    Every call uses ElevenLabs conversation minutes, or Twilio minutes for a phone number. A simulated call also uses OpenAI audio tokens.
 
-<Note>
-  Projects that share one ElevenLabs key share that workspace's agents and conversations, because ElevenLabs checks the key, not the project. Scope the key to the project to keep its voice agents apart from the rest of the organization.
-</Note>
-
-### Add a voice agent
-
-Open **Agents**, press **New Agent** and pick **Voice**. Two kinds of target:
-
-| Target | What you enter | What a run does |
-|---|---|---|
-| **ElevenLabs agent** | The agent id from ElevenLabs Conversational AI | Opens a conversation with the agent and speaks to it. |
-| **Phone number** | The number to call | Dials the number through your Twilio account and speaks to whoever answers. |
-
-The Phone number option is always listed, but it is disabled and marked **(Unavailable)** until the project has a Twilio provider. Until then, the drawer points you to **Settings > Model Providers**.
-
-LangWatch never sends prompt overrides. The agent's own ElevenLabs configuration is what gets tested.
-
-### Talk to it yourself
-
-An ElevenLabs agent has a **Talk to it** button in the agent drawer. It opens a call from your browser, so you hear the agent before you write a scenario. It works before the agent is saved, as soon as the agent id and the ElevenLabs key exist, and saves the agent on hang-up. The panel shows the transcript and, once ElevenLabs has processed it, a **Play** control for the recording.
-
-A **Talk to it** call is not a run. Each exchange is recorded as a trace, so it stays queryable in the Trace Explorer. To have a call of your own scored against a scenario, open the run dialog of the scenario and pick **Call it myself**. That call is written as a run under the scenario and judged like a simulated one.
-
-The browser needs HTTPS or localhost and microphone permission. One call per tab. A phone number has no browser leg, so it supports scenario runs only.
-
-### Set the caller voice
-
-The caller voice lives on the scenario, under **Customize scenario** in the editor, so every run of it uses the same caller.
-
-| Field | Values |
-|---|---|
-| **Voice** | An OpenAI text-to-speech voice: `alloy`, `ash`, `ballad`, `coral`, `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse`. Default `nova`. |
-| **Interrupts** | Probability from 0 to 1 that the caller talks over the agent. |
-| **Effects** | None, phone line, or background noise. |
-
-### Run and read the results
-
-**Run** on the scenario row, or **Run suite**, opens the same [run dialog](/agent-testing/run-plans#the-run-dialog) as for a text agent. Pick the voice agent as the **Agent to be tested**. The simulated caller places the call, and the run row shows the result when the judge is done.
-
-The conversation drawer shows the transcript per turn, the recording, and the verdict with its reasoning, like any other run. See [Results](/agent-testing/results). The recording can be unavailable for a short while after the call while ElevenLabs processes it; reload the run.
-
-A voice run takes longer than a text run: the caller speaks, the agent answers in audio, and each turn is transcribed. Expect one to two minutes per scenario. Every call consumes ElevenLabs conversation minutes, or Twilio minutes for a phone number, plus OpenAI audio tokens.
-
-### Limits
-
-| Variable | Default | Effect |
-|---|---|---|
-| `VOICE_CALL_MAX_SECONDS` | 300 | A scenario call is cut at the limit. The run is marked "Cut at the call limit" and the judge scores what was said. A **Talk to it** or **Call it myself** call is cut at the same limit, and is also bounded by the browser tab and ElevenLabs' own maximum. |
-| `VOICE_RUNS_MAX_CONCURRENT` | 2 | Voice runs per execution process, per project. More voice runs queue. Text runs are unaffected. The count is local to each process, so a multi-process deployment allows more in total. |
-
-Self-hosted, three more variables shape the phone transport. Set `VOICE_PUBLIC_BASE_URL` to the voice worker's public https origin; when set, it always wins. When it is unset, the worker opens a free cloudflared quick tunnel at boot and uses that URL.
-
-Set `VOICE_TUNNEL=false` to turn the tunnel off. With the URL unset and the tunnel off, the worker has no public URL and phone runs fail.
-
-`VOICE_WS_PORT` is the port the phone transport listens on, so your public origin can route to it. It defaults to `3300`.
-
-### Troubleshooting
-
-| Message | Cause | Fix |
-|---|---|---|
-| "...missing the permission convai_write..." | The ElevenLabs key lacks `convai_write` | Regenerate the key with `convai_read`, `convai_write` and conversation read |
-| "ElevenLabs rejected the connection: Status code: 401" | Wrong or revoked key | Check the key in **Settings > Model Providers** |
-| Agent not found | Wrong agent id, or the agent is in a different ElevenLabs workspace than the key. A public agent still needs the key | Confirm the agent id and the workspace |
-| "The caller voice needs an OpenAI key..." | No OpenAI provider | Add an OpenAI provider in **Settings > Model Providers** |
-| "Recording unavailable" | ElevenLabs is still processing the recording | Reload the run after a short wait |
-| The agent stays silent in the browser | Autoplay policy, or no microphone permission | Click the page once, allow the microphone, use HTTPS or localhost |
-| Run marked "Cut at the call limit" | The call reached `VOICE_CALL_MAX_SECONDS` | Raise the limit, or shorten the scenario |
-| Runs sit in queue | `VOICE_RUNS_MAX_CONCURRENT` is reached | Wait for a slot, or raise the limit |
-| "No response" after a call that clearly happened (self-hosted) | Audio could not be written to stored objects, so the voice turns were dropped | Make the stored-objects directory writable by the app user, or configure the S3 bucket. Look for `EACCES` in the api log |
-
-## Write voice scenarios in code
-
-The Scenario SDK runs the call from your own test runner. The agent under test can be one deployed on a voice transport (Pipecat, ElevenLabs, Twilio), or one running directly on a realtime model through `OpenAIRealtimeAgentAdapter` or `GeminiLiveAgentAdapter`. The scenario, the simulated caller and the judge are the same as above, and with `LANGWATCH_API_KEY` set every run appears under **Agent Testing > Results** with the recording and the transcript.
-
-<Tip>
-  **Quick setup?** Run `/scenarios add voice testing to my agent` in your coding assistant after installing the [`/scenarios` skill](/skills/directory). It detects your transport, picks the adapter and wires it to your agent.
-</Tip>
-
-New to Scenario? Start with [Write scenarios in code](/agent-testing/scenarios-in-code) for the API key and your first text scenario. Then pick the adapter for your transport:
-
-| Transport | Adapter |
-| --- | --- |
-| Pipecat / Twilio Media Streams | `PipecatAgentAdapter` |
-| ElevenLabs Conversational AI | `ElevenLabsAgentAdapter` |
-| OpenAI Realtime | `OpenAIRealtimeAgentAdapter` |
-| Gemini Live | `GeminiLiveAgentAdapter` |
-| Twilio phone number | `TwilioAgentAdapter` |
-| Text-only agent, no transport yet | `ComposableVoiceAgent` |
-
-Give the user simulator a voice and it becomes the caller. Audio effects, interruptions and latency metrics are options on the same run:
-
-
-  ### Python
-
-    ```python
-    import pytest
-    import scenario
-
-    scenario.configure(default_model="openai/gpt-5-mini")
-
-    @pytest.mark.agent_test
-    @pytest.mark.asyncio
-    async def test_billing_inquiry():
-        result = await scenario.run(
-            name="billing inquiry",
-            description="An upset customer calls about a duplicate charge.",
-            agents=[
-                scenario.PipecatAgentAdapter(url="ws://localhost:8765/stream"),
-                scenario.UserSimulatorAgent(
-                    voice="elevenlabs/EXAVITQu4vr4xnSDxMaL",
-                    audio_effects=[scenario.effects.phone_quality()],
-                ),
-                scenario.JudgeAgent(criteria=[
-                    "Acknowledged the frustration before logistics",
-                    "Verified identity before any account action",
-                ]),
-            ],
-            script=[scenario.agent(), scenario.user(), scenario.proceed(turns=5), scenario.judge()],
-        )
-        assert result.success
-    ```
-
-    The `asyncio` marker needs `pytest-asyncio` installed.
-
-  ### TypeScript
-
-    ```typescript
-    import { it, expect } from "vitest";
-    import scenario, { voice } from "@langwatch/scenario";
-
-    it("handles a billing inquiry", async () => {
-      const result = await scenario.run({
-        name: "billing inquiry",
-        description: "An upset customer calls about a duplicate charge.",
-        agents: [
-          scenario.pipecatAgent({ url: "ws://localhost:8765/stream" }),
-          scenario.userSimulatorAgent({
-            voice: "elevenlabs/EXAVITQu4vr4xnSDxMaL",
-            audioEffects: [voice.effects.phoneQuality()],
-          }),
-          scenario.judgeAgent({
-            criteria: [
-              "Acknowledged the frustration before logistics",
-              "Verified identity before any account action",
-            ],
-          }),
-        ],
-        script: [scenario.agent(), scenario.user(), scenario.proceed(5), scenario.judge()],
-      });
-
-      expect(result.success).toBe(true);
-    }, 180_000);
-    ```
-
-
-
-Run it with `pytest` or `vitest`, with a generous timeout: a voice run takes 30 to 120 seconds.
-
-The rest lives in the Scenario documentation:
-
-<CardGroup cols={2}>
-  <Card title="Voice quick start" icon="rocket" href="https://langwatch.ai/scenario/voice/getting-started">
-    The full walkthrough, with a worked example per adapter.
-  </Card>
-  <Card title="Choosing an adapter" icon="table-list" href="https://langwatch.ai/scenario/voice/choosing-an-adapter">
-    Constructors per transport and the capability matrix.
-  </Card>
-  <Card title="Audio effects and interruptions" icon="sliders" href="https://langwatch.ai/scenario/voice/recipes">
-    Background noise, codec degradation, custom WAV clips and barge-in.
-  </Card>
-  <Card title="Runnable examples" icon="github" href="https://github.com/langwatch/scenario/tree/main/python/examples/voice">
-    One example per adapter on GitHub.
-  </Card>
-</CardGroup>
+    Projects that share one ElevenLabs key share that workspace's agents and calls, because ElevenLabs checks the key, not the project. Give each project its own key to keep them apart.
+  </Accordion>
+  <Accordion title="Troubleshooting">
+    | Message | Fix |
+    |---|---|
+    | "...missing the permission convai_write..." | Create an ElevenLabs key with `convai_read`, `convai_write` and conversation read. |
+    | "ElevenLabs rejected the connection" with status 401 | The key is wrong or revoked. Check it in **Settings > Model Providers**. |
+    | Agent not found | Check the agent id, and that the agent is in the same ElevenLabs workspace as the key. |
+    | "The caller voice needs an OpenAI key..." | Add an OpenAI provider in **Settings > Model Providers**. |
+    | "Recording not ready yet" | ElevenLabs is still processing the call. Reload the run after a short wait. |
+    | The agent is silent in the browser | Click the page once, allow the microphone, and use HTTPS or localhost. |
+    | "Cut at the call limit" | Shorten the scenario, or raise the call limit if you self-host. |
+  </Accordion>
+</AccordionGroup>
 
 ---
 
@@ -58372,6 +58250,18 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 | `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key | - |
 | `GOOGLE_EVALUATOR_ENABLED` | Enable Google AI for evaluations (PII detection) | `false` |
 | `GOOGLE_CREDENTIALS_JSON` | Google service account credentials JSON | - |
+
+## Voice Agents
+
+These variables apply only when [voice agents](/agent-testing/voice-agents) are enabled with `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VOICE_CALL_MAX_SECONDS` | Longest a voice call can last, in seconds. A scenario call is cut at this limit and marked "Cut at the call limit". Browser calls (**Talk to it**, **Call it myself**) are cut at the same limit. | `300` |
+| `VOICE_RUNS_MAX_CONCURRENT` | Voice runs at a time, per project, per worker process. More voice runs wait in the queue. Text runs are not affected. | `2` |
+| `VOICE_PUBLIC_BASE_URL` | Public https origin of the voice worker, for Twilio phone calls to reach it. When set, it always wins over the tunnel. | - |
+| `VOICE_TUNNEL` | With `VOICE_PUBLIC_BASE_URL` unset, the worker opens a cloudflared quick tunnel at boot and uses its URL. Set to `false` to turn the tunnel off. With both off, phone runs fail. | on |
+| `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
 ## Feature Flags
 
