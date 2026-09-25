@@ -496,7 +496,7 @@ export class IngestionSourceService {
   }: {
     id: string;
     organizationId: string;
-  }): Promise<CreatedGovernanceIngestionSource> {
+  }): Promise<{ source: GovernanceIngestionSource; ingestSecret: string }> {
     const existing = await this.getById({ id, organizationId });
     if (!isPushSourceType({ sourceType: existing.sourceType })) {
       throw new GovernanceValidationError(

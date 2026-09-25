@@ -61,6 +61,13 @@ import {
   type GovernanceOcsfExportPage,
   type GovernanceOcsfExportInput,
   type GovernanceSetupState,
+  getStarterTemplate,
+  type IngestionSourceCreateInput,
+  type IngestionSourceDto,
+  type IngestionSourceUpdateInput,
+  isOttlEnabledSourceType,
+  OTTL_ENABLED_SOURCE_TYPES,
+  type OttlStarterTemplate,
   type IssuedIngestionKey,
   type PersonalIngestionKeyListing,
   type PersonalIngestionKeyMint,
@@ -207,6 +214,7 @@ import { IngestionPullLogService } from "../services/ingestion-pull-log.service.
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
+import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -634,6 +642,11 @@ export class GovernanceApp implements GovernanceRestApi {
       providerAccounts: HttpProviderAccountChannel.create({ credentials: ingestionCredentials }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
+    this.sourceReads = IngestionSourceReadService.create({
+      sources: this.ingestionSources,
+      pullRuns: repositories.ingestionPullRuns,
+      projects: dependencies.projects,
+    });
     // Stored credentials seal under the process's CREDENTIALS_SECRET, the key main sealed them with.
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
@@ -734,6 +747,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly workspaceViews: DefaultGovernanceAdminWorkspaceViewAuditService;
   private readonly pullLifecycle: IngestionPullLifecycleService;
   private readonly ingestionSources: IngestionSourceService;
+  private readonly sourceReads: IngestionSourceReadService;
   private readonly ocsfExport: DefaultGovernanceOcsfExportService;
   private readonly quarantineFill: QuarantineFillEvaluatorService;
   private readonly erasureSuppression: ErasureSuppressionService;
@@ -1136,6 +1150,56 @@ export class GovernanceApp implements GovernanceRestApi {
   }
 
   // ── The governance overview: setup state, OCSF export (Enterprise), quarantine fill ──
+
+  // ── Ingestion sources (main `ingestionSources.ts`) ──────────────────────
+
+  ingestionSourceList(input: { organizationId: string }): Promise<IngestionSourceDto[]> {
+    return this.sourceReads.list(input.organizationId);
+  }
+
+  ingestionSourceGet(input: { id: string; organizationId: string }): Promise<IngestionSourceDto> {
+    return this.sourceReads.get(input);
+  }
+
+  async ingestionSourceCreate(
+    input: IngestionSourceCreateInput & { actorUserId: string },
+  ): Promise<{ source: IngestionSourceDto; ingestSecret: string | null }> {
+    const created = await this.ingestionSources.createSource(input);
+    return {
+      source: await this.sourceReads.present(created.source),
+      ingestSecret: created.ingestSecret,
+    };
+  }
+
+  async ingestionSourceUpdate(input: IngestionSourceUpdateInput): Promise<IngestionSourceDto> {
+    return this.sourceReads.present(await this.ingestionSources.updateSource(input));
+  }
+
+  async ingestionSourceRotateSecret(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ source: IngestionSourceDto; ingestSecret: string }> {
+    const rotated = await this.ingestionSources.rotateSecret(input);
+    return {
+      source: await this.sourceReads.present(rotated.source),
+      ingestSecret: rotated.ingestSecret,
+    };
+  }
+
+  async ingestionSourceArchive(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionSourceDto> {
+    return this.sourceReads.present(await this.ingestionSources.archive(input));
+  }
+
+  ingestionSourceOttlStarter({ sourceType }: { sourceType: string }): OttlStarterTemplate {
+    return {
+      enabled: isOttlEnabledSourceType(sourceType),
+      statements: [...getStarterTemplate(sourceType)],
+      enabledSourceTypes: [...OTTL_ENABLED_SOURCE_TYPES],
+    };
+  }
 
   async governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState> {
     return this.setupState.resolve(input.organizationId);

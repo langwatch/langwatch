@@ -17,6 +17,21 @@ export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlE
 }
 
 /**
+ * How the last pull went, as main's `sourcePullStatus` reports it: dates and a
+ * continuation flag only, never cursors or upstream error bodies.
+ */
+export const ingestionSourcePullStatusSchema = z
+  .object({
+    lastRunAt: z.string().nullable(),
+    outcome: z.string().nullable(),
+    error: z.string().nullable(),
+    backfillThrough: z.string().nullable(),
+    hasMore: z.boolean().nullable(),
+  })
+  .strict();
+export type IngestionSourcePullStatus = z.infer<typeof ingestionSourcePullStatusSchema>;
+
+/**
  * One configured source, as the admin surface reads it — deliberately NOT
  * the stored row: the secret hash, rotation slot and credentials envelope
  * never travel, guarding against a later `select` widening putting one back.
@@ -33,6 +48,11 @@ export const ingestionSourceDtoSchema = z
     hasPollerCursor: z.boolean(),
     pullSchedule: z.string().nullable(),
     status: z.string(),
+    errorCount: z.number().int().nonnegative(),
+    lastSuccessAt: z.date().nullable(),
+    lastReadThroughAt: z.date().nullable(),
+    lastRunCompleteness: z.string().nullable(),
+    pullStatus: ingestionSourcePullStatusSchema,
     traceProjectId: z.string().nullable(),
     /** The destination it points at is gone: archived, deleted, or never ours. */
     traceProjectArchived: z.boolean(),
@@ -64,3 +84,4 @@ export const ottlStarterTemplateSchema = z
     enabledSourceTypes: z.array(z.string()),
   })
   .strict();
+export type OttlStarterTemplate = z.infer<typeof ottlStarterTemplateSchema>;

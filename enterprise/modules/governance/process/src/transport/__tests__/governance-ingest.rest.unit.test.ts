@@ -131,6 +131,15 @@ function mountIngest(world: World = {}) {
     ingestionKeyRotate: unsupportedRestOperation,
     ingestionKeyRevoke: unsupportedRestOperation,
     governanceSetupState: unsupportedRestOperation,
+    ingestionSourceList: unsupportedRestOperation,
+    ingestionSourceGet: unsupportedRestOperation,
+    ingestionSourceCreate: unsupportedRestOperation,
+    ingestionSourceUpdate: unsupportedRestOperation,
+    ingestionSourceRotateSecret: unsupportedRestOperation,
+    ingestionSourceArchive: unsupportedRestOperation,
+    ingestionSourceOttlStarter: () => {
+      throw new Error("not reachable through this door");
+    },
     governanceRecordWorkspaceView: unsupportedRestOperation,
     governanceOcsfExport: unsupportedRestOperation,
     governanceQuarantineFillStats: unsupportedRestOperation,

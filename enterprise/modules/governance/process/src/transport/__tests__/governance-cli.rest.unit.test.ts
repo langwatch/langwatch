@@ -144,6 +144,15 @@ function mountCli(world: World = {}) {
     ingestWebhook: unavailable,
     ingestOtlpLogs: unavailable,
     ingestOtlpMetrics: unavailable,
+    ingestionSourceList: unavailable,
+    ingestionSourceGet: unavailable,
+    ingestionSourceCreate: unavailable,
+    ingestionSourceUpdate: unavailable,
+    ingestionSourceRotateSecret: unavailable,
+    ingestionSourceArchive: unavailable,
+    ingestionSourceOttlStarter: () => {
+      throw new Error("not reachable through this door");
+    },
     listIngestionTemplatesForMember: unavailable,
     listIngestionTemplatesForAdmin: unavailable,
     getIngestionTemplate: unavailable,

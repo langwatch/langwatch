@@ -98,6 +98,11 @@ import type {
   GovernanceIngestionSource,
   UpdateGovernanceIngestionSourceCommand,
 } from "./ingestion-source.commands.ts";
+import type { IngestionSourceDto, OttlStarterTemplate } from "./ingestion-source.ts";
+import type {
+  IngestionSourceCreateInput,
+  IngestionSourceUpdateInput,
+} from "./ingestion-sources.trpc.ts";
 import type {
   ArchiveIngestionTemplateInput,
   CloneIngestionTemplateInput,
@@ -500,6 +505,21 @@ export interface GovernanceRestApi {
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;
+  ingestionSourceList(input: { organizationId: string }): Promise<IngestionSourceDto[]>;
+  ingestionSourceGet(input: { id: string; organizationId: string }): Promise<IngestionSourceDto>;
+  ingestionSourceCreate(
+    input: IngestionSourceCreateInput & { actorUserId: string },
+  ): Promise<{ source: IngestionSourceDto; ingestSecret: string | null }>;
+  ingestionSourceUpdate(input: IngestionSourceUpdateInput): Promise<IngestionSourceDto>;
+  ingestionSourceRotateSecret(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ source: IngestionSourceDto; ingestSecret: string }>;
+  ingestionSourceArchive(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<IngestionSourceDto>;
+  ingestionSourceOttlStarter(input: { sourceType: string }): OttlStarterTemplate;
   governanceSetupState(input: { organizationId: string }): Promise<GovernanceSetupState>;
   governanceOcsfExport(
     input: GovernanceOcsfExportInput,

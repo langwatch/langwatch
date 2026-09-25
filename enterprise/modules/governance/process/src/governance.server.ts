@@ -90,6 +90,7 @@ import {
 } from "./transport/governance.rest.ts";
 import { governanceTrpcTransport } from "./transport/governance.trpc.ts";
 import { ingestionKeyTrpcTransport } from "./transport/ingestion-key.trpc.ts";
+import { ingestionSourcesTrpcTransport } from "./transport/ingestion-sources.trpc.ts";
 import { ingestionTemplatesTrpcTransport } from "./transport/ingestion-templates.trpc.ts";
 import { personalSessionsTrpcTransport } from "./transport/personal-sessions.trpc.ts";
 import { personalVirtualKeysTrpcTransport } from "./transport/personal-virtual-keys.trpc.ts";
@@ -115,6 +116,7 @@ export const governanceServer = defineServerModule("governance")
     governanceRest,
     departmentsTrpcTransport,
     ingestionTemplatesTrpcTransport,
+    ingestionSourcesTrpcTransport,
     governanceTrpcTransport,
     anomalyRulesTrpcTransport,
     personalSessionsTrpcTransport,
