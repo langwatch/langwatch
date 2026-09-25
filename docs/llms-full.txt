@@ -35563,7 +35563,7 @@ Open **Agents**, press **New Agent** and pick **Voice**. Two kinds of target:
 | **ElevenLabs agent** | The agent id from ElevenLabs Conversational AI | Opens a conversation with the agent and speaks to it. |
 | **Phone number** | The number to call | Dials the number through your Twilio account and speaks to whoever answers. |
 
-The Phone number option appears once the project has a Twilio provider. Until then, the drawer points you to **Settings > Model Providers**.
+The Phone number option is always listed, but it is disabled and marked **(Unavailable)** until the project has a Twilio provider. Until then, the drawer points you to **Settings > Model Providers**.
 
 LangWatch never sends prompt overrides. The agent's own ElevenLabs configuration is what gets tested.
 
@@ -35597,10 +35597,10 @@ A voice run takes longer than a text run: the caller speaks, the agent answers i
 
 | Variable | Default | Effect |
 |---|---|---|
-| `VOICE_CALL_MAX_SECONDS` | 300 | A scenario call is cut at the limit. The run is marked "Cut at the call limit" and the judge scores what was said. A **Talk to it** or **Call it myself** call is bounded by the browser tab and ElevenLabs' own maximum instead. |
+| `VOICE_CALL_MAX_SECONDS` | 300 | A scenario call is cut at the limit. The run is marked "Cut at the call limit" and the judge scores what was said. A **Talk to it** or **Call it myself** call is cut at the same limit, and is also bounded by the browser tab and ElevenLabs' own maximum. |
 | `VOICE_RUNS_MAX_CONCURRENT` | 2 | Voice runs per execution process, per project. More voice runs queue. Text runs are unaffected. The count is local to each process, so a multi-process deployment allows more in total. |
 
-Self-hosted, two more variables shape the phone transport. Set `VOICE_PUBLIC_BASE_URL` only when the voice worker has its own public hostname; unset, the app's own public host is used. Set `VOICE_WS_PORT` to pin the port the phone transport listens on, so your public origin can route to it; unset, it picks an ephemeral port.
+Self-hosted, three more variables shape the phone transport. Set `VOICE_PUBLIC_BASE_URL` to the voice worker's public https origin; when set, it always wins. When it is unset, the worker opens a free cloudflared quick tunnel at boot and uses that URL. Set `VOICE_TUNNEL=false` to turn the tunnel off; with the URL unset and the tunnel off, the worker has no public URL and phone runs fail. `VOICE_WS_PORT` is the port the phone transport listens on, so your public origin can route to it; it defaults to `3300`.
 
 ### Troubleshooting
 
