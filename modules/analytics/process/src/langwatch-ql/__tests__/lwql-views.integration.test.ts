@@ -526,7 +526,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * edge case — and the failure it produces is not a visible duplicate but
      * every aggregate over the dataset counting the evaluation twice.
      */
-    /** @scenario "A dataset whose sort key moves is deduplicated by its own identity" */
+    /** @scenario "A view whose sort key moves is deduplicated by its own identity" */
     it("returns one row for a record whose two versions carry two sort keys", async () => {
       const evaluationId = evaluationDedupId(harness.tenantA.tenantId);
 
@@ -608,7 +608,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * expects, and a case that checks four of eleven measures is a case a
      * mislabelled twelfth walks straight past.
      */
-    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    /** @scenario "A pre-aggregated view returns one merged row per bucket" */
     it("returns one merged row, each measure the sum of its own column's parts", async () => {
       for (const [name, filter, parts, totals] of [
         // The grouped rollup: no Model/SpanType columns to filter on, so the
@@ -689,7 +689,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * through to `system.columns` and therefore to the schema endpoint — a
      * caller would be told the name of an engine instead of a number's type.
      */
-    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    /** @scenario "A pre-aggregated view returns one merged row per bucket" */
     it("publishes the measures as plain numeric types", async () => {
       const stored = await selectScalar<string>(
         harness.admin,

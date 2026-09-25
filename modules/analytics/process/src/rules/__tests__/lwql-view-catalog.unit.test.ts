@@ -391,7 +391,7 @@ describe("given the LangWatchQL view catalog", () => {
      * the maps someone remembered, so a dataset added with an unfiltered map
      * fails here.
      */
-    /** @scenario "The analytics-optimised datasets expose no captured content" */
+    /** @scenario "The analytics-optimised views expose no captured content" */
     it("filters the content keys out of every map column any dataset exposes", () => {
       let checked = 0;
       for (const view of LWQL_VIEW_CATALOG) {
@@ -423,7 +423,7 @@ describe("given the LangWatchQL view catalog", () => {
       /_analytics(_rollup)?$/.test(view.sourceTable),
     );
 
-    /** @scenario "The analytics-optimised datasets expose no captured content" */
+    /** @scenario "The analytics-optimised views expose no captured content" */
     it("exposes no content-gated column on any of them", () => {
       expect(
         analyticsDatasets.length,
@@ -462,7 +462,7 @@ describe("given the LangWatchQL view catalog", () => {
   describe("when a dataset's source aggregates rather than supersedes", () => {
     const aggregating = LWQL_VIEW_CATALOG.filter((view) => view.dedup.aggregating);
 
-    /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
+    /** @scenario "A pre-aggregated view declares that its rows merge rather than supersede" */
     it("declares every column that is not a measure as a key its rows merge on", () => {
       expect(
         aggregating.length,
@@ -495,7 +495,7 @@ describe("given the LangWatchQL view catalog", () => {
      * together under one. Advertising the prefix as the join surface is
      * therefore advertising a wrong number.
      */
-    /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
+    /** @scenario "A pre-aggregated view advertises its whole bucket key as its join keys" */
     it("advertises the whole bucket key as its join keys, not a prefix of it", () => {
       for (const view of aggregating) {
         expect(
@@ -513,7 +513,7 @@ describe("given the LangWatchQL view catalog", () => {
      * rule above could be read as "join keys are always the grain", which the
      * shipped catalog does not say and must not start saying.
      */
-    /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
+    /** @scenario "A pre-aggregated view advertises its whole bucket key as its join keys" */
     it("leaves a record dataset free to advertise a foreign key it is not unique on", () => {
       const evaluations = pickLwqlViewByName("evaluations")!;
       expect([...evaluations.joinKeys].toSorted()).not.toEqual(
@@ -521,7 +521,7 @@ describe("given the LangWatchQL view catalog", () => {
       );
     });
 
-    /** @scenario "A pre-aggregated dataset declares that its rows merge rather than supersede" */
+    /** @scenario "A pre-aggregated view declares that its rows merge rather than supersede" */
     it("leaves a versioned dataset's version column required, so this is not a blanket exemption", () => {
       const versioned = LWQL_VIEW_CATALOG.filter(
         (view) => !view.dedup.aggregating && !catalogShapes.isPostgresResident(view),
@@ -542,7 +542,7 @@ describe("given the LangWatchQL view catalog", () => {
   describe("when a dataset's source sorts by a column its write path moves", () => {
     const evaluationMetrics = pickLwqlViewByName("evaluation_metrics")!;
 
-    /** @scenario "A dataset whose sort key moves declares the strategy that deduplicates it" */
+    /** @scenario "A view whose sort key moves declares the strategy that deduplicates it" */
     it("deduplicates by the record rather than by the engine's key", () => {
       expect(
         evaluationMetrics.dedup.strategy,
@@ -568,7 +568,7 @@ describe("given the LangWatchQL view catalog", () => {
      * versioned source. A name list would lock the next violation in as
      * "expected".
      */
-    /** @scenario "A dataset whose sort key moves declares the strategy that deduplicates it" */
+    /** @scenario "A view whose sort key moves declares the strategy that deduplicates it" */
     it("leaves the datasets whose sort keys hold still on the shipped default", () => {
       const pinned = LWQL_VIEW_CATALOG.filter((view) => view.dedup.strategy !== undefined);
       expect(
@@ -596,7 +596,7 @@ describe("given the LangWatchQL view catalog", () => {
      * itself, and an aggregating source, whose view is rendered as a
      * `GROUP BY` over the grain.
      */
-    /** @scenario "A dataset whose sort key moves declares the strategy that deduplicates it" */
+    /** @scenario "A view whose sort key moves declares the strategy that deduplicates it" */
     it("requires a grain narrower than the engine's key to name a strategy that can deliver it", () => {
       const narrower = LWQL_VIEW_CATALOG.filter(
         (view) =>

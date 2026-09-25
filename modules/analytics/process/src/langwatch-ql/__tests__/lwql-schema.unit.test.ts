@@ -244,6 +244,7 @@ describe("given the LangWatchQL schema catalog", () => {
       }
     });
 
+    /** @scenario "The schema's example query for a dataset without a time column is runnable" */
     it("orders by the time column instead of filtering it, when it cannot be bounded", () => {
       const unboundable = schemaFor(FULLY_PERMITTED).views.filter(
         (dataset) => !hasBoundableTimeColumn(dataset),
