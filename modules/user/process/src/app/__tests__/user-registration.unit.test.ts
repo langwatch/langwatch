@@ -11,16 +11,22 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  REFUSED_ADDRESS_PROOF,
   createUserTestApp,
   createUserTestAuth,
   createUserTestInfrastructure,
 } from "./user.fixture.ts";
 
-function register(app: ReturnType<typeof createUserTestApp>, email = "a@x.com") {
+function register(
+  app: ReturnType<typeof createUserTestApp>,
+  email = "a@x.com",
+  { addressProof = "address-proof", password = "supersecret" } = {},
+) {
   return app.registerCredentialAccount({
     name: "Alice",
     email,
-    password: "supersecret",
+    password,
+    addressProof,
     callerAddress: "127.0.0.1",
   });
 }
@@ -85,6 +91,46 @@ describe("registering a credential account", () => {
       await expect(register(app, "Joel.During@example.com")).rejects.toBeInstanceOf(
         EmailAlreadyRegisteredError,
       );
+    });
+  });
+
+  describe("when the address proof is refused", () => {
+    /** @scenario "No credential is collected until the confirmation link is opened" */
+    it("refuses as an expired verification and creates no account", async () => {
+      const trackServerEvent = vi.fn();
+      const members = createUserTestInfrastructure({ analytics: { trackServerEvent } });
+      const app = createUserTestApp({ members });
+
+      await expect(
+        register(app, "sam@acme.com", { addressProof: REFUSED_ADDRESS_PROOF }),
+      ).rejects.toMatchObject({ code: "identity_verification_expired" });
+      await expect(app.findByEmail({ email: "sam@acme.com" })).resolves.toBeNull();
+      expect(trackServerEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the address proof is offered", () => {
+    /** @scenario "No credential is collected until the confirmation link is opened" */
+    it("claims it for the lowercased address being registered", async () => {
+      const auth = createUserTestAuth();
+      const app = createUserTestApp({ dependencies: { auth } });
+
+      await register(app, "Sam@Acme.com", { addressProof: "proof-1" });
+
+      expect(auth.claimSignUpAddressProof).toHaveBeenCalledWith({
+        token: "proof-1",
+        email: "sam@acme.com",
+      });
+    });
+
+    it("leaves it unspent when the password is refused", async () => {
+      const auth = createUserTestAuth();
+      const app = createUserTestApp({ dependencies: { auth } });
+
+      await expect(register(app, "sam@acme.com", { password: "short" })).rejects.toMatchObject({
+        code: "validation_error",
+      });
+      expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();
     });
   });
 

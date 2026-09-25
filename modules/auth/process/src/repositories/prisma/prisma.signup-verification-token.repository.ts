@@ -50,4 +50,21 @@ export class PrismaSignUpVerificationTokenRepository
 
     return { identifier: claimed.identifier };
   }
+
+  /** One conditional delete, so the identifier binding and the spend cannot race apart. */
+  async claimExpected({
+    token,
+    identifier,
+    now,
+  }: {
+    token: string;
+    identifier: string;
+    now: Instant;
+  }): Promise<boolean> {
+    const claimed = await this.prisma.verificationToken.deleteMany({
+      where: { token, identifier, expires: { gt: toDate(now) } },
+    });
+
+    return claimed.count === 1;
+  }
 }

@@ -18,7 +18,7 @@ type BorrowedProcedures = {
   user: {
     register: {
       mutation: {
-        input: { email: string; password: string; name?: string; confirmPassword?: string };
+        input: { email: string; password: string; addressProof: string; name?: string };
         output: unknown;
       };
     };

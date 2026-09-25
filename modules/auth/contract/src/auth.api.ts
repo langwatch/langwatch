@@ -171,6 +171,11 @@ export interface AuthApi {
   /** Spends a confirmation link and answers the address it confirmed. */
   completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**
+   * Spends the single-use proof a spent link minted for an address with no
+   * account. False for a proof that is missing, expired, spent or another address's.
+   */
+  claimSignUpAddressProof(input: Readonly<{ token: string; email: string }>): Promise<boolean>;
+  /**
    * The invitation behind a code. Missing and revoked both raise `invite_not_found`
    * to prevent code guessing; expired raises `invite_expired` for recovery (D11).
    */

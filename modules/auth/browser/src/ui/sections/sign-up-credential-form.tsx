@@ -60,11 +60,14 @@ const ACCOUNT_CREATED_FALLBACK =
  */
 export function SignUpCredentialForm({
   email,
+  addressProof,
   callbackUrl,
   onUseDifferentEmail,
   onAddressAlreadyRegistered,
 }: {
   email: string;
+  /** The proof the spent link returned; registering spends it. */
+  addressProof: string;
   callbackUrl: string;
   /** Back to the address step, for the address that was typed wrong. */
   onUseDifferentEmail: () => void;
@@ -119,7 +122,7 @@ export function SignUpCredentialForm({
     setSubmitError(null);
     setServerErrorIsOnTheForm(false);
     try {
-      await register.mutateAsync({ email, password: values.password });
+      await register.mutateAsync({ email, password: values.password, addressProof });
     } catch (error) {
       // An address that already has an account is a wrong door, not a bad
       // field: the way on is to log in, with the address carried, and the

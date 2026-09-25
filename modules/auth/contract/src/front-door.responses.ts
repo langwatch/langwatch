@@ -13,14 +13,16 @@ export const frontDoorAskedSchema = z.object({ asked: z.boolean() }).strict();
 export type FrontDoorAsked = z.infer<typeof frontDoorAskedSchema>;
 
 /**
- * What a spent confirmation link resolved to: the address it confirmed, and
- * whether spending it is what brought the account into being.
+ * What a spent confirmation link resolved to: the address it confirmed, whether
+ * spending it brought the account into being, and — only where no account stands
+ * behind the address — the single-use proof `user.register` spends.
  */
 export const signUpVerificationResultSchema = z
   .object({
     email: z.string(),
     accountCreated: z.boolean(),
     accountExists: z.boolean(),
+    addressProof: z.string().nullable(),
   })
   .strict();
 export type SignUpVerificationResult = z.infer<typeof signUpVerificationResultSchema>;

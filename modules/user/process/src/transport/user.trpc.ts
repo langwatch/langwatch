@@ -46,6 +46,7 @@ export const userTrpcTransport = defineTrpcRouter(UserApi, userTrpc)
       name: input.name ?? null,
       email: input.email,
       password: input.password,
+      addressProof: input.addressProof,
       callerAddress: callerAddress ?? "unknown",
     }),
   )

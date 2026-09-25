@@ -24,6 +24,8 @@ export const userApiRegisterInputSchema = z.object({
   // looking at. An input-schema rejection arrives as a tRPC parse error
   // with no field to hang on.
   password: z.string().min(1),
+  /** The single-use proof a spent confirmation link minted for this address. */
+  addressProof: z.string().min(1),
 });
 
 export const userApiUnlinkAccountInputSchema = z.object({ accountId: z.string() });

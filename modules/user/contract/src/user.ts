@@ -251,6 +251,8 @@ export const registerCredentialAccountInputSchema = z
     name: z.string().nullable(),
     email: z.string().min(1),
     password: z.string().min(1),
+    /** Spent before anything is written; the account exists only for a proven address. */
+    addressProof: z.string().min(1),
     /** The caller's address, for the per-address signup budget. */
     callerAddress: z.string().min(1),
   })

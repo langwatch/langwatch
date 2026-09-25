@@ -40,13 +40,13 @@ const door: AuthApi = {
   requestNewAccountVerification,
   sendMyAddressConfirmation,
   completeSignUpVerification,
+  claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
   readInviteLanding,
   requestFreshInvite,
   resolveAuthProvider: () => unreached("resolveAuthProvider"),
   tryVerifyBrowserSession: () => unreached("tryVerifyBrowserSession"),
   tryResolveBrowserSession: () => unreached("tryResolveBrowserSession"),
-  findCliAccessSession: () => unreached("findCliAccessSession"),
-  revokeCliAccessToken: () => unreached("revokeCliAccessToken"),
+  getCliAccessSession: () => unreached("getCliAccessSession"),
   findCliTokenRecordsForUser: () => unreached("findCliTokenRecordsForUser"),
   revokeCliTokens: () => unreached("revokeCliTokens"),
   listBrowserSessions: () => unreached("listBrowserSessions"),
@@ -259,14 +259,16 @@ describe("the signed-out front door", () => {
     it("answers the address it confirmed and what spending it made", async () => {
       completeSignUpVerification.mockResolvedValue({
         email: "ana@acme.com",
-        accountCreated: true,
+        accountCreated: false,
         accountExists: false,
+        addressProof: "proof",
       });
 
       await expect(visitor.completeSignUpVerification({ token: "tok" })).resolves.toEqual({
         email: "ana@acme.com",
-        accountCreated: true,
+        accountCreated: false,
         accountExists: false,
+        addressProof: "proof",
       });
     });
   });

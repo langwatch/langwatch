@@ -161,13 +161,13 @@ describe("given the identifier-first front door is not enforced", () => {
   });
 
   describe("when the sign-up page is requested", () => {
-    /** @scenario The legacy screens return untouched when the flag is off */
-    it("answers with the legacy screen, which asks for a password up front", () => {
+    /** @scenario Sign-up proves the address before asking for a credential */
+    it("asks for the address first, because no account is made without its proof", async () => {
       const { container } = renderPage(<SignUp />);
 
-      expect(container.querySelectorAll('input[type="password"]').length).toBe(2);
-      expect(screen.getByRole("button", { name: /sign up/i })).toBeTruthy();
-      expect(requestVerificationMock).not.toHaveBeenCalled();
+      expect(await screen.findByRole("button", { name: "Continue" })).toBeTruthy();
+      expect(container.querySelectorAll('input[type="password"]').length).toBe(0);
+      expect(registerMock).not.toHaveBeenCalled();
     });
   });
 

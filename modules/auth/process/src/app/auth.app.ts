@@ -794,6 +794,12 @@ export class AuthApp implements AuthApiContract {
     return this.requireSignUp().completeVerification(input);
   }
 
+  async claimSignUpAddressProof(
+    input: Readonly<{ token: string; email: string }>,
+  ): Promise<boolean> {
+    return this.requireSignUp().claimAddressProof(input);
+  }
+
   async readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding> {
     return this.requireInvites().readLanding(input);
   }

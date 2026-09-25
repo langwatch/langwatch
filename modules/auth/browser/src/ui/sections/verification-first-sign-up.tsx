@@ -35,9 +35,9 @@ import { SignUpCredentialForm } from "./sign-up-credential-form.tsx";
 const JOIN_BEFORE_CREATE_PATH = "/auth/join";
 
 /**
- * Sign-up (D13, ADR-117 §6, revised): address, then password, account exists.
- * Confirmation FOLLOWS somebody in rather than blocking them. An address with
- * an account already becomes the log-in step, pre-filled, not a wall.
+ * Sign-up (D13, ADR-117 §6): address, link, proof, then password. The account
+ * is created only by spending the proof the link returned. An address with an
+ * account already becomes the log-in step, pre-filled, not a wall.
  */
 export function VerificationFirstSignUp() {
   const query = useSearchParams();
@@ -56,10 +56,9 @@ export function VerificationFirstSignUp() {
   const { decide } = routing;
 
   const [sentTo, setSentTo] = useState<string | null>(null);
-  // The address typed on the first step, on its way to the password step.
-  // Nothing has been created or sent yet — this is somebody mid-sign-up.
-  const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  // The single-use proof `user.register` spends; only where no account stands behind the address.
+  const [addressProof, setAddressProof] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
   const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
@@ -80,8 +79,9 @@ export function VerificationFirstSignUp() {
     spent.current = true;
     completeVerification
       .mutateAsync({ token: verifyToken })
-      .then(async ({ email, accountCreated, accountExists }) => {
+      .then(async ({ email, accountCreated, accountExists, addressProof: proof }) => {
         setVerifiedEmail(email);
+        setAddressProof(proof);
         // "Ready" means there is nothing left to choose. An account that was
         // already there is just as ready as one this link created — sign-up
         // made it and the link is the address catching up, so asking such a
@@ -140,9 +140,9 @@ export function VerificationFirstSignUp() {
     depth: signUpDepth({
       verifiedEmail,
       accountIsReady,
+      addressProof,
       welcomeBackEmail,
       sentTo,
-      signingUpEmail,
     }),
   });
 
@@ -165,10 +165,11 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (verifiedEmail) {
+  if (verifiedEmail && addressProof) {
     return (
       <MethodChoice
         verifiedEmail={verifiedEmail}
+        addressProof={addressProof}
         decision={routing.decision}
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -200,26 +201,6 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  // The credential step, which is the step that creates the account. It takes
-  // a passkey or a password — named for the choice rather than for one of its
-  // answers. Confirming the address happens after it and gates nothing.
-  if (signingUpEmail) {
-    return (
-      <AuthCard title="Choose how to sign in" finePrint={<FrontDoorFinePrint />}>
-        <SignUpCredentialForm
-          email={signingUpEmail}
-          callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-          onUseDifferentEmail={() => setSigningUpEmail(null)}
-          onAddressAlreadyRegistered={() => {
-            setSigningUpEmail(null);
-            setWelcomeBackEmail(signingUpEmail);
-            void decide({ identifier: signingUpEmail });
-          }}
-        />
-      </AuthCard>
-    );
-  }
-
   return (
     <AuthCard title="Create your LangWatch account" finePrint={<FrontDoorFinePrint />}>
       {requestVerification.error ? (
@@ -238,13 +219,8 @@ export function VerificationFirstSignUp() {
         submitLabel="Continue"
         isSubmitting={requestVerification.isPending}
         defaultEmail={carriedEmail}
-        // Straight to the password. Nothing is sent from this step any more:
-        // the account is created on the next one and the confirmation follows
-        // it out, so an address typed here costs nobody an email.
-        onSubmit={({ email }) => {
-          setSigningUpEmail(email);
-          return Promise.resolve();
-        }}
+        // The link comes first: no credential is collected until it is opened.
+        onSubmit={({ email }) => sendTo(email)}
         footer={<LogInLink callbackUrl={callbackUrl} label="Already have an account? Log in" />}
         alternatives={
           hasAlternativeMethods({ methodSet: instanceMethods, showsAllSocial }) ? (
@@ -377,20 +353,19 @@ function LinkNoLongerWorks({
 function signUpDepth({
   verifiedEmail,
   accountIsReady,
+  addressProof,
   welcomeBackEmail,
   sentTo,
-  signingUpEmail,
 }: {
   verifiedEmail: string | null;
   accountIsReady: boolean;
+  addressProof: string | null;
   welcomeBackEmail: string | null;
   sentTo: string | null;
-  signingUpEmail: string | null;
 }): FrontDoorDepth {
   if (verifiedEmail && accountIsReady) return "settled";
-  if (verifiedEmail !== null || welcomeBackEmail !== null || signingUpEmail !== null) {
-    return "credential";
-  }
+  if (welcomeBackEmail !== null) return "credential";
+  if (verifiedEmail !== null && addressProof !== null) return "credential";
   if (sentTo !== null) return "sent";
   return "entry";
 }
@@ -406,12 +381,14 @@ const noPasskeyOnThisStep = () => undefined;
  */
 function MethodChoice({
   verifiedEmail,
+  addressProof,
   decision,
   lastUsedMethodId,
   callbackUrl,
   onFederatedMethodChosen,
 }: {
   verifiedEmail: string;
+  addressProof: string;
   decision: RoutingDecision | null;
   lastUsedMethodId: string | null;
   callbackUrl: string;
@@ -442,6 +419,7 @@ function MethodChoice({
               <SignUpCredentialForm
                 key={method.id}
                 email={verifiedEmail}
+                addressProof={addressProof}
                 callbackUrl={callbackUrl}
                 // This address arrived on a link that has just been spent, so
                 // there is no step behind this one to go back to. Changing it

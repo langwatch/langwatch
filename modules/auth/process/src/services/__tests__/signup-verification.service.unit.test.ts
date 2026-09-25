@@ -2,6 +2,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  CONFIRMED_ADDRESS_TTL_MS,
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,
 } from "../signup-verification.service.ts";
@@ -22,6 +23,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
   /** Addresses a spent link proved. The whole job of a link now. */
   const confirmed: string[] = [];
   let addressIsTaken = registered;
+  let minted = 0;
 
   const service = SignUpVerificationService.create({
     tokens: {
@@ -34,6 +36,17 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         const [record] = issued.splice(index, 1);
         if (!record || Temporal.Instant.compare(record.expires, now) <= 0) return null;
         return { identifier: record.identifier };
+      },
+      claimExpected: async ({ token, identifier, now }) => {
+        const index = issued.findIndex(
+          (record) =>
+            record.token === token &&
+            record.identifier === identifier &&
+            Temporal.Instant.compare(record.expires, now) > 0,
+        );
+        if (index === -1) return false;
+        issued.splice(index, 1);
+        return true;
       },
     },
     mailer: {
@@ -53,7 +66,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
     },
     buildVerificationUrl: ({ token }) => `https://app.test/auth/signup?verify=${token}`,
     now: () => NOW,
-    mintToken: vi.fn(() => "token-1"),
+    mintToken: vi.fn(() => `token-${++minted}`),
   });
 
   return {
@@ -105,6 +118,7 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "token-2",
       });
 
       await expect(
@@ -162,6 +176,7 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        addressProof: "token-2",
       });
       expect(harness.created).toHaveLength(0);
     });
@@ -193,6 +208,7 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: true,
         accountExists: true,
+        addressProof: null,
       });
       expect(harness.created).toEqual([
         { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
@@ -215,9 +231,56 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: true,
+        addressProof: null,
       });
       expect(harness.confirmed).toEqual(["sam@acme.com"]);
       expect(harness.created).toHaveLength(0);
+    });
+  });
+});
+
+describe("given the proof a spent link handed to the credential step", () => {
+  let harness: ReturnType<typeof makeService>;
+
+  beforeEach(async () => {
+    harness = makeService();
+    await harness.service.requestVerification({ email: "sam@acme.com" });
+    await harness.service.completeVerification({ token: "token-1" });
+  });
+
+  it("lives for the credential step and no longer", () => {
+    expect(harness.issued[0]?.expires).toEqual(NOW.add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }));
+  });
+
+  describe("when it is claimed for the address it proved", () => {
+    it("spends it exactly once", async () => {
+      await expect(
+        harness.service.claimAddressProof({ token: "token-2", email: " Sam@Acme.com " }),
+      ).resolves.toBe(true);
+      await expect(
+        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when it is claimed for another address", () => {
+    it("refuses without spending it", async () => {
+      await expect(
+        harness.service.claimAddressProof({ token: "token-2", email: "eve@acme.com" }),
+      ).resolves.toBe(false);
+      await expect(
+        harness.service.claimAddressProof({ token: "token-2", email: "sam@acme.com" }),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe("when the token offered is the emailed link rather than the proof", () => {
+    it("refuses it", async () => {
+      await harness.service.requestVerification({ email: "sam@acme.com" });
+
+      await expect(
+        harness.service.claimAddressProof({ token: "token-3", email: "sam@acme.com" }),
+      ).resolves.toBe(false);
     });
   });
 });

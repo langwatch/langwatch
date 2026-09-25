@@ -21,6 +21,9 @@ import type { UserAvatarStorage, UserInfrastructure } from "../user.members.ts";
 /** The issuer this deployment stores its credential account rows under. */
 export const TEST_CREDENTIAL_ISSUER = "local:credential";
 
+/** The one proof the test auth refuses, as a spent or foreign proof is refused. */
+export const REFUSED_ADDRESS_PROOF = "refused-address-proof";
+
 /**
  * The auth peer a suite runs against; `provider` is what ADR-027 resolved,
  * `issuesOwnPasswords` the D09 switch, and `governedDomain` a domain an
@@ -38,6 +41,9 @@ export function createUserTestAuth(
     revokeAllBrowserSessions: vi.fn(async () => undefined),
     resolveAuthProvider: vi.fn(async () => provider),
     issuesOwnPasswords: vi.fn(() => issuesOwnPasswords),
+    claimSignUpAddressProof: vi.fn(
+      async ({ token }: { token: string; email: string }) => token !== REFUSED_ADDRESS_PROOF,
+    ),
     route: vi.fn(async ({ identifier }: { identifier: string | null }): Promise<RoutingDecision> =>
       governedDomain !== undefined && identifier?.endsWith(`@${governedDomain}`)
         ? {

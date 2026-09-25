@@ -52,6 +52,12 @@ const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 /** One hour, matching the reset link's lifetime and the email's promise. */
 export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
 
+/** A link confirmed an address with no account behind it; `user.register` spends this proof. */
+const CONFIRMED_ADDRESS_NAMESPACE = "identity-signup-confirmed:";
+
+/** Long enough to choose a password on the next screen; worthless in a closed tab. */
+export const CONFIRMED_ADDRESS_TTL_MS = 30 * 60 * 1000;
+
 /**
  * What a sign-up token stands for: an address, and — only on links minted before both
  * doors converged — a credential.
@@ -109,6 +115,7 @@ export class SignUpVerificationService {
     email: string;
     accountCreated: boolean;
     accountExists: boolean;
+    addressProof: string | null;
   }> {
     const claimed = await this.deps.tokens.findAndClaim({ token, now: this.now() });
     const pending = claimed ? parsePendingSignUp(claimed.identifier) : null;
@@ -130,17 +137,18 @@ export class SignUpVerificationService {
         email: pending.email,
         accountCreated: false,
         accountExists: true,
+        addressProof: null,
       };
     }
 
-    // No account, and no credential to make one from: the link came from the
-    // log-in door, where a password is asked for once and never kept. The
-    // screen takes it from here.
+    // No account, and no credential to make one from. The screen takes it from
+    // here, carrying the single-use proof `user.register` spends.
     if (!pending.passwordHash) {
       return {
         email: pending.email,
         accountCreated: false,
         accountExists: false,
+        addressProof: await this.issueAddressProof({ email: pending.email }),
       };
     }
 
@@ -150,7 +158,31 @@ export class SignUpVerificationService {
     });
     await this.deps.accounts.markAddressConfirmed({ email: pending.email });
 
-    return { email: pending.email, accountCreated: true, accountExists: true };
+    return { email: pending.email, accountCreated: true, accountExists: true, addressProof: null };
+  }
+
+  /**
+   * Spends a proof `completeVerification` minted. Single-use and bound to the
+   * address: missing, expired, spent or another address's proof all answer false.
+   */
+  async claimAddressProof({ token, email }: { token: string; email: string }): Promise<boolean> {
+    return this.deps.tokens.claimExpected({
+      token,
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${normalizeIdentifierValue(email)}`,
+      now: this.now(),
+    });
+  }
+
+  private async issueAddressProof({ email }: { email: string }): Promise<string> {
+    const token = this.mintToken();
+
+    await this.deps.tokens.issue({
+      identifier: `${CONFIRMED_ADDRESS_NAMESPACE}${email}`,
+      token,
+      expires: this.now().add({ milliseconds: CONFIRMED_ADDRESS_TTL_MS }),
+    });
+
+    return token;
   }
 
   private async issueLink({

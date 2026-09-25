@@ -10,6 +10,7 @@ import {
 import { ValidationError } from "@langwatch/handled-error";
 import {
   IdentityApi,
+  IdentityVerificationExpiredError,
   describePasswordProblem,
   type IdentityApi as IdentityApiContract,
   routesToOrganizationConnection,
@@ -415,6 +416,14 @@ export class UserApp implements UserApi {
       budget: SIGNUP_BUDGET,
       refuse: () => new UserSignupThrottledError(),
     });
+
+    // The mailbox proof is the authority to enrol a credential, spent before
+    // anything is hashed or written and bound to this exact address.
+    const proofClaimed = await this.#peers.auth.claimSignUpAddressProof({
+      token: input.addressProof,
+      email,
+    });
+    if (!proofClaimed) throw new IdentityVerificationExpiredError();
 
     // Case-insensitive on purpose: rows written before the lowercasing above
     // may carry capitals, and minting a case-twin beside one would leave two
