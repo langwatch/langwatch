@@ -14,8 +14,13 @@ import {
   IdentityLedgerStore,
   type IdentityStagedSender,
 } from "../eventing/identity-ledger.store.ts";
+import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
+import {
+  EventingIdentityHistoryRepository,
+  type IdentityEventReads,
+} from "../repositories/eventing/eventing.identity-history.repository.ts";
 import {
   EventingSsoConnectionHistoryRepository,
   type SsoConnectionEventReads,
@@ -186,6 +191,20 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
+/** The identity log, resolved per read like the connection history above. */
+function identityHistoryStore(options: {
+  eventing: EventSourcing;
+}): () => Promise<IdentityEventReads> {
+  const { eventing } = options;
+  return async () => {
+    const store = eventing.getEventStore<IdentityEvent>();
+    if (!store) {
+      throw new Error("identity history cannot read: the event-sourcing stack is unavailable");
+    }
+    return store;
+  };
+}
+
 /** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
@@ -231,6 +250,9 @@ export function buildIdentityInfrastructure(input: {
       ? EventingSsoConnectionHistoryRepository.create({
           eventStore: ssoConnectionHistoryStore({ eventing }),
         })
+      : null,
+    identityHistory: eventing.isEnabled
+      ? EventingIdentityHistoryRepository.create({ eventStore: identityHistoryStore({ eventing }) })
       : null,
     scimSyncs: repositories.scimSyncs,
   };

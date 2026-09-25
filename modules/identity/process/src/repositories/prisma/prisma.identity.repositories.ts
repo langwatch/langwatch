@@ -9,6 +9,7 @@ import type {
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
 import { PrismaIdentityHeadsRepository } from "./prisma.identity-heads.repository.ts";
 import { PrismaIdentityLatchRepository } from "./prisma.identity-latch.repository.ts";
+import { PrismaIdentityLookupRepository } from "./prisma.identity-lookup.repository.ts";
 import { PrismaIdentityNewbornRepository } from "./prisma.identity-newborn.repository.ts";
 import { PrismaIdentityProjectionRepository } from "./prisma.identity-projection.repository.ts";
 import { PrismaIdentityReservationRepository } from "./prisma.identity-reservations.repository.ts";
@@ -99,6 +100,7 @@ export class PostgresIdentityRepositories {
         adminEmails: members.adminEmails,
       }),
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
+      identityLookup: PrismaIdentityLookupRepository.create(database),
     };
   }
 }

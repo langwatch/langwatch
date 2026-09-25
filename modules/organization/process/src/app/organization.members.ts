@@ -295,6 +295,9 @@ export interface OrganizationInvitations {
   resend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): Promise<Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>>;
+  extend(
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): Promise<Readonly<{ invite: OrganizationInvite }>>;
   list(
     input: Readonly<{ organizationId: string }>,
   ): Promise<

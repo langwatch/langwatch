@@ -1,8 +1,13 @@
-import type { LookupOperatorActivityRow } from "@langwatch/identity-contract";
+import {
+  type LookupOperatorActivityRow,
+  qualifySsoDomainOwnership,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
 
 import {
   type IdentityLookupRepository,
   type LookupConnectionRow,
+  type LookupDomainClaimRow,
   type LookupIdentifierRow,
   type LookupInvitationRow,
   type LookupMembershipRow,
@@ -85,7 +90,50 @@ export class MemoryIdentityLookupRepository implements IdentityLookupRepository 
       organizationName: this.store.organizationNames.get(connection.organizationId) ?? null,
       state: connection.state,
       providerId: connection.idpMetadata.providerId,
+      ownershipProof: qualifySsoDomainOwnership({ state: connection, domain }).status,
+      routeKind:
+        connection.source === "legacy-grandfathered" ? "legacy-configuration" : "connection",
     };
+  }
+
+  async findClaimsAwaitingReview({
+    domains,
+  }: {
+    domains: readonly string[];
+  }): Promise<readonly LookupDomainClaimRow[]> {
+    return this.claims({ domains });
+  }
+
+  async findClaimQueue({ limit }: { limit: number }): Promise<readonly LookupDomainClaimRow[]> {
+    return this.claims({ domains: null }).slice(0, limit);
+  }
+
+  async findOrganizationNames({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
+    return new Map(
+      organizationIds.flatMap((organizationId) => {
+        const name = this.store.organizationNames.get(organizationId);
+        return name === undefined ? [] : [[organizationId, name] as const];
+      }),
+    );
+  }
+
+  private claims({ domains }: { domains: readonly string[] | null }): LookupDomainClaimRow[] {
+    return [...this.store.ssoConnections.values()]
+      .toSorted((a, b) => a.updatedAtMs - b.updatedAtMs)
+      .flatMap((connection: SsoConnectionState) =>
+        connection.claimedDomains
+          .filter((domain) => domains === null || domains.includes(domain))
+          .map((domain) => ({
+            connectionId: connection.connectionId,
+            organizationId: connection.organizationId,
+            domain,
+            waitingSinceMs: connection.updatedAtMs,
+          })),
+      );
   }
 
   async findRecentOperatorActivity({

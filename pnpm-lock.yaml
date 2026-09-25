@@ -8174,6 +8174,9 @@ importers:
 
   modules/identity/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -8211,6 +8214,9 @@ importers:
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../../../packages/actor
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/audit-log-contract':
         specifier: workspace:*
         version: link:../../audit-log/contract
@@ -8253,6 +8259,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract

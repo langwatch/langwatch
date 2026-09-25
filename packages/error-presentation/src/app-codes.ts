@@ -279,6 +279,7 @@ export const APP_ERROR_CODES = [
   "identity_identifier_not_verifiable",
   "identity_jit_disabled",
   "identity_link_proposed",
+  "identity_lookup_not_found",
   "identity_match_suggestion_not_found",
   "identity_mfa_backup_codes_exhausted",
   "identity_mfa_code_invalid",

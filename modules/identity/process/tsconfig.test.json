@@ -16,6 +16,9 @@
       "path": "../../../packages/actor/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../audit-log/contract/tsconfig.build.json"
     },
     {
@@ -52,7 +55,13 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../ops/contract/tsconfig.build.json"
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"

@@ -24,6 +24,18 @@ export abstract class IdentityLookupRepository {
 
   abstract findConnectionForDomain(input: { domain: string }): Promise<LookupConnectionRow | null>;
 
+  /** The claims naming any of these domains, longest wait first. */
+  abstract findClaimsAwaitingReview(input: {
+    domains: readonly string[];
+  }): Promise<readonly LookupDomainClaimRow[]>;
+
+  /** Every claim waiting on a review, longest wait first. */
+  abstract findClaimQueue(input: { limit: number }): Promise<readonly LookupDomainClaimRow[]>;
+
+  abstract findOrganizationNames(input: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>>;
+
   abstract findRecentOperatorActivity(input: {
     limit: number;
   }): Promise<readonly LookupOperatorActivityRow[]>;
@@ -71,4 +83,14 @@ export interface LookupConnectionRow {
   organizationName: string | null;
   state: string;
   providerId: string;
+  ownershipProof: "QUALIFIED" | "UNKNOWN" | "LAPSED";
+  routeKind: "legacy-configuration" | "connection";
+}
+
+export interface LookupDomainClaimRow {
+  connectionId: string;
+  organizationId: string;
+  domain: string;
+  /** When the connection last moved, which for a claimed one is the claim. */
+  waitingSinceMs: number;
 }

@@ -1,16 +1,23 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AuditLogApi,
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
+import type { IdentityHistoryEntry, LinkProposalRecord } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { IdentityHistoryRepository } from "../../repositories/identity-history.repository.ts";
 import { MemoryIdentityLookupRepository } from "../../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import type { SsoPlatformOperatorRepository } from "../../repositories/sso-connection.repository.ts";
-import { IdentityLookupRefusedError, IdentityLookupService } from "../identity-lookup.service.ts";
+import {
+  IdentityLookupService,
+  type IdentityLookupServiceDeps,
+} from "../../services/identity-lookup.service.ts";
+import type { IdentityService } from "../../services/identity.service.ts";
 
 const OLIVE = { userId: "user_olive" };
 const MALLORY = { userId: "user_mallory" };
@@ -78,6 +85,17 @@ function fakeRouter() {
   return { route: async () => NO_ROUTE };
 }
 
+/** A person with no identity facts on the log yet. */
+class EmptyIdentityHistory extends IdentityHistoryRepository {
+  async findHistory(): Promise<readonly IdentityHistoryEntry[]> {
+    return [];
+  }
+
+  async findProposals(): Promise<readonly LinkProposalRecord[]> {
+    return [];
+  }
+}
+
 let store: MemoryIdentityStore;
 let reads: MemoryIdentityLookupRepository;
 let auditLog: FakeAuditLog;
@@ -88,7 +106,13 @@ function serviceFor({
 }: { operatorIds?: Set<string>; budget?: number } = {}): IdentityLookupService {
   return IdentityLookupService.create({
     reads,
-    router: () => fakeRouter(),
+    router: fakeRouter(),
+    history: new EmptyIdentityHistory(),
+    identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+    sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
+      listBrowserSessions: async () => [],
+    }),
+    invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
     platformOperators: new FakeOperators(operatorIds),
     auditLog,
     rateLimiter: fakeRateLimiter(budget),
@@ -105,7 +129,10 @@ describe("IdentityLookupService", () => {
   describe("when the address nobody holds is resolved", () => {
     /** @scenario "A lookup that finds nobody is recorded exactly like one that finds somebody" */
     it("answers with an empty people list and still records the attempt", async () => {
-      const answer = await serviceFor().resolve({ address: "nobody@acme.com", operator: OLIVE });
+      const answer = await serviceFor().lookupAddress({
+        address: "nobody@acme.com",
+        operator: OLIVE,
+      });
 
       expect(answer.people).toEqual([]);
       expect(auditLog.rows).toHaveLength(1);
@@ -120,8 +147,8 @@ describe("IdentityLookupService", () => {
 
       for (let attempt = 0; attempt < 4; attempt++) {
         await expect(
-          service.resolve({ address: "sam@acme.com", operator: MALLORY }),
-        ).rejects.toThrow(IdentityLookupRefusedError);
+          service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
+        ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
       }
 
       expect(auditLog.rows).toHaveLength(2);
@@ -131,12 +158,12 @@ describe("IdentityLookupService", () => {
     it("refuses with nothing about the address, every time", async () => {
       const service = serviceFor({ operatorIds: new Set() });
 
-      await expect(service.resolve({ address: "sam@acme.com", operator: MALLORY })).rejects.toThrow(
-        IdentityLookupRefusedError,
-      );
-      await expect(service.resolve({ address: "sam@acme.com", operator: MALLORY })).rejects.toThrow(
-        IdentityLookupRefusedError,
-      );
+      await expect(
+        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
+      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+      await expect(
+        service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
+      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
     });
   });
 
@@ -146,7 +173,7 @@ describe("IdentityLookupService", () => {
       const service = serviceFor({ budget: 2 });
 
       for (let attempt = 0; attempt < 5; attempt++) {
-        await service.resolve({ address: `sam${attempt}@acme.com`, operator: OLIVE });
+        await service.lookupAddress({ address: `sam${attempt}@acme.com`, operator: OLIVE });
       }
 
       expect(auditLog.rows).toHaveLength(5);
@@ -156,7 +183,7 @@ describe("IdentityLookupService", () => {
   describe("when any lookup is recorded", () => {
     /** @scenario "The recorded address is the address, and the history is not a copy of the person" */
     it("carries the address and the operator, and no secret-shaped field", async () => {
-      await serviceFor().resolve({ address: "sam@acme.com", operator: OLIVE });
+      await serviceFor().lookupAddress({ address: "sam@acme.com", operator: OLIVE });
 
       const [row] = auditLog.rows;
       expect(row?.userId).toBe(OLIVE.userId);
@@ -187,7 +214,7 @@ describe("IdentityLookupService", () => {
       });
       reads.users.set("user_sam", { userId: "user_sam", name: "Sam", email: "sam@acme.com" });
 
-      const detail = await serviceFor().findPerson({
+      const detail = await serviceFor().getLookupPerson({
         userId: "user_sam",
         address: "sam@acme.com",
         operator: OLIVE,
@@ -201,7 +228,7 @@ describe("IdentityLookupService", () => {
   describe("when the operator pastes an address with different capitalization", () => {
     /** @scenario "The address is resolved the way the auth screens resolves it" */
     it("resolves to the same normalized value the auth screens would use", async () => {
-      const answer = await serviceFor().resolve({
+      const answer = await serviceFor().lookupAddress({
         address: "Sam+ops@ACME.com",
         operator: OLIVE,
       });

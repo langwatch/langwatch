@@ -20,6 +20,7 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import {
   OrganizationCapabilityUnavailableError,
+  type OrganizationInvite,
   type OrganizationPendingInviteApplied,
 } from "@langwatch/organization-contract";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -276,6 +277,12 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): ReturnType<InviteService["resendInvite"]> {
     return this.options.invites.resendInvite(input);
+  }
+
+  extend(
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): Promise<Readonly<{ invite: OrganizationInvite }>> {
+    return this.options.invites.extendInvite(input);
   }
 
   list(input: Readonly<{ organizationId: string }>): ReturnType<InviteService["listInvites"]> {

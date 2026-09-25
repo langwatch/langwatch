@@ -89,12 +89,8 @@ export interface IdentityRepositories {
   readonly ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** Which domains a connection owns, re-projected by the ownership backfill. */
   readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
-  /**
-   * Optional until `identity.app.ts` and the two aggregate backends wire a
-   * concrete instance in (out of this lane's owned paths - see the
-   * identity-lookup-server-reads handoff).
-   */
-  readonly identityLookup?: IdentityLookupRepository;
+  /** The cross-organization reads the operator identity lookup takes (D05). */
+  readonly identityLookup: IdentityLookupRepository;
 }
 
 /** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */

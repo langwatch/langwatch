@@ -2890,6 +2890,10 @@ const presentations = {
     describe: () =>
       "Your workspace administrator has been asked to confirm it. Try again once they have.",
   },
+  identity_lookup_not_found: {
+    title: "Not found",
+    describe: () => "Check the address, or go back to the page you came from.",
+  },
   identity_jit_disabled: {
     title: "This workspace does not create accounts automatically",
     describe: () => "Ask a workspace administrator to invite you, then sign in again.",

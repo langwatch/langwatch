@@ -7,14 +7,12 @@ import { scimSyncEventing } from "./eventing/scim-sync.pipeline.ts";
 import { ssoConnectionEventing } from "./eventing/sso-connection.pipeline.ts";
 import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
+import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
 
-/**
- * No `.withTransports(...)` - identity has no `transport/` directory and
- * serves no doors of its own.
- */
 export const identityServer = defineServerModule("identity")
   .withRepositories(identityRepositories)
   .withApp(IdentityApp)
+  .withTransports(identityLookupTrpcTransport)
   .withEventing(identityEventing)
   .withEventing(identityPipelineEventing)
   .withEventing(joinRequestEventing)

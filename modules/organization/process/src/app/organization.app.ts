@@ -29,6 +29,7 @@ import {
   type OrganizationApiCreateInvitationsInput,
   type OrganizationInviteCreated,
   type OrganizationApiInviteScope,
+  type OrganizationInviteExtended,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
   type OrganizationInviteAccepted,
@@ -1389,6 +1390,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent> {
     return this.#invitations.resend(input);
+  }
+
+  extendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended> {
+    return this.#invitations.extend(input);
   }
 
   listPendingInvitations(

@@ -38,6 +38,7 @@ import type {
 import type {
   OrganizationInviteAccepted,
   OrganizationInviteCreated,
+  OrganizationInviteExtended,
   OrganizationInviteResent,
   OrganizationListedInvite,
   OrganizationMemberProvenance,
@@ -570,6 +571,8 @@ export interface OrganizationApi {
   ): Promise<OrganizationInviteCreated[]>;
   revokeInvitation(input: OrganizationApiInviteScope): Promise<void>;
   resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent>;
+  /** A fresh expiry on the same code, and nothing mailed: the link already sent works again. */
+  extendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended>;
   listPendingInvitations(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationListedInvite[]>;

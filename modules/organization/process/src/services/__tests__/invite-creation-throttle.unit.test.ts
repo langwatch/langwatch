@@ -55,6 +55,7 @@ function invitationStub(create: OrganizationInvitations["create"]): Organization
     revoke: unreachable("revoke"),
     assertSendAllowed: unreachable("assertSendAllowed"),
     resend: unreachable("resend"),
+    extend: unreachable("extend"),
     list: unreachable("list"),
     findByCode: unreachable("findByCode"),
     matchToAcceptor: unreachable("matchToAcceptor"),

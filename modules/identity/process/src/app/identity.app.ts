@@ -16,7 +16,14 @@ import {
   identityConfig,
   sealedProviderConfigCipher,
   type IdentityEmailResolution,
+  type IdentityLookupAnswer,
+  type IdentityLookupApi,
+  type IdentityLookupOperator,
   type IdentityReservationsApi,
+  type LookupDomainClaim,
+  type LookupInvitationExpiry,
+  type LookupOperatorActivityRow,
+  type LookupPersonDetail,
   type IdentityServerConfig,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
@@ -66,6 +73,7 @@ import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
 import { IdentityEmailService } from "../services/identity-email.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { IdentityLookupService } from "../services/identity-lookup.service.ts";
 import {
   IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
   IdentityNewbornReconciliationService,
@@ -182,6 +190,7 @@ type IdentityAppParts = {
   ssoSetupCommands: SsoSetupCommandsService | null;
   scimSyncGuards: ScimSyncGuardsService;
   scimSyncReads: ScimSyncReadsService;
+  lookup: IdentityLookupService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -349,7 +358,7 @@ function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit
   };
 }
 
-export class IdentityApp implements IdentityApi {
+export class IdentityApp implements IdentityApi, IdentityLookupApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -636,6 +645,17 @@ export class IdentityApp implements IdentityApi {
       ssoSetupCommands,
       scimSyncGuards,
       scimSyncReads,
+      lookup: IdentityLookupService.create({
+        reads: setup.repositories.identityLookup,
+        history: infrastructure.identityHistory,
+        router: setup.dependencies.auth,
+        identity: () => identity,
+        platformOperators: setup.repositories.ssoPlatformOperators,
+        auditLog: setup.dependencies.auditLog,
+        rateLimiter: setup.members.rateLimiter,
+        sessions: setup.dependencies.auth,
+        invitations: setup.dependencies.organizations,
+      }),
       pipelines: {
         eventing: identityEventing,
         producer: IdentityProducerPipelines.create({ processName: "identity" }),
@@ -876,5 +896,62 @@ export class IdentityApp implements IdentityApi {
 
   scimSyncReads(): ScimSyncReadsService {
     return this.#parts.scimSyncReads;
+  }
+
+  lookupAddress(input: {
+    address: string;
+    operator: IdentityLookupOperator;
+  }): Promise<IdentityLookupAnswer> {
+    return this.#parts.lookup.lookupAddress(input);
+  }
+
+  getLookupPerson(input: {
+    userId: string;
+    address: string;
+    operator: IdentityLookupOperator;
+  }): Promise<LookupPersonDetail> {
+    return this.#parts.lookup.getLookupPerson(input);
+  }
+
+  findLookupActivity(input: {
+    operator: IdentityLookupOperator;
+  }): Promise<LookupOperatorActivityRow[]> {
+    return this.#parts.lookup.findLookupActivity(input);
+  }
+
+  findDomainClaimQueue(input: { operator: IdentityLookupOperator }): Promise<LookupDomainClaim[]> {
+    return this.#parts.lookup.findDomainClaimQueue(input);
+  }
+
+  detachLookupMethod(input: {
+    userId: string;
+    identifierId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    return this.#parts.lookup.detachLookupMethod(input);
+  }
+
+  endLookupSessions(input: {
+    userId: string;
+    identifierId: string | null;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    return this.#parts.lookup.endLookupSessions(input);
+  }
+
+  resendLookupInvitation(input: {
+    organizationId: string;
+    inviteId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<LookupInvitationExpiry> {
+    return this.#parts.lookup.resendLookupInvitation(input);
+  }
+
+  extendLookupInvitation(input: {
+    organizationId: string;
+    inviteId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<LookupInvitationExpiry> {
+    return this.#parts.lookup.extendLookupInvitation(input);
   }
 }

@@ -92,6 +92,12 @@ export const organizationInvitesCreatedSchema = organizationInviteCreatedSchema.
 export const organizationInviteResentSchema = organizationInviteCreatedSchema;
 export type OrganizationInviteResent = z.infer<typeof organizationInviteResentSchema>;
 
+/** An extended invitation: the same row and code, with a fresh expiry. */
+export const organizationInviteExtendedSchema = z
+  .object({ invite: organizationInviteRowSchema })
+  .strict();
+export type OrganizationInviteExtended = z.infer<typeof organizationInviteExtendedSchema>;
+
 /** One pending invitation, as the members screen's admin list renders it. */
 export const organizationListedInviteSchema = organizationInviteRowSchema
   .safeExtend({

@@ -2,6 +2,7 @@ import type { IdentifierProvider, IdentityCommand } from "@langwatch/identity-co
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
 
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
+import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type { JoinRequestAudienceRepository } from "../repositories/join-request-audience.repository.ts";
 import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
 import type { SsoConnectionHistoryRepository } from "../repositories/sso-connection-history.repository.ts";
@@ -254,6 +255,8 @@ export type IdentityInfrastructure = Readonly<{
    * would be indistinguishable from a connection nothing ever happened to.
    */
   ssoConnectionHistory: SsoConnectionHistoryRepository | null;
+  /** A person's identity log, read; null where the process composed no event stack. */
+  identityHistory: IdentityHistoryRepository | null;
   /** The folded state of one connection's directory sync (D08). */
   scimSyncs: ScimSyncReadRepository;
 }>;

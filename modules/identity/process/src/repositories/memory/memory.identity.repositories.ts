@@ -4,6 +4,7 @@ import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projectio
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
+import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
 import { MemoryIdentitySignInAccountsRepository } from "./memory.identity-signin-accounts.repository.ts";
 import {
@@ -89,5 +90,6 @@ export function identityRepositoriesOverMemory(
     joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),
     ssoPlatformOperators: MemorySsoPlatformOperatorsRepository.create({ store, adminEmails }),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
+    identityLookup: MemoryIdentityLookupRepository.create(store),
   };
 }

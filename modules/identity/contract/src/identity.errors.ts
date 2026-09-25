@@ -903,3 +903,16 @@ export class ScimSyncNotFoundError extends NotFoundError {
     this.name = "ScimSyncNotFoundError";
   }
 }
+
+/**
+ * The identity lookup, refused: a 404 so the surface does not confirm it exists
+ * to a caller outside the ADMIN_EMAILS staff list. No identifying fields.
+ */
+export class IdentityLookupNotFoundError extends HandledError {
+  declare readonly code: "identity_lookup_not_found";
+
+  constructor() {
+    super("identity_lookup_not_found", "Not found", { httpStatus: 404, fault: "customer" });
+    this.name = "IdentityLookupNotFoundError";
+  }
+}

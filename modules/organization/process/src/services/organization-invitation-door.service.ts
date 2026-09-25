@@ -17,6 +17,7 @@ import {
   type OrganizationInvite,
   type OrganizationInviteAccepted,
   type OrganizationInviteCreated,
+  type OrganizationInviteExtended,
   type OrganizationInviteResent,
   type OrganizationListedInvite,
   type OrganizationPendingInviteApplied,
@@ -130,6 +131,12 @@ export class OrganizationInvitationDoorService {
       emailNotSent,
       inviteUrl: this.deps.invitations.acceptUrl(invite.inviteCode),
     };
+  }
+
+  async extend(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended> {
+    const { invite } = await this.deps.invitations.extend(input);
+
+    return { invite: inviteOnWire(invite) };
   }
 
   async list(input: Readonly<{ organizationId: string }>): Promise<OrganizationListedInvite[]> {

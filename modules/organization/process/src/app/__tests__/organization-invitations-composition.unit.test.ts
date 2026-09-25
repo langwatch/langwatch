@@ -97,6 +97,34 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 
       return 1;
     },
+    getInviteWithOrganization: async ({
+      inviteId,
+      organizationId,
+    }: {
+      inviteId: string;
+      organizationId: string;
+    }) => {
+      const invite = invites.get(inviteId);
+      if (!invite || invite.organizationId !== organizationId) {
+        throw new InviteNotFoundError("Invitation not found");
+      }
+
+      return { ...invite, organization: makeOrganization({ id: organizationId }) };
+    },
+    extendInviteExpiration: async ({
+      inviteId,
+      expiration,
+    }: {
+      inviteId: string;
+      organizationId: string;
+      expiration: NonNullable<OrganizationInvite["expiration"]>;
+    }) => {
+      const invite = invites.get(inviteId);
+      if (!invite || invite.status !== "PENDING") return 0;
+      invites.set(inviteId, { ...invite, expiration });
+
+      return 1;
+    },
     getInviteByCodeWithOrganization: async ({ inviteCode }: { inviteCode: string }) => {
       const invite = Array.from(invites.values()).find(
         (candidate) => candidate.inviteCode === inviteCode,
@@ -179,6 +207,32 @@ describe("given the invitation member the process composes", () => {
       expect(listed[0]!.displayStatus).toBe("REVOKED");
       await expect(
         door.revoke({ organizationId: ORGANIZATION_ID, inviteId }),
+      ).rejects.toMatchObject({ code: "invite_not_found" });
+    });
+  });
+
+  describe("when a pending invite is extended", () => {
+    it("keeps its code, moves its expiry later, and refuses once it is revoked", async () => {
+      const door = invitations();
+      const created = await door.create({
+        organizationId: ORGANIZATION_ID,
+        validation: "lenient",
+        invites: [{ email: "extend-me@acme.test", role: "MEMBER", teamIds: "team-1" }],
+      });
+      const original = created.invites[0]!.invite;
+
+      const { invite } = await door.extend({
+        organizationId: ORGANIZATION_ID,
+        inviteId: original.id,
+      });
+
+      expect(invite.inviteCode).toBe(original.inviteCode);
+      expect(invite.expiration!.epochMilliseconds).toBeGreaterThanOrEqual(
+        original.expiration!.epochMilliseconds,
+      );
+      await door.revoke({ organizationId: ORGANIZATION_ID, inviteId: original.id });
+      await expect(
+        door.extend({ organizationId: ORGANIZATION_ID, inviteId: original.id }),
       ).rejects.toMatchObject({ code: "invite_not_found" });
     });
   });

@@ -270,6 +270,7 @@ export {
   IdentityEmailInUseError,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
+  IdentityLookupNotFoundError,
   IdentityMfaBackupCodesExhaustedError,
   IdentityMfaCodeInvalidError,
   IdentityEngineUnavailableError,
@@ -734,4 +735,5 @@ export {
 } from "./sso-domain-claims.ts";
 export * from "./identity.api.ts";
 export * from "./identity-lookup.ts";
+export * from "./identity-lookup.trpc.ts";
 export * from "./identity.config.ts";
