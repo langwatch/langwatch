@@ -5,7 +5,9 @@
  */
 
 import type { FilterField, FilterParam } from "@langwatch/analytics-browser-kit";
-import { differenceInCalendarDays, nowInstant } from "@langwatch/time";
+import { differenceInCalendarDays, nowInstant, subDays } from "@langwatch/time";
+
+import { availableFilters } from "../../model/analytics-filter-catalogue.ts";
 
 /** Maximum allowed length for a view name */
 export const MAX_VIEW_NAME_LENGTH = 50;
@@ -203,4 +205,78 @@ export function findMatchingView({
  */
 export function generateViewId(): string {
   return `view-${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** The URL keys a filter reset keeps: the page's own address, not the filters on it. */
+const RESET_KEEP = new Set(["project", "view", "group_by", "startDate", "endDate"]);
+
+export function keepOnFilterReset<T>(query: Readonly<Record<string, T>>): Record<string, T> {
+  return Object.fromEntries(Object.entries(query).filter(([key]) => RESET_KEEP.has(key)));
+}
+
+/** A saved period as URL dates: a relative one ends now, a fixed one is used as saved. */
+export function viewPeriodDates(period: SavedView["period"] | undefined): {
+  startDate: string | undefined;
+  endDate: string | undefined;
+} {
+  if (period?.relativeDays !== undefined) {
+    return {
+      endDate: nowInstant().toString({ fractionalSecondDigits: 3 }),
+      startDate: subDays(nowInstant().epochMilliseconds, period.relativeDays - 1).toISOString(),
+    };
+  }
+  if (period?.startDate && period.endDate) {
+    return { startDate: period.startDate, endDate: period.endDate };
+  }
+  return { startDate: undefined, endDate: undefined };
+}
+
+/** The URL dates as a period to save: relative when they end today or yesterday. */
+export function periodFromUrlDates({
+  startDate,
+  endDate,
+}: {
+  startDate: string | undefined;
+  endDate: string | undefined;
+}): SavedView["period"] | undefined {
+  if (!startDate || !endDate) return undefined;
+  const daysDifference = differenceInCalendarDays(endDate, startDate) + 1;
+  const endIsRecent = differenceInCalendarDays(nowInstant().epochMilliseconds, endDate) <= 1;
+  return endIsRecent ? { relativeDays: daysDifference } : { startDate, endDate };
+}
+
+/** Whether the address itself (not the stored fallback) carries filters, dates or a query. */
+export function urlCarriesViewParams(asPath: string): boolean {
+  const urlParams = new URLSearchParams(asPath.split("?")[1] ?? "");
+  const hasUrlFilters = Object.values(availableFilters).some((f) => urlParams.has(f.urlKey));
+  return (
+    hasUrlFilters ||
+    urlParams.has("startDate") ||
+    urlParams.has("endDate") ||
+    urlParams.has("query")
+  );
+}
+
+export function withoutView<T extends { id: string }>(views: readonly T[], viewId: string): T[] {
+  return views.filter((v) => v.id !== viewId);
+}
+
+export function withViewRenamed<T extends { id: string; name: string }>(
+  views: readonly T[],
+  viewId: string,
+  name: string,
+): T[] {
+  return views.map((v) => (v.id === viewId ? { ...v, name } : v));
+}
+
+/** Views in the given id order, each stamped with its new position; unknown ids drop out. */
+export function inViewOrder<T extends { id: string }>(
+  views: readonly T[],
+  viewIds: readonly string[],
+): (T & { order: number })[] {
+  const viewMap = new Map(views.map((v) => [v.id, v]));
+  return viewIds.flatMap((id, index) => {
+    const view = viewMap.get(id);
+    return view ? [{ ...view, order: index }] : [];
+  });
 }

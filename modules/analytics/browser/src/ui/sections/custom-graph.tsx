@@ -18,7 +18,7 @@ import {
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
-import { format, nowInstant, Temporal, toEpochMs } from "@langwatch/time";
+import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
@@ -58,6 +58,7 @@ import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { formatChartDate } from "../../model/chart-date.ts";
 import { describeError } from "../../model/describe-error.ts";
 import { buildMetadataFilterParams } from "../../model/metadata-filter-params.ts";
+import { monitorPeriodLabel, summarizeMonitor } from "../../model/monitor-summary.ts";
 import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/series-group-name.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
@@ -815,82 +816,23 @@ const CustomGraph_ = React.memo(
     ) as [typeof XAxis, typeof YAxis];
 
     if (["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full") {
-      const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
-      const sortedCurrentData = [...(summaryData.current ?? [])].toSorted(
-        (a, b) => b.value - a.value,
-      );
-
-      const longestName = Math.max(...summaryData.current.map((entry) => entry.name.length));
-
-      const xAxisWidth = Math.min(longestName * 8, 300);
-
       return container(
-        <ResponsiveContainer
-          key={currentAndPreviousDataFilled ? input.graphId : "loading"}
-          height={height_}
-        >
-          <BarChart
-            data={sortedCurrentData}
-            barCategoryGap={10}
-            layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
-          >
-            <XAxisComponent
-              type="category"
-              dataKey="name"
-              width={input.graphType === "horizontal_bar" ? xAxisWidth : undefined}
-              height={input.graphType === "horizontal_bar" ? undefined : xAxisWidth}
-              interval={input.graphType === "horizontal_bar" ? 0 : undefined}
-              tickLine={false}
-              axisLine={false}
-              tick={{ fill: gray400 }}
-              style={{ fontSize: "11px" }}
-              angle={input.graphType === "horizontal_bar" ? undefined : 45}
-              textAnchor={input.graphType === "horizontal_bar" ? "end" : "start"}
-            />
-            <YAxisComponent
-              type="number"
-              dataKey="value"
-              domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
-              tick={{ fill: gray400 }}
-              style={{ fontSize: "11px" }}
-              tickFormatter={(value: number) => {
-                if (typeof yAxisValueFormat === "function") {
-                  return yAxisValueFormat(value);
-                }
-                return numeral(value).format(yAxisValueFormat);
-              }}
-            />
-            <Tooltip
-              content={<ChartTooltip />}
-              formatter={tooltipValueFormatter}
-              cursor={{ fill: cursorColor }}
-              wrapperStyle={{ zIndex: 1000 }}
-            />
-            <Bar
-              dataKey="value"
-              minPointSize={4}
-              onClick={(item) => {
-                if (handleDataPointClick && item?.payload?.key) {
-                  const key = item.payload.key;
-                  const { series, groupKey } = getSeries(seriesByKey, key);
-                  // Derive evaluatorId from per-series metadata, falling back to groupByKey or
-                  // first series key
-                  const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
-
-                  handleDataPointClick({
-                    evaluatorId,
-                    groupKey,
-                  });
-                }
-              }}
-              style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
-            >
-              {sortedCurrentData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={colorForSeries(entry.key, index)} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>,
+        <SummaryBarGraph
+          input={input}
+          seriesByKey={seriesByKey}
+          timeseries={timeseries}
+          nameForSeries={nameForSeries}
+          chartKey={currentAndPreviousDataFilled ? input.graphId : "loading"}
+          height_={height_}
+          gray400={gray400}
+          yAxisValueFormat={yAxisValueFormat}
+          tooltipValueFormatter={tooltipValueFormatter}
+          cursorColor={cursorColor}
+          handleDataPointClick={handleDataPointClick}
+          colorForSeries={colorForSeries}
+          XAxisComponent={XAxisComponent}
+          YAxisComponent={YAxisComponent}
+        />,
       );
     }
 
@@ -1371,51 +1313,15 @@ function MonitorGraph({
 }) {
   const firstKey = Object.keys(seriesByKey)[0] ?? "";
   const name = nameForSeries(firstKey);
-  const isPassRate = firstKey.includes("pass_rate");
-  const allValues = isPassRate
-    ? currentAndPreviousDataFilled
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null)
-    : currentAndPreviousData
-        ?.map((entry) => entry[firstKey]!)
-        .filter((x) => x !== undefined && x !== null);
-
-  // Fallback statistic from the REAL daily values (never the sparkline's
-  // filled data — for pass rates that substitutes 1 for empty days and would
-  // inflate the average).
-  const realDailyValues = currentAndPreviousData
-    ?.map((entry) => entry[firstKey]!)
-    .filter((x) => x !== undefined && x !== null);
-  const dailyAverage =
-    realDailyValues && realDailyValues.length > 0
-      ? realDailyValues.reduce((acc, curr) => acc + curr, 0) / realDailyValues.length
-      : undefined;
-
-  // The headline is the run-weighted value over the whole period (one "full"
-  // bucket), so it matches the run-counting charts on the analytics page. The
-  // daily buckets only draw the sparkline; averaging them would weigh a 1-run
-  // day the same as a 100-run day. Fall back to that average only if the
-  // full-period read errored, so a transient failure doesn't blank the card.
-  const summaryRaw = summaryTimeseries.data?.currentPeriod?.[0]?.[firstKey];
-  const fallbackValue = summaryTimeseries.isError ? dailyAverage : undefined;
-  const summaryValue = typeof summaryRaw === "number" ? summaryRaw : fallbackValue;
-  const hasData = summaryValue !== undefined;
-  const hasLoaded =
-    currentAndPreviousDataFilled?.length !== undefined &&
-    (summaryTimeseries.data !== undefined || summaryTimeseries.isError);
+  const { isPassRate, summaryValue, hasData, hasLoaded, colorSet, scoreLabel, maxValue } =
+    summarizeMonitor({
+      seriesKey: firstKey,
+      data: currentAndPreviousData,
+      filledData: currentAndPreviousDataFilled,
+      summary: summaryTimeseries,
+      disabled: !!input.monitorGraph?.disabled,
+    });
   const gray400 = useColorRawValue("gray.400");
-
-  // TODO: allow user to define the thresholds instead of hardcoded amounts
-  const isHealthy = summaryValue === undefined || summaryValue > 0.8 || !hasLoaded;
-  const belowThresholdSet: RotatingColorSet =
-    summaryValue !== undefined && summaryValue < 0.4 ? "redTones" : "orangeTones";
-  const activeColorSet: RotatingColorSet = isHealthy ? "greenTones" : belowThresholdSet;
-  const colorSet: RotatingColorSet = input.monitorGraph?.disabled ? "grayTones" : activeColorSet;
-
-  const finiteValues = allValues && allValues.length > 0 ? allValues.filter(Number.isFinite) : [];
-  const scoreLabel = isPassRate ? "Pass Rate" : "Average Score";
-  const observedMax = finiteValues.length > 0 ? Math.max(...finiteValues) : 1;
-  const maxValue = isPassRate ? 1 : observedMax;
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
@@ -1474,25 +1380,11 @@ function MonitorGraph({
         <Text fontSize="xs">
           {filterParams.startDate &&
             filterParams.endDate &&
-            (() => {
-              const now = nowInstant().epochMilliseconds;
-              const daysDiff = Math.abs(
-                Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24)),
-              );
-              const periodDays = Math.ceil(
-                (filterParams.endDate - filterParams.startDate) / (1000 * 60 * 60 * 24),
-              );
-
-              // If end date is within one day of today, show "Last X days"
-              if (daysDiff <= 1) {
-                return `Last ${periodDays} days`;
-              }
-              // Otherwise show date range
-              return `${format(
-                filterParams.startDate,
-                "MMM d",
-              )} - ${format(filterParams.endDate, "MMM d, yyyy")}`;
-            })()}
+            monitorPeriodLabel({
+              startDate: filterParams.startDate,
+              endDate: filterParams.endDate,
+              now: nowInstant().epochMilliseconds,
+            })}
         </Text>
       </VStack>
       <ResponsiveContainer
@@ -1559,5 +1451,111 @@ function MonitorGraph({
         </AreaChart>
       </ResponsiveContainer>
     </Box>
+  );
+}
+
+/** A bar per group over the whole period, largest first; clicking one drills into it. */
+function SummaryBarGraph({
+  input,
+  seriesByKey,
+  timeseries,
+  nameForSeries,
+  chartKey,
+  height_,
+  gray400,
+  yAxisValueFormat,
+  tooltipValueFormatter,
+  cursorColor,
+  handleDataPointClick,
+  colorForSeries,
+  XAxisComponent,
+  YAxisComponent,
+}: {
+  input: CustomGraphInput;
+  seriesByKey: Record<string, Series>;
+  timeseries: TimeseriesQuery;
+  nameForSeries: (aggKey: string) => string;
+  chartKey: string;
+  height_: number;
+  gray400: string;
+  yAxisValueFormat: string | ((value: number) => string) | undefined;
+  tooltipValueFormatter: Formatter<ValueType, NameType>;
+  cursorColor: string;
+  handleDataPointClick: Parameters<typeof CustomGraph>[0]["onDataPointClick"];
+  colorForSeries: (aggKey: string, index: number) => string;
+  XAxisComponent: typeof XAxis;
+  YAxisComponent: typeof YAxis;
+}) {
+  const summaryData = shapeDataForSummary({ input, seriesByKey, timeseries, nameForSeries });
+  const sortedCurrentData = [...(summaryData.current ?? [])].toSorted((a, b) => b.value - a.value);
+
+  const longestName = Math.max(...summaryData.current.map((entry) => entry.name.length));
+
+  const xAxisWidth = Math.min(longestName * 8, 300);
+
+  return (
+    <ResponsiveContainer key={chartKey} height={height_}>
+      <BarChart
+        data={sortedCurrentData}
+        barCategoryGap={10}
+        layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
+      >
+        <XAxisComponent
+          type="category"
+          dataKey="name"
+          width={input.graphType === "horizontal_bar" ? xAxisWidth : undefined}
+          height={input.graphType === "horizontal_bar" ? undefined : xAxisWidth}
+          interval={input.graphType === "horizontal_bar" ? 0 : undefined}
+          tickLine={false}
+          axisLine={false}
+          tick={{ fill: gray400 }}
+          style={{ fontSize: "11px" }}
+          angle={input.graphType === "horizontal_bar" ? undefined : 45}
+          textAnchor={input.graphType === "horizontal_bar" ? "end" : "start"}
+        />
+        <YAxisComponent
+          type="number"
+          dataKey="value"
+          domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
+          tick={{ fill: gray400 }}
+          style={{ fontSize: "11px" }}
+          tickFormatter={(value: number) => {
+            if (typeof yAxisValueFormat === "function") {
+              return yAxisValueFormat(value);
+            }
+            return numeral(value).format(yAxisValueFormat);
+          }}
+        />
+        <Tooltip
+          content={<ChartTooltip />}
+          formatter={tooltipValueFormatter}
+          cursor={{ fill: cursorColor }}
+          wrapperStyle={{ zIndex: 1000 }}
+        />
+        <Bar
+          dataKey="value"
+          minPointSize={4}
+          onClick={(item) => {
+            if (handleDataPointClick && item?.payload?.key) {
+              const key = item.payload.key;
+              const { series, groupKey } = getSeries(seriesByKey, key);
+              // Derive evaluatorId from per-series metadata, falling back to groupByKey or
+              // first series key
+              const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
+
+              handleDataPointClick({
+                evaluatorId,
+                groupKey,
+              });
+            }
+          }}
+          style={{ cursor: handleDataPointClick ? "pointer" : "default" }}
+        >
+          {sortedCurrentData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={colorForSeries(entry.key, index)} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   );
 }

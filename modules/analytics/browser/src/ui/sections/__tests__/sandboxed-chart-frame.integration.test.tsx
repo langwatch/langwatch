@@ -12,9 +12,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const { bridgeMock } = vi.hoisted(() => ({ bridgeMock: vi.fn() }));
 
 vi.mock("../../../behavior/frame-bridge.ts", () => ({
-  createFrameBridge: (options: { source: string }) => {
-    bridgeMock(options);
-    return { postDashboardContextChange: vi.fn(), dispose: vi.fn() };
+  FrameBridgeSession: {
+    create: (options: { source: string }) => {
+      bridgeMock(options);
+      return { postDashboardContextChange: vi.fn(), dispose: vi.fn() };
+    },
   },
 }));
 

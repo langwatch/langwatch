@@ -13,7 +13,7 @@ import {
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
-import { differenceInCalendarDays, nowInstant, subDays, toDate } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import type React from "react";
 import {
   createContext,
@@ -28,8 +28,15 @@ import {
 import {
   type DefaultView,
   findMatchingView,
+  inViewOrder,
+  keepOnFilterReset,
   MAX_VIEW_NAME_LENGTH,
+  periodFromUrlDates,
   type SavedView,
+  urlCarriesViewParams,
+  viewPeriodDates,
+  withoutView,
+  withViewRenamed,
 } from "./saved-views-logic.ts";
 
 // Re-export types and constants for consumers
@@ -243,10 +250,7 @@ function useSavedViewsInternal() {
   // -- Filter actions -------------------------------------------------------
 
   const resetAllFilters = useCallback(() => {
-    const RESET_KEEP = new Set(["project", "view", "group_by", "startDate", "endDate"]);
-    const cleanQuery = Object.fromEntries(
-      Object.entries(router.query).filter(([key]) => RESET_KEEP.has(key)),
-    );
+    const cleanQuery = keepOnFilterReset(router.query);
     void router.push({ pathname: router.pathname, query: cleanQuery }, undefined, {
       shallow: true,
       scroll: false,
@@ -259,21 +263,7 @@ function useSavedViewsInternal() {
       query?: string,
       period?: SavedView["period"],
     ): Promise<boolean> => {
-      let startDate: string | undefined;
-      let endDate: string | undefined;
-
-      if (period) {
-        if (period.relativeDays !== undefined) {
-          endDate = nowInstant().toString({ fractionalSecondDigits: 3 });
-          startDate = subDays(
-            nowInstant().epochMilliseconds,
-            period.relativeDays - 1,
-          ).toISOString();
-        } else if (period.startDate && period.endDate) {
-          startDate = period.startDate;
-          endDate = period.endDate;
-        }
-      }
+      const { startDate, endDate } = viewPeriodDates(period);
 
       const queryObj = buildViewQuery({
         routerQuery: router.query as Record<string, string | string[] | undefined>,
@@ -311,12 +301,7 @@ function useSavedViewsInternal() {
     // We check router.asPath (not `filters` from useFilterParams) because
     // useFilterParams now includes a localStorage fallback — so `filters` may
     // be populated even when the URL itself is clean.
-    const urlQueryString = router.asPath.split("?")[1] ?? "";
-    const urlParams = new URLSearchParams(urlQueryString);
-    const hasUrlFilters = Object.values(availableFilters).some((f) => urlParams.has(f.urlKey));
-    const hasUrlDates = urlParams.has("startDate") || urlParams.has("endDate");
-    const hasUrlQuery = urlParams.has("query");
-    if (hasUrlFilters || hasUrlDates || hasUrlQuery) return;
+    if (urlCarriesViewParams(router.asPath)) return;
 
     const customView = customViews.find((v: any) => v.id === selectedViewId);
     if (customView) {
@@ -367,21 +352,10 @@ function useSavedViewsInternal() {
       const trimmedName = name.slice(0, MAX_VIEW_NAME_LENGTH);
       const queryParam = (router.query.query as string) || undefined;
 
-      let period: SavedView["period"] | undefined;
-      const startDateStr = router.query.startDate as string | undefined;
-      const endDateStr = router.query.endDate as string | undefined;
-
-      if (startDateStr && endDateStr) {
-        const daysDifference = differenceInCalendarDays(endDateStr, startDateStr) + 1;
-        const endIsRecent =
-          differenceInCalendarDays(nowInstant().epochMilliseconds, endDateStr) <= 1;
-
-        if (endIsRecent) {
-          period = { relativeDays: daysDifference };
-        } else {
-          period = { startDate: startDateStr, endDate: endDateStr };
-        }
-      }
+      const period = periodFromUrlDates({
+        startDate: router.query.startDate as string | undefined,
+        endDate: router.query.endDate as string | undefined,
+      });
 
       const tempId = `temp-${nowInstant().epochMilliseconds}`;
       const optimisticView: SavedView = {
@@ -444,10 +418,9 @@ function useSavedViewsInternal() {
     (viewId: string) => {
       const newSelectedId = selectedViewId === viewId ? "all-traces" : selectedViewId;
 
-      utils.savedViews.getAll.setData({ projectId }, (old: any) => {
-        if (!old) return old;
-        return old.filter((v: any) => v.id !== viewId);
-      });
+      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+        old ? withoutView(old, viewId) : old,
+      );
 
       setSelectedViewIdState(newSelectedId);
       writeSelectedViewId(projectId, newSelectedId);
@@ -465,10 +438,9 @@ function useSavedViewsInternal() {
     (viewId: string, newName: string) => {
       const trimmedName = newName.slice(0, MAX_VIEW_NAME_LENGTH);
 
-      utils.savedViews.getAll.setData({ projectId }, (old: any) => {
-        if (!old) return old;
-        return old.map((v: any) => (v.id === viewId ? { ...v, name: trimmedName } : v));
-      });
+      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+        old ? withViewRenamed(old, viewId, trimmedName) : old,
+      );
 
       renameMutation.mutate({ projectId, viewId, name: trimmedName });
     },
@@ -479,17 +451,9 @@ function useSavedViewsInternal() {
     (newOrder: SavedView[]) => {
       const viewIds = newOrder.map((v) => v.id);
 
-      utils.savedViews.getAll.setData({ projectId }, (old: any) => {
-        if (!old) return old;
-        const viewMap = new Map(old.map((v: any) => [v.id, v]));
-        return viewIds
-          .map((id, index) => {
-            const view = viewMap.get(id);
-            if (!view) return null;
-            return { ...view, order: index };
-          })
-          .filter(Boolean) as typeof old;
-      });
+      utils.savedViews.getAll.setData({ projectId }, (old: any) =>
+        old ? inViewOrder(old, viewIds) : old,
+      );
 
       reorderMutation.mutate({ projectId, viewIds });
     },

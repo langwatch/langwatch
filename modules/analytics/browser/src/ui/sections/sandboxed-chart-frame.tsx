@@ -15,8 +15,12 @@ import {
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
-import { createFrameBridge } from "../../behavior/frame-bridge.ts";
+import {
+  type ChartFrameExecuteQuery,
+  type ChartFrameLogEntry,
+  type FrameBridge,
+  FrameBridgeSession,
+} from "../../behavior/frame-bridge.ts";
 import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,
@@ -96,7 +100,7 @@ export function SandboxedChartFrame({
   const initialDashboardContextRef = useRef(dashboardContext);
   const paramsRef = useRef(params);
   paramsRef.current = params;
-  const bridgeRef = useRef<ReturnType<typeof createFrameBridge> | null>(null);
+  const bridgeRef = useRef<FrameBridge | null>(null);
 
   // generation and codeGeneration re-key the frame; dashboardContext/params are
   // deliberately not dependencies (initial values only — dashboardContext
@@ -105,7 +109,7 @@ export function SandboxedChartFrame({
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
-    const bridge = createFrameBridge({
+    const bridge = FrameBridgeSession.create({
       iframe,
       executeQuery: (args) => executeQueryRef.current(args),
       dashboardContext: initialDashboardContextRef.current,

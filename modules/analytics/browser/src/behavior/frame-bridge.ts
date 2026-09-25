@@ -87,73 +87,143 @@ export interface FrameBridge {
   dispose(): void;
 }
 
-// One factory wiring the iframe's postMessage handlers and lifecycle together;
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: splitting scatters state.
-export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridge {
-  const {
-    iframe,
-    executeQuery,
-    onLog,
-    onHeightChange,
-    onNavigate,
-    onTeardown,
-    src = CHART_FRAME_PATH,
-  } = options;
+/** One bridge to one frame: the handshake, the forwarded messages, the queries and the watchdog. */
+export class FrameBridgeSession implements FrameBridge {
+  static create(options: CreateFrameBridgeOptions): FrameBridgeSession {
+    const session = new FrameBridgeSession(options);
+    // The listener goes on before the frame navigates, so a fast load cannot
+    // miss lw:init; a sandboxed frame's document is unreadable, so no probe.
+    options.iframe.addEventListener("load", session.#onFrameLoad);
+    options.iframe.src = options.src ?? CHART_FRAME_PATH;
+    return session;
+  }
 
-  let port: MessagePort | null = null;
-  let initialized = false;
-  let disposed = false;
-  let lastHeartbeatAt = 0;
-  let watchdog: ReturnType<typeof setInterval> | null = null;
-  // Keyed by requestId, not a single slot: a widget can have several
-  // LW.query calls in flight at once (e.g. Promise.all of two queries), and
-  // each needs its own abort lifecycle independent of the others.
-  const activeAborts = new Map<number, AbortController>();
+  readonly #options: CreateFrameBridgeOptions;
+  #port: MessagePort | null = null;
+  #initialized = false;
+  #disposed = false;
+  #lastHeartbeatAt = 0;
+  #watchdog: ReturnType<typeof setInterval> | null = null;
+  // Keyed by requestId: several LW.query calls can be in flight at once
+  // (e.g. Promise.all), and each needs its own abort lifecycle.
+  readonly #activeAborts = new Map<number, AbortController>();
 
-  const abortAll = () => {
-    for (const abort of activeAborts.values()) abort.abort();
-    activeAborts.clear();
+  private constructor(options: CreateFrameBridgeOptions) {
+    this.#options = options;
+  }
+
+  postDashboardContextChange(dashboardContext: ChartFrameDashboardContext): void {
+    if (this.#disposed || !this.#port) return;
+    this.#port.postMessage({ type: "lw:dashboard-context-change", dashboardContext });
+  }
+
+  /** Detaches everything. Safe to call twice. */
+  dispose = (): void => {
+    if (this.#disposed) return;
+    this.#disposed = true;
+    if (this.#watchdog !== null) clearInterval(this.#watchdog);
+    this.#options.iframe.removeEventListener("load", this.#onFrameLoad);
+    document.removeEventListener("visibilitychange", this.#onVisibilityChange);
+    for (const abort of this.#activeAborts.values()) abort.abort();
+    this.#activeAborts.clear();
+    this.#port?.close();
+    this.#port = null;
   };
 
-  const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      // Fresh grace period: a backlog of misses accrued while hidden/
-      // throttled must not read as instant silence.
-      lastHeartbeatAt = nowInstant().epochMilliseconds;
+  #teardown(): void {
+    this.dispose();
+    // Clearing srcdoc is what actually kills a busy-looping frame.
+    this.#options.iframe.removeAttribute("srcdoc");
+    this.#options.iframe.src = "about:blank";
+    this.#options.onTeardown();
+  }
+
+  #onVisibilityChange = (): void => {
+    // Fresh grace period: misses accrued while hidden/throttled must not read as silence.
+    if (document.visibilityState === "visible")
+      this.#lastHeartbeatAt = nowInstant().epochMilliseconds;
+  };
+
+  #onFrameLoad = (): void => {
+    const { iframe } = this.#options;
+    if (this.#disposed || this.#initialized || !iframe.contentWindow) return;
+    this.#initialized = true;
+    const channel = new MessageChannel();
+    this.#port = channel.port1;
+    this.#port.onmessage = this.#onPortMessage;
+    // Sandboxed srcdoc frames have the opaque origin "null" — "*" is the only
+    // targetOrigin that reaches them. Nothing sensitive rides on init.
+    iframe.contentWindow.postMessage(
+      {
+        type: "lw:init",
+        dashboardContext: this.#options.dashboardContext,
+        params: this.#options.params ?? {},
+        source: this.#options.source,
+      },
+      "*",
+      [channel.port2],
+    );
+    this.#lastHeartbeatAt = nowInstant().epochMilliseconds;
+    document.addEventListener("visibilitychange", this.#onVisibilityChange);
+    this.#watchdog = setInterval(
+      () => this.#checkHeartbeat(),
+      CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5,
+    );
+  };
+
+  /** Suspended while hidden: background throttling hits both sides, so silence proves nothing. */
+  #checkHeartbeat(): void {
+    if (document.visibilityState === "hidden") return;
+    if (
+      nowInstant().epochMilliseconds - this.#lastHeartbeatAt <=
+      CHART_FRAME_HEARTBEAT_TIMEOUT_MS
+    ) {
+      return;
+    }
+    this.#options.onLog({
+      level: "error",
+      source: "bridge",
+      text: "No heartbeat for 10s — frame torn down.",
+    });
+    this.#teardown();
+  }
+
+  #onPortMessage = (event: MessageEvent): void => {
+    if (this.#disposed) return;
+    const message = event.data as FrameToParentMessage | undefined;
+    const { onHeightChange, onNavigate, onLog } = this.#options;
+    switch (message?.type) {
+      case "lw:heartbeat":
+        this.#lastHeartbeatAt = nowInstant().epochMilliseconds;
+        return;
+      case "lw:query":
+        this.#handleQuery(message.requestId, message.queryName, message.params ?? {});
+        return;
+      case "lw:set-height":
+        onHeightChange(message.px);
+        return;
+      case "lw:navigate":
+        onNavigate?.({ target: message.target, params: message.params ?? {} });
+        return;
+      case "lw:log":
+        onLog({ level: message.level, source: message.source, text: message.parts.join(" ") });
+        return;
+      case "lw:error":
+        onLog({ level: "error", source: message.source, text: message.message });
+        return;
+      default:
+        return;
     }
   };
 
-  const stop = () => {
-    if (disposed) return;
-    disposed = true;
-    if (watchdog !== null) clearInterval(watchdog);
-    iframe.removeEventListener("load", onFrameLoad);
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    abortAll();
-    port?.close();
-    port = null;
-  };
-
-  const teardown = () => {
-    stop();
-    // Clearing srcdoc is what actually kills a busy-looping frame.
-    iframe.removeAttribute("srcdoc");
-    iframe.src = "about:blank";
-    onTeardown();
-  };
-
-  const handleQuery = (
+  /** Past the in-flight cap a query is refused at once rather than piled onto the executor. */
+  #handleQuery(
     requestId: number,
     queryName: string,
     params: Readonly<Record<string, ChartQueryParamValue>>,
-  ) => {
-    // Bound in-flight queries: author code can fire an unbounded fan-out
-    // (a render loop calling LW.query, a large Promise.all), and each one is
-    // a real backend request. Past the cap, reject immediately rather than
-    // pile onto the executor. Settled requests are dropped from activeAborts
-    // below, so the slot frees as soon as one resolves.
-    if (activeAborts.size >= MAX_CONCURRENT_QUERIES && port) {
-      port.postMessage({
+  ): void {
+    if (this.#activeAborts.size >= MAX_CONCURRENT_QUERIES && this.#port) {
+      this.#port.postMessage({
         type: "lw:query-error",
         requestId,
         error: {
@@ -164,116 +234,26 @@ export function createFrameBridge(options: CreateFrameBridgeOptions): FrameBridg
       });
       return;
     }
-    // Each request gets its own abort controller, so concurrent queries
-    // (e.g. Promise.all of two LW.query calls) don't cancel one another.
     const abort = new AbortController();
-    activeAborts.set(requestId, abort);
-    executeQuery({ queryName, params, signal: abort.signal })
-      .then((result) => {
-        // A reply for a request we've already forgotten (torn down, or this
-        // exact requestId already settled) is dropped.
-        if (disposed || !activeAborts.has(requestId) || !port) return;
-        activeAborts.delete(requestId);
-        port.postMessage({ type: "lw:query-result", requestId, result });
-      })
-      .catch((error: unknown) => {
-        if (disposed || !activeAborts.has(requestId) || !port) return;
-        activeAborts.delete(requestId);
-        port.postMessage({
+    this.#activeAborts.set(requestId, abort);
+    this.#options
+      .executeQuery({ queryName, params, signal: abort.signal })
+      .then((result) => this.#settle(requestId, { type: "lw:query-result", requestId, result }))
+      .catch((error: unknown) =>
+        this.#settle(requestId, {
           type: "lw:query-error",
           requestId,
           error: toChartQueryErrorPayload(error),
-        });
-      });
-  };
+        }),
+      );
+  }
 
-  const onPortMessage = (event: MessageEvent) => {
-    if (disposed) return;
-    const message = event.data as FrameToParentMessage | undefined;
-    switch (message?.type) {
-      case "lw:heartbeat":
-        lastHeartbeatAt = nowInstant().epochMilliseconds;
-        return;
-      case "lw:query":
-        handleQuery(message.requestId, message.queryName, message.params ?? {});
-        return;
-      case "lw:set-height":
-        onHeightChange(message.px);
-        return;
-      case "lw:navigate":
-        onNavigate?.({ target: message.target, params: message.params ?? {} });
-        return;
-      case "lw:log":
-        onLog({
-          level: message.level,
-          source: message.source,
-          text: message.parts.join(" "),
-        });
-        return;
-      case "lw:error":
-        onLog({
-          level: "error",
-          source: message.source,
-          text: message.message,
-        });
-        return;
-      default:
-        return;
-    }
-  };
-
-  const onFrameLoad = () => {
-    if (disposed || initialized || !iframe.contentWindow) return;
-    initialized = true;
-    const channel = new MessageChannel();
-    port = channel.port1;
-    port.onmessage = onPortMessage;
-    // Sandboxed srcdoc frames have the opaque origin "null" — "*" is the only
-    // targetOrigin that reaches them. Nothing sensitive rides on init.
-    iframe.contentWindow.postMessage(
-      {
-        type: "lw:init",
-        dashboardContext: options.dashboardContext,
-        params: options.params ?? {},
-        source: options.source,
-      },
-      "*",
-      [channel.port2],
-    );
-    lastHeartbeatAt = nowInstant().epochMilliseconds;
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    watchdog = setInterval(() => {
-      // Suspended while hidden: background-tab timer throttling hits both
-      // sides of the bridge, so silence here is not evidence of a wedged
-      // frame. onVisibilityChange resets lastHeartbeatAt on return, giving a
-      // fresh window before the check below can fire again.
-      if (document.visibilityState === "hidden") return;
-      if (nowInstant().epochMilliseconds - lastHeartbeatAt > CHART_FRAME_HEARTBEAT_TIMEOUT_MS) {
-        onLog({
-          level: "error",
-          source: "bridge",
-          text: "No heartbeat for 10s — frame torn down.",
-        });
-        teardown();
-      }
-    }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
-  };
-
-  // The listener goes on before the frame navigates, so a fast load cannot
-  // miss lw:init; a sandboxed frame's document is unreadable, so no probe.
-  iframe.addEventListener("load", onFrameLoad);
-  iframe.src = src;
-
-  return {
-    postDashboardContextChange(dashboardContext: ChartFrameDashboardContext) {
-      if (disposed || !port) return;
-      port.postMessage({
-        type: "lw:dashboard-context-change",
-        dashboardContext,
-      });
-    },
-    dispose: stop,
-  };
+  /** A reply for a request already forgotten (torn down, or already settled) is dropped. */
+  #settle(requestId: number, reply: unknown): void {
+    if (this.#disposed || !this.#activeAborts.has(requestId) || !this.#port) return;
+    this.#activeAborts.delete(requestId);
+    this.#port.postMessage(reply);
+  }
 }
 
 /**

@@ -6,7 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createFrameBridge } from "../frame-bridge.ts";
+import { FrameBridgeSession } from "../frame-bridge.ts";
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -25,7 +25,7 @@ describe("given a chart frame the bridge attaches to", () => {
         addEventListener(type, listener, options);
       });
 
-      const bridge = createFrameBridge({
+      const bridge = FrameBridgeSession.create({
         iframe,
         source: "export default () => null;",
         executeQuery: vi.fn(),
