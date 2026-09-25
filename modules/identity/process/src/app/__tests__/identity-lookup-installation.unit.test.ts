@@ -73,7 +73,7 @@ describe("identity lookup installation", () => {
   });
 
   describe("when somebody outside the staff list resolves an address", () => {
-    it("refuses with identity_lookup_not_found through IdentityLookupApi", async () => {
+    it("refuses with the generic not_found through IdentityLookupApi", async () => {
       const runtime = await bootIdentity();
       try {
         const lookup = runtime.transports.trpc.identityLookup?.app;
@@ -81,7 +81,7 @@ describe("identity lookup installation", () => {
 
         await expect(
           lookup.lookupAddress({ address: "sam@acme.com", operator: { userId: "user_mallory" } }),
-        ).rejects.toMatchObject({ code: "identity_lookup_not_found", httpStatus: 404 });
+        ).rejects.toMatchObject({ code: "not_found", httpStatus: 404 });
       } finally {
         await runtime.stop();
       }

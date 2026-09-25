@@ -137,6 +137,10 @@ export const SSO_MIGRATION_ROUTES = ["legacy", "direct"] as const;
 export const ssoMigrationRouteSchema = z.enum(SSO_MIGRATION_ROUTES);
 export type SsoMigrationRoute = z.infer<typeof ssoMigrationRouteSchema>;
 
+/** An operator attestation's evidence: a durable reference, and what the operator checked. */
+export const ssoAttestationEvidenceRefSchema = z.string().trim().min(1).max(500);
+export const ssoAttestationNoteSchema = z.string().trim().min(1).max(1_000);
+
 /**
  * The IdP's dialing information as a FACT carries it: endpoints and
  * REFERENCES. `clientIdRef` and `secretRef` name credential records; the
@@ -300,6 +304,10 @@ export const verificationRequestedPayloadSchema = z.object({
 export const domainAttestedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
+  /** A ticket, case or other durable reference to the evidence reviewed. */
+  evidenceRef: ssoAttestationEvidenceRefSchema.nullable().optional(),
+  /** What the operator checked. Kept bounded because this is event data. */
+  note: ssoAttestationNoteSchema.nullable().optional(),
   /** The platform operator who attested. Recorded because an attested domain
    *  is exactly as trustworthy as the operator behind it, and a dispute is
    *  answered from this fact. */
@@ -430,6 +438,8 @@ export const ssoDomainVerificationSchema = z.object({
   /** `sha256:…` of the published token, so a re-read is verification; null for a proof
    *  that published nothing (attestation, licence, grandfather), which is never re-read. */
   tokenHash: z.string().nullable(),
+  evidenceRef: z.string().min(1).max(500).nullable().optional(),
+  note: z.string().min(1).max(1_000).nullable().optional(),
 });
 
 export const connectionRenamedPayloadSchema = z.object({
@@ -1058,6 +1068,8 @@ function reduceSsoLifecycleFact({
           // An attestation publishes nothing, so there is no record to read
           // again and nothing to read it against.
           tokenHash: null,
+          evidenceRef: fact.data.evidenceRef ?? null,
+          note: fact.data.note ?? null,
         }),
         pendingVerification: null,
       };

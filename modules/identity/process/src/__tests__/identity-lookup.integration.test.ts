@@ -4,16 +4,21 @@ import type {
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
-import type {
-  IdentifierFact,
-  IdentityHistoryEntry,
-  LinkProposalRecord,
-  SsoConnectionState,
+import {
+  type IdentifierFact,
+  type IdentityHistoryEntry,
+  LINK_PROPOSED_EVENT_TYPE,
+  LINK_REJECTED_EVENT_TYPE,
+  type LinkProposalRecord,
+  PROPOSE_LINK_COMMAND_TYPE,
+  type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
+import { MemoryIdentityHistoryRepository } from "../repositories/memory/memory.identity-history.repository.ts";
 import { MemoryIdentityLookupRepository } from "../repositories/memory/memory.identity-lookup.repository.ts";
 import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
@@ -22,6 +27,8 @@ import {
   type IdentityLookupServiceDeps,
 } from "../services/identity-lookup.service.ts";
 import type { IdentityService } from "../services/identity.service.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
+import { LinkProposalService } from "../services/link-proposal.service.ts";
 
 /**
  * D05 tier 1 end to end at the read surface: the real service, the real
@@ -103,6 +110,7 @@ beforeEach(() => {
     router: { route: async () => CONNECTED_ROUTE },
     history: new EmptyIdentityHistory(),
     identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+    links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
     sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
       listBrowserSessions: async () => [],
     }),
@@ -203,7 +211,7 @@ describe("identity lookup, end to end at the read surface", () => {
     it("refuses the request and records only that she made an attempt", async () => {
       await expect(
         service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+      ).rejects.toMatchObject({ code: "not_found" });
 
       expect(auditLog.rows).toHaveLength(1);
       expect(auditLog.rows[0]?.userId).toBe(MALLORY.userId);
@@ -257,6 +265,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
       history: new EmptyIdentityHistory(),
       router: { route: async () => CONNECTED_ROUTE },
       identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+      links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
       platformOperators: new FakeOperators(new Set([OLIVE.userId])),
       auditLog,
       rateLimiter: noopRateLimiter(),
@@ -337,10 +346,10 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
   });
 
   describe("when somebody outside the staff list asks for the claim queue", () => {
-    it("refuses with identity_lookup_not_found", async () => {
+    it("refuses with the generic not_found", async () => {
       await expect(
         repairingService().findDomainClaimQueue({ operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+      ).rejects.toMatchObject({ code: "not_found" });
     });
   });
 
@@ -384,3 +393,123 @@ function invitationRow({ inviteId, expiration }: { inviteId: string; expiration:
     updatedAt: new Date(0),
   };
 }
+
+describe("identity lookup, deciding a sign-in waiting on a human", () => {
+  const SAM = "user_sam";
+
+  function decidingService(): IdentityLookupService {
+    const history = MemoryIdentityHistoryRepository.create(store);
+    return IdentityLookupService.create({
+      reads,
+      history,
+      router: { route: async () => CONNECTED_ROUTE },
+      identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+      links: LinkProposalService.create({
+        guards: LinkProposalGuardsService.create({ proposals: history }),
+        ledger: {
+          async commit({ command, facts }) {
+            const events = identityEventsFor({ command, facts });
+            store.identityEvents.push(...events);
+            return events;
+          },
+        },
+      }),
+      platformOperators: new FakeOperators(new Set([OLIVE.userId])),
+      auditLog,
+      rateLimiter: noopRateLimiter(),
+      sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
+        listBrowserSessions: async () => [],
+      }),
+      invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+    });
+  }
+
+  beforeEach(() => {
+    const actor = { type: "system" as const, id: null };
+    store.identityEvents.push(
+      ...identityEventsFor({
+        command: {
+          type: PROPOSE_LINK_COMMAND_TYPE,
+          data: {
+            tenantId: SAM,
+            userId: SAM,
+            commandId: "idcmd_propose",
+            proposalId: "prop_1",
+            connectionId: "ssoc_1",
+            provider: "oidc",
+            providerAccountId: "sub_sam",
+            value: "sam@acme.com",
+            reason: "ambiguous_candidates",
+            occurredAtMs: 1,
+            actor,
+          },
+        },
+        facts: [
+          {
+            type: LINK_PROPOSED_EVENT_TYPE,
+            data: {
+              proposalId: "prop_1",
+              userId: SAM,
+              connectionId: "ssoc_1",
+              provider: "oidc",
+              providerAccountId: "sub_sam",
+              value: "sam@acme.com",
+              domain: "acme.com",
+              reason: "ambiguous_candidates",
+              actor,
+            },
+          },
+        ],
+      }),
+    );
+  });
+
+  describe("when olive rejects it", () => {
+    /** @scenario "Rejecting a proposed sign-in records the decision and changes nothing else" */
+    it("records the act, states the rejection naming olive, and the panel no longer waits on it", async () => {
+      const service = decidingService();
+      const before = await service.getLookupPerson({
+        userId: SAM,
+        address: "sam@acme.com",
+        operator: OLIVE,
+      });
+      expect(before.waiting.proposals.map((proposal) => proposal.proposalId)).toEqual(["prop_1"]);
+
+      await service.rejectProposedSignIn({ userId: SAM, proposalId: "prop_1", operator: OLIVE });
+
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: OLIVE.userId,
+        action: "identityLookup.rejectProposedSignIn",
+        targetId: SAM,
+      });
+      const decided = store.identityEvents.filter(
+        (event) => event.type === LINK_REJECTED_EVENT_TYPE,
+      );
+      expect(decided.map((event) => event.data)).toEqual([
+        { proposalId: "prop_1", userId: SAM, actor: { type: "user", id: OLIVE.userId } },
+      ]);
+      const after = await service.getLookupPerson({
+        userId: SAM,
+        address: "sam@acme.com",
+        operator: OLIVE,
+      });
+      expect(after.waiting.proposals).toEqual([]);
+      expect(after.identifiers).toEqual(before.identifiers);
+    });
+  });
+
+  describe("when somebody outside the staff list tries to decide it", () => {
+    it("records the attempt, refuses with the generic not_found, and decides nothing", async () => {
+      await expect(
+        decidingService().confirmProposedSignIn({
+          userId: SAM,
+          proposalId: "prop_1",
+          operator: MALLORY,
+        }),
+      ).rejects.toMatchObject({ code: "not_found" });
+
+      expect(auditLog.rows[0]?.action).toBe("identityLookup.confirmProposedSignIn");
+      expect(store.identityEvents.map((event) => event.type)).toEqual([LINK_PROPOSED_EVENT_TYPE]);
+    });
+  });
+});

@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
+import { LinkProposalGuardsService } from "../../services/link-proposal-guards.service.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { AttachIdentifierCommand } from "../attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../detach-identifier.intent.ts";
@@ -186,6 +187,7 @@ describe("identity event aggregate type", () => {
       const declared = defineIdentityPipeline({
         identityProjectionStore: {} as never,
         identityGuards: {} as never,
+        linkProposalGuards: LinkProposalGuardsService.create({ proposals: null }),
         mfaProjectionStore: {} as never,
         mfaGuards: {} as never,
       }).metadata.aggregateType;

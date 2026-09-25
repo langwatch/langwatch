@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/identity-contract";
 import type { Instant } from "@langwatch/time";
 
+import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
 import type { SsoEngineProviderRow } from "../../rules/sso-engine-provider.rules.ts";
 import type { BackfillAccountRow } from "../identity-backfill.repository.ts";
 import type { IdentifierReservationHolder } from "../identity-reservations.repository.ts";
@@ -72,6 +73,8 @@ export class MemoryIdentityStore {
     authenticatedAtMs: number;
     providerAccountId: string | null;
   }[] = [];
+  /** The identity log: every person's events, in the order they landed. */
+  readonly identityEvents: IdentityEvent[] = [];
   readonly organizationNames = new Map<string, string>();
   readonly organizationAdminEmails = new Map<string, string[]>();
   readonly finalizedUsers = new Set<string>();
@@ -90,6 +93,10 @@ export class MemoryIdentityStore {
 
   findIdentifiersForUser(args: { userId: string }): IdentifierFact[] {
     return [...this.identifiers.values()].filter((fact) => fact.userId === args.userId);
+  }
+
+  findIdentityEvents(args: { userId: string }): IdentityEvent[] {
+    return this.identityEvents.filter((event) => event.aggregateId === args.userId);
   }
 
   static rejectionKey(args: { userId: string; organizationId: string }): string {

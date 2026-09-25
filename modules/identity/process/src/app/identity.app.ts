@@ -85,6 +85,8 @@ import { JoinRequestGuardsService } from "../services/join-request-guards.servic
 import { JoinRequestNotifierService } from "../services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../services/join-request.service.ts";
 import { JoinRequestsService } from "../services/join-requests.service.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
+import { LinkProposalService } from "../services/link-proposal.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
@@ -650,6 +652,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
         history: infrastructure.identityHistory,
         router: setup.dependencies.auth,
         identity: () => identity,
+        links: LinkProposalService.create({
+          guards: LinkProposalGuardsService.create({ proposals: infrastructure.identityHistory }),
+          ledger: infrastructure.ledger,
+        }),
         platformOperators: setup.repositories.ssoPlatformOperators,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.members.rateLimiter,
@@ -659,7 +665,11 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
       pipelines: {
         eventing: identityEventing,
         producer: IdentityProducerPipelines.create({ processName: "identity" }),
-        identity: () => composeIdentityPipeline(setup.repositories),
+        identity: () =>
+          composeIdentityPipeline({
+            repositories: setup.repositories,
+            history: infrastructure.identityHistory,
+          }),
         joinRequests: () =>
           composeJoinRequestPipeline({
             repositories: setup.repositories,
@@ -921,6 +931,22 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
 
   findDomainClaimQueue(input: { operator: IdentityLookupOperator }): Promise<LookupDomainClaim[]> {
     return this.#parts.lookup.findDomainClaimQueue(input);
+  }
+
+  confirmProposedSignIn(input: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    return this.#parts.lookup.confirmProposedSignIn(input);
+  }
+
+  rejectProposedSignIn(input: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    return this.#parts.lookup.rejectProposedSignIn(input);
   }
 
   detachLookupMethod(input: {

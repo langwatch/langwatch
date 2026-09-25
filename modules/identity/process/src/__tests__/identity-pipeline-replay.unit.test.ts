@@ -19,6 +19,7 @@ import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../testing.ts";
 
 const USER = "user_sam";
@@ -110,6 +111,7 @@ describe("identity pipeline", () => {
             reservations: inMemoryIdentityReservations(),
             identifiers: CryptoIdentifierIdentityService.create(),
           }),
+          linkProposalGuards: LinkProposalGuardsService.create({ proposals: null }),
           // Two-step verification rides this same pipeline (D06); this test
           // exercises the identifier half, so its store is never reached.
           mfaProjectionStore: new InMemoryStateStore() as never,

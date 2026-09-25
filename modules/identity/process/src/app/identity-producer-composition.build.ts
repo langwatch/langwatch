@@ -25,6 +25,7 @@ import {
   type IdentityPipeline,
 } from "../eventing/user-identity.pipeline.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
+import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 import type { JoinRequestReadRepository } from "../repositories/join-request.repository.ts";
@@ -40,6 +41,7 @@ import type {
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import { JoinRequestGuardsService } from "../services/join-request-guards.service.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { SsoConnectionGuardsService } from "../services/sso-connection-guards.service.ts";
@@ -81,6 +83,13 @@ export class IdentityProducerPipelines {
           name: "identifier reservations",
         }),
         identifiers: CryptoIdentifierIdentityService.create(),
+      }),
+      linkProposalGuards: LinkProposalGuardsService.create({
+        proposals: producerOnlyReads<IdentityHistoryRepository>({
+          processName: this.processName,
+          pipeline,
+          name: "identity link proposals",
+        }),
       }),
       mfaProjectionStore: new ProducerOnlyStateProjectionStore<MfaFoldState>(
         this.processName,

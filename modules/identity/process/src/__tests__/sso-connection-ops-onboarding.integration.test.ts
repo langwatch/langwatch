@@ -96,6 +96,8 @@ async function onboard(): Promise<void> {
   await service.attestDomain({
     ...commandFor("ssocmd_4"),
     domain: "acme.com",
+    evidenceRef: "SUP-1234",
+    note: "Checked the registrar record",
   });
 }
 
@@ -180,6 +182,8 @@ describe("ops-assisted onboarding", () => {
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
           tokenHash: null,
+          evidenceRef: "SUP-1234",
+          note: "Checked the registrar record",
         },
       ]);
       // And it never reads as a domain the customer proved: the method is a

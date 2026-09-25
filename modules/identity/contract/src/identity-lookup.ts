@@ -176,7 +176,7 @@ export type IdentityLookupOperator = Readonly<{ userId: string }>;
 
 /**
  * The platform operator's identity lookup (D05). Every operation records the
- * act before it gates, and refuses a non-operator with `identity_lookup_not_found`.
+ * act before it gates, and refuses a non-operator with the generic `not_found`.
  */
 export interface IdentityLookupApi {
   lookupAddress(input: {
@@ -192,6 +192,16 @@ export interface IdentityLookupApi {
     operator: IdentityLookupOperator;
   }): Promise<LookupOperatorActivityRow[]>;
   findDomainClaimQueue(input: { operator: IdentityLookupOperator }): Promise<LookupDomainClaim[]>;
+  confirmProposedSignIn(input: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void>;
+  rejectProposedSignIn(input: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void>;
   detachLookupMethod(input: {
     userId: string;
     identifierId: string;

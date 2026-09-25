@@ -64,7 +64,7 @@ function resolveSenders(input: {
 }
 
 /**
- * The thirteen identity verbs, listed once. A list rather than a trusted read of whatever
+ * The fifteen identity verbs, listed once. A list rather than a trusted read of whatever
  * the registration happened to expose, so a command REMOVED from the packaged definition
  * fails this process's boot rather than one person's sign-in ceremony.
  */
@@ -75,6 +75,8 @@ const IDENTITY_COMMAND_NAMES = [
   "detachIdentifier",
   "eraseUser",
   "proposeLink",
+  "confirmLink",
+  "rejectLink",
   "enrollMfa",
   "confirmMfa",
   "expireMfaEnrollment",

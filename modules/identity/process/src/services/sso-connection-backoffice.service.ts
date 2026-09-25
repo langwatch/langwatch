@@ -227,10 +227,14 @@ export class SsoConnectionBackofficeService {
     });
   }
 
-  async attestDomain(args: DomainCommandArgs): Promise<void> {
+  async attestDomain(
+    args: DomainCommandArgs & { evidenceRef: string; note: string },
+  ): Promise<void> {
     await this.deps.connections().attestDomain({
       ...this.command(args),
       domain: args.domain,
+      evidenceRef: args.evidenceRef,
+      note: args.note,
     });
   }
 

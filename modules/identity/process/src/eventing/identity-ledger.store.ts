@@ -6,6 +6,7 @@ import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
+  CONFIRM_LINK_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
   type IdentityCommand,
@@ -14,6 +15,7 @@ import {
   type IdentityFactInput,
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
+  REJECT_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   IDENTITY_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
@@ -69,6 +71,8 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [DETACH_IDENTIFIER_COMMAND_TYPE]: "detachIdentifier",
   [ERASE_USER_COMMAND_TYPE]: "eraseUser",
   [PROPOSE_LINK_COMMAND_TYPE]: "proposeLink",
+  [CONFIRM_LINK_COMMAND_TYPE]: "confirmLink",
+  [REJECT_LINK_COMMAND_TYPE]: "rejectLink",
 };
 
 export interface IdentityLedgerWriterDeps {

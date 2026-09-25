@@ -73,7 +73,10 @@ function recordingDatabase() {
 
 function compose() {
   const recording = recordingDatabase();
-  const pipeline: IdentityPipeline = composeIdentityPipeline(liveRepositories(recording.database));
+  const pipeline: IdentityPipeline = composeIdentityPipeline({
+    repositories: liveRepositories(recording.database),
+    history: null,
+  });
   return { ...recording, pipeline };
 }
 
@@ -153,6 +156,8 @@ describe("composeIdentityPipeline", () => {
         "detachIdentifier",
         "eraseUser",
         "proposeLink",
+        "confirmLink",
+        "rejectLink",
         "enrollMfa",
         "confirmMfa",
         "expireMfaEnrollment",

@@ -21,6 +21,7 @@ import {
 } from "../eventing/mfa.intent.ts";
 import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
 
 const USER = "user_sam";
@@ -182,6 +183,7 @@ describe("two-step verification event aggregate type", () => {
       const declared = defineIdentityPipeline({
         identityProjectionStore: noopStore,
         identityGuards: null as never,
+        linkProposalGuards: LinkProposalGuardsService.create({ proposals: null }),
         mfaProjectionStore: noopStore,
         mfaGuards: MfaGuardsService.create(new EnrollmentOf(ENABLED)),
       }).metadata.aggregateType;

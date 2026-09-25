@@ -11,6 +11,11 @@ import {
   lookupPersonDetailSchema,
 } from "./identity-lookup.ts";
 
+const proposalInputSchema = z.object({
+  userId: z.string().min(1),
+  proposalId: z.string().min(1),
+});
+
 const invitationInputSchema = z.object({
   organizationId: z.string().min(1),
   inviteId: z.string().min(1),
@@ -32,6 +37,14 @@ export const identityLookupTrpc = defineTrpcContract("identityLookup")
   .query("claimQueue")
   .withInput(z.object({}))
   .withOutput(z.array(lookupDomainClaimSchema))
+
+  .mutation("confirmProposedSignIn")
+  .withInput(proposalInputSchema)
+  .withOutput(z.void())
+
+  .mutation("rejectProposedSignIn")
+  .withInput(proposalInputSchema)
+  .withOutput(z.void())
 
   .mutation("detachMethod")
   .withInput(z.object({ userId: z.string().min(1), identifierId: z.string().min(1) }))

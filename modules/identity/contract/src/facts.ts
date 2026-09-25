@@ -21,6 +21,8 @@ export const PRIMARY_CHANGED_EVENT_TYPE = "lw.identity.primary_changed" as const
 export const IDENTIFIER_DETACHED_EVENT_TYPE = "lw.identity.identifier_detached" as const;
 export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
 export const LINK_PROPOSED_EVENT_TYPE = "lw.identity.link_proposed" as const;
+export const LINK_CONFIRMED_EVENT_TYPE = "lw.identity.link_confirmed" as const;
+export const LINK_REJECTED_EVENT_TYPE = "lw.identity.link_rejected" as const;
 
 export const IDENTITY_EVENT_TYPES = [
   IDENTIFIER_ATTACHED_EVENT_TYPE,
@@ -30,6 +32,8 @@ export const IDENTITY_EVENT_TYPES = [
   IDENTIFIER_DETACHED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
+  LINK_CONFIRMED_EVENT_TYPE,
+  LINK_REJECTED_EVENT_TYPE,
 ] as const;
 export type IdentityEventType = (typeof IDENTITY_EVENT_TYPES)[number];
 
@@ -147,6 +151,20 @@ export const linkProposedPayloadSchema = z.object({
   actor: identityActorSchema,
 });
 
+/** A human decided a proposal (ADR-117 §3). Names only the proposal; the address
+ *  stays on the proposal fact, which erasure wipes. */
+export const linkConfirmedPayloadSchema = z.object({
+  proposalId: z.string().min(1),
+  userId: z.string().min(1),
+  actor: identityActorSchema,
+});
+
+export const linkRejectedPayloadSchema = z.object({
+  proposalId: z.string().min(1),
+  userId: z.string().min(1),
+  actor: identityActorSchema,
+});
+
 /**
  * A fact as a command decides it: the type and the payload. The framework
  * envelope and `occurredAt` are stamped by whoever appends, from the command
@@ -180,6 +198,14 @@ export const identifierFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(LINK_PROPOSED_EVENT_TYPE),
     data: linkProposedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(LINK_CONFIRMED_EVENT_TYPE),
+    data: linkConfirmedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(LINK_REJECTED_EVENT_TYPE),
+    data: linkRejectedPayloadSchema,
   }),
 ]);
 export type IdentityFactInput = z.infer<typeof identifierFactInputSchema>;
@@ -248,6 +274,8 @@ export const MARK_PRIMARY_COMMAND_TYPE = "lw.identity.mark_primary" as const;
 export const DETACH_IDENTIFIER_COMMAND_TYPE = "lw.identity.detach_identifier" as const;
 export const ERASE_USER_COMMAND_TYPE = "lw.identity.erase_user" as const;
 export const PROPOSE_LINK_COMMAND_TYPE = "lw.identity.propose_link" as const;
+export const CONFIRM_LINK_COMMAND_TYPE = "lw.identity.confirm_link" as const;
+export const REJECT_LINK_COMMAND_TYPE = "lw.identity.reject_link" as const;
 
 export const IDENTITY_COMMAND_TYPES = [
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -256,6 +284,8 @@ export const IDENTITY_COMMAND_TYPES = [
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
+  CONFIRM_LINK_COMMAND_TYPE,
+  REJECT_LINK_COMMAND_TYPE,
 ] as const;
 export type IdentityCommandType = (typeof IDENTITY_COMMAND_TYPES)[number];
 
@@ -364,6 +394,19 @@ export const proposeLinkCommandDataSchema = userTenantedCommandSchema({
 });
 export type ProposeLinkCommandData = z.infer<typeof proposeLinkCommandDataSchema>;
 
+/** Deciding a proposal names only the proposal and who decided; the assertion is already a fact. */
+const linkDecisionShape = {
+  proposalId: z.string().min(1),
+  occurredAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+};
+
+export const confirmLinkCommandDataSchema = userTenantedCommandSchema(linkDecisionShape);
+export type ConfirmLinkCommandData = z.infer<typeof confirmLinkCommandDataSchema>;
+
+export const rejectLinkCommandDataSchema = userTenantedCommandSchema(linkDecisionShape);
+export type RejectLinkCommandData = z.infer<typeof rejectLinkCommandDataSchema>;
+
 /** One identity command, typed on its verb — what the ledger stages. */
 export type IdentityCommand =
   | { type: typeof ATTACH_IDENTIFIER_COMMAND_TYPE; data: AttachIdentifierCommandData }
@@ -371,4 +414,6 @@ export type IdentityCommand =
   | { type: typeof MARK_PRIMARY_COMMAND_TYPE; data: MarkPrimaryCommandData }
   | { type: typeof DETACH_IDENTIFIER_COMMAND_TYPE; data: DetachIdentifierCommandData }
   | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData }
-  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData };
+  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData }
+  | { type: typeof CONFIRM_LINK_COMMAND_TYPE; data: ConfirmLinkCommandData }
+  | { type: typeof REJECT_LINK_COMMAND_TYPE; data: RejectLinkCommandData };

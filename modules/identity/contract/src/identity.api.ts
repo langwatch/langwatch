@@ -356,6 +356,8 @@ export interface SsoConnectionBackofficeApi {
     connectionId: string;
     operator: IdentityOperatorActor;
     domain: string;
+    evidenceRef: string;
+    note: string;
   }): Promise<void>;
   activateConnection(args: {
     organizationId: string;

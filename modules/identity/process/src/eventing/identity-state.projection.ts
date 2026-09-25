@@ -15,8 +15,12 @@ import {
   identifierDetachedPayloadSchema,
   identifierVerifiedPayloadSchema,
   type IdentityHeads,
+  LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
+  LINK_REJECTED_EVENT_TYPE,
+  linkConfirmedPayloadSchema,
   linkProposedPayloadSchema,
+  linkRejectedPayloadSchema,
   PRIMARY_CHANGED_EVENT_TYPE,
   primaryChangedPayloadSchema,
   reduceIdentity,
@@ -80,6 +84,20 @@ export const linkProposedEventSchema = z.object({
 });
 export type LinkProposedEvent = z.infer<typeof linkProposedEventSchema>;
 
+export const linkConfirmedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(LINK_CONFIRMED_EVENT_TYPE),
+  data: linkConfirmedPayloadSchema,
+});
+export type LinkConfirmedEvent = z.infer<typeof linkConfirmedEventSchema>;
+
+export const linkRejectedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(LINK_REJECTED_EVENT_TYPE),
+  data: linkRejectedPayloadSchema,
+});
+export type LinkRejectedEvent = z.infer<typeof linkRejectedEventSchema>;
+
 export const identityEventSchema = z.discriminatedUnion("type", [
   identifierAttachedEventSchema,
   identifierVerifiedEventSchema,
@@ -88,6 +106,8 @@ export const identityEventSchema = z.discriminatedUnion("type", [
   identifierDetachedEventSchema,
   userErasedEventSchema,
   linkProposedEventSchema,
+  linkConfirmedEventSchema,
+  linkRejectedEventSchema,
 ]);
 export type IdentityEvent = z.infer<typeof identityEventSchema>;
 
@@ -101,6 +121,8 @@ const identityEvents = [
   identifierDetachedEventSchema,
   userErasedEventSchema,
   linkProposedEventSchema,
+  linkConfirmedEventSchema,
+  linkRejectedEventSchema,
 ] as const;
 
 /** The reducer's heads plus the base class's bookkeeping stamps — server
@@ -204,6 +226,20 @@ export class IdentityStateFoldProjection
    */
   handleIdentityLinkProposed(
     event: LinkProposedEvent,
+    state: IdentityFoldState,
+  ): IdentityFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityLinkConfirmed(
+    event: LinkConfirmedEvent,
+    state: IdentityFoldState,
+  ): IdentityFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityLinkRejected(
+    event: LinkRejectedEvent,
     state: IdentityFoldState,
   ): IdentityFoldState {
     return this.fold(event, state);

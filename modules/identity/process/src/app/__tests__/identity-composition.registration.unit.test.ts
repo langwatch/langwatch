@@ -14,6 +14,8 @@ const IDENTITY_VERBS = [
   "detachIdentifier",
   "eraseUser",
   "proposeLink",
+  "confirmLink",
+  "rejectLink",
   "enrollMfa",
   "confirmMfa",
   "expireMfaEnrollment",

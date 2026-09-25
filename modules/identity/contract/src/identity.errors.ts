@@ -25,6 +25,35 @@ export class IdentityIdentifierNotFoundError extends IdentityCommandRefusedError
   }
 }
 
+/** The proposal named is not one this person has, or the operator holds a stale page. */
+export class IdentityLinkProposalNotFoundError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_link_proposal_not_found", "identity_link_proposal_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityLinkProposalNotFoundError";
+  }
+}
+
+/** Somebody already decided this proposal; `meta` names the outcome and who,
+ *  so the second operator can talk to the first. */
+export class IdentityLinkProposalResolvedError extends IdentityCommandRefusedError {
+  constructor(
+    detail: string,
+    decision: { outcome: "confirmed" | "rejected"; byActorId: string | null },
+  ) {
+    super("identity_link_proposal_resolved", "identity_link_proposal_resolved", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { decidedOutcome: decision.outcome, decidedByActorId: decision.byActorId },
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityLinkProposalResolvedError";
+  }
+}
+
 export class IdentityIdentifierNotVerifiableError extends IdentityCommandRefusedError {
   constructor(detail: string) {
     super("identity_identifier_not_verifiable", "identity_identifier_not_verifiable", {
@@ -901,18 +930,5 @@ export class ScimSyncNotFoundError extends NotFoundError {
   constructor(scimSyncId: string) {
     super("scim_sync_not_found", "SCIM sync", scimSyncId, { meta: { scimSyncId } });
     this.name = "ScimSyncNotFoundError";
-  }
-}
-
-/**
- * The identity lookup, refused: a 404 so the surface does not confirm it exists
- * to a caller outside the ADMIN_EMAILS staff list. No identifying fields.
- */
-export class IdentityLookupNotFoundError extends HandledError {
-  declare readonly code: "identity_lookup_not_found";
-
-  constructor() {
-    super("identity_lookup_not_found", "Not found", { httpStatus: 404, fault: "customer" });
-    this.name = "IdentityLookupNotFoundError";
   }
 }

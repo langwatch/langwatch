@@ -66,7 +66,10 @@ describe("given a process that produces identity commands without consuming them
       const producer = IdentityProducerPipelines.create({
         processName: PROCESS_NAME,
       }).identityPipeline();
-      const consumer = composeIdentityPipeline(liveRepositories(prismaDouble({})));
+      const consumer = composeIdentityPipeline({
+        repositories: liveRepositories(prismaDouble({})),
+        history: null,
+      });
 
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));
       expect(producer.aggregate.type).toBe(consumer.aggregate.type);

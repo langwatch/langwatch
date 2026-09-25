@@ -40,6 +40,8 @@ const identity = {
   source: "self-serve" as const,
 };
 
+const EVIDENCE = { evidenceRef: "SUP-1234", note: "Checked the registrar record" };
+
 const IDP = {
   issuer: "https://login.acme.okta.com",
   providerId: "okta",
@@ -105,7 +107,7 @@ describe("operator attestation", () => {
     /** @scenario "An operator attests a domain instead of waiting for a record" */
     it("verifies the domain with nothing published, naming the operator and the time", async () => {
       const { facts, state } = await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       );
 
       expect(facts).toHaveLength(1);
@@ -113,6 +115,8 @@ describe("operator attestation", () => {
       expect(facts[0]!.data).toMatchObject({
         connectionId: CONNECTION,
         domain: "acme.com",
+        evidenceRef: EVIDENCE.evidenceRef,
+        note: EVIDENCE.note,
         actor: OLIVE,
       });
       // Nothing was published, so nothing was hashed: an attestation carries
@@ -134,6 +138,8 @@ describe("operator attestation", () => {
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
           tokenHash: null,
+          evidenceRef: EVIDENCE.evidenceRef,
+          note: EVIDENCE.note,
         },
       ]);
     });
@@ -141,7 +147,7 @@ describe("operator attestation", () => {
     /** @scenario "An organization administrator can never attest their own domain" */
     it("refuses an organization administrator and states no fact", async () => {
       await expect(
-        guards.attestDomain({ ...identity, actor: ANA, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: ANA, domain: "acme.com" }),
       ).rejects.toMatchObject({
         code: "sso_connection_operator_act_required",
       });
@@ -170,7 +176,7 @@ describe("operator attestation", () => {
       // self-hosted installation's platform operator is a platform operator,
       // and its organization administrator is not.
       const { facts, state } = await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       );
       expect(state.state).toBe("VERIFIED");
       expect(facts[0]!.data).toMatchObject({ actor: OLIVE });
@@ -210,6 +216,7 @@ describe("operator attestation", () => {
       await expect(
         guards.attestDomain({
           ...second,
+          ...EVIDENCE,
           actor: ANA,
           domain: "other.example",
         }),
@@ -220,7 +227,9 @@ describe("operator attestation", () => {
 
     /** @scenario "An attestation stands until somebody decides otherwise" */
     it("still verifies and still routes a year later, with nothing asking again", async () => {
-      await run(() => guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }));
+      await run(() =>
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
+      );
       const { state } = await run(
         () =>
           guards.activateConnection({
@@ -253,6 +262,8 @@ describe("operator attestation", () => {
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
           tokenHash: null,
+          evidenceRef: EVIDENCE.evidenceRef,
+          note: EVIDENCE.note,
         },
       ]);
 
@@ -273,7 +284,7 @@ describe("operator attestation", () => {
     /** @scenario "A disputed attested domain is answered by suspending, not by expiring" */
     it("stops routing the moment an operator suspends, with the whole story readable", async () => {
       const attested = await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       );
       await run(() =>
         guards.activateConnection({
@@ -319,6 +330,8 @@ describe("operator attestation", () => {
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
           tokenHash: null,
+          evidenceRef: EVIDENCE.evidenceRef,
+          note: EVIDENCE.note,
         },
       ]);
     });
@@ -330,7 +343,7 @@ describe("operator attestation", () => {
     /** @scenario "Attestation replaces the proof and never the approval" */
     it("refuses the attestation, states no fact, and admits it once the claim is approved", async () => {
       await expect(
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       ).rejects.toMatchObject({
         code: "sso_connection_invalid_transition",
       });
@@ -352,7 +365,7 @@ describe("operator attestation", () => {
         }),
       );
       const { state } = await run(() =>
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       );
       expect(state.state).toBe("VERIFIED");
     });
@@ -384,7 +397,7 @@ describe("operator attestation", () => {
     /** @scenario "An attested domain cannot take one another ACTIVE connection holds" */
     it("refuses the attestation exactly as any other method is refused", async () => {
       await expect(
-        guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
       ).rejects.toMatchObject({ code: "sso_connection_domain_taken" });
 
       // The same code the DNS ceremony is refused with, from the same check:
@@ -415,7 +428,9 @@ describe("operator attestation", () => {
     /** @scenario "Which tier a connection came through stays readable afterwards" */
     it("names each domain's method and who authorized it, on the connection itself", async () => {
       await reachApproved();
-      await run(() => guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }));
+      await run(() =>
+        guards.attestDomain({ ...identity, ...EVIDENCE, actor: OLIVE, domain: "acme.com" }),
+      );
 
       // Another organization's connection, whose domain the customer proved.
       const proved = {
@@ -479,6 +494,8 @@ describe("operator attestation", () => {
           firstAbsentAtMs: null,
           graceEndsAtMs: null,
           tokenHash: null,
+          evidenceRef: EVIDENCE.evidenceRef,
+          note: EVIDENCE.note,
         },
       ]);
       expect(published?.domainVerifications).toEqual([

@@ -109,6 +109,7 @@ function serviceFor({
     router: fakeRouter(),
     history: new EmptyIdentityHistory(),
     identity: () => createApiFixture<Pick<IdentityService, "detachIdentifier">>({}),
+    links: createApiFixture<IdentityLookupServiceDeps["links"]>({}),
     sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
       listBrowserSessions: async () => [],
     }),
@@ -148,7 +149,7 @@ describe("IdentityLookupService", () => {
       for (let attempt = 0; attempt < 4; attempt++) {
         await expect(
           service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-        ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+        ).rejects.toMatchObject({ code: "not_found" });
       }
 
       expect(auditLog.rows).toHaveLength(2);
@@ -160,10 +161,10 @@ describe("IdentityLookupService", () => {
 
       await expect(
         service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+      ).rejects.toMatchObject({ code: "not_found" });
       await expect(
         service.lookupAddress({ address: "sam@acme.com", operator: MALLORY }),
-      ).rejects.toMatchObject({ code: "identity_lookup_not_found" });
+      ).rejects.toMatchObject({ code: "not_found" });
     });
   });
 

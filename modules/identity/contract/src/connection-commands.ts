@@ -7,6 +7,8 @@ import {
   ssoDomainClaimAuthoritySchema,
   ssoIdpMetadataSchema,
   ssoMigrationRouteSchema,
+  ssoAttestationEvidenceRefSchema,
+  ssoAttestationNoteSchema,
   ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection.ts";
@@ -227,7 +229,12 @@ export type RequestVerificationCommandData = z.infer<typeof requestVerificationC
  * Domain attestation command (D05 tier 1): carries domain only; authorization checked via port.
  */
 export const attestDomainCommandDataSchema = commandDataSchema(
-  z.object({ ...commandIdentitySchema.shape, ...domainShape }),
+  z.object({
+    ...commandIdentitySchema.shape,
+    ...domainShape,
+    evidenceRef: ssoAttestationEvidenceRefSchema,
+    note: ssoAttestationNoteSchema,
+  }),
 );
 export type AttestDomainCommandData = z.infer<typeof attestDomainCommandDataSchema>;
 

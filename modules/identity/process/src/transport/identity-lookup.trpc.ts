@@ -60,6 +60,20 @@ export const identityLookupTrpcTransport = defineTrpcRouter(IdentityLookupApi, i
     app.findDomainClaimQueue({ operator: operatorOf(operator, actor) }),
   )
 
+  .procedure("confirmProposedSignIn")
+  .withFacts(operatorFact)
+  .noPermission(NO_PERMISSION)
+  .handle(({ app, input, actor }, operator) =>
+    app.confirmProposedSignIn({ ...input, operator: operatorOf(operator, actor) }),
+  )
+
+  .procedure("rejectProposedSignIn")
+  .withFacts(operatorFact)
+  .noPermission(NO_PERMISSION)
+  .handle(({ app, input, actor }, operator) =>
+    app.rejectProposedSignIn({ ...input, operator: operatorOf(operator, actor) }),
+  )
+
   .procedure("detachMethod")
   .withFacts(operatorFact)
   .noPermission(NO_PERMISSION)

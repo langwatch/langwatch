@@ -6,7 +6,6 @@ import {
   IDENTITY_LOOKUP_HISTORY_LIMIT,
   IdentityCapabilityUnavailableError,
   type IdentityLookupAnswer,
-  IdentityLookupNotFoundError,
   type IdentityLookupOperator,
   type LookupDomainClaim,
   type LookupIdentifier,
@@ -20,6 +19,7 @@ import {
   OPERATOR_ACTIVITY_LIMIT,
   routingIdentifierOf,
 } from "@langwatch/identity-contract";
+import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
 import { Temporal } from "@langwatch/time";
@@ -33,6 +33,7 @@ import type {
 import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
 import { newIdentityCommandId } from "../rules/identity-command-id.rules.ts";
 import type { IdentityService } from "./identity.service.ts";
+import type { LinkProposalService } from "./link-proposal.service.ts";
 
 export interface IdentityLookupServiceDeps {
   reads: IdentityLookupRepository;
@@ -41,6 +42,7 @@ export interface IdentityLookupServiceDeps {
   /** The auth screens' own router, so this answer cannot drift from theirs. */
   router: Pick<AuthApi, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
+  links: Pick<LinkProposalService, "confirmLink" | "rejectLink">;
   platformOperators: SsoPlatformOperatorRepository;
   auditLog: AuditLogApi;
   rateLimiter: RateLimiter;
@@ -178,6 +180,46 @@ export class IdentityLookupService {
     return this.nameOrganizations({ claims: rows });
   }
 
+  /** Straight through to the guard, which refuses a proposal already decided. */
+  async confirmProposedSignIn({
+    userId,
+    proposalId,
+    operator,
+  }: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    await this.recorded({
+      operator,
+      action: "confirmProposedSignIn",
+      args: { userId, proposalId },
+      targetId: userId,
+    });
+    await this.deps.links.confirmLink({
+      ...this.operatorCommand({ userId, operator }),
+      proposalId,
+    });
+  }
+
+  async rejectProposedSignIn({
+    userId,
+    proposalId,
+    operator,
+  }: {
+    userId: string;
+    proposalId: string;
+    operator: IdentityLookupOperator;
+  }): Promise<void> {
+    await this.recorded({
+      operator,
+      action: "rejectProposedSignIn",
+      args: { userId, proposalId },
+      targetId: userId,
+    });
+    await this.deps.links.rejectLink({ ...this.operatorCommand({ userId, operator }), proposalId });
+  }
+
   /** Straight through to the guard, which refuses to strand somebody. */
   async detachLookupMethod({
     userId,
@@ -194,15 +236,9 @@ export class IdentityLookupService {
       args: { userId, identifierId },
       targetId: userId,
     });
-    // The subject's user id is the tenant; the operator is the actor.
-    await this.deps.identity().detachIdentifier({
-      tenantId: userId,
-      userId,
-      commandId: newIdentityCommandId(),
-      occurredAtMs: this.now(),
-      actor: { type: "user", id: operator.userId },
-      identifierId,
-    });
+    await this.deps
+      .identity()
+      .detachIdentifier({ ...this.operatorCommand({ userId, operator }), identifierId });
   }
 
   async endLookupSessions({
@@ -295,7 +331,30 @@ export class IdentityLookupService {
         targetId,
       });
     }
-    if (!isOperator) throw new IdentityLookupNotFoundError();
+    if (!isOperator) throw new AdminSurfaceHiddenError();
+  }
+
+  /** The subject's user id is the tenant; the operator is the actor. */
+  private operatorCommand({
+    userId,
+    operator,
+  }: {
+    userId: string;
+    operator: IdentityLookupOperator;
+  }): {
+    tenantId: string;
+    userId: string;
+    commandId: string;
+    occurredAtMs: number;
+    actor: { type: "user"; id: string };
+  } {
+    return {
+      tenantId: userId,
+      userId,
+      commandId: newIdentityCommandId(),
+      occurredAtMs: this.now(),
+      actor: { type: "user", id: operator.userId },
+    };
   }
 
   private async withinAttemptBudget(userId: string): Promise<boolean> {

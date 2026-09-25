@@ -394,6 +394,8 @@ export class SsoConnectionGuardsService {
         data: {
           connectionId: data.connectionId,
           domain,
+          evidenceRef: data.evidenceRef,
+          note: data.note,
           actor: data.actor,
           source: data.source,
         },
