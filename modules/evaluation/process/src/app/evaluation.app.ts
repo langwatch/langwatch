@@ -407,6 +407,7 @@ export class EvaluationApp implements EvaluationApiContract {
         inputResolution: inputs,
         environment,
         report: commands,
+        runner: { runEvaluation: (input) => execution.executeForData(input) },
       },
       dependencies,
       repositories,

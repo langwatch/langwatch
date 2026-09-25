@@ -78,6 +78,7 @@ export {
 export function simulationRunExecutionPM(
   execution: ScenarioExecutionService,
   simulations: SimulationService,
+  resolveEvaluatorNames?: Parameters<typeof createRecordEvaluationsHandler>[1],
 ): ProcessManagerApplier<SimulationProcessingEvent> {
   return (pm) =>
     pm
@@ -100,7 +101,7 @@ export function simulationRunExecutionPM(
       .intent(
         SIMULATION_RUN_EXECUTION_INTENT_TYPES.RECORD_EVALUATIONS,
         recordEvaluationsIntentSchema,
-        createRecordEvaluationsHandler(simulations),
+        createRecordEvaluationsHandler(simulations, resolveEvaluatorNames),
       )
       .on(SIMULATION_RUN_EVENT_TYPES.QUEUED, handleRunQueued)
       .on(SIMULATION_RUN_EVENT_TYPES.STARTED, handleRunActivity)

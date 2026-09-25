@@ -29,6 +29,7 @@ import {
 import type { ScenarioApp } from "../app/scenario.app.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
+import { QueueRunCommand } from "./queue-run.commands.ts";
 import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
 import { SimulationProcessingCommandsAdapter } from "./simulation-processing.commands.ts";
 import {
@@ -60,10 +61,12 @@ export interface SimulationProcessingPipelineDeps {
    * adapter to hand — naming the concrete class here blocked it registering at all.
    */
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  queueRunCommand: QueueRunCommand;
   finishRunCommand: FinishRunCommand;
   recordEvaluationsCommand: RecordEvaluationsCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
   scenarioRunExecution: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
+  scenarioEvaluations: { name: string; process: ProcessManagerApplier<SimulationProcessingEvent> };
   simulations: SimulationService;
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
@@ -112,7 +115,8 @@ function buildSimulationProcessingPipelineDefinition(
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
     .withProcessManager(deps.scenarioRunExecution.name, deps.scenarioRunExecution.process)
-    .withCommand("queueRun", commands.queueRun)
+    .withProcessManager(deps.scenarioEvaluations.name, deps.scenarioEvaluations.process)
+    .withCommandInstance("queueRun", QueueRunCommand, deps.queueRunCommand)
     .withCommand("startRun", commands.startRun)
     .withCommand("messageSnapshot", commands.messageSnapshot)
     .withCommand("textMessageStart", commands.textMessageStart)

@@ -37,3 +37,10 @@ Feature: Suite service
     When a caller archives that suite
     Then the suite boundary reports suite_not_found
 
+  @unit
+  Scenario: A run's evaluators are its test suite's, then its plan's own, each listed once
+    Given a scenario filed in a test suite that was archived after the run was queued
+    And the run plan the run was filed under attaches evaluators of its own
+    When the evaluators the run carries are read
+    Then the test suite's attachments come first, then the plan's
+    And an evaluator attached on both sides is listed once, as the suite's copy

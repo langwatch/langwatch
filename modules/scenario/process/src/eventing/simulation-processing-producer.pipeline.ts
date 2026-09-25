@@ -15,7 +15,12 @@ import { NullSimulationRepository } from "../repositories/simulation.repository.
 import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
 import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "./finish-run.commands.ts";
+import { QueueRunCommand } from "./queue-run.commands.ts";
 import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
+import {
+  SCENARIO_EVALUATIONS_PROCESS_NAME,
+  scenarioEvaluationsPM,
+} from "./scenario-evaluations.process.ts";
 import {
   SimulationProcessingPipelineAdapter,
   type SimulationProcessingPipelineDefinition,
@@ -157,6 +162,9 @@ function buildSimulationProcessingProducerPipeline(input: {
     execution,
   );
 
+  const refuseGrading = () =>
+    Promise.reject(producerOnly(processName, "grade a finished scenario run"));
+
   return SimulationProcessingPipelineAdapter.create({
     simulationRunStore: new ProducerOnlyFoldStore<SimulationRunStateData>(
       processName,
@@ -166,6 +174,7 @@ function buildSimulationProcessingProducerPipeline(input: {
       processName,
       "simulation run metrics",
     ),
+    queueRunCommand: new QueueRunCommand(),
     finishRunCommand: new FinishRunCommand({
       loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
     }),
@@ -184,6 +193,21 @@ function buildSimulationProcessingProducerPipeline(input: {
         new ProducerOnlyScenarioExecution(processName),
         simulations,
       ),
+    },
+    scenarioEvaluations: {
+      name: SCENARIO_EVALUATIONS_PROCESS_NAME,
+      process: scenarioEvaluationsPM({
+        loadPriorEvents: refuseGrading,
+        evaluations: {
+          scenarios: { getById: refuseGrading },
+          suites: { getRunAttachments: refuseGrading, getAttachedEvaluators: refuseGrading },
+          runs: { getRunState: refuseGrading },
+          spans: { getSpansByTraceId: refuseGrading },
+          runEvaluation: refuseGrading,
+          reportEvaluation: refuseGrading,
+          recordEvaluations: refuseGrading,
+        },
+      }),
     },
     simulations,
     snapshotUpdateBroadcast: {

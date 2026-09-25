@@ -35,6 +35,13 @@ Feature: Evaluation service boundary
     When a caller requests that run
     Then EvaluationNotFoundError is thrown
 
+  @unit
+  Scenario: An installed evaluation module runs an evaluator over data it is handed
+    Given a process that installs the evaluation feature
+    When a caller runs an evaluator over data it holds, with no trace behind it
+    Then the evaluator runtime answers with the evaluator's result
+    And the call is never refused for want of a composed runtime
+
   Scenario: API and workers share the same service
     Given the process has composed one Evaluation service
     When an API handler or worker reads a run

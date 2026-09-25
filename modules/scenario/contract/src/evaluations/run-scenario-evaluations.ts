@@ -108,7 +108,7 @@ export interface RunScenarioEvaluationsDeps {
 
 /**
  * Thrown when a mapping reads the trace and the spans have not arrived yet.
- * The job catches it and queues itself again with a delay.
+ * Grading throws it so the outbox retries the attempt after a growing delay.
  */
 export class TraceDataPendingError extends Error {
   constructor(details: string) {

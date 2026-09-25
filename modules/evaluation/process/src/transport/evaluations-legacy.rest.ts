@@ -521,7 +521,7 @@ async function evaluateDataset({
     app.runEvaluator({
       projectId,
       data,
-      evaluatorType: checkType as EvaluatorTypes,
+      evaluatorType: checkType,
       settings: (settings as Record<string, unknown>) ?? {},
     }),
   );
@@ -900,7 +900,7 @@ async function runAndReport({
   const runEval = () =>
     app.runEvaluator({
       projectId,
-      evaluatorType: checkType as EvaluatorTypes,
+      evaluatorType: checkType,
       data,
       settings,
     });

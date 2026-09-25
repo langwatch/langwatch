@@ -142,7 +142,7 @@ export function createVoiceCallRunWriter(
 
     // No results envelope: the verdict is not decided here. The run is
     // finished SUCCESS with the scenario id named on the event, so the
-    // scenario-evaluations subscriber grades the transcript against the
+    // scenario_evaluations process manager grades the transcript against the
     // scenario's attached evaluators (AC23): exactly the path a simulated
     // run's finish takes.
     await collaborators.simulations.finishRun({

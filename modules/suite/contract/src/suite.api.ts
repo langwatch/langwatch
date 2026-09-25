@@ -1,5 +1,7 @@
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type {
+  EvaluatorAttachment,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
   ScenarioTestSuiteIdInput,
@@ -75,6 +77,20 @@ export interface SuiteApi {
   completeSuiteRunItem(input: CompleteSuiteRunItemCommandData): Promise<void>;
   /** A finished run's verdict changed after the fact; `idempotencyKey` names the change. */
   regradeSuiteRunItem(input: RegradeSuiteRunItemCommandData): Promise<void>;
+  /**
+   * The evaluators one run carries: the test suite's, then the plan's own, an
+   * evaluator on both listed once. An archived suite or plan still answers.
+   */
+  getRunAttachments(input: {
+    projectId: string;
+    suiteId?: string | null;
+    planId?: string | null;
+  }): Promise<EvaluatorAttachment[]>;
+  /** The saved evaluators the attachments name, with their fields, by id; unknown ids left out. */
+  getAttachedEvaluators(input: {
+    projectId: string;
+    attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
+  }): Promise<Map<string, EvaluatorWithFields>>;
   /**
    * The platform's own address for one suite resource, from the project's
    * slug and the path already resolved — the three suite REST declarations

@@ -4,7 +4,11 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { EvaluatorApi, type EvaluatorApi as EvaluatorApiType } from "@langwatch/evaluator-contract";
+import {
+  EvaluatorApi,
+  type EvaluatorApi as EvaluatorApiType,
+  type EvaluatorWithFields,
+} from "@langwatch/evaluator-contract";
 import {
   RepositoryFoldStore,
   type EventingCommands,
@@ -17,6 +21,7 @@ import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-co
 import {
   ScenarioApi,
   ScenarioTestSuiteNotFoundError,
+  type EvaluatorAttachment,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
   type ScenarioRunConfig,
@@ -267,6 +272,21 @@ export class SuiteApp implements SuiteApi {
 
   regradeSuiteRunItem(input: RegradeSuiteRunItemCommandData): Promise<void> {
     return this.#runItems.regradeSuiteRunItem(input);
+  }
+
+  getRunAttachments(input: {
+    projectId: string;
+    suiteId?: string | null;
+    planId?: string | null;
+  }): Promise<EvaluatorAttachment[]> {
+    return this.#dependencies.suites.getRunAttachments(input);
+  }
+
+  getAttachedEvaluators(input: {
+    projectId: string;
+    attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
+  }): Promise<Map<string, EvaluatorWithFields>> {
+    return this.#dependencies.suites.getAttachedEvaluators(input);
   }
 
   // -- reads -----------------------------------------------------------------

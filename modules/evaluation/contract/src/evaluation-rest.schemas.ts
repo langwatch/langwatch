@@ -3,7 +3,6 @@
  * wire schemas those doors publish stay beside their declaration; these are the
  * shapes the operations themselves take.
  */
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import type { ESBatchEvaluationRESTParams } from "@langwatch/experiment-contract";
 
 /**
@@ -11,7 +10,7 @@ import type { ESBatchEvaluationRESTParams } from "@langwatch/experiment-contract
  * the six canonical fields, a custom or code evaluator whatever it declares.
  */
 export type EvaluationDispatchData =
-  | Readonly<{ type: "default"; data: Record<string, string | number | undefined | null> }>
+  | Readonly<{ type: "default"; data: Record<string, unknown> }>
   | Readonly<{ type: "custom"; data: Record<string, unknown> }>;
 
 /** One saved or configured monitor, as the evaluate doors read it. */
@@ -41,9 +40,11 @@ export type EvaluationSlugMatch = Readonly<{ id: string }>;
 /** Running one evaluator over one input. */
 export type RunEvaluatorInput = Readonly<{
   projectId: string;
-  evaluatorType: EvaluatorTypes;
+  /** A built-in evaluator type, `custom/<workflowId>` or `code/<evaluatorId>`. */
+  evaluatorType: string;
   data: EvaluationDispatchData;
   settings: Record<string, unknown>;
+  workflowId?: string | null;
 }>;
 
 /** Which model the project's cascade resolves for one feature key. */

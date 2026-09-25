@@ -6,7 +6,11 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import type { EvaluatorAttachment, ScenarioApi } from "@langwatch/scenario-contract";
+import type {
+  EvaluatorAttachment,
+  ScenarioApi,
+  ScenarioTestSuite,
+} from "@langwatch/scenario-contract";
 import type { RunPlanConfigInput } from "@langwatch/suite-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -52,11 +56,36 @@ const config: RunPlanConfigInput = {
   scenarioIds: ["scenario-1"],
 };
 
+function archivedTestSuite(evaluators: EvaluatorAttachment[]): ScenarioTestSuite {
+  return {
+    id: "suite-1",
+    projectId,
+    name: "Checkout",
+    slug: "checkout",
+    description: null,
+    scenarioIds: [],
+    targets: [],
+    repeatCount: 1,
+    labels: [],
+    simulatorModel: null,
+    judgeModel: null,
+    kind: "test_suite",
+    scope: null,
+    fields: [],
+    evaluators,
+    archivedAt: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
+
 let database: MemorySuiteDatabase;
 let service: SuiteService;
+let testSuites: ScenarioTestSuite[];
 
 beforeEach(() => {
   database = MemorySuiteDatabase.create();
+  testSuites = [];
   const references = async ({ ids }: { ids: string[] }) =>
     ids.map((id) => ({ id, archivedAt: null }));
   service = SuiteService.create({
@@ -64,7 +93,8 @@ beforeEach(() => {
     scenarios: createApiFixture<ScenarioApi>({
       findTestSuite: async () => null,
       list: async () => [],
-      listTestSuites: async () => [],
+      listTestSuites: async ({ includeArchived }) =>
+        testSuites.filter((suite) => includeArchived || !suite.archivedAt),
       getReferenceStates: references,
       resolveRunParametersForScenarios: async () => [],
       getRunConfigs: async ({ ids }) =>
@@ -180,6 +210,58 @@ describe("a run plan's own evaluators", () => {
           fields: [{ identifier: "golden", type: "text" }],
         }),
       ).rejects.toMatchObject({ code: "validation_error" });
+    });
+  });
+});
+
+describe("the evaluators one run carries", () => {
+  describe("when the run's test suite is archived and its plan attaches its own", () => {
+    /** @scenario "A run's evaluators are its test suite's, then its plan's own, each listed once" */
+    it("lists the suite's first, then the plan's", async () => {
+      const suiteCopy = { ...attachment("evaluator-2"), id: "suite-attachment" };
+      testSuites = [archivedTestSuite([suiteCopy])];
+      const { suiteId: planId } = await runPlan([attachment("evaluator-1")]);
+
+      await expect(
+        service.getRunAttachments({ projectId, suiteId: "suite-1", planId }),
+      ).resolves.toEqual([suiteCopy, attachment("evaluator-1")]);
+    });
+  });
+
+  describe("when the suite and the plan attach the same evaluator", () => {
+    /** @scenario "A run's evaluators are its test suite's, then its plan's own, each listed once" */
+    it("keeps the suite's copy only", async () => {
+      const suiteCopy = { ...attachment("evaluator-1"), id: "suite-attachment" };
+      testSuites = [archivedTestSuite([suiteCopy])];
+      const { suiteId: planId } = await runPlan([attachment("evaluator-1")]);
+
+      await expect(
+        service.getRunAttachments({ projectId, suiteId: "suite-1", planId }),
+      ).resolves.toEqual([suiteCopy]);
+    });
+  });
+
+  describe("when the run names neither a suite nor a plan", () => {
+    it("carries no evaluators", async () => {
+      await expect(
+        service.getRunAttachments({ projectId, suiteId: null, planId: null }),
+      ).resolves.toEqual([]);
+    });
+  });
+});
+
+describe("the saved evaluators a run's attachments name", () => {
+  describe("when one attachment names an evaluator the project no longer holds", () => {
+    it("answers the ones it holds, by id, and leaves the other out", async () => {
+      const evaluators = await service.getAttachedEvaluators({
+        projectId,
+        attachments: [attachment("evaluator-1"), attachment("evaluator-gone")],
+      });
+
+      expect([...evaluators.keys()]).toEqual(["evaluator-1"]);
+      expect(evaluators.get("evaluator-1")?.fields).toEqual([
+        { identifier: "output", type: "str" },
+      ]);
     });
   });
 });

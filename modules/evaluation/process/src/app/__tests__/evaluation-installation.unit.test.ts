@@ -33,7 +33,7 @@ function process(role: "api" | "worker") {
         getExecutionProviders: async () => ({}),
       }),
       "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluator: createApiFixture<EvaluatorApi>(),
+      evaluator: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
       monitor: createApiFixture<MonitorApi>(),
       automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
@@ -61,5 +61,28 @@ describe("given a process that installs the evaluation feature", () => {
         await runtime.stop();
       }
     });
+  });
+
+  describe("when a caller runs an evaluator over data it holds", () => {
+    /** @scenario "An installed evaluation module runs an evaluator over data it is handed" */
+    it.each(["api", "worker"] as const)(
+      "answers with the evaluator's result in the %s role",
+      async (role) => {
+        const runtime = await process(role).boot();
+
+        try {
+          const result = await runtime.service(EvaluationApi).runEvaluator({
+            projectId: "project-1",
+            evaluatorType: "langevals/exact_match",
+            data: { type: "default", data: { output: "yes", expected_output: "yes" } },
+            settings: {},
+          });
+
+          expect(["processed", "skipped", "error"]).toContain(result.status);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
   });
 });

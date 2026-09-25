@@ -9,6 +9,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -224,6 +225,8 @@ export const scenarioAppDependencyTokens = {
   retention: DataRetentionApi,
   /** Where a suite set's scenario runs are recorded against their suite run. */
   suites: SuiteApi,
+  /** Runs and reports the evaluators a finished run is graded with. */
+  evaluations: EvaluationApi,
   /** A run's prompt, secret and workflow targets, resolved before its child starts. */
   prompts: PromptApi,
   secrets: SecretApi,
@@ -378,6 +381,18 @@ export class ScenarioApp implements ScenarioApi {
           regradeSuiteRunItem: (data) => setup.dependencies.suites.regradeSuiteRunItem(data),
         },
         snapshotUpdates: undeliveredSnapshotUpdates(),
+        grading: {
+          scenarios: { getById: (input) => scenarios.getById(input) },
+          suites: {
+            getRunAttachments: (input) => setup.dependencies.suites.getRunAttachments(input),
+            getAttachedEvaluators: (input) =>
+              setup.dependencies.suites.getAttachedEvaluators(input),
+          },
+          evaluations: {
+            runEvaluator: (input) => setup.dependencies.evaluations.runEvaluator(input),
+            reportEvaluation: (data) => setup.dependencies.evaluations.reportEvaluation(data),
+          },
+        },
         executor: ScenarioExecutorService.create({
           peers: setup.dependencies,
           scenarios,

@@ -11900,6 +11900,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
+      '@langwatch/evaluation-contract':
+        specifier: workspace:*
+        version: link:../../evaluation/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../packages/eventing

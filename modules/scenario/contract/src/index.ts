@@ -51,6 +51,18 @@ export * from "./simulation-run.schemas.ts";
 export * from "./evaluator-attachments.ts";
 export * from "./suite-fields.ts";
 export * from "./evaluations/types.ts";
+export {
+  backoffDelayMs,
+  isFinalAttempt,
+  SCENARIO_EVALUATIONS_JOB,
+} from "./evaluations/constants.ts";
+export {
+  loadRunAttachments,
+  runScenarioEvaluations,
+  TraceDataPendingError,
+  type RunScenarioEvaluationsDeps,
+  type ScenarioRunState,
+} from "./evaluations/run-scenario-evaluations.ts";
 export * from "./scenario-field-values.ts";
 export * from "./scenario-evaluation-gate.ts";
 export * from "./voice/caller-voice.config.ts";

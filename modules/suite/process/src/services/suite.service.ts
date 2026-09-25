@@ -1,5 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@langwatch/scenario-contract";
 import {
   createSuiteCommandSchema,
+  mergeRunAttachments,
   readEvaluatorAttachments,
   suiteArchivedNamesInputSchema,
   suiteIdInputSchema,
@@ -158,6 +159,45 @@ export class SuiteService {
       ...(slug === undefined ? {} : { slug }),
       ...(checked === undefined ? {} : { evaluators: checked }),
     });
+  }
+
+  /**
+   * The attachments one run carries: the test suite's, then the plan's own, each evaluator
+   * once. An archived row still answers, so a run reads what it was queued with.
+   */
+  async getRunAttachments(input: {
+    projectId: string;
+    suiteId?: string | null;
+    planId?: string | null;
+  }): Promise<EvaluatorAttachment[]> {
+    const { projectId, suiteId, planId } = input;
+    const [testSuites, planAttachments] = await Promise.all([
+      suiteId
+        ? this.options.scenarios.listTestSuites({ projectId, includeArchived: true })
+        : Promise.resolve([]),
+      planId
+        ? this.options.repository.findPlanEvaluators({ projectId, id: planId })
+        : Promise.resolve([]),
+    ]);
+    const testSuite = testSuites.find((candidate) => candidate.id === suiteId);
+    return mergeRunAttachments({
+      suiteAttachments: testSuite?.evaluators ?? [],
+      planAttachments,
+    });
+  }
+
+  /** The saved evaluators the attachments name, with their fields, by id; unknown ids left out. */
+  async getAttachedEvaluators(input: {
+    projectId: string;
+    attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
+  }): Promise<Map<string, EvaluatorWithFields>> {
+    const ids = [...new Set(input.attachments.map((attachment) => attachment.evaluatorId))];
+    const rows = await Promise.all(
+      ids.map((id) =>
+        this.options.evaluators.findByIdWithFields({ id, projectId: input.projectId }),
+      ),
+    );
+    return new Map(rows.flatMap((row) => (row ? [[row.id, row] as const] : [])));
   }
 
   /**
