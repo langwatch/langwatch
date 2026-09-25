@@ -135,12 +135,15 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 
 	describe("given a langwatch block that still carries the legacy OTEL_LOG_RAW_API_BODIES", () => {
 		it("strips the legacy flag on refresh, keeping the rest of the block", () => {
-			// A block written by an older CLI: current wiring plus the flag we
-			// no longer set (#8284). Refresh must remove it on upgrade even
-			// though the current vars are otherwise all present.
+			// A block written by a pre-#8284 CLI: the wiring of the day, which
+			// set RAW_API_BODIES and did not yet know OTEL_LOG_ASSISTANT_RESPONSES.
+			// Refresh must migrate it in one go: drop the legacy flag and add
+			// the replacement.
+			const { OTEL_LOG_ASSISTANT_RESPONSES: _new, ...preMigration } =
+				currentClaudeVars();
 			const target = appSettingsTargetFor("claude")!;
 			installAppEnv(target, {
-				...currentClaudeVars(),
+				...preMigration,
 				OTEL_LOG_RAW_API_BODIES: "1",
 			});
 
@@ -153,6 +156,45 @@ describe("refreshClaudeUserTelemetryEnv", () => {
 			expect(after.env.OTEL_LOG_RAW_API_BODIES).toBeUndefined();
 			expect(after.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
 			expect(after.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(CURRENT_ENDPOINT);
+		});
+	});
+
+	describe("given a migrated block where the user opted back into OTEL_LOG_RAW_API_BODIES", () => {
+		/** @scenario "A raw-body opt-in added after the upgrade survives every refresh" */
+		it("preserves the opt-in on refresh instead of stripping it again", () => {
+			// The block already carries OTEL_LOG_ASSISTANT_RESPONSES (it has
+			// migrated), and the user then deliberately added RAW_API_BODIES
+			// back for debugging — the documented opt-in. The legacy strip is a
+			// one-time migration keyed on the absence of the new flag, so it
+			// must NOT fire here; a recurring prune would silently disable the
+			// user's debugging capture at the next launch (#8284 review P2).
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, {
+				...currentClaudeVars(), // includes OTEL_LOG_ASSISTANT_RESPONSES
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+
+			expect(refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() })).toBe(
+				null,
+			);
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
+			expect(after.env.OTEL_LOG_ASSISTANT_RESPONSES).toBe("1");
+		});
+
+		it("keeps preserving it across a second refresh", () => {
+			const target = appSettingsTargetFor("claude")!;
+			installAppEnv(target, {
+				...currentClaudeVars(),
+				OTEL_LOG_RAW_API_BODIES: "1",
+			});
+
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+			refreshClaudeUserTelemetryEnv({ vars: currentClaudeVars() });
+
+			const after = JSON.parse(fs.readFileSync(target.path, "utf8"));
+			expect(after.env.OTEL_LOG_RAW_API_BODIES).toBe("1");
 		});
 	});
 

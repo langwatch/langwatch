@@ -308,6 +308,11 @@ function buildEnvBlock(
         `export OTEL_LOG_TOOL_DETAILS=1`,
         `export OTEL_LOG_TOOL_CONTENT=1`,
         `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+        // These instructions are pasted into a shell rc by hand, so an older
+        // `export OTEL_LOG_RAW_API_BODIES=1` line from a previous install is
+        // not replaced for the user — tell them, rather than `unset` it
+        // unconditionally, since setting it is the documented opt-in.
+        `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,

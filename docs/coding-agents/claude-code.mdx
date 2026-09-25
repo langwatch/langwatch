@@ -130,9 +130,9 @@ Everything above is telemetry: Claude Code keeps your own plan and your own prov
   </Accordion>
 
   <Accordion title="The trace has no response">
-    `OTEL_LOG_ASSISTANT_RESPONSES` is missing. `langwatch claude` and `langwatch instrument claude` set it for you, so this only happens on a hand-written configuration or a session that was open before you re-ran the wrapper (restart Claude Code so it re-reads `~/.claude/settings.json`). Claude Code reports the assistant's response text on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text) or, if you set it yourself, on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the full request and response JSON). Set `OTEL_LOG_ASSISTANT_RESPONSES=1` for just the response text.
+    Response text is off. `langwatch claude` and `langwatch instrument claude` set `OTEL_LOG_ASSISTANT_RESPONSES=1` for you, so this only happens on a hand-written configuration or a session that was open before you re-ran the wrapper (restart Claude Code so it re-reads `~/.claude/settings.json`). Claude Code reports the assistant's response text on its lighter `assistant_response` event (needs `OTEL_LOG_ASSISTANT_RESPONSES=1`, and carries only the response text) or, if you opt in, on its `api_response_body` event (needs `OTEL_LOG_RAW_API_BODIES=1`, and carries the response JSON; the request JSON arrives on the separate `api_request_body` event). Set `OTEL_LOG_ASSISTANT_RESPONSES=1` for just the response text.
 
-    Claude Code docs describe `OTEL_LOG_ASSISTANT_RESPONSES` as falling back to the value of `OTEL_LOG_USER_PROMPTS`. Don't rely on that fallback: set it explicitly.
+    When `OTEL_LOG_ASSISTANT_RESPONSES` is unset, Claude Code falls back to the value of `OTEL_LOG_USER_PROMPTS`, so prompt logging alone can still emit the response text. The response is redacted when the flag is set to `0`, or when it is unset and prompt logging is off. Don't rely on the fallback: set it explicitly.
 
     Claude Code also reports `api_response_body` and `assistant_response` for work that is not a conversation, such as an autosuggestion or a session title. LangWatch filters those out, so a title never becomes the output of a trace.
   </Accordion>

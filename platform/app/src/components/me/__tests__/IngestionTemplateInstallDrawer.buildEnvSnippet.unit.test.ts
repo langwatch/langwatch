@@ -62,7 +62,17 @@ describe("buildEnvSnippet", () => {
       expect(snippet).toContain("export OTEL_LOG_TOOL_DETAILS=1");
       expect(snippet).toContain("export OTEL_LOG_TOOL_CONTENT=1");
       expect(snippet).toContain("export OTEL_LOG_ASSISTANT_RESPONSES=1");
-      expect(snippet).not.toContain("OTEL_LOG_RAW_API_BODIES");
+      // The heavy export must not be emitted. (A commented upgrade note
+      // mentioning the flag by name is fine and expected.)
+      expect(snippet).not.toContain("export OTEL_LOG_RAW_API_BODIES=1");
+    });
+
+    it("tells an upgrading user to drop the old raw-bodies line from their rc", () => {
+      // The snippet is pasted by hand, so it cannot replace a previous
+      // install's line for the user — it has to say so (#8284).
+      expect(snippet).toContain(
+        "Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc",
+      );
     });
 
     it("interpolates the endpoint and token", () => {

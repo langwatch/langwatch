@@ -66,6 +66,9 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
       `export OTEL_LOG_TOOL_DETAILS=1`,
       `export OTEL_LOG_TOOL_CONTENT=1`,
       `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+      // Pasted by hand, so an older RAW_API_BODIES line is not replaced
+      // for the user; note it rather than `unset` the documented opt-in.
+      `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
       base,
       `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
     ].join("\n");
