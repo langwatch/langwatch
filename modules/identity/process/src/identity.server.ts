@@ -1,3 +1,4 @@
+import { bindTrpcFact, type TrpcRuntimeContext } from "@langwatch/api/trpc";
 import { defineServerModule } from "@langwatch/kernel";
 
 import { IdentityApp } from "./app/identity.app.ts";
@@ -9,7 +10,10 @@ import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";
-import { twoStepVerificationTrpcTransport } from "./transport/two-step-verification.trpc.ts";
+import {
+  twoStepRequestHeadersFact,
+  twoStepVerificationTrpcTransport,
+} from "./transport/two-step-verification.trpc.ts";
 
 export const identityServer = defineServerModule("identity")
   .withRepositories(identityRepositories)
@@ -19,6 +23,12 @@ export const identityServer = defineServerModule("identity")
     identityTrpcTransport,
     twoStepVerificationTrpcTransport,
   )
+  .withTransportFacts(() => [
+    bindTrpcFact(
+      twoStepRequestHeadersFact,
+      (context: TrpcRuntimeContext) => context.req?.headers ?? null,
+    ),
+  ])
   .withEventing(identityEventing)
   .withEventing(identityPipelineEventing)
   .withEventing(joinRequestEventing)

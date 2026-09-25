@@ -630,6 +630,21 @@ export class IdentityMfaEnrollmentRequiredError extends MfaCommandRefusedError {
 }
 
 /**
+ * Requiring a second factor of every member is a paid capability, refused here rather than by
+ * the screen. Turning the requirement off is never refused for this reason.
+ */
+export class IdentityMfaRequirementNotLicensedError extends MfaCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_mfa_requirement_not_licensed", "identity_mfa_requirement_not_licensed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityMfaRequirementNotLicensedError";
+  }
+}
+
+/**
  * A passkey refusal (D07): a failed browser ceremony and an unrecognized
  * credential stay indistinguishable, or the endpoint answers "does this
  * passkey exist here" for anybody who asks.

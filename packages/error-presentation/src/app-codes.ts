@@ -291,6 +291,7 @@ export const APP_ERROR_CODES = [
   "identity_mfa_locked_out",
   "identity_mfa_password_invalid",
   "identity_mfa_required_by_organization",
+  "identity_mfa_requirement_not_licensed",
   "identity_passkey_ceremony_failed",
   "identity_passkey_not_recognized",
   "identity_primary_must_demote_first",

@@ -2740,6 +2740,11 @@ const presentations = {
     describe: () =>
       "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
   },
+  identity_mfa_requirement_not_licensed: {
+    title: "Requiring two-step verification needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. Members can still set two-step verification up on their own accounts. Talk to your account team about upgrading to require it of everybody.",
+  },
   identity_mfa_enrollment_required: {
     // Not an authentication failure: nobody is signed out and every other
     // organization still works. The copy has to make that obvious, or people

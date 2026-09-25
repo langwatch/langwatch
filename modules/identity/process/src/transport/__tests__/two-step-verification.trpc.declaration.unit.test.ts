@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The `twoStepVerification.*` procedures served so far, under main's namespace.
+ * The `twoStepVerification.*` procedures, under main's namespace.
  * @see specs/identity/mfa-and-session-shape.feature
  */
 import { twoStepVerificationTrpc } from "@langwatch/identity-contract";
@@ -19,7 +19,14 @@ describe("the twoStepVerification tRPC surface", () => {
             member.kind,
           ]),
         ),
-      ).toEqual({ account: "query", memberFactors: "query" });
+      ).toEqual({
+        account: "query",
+        disable: "mutation",
+        standing: "query",
+        requirement: "query",
+        setRequirement: "mutation",
+        memberFactors: "query",
+      });
     });
 
     it("takes nothing from the browser for the account read: the session names the person", () => {

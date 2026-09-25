@@ -3,7 +3,7 @@
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { z } from "zod";
 
-import { secondFactorSatisfactionSchema } from "./mfa-condition.ts";
+import { amrSchema, secondFactorSatisfactionSchema } from "./mfa-condition.ts";
 
 /** An organization that will not let this person turn their second factor off. */
 export const requiringOrganizationSchema = z.object({
@@ -39,6 +39,51 @@ export const organizationMemberFactorSchema = z.object({
 });
 export type OrganizationMemberFactor = z.infer<typeof organizationMemberFactorSchema>;
 
+/** Where one person stands with one organization; a stranger gets a member-with-nothing's shape. */
+export const organizationMfaStandingSchema = z.object({
+  organizationId: z.string(),
+  /** Null for a non-member, or the procedure is a directory of every tenant's name. */
+  organizationName: z.string().nullable(),
+  required: z.boolean(),
+  satisfaction: secondFactorSatisfactionSchema,
+  holdsPasskey: z.boolean(),
+});
+export type OrganizationMfaStanding = z.infer<typeof organizationMfaStandingSchema>;
+
+/** What the organization's identity provider asserts, read off the sessions it minted. */
+export const organizationConnectionFactorsSchema = z.object({
+  connected: z.boolean(),
+  assertedFactors: z.array(amrSchema).readonly(),
+  assertsSecondFactor: z.boolean(),
+});
+export type OrganizationConnectionFactors = z.infer<typeof organizationConnectionFactorsSchema>;
+
+/** What the organization has set, for its administrator's screen. */
+export const organizationMfaRequirementSchema = z.object({
+  mfaRequired: z.boolean(),
+  offered: z.boolean(),
+  connection: organizationConnectionFactorsSchema,
+});
+export type OrganizationMfaRequirement = z.infer<typeof organizationMfaRequirementSchema>;
+
+export const organizationMfaRequirementChangeSchema = z.object({
+  previous: z.boolean(),
+  next: z.boolean(),
+});
+export type OrganizationMfaRequirementChange = z.infer<
+  typeof organizationMfaRequirementChangeSchema
+>;
+
+/** The request's headers as the process read them; this package holds no Fetch `Headers`. */
+export const requestHeaderRecordSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.array(z.string())]).optional(),
+);
+export type RequestHeaderRecord = z.infer<typeof requestHeaderRecordSchema>;
+
+export const twoStepDisabledSchema = z.object({ disabled: z.literal(true) });
+export type TwoStepDisabled = z.infer<typeof twoStepDisabledSchema>;
+
 export interface TwoStepVerificationApi {
   /** The caller's own setup, for their security screen. */
   getTwoStepAccountStanding(input: { userId: string }): Promise<TwoStepAccountStanding>;
@@ -46,6 +91,28 @@ export interface TwoStepVerificationApi {
   findOrganizationMemberFactors(input: {
     organizationId: string;
   }): Promise<OrganizationMemberFactor[]>;
+  /** On the session they hold now; a session that recorded nothing proved nothing. */
+  getOrganizationMfaStanding(input: {
+    userId: string;
+    organizationId: string;
+    sessionId: string | null;
+  }): Promise<OrganizationMfaStanding>;
+  getOrganizationMfaRequirement(input: {
+    organizationId: string;
+  }): Promise<OrganizationMfaRequirement>;
+  /** Turning it on is the paid move; turning it off never asks the plan. Ends no session. */
+  setOrganizationMfaRequirement(input: {
+    organizationId: string;
+    mfaRequired: boolean;
+    actorUserId: string;
+  }): Promise<OrganizationMfaRequirementChange>;
+  /** Refused while an organization requires it, before either proof is spent. */
+  disableTwoStepVerification(input: {
+    userId: string;
+    password?: string | undefined;
+    code: string;
+    headers: RequestHeaderRecord;
+  }): Promise<TwoStepDisabled>;
 }
 
 export const TwoStepVerificationApi = moduleApi<TwoStepVerificationApi>()("identity");

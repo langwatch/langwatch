@@ -31,7 +31,12 @@ import {
   type RoutingDecision,
   SignInMethodPolicyService,
   type OrganizationMemberFactor,
+  type OrganizationMfaRequirement,
+  type OrganizationMfaRequirementChange,
+  type OrganizationMfaStanding,
+  type RequestHeaderRecord,
   type TwoStepAccountStanding,
+  type TwoStepDisabled,
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
@@ -45,6 +50,7 @@ import { UserApi } from "@langwatch/user-contract";
 
 import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
+import { organizationMfaRequirementMailChannels } from "../channels/organization-mfa-requirement-mail-channels.registry.ts";
 import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
   ssoDomainProofChannels,
@@ -100,6 +106,7 @@ import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { OrganizationMfaNotifierService } from "../services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
@@ -731,8 +738,21 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       twoStepAccounts: TwoStepAccountService.create({
         accounts: setup.repositories.twoStepVerification,
         deployment: setup.dependencies.auth,
+        protocol: setup.dependencies.auth,
       }),
-      organizationMfa: OrganizationMfaService.create(setup.repositories.twoStepVerification),
+      organizationMfa: OrganizationMfaService.create({
+        accounts: setup.repositories.twoStepVerification,
+        auth: setup.dependencies.auth,
+        notifier: OrganizationMfaNotifierService.create({
+          accounts: setup.repositories.twoStepVerification,
+          mail: organizationMfaRequirementMailChannels.ses.create({ mailer: setup.members.mail }),
+          emails,
+        }),
+        entitled: async ({ organizationId }) =>
+          isEnterpriseTier(
+            (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
+          ),
+      }),
       signInRouter,
       pipelines: {
         eventing: identityEventing,
@@ -866,6 +886,37 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     organizationId: string;
   }): Promise<OrganizationMemberFactor[]> {
     return this.#parts.organizationMfa.findMemberFactors(input);
+  }
+
+  getOrganizationMfaStanding(input: {
+    userId: string;
+    organizationId: string;
+    sessionId: string | null;
+  }): Promise<OrganizationMfaStanding> {
+    return this.#parts.organizationMfa.getStanding(input);
+  }
+
+  getOrganizationMfaRequirement(input: {
+    organizationId: string;
+  }): Promise<OrganizationMfaRequirement> {
+    return this.#parts.organizationMfa.getRequirement(input);
+  }
+
+  setOrganizationMfaRequirement(input: {
+    organizationId: string;
+    mfaRequired: boolean;
+    actorUserId: string;
+  }): Promise<OrganizationMfaRequirementChange> {
+    return this.#parts.organizationMfa.setRequirement(input);
+  }
+
+  disableTwoStepVerification(input: {
+    userId: string;
+    password?: string | undefined;
+    code: string;
+    headers: RequestHeaderRecord;
+  }): Promise<TwoStepDisabled> {
+    return this.#parts.twoStepAccounts.disable(input);
   }
 
   guards(): IdentityGuardsService {

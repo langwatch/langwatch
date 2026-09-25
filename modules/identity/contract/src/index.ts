@@ -283,6 +283,7 @@ export {
   IdentityMfaEnrollmentRequiredError,
   IdentityMfaLockedOutError,
   IdentityMfaRequiredByOrganizationError,
+  IdentityMfaRequirementNotLicensedError,
   IdentityPasskeyCeremonyFailedError,
   IdentityPasskeyNotRecognizedError,
   IdentityPrimaryMustDemoteFirstError,
