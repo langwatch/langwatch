@@ -85,8 +85,8 @@ export interface EndpointDocs {
    */
   responses?: DescribeRouteOptions["responses"];
   /**
-   * Hand-written operation parameters, appended after the ones the framework
-   * derives (the version header, the idempotency key).
+   * Hand-written operation parameters, appended after the one the framework
+   * derives (the idempotency key).
    */
   parameters?: DescribeRouteOptions["parameters"];
   /**
@@ -444,7 +444,7 @@ export const buildStandardSuccessResponse = (zodSchema: ZodType): RouteResponse 
   return {
     description: "Success",
     content: {
-      "application/json": { schema: resolver(zodSchema) },
+      "application/json": { schema: resolver(zodSchema, { options: { io: "output" } }) },
     },
   };
 };

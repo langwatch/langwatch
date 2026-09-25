@@ -64,6 +64,7 @@ import {
   deprecatedAlias,
   deprecationNotice,
   documentRoute,
+  requiresBody,
 } from "./openapi.ts";
 import {
   bodyLimit,
@@ -733,7 +734,8 @@ function validators({
 
     const middleware = readingAbsentBody({ route, target, schema, validate });
 
-    if (!documented) {
+    // An optional JSON body is published by the route's own document instead.
+    if (!documented || (target === "json" && !requiresBody(schema))) {
       delete (middleware as Partial<Record<typeof uniqueSymbol, unknown>>)[uniqueSymbol];
     }
 

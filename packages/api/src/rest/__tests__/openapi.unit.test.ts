@@ -5,16 +5,21 @@
  * @see specs/api-reference/exclusive-bounds-3-1.feature
  * @see ../../../specs/endpoint-capabilities.feature
  */
+import { Hono } from "hono";
+import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { RestTransportRoute } from "../declaration.ts";
 import type { RestTransportDocs } from "../openapi.ts";
 import {
+  documentedResponses,
+  documentRoute,
   hoistStraySchemaDefs,
   normalizeExclusiveBounds,
   restRouteDocumentation,
 } from "../openapi.ts";
+import { buildStandardSuccessResponse } from "../response.ts";
 
 /** A webhook intake: the signature is over the exact characters, so nothing parses them. */
 function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
@@ -358,6 +363,154 @@ describe("the security requirement an operation publishes", () => {
       });
 
       expect(published.security).toEqual([]);
+    });
+  });
+});
+
+type PublishedOperation = Readonly<{
+  parameters?: readonly Readonly<{ name: string; in: string; required?: boolean }>[];
+  requestBody?: Readonly<{ required?: boolean; content: Record<string, { schema?: unknown }> }>;
+  responses: Record<string, { content?: Record<string, { schema?: { required?: string[] } }> }>;
+}>;
+
+/** The operation the generated document publishes for one declared route. */
+async function publishedOperation(route: RestTransportRoute<unknown>): Promise<PublishedOperation> {
+  const app = new Hono().on(route.method.toUpperCase(), route.path, documentRoute({ route }), (c) =>
+    c.body(null, 204),
+  );
+  const document = JSON.parse(JSON.stringify(await generateSpecs(app))) as {
+    paths: Record<string, Record<string, PublishedOperation>>;
+  };
+  const operation = document.paths[route.path]?.[route.method];
+
+  if (!operation) throw new Error(`the document publishes no ${route.method} ${route.path}`);
+
+  return operation;
+}
+
+/** A create a caller may retry under its own key. */
+function idempotentCreateRoute(): RestTransportRoute<unknown> {
+  return {
+    ...declaredOutputRoute(),
+    method: "post",
+    operation: "createWidget",
+    idempotency: { operation: "createWidget" },
+  };
+}
+
+/** A route whose JSON body the runtime parses from the declared input. */
+function jsonInputRoute(input: z.ZodObject): RestTransportRoute<unknown> {
+  return { ...declaredOutputRoute(), method: "post", path: "/widgets/archive", input };
+}
+
+const withDefaultedField = z.object({ id: z.string(), archived: z.boolean().default(false) });
+
+describe("the generated document", () => {
+  describe("given a route that declared idempotency", () => {
+    it("publishes the Idempotency-Key header a caller may send", async () => {
+      const operation = await publishedOperation(idempotentCreateRoute());
+
+      expect(operation.parameters).toContainEqual(
+        expect.objectContaining({ name: "Idempotency-Key", in: "header", required: false }),
+      );
+    });
+  });
+
+  describe("given a route that declared no idempotency", () => {
+    it("publishes no Idempotency-Key header", async () => {
+      const operation = await publishedOperation(declaredOutputRoute());
+
+      expect(operation.parameters ?? []).not.toContainEqual(
+        expect.objectContaining({ name: "Idempotency-Key" }),
+      );
+    });
+  });
+
+  describe("given an answer schema with a defaulted field", () => {
+    it("publishes the field required in the declared success, as a caller receives it", async () => {
+      const operation = await publishedOperation({
+        ...declaredOutputRoute(),
+        output: withDefaultedField,
+      });
+
+      expect(operation.responses["200"]?.content?.["application/json"]?.schema?.required).toEqual([
+        "id",
+        "archived",
+      ]);
+    });
+
+    it("publishes the field required in a documented answer", async () => {
+      const operation = await publishedOperation(
+        declaredOutputRoute({ responses: documentedResponses({ 409: withDefaultedField }) }),
+      );
+
+      expect(operation.responses["409"]?.content?.["application/json"]?.schema?.required).toEqual([
+        "id",
+        "archived",
+      ]);
+    });
+
+    it("publishes the field required in the standard success answer", async () => {
+      const operation = await publishedOperation(
+        declaredOutputRoute({
+          responses: { 201: buildStandardSuccessResponse(withDefaultedField) },
+        }),
+      );
+
+      expect(operation.responses["201"]?.content?.["application/json"]?.schema?.required).toEqual([
+        "id",
+        "archived",
+      ]);
+    });
+  });
+
+  describe("given a body-less action that declared an empty input", () => {
+    it("publishes no request body", async () => {
+      const operation = await publishedOperation(jsonInputRoute(z.object({})));
+
+      expect(operation.requestBody).toBeUndefined();
+    });
+  });
+
+  describe("given an input every field of which is optional", () => {
+    it("publishes the body as one a caller may leave out", async () => {
+      const operation = await publishedOperation(
+        jsonInputRoute(z.object({ reason: z.string().optional() })),
+      );
+
+      expect(operation.requestBody).toEqual({
+        required: false,
+        content: {
+          "application/json": {
+            schema: { type: "object", properties: { reason: { type: "string" } } },
+          },
+        },
+      });
+    });
+  });
+
+  describe("given an input with a required field", () => {
+    it("leaves the body to the validator, which publishes it required", () => {
+      const published = restRouteDocumentation({
+        route: jsonInputRoute(z.object({ reason: z.string() })),
+      });
+
+      expect(published.requestBody).toBeUndefined();
+    });
+  });
+
+  describe("given a route that reads its own body and said the body may be left out", () => {
+    it("publishes the declared shape as optional", async () => {
+      const operation = await publishedOperation(
+        rawBodyRoute({
+          requestBody: { schema: z.object({ inputs: z.array(z.string()) }), required: false },
+        }),
+      );
+
+      expect(operation.requestBody?.required).toBe(false);
+      expect(operation.requestBody?.content["application/json"]?.schema).toMatchObject({
+        type: "object",
+      });
     });
   });
 });

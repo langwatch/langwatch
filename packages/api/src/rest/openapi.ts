@@ -10,6 +10,7 @@ import { z, type ZodType } from "zod";
 import type { CredentialClass } from "../access-policy.ts";
 import { securityRequirement } from "../access/access.ts";
 import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./declaration.ts";
+import { idempotencyKeyParameter } from "./idempotency.ts";
 import type { RestMultipart } from "./request.ts";
 import type { EndpointDocs, RouteResponse } from "./response.ts";
 
@@ -46,7 +47,12 @@ export type RestTransportDocs = Readonly<{
    * bytes itself, but a reader of the document still needs to know what to write. Published
    * like any other body.
    */
-  readonly requestBody?: Readonly<{ description?: string; schema: ZodType }>;
+  readonly requestBody?: Readonly<{
+    description?: string;
+    schema: ZodType;
+    /** False where the route reads an absent body as a request of its own; true by default. */
+    required?: boolean;
+  }>;
 }>;
 
 /**
@@ -89,6 +95,8 @@ export function restRouteDocumentation({
   if (route.docs?.tags !== undefined) options.tags = [...route.docs.tags];
 
   if (route.docs?.hide) options.hide = true;
+
+  if (route.idempotency) options.parameters = [idempotencyKeyParameter];
 
   const requestBody = publishedRequestBody(route);
 
@@ -148,7 +156,7 @@ function publishedRequestBody(
     const description = declared.description;
 
     return {
-      required: true,
+      required: declared.required ?? true,
       ...(description === undefined ? {} : { description }),
       content: {
         [route.rawBody?.mediaType ?? "application/json"]: {
@@ -169,12 +177,33 @@ function publishedRequestBody(
     };
   }
 
+  if (route.input && !requiresBody(route.input)) return optionalJsonBody(route.input);
+
   return undefined;
+}
+
+/**
+ * Whether a JSON body must be sent. The runtime reads an absent body as `{}`
+ * (ARCHITECTURE.md §8), so a schema that accepts `{}` does not need one, and its
+ * validator leaves the body to this document rather than publishing it required.
+ */
+export function requiresBody(schema: ZodType): boolean {
+  return !schema.validate({});
+}
+
+/** A body a caller may leave out: none at all for an empty input, else an optional one. */
+function optionalJsonBody(schema: ZodType): DescribeRouteOptions["requestBody"] {
+  if (schema instanceof z.ZodObject && Object.keys(schema.shape).length === 0) return undefined;
+
+  return { required: false, content: { "application/json": { schema: publishedInput(schema) } } };
 }
 
 /** The shape a caller sends, as the document spells it, without the draft line. */
 function publishedInput(schema: ZodType): Record<string, unknown> {
-  const { $schema: _draft, ...published } = z.toJSONSchema(schema, { io: "input" });
+  const { $schema: _draft, ...published } = z.toJSONSchema(schema, {
+    io: "input",
+    unrepresentable: "any",
+  });
 
   return published;
 }
@@ -264,7 +293,7 @@ function answerSchema(schema: RestTransportRoute<unknown>["output"]): unknown {
     };
   }
 
-  return resolver(schema);
+  return resolver(schema, { options: { io: "output" } });
 }
 
 /** One member of a published union, without the draft the document declares. */
@@ -291,7 +320,7 @@ export function documentedResponses(
   for (const [status, schema] of Object.entries(bodies)) {
     responses[Number(status)] = {
       description: answerDescription(Number(status)),
-      content: { "application/json": { schema: resolver(schema) } },
+      content: { "application/json": { schema: resolver(schema, { options: { io: "output" } }) } },
     };
   }
 

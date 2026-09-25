@@ -113,7 +113,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     description:
       "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
     tags: ["Experiments"],
-    requestBody: { schema: runInputsBodySchema },
+    requestBody: { schema: runInputsBodySchema, required: false },
     responses: {
       200: {
         description: "Run started",

@@ -6,6 +6,7 @@
 import {
   badRequestSchema,
   baseResponses,
+  buildStandardSuccessResponse,
   conflictResponses,
   defineRestMiddleware,
   defineRestRouter,
@@ -37,7 +38,7 @@ import {
   tagParamsSchema,
   updatePromptInputSchema,
 } from "@langwatch/prompt-contract";
-import { z, type ZodSchema } from "zod";
+import { z } from "zod";
 
 export const versionInputSchema = getLatestConfigVersionSchema();
 
@@ -76,20 +77,6 @@ export const promptRestCredential = defineRestMiddleware(
 
 // ── OpenAPI + refusal helpers ────────────────────────────────────────────────
 
-/** A success body as the caller receives it: a field the schema defaults is always present. */
-export const buildStandardSuccessResponse = ({
-  schema,
-  description = "Success",
-}: {
-  schema: ZodSchema;
-  description?: string;
-}): RouteResponse => ({
-  description,
-  content: {
-    "application/json": { schema: resolver(schema, { options: { io: "output" } }) },
-  },
-});
-
 // ── the family ───────────────────────────────────────────────────────────────
 
 const logger = createLogger("langwatch:api:prompts");
@@ -112,7 +99,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Get all prompts for a project",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: z.array(promptWireSchema) }),
+      200: buildStandardSuccessResponse(z.array(promptWireSchema)),
     },
   })
   .handle(async ({ app, scope }, project) => {
@@ -145,7 +132,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: 'Assign a tag (e.g. "production", "staging") to a specific prompt version',
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: assignTagResponseSchema }),
+      200: buildStandardSuccessResponse(assignTagResponseSchema),
       404: notFoundResponse,
       422: {
         description: "Invalid tag or version",
@@ -180,7 +167,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "List all prompt tag definitions for the organization",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: z.array(tagDefinitionSchema) }),
+      200: buildStandardSuccessResponse(z.array(tagDefinitionSchema)),
     },
   })
   .handle(async ({ app }, project) => {
@@ -199,10 +186,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Create a custom prompt tag definition for the organization",
     responses: {
       ...baseResponses,
-      201: buildStandardSuccessResponse({
-        schema: tagDefinitionSchema,
-        description: "Tag created",
-      }),
+      201: { ...buildStandardSuccessResponse(tagDefinitionSchema), description: "Tag created" },
     },
   })
   .handle(async ({ app, input }, project) => {
@@ -224,10 +208,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Rename a prompt tag definition",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({
-        schema: tagDefinitionSchema,
-        description: "Tag renamed",
-      }),
+      200: { ...buildStandardSuccessResponse(tagDefinitionSchema), description: "Tag renamed" },
     },
   })
   .handle(async ({ app, input, scope }, project, credential) => {
@@ -270,7 +251,7 @@ export const promptRest = defineRestRouter(PromptApi)
       "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: z.array(promptWireSchema) }),
+      200: buildStandardSuccessResponse(z.array(promptWireSchema)),
       404: notFoundResponse,
     },
   })
@@ -310,7 +291,7 @@ export const promptRest = defineRestRouter(PromptApi)
       "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: promptWireSchema }),
+      200: buildStandardSuccessResponse(promptWireSchema),
       404: {
         description: "Prompt or version not found",
         content: { "application/json": { schema: resolver(badRequestSchema) } },
@@ -358,7 +339,7 @@ export const promptRest = defineRestRouter(PromptApi)
       "Alternatively, use the tag or version query parameters with a bare slug.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: promptWireSchema }),
+      200: buildStandardSuccessResponse(promptWireSchema),
       404: notFoundResponse,
     },
   })
@@ -391,7 +372,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Create a new prompt with default initial version",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: promptWireSchema }),
+      200: buildStandardSuccessResponse(promptWireSchema),
       409: conflictResponses[409],
     },
   })
@@ -418,10 +399,10 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Sync/upsert a prompt with local content",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({
-        schema: documentedSyncResultSchema,
+      200: {
+        ...buildStandardSuccessResponse(documentedSyncResultSchema),
         description: "Sync result",
-      }),
+      },
     },
   })
   .handle(async ({ app, input, scope }, project) =>
@@ -446,7 +427,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Update a prompt",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: promptWireSchema }),
+      200: buildStandardSuccessResponse(promptWireSchema),
       404: notFoundResponse,
       409: conflictResponses[409],
       422: {
@@ -480,7 +461,7 @@ export const promptRest = defineRestRouter(PromptApi)
     description: "Delete a prompt",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse({ schema: successSchema }),
+      200: buildStandardSuccessResponse(successSchema),
       404: notFoundResponse,
     },
   })
