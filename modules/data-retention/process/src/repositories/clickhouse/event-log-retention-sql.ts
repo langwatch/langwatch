@@ -78,7 +78,7 @@ export function eventLogRetentionCategoryMutationMarkerSql(category: RetentionCa
 }
 
 /** Recovers the marker {@link eventLogRetentionCategoryMutationMarkerSql} stamped, if any. */
-export function eventLogRetentionCategoryFromMutationCommand(
+export function extractEventLogRetentionCategoryFromMutationCommand(
   command: string | null | undefined,
 ): RetentionCategory | null {
   if (!command) return null;

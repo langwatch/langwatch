@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { EventExplorerClickHouseRepository } from "../clickhouse.event-explorer.repository.ts";
+import {
+  type EventExplorerClickHouseClient,
+  EventExplorerClickHouseRepository,
+} from "../clickhouse.event-explorer.repository.ts";
 
 const repoCapturingQuery = () => {
-  const query = vi.fn().mockResolvedValue({ json: async () => [] as unknown[] });
-  const client = { query } as unknown as Parameters<
-    typeof EventExplorerClickHouseRepository.create
-  >[0]["client"];
-  const repo = EventExplorerClickHouseRepository.create({ client });
+  const query = vi
+    .fn<EventExplorerClickHouseClient["query"]>()
+    .mockResolvedValue({ json: async () => [] });
+  const repo = EventExplorerClickHouseRepository.create({ client: { query } });
   return { repo, query };
 };
 

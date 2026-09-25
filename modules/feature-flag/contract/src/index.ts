@@ -27,7 +27,7 @@ export type {
 } from "./feature-flag-rules.ts";
 export {
   emailDomainsOf,
-  evaluateRules,
+  deriveRuleOutcome,
   featureFlagRuleSchema,
   featureFlagRulesSchema,
   featureFlagRulesWriteSchema,

@@ -7,10 +7,15 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
-import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
+import type { TenantOrganizationRepository } from "../../repositories/tenant-organization.repository.ts";
+import {
+  type BillingTenantOrganizationCache,
+  BillingTenantOrganizationService,
+} from "../../services/tenant-organization.service.ts";
 import { BillableEventsMeterProjection } from "../billable-events-meter.projection.ts";
 
 // Repo root containing both `packages/` and `docs/`. `process.cwd()` is this
@@ -80,7 +85,10 @@ function pricingFaqAnswer(): string {
 
 const meteredEventTypes = BillableEventsMeterProjection.create({
   meter: { insert: vi.fn<BillableEventsMeterRepository["insert"]>() },
-  organizations: {} as unknown as BillingTenantOrganizationService,
+  organizations: BillingTenantOrganizationService.create({
+    organizations: createApiFixture<TenantOrganizationRepository>(),
+    cache: createApiFixture<BillingTenantOrganizationCache>(),
+  }),
 }).build().eventTypes;
 
 describe("Billable-event documentation", () => {

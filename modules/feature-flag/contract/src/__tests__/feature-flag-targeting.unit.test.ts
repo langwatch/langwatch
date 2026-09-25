@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateRules, type FeatureFlagRules } from "../feature-flag-rules.ts";
+import { deriveRuleOutcome, type FeatureFlagRules } from "../feature-flag-rules.ts";
 import {
   NOT_TARGETED,
   toRuleContextId,
@@ -52,7 +52,7 @@ describe("given a surface that has no project of its own", () => {
   it("matches no rule that names a project", () => {
     const rules: FeatureFlagRules = [{ match: { projectId: "project-1" }, enabled: true }];
 
-    const hit = evaluateRules(rules, {
+    const hit = deriveRuleOutcome(rules, {
       projectId: toRuleContextId(NOT_TARGETED),
       organizationId: toRuleContextId("organization-1"),
     });
@@ -81,7 +81,7 @@ describe("given a flag that is off by default with one organization rule", () =>
       { match: { organizationId: "organization-1" }, enabled: true },
     ];
 
-    const hit = evaluateRules(rules, {
+    const hit = deriveRuleOutcome(rules, {
       projectId: "project-1",
       organizationId: "organization-1",
     });

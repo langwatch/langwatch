@@ -1,4 +1,5 @@
 import type {
+  CodingAgentSessionLookup,
   CodingAgentProjectionPersistence,
   CodingAgentSession,
 } from "@langwatch/coding-agent-contract";
@@ -85,9 +86,9 @@ class FakePersistence implements CodingAgentProjectionPersistence {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSession; appliedEventIds: string[] } | null> {
+  }): Promise<CodingAgentSessionLookup> {
     this.lastFindParams = params;
-    return this.withApplied;
+    return this.withApplied ? { kind: "hit", ...this.withApplied } : { kind: "miss" };
   }
 
   async appendTraceSessions(): Promise<void> {}

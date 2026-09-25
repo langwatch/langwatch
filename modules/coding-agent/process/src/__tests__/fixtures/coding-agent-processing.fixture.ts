@@ -1,4 +1,7 @@
-import { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
+import {
+  CodingAgentProjectionPersistence,
+  type CodingAgentSessionLookup,
+} from "@langwatch/coding-agent-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import {
   type ModelProviderApi,
@@ -27,8 +30,8 @@ class NoopCodingAgentProjectionPersistence extends CodingAgentProjectionPersiste
     return Promise.resolve();
   }
 
-  loadSessionWithApplied(): Promise<null> {
-    return Promise.resolve(null);
+  loadSessionWithApplied(): Promise<CodingAgentSessionLookup> {
+    return Promise.resolve({ kind: "miss" });
   }
 
   appendTraceSessions(): Promise<void> {

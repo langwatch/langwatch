@@ -7,8 +7,15 @@ import type {
 } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  createPresenceTestProjects,
+  RecordingPresenceBroadcast,
+  RecordingPresenceDiagnostics,
+} from "../../app/__tests__/presence.fixture.ts";
 import type { PresenceEmitter } from "../../app/presence.app.ts";
+import { MemoryPresenceRepository } from "../../repositories/memory/memory.presence.repository.ts";
 import { PresenceStreamService } from "../presence-stream.service.ts";
+import { PresenceService } from "../presence.service.ts";
 
 const session: PresenceSession = {
   projectId: "project-1",
@@ -38,15 +45,15 @@ class RecordingEmitters implements PresenceEmitter {
   });
 }
 
-function createPresence(options: { enabled: boolean; sessions?: PresenceSession[] }) {
-  return {
-    enabled: options.enabled,
-    isEnabledForProject: vi.fn(async () => options.enabled),
-    list: vi.fn(async () => options.sessions ?? []),
-    update: vi.fn(),
-    leave: vi.fn(),
-    broadcastCursor: vi.fn(),
-  } as unknown as Parameters<typeof PresenceStreamService.create>[0]["presence"];
+async function createPresence(options: { enabled: boolean; sessions?: PresenceSession[] }) {
+  const repository = MemoryPresenceRepository.create();
+  for (const session of options.sessions ?? []) await repository.upsert(session, 60);
+  return PresenceService.create({
+    repository,
+    broadcast: new RecordingPresenceBroadcast(),
+    projects: createPresenceTestProjects(options.enabled),
+    diagnostics: new RecordingPresenceDiagnostics(),
+  });
 }
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -88,7 +95,7 @@ describe("PresenceStreamService", () => {
     it("yields one empty snapshot and completes", async () => {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: false }),
+        presence: await createPresence({ enabled: false }),
         emitters,
       });
 
@@ -102,7 +109,7 @@ describe("PresenceStreamService", () => {
     it("yields no cursor at all", async () => {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: false }),
+        presence: await createPresence({ enabled: false }),
         emitters,
       });
 
@@ -125,7 +132,7 @@ describe("PresenceStreamService", () => {
     it("opens with a snapshot of the sessions currently present", async () => {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: true, sessions: [session] }),
+        presence: await createPresence({ enabled: true, sessions: [session] }),
         emitters,
       });
       const controller = new AbortController();
@@ -142,7 +149,7 @@ describe("PresenceStreamService", () => {
     it("releases the tenant emitter when the subscriber disconnects", async () => {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: true }),
+        presence: await createPresence({ enabled: true }),
         emitters,
       });
       const controller = new AbortController();
@@ -161,7 +168,7 @@ describe("PresenceStreamService", () => {
     async function eventsAround(emit: (emitter: EventEmitter) => void) {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: true }),
+        presence: await createPresence({ enabled: true }),
         emitters,
       });
       const controller = new AbortController();
@@ -217,7 +224,7 @@ describe("PresenceStreamService", () => {
     async function cursorsAround(emit: (emitter: EventEmitter) => void) {
       const emitters = new RecordingEmitters();
       const stream = PresenceStreamService.create({
-        presence: createPresence({ enabled: true }),
+        presence: await createPresence({ enabled: true }),
         emitters,
       });
       const controller = new AbortController();

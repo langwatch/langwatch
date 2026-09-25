@@ -125,7 +125,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
       sessionId: aggregateId,
       window: context.readWindow,
     });
-    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
+    if (found.kind === "miss") return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: read-back columns didn't exist when this row was
     // written, so decoding it would fabricate state. The watermark is dropped
     // too — one without its state would suppress events the re-fold needs —

@@ -178,7 +178,7 @@ export function parseRules(input: unknown): FeatureFlagRules {
  * no rule matches, returns null so callers can fall back to the
  * row-level default.
  */
-export function evaluateRules(
+export function deriveRuleOutcome(
   rules: FeatureFlagRules,
   ctx: RuleEvaluationContext,
   flagKey = "",
@@ -207,7 +207,7 @@ export function resolveEffectiveForListing({
   flagKey?: string;
 }): boolean {
   if (envOverride !== null) return envOverride;
-  const ruleHit = evaluateRules(rules, {}, flagKey);
+  const ruleHit = deriveRuleOutcome(rules, {}, flagKey);
   if (ruleHit !== null) return ruleHit;
   if (rowEnabled !== null) return rowEnabled;
   return registryDefault;

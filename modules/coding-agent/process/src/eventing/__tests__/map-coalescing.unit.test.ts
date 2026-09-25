@@ -12,7 +12,7 @@ import { SessionMetricSeriesMapProjection } from "../session-metric-series.proje
 const persistence = {
   storeSession: async () => void 0,
   storeSessionBatch: async () => void 0,
-  loadSessionWithApplied: async () => null,
+  loadSessionWithApplied: async () => ({ kind: "miss" as const }),
   appendTraceSessions: async () => void 0,
   appendMetricSeries: async () => void 0,
   appendSessionEvents: async () => void 0,

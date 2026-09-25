@@ -5,6 +5,11 @@ import type {
   CodingAgentTraceSessionRecord,
 } from "./coding-agent.ts";
 
+/** A stored session read: the row with its applied event ids, or a miss the fold starts from. */
+export type CodingAgentSessionLookup =
+  | { kind: "hit"; row: CodingAgentSession; appliedEventIds: string[] }
+  | { kind: "miss" };
+
 /** Process-lifecycle port used by Coding Agent's durable event projections. */
 export abstract class CodingAgentProjectionPersistence {
   abstract storeSession(input: {
@@ -25,10 +30,7 @@ export abstract class CodingAgentProjectionPersistence {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{
-    row: CodingAgentSession;
-    appliedEventIds: string[];
-  } | null>;
+  }): Promise<CodingAgentSessionLookup>;
 
   abstract appendTraceSessions(
     records: CodingAgentTraceSessionRecord[],

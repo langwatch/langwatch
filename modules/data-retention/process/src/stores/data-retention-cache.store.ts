@@ -2,6 +2,7 @@ import {
   resolvedRetentionSchema,
   type ResolvedRetention,
 } from "@langwatch/data-retention-contract";
+import type { Cluster, Redis } from "ioredis";
 
 /** A cache read: the retention held under the key, or a miss the caller resolves. */
 export type CachedRetentionLookup = { kind: "hit"; value: ResolvedRetention } | { kind: "miss" };
@@ -13,11 +14,8 @@ export abstract class DataRetentionCacheStore {
   abstract delete(key: string): Promise<void>;
 }
 
-export interface DataRetentionRedis {
-  get(key: string): Promise<string | null>;
-  setex(key: string, ttlSeconds: number, value: string): Promise<unknown>;
-  del(key: string): Promise<unknown>;
-}
+/** Only what this cache calls. */
+export type DataRetentionRedis = Pick<Redis | Cluster, "get" | "setex" | "del">;
 
 type MemoryEntry = {
   value: ResolvedRetention;

@@ -1,12 +1,18 @@
 import { PromptTagValidationError } from "@langwatch/prompt-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  PrismaPromptTagRepository,
-  type PromptTagDatabase,
-} from "../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
 import { PROTECTED_TAGS } from "../repositories/prompt-tag.repository.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
+
+/** An interactive `$transaction` that runs its callback over the scripted transaction client. */
+function transactionOver(tx: object) {
+  return vi.fn(async (run: unknown) => {
+    if (typeof run !== "function") throw new Error("expected an interactive transaction");
+    return run(tx);
+  });
+}
 
 function makeTag(overrides: Record<string, unknown> = {}) {
   return {
@@ -32,9 +38,7 @@ describe("PrismaPromptTagRepository", () => {
         // mock's own call history rather than extracting the generated
         // Prisma client's `findFirst` as an unbound method.
         const findFirst = vi.fn().mockResolvedValue(tag);
-        const mockPrisma = {
-          promptTag: { findFirst },
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({ promptTag: { findFirst } });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.findByName({
@@ -51,11 +55,9 @@ describe("PrismaPromptTagRepository", () => {
 
     describe("when tag does not exist", () => {
       it("returns null", async () => {
-        const mockPrisma = {
-          promptTag: {
-            findFirst: vi.fn().mockResolvedValue(null),
-          },
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({
+          promptTag: { findFirst: vi.fn().mockResolvedValue(null) },
+        });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.findByName({
@@ -84,9 +86,7 @@ describe("PrismaPromptTagRepository", () => {
             deleteMany: vi.fn().mockResolvedValue({ count: 2 }),
           },
         };
-        const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({ $transaction: transactionOver(mockTx) });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await repo.deleteByName({ organizationId, name: "canary" });
@@ -113,9 +113,7 @@ describe("PrismaPromptTagRepository", () => {
           project: { findMany: vi.fn() },
           promptTagAssignment: { deleteMany: vi.fn() },
         };
-        const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<void>) => fn(mockTx)),
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({ $transaction: transactionOver(mockTx) });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await repo.deleteByName({ organizationId, name: "nonexistent" });
@@ -136,9 +134,7 @@ describe("PrismaPromptTagRepository", () => {
             update: vi.fn().mockResolvedValue(updatedTag),
           },
         };
-        const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({ $transaction: transactionOver(mockTx) });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         const result = await repo.rename({
@@ -165,9 +161,7 @@ describe("PrismaPromptTagRepository", () => {
           project: { findMany: vi.fn() },
           promptTagAssignment: { updateMany: vi.fn() },
         };
-        const mockPrisma = {
-          $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
-        } as unknown as PromptTagDatabase;
+        const mockPrisma = prismaDouble({ $transaction: transactionOver(mockTx) });
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
         await expect(

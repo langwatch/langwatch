@@ -1,4 +1,5 @@
 import { DispatchError } from "@langwatch/eventing";
+import { Response as FenceResponse } from "undici";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../ssrf/fenced-fetch.ts", () => ({ fetchValidatedDestination: vi.fn() }));
@@ -12,8 +13,6 @@ import { sendHttpDestination } from "../http-destination.ts";
  * What the sender does with the ANSWER: response caps, teardown, and
  * retry-worthy failures. Fence stubbed; real fence: network unit test.
  */
-
-type FenceResponse = Awaited<ReturnType<typeof fetchValidatedDestination>>;
 
 const mockedFetch = vi.mocked(fetchValidatedDestination);
 
@@ -41,9 +40,7 @@ const send = (overrides?: { maxResponseBytes?: number }) =>
 
 /** A REAL Response, so `body` is a real stream — the sender reads the stream, not `text()`. */
 function fetchResolves(status: number, text: string, headers?: Record<string, string>) {
-  mockedFetch.mockResolvedValue(
-    new Response(text, { status, headers }) as unknown as FenceResponse,
-  );
+  mockedFetch.mockResolvedValue(new FenceResponse(text, { status, headers }));
 }
 
 /** A body that never ends — the shape a hostile receiver uses to stream forever. */
@@ -104,21 +101,19 @@ describe("sendHttpDestination", () => {
 
     /** @scenario "The response body is read only as far as the cap and then cancelled" */
     it("keeps an empty snippet when the body cannot be read at all", async () => {
-      mockedFetch.mockResolvedValue({
-        status: 200,
-        body: new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.error(new Error("stream error"));
-          },
-        }),
-      } as unknown as FenceResponse);
+      const failing = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.error(new Error("stream error"));
+        },
+      });
+      mockedFetch.mockResolvedValue(new FenceResponse(failing, { status: 200 }));
 
       await expect(send()).resolves.toMatchObject({ status: 200, body: "" });
     });
 
     /** @scenario "The response body is read only as far as the cap and then cancelled" */
     it("keeps an empty snippet when there is no body at all", async () => {
-      mockedFetch.mockResolvedValue({ status: 204, body: null } as unknown as FenceResponse);
+      mockedFetch.mockResolvedValue(new FenceResponse(null, { status: 204 }));
 
       await expect(send()).resolves.toMatchObject({ status: 204, body: "" });
     });
@@ -128,10 +123,7 @@ describe("sendHttpDestination", () => {
     /** @scenario "The response body is read only as far as the cap and then cancelled" */
     it("stops at the cap and tears the transfer down instead of draining it", async () => {
       const { stream, wasCancelled } = endlessBody();
-      mockedFetch.mockResolvedValue({
-        status: 200,
-        body: stream,
-      } as unknown as FenceResponse);
+      mockedFetch.mockResolvedValue(new FenceResponse(stream, { status: 200 }));
 
       const result = await send();
 

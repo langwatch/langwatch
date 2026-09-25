@@ -8,7 +8,7 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import {
-  evaluateRules,
+  deriveRuleOutcome,
   type FeatureFlagRules,
   featureFlagRulesWriteSchema,
   parseRules,
@@ -24,7 +24,7 @@ describe("given a rule naming the date a rollout starts", () => {
   describe("when the flag is read for an organization created after that date", () => {
     /** @scenario "a new-users rule enables the flag for an organization created after its date" */
     it("resolves enabled from the rule", () => {
-      const enabled = evaluateRules(NEW_USERS_RULE, {
+      const enabled = deriveRuleOutcome(NEW_USERS_RULE, {
         organizationId: "organization_new",
         organizationCreatedAt: Temporal.Instant.from("2026-07-15T09:00:00.000Z"),
       });
@@ -36,7 +36,7 @@ describe("given a rule naming the date a rollout starts", () => {
   describe("when the flag is read for an organization that predates the rollout", () => {
     /** @scenario "an organization that predates the rollout date sees no change" */
     it("matches nothing, so the read falls through to the row-level default", () => {
-      const enabled = evaluateRules(NEW_USERS_RULE, {
+      const enabled = deriveRuleOutcome(NEW_USERS_RULE, {
         organizationId: "organization_old",
         organizationCreatedAt: Temporal.Instant.from("2025-01-05T09:00:00.000Z"),
       });
@@ -48,7 +48,7 @@ describe("given a rule naming the date a rollout starts", () => {
   describe("when the organization was created at the very start of that date", () => {
     /** @scenario "an organization created on the rollout date itself is included" */
     it("matches, because an operator reads the date as 'from this day on'", () => {
-      const enabled = evaluateRules(NEW_USERS_RULE, {
+      const enabled = deriveRuleOutcome(NEW_USERS_RULE, {
         organizationId: "organization_boundary",
         organizationCreatedAt: Temporal.Instant.from("2026-06-01T00:00:00.000Z"),
       });
@@ -60,15 +60,15 @@ describe("given a rule naming the date a rollout starts", () => {
   describe("when the read carries no organization creation date", () => {
     /** @scenario "a read with no organization creation date matches no age rule" */
     it("does not match, rather than reaching every caller whose age is unknown", () => {
-      expect(evaluateRules(NEW_USERS_RULE, { organizationId: "organization_new" })).toBeNull();
-      expect(evaluateRules(NEW_USERS_RULE, { organizationCreatedAt: null })).toBeNull();
+      expect(deriveRuleOutcome(NEW_USERS_RULE, { organizationId: "organization_new" })).toBeNull();
+      expect(deriveRuleOutcome(NEW_USERS_RULE, { organizationCreatedAt: null })).toBeNull();
     });
   });
 
   describe("when an organization creation date arrives as an ISO string", () => {
     it("compares it the same way it compares a Date, since JSON carries strings", () => {
       expect(
-        evaluateRules(NEW_USERS_RULE, {
+        deriveRuleOutcome(NEW_USERS_RULE, {
           organizationId: "organization_new",
           organizationCreatedAt: "2026-08-20T12:00:00.000Z",
         }),
@@ -84,7 +84,7 @@ describe("given a stored rule whose date is not a date", () => {
 
     expect(rules).toHaveLength(1);
     expect(
-      evaluateRules(rules, {
+      deriveRuleOutcome(rules, {
         organizationId: "organization_new",
         organizationCreatedAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
       }),
@@ -99,7 +99,7 @@ describe("given an age rule alongside rules for named targets", () => {
       { match: { organizationCreatedAfter: ROLLOUT_START }, enabled: true },
     ];
 
-    const enabled = evaluateRules(rules, {
+    const enabled = deriveRuleOutcome(rules, {
       organizationId: "organization_new",
       organizationCreatedAt: Temporal.Instant.from("2026-07-15T09:00:00.000Z"),
     });
@@ -192,28 +192,28 @@ describe("what an operator is allowed to save", () => {
     /** @scenario "an operator cannot save an age rule without a readable date" */
     it("is rejected", () => {
       expect(
-        featureFlagRulesWriteSchema.safeParse([
+        featureFlagRulesWriteSchema.validate([
           {
             match: { organizationCreatedAfter: "next quarter" },
             enabled: true,
           },
-        ]).success,
+        ]),
       ).toBe(false);
     });
   });
 
   describe("when a new-users rule carries a calendar date", () => {
     it("is accepted", () => {
-      expect(featureFlagRulesWriteSchema.safeParse(NEW_USERS_RULE).success).toBe(true);
+      expect(featureFlagRulesWriteSchema.validate(NEW_USERS_RULE)).toBe(true);
     });
   });
 
   describe("when an organization rule carries a padded id", () => {
     it("is still rejected, as it was before age rules existed", () => {
       expect(
-        featureFlagRulesWriteSchema.safeParse([
+        featureFlagRulesWriteSchema.validate([
           { match: { organizationId: " organization_a " }, enabled: true },
-        ]).success,
+        ]),
       ).toBe(false);
     });
   });

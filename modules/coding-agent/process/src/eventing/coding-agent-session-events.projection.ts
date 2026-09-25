@@ -104,9 +104,7 @@ export class CodingAgentSessionEventsMapProjection
     this.options = {
       coalesceMaxBatch: CODING_AGENT_MAP_COALESCE_MAX_BATCH,
       enqueue: {
-        filter: CodingAgentSessionEventsMapProjection.accepts.bind(
-          CodingAgentSessionEventsMapProjection,
-        ),
+        filter: CodingAgentSessionEventsMapProjection.accepts,
       },
     };
   }
@@ -117,13 +115,10 @@ export class CodingAgentSessionEventsMapProjection
     return new CodingAgentSessionEventsMapProjection(deps);
   }
 
-  static accepts(event: { data?: unknown }): boolean {
-    return (
-      CodingAgentSessionEventsMapProjection.resolveEventKind(
-        CodingAgentSessionEventsMapProjection.rawEventName(event),
-      ) !== null
-    );
-  }
+  static readonly accepts = (event: { data?: unknown }): boolean =>
+    CodingAgentSessionEventsMapProjection.resolveEventKind(
+      CodingAgentSessionEventsMapProjection.rawEventName(event),
+    ) !== null;
 
   mapCodingAgentSessionLogFactsContributed(
     event: LogFactsContributedEvent,

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 /**
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
@@ -66,11 +66,11 @@ function compose(
   } = {},
 ) {
   const subscriptions = options.repository ?? repositoryDouble();
-  const database = {
+  const database = prismaDouble({
     organization: {
-      findUnique: vi.fn(() => Promise.resolve({ license: options.license ?? null })),
+      findUnique: async () => ({ license: options.license ?? null }),
     },
-  } as unknown as Pick<PrismaClient, "organization">;
+  });
 
   return {
     subscriptions,

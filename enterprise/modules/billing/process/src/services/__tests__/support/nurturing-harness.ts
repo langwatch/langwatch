@@ -28,7 +28,7 @@ export type NurturingHarness = {
 
 /** Registers a working sink and answers what it sent. */
 export function registerNurturingSink({ failing = false, hanging = false } = {}): NurturingHarness {
-  const fetchFn = vi.fn(async (_url: string | URL | Request, _options?: RequestInit) => {
+  const fetchFn = vi.fn<typeof fetch>(async () => {
     if (hanging) return new Promise<Response>(() => undefined);
     if (failing) throw new Error("customer.io unreachable");
     return new Response(null, { status: 200 });
@@ -38,7 +38,7 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
   setSink(
     NurturingService.create({
       config: { customerIoApiKey: "test-key", customerIoRegion: "us" },
-      fetchFn: fetchFn as unknown as typeof fetch,
+      fetchFn,
       errorReporter,
     }),
   );

@@ -3,7 +3,7 @@ import {
   type CodingAgentReceivedSpan,
   type ContributeSpanFactsCommandData,
   detectCodingAgent,
-  resolveSpanConversationKey,
+  deriveSpanConversationKey,
 } from "@langwatch/coding-agent-contract";
 
 /** The bounded session facts one normalized span contributes, as main's dispatch lifted them. */
@@ -20,7 +20,7 @@ export function liftSpanContribution({
     serviceName: typeof serviceName === "string" ? serviceName : null,
   });
   // The agent's own reading first: codex keeps the session under thread.id, not the shared key.
-  const sessionKey = resolveSpanConversationKey({
+  const sessionKey = deriveSpanConversationKey({
     agent,
     name: span.name,
     attrs: span.spanAttributes,

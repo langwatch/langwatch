@@ -10,7 +10,7 @@ import { z } from "zod";
 
 import type { RetroactiveRetentionRepository } from "../retroactive-retention.repository.ts";
 import {
-  eventLogRetentionCategoryFromMutationCommand,
+  extractEventLogRetentionCategoryFromMutationCommand,
   eventLogRetentionCategoryMutationMarkerSql,
   eventLogRetentionCategorySqlPredicate,
 } from "./event-log-retention-sql.ts";
@@ -225,7 +225,9 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
    */
   private categoryForRow(table: string, command: string | undefined): RetentionCategory | null {
     if (table === EVENT_LOG_TABLE) {
-      return eventLogRetentionCategoryFromMutationCommand(command) ?? this.categoryForTable(table);
+      return (
+        extractEventLogRetentionCategoryFromMutationCommand(command) ?? this.categoryForTable(table)
+      );
     }
     return this.categoryForTable(table);
   }

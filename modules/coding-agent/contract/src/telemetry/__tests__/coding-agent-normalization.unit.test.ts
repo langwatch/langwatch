@@ -16,7 +16,7 @@ import {
   normalizeTokenType,
   parseMcpToolName,
   deriveConversationKey,
-  resolveSpanConversationKey,
+  deriveSpanConversationKey,
   deriveToolName,
   SESSION_CONTEXT_EVENT_NAME,
   deriveSessionTitleFromPrompt,
@@ -119,7 +119,7 @@ describe("deriveConversationKey", () => {
   });
 });
 
-describe("resolveSpanConversationKey", () => {
+describe("deriveSpanConversationKey", () => {
   /**
    * Live-verified on codex 0.147: the turn span's `gen_ai.conversation.id` is
    * the TURN id; the session rides `thread.id`, matching every codex log
@@ -127,7 +127,7 @@ describe("resolveSpanConversationKey", () => {
    */
   it("keys a codex turn span on its thread id, not the per-turn id", () => {
     expect(
-      resolveSpanConversationKey({
+      deriveSpanConversationKey({
         agent: "codex",
         name: "session_task.turn",
         attrs: {
@@ -140,7 +140,7 @@ describe("resolveSpanConversationKey", () => {
 
   it("falls back to the shared order when the thread id is a tokio worker id", () => {
     expect(
-      resolveSpanConversationKey({
+      deriveSpanConversationKey({
         agent: "codex",
         name: "session_task.turn",
         attrs: {
@@ -153,7 +153,7 @@ describe("resolveSpanConversationKey", () => {
 
   it("leaves every other agent on the shared order", () => {
     expect(
-      resolveSpanConversationKey({
+      deriveSpanConversationKey({
         agent: "claude_code",
         name: "claude_code.llm_request",
         attrs: { "gen_ai.conversation.id": "s-1", "thread.id": "t-1" },

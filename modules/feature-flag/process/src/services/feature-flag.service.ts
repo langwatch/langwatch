@@ -1,6 +1,6 @@
 import {
   isExperimentVisibleToTarget,
-  evaluateRules,
+  deriveRuleOutcome,
   ruleContextForTarget,
   resolveExperimentDecision,
   resolveEffectiveForListing,
@@ -378,7 +378,7 @@ export class FeatureFlagService {
       return null;
     }
 
-    const ruleHit = evaluateRules(
+    const ruleHit = deriveRuleOutcome(
       row.rules,
       await this.withOrganizationAge(row.rules, context, flagKey),
       flagKey,

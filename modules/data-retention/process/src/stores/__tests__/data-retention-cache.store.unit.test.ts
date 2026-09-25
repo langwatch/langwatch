@@ -1,9 +1,7 @@
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  RedisDataRetentionCacheStore,
-  type DataRetentionRedis,
-} from "../data-retention-cache.store.ts";
+import { RedisDataRetentionCacheStore } from "../data-retention-cache.store.ts";
 
 const retention = {
   traces: 49,
@@ -17,8 +15,8 @@ describe("RedisDataRetentionCacheStore", () => {
       get: vi.fn().mockRejectedValue(new Error("redis unavailable")),
       setex: vi.fn().mockResolvedValue("OK"),
       del: vi.fn().mockResolvedValue(1),
-    } satisfies DataRetentionRedis;
-    const cache = RedisDataRetentionCacheStore.create({ redis, ttlMs: 60_000 });
+    };
+    const cache = RedisDataRetentionCacheStore.create({ redis: redisDouble(redis), ttlMs: 60_000 });
 
     await cache.set("project", retention);
 

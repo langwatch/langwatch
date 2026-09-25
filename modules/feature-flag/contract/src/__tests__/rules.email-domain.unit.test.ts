@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   emailDomainsOf,
-  evaluateRules,
+  deriveRuleOutcome,
   type FeatureFlagRules,
   featureFlagRulesWriteSchema,
 } from "../feature-flag-rules.ts";
@@ -17,7 +17,7 @@ function domainRule(emailDomain: string | string[]): FeatureFlagRules {
 }
 
 function readFor(rules: FeatureFlagRules, userEmail: string | undefined): boolean | null {
-  return evaluateRules(rules, {
+  return deriveRuleOutcome(rules, {
     organizationId: "organization_1",
     bucketingId: "user_1",
     userEmail,
@@ -52,7 +52,7 @@ describe("given a rule enabling the flag for users at acme.com", () => {
   it("matches nothing rather than every caller whose email is unknown", () => {
     expect(readFor(rules, undefined)).toBeNull();
     expect(readFor(rules, "")).toBeNull();
-    expect(evaluateRules(rules, { organizationId: "organization_1" })).toBeNull();
+    expect(deriveRuleOutcome(rules, { organizationId: "organization_1" })).toBeNull();
   });
 
   it("matches nothing when the email has no @ at all", () => {
@@ -84,13 +84,16 @@ describe("given a rule naming both an organization and a domain", () => {
   /** @scenario "an email domain rule combines with the other conditions" */
   it("combines with the other conditions", () => {
     expect(
-      evaluateRules(rules, { organizationId: "organization_other", userEmail: "qa@acme.com" }),
+      deriveRuleOutcome(rules, { organizationId: "organization_other", userEmail: "qa@acme.com" }),
     ).toBeNull();
     expect(
-      evaluateRules(rules, { organizationId: "organization_acme", userEmail: "qa@acme.com" }),
+      deriveRuleOutcome(rules, { organizationId: "organization_acme", userEmail: "qa@acme.com" }),
     ).toBe(true);
     expect(
-      evaluateRules(rules, { organizationId: "organization_acme", userEmail: "qa@example.com" }),
+      deriveRuleOutcome(rules, {
+        organizationId: "organization_acme",
+        userEmail: "qa@example.com",
+      }),
     ).toBeNull();
   });
 });
@@ -115,15 +118,13 @@ describe("given an operator writing an email domain rule", () => {
       if (result.success) continue;
       expect(result.error.issues[0]?.message).toContain("lowercase domains without the @");
     }
-    expect(featureFlagRulesWriteSchema.safeParse(domainRule([])).success).toBe(false);
-    expect(featureFlagRulesWriteSchema.safeParse(domainRule(["acme.com", ""])).success).toBe(false);
+    expect(featureFlagRulesWriteSchema.validate(domainRule([]))).toBe(false);
+    expect(featureFlagRulesWriteSchema.validate(domainRule(["acme.com", ""]))).toBe(false);
   });
 
   it("accepts domains in their stored form, one or several", () => {
-    expect(featureFlagRulesWriteSchema.safeParse(domainRule("acme.com")).success).toBe(true);
-    expect(featureFlagRulesWriteSchema.safeParse(domainRule(["acme.com", "acme.io"])).success).toBe(
-      true,
-    );
+    expect(featureFlagRulesWriteSchema.validate(domainRule("acme.com"))).toBe(true);
+    expect(featureFlagRulesWriteSchema.validate(domainRule(["acme.com", "acme.io"]))).toBe(true);
   });
 });
 

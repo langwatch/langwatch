@@ -55,7 +55,7 @@ export function deriveConversationKey(attrs: Record<string, unknown>): string | 
  * `deriveSessionKeyFromSpan` hook first, the shared candidate order otherwise. Log and metric
  * callers instead keep {@link deriveConversationKey} — no agent's events need the override.
  */
-export function resolveSpanConversationKey({
+export function deriveSpanConversationKey({
   agent,
   name,
   attrs,

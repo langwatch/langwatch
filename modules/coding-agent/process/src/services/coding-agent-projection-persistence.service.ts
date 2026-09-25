@@ -2,6 +2,7 @@ import {
   CodingAgentProjectionPersistence,
   type CodingAgentSession,
   type CodingAgentSessionEventRecord,
+  type CodingAgentSessionLookup,
   type CodingAgentSessionMetricSeriesRecord,
   type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
@@ -42,12 +43,13 @@ export class CodingAgentProjectionPersistenceService extends CodingAgentProjecti
     return this.repositories.sessions.upsertBatch(rows);
   }
 
-  loadSessionWithApplied(input: {
+  async loadSessionWithApplied(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: CodingAgentSession; appliedEventIds: string[] } | null> {
-    return this.repositories.sessions.findBySessionIdWithApplied(input);
+  }): Promise<CodingAgentSessionLookup> {
+    const found = await this.repositories.sessions.findBySessionIdWithApplied(input);
+    return found ? { kind: "hit", ...found } : { kind: "miss" };
   }
 
   appendTraceSessions(

@@ -1,29 +1,29 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 /**
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { PrismaBillingWebhookOrganizationRepository } from "../prisma.billing-webhook-organization.repository.ts";
 
 function organizationDouble(rows: Record<string, unknown>[] = []) {
   const updates: Record<string, unknown>[] = [];
-  const database = {
+  const database = prismaDouble({
     organization: {
-      findFirst: vi.fn(({ where }: { where: { stripeCustomerId: string } }) => {
-        const found = rows.find((row) => row.stripeCustomerId === where.stripeCustomerId);
-        return Promise.resolve(found ? { id: found.id } : null);
-      }),
-      findUnique: vi.fn(({ where }: { where: { id: string } }) => {
-        const found = rows.find((row) => row.id === where.id);
-        return Promise.resolve(found ? { id: found.id, name: found.name } : null);
-      }),
-      update: vi.fn((args: Record<string, unknown>) => {
-        updates.push(args);
-        return Promise.resolve({});
-      }),
+      findFirst: async (args) => {
+        const found = rows.find((row) => row.stripeCustomerId === args?.where?.stripeCustomerId);
+        return found ? { id: found.id } : null;
+      },
+      findUnique: async (args) => {
+        const found = rows.find((row) => row.id === args.where.id);
+        return found ? { id: found.id, name: found.name } : null;
+      },
+      update: async (args) => {
+        updates.push({ where: args.where, data: args.data });
+        return {};
+      },
     },
-  } as unknown as Pick<PrismaClient, "organization">;
+  });
 
   return {
     updates,

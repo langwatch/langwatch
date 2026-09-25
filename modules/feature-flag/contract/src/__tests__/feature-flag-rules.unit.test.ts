@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  evaluateRules,
+  deriveRuleOutcome,
   type FeatureFlagRules,
+  featureFlagRulesSchema,
   featureFlagRulesWriteSchema,
   parseRules,
   resolveEffectiveForListing,
@@ -10,11 +11,11 @@ import {
 
 const FLAG = "release_ui_agent_testing_v2_enabled";
 
-describe("evaluateRules", () => {
+describe("deriveRuleOutcome", () => {
   describe("when no rule matches", () => {
     it("returns null so callers can fall back to the row default", () => {
       const rules: FeatureFlagRules = [{ match: { organizationId: "org_other" }, enabled: true }];
-      expect(evaluateRules(rules, { organizationId: "org_self" }, FLAG)).toBeNull();
+      expect(deriveRuleOutcome(rules, { organizationId: "org_self" }, FLAG)).toBeNull();
     });
   });
 
@@ -24,7 +25,7 @@ describe("evaluateRules", () => {
         { match: { organizationId: "org_a" }, enabled: true },
         { match: { organizationId: "org_a" }, enabled: false },
       ];
-      expect(evaluateRules(rules, { organizationId: "org_a" }, FLAG)).toBe(true);
+      expect(deriveRuleOutcome(rules, { organizationId: "org_a" }, FLAG)).toBe(true);
     });
   });
 
@@ -35,7 +36,7 @@ describe("evaluateRules", () => {
         { match: { projectId: "proj_x" }, enabled: false },
         { match: { organizationId: "org_a" }, enabled: true },
       ];
-      const enabled = evaluateRules(
+      const enabled = deriveRuleOutcome(
         rules,
         {
           projectId: "proj_x",
@@ -53,7 +54,7 @@ describe("evaluateRules", () => {
         { match: { projectId: "proj_other" }, enabled: false },
         { match: {}, enabled: true },
       ];
-      expect(evaluateRules(rules, { projectId: "proj_self" }, FLAG)).toBe(true);
+      expect(deriveRuleOutcome(rules, { projectId: "proj_self" }, FLAG)).toBe(true);
     });
   });
 
@@ -66,9 +67,9 @@ describe("evaluateRules", () => {
         },
       ];
       expect(
-        evaluateRules(rules, { projectId: "proj_a", organizationId: "org_b" }, FLAG),
+        deriveRuleOutcome(rules, { projectId: "proj_a", organizationId: "org_b" }, FLAG),
       ).toBeNull();
-      expect(evaluateRules(rules, { projectId: "proj_a", organizationId: "org_a" }, FLAG)).toBe(
+      expect(deriveRuleOutcome(rules, { projectId: "proj_a", organizationId: "org_a" }, FLAG)).toBe(
         true,
       );
     });
@@ -81,16 +82,11 @@ describe("evaluateRules", () => {
       // An older reader doesn't know about percentageRollout — without
       // the fail-closed guard this would degenerate to an empty match
       // and turn into a global on-switch.
-      const rules: FeatureFlagRules = [
-        {
-          match: {
-            percentageRollout: 10,
-          } as unknown as FeatureFlagRules[number]["match"],
-          enabled: true,
-        },
-      ];
+      const rules = featureFlagRulesSchema.parse([
+        { match: { percentageRollout: 10 }, enabled: true },
+      ]);
       expect(
-        evaluateRules(
+        deriveRuleOutcome(
           rules,
           {
             projectId: "proj_a",
@@ -114,9 +110,9 @@ describe("a percentage rule", () => {
 
       expect(result.success).toBe(false);
       expect(result.error?.issues[0]?.message).toContain("between 0 and 100");
-      expect(featureFlagRulesWriteSchema.safeParse(rule(-1)).success).toBe(false);
-      expect(featureFlagRulesWriteSchema.safeParse(rule(0)).success).toBe(true);
-      expect(featureFlagRulesWriteSchema.safeParse(rule(100)).success).toBe(true);
+      expect(featureFlagRulesWriteSchema.validate(rule(-1))).toBe(false);
+      expect(featureFlagRulesWriteSchema.validate(rule(0))).toBe(true);
+      expect(featureFlagRulesWriteSchema.validate(rule(100))).toBe(true);
     });
   });
 
@@ -127,10 +123,10 @@ describe("a percentage rule", () => {
       ];
 
       expect(
-        evaluateRules(rules, { organizationId: "org_other", bucketingId: "user_1" }, FLAG),
+        deriveRuleOutcome(rules, { organizationId: "org_other", bucketingId: "user_1" }, FLAG),
       ).toBeNull();
       expect(
-        evaluateRules(rules, { organizationId: "org_acme", bucketingId: "user_1" }, FLAG),
+        deriveRuleOutcome(rules, { organizationId: "org_acme", bucketingId: "user_1" }, FLAG),
       ).toBe(true);
     });
   });
@@ -139,7 +135,7 @@ describe("a percentage rule", () => {
     it("matches nothing rather than bucketing every flag the same way", () => {
       const rules: FeatureFlagRules = [{ match: { percentage: 100 }, enabled: true }];
 
-      expect(evaluateRules(rules, { bucketingId: "user_1" })).toBeNull();
+      expect(deriveRuleOutcome(rules, { bucketingId: "user_1" })).toBeNull();
     });
   });
 });

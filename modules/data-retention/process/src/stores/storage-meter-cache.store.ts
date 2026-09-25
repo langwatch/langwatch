@@ -1,3 +1,4 @@
+import type { Cluster, Redis } from "ioredis";
 import { z } from "zod";
 
 const cachedStorageBytesSchema = z
@@ -19,17 +20,8 @@ type MemoryEntry = {
   expiresAt: number;
 };
 
-export interface StorageMeterRedis {
-  get(key: string): Promise<string | null>;
-  setex(key: string, ttlSeconds: number, value: string): Promise<unknown>;
-  set(
-    key: string,
-    value: string,
-    mode: "EX",
-    ttlSeconds: number,
-    condition: "NX",
-  ): Promise<unknown>;
-}
+/** Only what this cache calls. */
+export type StorageMeterRedis = Pick<Redis | Cluster, "get" | "setex" | "set">;
 
 export abstract class StorageMeterCacheStore {
   abstract get(key: string): Promise<CachedStorageBytesLookup>;
