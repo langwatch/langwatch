@@ -55,6 +55,7 @@ export const analyticsLegacyRest: Readonly<{
     summary: "Query analytics timeseries (legacy path)",
     description: LEGACY_DESCRIPTION,
     tags: ["Analytics"],
+    requestBody: { schema: analyticsTimeseriesRestBodySchema },
     responses: {
       400: {
         description: "The body was not valid JSON, or failed validation",

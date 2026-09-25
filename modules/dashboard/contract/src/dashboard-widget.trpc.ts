@@ -81,4 +81,8 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
   .mutation("assignDashboard")
   .withInput(z.object({ ...projectScopeSchema.shape, id: z.string(), dashboardId: z.string() }))
   .withOutput(dashboardWidgetTrpcSuccessSchema)
+
+  .mutation("delete")
+  .withInput(z.object({ ...projectScopeSchema.shape, id: z.string() }))
+  .withOutput(dashboardWidgetTrpcSuccessSchema)
   .build();

@@ -111,7 +111,7 @@ export const langWatchQLSchemaAppFunctionSchema = z
      */
     kind: z.enum(["extraction", "eval"]),
     /** How many distinct keys of that kind one run may read. */
-    cap: z.number(),
+    cap: z.number().int().positive(),
     /** Permissions that must all be held to call it. Empty for an ungated one. */
     gates: z.array(z.string()).readonly(),
     available: z.boolean(),

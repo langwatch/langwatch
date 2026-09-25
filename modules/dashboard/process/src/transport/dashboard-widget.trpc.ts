@@ -73,4 +73,12 @@ export const dashboardWidgetTrpcTransport = defineTrpcRouter(DashboardApi, dashb
 
     return { success: true as const };
   })
+
+  .procedure("delete")
+  .withPermission("analytics:delete")
+  .handle(async ({ app, input }) => {
+    await app.deleteDashboardWidget({ projectId: input.projectId, id: input.id });
+
+    return { success: true as const };
+  })
   .build();

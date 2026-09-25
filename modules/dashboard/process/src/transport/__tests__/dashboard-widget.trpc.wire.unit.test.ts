@@ -71,7 +71,7 @@ function mounted(app: DashboardApi) {
 
 describe("the dashboard widgets tRPC namespace", () => {
   describe("when the process root composes it", () => {
-    it("serves list, create, update and assignDashboard under dashboardWidgets with main's permissions", () => {
+    it("serves list, create, update, assignDashboard and delete under dashboardWidgets with main's permissions", () => {
       const { requests } = mounted(createDashboardTestApp());
 
       expect(
@@ -85,6 +85,7 @@ describe("the dashboard widgets tRPC namespace", () => {
         ["dashboardWidgets.create", "mutation", "analytics:create"],
         ["dashboardWidgets.update", "mutation", "analytics:update"],
         ["dashboardWidgets.assignDashboard", "mutation", "analytics:update"],
+        ["dashboardWidgets.delete", "mutation", "analytics:delete"],
       ]);
     });
   });
@@ -141,6 +142,18 @@ describe("the dashboard widgets tRPC namespace", () => {
     });
   });
 
+  describe("when the delete mutation removes a widget", () => {
+    it("answers success, as main did, and the widget is gone from the list", async () => {
+      const { call } = mounted(createDashboardTestApp());
+      const created = dashboardWidgetTrpcSchema.parse(await call("create", WIDGET));
+
+      await expect(call("delete", { projectId: PROJECT_ID, id: created.id })).resolves.toEqual({
+        success: true,
+      });
+      await expect(call("list", { projectId: PROJECT_ID })).resolves.toEqual([]);
+    });
+  });
+
   describe("when the project has the custom-chart playground switched off", () => {
     /** @scenario "Every dashboard widget procedure is refused while the custom-chart playground is off" */
     it("refuses every widget procedure with the playground's own code", async () => {
@@ -158,6 +171,9 @@ describe("the dashboard widgets tRPC namespace", () => {
       await expect(
         call("assignDashboard", { projectId: PROJECT_ID, id: "widget-1", dashboardId: "d" }),
       ).rejects.toMatchObject({ code });
+      await expect(call("delete", { projectId: PROJECT_ID, id: "widget-1" })).rejects.toMatchObject(
+        { code },
+      );
     });
   });
 });
