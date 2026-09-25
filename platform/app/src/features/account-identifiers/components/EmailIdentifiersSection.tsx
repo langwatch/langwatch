@@ -180,8 +180,8 @@ function canResendOwnAddress(
 }
 
 /**
- * The email rows, with the own address's resend taken away where the
- * installation has no email provider and so could never send its link.
+ * The email rows, with every resend taken away where the installation has no
+ * email provider and so could never send a link.
  */
 function emailRowsOf({
   rows,
@@ -193,8 +193,7 @@ function emailRowsOf({
   return rows
     .filter((row) => row.provider === "email")
     .map((row) =>
-      confirmation?.canSendConfirmation === false &&
-      row.value === confirmation.email
+      confirmation?.canSendConfirmation === false
         ? { ...row, resendable: false }
         : row,
     );
