@@ -1,9 +1,9 @@
-/** The server half of `invite.*`: every procedure is an administrator's. */
+/** The server half of `invite.*`: an administrator's, except accepting one. */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { inviteTrpc, OrganizationApi } from "@langwatch/organization-contract";
 
-import { callerOf, organizationSessionPersonFact } from "./organization.trpc.ts";
+import { BEFORE_MEMBERSHIP, callerOf, organizationSessionPersonFact } from "./organization.trpc.ts";
 
 export const inviteTrpcTransport = defineTrpcRouter(OrganizationApi, inviteTrpc)
   /**
@@ -35,4 +35,12 @@ export const inviteTrpcTransport = defineTrpcRouter(OrganizationApi, inviteTrpc)
   .procedure("getOrganizationPendingInvites")
   .withPermission("organization:manage")
   .handle(({ app, input }) => app.listPendingInvitations(input))
+
+  /** The invitee's own act: they hold the code and are not a member yet. */
+  .procedure("acceptInvite")
+  .withFacts(organizationSessionPersonFact)
+  .noPermission(BEFORE_MEMBERSHIP)
+  .handle(({ app, input, actor }, person) =>
+    app.acceptInvitation({ inviteCode: input.inviteCode }, callerOf(actor, person)),
+  )
   .build();

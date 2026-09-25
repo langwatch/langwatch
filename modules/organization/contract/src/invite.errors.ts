@@ -6,7 +6,7 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
 
 /**
- * Message thrown by `organization.acceptInvite` when the invite has already
+ * Message thrown by `invite.acceptInvite` when the invite has already
  * been consumed. Shared between server (where it's thrown) and client (where
  * it's matched to trigger a redirect) so the two cannot drift.
  */

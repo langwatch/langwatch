@@ -1,11 +1,11 @@
 /**
- * The server half of `frontDoor.*`, the unauthenticated front door (D13,
+ * The server half of `auth.*`, the unauthenticated front door (D13,
  * ADR-117 §6). Every procedure is throttled and every answer is written to be
  * safe in front of whoever arrived, not whoever it was meant for.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
-import { AuthApi, FrontDoorRateLimitedError, frontDoorTrpc } from "@langwatch/auth-contract";
+import { AuthApi, authTrpc, FrontDoorRateLimitedError } from "@langwatch/auth-contract";
 import { z } from "zod";
 
 /**
@@ -46,7 +46,7 @@ const FRESH_INVITE_REQUEST = publicRoute({
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
 
-export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
+export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
   /**
    * Where this address signs in. A mutation, not a query: a per-address cache
    * entry is an account-existence oracle built out of network timing, and the
@@ -185,7 +185,7 @@ async function spend({
   refusal: string;
 }): Promise<void> {
   const budget = await app.isWithinBudget({
-    key: `frontDoor.${procedure}:${address ?? "unknown"}`,
+    key: `auth.${procedure}:${address ?? "unknown"}`,
     windowSeconds: HOUR_SECONDS,
     max,
   });

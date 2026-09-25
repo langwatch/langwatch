@@ -35,7 +35,7 @@ type SessionPerson = Readonly<{ name: string | null; email: string | null }> | n
  * procedures that make it: each runs before or across membership, so there is
  * no scope to check and no permission the caller could hold.
  */
-const BEFORE_MEMBERSHIP = {
+export const BEFORE_MEMBERSHIP = {
   reason:
     "runs before or across organization membership: creating an organization, listing the caller's own, accepting an invite",
 } as const;
@@ -173,13 +173,6 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .procedure("getMemberProvenance")
   .withPermission("organization:manage")
   .handle(({ app, input }) => app.getMemberProvenance(input))
-
-  .procedure("acceptInvite")
-  .withFacts(organizationSessionPersonFact)
-  .noPermission(BEFORE_MEMBERSHIP)
-  .handle(({ app, input, actor }, person) =>
-    app.acceptInvitation({ inviteCode: input.inviteCode }, callerOf(actor, person)),
-  )
 
   .procedure("updateTeamMemberRole")
   .withFacts(organizationSessionPersonFact)

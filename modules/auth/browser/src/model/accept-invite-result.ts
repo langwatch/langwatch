@@ -1,4 +1,4 @@
-/** Narrows `organization.acceptInvite`, borrowed as `unknown` until it splits. */
+/** Narrows `invite.acceptInvite`'s answer to the fields the join toast and redirect read. */
 import { z } from "zod";
 
 export const acceptInviteResultSchema = z.object({

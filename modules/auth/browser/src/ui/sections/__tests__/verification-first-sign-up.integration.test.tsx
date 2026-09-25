@@ -69,7 +69,7 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
 
   return {
     authApi: {
-      frontDoor: {
+      auth: {
         route: { useMutation: useFakeMutation(routeMock) },
         requestSignUpVerification: {
           useMutation: useFakeMutation(requestVerificationMock),

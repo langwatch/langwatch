@@ -1,5 +1,5 @@
 /**
- * Every `frontDoor.*` procedure, declared once (D13, ADR-117 §6). The names
+ * Every `auth.*` procedure, declared once (D13, ADR-117 §6). The names
  * are the browser's cache keys, so they are the wire names the signed-out
  * screens have always called.
  */
@@ -20,7 +20,7 @@ import {
   frontDoorTokenInputSchema,
 } from "./front-door.schemas.ts";
 
-export const frontDoorTrpc = defineTrpcContract("frontDoor")
+export const authTrpc = defineTrpcContract("auth")
   /**
    * A mutation rather than a query on purpose: a query would be cached and
    * refetched per address, and a per-address cache entry is an

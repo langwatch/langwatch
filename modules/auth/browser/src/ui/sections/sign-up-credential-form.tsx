@@ -99,7 +99,7 @@ export function SignUpCredentialForm({
   // the address follows somebody in rather than standing in front of them, so
   // a slow or failing mailer must not hold up the door it is following them
   // through. A send that does not happen is recoverable from inside the app.
-  const sendConfirmation = api.frontDoor.sendMyAddressConfirmation.useMutation();
+  const sendConfirmation = api.auth.sendMyAddressConfirmation.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);

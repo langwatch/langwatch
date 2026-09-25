@@ -50,8 +50,8 @@ export function VerificationFirstSignUp() {
   const [carriedEmail] = useState(readCarriedEmail);
   useEffect(forgetCarriedEmail, []);
 
-  const requestVerification = api.frontDoor.requestSignUpVerification.useMutation();
-  const completeVerification = api.frontDoor.completeSignUpVerification.useMutation();
+  const requestVerification = api.auth.requestSignUpVerification.useMutation();
+  const completeVerification = api.auth.completeSignUpVerification.useMutation();
   const routing = useSignInRouting();
   const { decide } = routing;
 

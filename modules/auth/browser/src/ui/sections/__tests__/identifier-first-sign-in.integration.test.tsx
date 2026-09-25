@@ -29,7 +29,7 @@ const {
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
-    frontDoor: {
+    auth: {
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,

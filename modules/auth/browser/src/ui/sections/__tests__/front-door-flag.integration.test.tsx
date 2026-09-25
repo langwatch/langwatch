@@ -43,7 +43,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
-    frontDoor: {
+    auth: {
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,

@@ -93,7 +93,7 @@ export function CredentialSignInForm({
   // The same request the sign-up door makes, because from here on it IS the
   // sign-up door: no password travels with it, and the one that was typed
   // above is not kept.
-  const requestSignUpVerification = api.frontDoor.requestSignUpVerification.useMutation();
+  const requestSignUpVerification = api.auth.requestSignUpVerification.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const passwordField = useFocusWhenSettled();

@@ -45,7 +45,7 @@ export function _resetSubmittedInviteCodesForTests(): void {
   inviteOutcomes.clear();
 }
 
-type AcceptInviteMutation = ReturnType<typeof api.organization.acceptInvite.useMutation>;
+type AcceptInviteMutation = ReturnType<typeof api.invite.acceptInvite.useMutation>;
 type AcceptInviteMutationResult = Pick<
   AcceptInviteMutation,
   "isPending" | "isSuccess" | "isError" | "error"
@@ -83,7 +83,7 @@ export function useAcceptInviteOnce({
   inviteCode,
   enabled,
 }: UseAcceptInviteOnceOptions): UseAcceptInviteOnceResult {
-  const mutation = api.organization.acceptInvite.useMutation({
+  const mutation = api.invite.acceptInvite.useMutation({
     onSuccess: (data, variables) => {
       recordInviteOutcome(variables.inviteCode, {
         status: "success",

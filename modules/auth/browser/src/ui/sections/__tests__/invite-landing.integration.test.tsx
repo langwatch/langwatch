@@ -51,7 +51,7 @@ const {
 
 vi.mock("../../../behavior/auth-api.ts", () => ({
   authApi: {
-    frontDoor: {
+    auth: {
       inviteLanding: { useQuery: () => landingRef.current },
       route: {
         useMutation: () => ({
@@ -66,7 +66,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
         }),
       },
     },
-    organization: {
+    invite: {
       acceptInvite: {
         useMutation: () => ({
           mutate: acceptMock,

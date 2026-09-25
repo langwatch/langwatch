@@ -775,7 +775,7 @@ export class AuthApp implements AuthApiContract {
     if (!input.email) throw new NoAddressToConfirmError();
 
     const budget = await this.isWithinBudget({
-      key: `frontDoor.sendMyAddressConfirmation:${input.actorId}`,
+      key: `auth.sendMyAddressConfirmation:${input.actorId}`,
       windowSeconds: 60 * 60,
       max: 10,
     });

@@ -13,7 +13,7 @@ export * from "./browser-session.ts";
 export * from "./cli-session-keys.ts";
 export * from "./front-door.responses.ts";
 export * from "./front-door.schemas.ts";
-export { frontDoorTrpc } from "./front-door.trpc.ts";
+export { authTrpc } from "./auth.trpc.ts";
 export * from "./sign-in-security.ts";
 export { signInSecurityTrpc } from "./sign-in-security.trpc.ts";
 export * from "./session-bound.ts";

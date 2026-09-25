@@ -1,13 +1,15 @@
-/** Every `invite.*` procedure: the invitations an organization's administrators send. */
+/** Every `invite.*` procedure: the invitations administrators send, and accepting one. */
 
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
+  organizationInviteAcceptedSchema,
   organizationInviteResentSchema,
   organizationInvitesCreatedSchema,
   organizationListedInvitesSchema,
 } from "./organization.responses.ts";
 import {
+  organizationApiAcceptInviteInputSchema,
   organizationApiCreateInvitesInputSchema,
   organizationApiInviteScopeSchema,
   organizationApiScopeSchema,
@@ -28,4 +30,8 @@ export const inviteTrpc = defineTrpcContract("invite")
   .query("getOrganizationPendingInvites")
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationListedInvitesSchema)
+
+  .mutation("acceptInvite")
+  .withInput(organizationApiAcceptInviteInputSchema)
+  .withOutput(organizationInviteAcceptedSchema)
   .build();

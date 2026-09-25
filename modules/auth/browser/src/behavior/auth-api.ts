@@ -4,8 +4,8 @@
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
-import type { frontDoorTrpc, signInSecurityTrpc } from "@langwatch/auth-contract";
-import type { joinRequestTrpc } from "@langwatch/organization-contract";
+import type { authTrpc, signInSecurityTrpc } from "@langwatch/auth-contract";
+import type { inviteTrpc, joinRequestTrpc } from "@langwatch/organization-contract";
 import type { identityTrpc } from "@langwatch/user-contract";
 
 /** What an invitation link may say to whoever opens it. */
@@ -15,9 +15,6 @@ export type AuthInviteLanding = {
 };
 
 type BorrowedProcedures = {
-  organization: {
-    acceptInvite: { mutation: { input: { inviteCode: string }; output: unknown } };
-  };
   user: {
     register: {
       mutation: {
@@ -28,9 +25,10 @@ type BorrowedProcedures = {
   };
 };
 
-export type AuthApiMap = ContractApiMap<typeof frontDoorTrpc> &
+export type AuthApiMap = ContractApiMap<typeof authTrpc> &
   ContractApiMap<typeof signInSecurityTrpc> &
   ContractApiMap<typeof joinRequestTrpc> &
+  ContractApiMap<typeof inviteTrpc> &
   ContractApiMap<typeof identityTrpc> &
   BorrowedProcedures;
 

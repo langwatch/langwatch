@@ -34,7 +34,7 @@ const { mutateSpy, toasterCreate, hardRedirectSpy, captureExceptionSpy, mockStat
 
 vi.mock("../auth-api.ts", () => ({
   authApi: {
-    organization: {
+    invite: {
       acceptInvite: {
         useMutation: (handlers: typeof mockState.handlers) => {
           mockState.handlers = handlers;

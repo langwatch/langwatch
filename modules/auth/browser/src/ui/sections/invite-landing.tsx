@@ -15,7 +15,7 @@ import { SignInMethodPicker } from "./sign-in-method-picker.tsx";
 /** Invitation landing: handles signed-out, signed-in, and expired cases. */
 export function InviteLanding({ inviteCode }: { inviteCode: string }) {
   const { data: session } = useSession();
-  const landing = api.frontDoor.inviteLanding.useQuery(
+  const landing = api.auth.inviteLanding.useQuery(
     { inviteCode },
     { retry: false, refetchOnWindowFocus: false },
   );
@@ -74,7 +74,7 @@ function InviteDeadEnd({ error, inviteCode }: { error: unknown; inviteCode: stri
  * who was asked — who runs an organization isn't something an expired link should teach.
  */
 function ExpiredInvite({ error, inviteCode }: { error: unknown; inviteCode: string }) {
-  const ask = api.frontDoor.requestFreshInvite.useMutation();
+  const ask = api.auth.requestFreshInvite.useMutation();
 
   return (
     <AuthCard title="Invitation">
@@ -212,7 +212,7 @@ function ConfirmAndJoin({
   inviteCode: string;
   organizationName: string;
 }) {
-  const accept = api.organization.acceptInvite.useMutation({
+  const accept = api.invite.acceptInvite.useMutation({
     onSuccess: (data) => {
       // A hard navigation on purpose: caches primed with the pre-invite "no
       // organization" state have to go, or the next page bounces the new

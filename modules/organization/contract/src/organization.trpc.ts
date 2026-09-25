@@ -6,14 +6,12 @@ import { z } from "zod";
 import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
-  organizationInviteAcceptedSchema,
   organizationMemberProvenanceByUserSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
   organizationWriteAckSchema,
 } from "./organization.responses.ts";
 import {
-  organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
   organizationApiGetAllInputSchema,
   organizationApiMemberScopeSchema,
@@ -95,10 +93,6 @@ export const organizationTrpc = defineTrpcContract("organization")
   .query("getMemberProvenance")
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationMemberProvenanceByUserSchema)
-
-  .mutation("acceptInvite")
-  .withInput(organizationApiAcceptInviteInputSchema)
-  .withOutput(organizationInviteAcceptedSchema)
 
   .mutation("updateTeamMemberRole")
   .withInput(organizationApiUpdateTeamMemberRoleInputSchema)

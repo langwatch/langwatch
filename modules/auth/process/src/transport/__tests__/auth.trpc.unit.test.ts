@@ -13,7 +13,7 @@ import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { callerEmailFact, frontDoorTrpcTransport } from "../front-door.trpc.ts";
+import { authTrpcTransport, callerEmailFact } from "../auth.trpc.ts";
 import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
 const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
@@ -76,7 +76,7 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
   procedure: trpc.procedure,
   anonymousProcedure: trpc.procedure,
   members: authTrpcTestMembers(),
-}).mount(frontDoorTrpcTransport, () => door, {
+}).mount(authTrpcTransport, () => door, {
   facts: [
     bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
     bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null),
@@ -129,7 +129,7 @@ describe("the signed-out front door", () => {
       await visitor.route({ identifier: "ana@acme.com", breakGlass: undefined });
 
       expect(isWithinBudget).toHaveBeenCalledWith({
-        key: "frontDoor.route:203.0.113.7",
+        key: "auth.route:203.0.113.7",
         windowSeconds: 3600,
         max: 200,
       });
@@ -142,7 +142,7 @@ describe("the signed-out front door", () => {
       await router.createCaller({}).route({ identifier: null, breakGlass: undefined });
 
       expect(isWithinBudget).toHaveBeenCalledWith({
-        key: "frontDoor.route:unknown",
+        key: "auth.route:unknown",
         windowSeconds: 3600,
         max: 200,
       });

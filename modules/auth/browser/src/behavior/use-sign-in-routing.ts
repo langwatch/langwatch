@@ -21,7 +21,7 @@ export function useSignInRouting(): {
   isDeciding: boolean;
   error: unknown;
 } {
-  const route = api.frontDoor.route.useMutation();
+  const route = api.auth.route.useMutation();
   const [decision, setDecision] = useState<RoutingDecision | null>(null);
   const [identifier, setIdentifier] = useState<string | null>(null);
 
