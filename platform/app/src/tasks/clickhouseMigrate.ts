@@ -1,11 +1,21 @@
 import { createLogger } from "@langwatch/observability";
 import { getPrivateClickHouseUrls } from "../server/clickhouse/clickhouseClient";
 import { runMigrations } from "../server/clickhouse/goose";
+import { withClickHouseMigrationLock } from "../server/clickhouse/migrationLock";
 import { reconcileTTL } from "../server/clickhouse/ttlReconciler";
+import { prisma } from "../server/db";
 
 const logger = createLogger("langwatch:task:clickhouseMigrate");
 
 export default async function execute() {
+  if (!process.env.DATABASE_URL) {
+    await migrateAll();
+    return;
+  }
+  await withClickHouseMigrationLock({ prisma }, migrateAll);
+}
+
+async function migrateAll() {
   // Run migrations on the shared instance (from CLICKHOUSE_URL)
   await runMigrations({ verbose: true });
   await reconcileTTL({ verbose: true });
