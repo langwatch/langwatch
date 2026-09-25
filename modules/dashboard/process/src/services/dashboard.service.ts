@@ -8,8 +8,11 @@ import {
   DashboardReorderUnknownIdsError,
   GRAPH_KSUID_RESOURCE,
   graphCreateInputSchema,
+  graphFiltersSchema,
   graphIdSchema,
   graphLayoutSchema,
+  graphNameSchema,
+  graphPayloadSchema,
   GraphNotFoundError,
   graphUpdateInputSchema,
   projectIdSchema,
@@ -202,8 +205,8 @@ export class DashboardService {
       id: generate(GRAPH_KSUID_RESOURCE).toString(),
       projectId: parsed.projectId,
       name: parsed.name,
-      graph: parsed.graph,
-      filters: parsed.filters ?? {},
+      graph: graphPayloadSchema.parse(parsed.graph),
+      filters: graphFiltersSchema.parse(parsed.filters ?? {}),
       dashboardId: parsed.dashboardId ?? null,
       layout,
     });
@@ -223,9 +226,11 @@ export class DashboardService {
     return this.#repository.updateGraph({
       projectId: parsed.projectId,
       graphId: parsed.graphId,
-      ...(parsed.name === undefined ? {} : { name: parsed.name }),
-      ...(parsed.graph === undefined ? {} : { graph: parsed.graph }),
-      ...(parsed.filters === undefined ? {} : { filters: parsed.filters }),
+      ...(parsed.name === undefined ? {} : { name: graphNameSchema.parse(parsed.name) }),
+      ...(parsed.graph === undefined ? {} : { graph: graphPayloadSchema.parse(parsed.graph) }),
+      ...(parsed.filters === undefined
+        ? {}
+        : { filters: graphFiltersSchema.parse(parsed.filters) }),
     });
   }
 

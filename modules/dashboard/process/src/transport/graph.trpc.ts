@@ -177,7 +177,7 @@ function knownFilters(
   const known: Record<string, string[] | Record<string, string[]>> = {};
   for (const [key, value] of Object.entries(filters)) {
     const usable = Array.isArray(value) || (typeof value === "object" && value !== null);
-    if (filterFieldsEnum.validate(key) && usable) {
+    if (filterFieldsEnum.safeParse(key).success && usable) {
       known[key] = value as string[] | Record<string, string[]>;
     }
   }
