@@ -81,6 +81,139 @@ type SummaryEvaluation = Pick<
 >;
 type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
 
+function predictedOf(result: unknown): Record<string, unknown> | null {
+  if (result === undefined || result === null) return null;
+  return typeof result === "object" ? (result as Record<string, unknown>) : { output: result };
+}
+
+type EvaluatorTally = { passed: number; failed: number; scoreSum: number; scoreCount: number };
+type TargetTally = {
+  passed: number;
+  failed: number;
+  latencySum: number;
+  latencyCount: number;
+  cost: number;
+};
+
+/** Crashed evaluators (status "error") count as failures so CI never passes on a crash. */
+function tallyEvaluators(evaluations: readonly SummaryEvaluation[]): {
+  evaluators: Map<string, EvaluatorTally>;
+  totalPassed: number;
+  totalFailed: number;
+  evaluationCost: number;
+} {
+  const evaluators = new Map<string, EvaluatorTally>();
+  let totalPassed = 0;
+  let totalFailed = 0;
+  let evaluationCost = 0;
+  for (const e of evaluations) {
+    const name = e.name ?? e.evaluator ?? "unknown";
+    const stats = evaluators.get(name) ?? { passed: 0, failed: 0, scoreSum: 0, scoreCount: 0 };
+    evaluators.set(name, stats);
+    if (e.status === "error" || e.passed === false) {
+      stats.failed += 1;
+      totalFailed += 1;
+    } else if (e.passed === true) {
+      stats.passed += 1;
+      totalPassed += 1;
+    }
+    if (typeof e.score === "number") {
+      stats.scoreSum += e.score;
+      stats.scoreCount += 1;
+    }
+    if (typeof e.cost === "number") evaluationCost += e.cost;
+  }
+  return { evaluators, totalPassed, totalFailed, evaluationCost };
+}
+
+function targetTallyOf({
+  targets,
+  tid,
+}: {
+  targets: Map<string, TargetTally>;
+  tid: string;
+}): TargetTally {
+  const stats = targets.get(tid) ?? {
+    passed: 0,
+    failed: 0,
+    latencySum: 0,
+    latencyCount: 0,
+    cost: 0,
+  };
+  targets.set(tid, stats);
+  return stats;
+}
+
+function targetSummaries(targets: Map<string, TargetTally>) {
+  return Array.from(targets.entries()).map(([targetId, s]) => ({
+    targetId,
+    name: targetId,
+    passed: s.passed,
+    failed: s.failed,
+    avgLatency: s.latencyCount > 0 ? s.latencySum / s.latencyCount : 0,
+    totalCost: s.cost,
+  }));
+}
+
+function evaluatorSummaries(evaluators: Map<string, EvaluatorTally>) {
+  return Array.from(evaluators.entries()).map(([name, s]) => ({
+    evaluatorId: name,
+    name,
+    passed: s.passed,
+    failed: s.failed,
+    passRate: s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
+    avgScore: s.scoreCount > 0 ? s.scoreSum / s.scoreCount : undefined,
+  }));
+}
+
+function tallyEntryTargets({
+  targets,
+  entries,
+}: {
+  targets: Map<string, TargetTally>;
+  entries: readonly SummaryEntry[];
+}): void {
+  for (const entry of entries) {
+    if (!entry.target_id) continue;
+    const stats = targetTallyOf({ targets, tid: entry.target_id });
+    if (typeof entry.duration === "number") {
+      stats.latencySum += entry.duration;
+      stats.latencyCount += 1;
+    }
+    if (typeof entry.cost === "number") stats.cost += entry.cost;
+  }
+}
+
+function tallyEvaluationTargets({
+  targets,
+  evaluations,
+}: {
+  targets: Map<string, TargetTally>;
+  evaluations: readonly SummaryEvaluation[];
+}): void {
+  for (const e of evaluations) {
+    if (!e.target_id) continue;
+    const stats = targetTallyOf({ targets, tid: e.target_id });
+    if (e.status === "error" || e.passed === false) stats.failed += 1;
+    else if (e.passed === true) stats.passed += 1;
+    if (typeof e.cost === "number") stats.cost += e.cost;
+  }
+}
+
+/** Evaluations seed targets too: one logged with an explicit target_id may have no entry row. */
+function tallyTargets({
+  entries,
+  evaluations,
+}: {
+  entries: readonly SummaryEntry[];
+  evaluations: readonly SummaryEvaluation[];
+}): Map<string, TargetTally> {
+  const targets = new Map<string, TargetTally>();
+  tallyEntryTargets({ targets, entries });
+  tallyEvaluationTargets({ targets, evaluations });
+  return targets;
+}
+
 /**
  * AsyncLocalStorage for iteration context isolation. This stores the current item, index
  * and trace for each iteration, preventing race conditions in concurrent execution.
@@ -297,6 +430,109 @@ export class Experiment {
   /**
    * Execute a single item in the dataset
    */
+  /** Runs one row without a trace of its own: each withTarget() call traces itself. */
+  private async runItemUntraced<T>({
+    iterationContext,
+    item,
+    callback,
+  }: {
+    iterationContext: IterationContext;
+    item: T;
+    callback: RunCallback<T>;
+  }): Promise<{ error: Error | undefined; capturedTraceId: string | null }> {
+    const index = iterationContext.index;
+    let error: Error | undefined;
+    await iterationContextStorage.run(iterationContext, async () => {
+      try {
+        // Create a minimal span context for the callback
+        const span = {
+          setStatus: () => {
+            /* no-op */
+          },
+          recordException: () => {
+            /* no-op */
+          },
+          end: () => {
+            /* no-op */
+          },
+        } as unknown as LangWatchSpan;
+
+        const ctx: RunContext<T> = { item, index, span };
+        const result = callback(ctx);
+
+        if (result && typeof result.then === "function") {
+          await result;
+        }
+      } catch (err) {
+        error = err instanceof Error ? err : new Error(String(err));
+        this.logger.error(`Evaluation error at index ${index}:`, error);
+      }
+    });
+    return { error, capturedTraceId: null };
+  }
+
+  /** Runs one row inside its own iteration span. */
+  private async runItemTraced<T>({
+    tracer,
+    iterationContext,
+    item,
+    callback,
+  }: {
+    tracer: ReturnType<typeof trace.getTracer>;
+    iterationContext: IterationContext;
+    item: T;
+    callback: RunCallback<T>;
+  }): Promise<{ error: Error | undefined; capturedTraceId: string | null }> {
+    const index = iterationContext.index;
+    let error: Error | undefined;
+    let capturedTraceId: string | null = null;
+    await iterationContextStorage.run(iterationContext, async () => {
+      await tracer.startActiveSpan(
+        "evaluation.iteration",
+        {
+          attributes: {
+            "langwatch.origin": "evaluation",
+            "evaluation.run_id": this.runId,
+            "evaluation.index": index,
+          },
+        },
+        async (otelSpan) => {
+          const span = createLangWatchSpan(otelSpan);
+          const spanContext = otelSpan.spanContext();
+          const traceId = spanContext.traceId;
+
+          // The row's own trace, for the log/evaluate/compare calls made
+          // inside it. It rides the iteration context rather than the
+          // instance, so a row reads its own trace and never a neighbour's.
+          iterationContext.traceId = traceId;
+          capturedTraceId = traceId;
+
+          try {
+            const ctx: RunContext<T> = { item, index, span };
+            const result = callback(ctx);
+
+            if (result && typeof result.then === "function") {
+              await result;
+            }
+
+            span.setStatus({ code: SpanStatusCode.OK });
+          } catch (err) {
+            error = err instanceof Error ? err : new Error(String(err));
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error.message,
+            });
+            span.recordException(error);
+            this.logger.error(`Evaluation error at index ${index}:`, error);
+          } finally {
+            span.end();
+          }
+        },
+      );
+    });
+    return { error, capturedTraceId };
+  }
+
   private async executeItem<T>(
     tracer: ReturnType<typeof trace.getTracer>,
     item: T,
@@ -304,8 +540,6 @@ export class Experiment {
     callback: RunCallback<T>,
   ): Promise<void> {
     const startTime = Date.now();
-    let error: Error | undefined;
-    let capturedTraceId: string | null = null;
 
     // Reset withTarget tracking for this iteration
     this.iterationUsedWithTarget.set(index, false);
@@ -315,79 +549,9 @@ export class Experiment {
 
     // If evaluation uses targets, skip creating iteration-level traces
     // Each withTarget() call will create its own independent trace
-    if (this.evaluationUsesTargets) {
-      await iterationContextStorage.run(iterationContext, async () => {
-        try {
-          // Create a minimal span context for the callback
-          const span = {
-            setStatus: () => {
-              /* no-op */
-            },
-            recordException: () => {
-              /* no-op */
-            },
-            end: () => {
-              /* no-op */
-            },
-          } as unknown as LangWatchSpan;
-
-          const ctx: RunContext<T> = { item, index, span };
-          const result = callback(ctx);
-
-          if (result && typeof result.then === "function") {
-            await result;
-          }
-        } catch (err) {
-          error = err instanceof Error ? err : new Error(String(err));
-          this.logger.error(`Evaluation error at index ${index}:`, error);
-        }
-      });
-    } else {
-      await iterationContextStorage.run(iterationContext, async () => {
-        await tracer.startActiveSpan(
-          "evaluation.iteration",
-          {
-            attributes: {
-              "langwatch.origin": "evaluation",
-              "evaluation.run_id": this.runId,
-              "evaluation.index": index,
-            },
-          },
-          async (otelSpan) => {
-            const span = createLangWatchSpan(otelSpan);
-            const spanContext = otelSpan.spanContext();
-            const traceId = spanContext.traceId;
-
-            // The row's own trace, for the log/evaluate/compare calls made
-            // inside it. It rides the iteration context rather than the
-            // instance, so a row reads its own trace and never a neighbour's.
-            iterationContext.traceId = traceId;
-            capturedTraceId = traceId;
-
-            try {
-              const ctx: RunContext<T> = { item, index, span };
-              const result = callback(ctx);
-
-              if (result && typeof result.then === "function") {
-                await result;
-              }
-
-              span.setStatus({ code: SpanStatusCode.OK });
-            } catch (err) {
-              error = err instanceof Error ? err : new Error(String(err));
-              span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: error.message,
-              });
-              span.recordException(error);
-              this.logger.error(`Evaluation error at index ${index}:`, error);
-            } finally {
-              span.end();
-            }
-          },
-        );
-      });
-    }
+    const { error, capturedTraceId } = this.evaluationUsesTargets
+      ? await this.runItemUntraced({ iterationContext, item, callback })
+      : await this.runItemTraced({ tracer, iterationContext, item, callback });
 
     // Only add a dataset entry if withTarget() was NOT used
     // When withTarget() is used, it creates its own dataset entries per target
@@ -806,9 +970,7 @@ export class Experiment {
 
     // On FIRST withTarget() call ever in this evaluation:
     // - Set flag to skip creating iteration-level traces going forward
-    if (!this.evaluationUsesTargets) {
-      this.evaluationUsesTargets = true;
-    }
+    this.evaluationUsesTargets = true;
 
     // Get iteration context (thread-safe via AsyncLocalStorage)
     const iterationContext = iterationContextStorage.getStore();
@@ -889,11 +1051,7 @@ export class Experiment {
     const duration = Date.now() - startTime;
 
     // Serialize the result as "predicted" output (similar to Evaluations V3)
-    let predicted: Record<string, unknown> | null = null;
-    if (result !== undefined && result !== null) {
-      predicted =
-        typeof result === "object" ? (result as Record<string, unknown>) : { output: result };
-    }
+    const predicted = predictedOf(result);
 
     // Create a dataset entry for this target execution (like Evaluations V3)
     // This captures per-target duration/latency properly
@@ -1021,91 +1179,14 @@ export class Experiment {
    * @example
    */
   printSummary(exitOnFailure = true): void {
-    const evaluators = new Map<
-      string,
-      { passed: number; failed: number; scoreSum: number; scoreCount: number }
-    >();
-    let totalPassed = 0;
-    let totalFailed = 0;
-    let totalCost = 0;
-
-    for (const e of this.cumulativeEvaluations) {
-      const name = e.name ?? e.evaluator ?? "unknown";
-      if (!evaluators.has(name)) {
-        evaluators.set(name, { passed: 0, failed: 0, scoreSum: 0, scoreCount: 0 });
-      }
-      const stats = evaluators.get(name)!;
-      // Evaluators that crashed come back as status:"error" with passed often null;
-      // treat them as failures so CI doesn't silently succeed on evaluator crashes.
-      if (e.status === "error" || e.passed === false) {
-        stats.failed += 1;
-        totalFailed += 1;
-      } else if (e.passed === true) {
-        stats.passed += 1;
-        totalPassed += 1;
-      }
-      if (typeof e.score === "number") {
-        stats.scoreSum += e.score;
-        stats.scoreCount += 1;
-      }
-      if (typeof e.cost === "number") {
-        totalCost += e.cost;
-      }
-    }
-
-    const targets = new Map<
-      string,
-      {
-        passed: number;
-        failed: number;
-        latencySum: number;
-        latencyCount: number;
-        cost: number;
-      }
-    >();
-    for (const entry of this.cumulativeEntries) {
-      const tid = entry.target_id;
-      if (!tid) continue;
-      if (!targets.has(tid)) {
-        targets.set(tid, {
-          passed: 0,
-          failed: 0,
-          latencySum: 0,
-          latencyCount: 0,
-          cost: 0,
-        });
-      }
-      const stats = targets.get(tid)!;
-      if (typeof entry.duration === "number") {
-        stats.latencySum += entry.duration;
-        stats.latencyCount += 1;
-      }
-      if (typeof entry.cost === "number") {
-        stats.cost += entry.cost;
-      }
-    }
-    // Lazily seed target stats from evaluations too — a user can log an
-    // evaluation with an explicit target_id without ever going through
-    // withTarget(), in which case the per-target entry row may not carry
-    // target_id. Without this, such a target would be silently dropped from
-    // the per-target summary.
-    for (const e of this.cumulativeEvaluations) {
-      const tid = e.target_id;
-      if (!tid) continue;
-      if (!targets.has(tid)) {
-        targets.set(tid, {
-          passed: 0,
-          failed: 0,
-          latencySum: 0,
-          latencyCount: 0,
-          cost: 0,
-        });
-      }
-      const stats = targets.get(tid)!;
-      if (e.status === "error" || e.passed === false) stats.failed += 1;
-      else if (e.passed === true) stats.passed += 1;
-      if (typeof e.cost === "number") stats.cost += e.cost;
-    }
+    const { evaluators, totalPassed, totalFailed, evaluationCost } = tallyEvaluators(
+      this.cumulativeEvaluations,
+    );
+    let totalCost = evaluationCost;
+    const targets = tallyTargets({
+      entries: this.cumulativeEntries,
+      evaluations: this.cumulativeEvaluations,
+    });
 
     const total = totalPassed + totalFailed;
     const passRate = total > 0 ? (totalPassed / total) * 100 : 0;
@@ -1143,22 +1224,8 @@ export class Experiment {
         totalFailed,
         passRate,
         totalCost,
-        targets: Array.from(targets.entries()).map(([targetId, s]) => ({
-          targetId,
-          name: targetId,
-          passed: s.passed,
-          failed: s.failed,
-          avgLatency: s.latencyCount > 0 ? s.latencySum / s.latencyCount : 0,
-          totalCost: s.cost,
-        })),
-        evaluators: Array.from(evaluators.entries()).map(([name, s]) => ({
-          evaluatorId: name,
-          name,
-          passed: s.passed,
-          failed: s.failed,
-          passRate: s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
-          avgScore: s.scoreCount > 0 ? s.scoreSum / s.scoreCount : undefined,
-        })),
+        targets: targetSummaries(targets),
+        evaluators: evaluatorSummaries(evaluators),
       },
     });
 

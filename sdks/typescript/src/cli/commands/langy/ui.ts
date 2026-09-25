@@ -345,13 +345,8 @@ export function fileOutcome({ call, text }: { call: LocalCall; text: string }): 
       const written = call.params.content === "" ? 0 : call.params.content.split("\n").length;
       return `Wrote ${plural(written, "line")}`;
     }
-    case "local_edit": {
-      const { added, removed } = editCounts(call.params.edits);
-      if (added === 0 && removed === 0) return "No line changed";
-      if (added === 0) return `Removed ${plural(removed, "line")}`;
-      if (removed === 0) return `Added ${plural(added, "line")}`;
-      return `Added ${plural(added, "line")}, removed ${plural(removed, "line")}`;
-    }
+    case "local_edit":
+      return editOutcome(editCounts(call.params.edits));
     case "local_grep": {
       const found = contentLines(text);
       return found.length === 0 || text.startsWith("No line matches")
@@ -374,6 +369,13 @@ export function fileOutcome({ call, text }: { call: LocalCall; text: string }): 
     case "local_bash":
       return "";
   }
+}
+
+function editOutcome({ added, removed }: { added: number; removed: number }): string {
+  if (added === 0 && removed === 0) return "No line changed";
+  if (added === 0) return `Removed ${plural(removed, "line")}`;
+  if (removed === 0) return `Added ${plural(added, "line")}`;
+  return `Added ${plural(added, "line")}, removed ${plural(removed, "line")}`;
 }
 
 /** True when a command ended with a status the developer should see. */

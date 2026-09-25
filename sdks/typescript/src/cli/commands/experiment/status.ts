@@ -84,6 +84,22 @@ export interface ExperimentStatusOptions {
   pollMs?: number;
 }
 
+type RunStatus = {
+  runId?: string;
+  status: string;
+  progress: number;
+  total: number;
+  startedAt?: number;
+  finishedAt?: number;
+  stoppedAt?: number;
+  summary?: {
+    completedCells?: number;
+    failedCells?: number;
+    duration?: number;
+    runUrl?: string;
+  };
+};
+
 export const experimentStatusCommand = async (
   experimentSlug: string,
   options?: ExperimentStatusOptions,
@@ -99,22 +115,6 @@ export const experimentStatusCommand = async (
       experimentSlug,
       runId: options?.runId,
     });
-
-    type RunStatus = {
-      runId?: string;
-      status: string;
-      progress: number;
-      total: number;
-      startedAt?: number;
-      finishedAt?: number;
-      stoppedAt?: number;
-      summary?: {
-        completedCells?: number;
-        failedCells?: number;
-        duration?: number;
-        runUrl?: string;
-      };
-    };
 
     const readStatus = async (): Promise<RunStatus> => {
       try {
@@ -141,36 +141,7 @@ export const experimentStatusCommand = async (
     let status = await readStatus();
 
     if (options?.wait) {
-      const seconds = Number(options.timeout ?? DEFAULT_WAIT_SECONDS);
-      const limitMs =
-        Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : DEFAULT_WAIT_SECONDS * 1000;
-      const deadline = Date.now() + limitMs;
-      const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
-
-      let lastReadError: Error | null = null;
-      while (true) {
-        if (TERMINAL_STATUSES.has(status.status)) break;
-        if (Date.now() >= deadline) break;
-
-        spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
-        await sleep(pollMs);
-        try {
-          status = await readStatus();
-          lastReadError = null;
-        } catch (error) {
-          // One unreadable poll says nothing about the run. The wait keeps the
-          // status it already has and looks again, so a dropped socket at
-          // second 12 of a 60 second wait no longer reports a healthy run as
-          // failed.
-          lastReadError = error instanceof Error ? error : new Error(String(error));
-        }
-      }
-      // Still unreadable when the wait ended: the caller has no current answer,
-      // so they get the failure rather than a stale status dressed up as fresh.
-      if (lastReadError) throw lastReadError;
-      // A run still going when the limit is up is not a failure: the caller
-      // asked how far it had got, and that is what it gets. Failing here would
-      // make a slow run indistinguishable from a broken one.
+      status = await waitForTerminalStatus({ status, readStatus, spinner, runId, options });
     }
 
     const color = statusColor(status.status);
@@ -178,55 +149,105 @@ export const experimentStatusCommand = async (
 
     return {
       data: status,
-      table: () => {
-        console.log();
-        console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
-        console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
-
-        if (status.startedAt) {
-          console.log(
-            `  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`,
-          );
-        }
-        if (status.finishedAt) {
-          console.log(
-            `  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`,
-          );
-        }
-        if (status.stoppedAt) {
-          console.log(
-            `  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`,
-          );
-        }
-
-        if (status.summary) {
-          console.log();
-          console.log(chalk.bold("  Summary:"));
-          if (status.summary.completedCells !== undefined) {
-            console.log(
-              `    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`,
-            );
-          }
-          if (status.summary.failedCells) {
-            console.log(
-              `    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`,
-            );
-          }
-          if (status.summary.duration) {
-            console.log(
-              `    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`,
-            );
-          }
-          if (status.summary.runUrl) {
-            console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
-          }
-        }
-
-        console.log();
-      },
+      table: () => printRunStatus({ status, color }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "check experiment status" });
     process.exit(1);
   }
 };
+
+function printRunStatus({
+  status,
+  color,
+}: {
+  status: RunStatus;
+  color: ReturnType<typeof statusColor>;
+}): void {
+  console.log();
+  console.log(`  ${chalk.gray("Status:")}   ${color(status.status)}`);
+  console.log(`  ${chalk.gray("Progress:")} ${status.progress}/${status.total} cells`);
+
+  if (status.startedAt) {
+    console.log(`  ${chalk.gray("Started:")}  ${new Date(status.startedAt).toLocaleString()}`);
+  }
+  if (status.finishedAt) {
+    console.log(`  ${chalk.gray("Finished:")} ${new Date(status.finishedAt).toLocaleString()}`);
+  }
+  if (status.stoppedAt) {
+    console.log(`  ${chalk.gray("Stopped:")}  ${new Date(status.stoppedAt).toLocaleString()}`);
+  }
+
+  if (status.summary) {
+    console.log();
+    console.log(chalk.bold("  Summary:"));
+    if (status.summary.completedCells !== undefined) {
+      console.log(
+        `    ${chalk.gray("Completed:")} ${chalk.green(String(status.summary.completedCells))}`,
+      );
+    }
+    if (status.summary.failedCells) {
+      console.log(
+        `    ${chalk.gray("Failed:")}    ${chalk.red(String(status.summary.failedCells))}`,
+      );
+    }
+    if (status.summary.duration) {
+      console.log(
+        `    ${chalk.gray("Duration:")}  ${(status.summary.duration / 1000).toFixed(1)}s`,
+      );
+    }
+    if (status.summary.runUrl) {
+      console.log(`    ${chalk.gray("View:")}      ${status.summary.runUrl}`);
+    }
+  }
+
+  console.log();
+}
+
+/** Polls until the run is over or the wait limit is up, keeping the last status read. */
+async function waitForTerminalStatus({
+  status: initial,
+  readStatus,
+  spinner,
+  runId,
+  options,
+}: {
+  status: RunStatus;
+  readStatus: () => Promise<RunStatus>;
+  spinner: ReturnType<typeof createSpinner>;
+  runId: string;
+  options: ExperimentStatusOptions;
+}): Promise<RunStatus> {
+  let status = initial;
+  const seconds = Number(options.timeout ?? DEFAULT_WAIT_SECONDS);
+  const limitMs =
+    Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : DEFAULT_WAIT_SECONDS * 1000;
+  const deadline = Date.now() + limitMs;
+  const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
+
+  let lastReadError: Error | null = null;
+  while (true) {
+    if (TERMINAL_STATUSES.has(status.status)) break;
+    if (Date.now() >= deadline) break;
+
+    spinner.text = `Waiting for run ${runId}: ${status.progress}/${status.total} cells...`;
+    await sleep(pollMs);
+    try {
+      status = await readStatus();
+      lastReadError = null;
+    } catch (error) {
+      // One unreadable poll says nothing about the run. The wait keeps the
+      // status it already has and looks again, so a dropped socket at
+      // second 12 of a 60 second wait no longer reports a healthy run as
+      // failed.
+      lastReadError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+  // Still unreadable when the wait ended: the caller has no current answer,
+  // so they get the failure rather than a stale status dressed up as fresh.
+  if (lastReadError) throw lastReadError;
+  // A run still going when the limit is up is not a failure: the caller
+  // asked how far it had got, and that is what it gets. Failing here would
+  // make a slow run indistinguishable from a broken one.
+  return status;
+}

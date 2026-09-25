@@ -30,69 +30,11 @@ export async function ingestTailCommand(
     process.exit(1);
   }
 
-  if (options.json) {
-    console.log(JSON.stringify(initial, null, 2));
-    if (!options.follow) return;
-  } else {
-    if (initial.length === 0) {
-      console.log(
-        chalk.gray(
-          "No events for this source yet. Once your upstream platform " +
-            "starts sending OTel/audit logs to /api/ingest/* with the " +
-            "source's bearer secret, events will land here.",
-        ),
-      );
-      if (!options.follow) return;
-    } else {
-      // Display oldest-first so a tail-like reader sees the chronology.
-      // (eventsForSource returns DESC; reverse for printing.)
-      const oldestFirst = [...initial].reverse();
-      for (const e of oldestFirst) {
-        printEventLine(e);
-      }
-    }
-  }
+  printInitialEvents({ initial, json: options.json === true });
 
   if (!options.follow) return;
 
-  // Poll every 3s. Track the most recent eventTimestamp + eventIds
-  // we've already printed within the same second so we don't dup
-  // events that share a timestamp.
-  let cursorIso = initial[0]?.eventTimestampIso ?? new Date().toISOString();
-  const seen = new Set<string>(initial.map((e) => e.eventId));
-  process.on("SIGINT", () => {
-    process.stderr.write(chalk.gray("\n^C — exiting tail\n"));
-    process.exit(0);
-  });
-  for (;;) {
-    await wait(3000);
-    let next: ActivityEventDetailRow[];
-    try {
-      // Query without beforeIso — we want the MOST RECENT, then
-      // filter in-memory to anything newer than cursorIso OR a new
-      // eventId at the cursorIso boundary.
-      next = await getEventsForSource(cfg, sourceId, { limit: 50 });
-    } catch (err) {
-      // Transient errors shouldn't kill the follow; print + retry. This is a
-      // deliberate non-terminal warning (the loop continues), so it stays a
-      // one-line yellow write rather than the full reportCommandError block —
-      // but the message is read through the same handled-error reader (scrubbed,
-      // domain-aware) as the terminal path.
-      const msg = readCommandError(err).message;
-      process.stderr.write(chalk.yellow(`warn: ${msg} (retrying)\n`));
-      continue;
-    }
-    const fresh = pickFreshEvents(next, { cursorIso, seen });
-    for (const e of fresh) {
-      if (options.json) {
-        console.log(JSON.stringify(e));
-      } else {
-        printEventLine(e);
-      }
-      seen.add(e.eventId);
-      if (e.eventTimestampIso > cursorIso) cursorIso = e.eventTimestampIso;
-    }
-  }
+  await followEvents({ cfg, sourceId, initial, json: options.json === true });
 }
 
 /**
@@ -131,4 +73,85 @@ export function formatEventLine(e: ActivityEventDetailRow): string {
 
 function printEventLine(e: ActivityEventDetailRow): void {
   console.log(formatEventLine(e));
+}
+
+function printInitialEvents({
+  initial,
+  json,
+}: {
+  initial: ActivityEventDetailRow[];
+  json: boolean;
+}): void {
+  if (json) {
+    console.log(JSON.stringify(initial, null, 2));
+  } else {
+    if (initial.length === 0) {
+      console.log(
+        chalk.gray(
+          "No events for this source yet. Once your upstream platform " +
+            "starts sending OTel/audit logs to /api/ingest/* with the " +
+            "source's bearer secret, events will land here.",
+        ),
+      );
+    } else {
+      // Display oldest-first so a tail-like reader sees the chronology.
+      // (eventsForSource returns DESC; reverse for printing.)
+      const oldestFirst = [...initial].reverse();
+      for (const e of oldestFirst) {
+        printEventLine(e);
+      }
+    }
+  }
+}
+
+/** Polls every 3s and prints each event not seen yet, until interrupted. */
+async function followEvents({
+  cfg,
+  sourceId,
+  initial,
+  json,
+}: {
+  cfg: ReturnType<typeof loadConfig>;
+  sourceId: string;
+  initial: ActivityEventDetailRow[];
+  json: boolean;
+}): Promise<void> {
+  // Poll every 3s. Track the most recent eventTimestamp + eventIds
+  // we've already printed within the same second so we don't dup
+  // events that share a timestamp.
+  let cursorIso = initial[0]?.eventTimestampIso ?? new Date().toISOString();
+  const seen = new Set<string>(initial.map((e) => e.eventId));
+  process.on("SIGINT", () => {
+    process.stderr.write(chalk.gray("\n^C — exiting tail\n"));
+    process.exit(0);
+  });
+  for (;;) {
+    await wait(3000);
+    let next: ActivityEventDetailRow[];
+    try {
+      // Query without beforeIso — we want the MOST RECENT, then
+      // filter in-memory to anything newer than cursorIso OR a new
+      // eventId at the cursorIso boundary.
+      next = await getEventsForSource(cfg, sourceId, { limit: 50 });
+    } catch (err) {
+      // Transient errors shouldn't kill the follow; print + retry. This is a
+      // deliberate non-terminal warning (the loop continues), so it stays a
+      // one-line yellow write rather than the full reportCommandError block —
+      // but the message is read through the same handled-error reader (scrubbed,
+      // domain-aware) as the terminal path.
+      const msg = readCommandError(err).message;
+      process.stderr.write(chalk.yellow(`warn: ${msg} (retrying)\n`));
+      continue;
+    }
+    const fresh = pickFreshEvents(next, { cursorIso, seen });
+    for (const e of fresh) {
+      if (json) {
+        console.log(JSON.stringify(e));
+      } else {
+        printEventLine(e);
+      }
+      seen.add(e.eventId);
+      if (e.eventTimestampIso > cursorIso) cursorIso = e.eventTimestampIso;
+    }
+  }
 }

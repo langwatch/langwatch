@@ -44,75 +44,10 @@ export function getLangWatchTracerFromProvider(
     get(target, prop) {
       switch (prop) {
         case "startActiveSpan":
-          return (...args: any[]) => {
-            const spanArgs = normalizeSpanArgs(args);
-            const options = withDefaultOrigin(spanArgs.options);
-
-            const wrappedFn = (span: Span, ...cbArgs: any[]) =>
-              spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
-
-            if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
-
-            return target.startActiveSpan(spanArgs.name, options, wrappedFn);
-          };
+          return startActiveSpanOf(target);
 
         case "withActiveSpan":
-          return (...args: any[]) => {
-            const spanArgs = normalizeSpanArgs(args);
-            const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
-
-            const cb = (span: Span) => {
-              const wrappedSpan = createLangWatchSpan(span);
-
-              try {
-                const result = spanArgs.fn(wrappedSpan);
-
-                // If result is a promise, handle it async
-                if (result && typeof result.then === "function") {
-                  return result
-                    .then((result: any) => {
-                      wrappedSpan.setStatus({
-                        code: SpanStatusCode.OK,
-                      });
-                      return result;
-                    })
-                    .catch((err: any) => {
-                      wrappedSpan.setStatus({
-                        code: SpanStatusCode.ERROR,
-                        message: err?.message ?? String(err),
-                      });
-                      wrappedSpan.recordException?.(err);
-                      throw err;
-                    })
-                    .finally(() => {
-                      wrappedSpan.end();
-                    });
-                }
-
-                // Sync result - end span and return
-                wrappedSpan.setStatus({
-                  code: SpanStatusCode.OK,
-                });
-                wrappedSpan.end();
-                return result;
-              } catch (err: any) {
-                wrappedSpan.setStatus({
-                  code: SpanStatusCode.ERROR,
-                  message: err?.message ?? String(err),
-                });
-                wrappedSpan.recordException?.(err);
-                wrappedSpan.end();
-                throw err;
-              }
-            };
-
-            // Call target.startActiveSpan to avoid double-wrapping
-            if (spanArgs.context !== void 0)
-              return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
-
-            return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
-          };
+          return withActiveSpanOf(target);
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
@@ -170,4 +105,82 @@ function withDefaultOrigin(options?: SpanOptions): SpanOptions {
       "langwatch.origin": "application",
     },
   };
+}
+
+/** `startActiveSpan` with the callback handed a LangWatch span. */
+function startActiveSpanOf(target: LangWatchTracer) {
+  return (...args: any[]) => {
+    const spanArgs = normalizeSpanArgs(args);
+    const options = withDefaultOrigin(spanArgs.options);
+
+    const wrappedFn = (span: Span, ...cbArgs: any[]) =>
+      spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
+
+    if (spanArgs.context !== void 0)
+      return target.startActiveSpan(spanArgs.name, options, spanArgs.context, wrappedFn);
+
+    return target.startActiveSpan(spanArgs.name, options, wrappedFn);
+  };
+}
+
+/** `withActiveSpan` through the target's own `startActiveSpan`, to avoid double-wrapping. */
+function withActiveSpanOf(target: LangWatchTracer) {
+  return (...args: any[]) => {
+    const spanArgs = normalizeSpanArgs(args);
+    const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
+
+    const cb = (span: Span) => runInLangWatchSpan(span, spanArgs.fn);
+
+    // Call target.startActiveSpan to avoid double-wrapping
+    if (spanArgs.context !== void 0)
+      return target.startActiveSpan(spanArgs.name, optionsWithOrigin, spanArgs.context, cb);
+
+    return target.startActiveSpan(spanArgs.name, optionsWithOrigin, cb);
+  };
+}
+
+/** Runs `fn` in a LangWatch span, setting its status and ending it, sync or async. */
+function runInLangWatchSpan(span: Span, fn: ReturnType<typeof normalizeSpanArgs>["fn"]) {
+  const wrappedSpan = createLangWatchSpan(span);
+
+  try {
+    const result = fn(wrappedSpan);
+
+    // If result is a promise, handle it async
+    if (result && typeof result.then === "function") {
+      return result
+        .then((result: any) => {
+          wrappedSpan.setStatus({
+            code: SpanStatusCode.OK,
+          });
+          return result;
+        })
+        .catch((err: any) => {
+          wrappedSpan.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: err?.message ?? String(err),
+          });
+          wrappedSpan.recordException?.(err);
+          throw err;
+        })
+        .finally(() => {
+          wrappedSpan.end();
+        });
+    }
+
+    // Sync result - end span and return
+    wrappedSpan.setStatus({
+      code: SpanStatusCode.OK,
+    });
+    wrappedSpan.end();
+    return result;
+  } catch (err: any) {
+    wrappedSpan.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: err?.message ?? String(err),
+    });
+    wrappedSpan.recordException?.(err);
+    wrappedSpan.end();
+    throw err;
+  }
 }

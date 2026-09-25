@@ -88,6 +88,18 @@ export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> 
     }
   }
 
+  const removed = removeTargets(present);
+
+  if (willRevoke) {
+    await revokeAndClearSession();
+    if (loggedIn) removed.push("LangWatch device session");
+  }
+
+  printRemoved(removed);
+};
+
+/** Removes each present block, returning the labels of those actually removed. */
+function removeTargets(present: ReturnType<typeof scanTelemetryTargets>): string[] {
   const removed: string[] = [];
   for (const t of present) {
     try {
@@ -96,12 +108,10 @@ export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> 
       console.log(chalk.yellow(`  ! Couldn't remove ${t.label}: ${(err as Error).message}`));
     }
   }
+  return removed;
+}
 
-  if (willRevoke) {
-    await revokeAndClearSession();
-    if (loggedIn) removed.push("LangWatch device session");
-  }
-
+function printRemoved(removed: readonly string[]): void {
   console.log();
   if (removed.length === 0) {
     console.log("Done — nothing needed removing.");
@@ -111,4 +121,4 @@ export const logoutCommand = async (options: LogoutOptions = {}): Promise<void> 
   for (const label of removed) {
     console.log(chalk.green(`  ✓ ${label}`));
   }
-};
+}

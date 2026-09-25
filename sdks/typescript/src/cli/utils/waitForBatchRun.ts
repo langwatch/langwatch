@@ -116,11 +116,7 @@ export async function waitForBatchRun({
   while (!completed) {
     if (Date.now() - startTime > timeoutMs) {
       outcome = "timeout";
-      process.exitCode = 1;
-      pollSpinner.fail(chalk.red(`The ${subject} timed out after ${describeMinutes(timeoutMs)}`));
-      if (!machine) {
-        console.log(chalk.yellow(`Check results in the dashboard. Batch ID: ${batchRunId}`));
-      }
+      reportTimedOutBatch({ batchRunId, subject, machine, timeoutMs, pollSpinner });
       break;
     }
 
@@ -153,18 +149,7 @@ export async function waitForBatchRun({
 
       if (tallies.completed >= total && total > 0) {
         completed = true;
-        if (tallies.failed > 0) {
-          outcome = "failed";
-          pollSpinner.warn(
-            `The ${subject} completed: ${tallies.passed}/${total} passed, ${chalk.red(`${tallies.failed} failed`)}`,
-          );
-          process.exitCode = 1;
-        } else {
-          outcome = "passed";
-          pollSpinner.succeed(
-            `The ${subject} completed: ${chalk.green(`${tallies.passed}/${total} passed`)}`,
-          );
-        }
+        outcome = reportCompletedBatch({ tallies, subject, pollSpinner });
       }
     } catch {
       consecutivePollFailures++;
@@ -183,4 +168,44 @@ export async function waitForBatchRun({
   }
 
   return { outcome, tallies, results: toRunResults(latestRuns) };
+}
+
+type PollSpinner = ReturnType<typeof createSpinner>;
+
+function reportTimedOutBatch({
+  batchRunId,
+  subject,
+  machine,
+  timeoutMs,
+  pollSpinner,
+}: Pick<WaitForBatchRunParams, "batchRunId" | "subject" | "machine" | "timeoutMs"> & {
+  pollSpinner: PollSpinner;
+}): void {
+  process.exitCode = 1;
+  pollSpinner.fail(chalk.red(`The ${subject} timed out after ${describeMinutes(timeoutMs)}`));
+  if (!machine) {
+    console.log(chalk.yellow(`Check results in the dashboard. Batch ID: ${batchRunId}`));
+  }
+}
+
+function reportCompletedBatch({
+  tallies,
+  subject,
+  pollSpinner,
+}: {
+  tallies: BatchRunTallies;
+  subject: string;
+  pollSpinner: PollSpinner;
+}): BatchRunOutcome {
+  if (tallies.failed > 0) {
+    pollSpinner.warn(
+      `The ${subject} completed: ${tallies.passed}/${tallies.total} passed, ${chalk.red(`${tallies.failed} failed`)}`,
+    );
+    process.exitCode = 1;
+    return "failed";
+  }
+  pollSpinner.succeed(
+    `The ${subject} completed: ${chalk.green(`${tallies.passed}/${tallies.total} passed`)}`,
+  );
+  return "passed";
 }

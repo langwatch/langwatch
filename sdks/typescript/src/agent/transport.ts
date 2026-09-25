@@ -316,56 +316,76 @@ export class HttpLongPollSocket implements SocketLike {
 
   private async pollLoop(): Promise<void> {
     while (!this.closed && this.token) {
-      const query =
-        this.inFlight.size > 0
-          ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}`
-          : "";
-      const startedAt = Date.now();
-      let response: Response;
-      try {
-        response = await this.fetchImpl(`${this.url}/poll${query}`, {
-          method: "GET",
-          headers: this.requestHeaders(),
-          signal: this.polls.signal,
-        });
-      } catch (error) {
-        if (!this.closed) this.fail(`the poll failed (${describe(error)})`, 1006);
-        return;
-      }
-      if (this.closed) return;
-      if (response.status === 410) {
-        this.fail(
-          "the platform no longer knows this instance, registering again",
-          SESSION_LOST_CLOSE_CODE,
-        );
-        return;
-      }
-      const body = await this.jsonOf(response);
-      if (!response.ok) {
-        const answered =
-          body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
-        if (answered) this.emitMessage(JSON.stringify(answered));
-        if ((answered as { type?: unknown } | null)?.type === "refused") {
-          // The platform refused the credential: the client prints and gives
-          // up, and closes the connection itself.
-          return;
-        }
-        this.fail(`the poll was answered with HTTP ${response.status}`, 1006);
-        return;
-      }
-      const frames = Array.isArray(body?.frames) ? (body.frames as unknown[]) : [];
-      for (const frame of frames) {
-        const entry = frame as { type?: unknown; callId?: unknown };
-        if (entry.type === "cancel" && typeof entry.callId === "string")
-          this.inFlight.delete(entry.callId);
-        this.emitMessage(JSON.stringify(frame));
-      }
-      for (const listener of this.pingListeners) listener();
-      if (frames.length === 0) {
-        const elapsedMs = Date.now() - startedAt;
-        if (elapsedMs < EMPTY_POLL_FLOOR_MS) await wait(EMPTY_POLL_FLOOR_MS - elapsedMs);
-      }
+      if (!(await this.pollOnce())) return;
     }
+  }
+
+  /** One long poll: delivers what it answered, and says whether polling goes on. */
+  private async pollOnce(): Promise<boolean> {
+    const query =
+      this.inFlight.size > 0 ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}` : "";
+    const startedAt = Date.now();
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.url}/poll${query}`, {
+        method: "GET",
+        headers: this.requestHeaders(),
+        signal: this.polls.signal,
+      });
+    } catch (error) {
+      if (!this.closed) this.fail(`the poll failed (${describe(error)})`, 1006);
+      return false;
+    }
+    if (this.closed) return false;
+    if (response.status === 410) {
+      this.fail(
+        "the platform no longer knows this instance, registering again",
+        SESSION_LOST_CLOSE_CODE,
+      );
+      return false;
+    }
+    const body = await this.jsonOf(response);
+    if (!response.ok) {
+      this.refusePoll({ status: response.status, body });
+      return false;
+    }
+    const delivered = this.deliverFrames(body);
+    for (const listener of this.pingListeners) listener();
+    if (delivered === 0) {
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs < EMPTY_POLL_FLOOR_MS) await wait(EMPTY_POLL_FLOOR_MS - elapsedMs);
+    }
+    return true;
+  }
+
+  private refusePoll({
+    status,
+    body,
+  }: {
+    status: number;
+    body: Record<string, unknown> | null;
+  }): void {
+    const answered =
+      body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
+    if (answered) this.emitMessage(JSON.stringify(answered));
+    if ((answered as { type?: unknown } | null)?.type === "refused") {
+      // The platform refused the credential: the client prints and gives
+      // up, and closes the connection itself.
+      return;
+    }
+    this.fail(`the poll was answered with HTTP ${status}`, 1006);
+  }
+
+  /** Emits every frame a poll answered and returns how many there were. */
+  private deliverFrames(body: Record<string, unknown> | null): number {
+    const frames = Array.isArray(body?.frames) ? (body.frames as unknown[]) : [];
+    for (const frame of frames) {
+      const entry = frame as { type?: unknown; callId?: unknown };
+      if (entry.type === "cancel" && typeof entry.callId === "string")
+        this.inFlight.delete(entry.callId);
+      this.emitMessage(JSON.stringify(frame));
+    }
+    return frames.length;
   }
 
   private async post(data: string): Promise<void> {
@@ -384,15 +404,7 @@ export class HttpLongPollSocket implements SocketLike {
         if (this.frames.signal.aborted) return;
         response = null;
       }
-      if (response?.ok) return;
-      if (response?.status === 410) {
-        this.fail(
-          "the platform no longer knows this instance, registering again",
-          SESSION_LOST_CLOSE_CODE,
-        );
-        return;
-      }
-      if (response && response.status < 500) return;
+      if (this.postSettled(response)) return;
       const delay = POST_RETRY_DELAYS_MS[attempt];
       if (delay === undefined) {
         this.fail(`a frame could not be posted after ${attempt} retries`, 1006);
@@ -400,6 +412,19 @@ export class HttpLongPollSocket implements SocketLike {
       }
       await wait(delay);
     }
+  }
+
+  /** Whether a post's response ends its retries: delivered, refused, or the session lost. */
+  private postSettled(response: Response | null): boolean {
+    if (response?.ok) return true;
+    if (response?.status === 410) {
+      this.fail(
+        "the platform no longer knows this instance, registering again",
+        SESSION_LOST_CLOSE_CODE,
+      );
+      return true;
+    }
+    return response !== null && response.status < 500;
   }
 
   private async jsonOf(response: Response): Promise<Record<string, unknown> | null> {

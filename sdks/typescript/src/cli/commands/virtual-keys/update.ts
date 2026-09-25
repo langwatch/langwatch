@@ -134,26 +134,7 @@ export const updateVirtualKeyCommand = async (
 
     return {
       data: updated,
-      table: () => {
-        console.log();
-        console.log(`${chalk.bold("ID:")}             ${updated.id}`);
-        console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
-        if (updated.description)
-          console.log(`${chalk.bold("Description:")}    ${updated.description}`);
-        console.log(
-          `${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
-        );
-        console.log(
-          `${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`,
-        );
-        console.log(
-          `${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`,
-        );
-        console.log();
-        console.log(chalk.gray("Config after update:"));
-        console.log(JSON.stringify(updated.config, null, 2));
-        console.log();
-      },
+      table: () => printUpdatedKey(updated),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "update virtual key" });
@@ -167,4 +148,22 @@ function traceProjectUpdate(options: { clearTraceProject?: boolean; traceProject
   if (options.clearTraceProject) return { trace_project_id: null };
   if (options.traceProject !== undefined) return { trace_project_id: options.traceProject };
   return {};
+}
+
+function printUpdatedKey(updated: Awaited<ReturnType<VirtualKeysApiService["update"]>>): void {
+  console.log();
+  console.log(`${chalk.bold("ID:")}             ${updated.id}`);
+  console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
+  if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
+  console.log(
+    `${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
+  );
+  console.log(
+    `${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`,
+  );
+  console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
+  console.log();
+  console.log(chalk.gray("Config after update:"));
+  console.log(JSON.stringify(updated.config, null, 2));
+  console.log();
 }

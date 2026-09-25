@@ -227,17 +227,27 @@ export function printSample({
     const traceId = typeof row.TraceId === "string" ? row.TraceId : "";
     console.log();
     console.log(`  ${chalk.bold("Trace")} ${chalk.green(traceId)}`);
-    for (const judgment of judgments.filter((one) => one.traceId === traceId)) {
-      console.log(`    ${chalk.cyan(judgment.questionId)}: ${verdictOf(judgment)}`);
-      const text = row[judgment.questionId];
-      if (typeof text !== "string" || text === "") continue;
-      const shown =
-        text.length > SAMPLE_TEXT_LIMIT ? `${text.slice(0, SAMPLE_TEXT_LIMIT)}\n    […]` : text;
-      for (const line of shown.split("\n")) {
-        console.log(`      ${chalk.gray(line)}`);
-      }
-      // Every question of one row judged the same text, so it is printed once.
-      break;
+    printRowJudgments({ row, judgments: judgments.filter((one) => one.traceId === traceId) });
+  }
+}
+
+function printRowJudgments({
+  row,
+  judgments,
+}: {
+  row: Record<string, unknown>;
+  judgments: readonly InstantEvalJudgment[];
+}): void {
+  for (const judgment of judgments) {
+    console.log(`    ${chalk.cyan(judgment.questionId)}: ${verdictOf(judgment)}`);
+    const text = row[judgment.questionId];
+    if (typeof text !== "string" || text === "") continue;
+    const shown =
+      text.length > SAMPLE_TEXT_LIMIT ? `${text.slice(0, SAMPLE_TEXT_LIMIT)}\n    […]` : text;
+    for (const line of shown.split("\n")) {
+      console.log(`      ${chalk.gray(line)}`);
     }
+    // Every question of one row judged the same text, so it is printed once.
+    break;
   }
 }

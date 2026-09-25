@@ -36,76 +36,80 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
 
     return {
       data: agent,
-      table: () => {
-        console.log();
-        console.log(chalk.bold.cyan(agent.name));
-        console.log(chalk.gray("─".repeat(40)));
-        console.log(`  ${chalk.gray("ID:")}          ${agent.id}`);
-        console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(agent.type)}`);
-        if (agent.environment) {
-          console.log(`  ${chalk.gray("Environment:")} ${agent.environment}`);
-        }
-        if (agent.status) {
-          const status = agent.status === "online" ? chalk.green("online") : chalk.gray("offline");
-          console.log(`  ${chalk.gray("Status:")}      ${status}`);
-        }
-        if (agent.owner?.name) {
-          console.log(`  ${chalk.gray("Owner:")}       ${agent.owner.name}`);
-        } else if (agent.hostLabel) {
-          console.log(`  ${chalk.gray("Host:")}        ${agent.hostLabel}`);
-        }
-        if (agent.selectable === false) {
-          console.log(
-            `  ${chalk.gray("Run:")}         ${chalk.yellow("only its owner can run this agent")}`,
-          );
-        }
-        if (agent.lastSeenAt) {
-          console.log(
-            `  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`,
-          );
-        }
-        console.log(
-          `  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`,
-        );
-        console.log(
-          `  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`,
-        );
-
-        if (agent.platformUrl) {
-          console.log(`  ${chalk.bold("View:")}        ${chalk.underline(agent.platformUrl)}`);
-        }
-
-        if (agent.parameters && agent.parameters.length > 0) {
-          console.log();
-          console.log(chalk.bold("  Parameters:"));
-          for (const parameter of agent.parameters) {
-            console.log(`    ${describeParameter(parameter)}`);
-          }
-        }
-
-        if (agent.instances && agent.instances.length > 0) {
-          console.log();
-          console.log(chalk.bold(`  Instances (${agent.instances.length}):`));
-          for (const instance of agent.instances) {
-            const label = instance.label ? ` (${instance.label})` : "";
-            const since = instance.connectedAt
-              ? ` since ${new Date(instance.connectedAt).toLocaleString()}`
-              : "";
-            console.log(`    ${instance.hostname || instance.id}${label}${since}`);
-          }
-        }
-
-        if (agent.config && Object.keys(agent.config).length > 0) {
-          console.log();
-          console.log(chalk.bold("  Config:"));
-          console.log(`    ${JSON.stringify(agent.config, null, 2).split("\n").join("\n    ")}`);
-        }
-
-        console.log();
-      },
+      table: () => printAgent(agent),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch agent" });
     process.exit(1);
   }
 };
+
+function printAgent(agent: Awaited<ReturnType<AgentsApiService["get"]>>): void {
+  console.log();
+  console.log(chalk.bold.cyan(agent.name));
+  console.log(chalk.gray("─".repeat(40)));
+  console.log(`  ${chalk.gray("ID:")}          ${agent.id}`);
+  console.log(`  ${chalk.gray("Type:")}        ${chalk.yellow(agent.type)}`);
+  if (agent.environment) {
+    console.log(`  ${chalk.gray("Environment:")} ${agent.environment}`);
+  }
+  if (agent.status) {
+    const status = agent.status === "online" ? chalk.green("online") : chalk.gray("offline");
+    console.log(`  ${chalk.gray("Status:")}      ${status}`);
+  }
+  if (agent.owner?.name) {
+    console.log(`  ${chalk.gray("Owner:")}       ${agent.owner.name}`);
+  } else if (agent.hostLabel) {
+    console.log(`  ${chalk.gray("Host:")}        ${agent.hostLabel}`);
+  }
+  if (agent.selectable === false) {
+    console.log(
+      `  ${chalk.gray("Run:")}         ${chalk.yellow("only its owner can run this agent")}`,
+    );
+  }
+  if (agent.lastSeenAt) {
+    console.log(`  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`);
+  }
+  console.log(`  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`);
+  console.log(`  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`);
+
+  if (agent.platformUrl) {
+    console.log(`  ${chalk.bold("View:")}        ${chalk.underline(agent.platformUrl)}`);
+  }
+
+  if (agent.parameters && agent.parameters.length > 0) {
+    console.log();
+    console.log(chalk.bold("  Parameters:"));
+    for (const parameter of agent.parameters) {
+      console.log(`    ${describeParameter(parameter)}`);
+    }
+  }
+
+  printInstances(agent.instances);
+
+  printConfig(agent.config);
+
+  console.log();
+}
+
+function printInstances(
+  instances: Awaited<ReturnType<AgentsApiService["get"]>>["instances"],
+): void {
+  if (!instances || instances.length === 0) return;
+  console.log();
+  console.log(chalk.bold(`  Instances (${instances.length}):`));
+  for (const instance of instances) {
+    const label = instance.label ? ` (${instance.label})` : "";
+    const since = instance.connectedAt
+      ? ` since ${new Date(instance.connectedAt).toLocaleString()}`
+      : "";
+    console.log(`    ${instance.hostname || instance.id}${label}${since}`);
+  }
+}
+
+function printConfig(config: Awaited<ReturnType<AgentsApiService["get"]>>["config"]): void {
+  if (!config || Object.keys(config).length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Config:"));
+  console.log(`    ${JSON.stringify(config, null, 2).split("\n").join("\n    ")}`);
+}

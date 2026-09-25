@@ -57,70 +57,7 @@ export const listCommand = async (
 
       return {
         data: allPrompts,
-        table: () => {
-          if (prompts.length === 0) {
-            console.log();
-            if (cut) {
-              // The cap ran before the published filter, so the page can hold
-              // only drafts while the server holds published prompts too.
-              // Saying "none on the server" here would be false.
-              console.log(
-                chalk.gray(
-                  `No published prompts in the first ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
-                ),
-              );
-              console.log();
-              return;
-            }
-            console.log(chalk.gray("No prompts found on the server."));
-            console.log(chalk.gray("Create your first prompt with:"));
-            console.log(chalk.cyan("  langwatch prompt init"));
-            return;
-          }
-
-          console.log();
-
-          // Format prompts for table display
-          const tableData = prompts.map((prompt) => ({
-            Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
-            Version: prompt.version ? `${prompt.version}` : "N/A",
-            Model: prompt.model ?? "N/A",
-            Tags:
-              prompt.tags && prompt.tags.length > 0
-                ? prompt.tags.map((t) => t.name).join(", ")
-                : chalk.gray("—"),
-            Updated: formatRelativeTime(prompt.updatedAt),
-          }));
-
-          // Display table
-          formatTable({
-            data: tableData,
-            headers: ["Name", "Version", "Model", "Tags", "Updated"],
-            colorMap: {
-              Name: chalk.cyan,
-              Version: chalk.green,
-              Model: chalk.yellow,
-              Tags: chalk.magenta,
-            },
-            emptyMessage: "No prompts found",
-          });
-
-          if (cut) {
-            console.log();
-            console.log(
-              chalk.gray(
-                `Showing ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
-              ),
-            );
-          }
-
-          console.log();
-          console.log(
-            chalk.gray(
-              `Use ${chalk.cyan("langwatch prompt add <name>")} to add a prompt to your project`,
-            ),
-          );
-        },
+        table: () => printPrompts({ prompts, allPrompts, fetched, cut }),
       };
     } catch (error) {
       failSpinner({ spinner, error, action: "fetch prompts" });
@@ -135,3 +72,78 @@ export const listCommand = async (
     process.exit(1);
   }
 };
+
+function printPrompts({
+  prompts,
+  allPrompts,
+  fetched,
+  cut,
+}: {
+  prompts: FetchedPrompts;
+  allPrompts: FetchedPrompts;
+  fetched: FetchedPrompts;
+  cut: boolean;
+}): void {
+  if (prompts.length === 0) {
+    console.log();
+    if (cut) {
+      // The cap ran before the published filter, so the page can hold
+      // only drafts while the server holds published prompts too.
+      // Saying "none on the server" here would be false.
+      console.log(
+        chalk.gray(
+          `No published prompts in the first ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+        ),
+      );
+      console.log();
+      return;
+    }
+    console.log(chalk.gray("No prompts found on the server."));
+    console.log(chalk.gray("Create your first prompt with:"));
+    console.log(chalk.cyan("  langwatch prompt init"));
+    return;
+  }
+
+  console.log();
+
+  // Format prompts for table display
+  const tableData = prompts.map((prompt) => ({
+    Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+    Version: prompt.version ? `${prompt.version}` : "N/A",
+    Model: prompt.model ?? "N/A",
+    Tags:
+      prompt.tags && prompt.tags.length > 0
+        ? prompt.tags.map((t) => t.name).join(", ")
+        : chalk.gray("—"),
+    Updated: formatRelativeTime(prompt.updatedAt),
+  }));
+
+  // Display table
+  formatTable({
+    data: tableData,
+    headers: ["Name", "Version", "Model", "Tags", "Updated"],
+    colorMap: {
+      Name: chalk.cyan,
+      Version: chalk.green,
+      Model: chalk.yellow,
+      Tags: chalk.magenta,
+    },
+    emptyMessage: "No prompts found",
+  });
+
+  if (cut) {
+    console.log();
+    console.log(
+      chalk.gray(
+        `Showing ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+      ),
+    );
+  }
+
+  console.log();
+  console.log(
+    chalk.gray(`Use ${chalk.cyan("langwatch prompt add <name>")} to add a prompt to your project`),
+  );
+}
+
+type FetchedPrompts = Awaited<ReturnType<PromptsApiService["getAll"]>>;

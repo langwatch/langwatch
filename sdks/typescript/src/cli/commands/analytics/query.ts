@@ -160,56 +160,7 @@ export const queryAnalyticsCommand = async (options: {
           metric,
         }),
       },
-      table: () => {
-        console.log();
-        console.log(chalk.bold("Current Period:"));
-
-        if (result.currentPeriod.length === 0) {
-          console.log(chalk.gray("  No data for the current period."));
-        } else {
-          for (const dataPoint of result.currentPeriod) {
-            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
-            const dateStr = dataPoint.date
-              ? new Date(dataPoint.date as number).toLocaleDateString()
-              : "—";
-
-            if (entries.length === 0) {
-              console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
-            } else {
-              const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-                .join(", ");
-              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-            }
-          }
-        }
-
-        if (result.previousPeriod.length > 0) {
-          console.log();
-          console.log(chalk.bold("Previous Period:"));
-          for (const dataPoint of result.previousPeriod) {
-            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
-            const dateStr = dataPoint.date
-              ? new Date(dataPoint.date as number).toLocaleDateString()
-              : "—";
-
-            if (entries.length > 0) {
-              const values = entries
-                .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
-                .join(", ");
-              console.log(`  ${chalk.gray(dateStr)}: ${values}`);
-            }
-          }
-        }
-
-        console.log();
-        console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
-        console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
-          ),
-        );
-      },
+      table: () => printTimeseries(result),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "query analytics" });
@@ -227,4 +178,57 @@ function formatValue(value: unknown): string {
 function parseTimeScale(timeScale: string | undefined): number | "full" | undefined {
   if (timeScale === "full") return "full";
   return timeScale ? Number(timeScale) : void 0;
+}
+
+type Timeseries = Awaited<ReturnType<AnalyticsApiService["timeseries"]>>;
+
+function pointParts(dataPoint: Timeseries["currentPeriod"][number]) {
+  const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
+  const dateStr = dataPoint.date ? new Date(dataPoint.date as number).toLocaleDateString() : "—";
+  return { entries, dateStr };
+}
+
+function printTimeseries(result: Timeseries): void {
+  console.log();
+  console.log(chalk.bold("Current Period:"));
+
+  if (result.currentPeriod.length === 0) {
+    console.log(chalk.gray("  No data for the current period."));
+  } else {
+    for (const dataPoint of result.currentPeriod) {
+      const { entries, dateStr } = pointParts(dataPoint);
+
+      if (entries.length === 0) {
+        console.log(`  ${chalk.gray(dateStr)}: ${chalk.gray("no data")}`);
+      } else {
+        const values = entries
+          .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+          .join(", ");
+        console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+      }
+    }
+  }
+
+  if (result.previousPeriod.length > 0) {
+    console.log();
+    console.log(chalk.bold("Previous Period:"));
+    for (const dataPoint of result.previousPeriod) {
+      const { entries, dateStr } = pointParts(dataPoint);
+
+      if (entries.length > 0) {
+        const values = entries
+          .map(([key, value]) => `${chalk.cyan(key)}: ${formatValue(value)}`)
+          .join(", ");
+        console.log(`  ${chalk.gray(dateStr)}: ${values}`);
+      }
+    }
+  }
+
+  console.log();
+  console.log(chalk.gray("Available presets: " + Object.keys(METRIC_PRESETS).join(", ")));
+  console.log(
+    chalk.gray(
+      `Use ${chalk.cyan("langwatch analytics query --metric <preset> -f json")} for raw data`,
+    ),
+  );
 }

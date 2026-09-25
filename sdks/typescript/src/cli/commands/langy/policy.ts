@@ -928,18 +928,29 @@ export function isReadOnlyGit(args: string[]): boolean {
   const [subcommand, ...operands] = words;
   if (subcommand === undefined) return VERSION_ARGUMENTS.has(args[0] ?? "");
   const rule = GIT_OPERAND_RULES.get(subcommand);
-  if (rule !== undefined) {
-    if (rule.lists === true) {
-      for (const argument of args) {
-        const flagName = argument.split("=")[0]!;
-        if (GIT_LIST_OPTIONS.has(flagName)) return true;
-      }
-    }
-    if (operands.length === 0) return rule.bare;
-    if (rule.refs !== undefined && operands.length <= rule.refs) return true;
-    return operands.length <= 2 && rule.verbs.has(operands[0]!);
-  }
+  if (rule !== undefined) return isReadOnlyGitOperation({ rule, args, operands });
   return READ_ONLY_GIT_SUBCOMMANDS.has(subcommand);
+}
+
+/** A subcommand with an operand rule reads only when listing, bare, or given a read verb. */
+function isReadOnlyGitOperation({
+  rule,
+  args,
+  operands,
+}: {
+  rule: NonNullable<ReturnType<typeof GIT_OPERAND_RULES.get>>;
+  args: string[];
+  operands: string[];
+}): boolean {
+  if (rule.lists === true) {
+    for (const argument of args) {
+      const flagName = argument.split("=")[0]!;
+      if (GIT_LIST_OPTIONS.has(flagName)) return true;
+    }
+  }
+  if (operands.length === 0) return rule.bare;
+  if (rule.refs !== undefined && operands.length <= rule.refs) return true;
+  return operands.length <= 2 && rule.verbs.has(operands[0]!);
 }
 
 /**
@@ -1487,38 +1498,41 @@ export function pathTokensOf(part: CommandPart): string[] {
   const named = new Set<string>();
   let afterEndOfOptions = false;
   for (let index = 0; index < part.tokens.length; index += 1) {
-    const token = part.tokens[index]!;
-    const next = part.tokens[index + 1];
-    if (part.redirectTarget[index] === true) {
-      named.add(token);
-      continue;
-    }
-    if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) {
-      named.add(next);
-      continue;
-    }
-    const equals = /^(--[A-Za-z0-9-]+)=(.+)$/.exec(token);
-    if (equals) {
-      const flag = equals[1]!;
-      const value = equals[2]!;
-      if (DIRECTORY_FLAGS.has(flag)) {
-        named.add(value);
-      } else if (isPathCandidate({ name, token: value, afterEndOfOptions })) {
-        named.add(value);
-      }
-      continue;
-    }
-    if (token === "--") {
-      afterEndOfOptions = true;
-      continue;
-    }
-    if (index === 0) continue;
-    if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) {
-      continue;
-    }
-    if (isPathCandidate({ name, token, afterEndOfOptions })) named.add(token);
+    const step = pathsNamedAt({ part, index, name, afterEndOfOptions });
+    for (const path of step.paths) named.add(path);
+    if (step.endsOptions) afterEndOfOptions = true;
   }
   return [...named];
+}
+
+/** The paths the token at `index` names, and whether it is the `--` that ends options. */
+function pathsNamedAt({
+  part,
+  index,
+  name,
+  afterEndOfOptions,
+}: {
+  part: CommandPart;
+  index: number;
+  name: string;
+  afterEndOfOptions: boolean;
+}): { paths: string[]; endsOptions: boolean } {
+  const token = part.tokens[index]!;
+  const next = part.tokens[index + 1];
+  const named = (...paths: string[]) => ({ paths, endsOptions: false });
+  if (part.redirectTarget[index] === true) return named(token);
+  if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) return named(next);
+  const equals = /^(--[A-Za-z0-9-]+)=(.+)$/.exec(token);
+  if (equals) {
+    const value = equals[2]!;
+    const namesPath =
+      DIRECTORY_FLAGS.has(equals[1]!) || isPathCandidate({ name, token: value, afterEndOfOptions });
+    return namesPath ? named(value) : named();
+  }
+  if (token === "--") return { paths: [], endsOptions: true };
+  if (index === 0) return named();
+  if (isTextArgument({ name, token, quoted: part.quoted[index] === true })) return named();
+  return isPathCandidate({ name, token, afterEndOfOptions }) ? named(token) : named();
 }
 
 /** File names a wildcard is measured against, for the secret-file rule. */

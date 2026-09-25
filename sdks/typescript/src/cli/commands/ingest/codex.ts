@@ -170,6 +170,20 @@ async function runBackfillMode(options: IngestCodexOptions): Promise<void> {
     return;
   }
 
+  reportBackfill({ options, turns, hours, sinceMs });
+}
+
+function reportBackfill({
+  options,
+  turns,
+  hours,
+  sinceMs,
+}: {
+  options: IngestCodexOptions;
+  turns: number;
+  hours: number;
+  sinceMs: number;
+}): void {
   if (options.json) {
     console.log(JSON.stringify({ turns, since: options.all ? null : sinceMs }));
     return;

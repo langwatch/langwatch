@@ -68,37 +68,43 @@ export const runExperimentCommand = async (
 
     return {
       data: status,
-      table: () => {
-        if (runResult.runUrl) {
-          console.log(chalk.gray(`  View at: ${runResult.runUrl}`));
-        }
-        if (status.status !== "completed" || !status.summary) return;
-        console.log();
-        console.log(chalk.bold("  Summary:"));
-        console.log(
-          `    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`,
-        );
-        console.log(
-          `    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`,
-        );
-        if (status.summary.failedCells) {
-          console.log(
-            `    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`,
-          );
-        }
-        if (status.summary.duration) {
-          console.log(
-            `    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`,
-          );
-        }
-        if (status.summary.runUrl) {
-          console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);
-        }
-        console.log();
-      },
+      table: () => printRunStatus({ runUrl: runResult.runUrl, status }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "run experiment" });
     process.exit(1);
   }
 };
+
+function printRunStatus({
+  runUrl,
+  status,
+}: {
+  runUrl: string | undefined;
+  status: Awaited<ReturnType<ExperimentsApiService["getRunStatus"]>>;
+}): void {
+  if (runUrl) {
+    console.log(chalk.gray(`  View at: ${runUrl}`));
+  }
+  if (status.status !== "completed" || !status.summary) return;
+  console.log();
+  console.log(chalk.bold("  Summary:"));
+  console.log(`    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`);
+  console.log(
+    `    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`,
+  );
+  if (status.summary.failedCells) {
+    console.log(
+      `    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`,
+    );
+  }
+  if (status.summary.duration) {
+    console.log(
+      `    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`,
+    );
+  }
+  if (status.summary.runUrl) {
+    console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);
+  }
+  console.log();
+}

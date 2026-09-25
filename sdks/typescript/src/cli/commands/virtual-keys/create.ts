@@ -140,43 +140,51 @@ export const createVirtualKeyCommand = async (
 
     return {
       data: { virtual_key, secret },
-      table: () => {
-        console.log();
-        console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
-        console.log();
-        console.log(`  ${chalk.green(secret)}`);
-        console.log();
-        console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
-        console.log(chalk.cyan('  export OPENAI_API_KEY="' + secret + '"'));
-        console.log(chalk.cyan('  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"'));
-        console.log();
-        console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
-        console.log(chalk.gray("Prefix:         ") + `${virtual_key.display_prefix}...`);
-        console.log(
-          chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "),
-        );
-        console.log(chalk.gray("Routing mode:   ") + virtual_key.routing_mode);
-        if (virtual_key.routing_policy_id) {
-          console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
-        }
-        if (virtual_key.principal_user_id) {
-          console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
-        }
-        if (budget) {
-          console.log(
-            chalk.gray("Budget:         ") +
-              `$${budget.limit_usd} / ${budget.window} (${budget.on_breach ?? "block"})`,
-          );
-        }
-        const detailUrl = virtualKeyDetailUrl(virtual_key.id);
-        if (detailUrl) {
-          console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
-        }
-        console.log();
-      },
+      table: () => printCreatedKey({ virtual_key, secret, budget }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "create virtual key" });
     process.exit(1);
   }
 };
+
+function printCreatedKey({
+  virtual_key,
+  secret,
+  budget,
+}: {
+  virtual_key: Awaited<ReturnType<VirtualKeysApiService["create"]>>["virtual_key"];
+  secret: string;
+  budget: VirtualKeyBudgetInput | undefined;
+}): void {
+  console.log();
+  console.log(chalk.bold.yellow("⚠  Save the secret below NOW. It will not be shown again."));
+  console.log();
+  console.log(`  ${chalk.green(secret)}`);
+  console.log();
+  console.log(chalk.gray("Use it as the API key in OpenAI-compatible clients:"));
+  console.log(chalk.cyan('  export OPENAI_API_KEY="' + secret + '"'));
+  console.log(chalk.cyan('  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"'));
+  console.log();
+  console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
+  console.log(chalk.gray("Prefix:         ") + `${virtual_key.display_prefix}...`);
+  console.log(chalk.gray("Scopes:         ") + virtual_key.scopes.map(formatScope).join(", "));
+  console.log(chalk.gray("Routing mode:   ") + virtual_key.routing_mode);
+  if (virtual_key.routing_policy_id) {
+    console.log(chalk.gray("Routing policy: ") + virtual_key.routing_policy_id);
+  }
+  if (virtual_key.principal_user_id) {
+    console.log(chalk.gray("Principal:      ") + virtual_key.principal_user_id);
+  }
+  if (budget) {
+    console.log(
+      chalk.gray("Budget:         ") +
+        `$${budget.limit_usd} / ${budget.window} (${budget.on_breach ?? "block"})`,
+    );
+  }
+  const detailUrl = virtualKeyDetailUrl(virtual_key.id);
+  if (detailUrl) {
+    console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
+  }
+  console.log();
+}

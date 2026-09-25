@@ -88,16 +88,7 @@ export async function waitForInstantEvalRun({
 
   for (;;) {
     if (Date.now() - startedAt > timeoutMs) {
-      process.exitCode = 1;
-      const minutes = timeoutMs / 60_000;
-      spinner.fail(
-        chalk.red(
-          `Stopped waiting after ${minutes} minute${minutes === 1 ? "" : "s"}. The run is still going.`,
-        ),
-      );
-      if (!machine) {
-        console.log(chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`));
-      }
+      reportTimedOut({ spinner, timeoutMs, machine, runId });
       return {
         outcome: "timeout",
         run: last ?? (await lastResort(service, runId, known)),
@@ -134,20 +125,7 @@ export async function waitForInstantEvalRun({
 
     if (!isOver(run.status)) continue;
 
-    if (run.status === "finished") {
-      spinner.succeed(
-        `Judged ${grouped(run.progress)} row${run.progress === 1 ? "" : "s"}` +
-          (run.matched === null ? "" : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
-      );
-      return { outcome: "finished", run };
-    }
-    if (run.status === "cancelled") {
-      spinner.warn(`The run was cancelled after judging ${grouped(run.progress)} rows.`);
-      return { outcome: "cancelled", run };
-    }
-    process.exitCode = 1;
-    spinner.fail(chalk.red(`The run failed: ${run.error ?? "unknown"}`));
-    return { outcome: "failed", run };
+    return reportOverRun({ run, spinner });
   }
 }
 
@@ -166,4 +144,53 @@ async function lastResort(
   } catch {
     return known;
   }
+}
+
+type WaitSpinner = ReturnType<typeof createSpinner>;
+
+function reportTimedOut({
+  spinner,
+  timeoutMs,
+  machine,
+  runId,
+}: {
+  spinner: WaitSpinner;
+  timeoutMs: number;
+  machine: boolean;
+  runId: string;
+}): void {
+  process.exitCode = 1;
+  const minutes = timeoutMs / 60_000;
+  spinner.fail(
+    chalk.red(
+      `Stopped waiting after ${minutes} minute${minutes === 1 ? "" : "s"}. The run is still going.`,
+    ),
+  );
+  if (!machine) {
+    console.log(chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`));
+  }
+}
+
+/** The result for a run that is over, reported on the spinner by how it ended. */
+function reportOverRun({
+  run,
+  spinner,
+}: {
+  run: InstantEvalRun;
+  spinner: WaitSpinner;
+}): InstantEvalWaitResult {
+  if (run.status === "finished") {
+    spinner.succeed(
+      `Judged ${grouped(run.progress)} row${run.progress === 1 ? "" : "s"}` +
+        (run.matched === null ? "" : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
+    );
+    return { outcome: "finished", run };
+  }
+  if (run.status === "cancelled") {
+    spinner.warn(`The run was cancelled after judging ${grouped(run.progress)} rows.`);
+    return { outcome: "cancelled", run };
+  }
+  process.exitCode = 1;
+  spinner.fail(chalk.red(`The run failed: ${run.error ?? "unknown"}`));
+  return { outcome: "failed", run };
 }

@@ -47,27 +47,44 @@ export function readClaudeSessionName({
     return null;
   }
 
+  return newestSessionName({ registryDir, entries, sessionId });
+}
+
+/** The name the most recently updated registry entry gives the session. */
+function newestSessionName({
+  registryDir,
+  entries,
+  sessionId,
+}: {
+  registryDir: string;
+  entries: string[];
+  sessionId: string;
+}): string | null {
   let name: string | null = null;
   let newest = -1;
   for (const entry of entries.slice(0, MAX_REGISTRY_FILES)) {
     if (!entry.endsWith(".json")) continue;
-    const file = join(registryDir, entry);
-    try {
-      if (statSync(file).size > MAX_REGISTRY_FILE_BYTES) continue;
-      const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
-      if (typeof parsed !== "object" || parsed === null) continue;
-      const record = parsed as Record<string, unknown>;
-      if (record.sessionId !== sessionId) continue;
-      if (typeof record.name !== "string") continue;
+    for (const record of findRegistryRecord(join(registryDir, entry))) {
+      if (record.sessionId !== sessionId || typeof record.name !== "string") continue;
       const updatedAt = typeof record.updatedAt === "number" ? record.updatedAt : 0;
       if (updatedAt < newest) continue;
       newest = updatedAt;
       name = record.name;
-    } catch {
-      // A file claude was mid-write on, or one that is not a registry
-      // entry at all. Either way it names nothing.
-      void 0;
     }
   }
   return name;
+}
+
+/** The record one registry file holds, or none when it is oversized, torn or not an object. */
+function findRegistryRecord(file: string): Record<string, unknown>[] {
+  try {
+    if (statSync(file).size > MAX_REGISTRY_FILE_BYTES) return [];
+    const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+    if (typeof parsed !== "object" || parsed === null) return [];
+    return [parsed as Record<string, unknown>];
+  } catch {
+    // A file claude was mid-write on, or one that is not a registry
+    // entry at all. Either way it names nothing.
+    return [];
+  }
 }

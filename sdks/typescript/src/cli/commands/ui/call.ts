@@ -42,6 +42,39 @@ const readPayloadFile = async (file: string): Promise<string> => {
   }
 };
 
+/** The JSON payload the flags name, `{}` when none, or "refused" once the reason is on stderr. */
+async function readPayloadFlag(options: {
+  payload?: string;
+  payloadFile?: string;
+}): Promise<{ payload: unknown } | "refused"> {
+  let source: { flag: string; read: () => Promise<string> } | null = null;
+  if (options.payloadFile) {
+    const payloadFile = options.payloadFile;
+    source = { flag: "--payload-file", read: () => readPayloadFile(payloadFile) };
+  } else if (options.payload) {
+    const payload = options.payload;
+    source = { flag: "--payload", read: async () => payload };
+  }
+  if (source) {
+    let raw: string;
+    try {
+      raw = await source.read();
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exitCode = 1;
+      return "refused";
+    }
+    try {
+      return { payload: JSON.parse(raw) };
+    } catch {
+      process.stderr.write(`${source.flag} is not valid JSON\n`);
+      process.exitCode = 1;
+      return "refused";
+    }
+  }
+  return { payload: {} };
+}
+
 /**
  * Dispatch one typed UI action to the page the user has open, and print the result
  * (specs/langy/langy-ui-actions.feature).
@@ -75,32 +108,9 @@ export const uiCallCommand = async (
     return;
   }
 
-  let payload: unknown = {};
-  let source: { flag: string; read: () => Promise<string> } | null = null;
-  if (options.payloadFile) {
-    const payloadFile = options.payloadFile;
-    source = { flag: "--payload-file", read: () => readPayloadFile(payloadFile) };
-  } else if (options.payload) {
-    const payload = options.payload;
-    source = { flag: "--payload", read: async () => payload };
-  }
-  if (source) {
-    let raw: string;
-    try {
-      raw = await source.read();
-    } catch (error) {
-      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-      process.exitCode = 1;
-      return;
-    }
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      process.stderr.write(`${source.flag} is not valid JSON\n`);
-      process.exitCode = 1;
-      return;
-    }
-  }
+  const read = await readPayloadFlag(options);
+  if (read === "refused") return;
+  const payload = read.payload;
 
   let response: Response;
   let text: string;

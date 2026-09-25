@@ -171,28 +171,35 @@ const readScope = (value: unknown): RegisteredAgentScope => {
   return { kind: "shared" };
 };
 
+/** One agent of a registered frame, or null when the entry is malformed. */
+const readRegisteredAgent = (entry: unknown): RegisteredAgent | null => {
+  if (!isRecord(entry)) return null;
+  if (!isString(entry.name)) return null;
+  let id: string | null = null;
+  if (isString(entry.id)) {
+    id = entry.id;
+  } else if (isString(entry.agentId)) {
+    id = entry.agentId;
+  }
+  if (id === null) return null;
+  return {
+    name: entry.name,
+    environment: isString(entry.environment) ? entry.environment : "",
+    id,
+    url: isString(entry.url) ? entry.url : "",
+    parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
+    scope: readScope(entry.scope),
+  };
+};
+
 const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null => {
   if (!Array.isArray(frame.agents)) return null;
   if (!isString(frame.instanceId)) return null;
   const agents: RegisteredAgent[] = [];
   for (const entry of frame.agents) {
-    if (!isRecord(entry)) return null;
-    if (!isString(entry.name)) return null;
-    let id: string | null = null;
-    if (isString(entry.id)) {
-      id = entry.id;
-    } else if (isString(entry.agentId)) {
-      id = entry.agentId;
-    }
-    if (id === null) return null;
-    agents.push({
-      name: entry.name,
-      environment: isString(entry.environment) ? entry.environment : "",
-      id,
-      url: isString(entry.url) ? entry.url : "",
-      parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
-      scope: readScope(entry.scope),
-    });
+    const agent = readRegisteredAgent(entry);
+    if (agent === null) return null;
+    agents.push(agent);
   }
   return {
     type: "registered",
