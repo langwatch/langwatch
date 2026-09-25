@@ -350,7 +350,7 @@
 		"vega-embed": "7.1.0",
 		"vega-lite": "6.4.3",
 		"vite": "^8.1.2",
-		"vitest": "^4.1.9",
+		"vitest": "^5.0.1",
 		"zundo": "^2.3.0"
 	},
 	"ct3aMetadata": {
