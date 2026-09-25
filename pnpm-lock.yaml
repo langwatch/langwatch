@@ -6022,6 +6022,9 @@ importers:
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
+      ioredis:
+        specifier: 'catalog:'
+        version: 5.10.1
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -8235,6 +8238,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability

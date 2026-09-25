@@ -35,6 +35,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
+    "ioredis": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
