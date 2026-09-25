@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
+import { GroupStagingScripts } from "../scripts.ts";
 
 /** Released by hand so the drain can be held open mid-close. */
 let releaseDrain: (() => void) | undefined;
@@ -80,10 +81,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
     const processor = new GroupQueueProcessor<TestPayload>(makeDefinition(), conn, {
       consumerEnabled: true,
     });
-    vi.spyOn(
-      (processor as unknown as { scripts: { retireWorker: () => unknown } }).scripts,
-      "retireWorker",
-    ).mockResolvedValue(undefined as never);
+    vi.spyOn(GroupStagingScripts.prototype, "retireWorker").mockResolvedValue(undefined);
     return processor;
   }
 

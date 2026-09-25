@@ -84,9 +84,21 @@ describe("GroupQueueProcessor - Poison guard", () => {
   const seedDeadOwner = (name: string, groupId: string, deaths?: number) =>
     sharedSeedDeadOwner({ redis, queueName: name, groupId, deaths });
 
-  /** The identity a queue stamps onto the claims it takes. */
-  const workerIdOf = (queue: GroupQueueProcessor<TestPayload>) =>
-    (queue as unknown as { workerId: string }).workerId;
+  /** The identity a queue stamps onto the claims it takes, read off the beacon it publishes. */
+  const workerIdOf = async (name: string): Promise<string> => {
+    const prefix = beaconKey(name, "");
+    let ids: string[] = [];
+    await vi.waitFor(
+      async () => {
+        ids = (await redis.keys(`${prefix}*`))
+          .map((key) => key.slice(prefix.length))
+          .filter((id) => !id.includes(":"));
+        expect(ids).toHaveLength(1);
+      },
+      { timeout: 5000, interval: 20 },
+    );
+    return ids[0]!;
+  };
 
   describe("given a claim marker whose owner is still running", () => {
     describe("when another worker claims the same group", () => {
@@ -178,7 +190,7 @@ describe("GroupQueueProcessor - Poison guard", () => {
           await handlerGate;
         });
         await queue.waitUntilReady();
-        const workerId = workerIdOf(queue);
+        const workerId = await workerIdOf(name);
 
         await queue.send({ id: "job-1", groupId: "slow", value: "x" });
         await handlerEntered;
@@ -224,7 +236,7 @@ describe("GroupQueueProcessor - Poison guard", () => {
           await handlerGate;
         });
         await queue.waitUntilReady();
-        const workerId = workerIdOf(queue);
+        const workerId = await workerIdOf(name);
 
         // A real claim marker, written by the real claim path.
         await queue.send({ id: "job-1", groupId: "outlived", value: "x" });
@@ -254,7 +266,7 @@ describe("GroupQueueProcessor - Poison guard", () => {
       it("reads the previous owner as retired rather than dead", async () => {
         const { queue: retiring, name } = createQueue(async () => {});
         await retiring.waitUntilReady();
-        const retiredWorkerId = workerIdOf(retiring);
+        const retiredWorkerId = await workerIdOf(name);
         await retiring.close();
 
         // A claim the retired worker still owned when it exited, already one
@@ -298,7 +310,7 @@ describe("GroupQueueProcessor - Poison guard", () => {
         await queue.waitUntilReady();
 
         await redis.hset(claimKey(name, "self"), {
-          owner: workerIdOf(queue),
+          owner: await workerIdOf(name),
           deaths: String(DEFAULT_CONFIRMED_DEATH_THRESHOLD - 1),
           stagedJobId: "staged-under-the-lapsed-lease",
         });
@@ -410,12 +422,7 @@ describe("GroupQueueProcessor - Poison guard", () => {
         const { queue, name } = createQueue(processed);
         await queue.waitUntilReady();
 
-        const internals = queue as unknown as {
-          scripts: {
-            releaseClaim: (params: { groupId: string; workerId: string }) => Promise<void>;
-          };
-        };
-        vi.spyOn(internals.scripts, "releaseClaim").mockResolvedValue(undefined);
+        vi.spyOn(GroupStagingScripts.prototype, "releaseClaim").mockResolvedValue(undefined);
 
         const jobs = DEFAULT_CONFIRMED_DEATH_THRESHOLD * 3;
         for (let i = 0; i < jobs; i++) {

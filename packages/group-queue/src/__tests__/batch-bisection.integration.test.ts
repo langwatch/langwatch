@@ -123,10 +123,12 @@ describe("GroupQueueProcessor — batch bisection", () => {
     processFn,
     overrides,
     payloads,
+    options = {},
   }: {
     processFn: (payload: TestPayload) => Promise<void>;
     overrides: Partial<GroupQueueRuntimeDefinition<TestPayload>>;
     payloads: TestPayload[];
+    options?: { policy?: { bisectionSplitBudget?: number } };
   }): Promise<GroupQueueProcessor<TestPayload>> {
     const name = `{test/bisect/${crypto.randomUUID().slice(0, 8)}}`;
     const producer = new GroupQueueProcessor<TestPayload>(
@@ -143,7 +145,7 @@ describe("GroupQueueProcessor — batch bisection", () => {
     queues.push(producer);
     await producer.sendBatch(payloads);
 
-    const consumer = createQueue(processFn, { ...overrides, name });
+    const consumer = createQueue(processFn, { ...overrides, name }, options);
     await consumer.waitUntilReady();
     return consumer;
   }
@@ -405,35 +407,32 @@ describe("GroupQueueProcessor — batch bisection", () => {
     /** @scenario Setting the split budget to zero disables bisection */
     it("never splits, restoring the pre-bisection behaviour", async () => {
       const sizes: number[] = [];
-      const queue = createQueue(
-        async () => {},
-        {
+
+      await stageThenConsume({
+        processFn: async () => {},
+        overrides: {
           processBatch: async (ps) => {
             sizes.push(ps.length);
             throw new Error("retryable");
           },
           coalesceMaxBatch: () => 8,
+          score: (p) => Number(p.value) * 1000,
         },
-        { policy: { bisectionSplitBudget: 0 } },
+        payloads: orderedPayloads(4),
+        options: { policy: { bisectionSplitBudget: 0 } },
+      });
+
+      await vi.waitFor(
+        () => {
+          expect(sizes.length).toBeGreaterThan(0);
+        },
+        { timeout: 30000, interval: 50 },
       );
-      await queue.waitUntilReady();
 
-      const entries = Array.from({ length: 4 }, (_, i) => ({
-        payload: { id: `j${i}`, groupId: "group-a", value: String(i) },
-        stagedJobId: `job-${i}`,
-      }));
-
-      await expect(
-        (queue as unknown as BisectingQueue).processBatchBisecting({
-          entries,
-          attempt: 1,
-          routingLabels: ROUTING_LABELS,
-          span: FAKE_SPAN,
-        }),
-      ).rejects.toThrow("retryable");
-
-      // One call, the whole batch, no descent.
-      expect(sizes).toEqual([4]);
+      // Give any split a chance to appear before asserting none did.
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(sizes.every((n) => n === sizes[0])).toBe(true);
+      expect(Math.min(...sizes)).toBeGreaterThan(1);
     });
   });
 

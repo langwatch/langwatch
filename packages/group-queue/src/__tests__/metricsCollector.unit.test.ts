@@ -162,6 +162,17 @@ function makeLogger() {
   };
 }
 
+const METRICS_INTERVAL_MS = 60_000;
+const realSetImmediate = setImmediate;
+/** Every cycle's reads are microtasks, so one real macrotask turn lets a fired cycle finish. */
+const settle = () => new Promise<void>((resolve) => realSetImmediate(resolve));
+const running: GroupQueueMetricsCollector[] = [];
+
+afterEach(() => {
+  for (const collector of running.splice(0)) collector.stop();
+});
+
+/** Drives cycles through the public timer: the first fire is `start`, then interval ticks. */
 function makeCollector({
   redis,
   logger = makeLogger(),
@@ -175,11 +186,26 @@ function makeCollector({
     redisConnection: redis,
     queueName: QUEUE,
     activeJobCountFn: () => 0,
-    metricsIntervalMs: 60_000,
+    metricsIntervalMs: METRICS_INTERVAL_MS,
     logger: logger as never,
   });
-  // collect() is private; drive cycles directly.
-  return collector as unknown as { collect: () => Promise<void> };
+  let started = false;
+  const fire = () => {
+    if (started) {
+      vi.advanceTimersByTime(METRICS_INTERVAL_MS);
+      return;
+    }
+    started = true;
+    running.push(collector);
+    collector.start();
+  };
+  return {
+    fire,
+    collect: async () => {
+      fire();
+      await settle();
+    },
+  };
 }
 
 /** One cycle on a fresh collector, which is what most cases here want. */
@@ -590,7 +616,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         });
         const collector = makeCollector({ redis });
 
-        const inFlight = collector.collect();
+        collector.fire();
         await collector.collect();
 
         // The first cycle is held before it reaches the sweep. If the second
@@ -599,7 +625,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
         expect(sscan).not.toHaveBeenCalled();
 
         release();
-        await inFlight;
+        await settle();
 
         expect(sscan).toHaveBeenCalledTimes(1);
       });
