@@ -17,7 +17,7 @@ import {
   API_KEY_PERMISSION_MODES,
   refineRestrictedPermissions,
 } from "~/server/api-key/restricted-permissions";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { permissionFormatSchema } from "~/server/app-layer/authz/custom-role-permissions";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";

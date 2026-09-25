@@ -1,4 +1,5 @@
 import { makeRequest } from "./langwatch-api.js";
+import type { SimulationRunEvaluation } from "./tools/format-suite-details.js";
 
 export interface SimulationRunSummary {
   scenarioRunId: string;
@@ -14,6 +15,8 @@ export interface SimulationRunSummary {
     metCriteria?: string[];
     unmetCriteria?: string[];
     error?: string | null;
+    /** One result per evaluator that ran after the conversation. */
+    evaluations?: SimulationRunEvaluation[];
   } | null;
   messages?: Array<{ role: string; content: string }>;
   /** Why the run was started, as given when it was queued. Null without one. */

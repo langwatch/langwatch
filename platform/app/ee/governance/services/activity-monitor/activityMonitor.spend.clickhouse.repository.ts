@@ -35,6 +35,19 @@ import {
   summarySpendRowSchema,
 } from "./activityMonitor.clickhouse.schemas";
 
+// These reads scan `trace_summaries`, which is PARTITION BY toYearWeek(OccurredAt)
+// and holds every traced request for the tenant. The dashboard asks for a
+// bounded window, so a read that overruns is a read that is scanning far more
+// than the window — there is nothing to wait for. Capping threads keeps one
+// dashboard load from taking the whole pool, and capping execution time fails
+// that single read rather than letting it grind. Same guardrail and rationale
+// as storage metering (storageMeter.service.ts:63-67).
+const GOVERNANCE_SPEND_MAX_EXECUTION_SECONDS = 45;
+const GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS = {
+  max_threads: 2,
+  max_execution_time: GOVERNANCE_SPEND_MAX_EXECUTION_SECONDS,
+} as const;
+
 export class ActivityMonitorSpendClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -46,10 +59,12 @@ export class ActivityMonitorSpendClickHouseRepository {
     tenantId,
     thisStart,
     prevStart,
+    windowEnd,
   }: {
     tenantId: string;
     thisStart: number;
     prevStart: number;
+    windowEnd: number;
   }): Promise<SummarySpendChRow> {
     const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
@@ -65,12 +80,14 @@ export class ActivityMonitorSpendClickHouseRepository {
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
       `,
@@ -78,10 +95,12 @@ export class ActivityMonitorSpendClickHouseRepository {
         tenantId,
         thisStart,
         prevStart,
+        windowEnd,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
       },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
       format: "JSONEachRow",
     });
     const rows = summarySpendRowSchema.array().parse(await result.json());
@@ -102,6 +121,7 @@ export class ActivityMonitorSpendClickHouseRepository {
   async findSpendByUser({
     tenantId,
     windowStart,
+    windowEnd,
     sortBy,
     sortDir,
     limit,
@@ -109,6 +129,7 @@ export class ActivityMonitorSpendClickHouseRepository {
   }: {
     tenantId: string;
     windowStart: number;
+    windowEnd: number;
     sortBy: SpendSortField;
     sortDir: SortDir;
     limit: number;
@@ -140,6 +161,7 @@ export class ActivityMonitorSpendClickHouseRepository {
           FROM trace_summaries ts
           WHERE ts.TenantId = {tenantId:String}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             AND ts.Attributes[{originKey:String}] = {originValue:String}
             AND ts.Attributes[{userKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
@@ -147,6 +169,7 @@ export class ActivityMonitorSpendClickHouseRepository {
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
             )
         )
@@ -157,12 +180,14 @@ export class ActivityMonitorSpendClickHouseRepository {
       query_params: {
         tenantId,
         windowStart,
+        windowEnd,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
         limit,
         offset,
       },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
       format: "JSONEachRow",
     });
     return spendByUserRowSchema.array().parse(await result.json());
@@ -176,9 +201,11 @@ export class ActivityMonitorSpendClickHouseRepository {
   async findSpendByDepartment({
     tenantIds,
     windowStart,
+    windowEnd,
   }: {
     tenantIds: string[];
     windowStart: number;
+    windowEnd: number;
   }): Promise<SpendByDepartmentChRow[]> {
     // Multi-tenant read across the org's projects; the shared client serves
     // every project, so resolving by any one of them routes identically.
@@ -194,11 +221,13 @@ export class ActivityMonitorSpendClickHouseRepository {
         FROM trace_summaries ts
         WHERE ts.TenantId IN ({tenantIds:Array(String)})
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId IN ({tenantIds:Array(String)})
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
         GROUP BY projectId, actor
@@ -206,8 +235,10 @@ export class ActivityMonitorSpendClickHouseRepository {
       query_params: {
         tenantIds,
         windowStart,
+        windowEnd,
         userKey: ATTR_USER_ID,
       },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
       format: "JSONEachRow",
     });
     return spendByDepartmentRowSchema.array().parse(await result.json());
@@ -221,10 +252,12 @@ export class ActivityMonitorSpendClickHouseRepository {
     tenantId,
     thisStart,
     prevStart,
+    windowEnd,
   }: {
     tenantId: string;
     thisStart: number;
     prevStart: number;
+    windowEnd: number;
   }): Promise<SpendByTeamSourceChRow[]> {
     const ch = await this.resolveClient(tenantId);
     const result = await ch.query({
@@ -243,6 +276,7 @@ export class ActivityMonitorSpendClickHouseRepository {
           FROM trace_summaries ts
           WHERE ts.TenantId = {tenantId:String}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             AND ts.Attributes[{originKey:String}] = {originValue:String}
             AND ts.Attributes[{sourceKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
@@ -250,6 +284,7 @@ export class ActivityMonitorSpendClickHouseRepository {
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
             )
         )
@@ -259,10 +294,12 @@ export class ActivityMonitorSpendClickHouseRepository {
         tenantId,
         thisStart,
         prevStart,
+        windowEnd,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         sourceKey: ATTR_INGESTION_SOURCE_ID,
       },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
       format: "JSONEachRow",
     });
     return spendByTeamSourceRowSchema.array().parse(await result.json());
@@ -275,10 +312,12 @@ export class ActivityMonitorSpendClickHouseRepository {
   async findSpendOverTime({
     tenantId,
     windowStart,
+    windowEnd,
     groupBy,
   }: {
     tenantId: string;
     windowStart: number;
+    windowEnd: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeChRow[]> {
     const ch = await this.resolveClient(tenantId);
@@ -303,12 +342,14 @@ export class ActivityMonitorSpendClickHouseRepository {
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
         GROUP BY bucketMs, groupKey
@@ -317,11 +358,13 @@ export class ActivityMonitorSpendClickHouseRepository {
       query_params: {
         tenantId,
         windowStart,
+        windowEnd,
         originKey: ATTR_ORIGIN_KIND,
         originValue: ORIGIN_KIND_VALUE,
         sourceKey: ATTR_INGESTION_SOURCE_ID,
         userKey: ATTR_USER_ID,
       },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
       format: "JSONEachRow",
     });
     return spendOverTimeRowSchema.array().parse(await result.json());

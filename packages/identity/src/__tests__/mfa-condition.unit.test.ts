@@ -80,7 +80,7 @@ describe("an organization's second-factor membership condition", () => {
   });
 
   describe("given the sign-in came through an identity provider", () => {
-    /** @scenario "A provider that asserted a second factor satisfies the requirement" */
+    /** @scenario "A supported verified provider factor satisfies the requirement" */
     it("takes the provider's assertion as the second factor", () => {
       const decision = reach({ amr: ["pwd", "otp"] });
 
@@ -89,7 +89,7 @@ describe("an organization's second-factor membership condition", () => {
       expect(decision).toMatchObject({ factors: ["otp"] });
     });
 
-    /** @scenario "A provider that asserts nothing satisfies nothing" */
+    /** @scenario "A supported verified provider that asserts nothing satisfies nothing" */
     it("infers no factor the provider did not assert", () => {
       // `saml` and `oidc` name a protocol, not a proof. A federated sign-in
       // is not a second factor just because it went through somebody else.

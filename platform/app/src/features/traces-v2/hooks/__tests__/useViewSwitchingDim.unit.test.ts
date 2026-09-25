@@ -19,8 +19,8 @@ const mockSetReplacingData = vi.fn();
 
 // ─── Store mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedQueryText: mockQueryText,
       debouncedTimeRange: {
@@ -30,12 +30,6 @@ vi.mock("../../stores/filterStore", () => ({
       },
       page: mockPage,
       pageSize: mockPageSize,
-    }),
-}));
-
-vi.mock("../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
-    selector({
       sort: { columnId: mockSortColumnId, direction: mockSortDirection },
       activeLensId: mockActiveLensId,
     }),

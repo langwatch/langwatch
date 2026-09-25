@@ -60,6 +60,20 @@ export interface LicensePurchaseHandler {
   }): Promise<void>;
 }
 
+/**
+ * What a finalized invoice means for a connected self-hosted customer
+ * (ADR-141, section 7): a renewal that was waiting for the old term's last
+ * invoice can now have its credit. Absent on a deployment that is not
+ * LangWatch Cloud.
+ */
+export interface ConnectedBillingInvoiceEvents {
+  /** The connected customer behind a payment-provider customer, if any. */
+  accountFor(
+    stripeCustomerId: string,
+  ): Promise<{ organizationId: string } | null>;
+  completeRenewalIfDue(input: { organizationId: string }): Promise<unknown>;
+}
+
 export type HandleEventResult =
   | { status: "ok" }
   | { status: "error"; httpStatus: 400 | 500; message: string };
@@ -122,6 +136,7 @@ export class EEWebhookService implements WebhookService {
   private readonly licensePaymentLinkId?: string;
   private readonly licensePrivateKey?: string;
   private readonly getPostHog?: () => PostHog | null;
+  private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
 
   constructor({
     subscriptionRepository,
@@ -133,6 +148,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId,
     licensePrivateKey,
     getPostHog,
+    connectedBilling,
   }: {
     subscriptionRepository: SubscriptionRepository;
     organizationRepository: OrganizationRepository;
@@ -143,6 +159,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId?: string;
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
+    connectedBilling?: ConnectedBillingInvoiceEvents;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
@@ -153,6 +170,7 @@ export class EEWebhookService implements WebhookService {
     this.licensePaymentLinkId = licensePaymentLinkId;
     this.licensePrivateKey = licensePrivateKey;
     this.getPostHog = getPostHog;
+    this.connectedBilling = connectedBilling;
   }
 
   static create({
@@ -164,6 +182,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId,
     licensePrivateKey,
     getPostHog,
+    connectedBilling,
   }: {
     db: PrismaClient;
     stripe: Stripe;
@@ -173,6 +192,7 @@ export class EEWebhookService implements WebhookService {
     licensePaymentLinkId?: string;
     licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
+    connectedBilling?: ConnectedBillingInvoiceEvents;
   }): WebhookService {
     return traced(
       new EEWebhookService({
@@ -185,6 +205,7 @@ export class EEWebhookService implements WebhookService {
         licensePaymentLinkId,
         licensePrivateKey,
         getPostHog,
+        connectedBilling,
       }),
       "EEWebhookService",
     );
@@ -203,6 +224,10 @@ export class EEWebhookService implements WebhookService {
         event.type === "invoice.payment_failed"
       ) {
         return await this.routeCheckoutOrInvoice(event);
+      }
+
+      if (event.type === "invoice.finalized") {
+        return await this.routeConnectedInvoiceFinalized(event);
       }
 
       if (
@@ -286,6 +311,33 @@ export class EEWebhookService implements WebhookService {
       privateKey: this.licensePrivateKey,
     });
 
+    return { status: "ok" };
+  }
+
+  /**
+   * A finalized invoice of a connected self-hosted customer. A LangWatch Cloud
+   * customer has no connected account, so nothing here touches one.
+   */
+  private async routeConnectedInvoiceFinalized(
+    event: Stripe.Event & { type: "invoice.finalized" },
+  ): Promise<HandleEventResult> {
+    const invoice = event.data.object as Stripe.Invoice;
+    const customerId =
+      typeof invoice.customer === "string"
+        ? invoice.customer
+        : invoice.customer?.id;
+    if (!this.connectedBilling || !customerId) return { status: "ok" };
+
+    const account = await this.connectedBilling.accountFor(customerId);
+    if (!account) return { status: "ok" };
+
+    await this.connectedBilling.completeRenewalIfDue({
+      organizationId: account.organizationId,
+    });
+    logger.info(
+      { eventId: event.id, organizationId: account.organizationId },
+      "[stripeWebhook] Connected customer invoice finalized",
+    );
     return { status: "ok" };
   }
 

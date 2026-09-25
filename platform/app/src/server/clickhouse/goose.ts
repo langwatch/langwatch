@@ -48,6 +48,36 @@ const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
  */
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
+/**
+ * How much of goose's own output a run may hold.
+ *
+ * Every migration runs verbose, so goose prints a line per statement and the
+ * output grows with the migration count. `spawnSync` defaults to one megabyte
+ * and then kills the child with ENOBUFS, which reads as a migration failure
+ * on a run where every migration in fact applied. The output is text we only
+ * scan for a few messages, so a generous ceiling costs a few megabytes of RSS
+ * for the length of one call.
+ */
+const GOOSE_OUTPUT_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * What to tell an operator when the child process itself did not run.
+ *
+ * ENOENT means the binary is missing, and ENOBUFS means goose printed past
+ * {@link GOOSE_OUTPUT_MAX_BYTES}, which says nothing about whether the
+ * migrations applied: the message has to point at the buffer rather than at
+ * the schema, or the next reader spends the afternoon in the wrong place.
+ */
+export function messageForSpawnError(message: string): string {
+  if (message.includes("ENOENT")) {
+    return "Goose binary not found. Install from https://github.com/pressly/goose";
+  }
+  if (message.includes("ENOBUFS")) {
+    return `Goose printed more than ${GOOSE_OUTPUT_MAX_BYTES} bytes and was cut off, so this run cannot say whether the migrations applied. Re-run it, and raise GOOSE_OUTPUT_MAX_BYTES if it happens again: ${message}`;
+  }
+  return message;
+}
+
 export interface GooseOptions {
   connectionUrl?: string;
   database?: string; // Optional database override (takes precedence over URL path)
@@ -500,12 +530,11 @@ function executeGoose({
     encoding: "utf-8",
     stdio: "pipe",
     env: envVars,
+    maxBuffer: GOOSE_OUTPUT_MAX_BYTES,
   });
 
   if (result.error) {
-    const message = result.error.message.includes("ENOENT")
-      ? "Goose binary not found. Install from https://github.com/pressly/goose"
-      : result.error.message;
+    const message = messageForSpawnError(result.error.message);
     throw new MigrationError(`Goose migration failed: ${message}`, "migrate");
   }
 

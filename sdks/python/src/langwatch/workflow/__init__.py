@@ -17,8 +17,6 @@ result.results  # per-row DataFrame, same shape as experiment.run(...).results
 from typing import Any, Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 
-import httpx
-
 import langwatch
 from langwatch.experiment.platform_run import (
     ExperimentRunResult,
@@ -27,6 +25,7 @@ from langwatch.experiment.platform_run import (
     _poll_until_complete,
     _replace_url_domain,
 )
+from langwatch.http_client import create_client
 from langwatch.state import get_api_key, get_endpoint
 from langwatch.utils.auth import build_auth_headers
 
@@ -152,7 +151,7 @@ def _evaluate_workflow(
     workflow_id: str, endpoint: str, api_key: str, body: Dict[str, Any]
 ) -> dict:
     """Kick off a workflow evaluation run."""
-    with httpx.Client(timeout=60) as client:
+    with create_client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/workflows/{workflow_id}/evaluate",
             headers=build_auth_headers(api_key),

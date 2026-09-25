@@ -3,8 +3,8 @@ import {
   simulationMessageSnapshotEventDataSchema,
   simulationRunAgentInstanceRecordedEventDataSchema,
   simulationRunCancelRequestedEventDataSchema,
+  simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
-  simulationRunQueuedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
@@ -14,29 +14,16 @@ import {
 /**
  * All pure simulation-processing commands defined from event data schemas.
  *
- * computeRunMetrics and finishRun are not DEFINED here — they carry DI
- * (TraceSummaryStore/scheduleRetry and loadPriorEvents respectively) and stay
- * as manual classes under ./commands/. FinishRunCommand is surfaced from this
- * module so callers have one import site for the pipeline's commands.
+ * computeRunMetrics, queueRun, finishRun and recordEvaluations are not
+ * DEFINED here: they carry DI (TraceSummaryStore/scheduleRetry,
+ * loadRunAttachments and loadPriorEvents) and stay as manual classes under
+ * ./commands/. They are surfaced from this module so callers have one import
+ * site for the pipeline's commands.
  */
 
 export { FinishRunCommand } from "./commands/finishRun.command";
-
-export const QueueRunCommand = defineCommand({
-  commandType: "lw.simulation_run.queue",
-  eventType: "lw.simulation_run.queued",
-  eventVersion: "2026-03-08",
-  aggregateType: "simulation_run",
-  schema: simulationRunQueuedEventDataSchema,
-  aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:queueRun`,
-  spanAttributes: (d) => ({
-    "payload.scenarioRun.id": d.scenarioRunId,
-    "payload.scenario.id": d.scenarioId,
-    "payload.batchRun.id": d.batchRunId,
-  }),
-  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:queue-run`,
-});
+export { QueueRunCommand } from "./commands/queueRun.command";
+export { RecordEvaluationsCommand } from "./commands/recordEvaluations.command";
 
 export const StartRunCommand = defineCommand({
   commandType: "lw.simulation_run.start",
@@ -119,6 +106,20 @@ export const RecordAgentInstanceCommand = defineCommand({
     "payload.agentInstance.hostname": d.agentInstance.hostname,
   }),
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-agent-instance`,
+});
+
+export const RecordCutAtLimitCommand = defineCommand({
+  commandType: "lw.simulation_run.record_cut_at_limit",
+  eventType: "lw.simulation_run.cut_at_limit_recorded",
+  eventVersion: "2026-09-09",
+  aggregateType: "simulation_run",
+  schema: simulationRunCutAtLimitRecordedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordCutAtLimit`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
 
 export const CancelRunCommand = defineCommand({

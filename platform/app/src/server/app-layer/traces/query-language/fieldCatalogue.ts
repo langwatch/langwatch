@@ -15,6 +15,7 @@
  * with one consumer, not yet a shared one.
  */
 import { getApp } from "~/server/app-layer/app";
+import { isInstantEvalField } from "./instantEvalChips";
 import { FIELD_VALUES, SEARCH_FIELDS } from "./metadata";
 
 /** Values fetched per categorical field before merging with the static list. */
@@ -34,6 +35,10 @@ export async function buildFieldsBlock(
   const dynamicValues = await fetchDynamicCategoricalValues(input);
   const lines: string[] = [];
   for (const [name, meta] of Object.entries(SEARCH_FIELDS)) {
+    // An `eval` chip stands for a run the Explorer starts under its cost
+    // rule; the model is never to write one, the search router decides when
+    // a sentence is a judgement.
+    if (isInstantEvalField(name)) continue;
     const sample = pickSampleValues(name, meta.facetField, dynamicValues);
     const sampleStr = sample.length > 0 ? ` — e.g. ${sample.join(", ")}` : "";
     lines.push(`- ${name} (${meta.valueType}): ${meta.label}${sampleStr}`);

@@ -26,8 +26,8 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { PermissionMiddleware } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
+import type { PermissionMiddleware } from "~/server/app-layer/authz/permission-adapters";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
 import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
 import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";

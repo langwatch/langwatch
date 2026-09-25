@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { CannotImpersonateWithoutSecondFactorError } from "@langwatch/identity";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { resolveSessionPrincipal } from "~/server/app-layer/identity/impersonation-claims";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */
@@ -37,6 +38,28 @@ export class CannotImpersonateAdminError extends HandledError {
       meta: { userId },
     });
     this.name = "CannotImpersonateAdminError";
+  }
+}
+
+/**
+ * Thrown when a session that is ALREADY impersonating tries to start a new
+ * impersonation without stopping the current one first. Hopping straight from
+ * one subject to another would leave the audit trail without the operator ever
+ * returning to themselves between hops — the same washing-out
+ * {@link CannotImpersonateAdminError} exists to prevent, reached a different
+ * way. To impersonate someone new the operator stops the current impersonation
+ * first. Maps to HTTP 403 — the same status as
+ * {@link CannotImpersonateAdminError} — because the action is deliberately
+ * denied, not a system failure.
+ */
+export class CannotReimpersonateWhileImpersonatingError extends HandledError {
+  constructor() {
+    super(
+      "cannot_reimpersonate_while_impersonating",
+      "Stop the current impersonation before starting another",
+      { httpStatus: 403 },
+    );
+    this.name = "CannotReimpersonateWhileImpersonatingError";
   }
 }
 
@@ -87,25 +110,47 @@ export interface StopImpersonationInput {
  * inside service logic (per the project's no-abstraction-leaks rule in
  * `CLAUDE.md`).
  */
+/**
+ * The address a person is known by, resolved the way a SESSION resolves it.
+ *
+ * `getServerAuthSession` sets `session.user.email` to
+ * `identityResolvedEmail ?? User.email`, and ADR-101 §5 makes those two
+ * different on purpose: once a user's identity backfill is finalized their
+ * address lives on the identifier and `User.email` is explicitly "a stale
+ * copy". The admin gate on the route reads the session's answer; the guard
+ * below has to read the same one, or an operator whose `ADMIN_EMAILS`
+ * address is on their identifier authenticates as an admin and reads as a
+ * non-admin when they are the TARGET — which is exactly the admin-to-admin
+ * hop `CannotImpersonateAdminError` exists to stop.
+ */
+export type ResolveIdentityEmail = (args: {
+  userId: string;
+}) => Promise<string | null>;
+
 export class ImpersonationService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly auditLog: AuditLogFn,
+    private readonly resolveIdentityEmail: ResolveIdentityEmail,
   ) {}
 
   static create(
     prisma: PrismaClient,
     auditLog: AuditLogFn,
+    resolveIdentityEmail: ResolveIdentityEmail,
   ): ImpersonationService {
-    return new ImpersonationService(prisma, auditLog);
+    return new ImpersonationService(prisma, auditLog, resolveIdentityEmail);
   }
 
   /**
    * Start an impersonation window on an existing BetterAuth session.
    *
    * Validates the target user, writes an audit log entry, and stores the
-   * impersonating identity on the session row so the rest of the app can
-   * read `session.user.impersonator` through `getServerAuthSession`.
+   * `{actor, subject}` claims on the session row so the rest of the app can
+   * read `session.principal` and `session.user.impersonator` through
+   * `getServerAuthSession` (D06). The reason is stored beside both people,
+   * not only in the audit log, so a request made under an impersonation
+   * carries its own justification.
    *
    * Throws (and does NOT mutate the session) when:
    *   - The target user does not exist → {@link UserToImpersonateNotFoundError}
@@ -160,6 +205,42 @@ export class ImpersonationService {
 
   async start(input: StartImpersonationInput): Promise<void> {
     /**
+     * The acting session must not already be impersonating somebody.
+     *
+     * Read FIRST, before the target is even looked up, so a re-impersonation
+     * attempt writes no audit entry and touches no session row. An operator
+     * already inside an impersonation who tries to start a fresh one would
+     * hop subject→subject with the trail never returning to them in between —
+     * so it is refused, and stopping the current window is the way to start
+     * another. The claim is resolved through the same pure function the
+     * session read uses (`getServerAuthSession`), so this fires on exactly the
+     * state that surfaces as `session.user.impersonator`: an active,
+     * unexpired, well-formed window whose actor is the session's own user.
+     */
+    const actingSession = await this.prisma.session.findUnique({
+      where: { id: input.sessionId },
+      select: {
+        userId: true,
+        actorUserId: true,
+        subjectUserId: true,
+        impersonationExpiresAt: true,
+      },
+    });
+    if (actingSession) {
+      const principal = resolveSessionPrincipal({
+        claims: {
+          sessionUserId: actingSession.userId,
+          actorUserId: actingSession.actorUserId,
+          subjectUserId: actingSession.subjectUserId,
+          impersonationExpiresAt: actingSession.impersonationExpiresAt,
+        },
+      });
+      if (principal.subject.userId !== principal.actor.userId) {
+        throw new CannotReimpersonateWhileImpersonatingError();
+      }
+    }
+
+    /**
      * The target, plus the memberships that decide whether the operator needs
      * a second factor of their own.
      *
@@ -198,7 +279,11 @@ export class ImpersonationService {
     if (target.deactivatedAt) {
       throw new CannotImpersonateDeactivatedUserError(target.id);
     }
-    if (isAdmin(target)) {
+    // Resolved through the same fork the session uses. `target.email` is the
+    // legacy column, which is stale for every finalized user.
+    const targetEmail =
+      (await this.resolveIdentityEmail({ userId: target.id })) ?? target.email;
+    if (isAdmin({ email: targetEmail })) {
       throw new CannotImpersonateAdminError(target.id);
     }
     await this.assertOperatorCanProveSecondFactor({
@@ -216,29 +301,37 @@ export class ImpersonationService {
       req: input.req,
     });
 
+    // The {actor, subject} claims, which is the shape the authz principal
+    // already speaks (D06). The operator is the actor and stays the session's
+    // own user; the target is the subject. Nothing here copies the target's
+    // name, e-mail or picture onto the session — the legacy payload did, and
+    // it went stale the moment either of them changed.
     await this.prisma.session.update({
       where: { id: input.sessionId },
       data: {
-        impersonating: {
-          id: target.id,
-          name: target.name,
-          email: target.email,
-          image: target.image,
-          expires: new Date(Date.now() + IMPERSONATION_TTL_MS),
-        },
+        actorUserId: input.impersonatorUserId,
+        subjectUserId: target.id,
+        impersonationReason: input.reason,
+        impersonationExpiresAt: new Date(Date.now() + IMPERSONATION_TTL_MS),
       },
     });
   }
 
   /**
    * End the impersonation window on the given session. Idempotent at the
-   * Prisma level — clearing an already-empty `impersonating` column is a
-   * no-op.
+   * Prisma level — clearing claims that are already empty is a no-op, and the
+   * operator's own session is untouched either way: stopping returns them to
+   * themselves rather than signing them out.
    */
   async stop(input: StopImpersonationInput): Promise<void> {
     await this.prisma.session.update({
       where: { id: input.sessionId },
-      data: { impersonating: Prisma.DbNull },
+      data: {
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      },
     });
   }
 }

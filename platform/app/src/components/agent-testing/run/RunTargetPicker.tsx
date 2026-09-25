@@ -8,10 +8,10 @@
  */
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { Check, Code, Globe, Plug, Workflow } from "lucide-react";
+import { Check, Code, Globe, Mic, Plug, Workflow } from "lucide-react";
 import { agentHasDevTunnel } from "~/components/agents/LocalTunnelBadge";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
-import { ownerOnlyCopy } from "~/components/scenarios/useFilteredScenarioTargets";
+import { notRunnableCopy } from "~/components/scenarios/useFilteredScenarioTargets";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../shared/design";
@@ -21,6 +21,7 @@ const AGENT_ICONS = {
   code: Code,
   workflow: Workflow,
   connected: Plug,
+  voice: Mic,
 } as const;
 
 /**
@@ -38,7 +39,7 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow" | "connected";
+  type: "http" | "code" | "workflow" | "connected" | "voice";
   config?: unknown;
   /** The name with the environment of a connected agent, when it has one. */
   label?: string;
@@ -48,10 +49,12 @@ export type RunDialogAgent = {
   status?: "online" | "offline";
   /** The owner of a personal development agent. */
   owner?: { userId: string; name: string | null } | null;
-  /** False only for a development agent of another person. */
+  /** False for a development agent of another person and for an offline agent. */
   isRunnable?: boolean;
   /** True when a development agent belongs to another person. */
   isTeammateOwned?: boolean;
+  /** True when a connected agent has no process holding it. */
+  isOffline?: boolean;
   /** The parameters a connected agent declares. */
   parameters?: ScenarioParameterDefinition[];
 };
@@ -210,7 +213,7 @@ function AgentBlock({
 
   if (canRun) return card;
   return (
-    <Tooltip content={ownerOnlyCopy(agent.owner?.name)}>
+    <Tooltip content={notRunnableCopy(agent)}>
       <Box minWidth={0}>{card}</Box>
     </Tooltip>
   );

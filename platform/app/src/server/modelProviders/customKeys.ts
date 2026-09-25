@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { EXACT_CREDENTIAL_FIELDS } from "~/utils/constants";
 import { decrypt } from "~/utils/encryption";
 
 const logger = createLogger("langwatch:modelProviders:customKeys");
@@ -38,6 +39,43 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Strips the whitespace around every credential in a bag, except the few
+ * listed in {@link EXACT_CREDENTIAL_FIELDS}.
+ *
+ * A credential pasted from a terminal, a password manager or a wiki page
+ * arrives with padding, and the padding survives into the column. Whether it
+ * then breaks the provider depends on where the credential is spent, which is
+ * why it can sit in a row for months looking harmless: a key in a query string
+ * is percent-encoded and the provider ignores the padding, while the same key
+ * in an HTTP header is refused before the request leaves the process. That is
+ * how a provider reports "Connection works" on the settings page, which probes
+ * `?key=`, while every evaluation against it fails with `Illegal header value`.
+ *
+ * A credential spent as a header or a query parameter means nothing different
+ * for the whitespace around it, so it is stripped once here and no caller has
+ * to ask. Stripping on the
+ * way out of the column rather than on the way in is deliberate: rows written
+ * before this existed are already padded, and healing them on read costs
+ * nobody a re-paste or a backfill.
+ *
+ * Only strings are touched. The bag carries more than secrets — a Gemini
+ * credential stores its project and location beside the key — and a value that
+ * is not a string has no padding to lose.
+ */
+function trimCredentials(
+  bag: Record<string, unknown>,
+): Record<string, unknown> {
+  const trimmed: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(bag)) {
+    trimmed[name] =
+      typeof value === "string" && !EXACT_CREDENTIAL_FIELDS.has(name)
+        ? value.trim()
+        : value;
+  }
+  return trimmed;
+}
+
+/**
  * Reads a ModelProvider's `customKeys` column.
  *
  * The column holds either an encrypted JSON string or, on rows written before
@@ -54,7 +92,9 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 export function readCustomKeys(raw: unknown): CustomKeysRead {
   if (raw === null || raw === undefined) return ABSENT;
   if (typeof raw === "object") {
-    return isKeyBag(raw) ? { state: "read", keys: raw } : UNREADABLE;
+    return isKeyBag(raw)
+      ? { state: "read", keys: trimCredentials(raw) }
+      : UNREADABLE;
   }
   if (typeof raw !== "string") return UNREADABLE;
   return parseDecrypted(raw);
@@ -71,7 +111,9 @@ function parseDecrypted(raw: string): CustomKeysRead {
   }
   try {
     const parsed: unknown = JSON.parse(plaintext);
-    return isKeyBag(parsed) ? { state: "read", keys: parsed } : UNREADABLE;
+    return isKeyBag(parsed)
+      ? { state: "read", keys: trimCredentials(parsed) }
+      : UNREADABLE;
   } catch (error) {
     // The error NAME only, never the error itself. A SyntaxError from
     // JSON.parse quotes the input it choked on, and the input here is the

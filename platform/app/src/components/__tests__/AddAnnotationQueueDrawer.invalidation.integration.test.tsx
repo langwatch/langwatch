@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   invalidate: {
     optimizedQueues: vi.fn(),
+    queueWalkStep: vi.fn(),
     queueBySlugOrId: vi.fn(),
     queues: vi.fn(),
     queueItemsCounts: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("~/utils/api", () => ({
         getOptimizedAnnotationQueues: {
           invalidate: mocks.invalidate.optimizedQueues,
         },
+        getQueueWalkStep: { invalidate: mocks.invalidate.queueWalkStep },
         getQueueBySlugOrId: { invalidate: mocks.invalidate.queueBySlugOrId },
         getQueues: { invalidate: mocks.invalidate.queues },
         getQueueItemsCounts: { invalidate: mocks.invalidate.queueItemsCounts },
@@ -125,6 +127,9 @@ describe("AddAnnotationQueueDrawer", () => {
       onSuccess?.({ name: "Support reviews" });
 
       expect(mocks.invalidate.optimizedQueues).toHaveBeenCalledTimes(1);
+      // Membership decides whose work an item is, and a reviewer already
+      // walking is reading the set it decides.
+      expect(mocks.invalidate.queueWalkStep).toHaveBeenCalledTimes(1);
       expect(mocks.invalidate.queueBySlugOrId).toHaveBeenCalledTimes(1);
       expect(mocks.invalidate.queues).toHaveBeenCalledTimes(1);
       expect(mocks.invalidate.queueItemsCounts).toHaveBeenCalledTimes(1);

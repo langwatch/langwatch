@@ -12,7 +12,7 @@
  * read, updated or deleted through this repository as though it were a saved
  * workbench chart.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import type {

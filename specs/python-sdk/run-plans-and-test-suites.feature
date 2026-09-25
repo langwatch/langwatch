@@ -190,6 +190,45 @@ Feature: Python SDK run plans and test suites
     And gives a repeat count, both models, parameters, a note and an idempotency key
     Then every one of those fields rides in the body beside the targets
 
+  # --- Fields and evaluators on a test suite ---
+
+  @unit
+  Scenario: Creating a test suite with fields and evaluators sends both
+    Given a test suite facade on a mounted transport
+    When the caller creates the test suite "Case lookups" with one field and one evaluator
+    Then the body carries the name, the fields and the evaluators
+
+  @unit
+  Scenario: Updating a test suite sends only what the caller gave
+    Given a test suite facade on a mounted transport
+    When the caller updates "suite_1" with a new field list and no name
+    Then the request is a PATCH to /api/v1/test-suites/suite_1
+    And the body carries the fields alone
+
+  @unit
+  Scenario: Updating a test suite can replace its evaluators
+    Given a test suite facade on a mounted transport
+    When the caller updates "suite_1" with an evaluator list
+    Then the body carries the evaluators alone
+
+  @unit
+  Scenario: A run with plan evaluators carries them in the configuration
+    Given a run plan facade on a mounted transport
+    When the caller runs with one plan evaluator
+    Then the configuration carries that evaluator under evaluators
+
+  @unit
+  Scenario: Creating a scenario with field values sends them under fields
+    Given a scenario facade on a mounted transport
+    When the caller creates a scenario with a value for golden_sql
+    Then the body carries that value under fields
+
+  @unit
+  Scenario: Updating a scenario with an empty field map clears its values
+    Given a scenario facade on a mounted transport
+    When the caller updates a scenario with an empty field map
+    Then the body carries fields as an empty object
+
   # --- Filing a scenario into a test suite ---
 
   @unit

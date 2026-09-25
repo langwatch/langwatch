@@ -6,9 +6,11 @@
  * or the one other environment it is online in), by `<name>@<environment>`
  * the way the SDK registered it, or by id. A personal development agent belongs to
  * the person whose key registered it, so a run started by anyone else, or by
- * no person at all, is refused before a job exists. The agent's own
- * parameters join the scenarios' declarations for the run, and its
- * environment and owner name are what its label reads.
+ * no person at all, is refused before a job exists. A connected agent no
+ * process is holding is refused the same way: the run would only fail on
+ * its first turn. The agent's own parameters join the scenarios'
+ * declarations for the run, and its environment and owner name are what
+ * its label reads.
  *
  * @see specs/agents/connected-agents.feature
  * @see dev/docs/adr/128-connected-agents.md
@@ -22,13 +24,18 @@ import type {
 import { isConnectedAgentStale } from "../agents/connected-agent-visibility";
 import {
   AgentEnvironmentUnresolvedError,
+  AgentOfflineError,
   AgentOwnerOnlyError,
 } from "../connected-agents/errors";
 import {
   DEVELOPMENT_ENVIRONMENT,
   parseConnectedReference,
 } from "../connected-agents/identity";
-import { readAgentPresence } from "../connected-agents/presence.read";
+import {
+  type PresenceReads,
+  readAgentPresence,
+} from "../connected-agents/presence.read";
+import { connectedAgentSelectability } from "../connected-agents/selectable";
 import {
   parseScenarioParameterDefinitions,
   type ScenarioParameterDefinition,
@@ -118,7 +125,9 @@ async function resolveConnectedReference({
       name: reference.name,
       environment: reference.environment,
     });
-    const picked = pickReferencedAgent({ rows, actor });
+    const picked =
+      pickReferencedAgent({ rows, actor }) ??
+      pickForeignPersonalAgent({ rows, actor });
     return picked ? { ...target, referenceId: picked.id } : target;
   }
   if (target.referenceId.includes("@")) return target;
@@ -140,6 +149,11 @@ async function resolveConnectedReference({
  * `<name>@<environment>` reference is, then the picks are read for presence.
  * Development wins when a process is connected there; otherwise the one
  * other environment with a process connected.
+ *
+ * When nothing the caller may run is connected but another person's
+ * personal agent is, that agent is picked so the run is refused as
+ * owner-only, naming the owner. Without it the refusal would say no process
+ * is connected while the process is printing that it is online.
  */
 async function pickAgentByNameAlone({
   name,
@@ -160,26 +174,34 @@ async function pickAgentByNameAlone({
     ...new Set(rows.map((row) => row.environment ?? DEVELOPMENT_ENVIRONMENT)),
   ];
   const candidates = registeredEnvironments.flatMap((environment) => {
-    const picked = pickReferencedAgent({
-      rows: rows.filter(
-        (row) => (row.environment ?? DEVELOPMENT_ENVIRONMENT) === environment,
-      ),
-      actor,
-    });
-    return picked ? [{ environment, row: picked }] : [];
+    const inEnvironment = rows.filter(
+      (row) => (row.environment ?? DEVELOPMENT_ENVIRONMENT) === environment,
+    );
+    const picked = pickReferencedAgent({ rows: inEnvironment, actor });
+    if (picked) return [{ environment, row: picked, foreign: false }];
+    const foreign = pickForeignPersonalAgent({ rows: inEnvironment, actor });
+    return foreign ? [{ environment, row: foreign, foreign: true }] : [];
   });
   const presences = await presence({
     projectId,
     agents: candidates.map(({ row }) => ({ id: row.id, type: "connected" })),
   });
   const online = candidates.filter(
-    ({ row }) => presences.get(row.id)?.status === "online",
+    ({ row, foreign }) =>
+      !foreign && presences.get(row.id)?.status === "online",
   );
   const development = online.find(
     ({ environment }) => environment === DEVELOPMENT_ENVIRONMENT,
   );
   if (development) return development.row;
   if (online.length === 1) return online[0]?.row;
+  if (online.length === 0) {
+    const foreignOnline = candidates.find(
+      ({ row, foreign }) =>
+        foreign && presences.get(row.id)?.status === "online",
+    );
+    if (foreignOnline) return foreignOnline.row;
+  }
   throw new AgentEnvironmentUnresolvedError({
     agentName: name,
     registeredEnvironments,
@@ -210,6 +232,29 @@ function pickReferencedAgent<
 }
 
 /**
+ * A personal agent of someone other than the actor, among the rows that
+ * carry a reference's name and environment; nothing when there is none.
+ *
+ * Picked only after `pickReferencedAgent` found nothing the caller may run.
+ * The run is then refused by `assertConnectedAgentsRunnable` as owner-only,
+ * which names the owner: a better answer than "not found" for a process the
+ * customer can see running.
+ */
+function pickForeignPersonalAgent<
+  Row extends Pick<AgentIdentityRow, "ownerUserId">,
+>({
+  rows,
+  actor,
+}: {
+  rows: readonly Row[];
+  actor: RunActor | undefined;
+}): Row | undefined {
+  return rows.find(
+    (row) => row.ownerUserId !== null && row.ownerUserId !== actor?.id,
+  );
+}
+
+/**
  * Whether a target's agent is a connected agent whose process has not been
  * seen for too long.
  *
@@ -228,6 +273,10 @@ export function isAgentUnseen(
 /**
  * Refuses the run when one of its agents is a personal development agent of
  * someone other than the actor.
+ *
+ * The same predicate the listings mark their rows with, so a row a client was
+ * told it could choose is never refused here, and one it was told it could
+ * not is never accepted.
  *
  * A run with no actor at all, one started with a legacy project key, has no
  * person to match, so a personal agent refuses it too. The refusal names the
@@ -248,8 +297,10 @@ export async function assertConnectedAgentsRunnable({
   const foreign = agents.find(
     (agent) =>
       agent.type === "connected" &&
-      agent.ownerUserId !== null &&
-      agent.ownerUserId !== actor?.id,
+      !connectedAgentSelectability({
+        ownerUserId: agent.ownerUserId,
+        viewerUserId: actor?.id ?? null,
+      }).selectable,
   );
   if (!foreign?.ownerUserId) return;
   const names = await ownerNamesOf({ agents: [foreign], users });
@@ -262,20 +313,54 @@ export async function assertConnectedAgentsRunnable({
 }
 
 /**
+ * Refuses the run when one of its connected agents has no process holding
+ * it right now.
+ *
+ * A run against such an agent would only fail on its first turn, so it is
+ * refused before a job exists. Only connected agents have a presence: an
+ * HTTP, code or workflow agent is never offline. The owner check runs first,
+ * so a personal agent of someone else reads as theirs rather than as offline.
+ */
+export async function assertConnectedAgentsOnline({
+  agents,
+  projectId,
+  presence,
+}: {
+  agents: readonly Pick<
+    AgentIdentityRow,
+    "id" | "name" | "type" | "environment"
+  >[];
+  projectId: string;
+  presence: PresenceReads;
+}): Promise<void> {
+  for (const agent of agents) {
+    if (agent.type !== "connected") continue;
+    const live = await presence.listLive({ projectId, agentId: agent.id });
+    if (live.length > 0) continue;
+    throw new AgentOfflineError({
+      agentName: agent.name,
+      environment: agent.environment,
+    });
+  }
+}
+
+/**
  * The parameters the agent of a target declares; none for other targets.
  *
  * Read tolerantly off the raw config, the way a scenario's own column is: a
  * row whose declarations this version does not understand runs with none.
  */
 export function agentParameterDefinitionsOf(
-  agent: AgentIdentityRow | undefined,
+  agent: (Pick<AgentIdentityRow, "type"> & { config: unknown }) | undefined,
 ): ScenarioParameterDefinition[] {
   if (agent?.type !== "connected") return [];
-  const config = agent.config;
+  const config: unknown = agent.config;
   if (typeof config !== "object" || config === null || Array.isArray(config)) {
     return [];
   }
-  return parseScenarioParameterDefinitions(config.parameters);
+  return parseScenarioParameterDefinitions(
+    "parameters" in config ? config.parameters : undefined,
+  );
 }
 
 /** The display names of the owners of the personal agents among these. */

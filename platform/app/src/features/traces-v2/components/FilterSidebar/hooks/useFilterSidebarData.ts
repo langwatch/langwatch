@@ -5,8 +5,11 @@ import {
   buildFacetStateLookup,
   getFacetValues,
 } from "~/server/app-layer/traces/query-language/queries";
+import { useFilteredTraceFacets } from "../../../hooks/useFilteredTraceFacets";
 import { useTraceFacets } from "../../../hooks/useTraceFacets";
+import { usePreviewTracesActive } from "../../../onboarding/hooks/usePreviewTracesActive";
 import { useDensityStore } from "../../../stores/densityStore";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import {
   applyLensOrder,
   useFacetLensStore,
@@ -15,7 +18,6 @@ import {
   selectVisibilityFor,
   useFacetVisibilityStore,
 } from "../../../stores/facetVisibilityStore";
-import { useFilterStore } from "../../../stores/filterStore";
 import {
   type NumericMode,
   selectNumericModesFor,
@@ -29,6 +31,7 @@ import {
   EVENT_ATTRIBUTES_SECTION_KEY,
   FACET_COLORS,
   FACET_DEFAULTS,
+  FACET_VALUE_ORDER,
   METADATA_DOCS_URL,
   METADATA_SECTION_KEY,
   RANGE_DEFAULTS,
@@ -39,6 +42,10 @@ import {
   computeDiscreteEligible,
   resolveNumericModeByKey,
 } from "../discreteMode";
+import {
+  type FacetCountState,
+  mergeFacetDescriptors,
+} from "../mergeFacetDescriptors";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {
   AttributeKey,
@@ -52,18 +59,18 @@ import type {
 import { facetLabel, sortBySectionOrder } from "../utils";
 
 export function useFilterSidebarData() {
-  const ast = useFilterStore((s) => s.ast);
-  const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
-  const storeExcludeFacet = useFilterStore((s) => s.excludeFacet);
-  const storeSetRange = useFilterStore((s) => s.setRange);
-  const storeRemoveRange = useFilterStore((s) => s.removeRange);
-  const toggleEvaluatorSubFilter = useFilterStore(
+  const ast = useExplorerStore((s) => s.ast);
+  const storeToggleFacet = useExplorerStore((s) => s.toggleFacet);
+  const storeExcludeFacet = useExplorerStore((s) => s.excludeFacet);
+  const storeSetRange = useExplorerStore((s) => s.setRange);
+  const storeRemoveRange = useExplorerStore((s) => s.removeRange);
+  const toggleEvaluatorSubFilter = useExplorerStore(
     (s) => s.toggleEvaluatorSubFilter,
   );
-  const setEvaluatorScoreRange = useFilterStore(
+  const setEvaluatorScoreRange = useExplorerStore(
     (s) => s.setEvaluatorScoreRange,
   );
-  const removeEvaluatorScoreRange = useFilterStore(
+  const removeEvaluatorScoreRange = useExplorerStore(
     (s) => s.removeEvaluatorScoreRange,
   );
 
@@ -112,7 +119,24 @@ export function useFilterSidebarData() {
     [storeRemoveRange],
   );
 
-  const { data: descriptors, isLoading: facetsLoading } = useTraceFacets();
+  // `discover` (value lists, attribute keys, the warm start) and the filtered
+  // read (the counts) are merged here: see `mergeFacetDescriptors`. The
+  // sample preview has no ClickHouse footprint, so its fixture descriptors
+  // are the counts.
+  const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
+  const filtered = useFilteredTraceFacets();
+  const isSamplePreview = usePreviewTracesActive();
+  const { descriptors, countState } = useMemo(
+    () =>
+      isSamplePreview
+        ? { descriptors: discovered, countState: "settled" as const }
+        : mergeFacetDescriptors({
+            discovered,
+            filtered: filtered.data,
+            filteredIsPlaceholder: filtered.isPlaceholderData,
+          }),
+    [isSamplePreview, discovered, filtered.data, filtered.isPlaceholderData],
+  );
 
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
@@ -320,7 +344,11 @@ export function useFilterSidebarData() {
   const facetItems = useMemo(() => {
     const map = new Map<string, FacetItem[]>();
     for (const cat of categoricals) {
-      const baseItems = buildFacetItems(cat, cat.synthetic ?? isSynthetic);
+      const baseItems = buildFacetItems({
+        cat,
+        isSynthetic: cat.synthetic ?? isSynthetic,
+        countState,
+      });
       // Surface values that the user typed in the search bar but that
       // discover didn't return (rare value, custom label, paste from
       // another query). Without this, an active filter like
@@ -352,10 +380,11 @@ export function useFilterSidebarData() {
     // Discrete numeric facets render through FacetSection too — build their
     // tick-list items from the descriptor's distinct values.
     for (const [key, range] of discreteEligible) {
-      const baseItems = buildDiscreteFacetItems(
+      const baseItems = buildDiscreteFacetItems({
         range,
-        range.synthetic ?? isSynthetic,
-      );
+        synthetic: range.synthetic ?? isSynthetic,
+        countState,
+      });
       // Same AST-extra handling as categoricals above: a selected discrete
       // value that discover dropped from the distinct set would otherwise
       // vanish from the sidebar while its filter stays active, leaving the
@@ -378,7 +407,7 @@ export function useFilterSidebarData() {
       map.set(key, [...extras, ...baseItems]);
     }
     return map;
-  }, [categoricals, discreteEligible, isSynthetic, ast]);
+  }, [categoricals, discreteEligible, isSynthetic, ast, countState]);
 
   const getValueStates = useMemo(() => {
     const map = new Map<string, (value: string) => FacetValueState>();
@@ -641,25 +670,42 @@ function synthesizeDefaultDescriptors(): Descriptors {
  * becomes a tickable row (value === label === the number), so the existing
  * categorical FacetSection renders the "Discrete" presentation unchanged.
  */
-function buildDiscreteFacetItems(
-  range: RangeSectionData,
-  synthetic: boolean,
-): FacetItem[] {
+function buildDiscreteFacetItems({
+  range,
+  synthetic,
+  countState,
+}: {
+  range: RangeSectionData;
+  synthetic: boolean;
+  countState: FacetCountState;
+}): FacetItem[] {
   const dimmed = !VIBRANT_FIELDS.has(range.key);
   return (range.discrete?.values ?? []).map((dv) => ({
     value: String(dv.value),
     label: String(dv.value),
-    count: dv.count,
+    count: countState === "pending" ? 0 : dv.count,
     dotColor: hashColor(String(dv.value)),
     dimmed,
     synthetic,
+    countState,
   }));
 }
 
-function buildFacetItems(
-  cat: CategoricalSection,
-  synthetic: boolean,
-): FacetItem[] {
+/**
+ * Exported for direct unit coverage. This is where a facet's curated colour
+ * and order rules actually reach the rows — `FACET_COLORS` being correct
+ * proves nothing if `dotColorFor` stops consulting it, and that wiring is
+ * otherwise only observable through the whole sidebar.
+ */
+export function buildFacetItems({
+  cat,
+  isSynthetic,
+  countState = "settled",
+}: {
+  cat: CategoricalSection;
+  isSynthetic: boolean;
+  countState?: FacetCountState;
+}): FacetItem[] {
   const curatedColors = FACET_COLORS[cat.key];
   const dimmed = !VIBRANT_FIELDS.has(cat.key);
   const counts = new Map(cat.topValues.map((v) => [v.value, v.count]));
@@ -683,6 +729,7 @@ function buildFacetItems(
   );
   const orderedValues = orderValues({
     defaults: FACET_DEFAULTS[cat.key],
+    order: FACET_VALUE_ORDER[cat.key],
     fallback: cat.topValues.map((v) => v.value),
     keys: [...counts.keys()],
   });
@@ -693,25 +740,46 @@ function buildFacetItems(
   return orderedValues.map((value) => ({
     value,
     label: labels.get(value) ?? facetLabel(value, cat.key),
-    count: counts.get(value) ?? 0,
+    // A warm-start row carries no count the user can read; see
+    // `mergeFacetDescriptors`.
+    count: countState === "pending" ? 0 : (counts.get(value) ?? 0),
     dotColor: dotColorFor(value),
     dimmed,
-    synthetic,
+    synthetic: isSynthetic,
+    countState,
     aggregates: aggregates.get(value),
     eventMetrics: eventMetrics.get(value),
   }));
 }
 
-function orderValues({
+/**
+ * Exported for direct unit coverage: the ordering rule (rank what is present,
+ * seed nothing) is invisible from the rendered sidebar, which sorts by count
+ * often enough to look right by accident.
+ */
+export function orderValues({
   defaults,
+  order,
   fallback,
   keys,
 }: {
   defaults: string[] | undefined;
+  order: readonly string[] | undefined;
   fallback: string[];
   keys: string[];
 }): string[] {
-  if (!defaults) return fallback;
-  const defaultSet = new Set(defaults);
-  return [...defaults, ...keys.filter((v) => !defaultSet.has(v))];
+  const base = defaults
+    ? [...defaults, ...keys.filter((v) => !new Set(defaults).has(v))]
+    : fallback;
+  if (!order) return base;
+  // Rank-sort rather than prepend: `defaults` may introduce values, `order`
+  // must not — a facet can be given a reading order without also being given
+  // rows for values it has never seen. Sort is stable, so anything outside
+  // the ranked list keeps the count-sorted position it arrived with.
+  const rank = new Map(order.map((value, i) => [value, i]));
+  return [...base].sort(
+    (a, b) =>
+      (rank.get(a) ?? Number.POSITIVE_INFINITY) -
+      (rank.get(b) ?? Number.POSITIVE_INFINITY),
+  );
 }

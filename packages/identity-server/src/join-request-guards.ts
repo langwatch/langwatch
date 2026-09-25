@@ -120,6 +120,7 @@ export class JoinRequestGuards {
           domain,
           matchedVia: data.matchedVia,
           expiresAtMs: data.expiresAtMs,
+          notifyAdmins: data.notifyAdmins,
           actor: data.actor,
         },
       },

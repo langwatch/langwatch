@@ -15,6 +15,7 @@ import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface RunAgentOptions {
   input?: string;
@@ -209,7 +210,7 @@ export const runAgentCommand = async (
 
     const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
-      const response = await fetch(
+      const response = await langwatchFetch(
         `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,
         {
           method: "POST",

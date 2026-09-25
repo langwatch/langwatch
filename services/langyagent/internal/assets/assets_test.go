@@ -95,3 +95,35 @@ func TestMaterializeSkills_WritesTreeToDisk(t *testing.T) {
 		t.Errorf("%s is not a non-empty file", skill)
 	}
 }
+
+// The guided onboarding kickoff arrives as an ordinary user message; the
+// routing table is what sends it to the native-only skill instead of the
+// generic reply rules.
+//
+// @scenario "The agent prompt routes the kickoff to the skill"
+func TestAgentsTemplate_RoutesGuidedKickoffToTheSkill(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	var row string
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "|") && strings.Contains(line, "Guided onboarding kickoff") {
+			row = line
+		}
+	}
+	if row == "" {
+		t.Fatal("AGENTS.md has no routing row for the guided onboarding kickoff")
+	}
+	for _, want := range []string{"`guided-onboarding`", "Let's set up", "`skill` tool"} {
+		if !strings.Contains(row, want) {
+			t.Errorf("the kickoff routing row lacks %q: %s", want, row)
+		}
+	}
+	// The row sends the model to the skill and names no command of its own:
+	// a command listed here gets run straight from the row, before the script
+	// is ever read.
+	if strings.Contains(row, "complete-path") {
+		t.Errorf("the kickoff routing row names a command the model then runs instead of loading the skill: %s", row)
+	}
+}

@@ -17,6 +17,7 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import { formatApiErrorForOperation } from "./format-api-error";
 import { throwIfHandledError } from "./throw-handled-error";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Builds the family's own error for a failure the platform did not name. */
 export type ManagementErrorFactory = (params: {
@@ -105,7 +106,7 @@ export const createManagementRequest = ({
     query,
     signal,
   }: ManagementRequestParams): Promise<T> => {
-    const response = await fetch(
+    const response = await langwatchFetch(
       `${endpoint}${path}${buildQueryString(query)}`,
       {
         ...(method ? { method } : {}),

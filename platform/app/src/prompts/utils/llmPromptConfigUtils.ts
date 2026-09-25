@@ -378,7 +378,7 @@ export function inputsAndOutputsToDemostrationColumns(
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
     ...(inputs ?? [])
-      .filter(({ type }) => type !== "image")
+      .filter(({ type }) => type !== "image" && type !== "file")
       .map((input) => ({
         id: input.identifier,
         name: input.identifier,
@@ -443,6 +443,8 @@ function inputOutputTypeToDatasetColumnType(
       return "list";
     case "image":
       throw new Error("Image is not supported in demonstrations");
+    case "file":
+      throw new Error("File is not supported in demonstrations");
     case "json_schema":
       return "json";
     case "list[float]":

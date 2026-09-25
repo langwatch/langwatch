@@ -3,6 +3,7 @@ import type { FoldProjectionStore } from "../../projections/foldProjection.types
 import {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
+  RegradeSuiteRunItemCommand,
   StartSuiteRunCommand,
 } from "./commands";
 import {
@@ -30,6 +31,8 @@ export interface SuiteRunProcessingPipelineDeps {
  * - startSuiteRun: Emits SuiteRunStartedEvent when suite run begins
  * - recordSuiteRunItemStarted: Emits SuiteRunItemStartedEvent per item
  * - completeSuiteRunItem: Emits SuiteRunItemCompletedEvent when item finishes
+ * - regradeSuiteRunItem: Emits SuiteRunItemRegradedEvent when a completed
+ *   item's verdict changes, so the counts follow it
  *
  * No subscriber on this pipeline — cross-pipeline subscribers live on the simulation pipeline.
  */
@@ -48,5 +51,6 @@ export function createSuiteRunProcessingPipeline(
     .withCommand("startSuiteRun", StartSuiteRunCommand)
     .withCommand("recordSuiteRunItemStarted", RecordSuiteRunItemStartedCommand)
     .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand)
+    .withCommand("regradeSuiteRunItem", RegradeSuiteRunItemCommand)
     .build();
 }

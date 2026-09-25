@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { PrismaSystemMigrationStateRepository } from "~/server/app-layer/system-migrations/repositories/system-migration-state.prisma.repository";
 import { parsePrismaDatamodel } from "~/test-utils/prismaDatamodel";
 import type { GuardParams } from "../dbGuardMiddleware";
 import {
@@ -550,6 +552,67 @@ describe("guardProjectId — SCOPED_MODELS (SystemMigrationTenantState)", () => 
       ).rejects.toThrow(/migrationName and tenantId/);
     });
   });
+
+  /**
+   * The ACTUAL repository through the ACTUAL middleware. The periodic re-drive
+   * names every registered migration in one `in` list; the guard read a
+   * migration name as a bare string only, so every tick threw and the
+   * mechanism that heals stragglers never ran. Nothing failed before
+   * production, because no test put the two in the same room.
+   */
+  function guardedStateRepository() {
+    const through = (action: string) => async (args: unknown) =>
+      guardProjectId(
+        { model: "SystemMigrationTenantState", action, args },
+        async () => null,
+      );
+    const prisma = {
+      systemMigrationTenantState: { findFirst: through("findFirst") },
+    };
+    return new PrismaSystemMigrationStateRepository(
+      prisma as unknown as PrismaClient,
+    );
+  }
+
+  describe("when the re-drive asks whether any named migration has a tenant left to move", () => {
+    /** @scenario The periodic re-drive reads across the migrations it names */
+    it("passes the guard - a finite list of migrations is as bounded as one", async () => {
+      await expect(
+        guardedStateRepository().hasTenantAwaitingRedrive({
+          migrationNames: [
+            "authz-team-user-backfill",
+            "identity-account-linkage",
+          ],
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe("when findFirst names an empty list of migrations", () => {
+    it("refuses - an empty list bounds nothing", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "findFirst",
+          args: { where: { migrationName: { in: [] } } },
+        }),
+      ).rejects.toThrow(/migrationName or tenantId/);
+    });
+  });
+
+  describe("when deleteMany names a list of migrations", () => {
+    it("refuses - a list of migrations is still a fleet-wide write", async () => {
+      await expect(
+        runGuard({
+          model: "SystemMigrationTenantState",
+          action: "deleteMany",
+          args: {
+            where: { migrationName: { in: ["authz-team-user-backfill"] } },
+          },
+        }),
+      ).rejects.toThrow(/bulk write/);
+    });
+  });
 });
 
 describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
@@ -802,6 +865,58 @@ describe("guardProjectId — SCOPED_MODELS (ModelDefaultConfig family)", () => {
         }),
       ).rejects.toThrow(/configId.*scopeType.*scopeId/);
     });
+  });
+});
+
+describe("guardProjectId — SCOPED_MODELS (SsoConnectionReproofCursor)", () => {
+  it("allows the sweep to create cursors for named connections", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "createMany",
+        args: {
+          data: [
+            {
+              connectionId: "ssoc_acme",
+              lastReproofAt: new Date("2026-08-28T12:00:00Z"),
+            },
+          ],
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("allows the sweep to advance only named connections", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "updateMany",
+        args: {
+          where: { connectionId: { in: ["ssoc_acme"] } },
+          data: { lastReproofAt: new Date("2026-08-28T12:00:00Z") },
+        },
+      }),
+    ).resolves.toBe("ok");
+  });
+
+  it("refuses a cursor query with no parent connection", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "findMany",
+        args: { where: {} },
+      }),
+    ).rejects.toThrow(/requires a connectionId/);
+  });
+
+  it("refuses a cursor created without its parent connection", async () => {
+    await expect(
+      runGuard({
+        model: "SsoConnectionReproofCursor",
+        action: "create",
+        args: { data: { lastReproofAt: new Date("2026-08-28T12:00:00Z") } },
+      }),
+    ).rejects.toThrow(/create requires a connectionId/);
   });
 });
 

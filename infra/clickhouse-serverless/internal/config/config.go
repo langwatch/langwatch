@@ -10,16 +10,16 @@ import (
 type Input struct {
 	// Primary — auto-detected from cgroups, or set explicitly. Error if neither.
 	// These are parsed manually in Load() to support Kubernetes quantity syntax (e.g. "500m", "4Gi").
-	CPU      int   `validate:"gte=1"`
-	RAMBytes int64 `validate:"gte=536870912"` // min 512MB
-	Replicated    bool   `env:"CH_REPLICATED"`
-	ClusterName   string `env:"CH_CLUSTER" default:"default"`
-	Shard         string `env:"CH_SHARD" default:"shard_01"`
-	Replica       string `env:"CH_REPLICA"`
-	KeeperNodes   string `env:"CH_KEEPER_NODES"`
-	KeeperPort    int    `env:"CH_KEEPER_PORT" default:"9181"`
-	DataNodes     string `env:"CH_DATA_NODES"`
-	DataNodePort  int    `env:"CH_DATA_NODE_PORT" default:"9000"`
+	CPU          int    `validate:"gte=1"`
+	RAMBytes     int64  `validate:"gte=536870912"` // min 512MB
+	Replicated   bool   `env:"CH_REPLICATED"`
+	ClusterName  string `env:"CH_CLUSTER" default:"default"`
+	Shard        string `env:"CH_SHARD" default:"shard_01"`
+	Replica      string `env:"CH_REPLICA"`
+	KeeperNodes  string `env:"CH_KEEPER_NODES"`
+	KeeperPort   int    `env:"CH_KEEPER_PORT" default:"9181"`
+	DataNodes    string `env:"CH_DATA_NODES"`
+	DataNodePort int    `env:"CH_DATA_NODE_PORT" default:"9000"`
 
 	// Auth
 	Password          string `env:"CLICKHOUSE_PASSWORD" validate:"required"`
@@ -48,29 +48,29 @@ type Input struct {
 	SystemLogTTLDays int    `env:"SYSTEM_LOG_TTL_DAYS" default:"30"`
 
 	// System logs — each log has enable + TTL + optional flush settings
-	EnableQueryLog     bool `env:"ENABLE_QUERY_LOG" default:"true"`
-	QueryLogTTLDays    int  `env:"QUERY_LOG_TTL_DAYS" default:"7"`
-	QueryLogFlushMs    int  `env:"QUERY_LOG_FLUSH_INTERVAL_MS" default:"7500"`
-	EnablePartLog      bool `env:"ENABLE_PART_LOG" default:"true"`
-	PartLogTTLDays     int  `env:"PART_LOG_TTL_DAYS" default:"14"`
-	EnableMetricLog    bool `env:"ENABLE_METRIC_LOG"`
-	MetricLogTTLDays   int  `env:"METRIC_LOG_TTL_DAYS" default:"7"`
-	MetricLogFlushMs   int  `env:"METRIC_LOG_FLUSH_INTERVAL_MS" default:"30000"`
-	MetricLogCollectMs int  `env:"METRIC_LOG_COLLECT_INTERVAL_MS" default:"10000"`
-	EnableTraceLog     bool `env:"ENABLE_TRACE_LOG"`
-	TraceLogTTLDays    int  `env:"TRACE_LOG_TTL_DAYS" default:"3"`
-	EnableTextLog      bool `env:"ENABLE_TEXT_LOG"`
-	TextLogTTLDays     int  `env:"TEXT_LOG_TTL_DAYS" default:"3"`
-	TextLogLevel       string `env:"TEXT_LOG_LEVEL" default:"warning"`
-	EnableSessionLog   bool `env:"ENABLE_SESSION_LOG"`
-	SessionLogTTLDays  int  `env:"SESSION_LOG_TTL_DAYS" default:"30"`
-	EnableAsyncMetricLog  bool `env:"ENABLE_ASYNC_METRIC_LOG"`
-	AsyncMetricLogTTLDays int  `env:"ASYNC_METRIC_LOG_TTL_DAYS" default:"7"`
-	EnableOtelSpanLog     bool `env:"ENABLE_OTEL_SPAN_LOG"`
-	OtelSpanLogTTLDays    int  `env:"OTEL_SPAN_LOG_TTL_DAYS" default:"7"`
-	EnableProfileLog   bool `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
-	EnableBlobLog      bool `env:"ENABLE_BLOB_STORAGE_LOG"`
-	EnablePrometheus   bool `env:"ENABLE_PROMETHEUS_METRICS"`
+	EnableQueryLog        bool   `env:"ENABLE_QUERY_LOG" default:"true"`
+	QueryLogTTLDays       int    `env:"QUERY_LOG_TTL_DAYS" default:"7"`
+	QueryLogFlushMs       int    `env:"QUERY_LOG_FLUSH_INTERVAL_MS" default:"7500"`
+	EnablePartLog         bool   `env:"ENABLE_PART_LOG" default:"true"`
+	PartLogTTLDays        int    `env:"PART_LOG_TTL_DAYS" default:"14"`
+	EnableMetricLog       bool   `env:"ENABLE_METRIC_LOG"`
+	MetricLogTTLDays      int    `env:"METRIC_LOG_TTL_DAYS" default:"7"`
+	MetricLogFlushMs      int    `env:"METRIC_LOG_FLUSH_INTERVAL_MS" default:"30000"`
+	MetricLogCollectMs    int    `env:"METRIC_LOG_COLLECT_INTERVAL_MS" default:"10000"`
+	EnableTraceLog        bool   `env:"ENABLE_TRACE_LOG"`
+	TraceLogTTLDays       int    `env:"TRACE_LOG_TTL_DAYS" default:"3"`
+	EnableTextLog         bool   `env:"ENABLE_TEXT_LOG"`
+	TextLogTTLDays        int    `env:"TEXT_LOG_TTL_DAYS" default:"3"`
+	TextLogLevel          string `env:"TEXT_LOG_LEVEL" default:"warning"`
+	EnableSessionLog      bool   `env:"ENABLE_SESSION_LOG"`
+	SessionLogTTLDays     int    `env:"SESSION_LOG_TTL_DAYS" default:"30"`
+	EnableAsyncMetricLog  bool   `env:"ENABLE_ASYNC_METRIC_LOG"`
+	AsyncMetricLogTTLDays int    `env:"ASYNC_METRIC_LOG_TTL_DAYS" default:"7"`
+	EnableOtelSpanLog     bool   `env:"ENABLE_OTEL_SPAN_LOG"`
+	OtelSpanLogTTLDays    int    `env:"OTEL_SPAN_LOG_TTL_DAYS" default:"7"`
+	EnableProfileLog      bool   `env:"ENABLE_PROCESSORS_PROFILE_LOG"`
+	EnableBlobLog         bool   `env:"ENABLE_BLOB_STORAGE_LOG"`
+	EnablePrometheus      bool   `env:"ENABLE_PROMETHEUS_METRICS"`
 
 	// Query limits (0 = unlimited)
 	MaxExecutionTime    int    `env:"MAX_EXECUTION_TIME"`
@@ -146,4 +146,3 @@ func Load() (*Input, error) {
 
 	return i, nil
 }
-

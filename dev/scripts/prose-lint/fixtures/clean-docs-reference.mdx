@@ -1,0 +1,20 @@
+---
+title: Instant Evals results flags
+description: Every flag of langwatch instant-eval results, with its default and its limit.
+---
+
+## results
+
+```bash
+langwatch instant-eval results <id> --question annoyed --matched --limit 200
+```
+
+| Flag | What it does |
+|---|---|
+| `--question <id>` | Only that question's judgements |
+| `--matched` / `--unmatched` | Only the rows that matched, or only the rows that did not |
+| `--status <status>` | Only `judged`, `skipped` or `failed` judgements |
+| `--limit <n>` | Judgements per page, at most 1000 (default 100) |
+| `--cursor <cursor>` | The cursor the previous page returned |
+
+Page with `--cursor`: each page returns the cursor of its last row, and no row appears on two pages while the run is still writing.

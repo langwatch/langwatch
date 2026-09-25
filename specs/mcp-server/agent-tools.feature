@@ -23,6 +23,12 @@ Feature: Agent tools expose connected agents and run them through the relay
       Then the parameters read their type, options, default and required
       And each instance reads its hostname, label and connection time
 
+    Scenario: A listed agent the key cannot choose says so
+      Given a personal development agent owned by another person
+      When the agent calls platform_list_agents
+      Then the entry is listed with its owner
+      And it says only its owner can run it
+
     Scenario: The listing keeps the HTTP agent entry unchanged
       Given an HTTP agent
       When the agent calls platform_list_agents

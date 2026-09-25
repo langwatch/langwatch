@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   Boxes,
   Building2,
@@ -5,7 +6,6 @@ import {
   UserRound,
   Waypoints,
 } from "lucide-react";
-import type { Permission } from "~/server/api/rbac";
 import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
@@ -93,6 +93,28 @@ export function productById(id: ProductId): ProductDefinition {
   const product = PRODUCTS.find((candidate) => candidate.id === id);
   if (!product) throw new Error(`Unknown product id "${id}"`);
   return product;
+}
+
+/**
+ * Whether a product is an organization-wide surface, read off the registry
+ * rather than from a list of product names. The scope of a product is a
+ * fact the registry owns; the shell route resolver used to type out
+ * "gateway" and "governance" by hand in two separate places, so a fifth
+ * org-wide product meant remembering to edit both. Now it is one entry
+ * here.
+ *
+ * Takes a nullable id because the callers work from the address: there is
+ * no active product on the settings detour, and `productFromPathname`
+ * returns null for every non-product page. A missing product is not
+ * organization-wide, so this looks the id up without `productById`, which
+ * throws on anything unknown.
+ */
+export function isOrganizationScopedProduct(id: ProductId | null): boolean {
+  if (!id) return false;
+  return (
+    PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind ===
+    "organization"
+  );
 }
 
 /**

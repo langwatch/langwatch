@@ -7,7 +7,7 @@
  * repository whose tenancy is asserted against an in-memory fake is asserting
  * the fake's `filter`, not the SQL that ships.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
@@ -25,6 +25,7 @@ import { prisma } from "~/server/db";
 
 import type { Protections } from "../../../traces/protections";
 import { allocateNextGridRow } from "../../allocateNextGridRow";
+import { CHART_GRID_DEFAULT_ROW_SPAN } from "../../chartGrid";
 import { BUILDER_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
 import { dashboardBelongsToProject } from "../../dashboardBelongsToProject";
 import { LangWatchQLService } from "../../lwql/lwql.service";
@@ -541,8 +542,11 @@ describe("saved workbench charts (integration)", () => {
           },
         });
 
+        // The placed chart sits at row 0 spanning the default row height, so
+        // the first free row is just below its bottom edge — never row 1,
+        // which the placed chart still covers.
         expect(builder.gridRow).not.toBe(0);
-        expect(builder.gridRow).toBe(1);
+        expect(builder.gridRow).toBe(CHART_GRID_DEFAULT_ROW_SPAN);
       });
     });
   });

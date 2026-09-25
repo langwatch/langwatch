@@ -1,4 +1,5 @@
 import { getScenario as apiGetScenario } from "../langwatch-api-scenarios.js";
+import { formatScenarioFields } from "./format-scenario.js";
 
 /**
  * Handles the get_scenario MCP tool invocation.
@@ -31,6 +32,8 @@ export async function handleGetScenario(params: {
   if (Array.isArray(scenario.labels) && scenario.labels.length > 0) {
     lines.push(`\n**Labels**: ${scenario.labels.join(", ")}`);
   }
+
+  lines.push(...formatScenarioFields(scenario.fields));
 
   return lines.join("\n");
 }

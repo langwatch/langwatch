@@ -95,6 +95,10 @@ const AgentHttpEditorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "AgentHttpEditorDrawerFromUrl",
 });
+const AgentVoiceEditorDrawerFromUrl = lazyDefault({
+  factory: () => import("./agents/drawerFromUrl"),
+  key: "AgentVoiceEditorDrawerFromUrl",
+});
 const WorkflowSelectorDrawerFromUrl = lazyDefault({
   factory: () => import("./agents/drawerFromUrl"),
   key: "WorkflowSelectorDrawerFromUrl",
@@ -219,6 +223,10 @@ const InviteMemberDrawer = lazyDefault({
   factory: () => import("./settings/InviteMemberDrawer"),
   key: "InviteMemberDrawer",
 });
+const PersonDrawer = lazyDefault({
+  factory: () => import("./access/PersonDrawer"),
+  key: "PersonDrawer",
+});
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
@@ -227,6 +235,14 @@ const RoutingPolicyDrawer = lazyDefault({
   factory: () =>
     import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
   key: "RoutingPolicyDrawer",
+});
+const AddDepartmentDrawer = lazyDefault({
+  factory: () => import("./governance/people/AddDepartmentDrawer"),
+  key: "AddDepartmentDrawer",
+});
+const RegisterAgentDrawer = lazyDefault({
+  factory: () => import("./governance/agents/RegisterAgentDrawer"),
+  key: "RegisterAgentDrawer",
 });
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
@@ -247,6 +263,10 @@ const ScenarioVersionHistoryDrawer = lazyDefault({
 const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
+});
+const AgentTestingSuiteEditorDrawer = lazyDefault({
+  factory: () => import("./agent-testing/suite/SuiteEditorDrawer"),
+  key: "SuiteEditorDrawer",
 });
 const AgentTestingCaseEditorDrawer = lazyDefault({
   factory: () => import("./agent-testing/cases/AgentTestingCaseEditorDrawer"),
@@ -312,6 +332,7 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawerFromUrl,
   agentHttpEditor: AgentHttpEditorDrawerFromUrl,
+  agentVoiceEditor: AgentVoiceEditorDrawerFromUrl,
   agentConnectedDetail: ConnectedAgentDrawer,
   agentConnectFromCode: ConnectFromCodeDrawer,
   agentWorkflowEditor: AgentWorkflowEditorDrawer,
@@ -337,15 +358,24 @@ export const drawers = {
   // Agent Testing v2 case editor, opened from the cases table, the run rows
   // and the run drawer.
   agentTestingCaseEditor: AgentTestingCaseEditorDrawer,
+  // Agent Testing v2 suite editor: the name, the fields and the evaluators
+  // of a test suite.
+  agentTestingSuiteEditor: AgentTestingSuiteEditorDrawer,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
   routingPolicy: RoutingPolicyDrawer,
+  addDepartment: AddDepartmentDrawer,
+  // Instructions rather than a form: an agent registers itself from the
+  // process that runs it (ADR-128), so this drawer shows the snippet that
+  // does it and collects nothing.
+  addAgent: RegisterAgentDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   inviteMember: InviteMemberDrawer,
+  person: PersonDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

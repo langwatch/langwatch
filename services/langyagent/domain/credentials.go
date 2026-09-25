@@ -80,6 +80,13 @@ type Credentials struct {
 	// worker signature (see SignatureOf): a flip takes effect on the next
 	// warm/probe-MISS re-warm, not on a live worker.
 	DeleteGate *bool `json:"deleteGate,omitempty"`
+	// DisabledSkillIds are the skill ids the control plane has flag-gated off
+	// for this project/user, resolved once over the full skill catalog by
+	// langy-turn.service.ts. Folded into the worker signature (see
+	// SignatureOf) so a flag flip recycles the worker rather than reusing one
+	// still hiding (or still offering) the wrong set. Threaded to the
+	// pi adapter, which denies the model access to these skills.
+	DisabledSkillIds []string `json:"disabledSkillIds,omitempty"`
 }
 
 // MirrorTier is the fidelity of the ADR-061 mirror copy, resolved per
@@ -161,6 +168,12 @@ type CredentialSignature struct {
 	// worker so the relay re-registers with the new tier, rather than mirroring
 	// a live worker's remaining turns under the policy it booted with.
 	MirrorTier string
+	// DisabledSkillIds is a canonical fingerprint (sorted + newline-joined,
+	// via canonicalStrings) of the flag-gated-off skill ids for this
+	// project/user. Folded in for the same reason as EgressAllowlist: a flag
+	// flip changes what the worker must hide, so it must recycle rather than
+	// keep running under the set it booted with.
+	DisabledSkillIds string
 }
 
 // SignatureOf derives the comparable signature from the parts that must match for
@@ -170,7 +183,7 @@ type CredentialSignature struct {
 // canonicalisation lives in ONE place and the two can never compute subtly
 // different signatures. capabilityKeys carries only capability PRESENCE, never a
 // secret, which is why the probe can supply it from a boolean.
-func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys []string, mirrorTier string) CredentialSignature {
+func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabilityKeys, disabledSkillIds []string, mirrorTier string) CredentialSignature {
 	return CredentialSignature{
 		ProjectID:       projectID,
 		ActorUserID:     actorUserID,
@@ -181,6 +194,9 @@ func SignatureOf(projectID, actorUserID, model string, egressAllowlist, capabili
 		// explicit "skip" produce the SAME signature — they mean the same thing
 		// (no mirror), and must not spuriously recycle a worker between them.
 		MirrorTier: string(NormalizeMirrorTier(mirrorTier)),
+		// A flag flip changes DisabledSkillIds' canonical fingerprint, which
+		// recycles the worker the same way an EgressAllowlist edit does.
+		DisabledSkillIds: canonicalStrings(disabledSkillIds),
 	}
 }
 

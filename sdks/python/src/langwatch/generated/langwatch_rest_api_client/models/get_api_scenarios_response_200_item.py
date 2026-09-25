@@ -9,6 +9,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_scenarios_response_200_item_fields import GetApiScenariosResponse200ItemFields
     from ..models.get_api_scenarios_response_200_item_parameters_item import (
         GetApiScenariosResponse200ItemParametersItem,
     )
@@ -38,6 +39,9 @@ class GetApiScenariosResponse200Item:
             default. Absent on servers that predate turn limits on this family.
         test_suite_id (None | str | Unset): The test suite this scenario is filed in, or null when unfiled. Absent on
             servers that predate test suites.
+        fields (GetApiScenariosResponse200ItemFields | Unset): The value this scenario carries for each field its test
+            suite declares, keyed by field identifier. A field with no value has no key. Absent on servers that predate
+            suite fields.
     """
 
     id: str
@@ -52,6 +56,7 @@ class GetApiScenariosResponse200Item:
     max_turns: int | None | Unset = UNSET
     min_turns: int | None | Unset = UNSET
     test_suite_id: None | str | Unset = UNSET
+    fields: GetApiScenariosResponse200ItemFields | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -102,6 +107,10 @@ class GetApiScenariosResponse200Item:
         else:
             test_suite_id = self.test_suite_id
 
+        fields: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = self.fields.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -125,11 +134,14 @@ class GetApiScenariosResponse200Item:
             field_dict["minTurns"] = min_turns
         if test_suite_id is not UNSET:
             field_dict["testSuiteId"] = test_suite_id
+        if fields is not UNSET:
+            field_dict["fields"] = fields
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_scenarios_response_200_item_fields import GetApiScenariosResponse200ItemFields
         from ..models.get_api_scenarios_response_200_item_parameters_item import (
             GetApiScenariosResponse200ItemParametersItem,
         )
@@ -199,6 +211,13 @@ class GetApiScenariosResponse200Item:
 
         test_suite_id = _parse_test_suite_id(d.pop("testSuiteId", UNSET))
 
+        _fields = d.pop("fields", UNSET)
+        fields: GetApiScenariosResponse200ItemFields | Unset
+        if isinstance(_fields, Unset):
+            fields = UNSET
+        else:
+            fields = GetApiScenariosResponse200ItemFields.from_dict(_fields)
+
         get_api_scenarios_response_200_item = cls(
             id=id,
             name=name,
@@ -212,6 +231,7 @@ class GetApiScenariosResponse200Item:
             max_turns=max_turns,
             min_turns=min_turns,
             test_suite_id=test_suite_id,
+            fields=fields,
         )
 
         get_api_scenarios_response_200_item.additional_properties = d

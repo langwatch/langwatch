@@ -659,6 +659,27 @@ HARDENED_WORKLOADS=(
   "templates/redis/statefulset.yaml"
   "charts/gateway/templates/deployment.yaml"
   "charts/clickhouse/templates/statefulset.yaml"
+  # The LWQL access-render Job runs the app image to write the access Secret.
+  # It reaches the Kubernetes API (like the preflight / stored-objects hooks), so
+  # it MUST mount the ServiceAccount token — see TOKEN_MOUNTING_WORKLOADS below.
+  # It renders whenever ClickHouse is chart-managed (default), including under
+  # strict-admission, so it is a hardened workload (not an exemption, which the
+  # strict overlay would have to remove and cannot: the flag that would remove it
+  # is the one that keeps the hardened ClickHouse StatefulSet rendering too). On
+  # every other axis it is fully hardened: read-only root, non-root uid 1000, all
+  # capabilities dropped, seccomp RuntimeDefault, size-bounded emptyDirs.
+  "templates/clickhouse/lwql-access-render.yaml"
+)
+
+# Hardened workloads that legitimately MOUNT the ServiceAccount token because they
+# call the Kubernetes API. For these, the sweep inverts the automount assertion:
+# the token must be mounted (automountServiceAccountToken NOT false) rather than
+# withheld. This is an honest positive requirement, not a skipped check — the
+# render Job cannot write the access Secret without its token, and it must not
+# hand-roll a projected token volume (that collides with the platform webhook's
+# own, which the helm-azure-identity guard forbids chart-wide), so it auto-mounts.
+TOKEN_MOUNTING_WORKLOADS=(
+  "templates/clickhouse/lwql-access-render.yaml"
 )
 
 # Workloads that render only behind a non-default value. They are as
@@ -745,6 +766,13 @@ assert_every_emptydir_bounded() {
 # one hit anywhere satisfies them for the whole document.
 assert_workload_hardened() {
   local tpl="$1"; shift
+  # Workloads that call the Kubernetes API must mount the token; for them the
+  # automount assertion is inverted (mounted, not withheld). See
+  # TOKEN_MOUNTING_WORKLOADS.
+  local needs_token=0 w
+  for w in "${TOKEN_MOUNTING_WORKLOADS[@]}"; do
+    [[ "$w" == "$tpl" ]] && needs_token=1
+  done
   local out report
   out=$(tmpl_only "$tpl" "$@") || {
     fail "hardening: could not render $tpl"; return
@@ -772,7 +800,13 @@ assert_workload_hardened() {
     (( nonroot == 1 ))    || missing+=" container.runAsNonRoot:true"
     (( podnonroot == 1 )) || missing+=" pod.runAsNonRoot:true"
     (( seccomp == 1 ))    || missing+=" pod.seccompProfile:RuntimeDefault"
-    (( automount == 1 ))  || missing+=" pod.automountServiceAccountToken:false"
+    if (( needs_token == 1 )); then
+      # Inverted: this workload calls the K8s API, so the token MUST be mounted
+      # (automount != false). Withholding it would break the write, not harden it.
+      (( automount == 0 )) || missing+=" pod.automountServiceAccountToken:true (workload calls the K8s API)"
+    else
+      (( automount == 1 )) || missing+=" pod.automountServiceAccountToken:false"
+    fi
     if [[ -n "$missing" ]]; then
       fail "hardening[$tpl]: ${id} container '${cname}' missing:${missing}"
       failures=$((failures + 1))
@@ -945,6 +979,8 @@ YAML
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: infrastructure overlays — verify external DB wiring
 # ─────────────────────────────────────────────────────────────────────────────
+# @scenario "The application self-provisions the LangWatchQL access model on every deployment"
+# @scenario "A ClickHouse mode transition rolls the application automatically"
 test_infra_overlays() {
   sep; info "Suite: infrastructure overlays"
 
@@ -956,6 +992,10 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-external.yaml")
   assert_not_contains "ext-ch: no CH StatefulSet" "$ch_ext" "clickhouse-serverless/templates"
   assert_contains "ext-ch: CLICKHOUSE_URL env" "$ch_ext" "name: CLICKHOUSE_URL"
+  # Issue #8258: the app always self-provisions the LWQL access model, on
+  # every posture — no chart-rendered DDL switch exists any more.
+  assert_not_contains "ext-ch: no LWQL_SELF_PROVISION env anywhere" "$ch_ext" "name: LWQL_SELF_PROVISION"
+  assert_contains "ext-ch: app still wired with LWQL query password" "$ch_ext" "name: LWQL_CLICKHOUSE_PASSWORD"
 
   # postgres-external: DATABASE_URL from secret
   local pg_ext
@@ -981,6 +1021,41 @@ test_infra_overlays() {
     -f "${OVERLAYS}/clickhouse-replicated.yaml")
   assert_contains "repl-ch: Keeper created" "$ch_repl" "name: ${RELEASE}-clickhouse-keeper"
   assert_contains "repl-ch: CLICKHOUSE_CLUSTER env" "$ch_repl" "name: CLICKHOUSE_CLUSTER"
+
+  # Issue #8258: the app self-provisions the LWQL access model on every
+  # posture, chart-managed ClickHouse included — so LWQL_SELF_PROVISION never
+  # renders anywhere, and the query password is always wired.
+  assert_not_contains "repl-ch: no LWQL_SELF_PROVISION env" "$ch_repl" "name: LWQL_SELF_PROVISION"
+
+  # ...same at replicas=1 (chart-managed at any replica count).
+  local ch_single
+  ch_single=$(tmpl --set autogen.enabled=true \
+    -f "${OVERLAYS}/size-dev.yaml" \
+    -f "${OVERLAYS}/access-nodeport.yaml")
+  assert_not_contains "single-ch: no LWQL_SELF_PROVISION env" "$ch_single" "name: LWQL_SELF_PROVISION"
+
+  # The app still gets the query-time LWQL password on the chart-managed path:
+  # it authenticates as langwatch_lwql regardless of ClickHouse posture.
+  assert_contains "chart-managed: app still wired with LWQL query password" \
+    "$ch_single" "name: LWQL_CLICKHOUSE_PASSWORD"
+
+  # No chart template renders any part of the access model any more.
+  assert_not_contains "chart-managed: no CLICKHOUSE_LWQL_* config rendered" \
+    "$ch_single" "CLICKHOUSE_LWQL_"
+
+  # Mode transition: app Deployment env differs between replicas=1 and replicas=3
+  if grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_repl" && ! grep -q "name: CLICKHOUSE_CLUSTER" <<< "$ch_single"; then
+    pass "mode-transition: app pod template differs between replicas=1 and replicas=3"
+  else
+    fail "mode-transition: CLICKHOUSE_CLUSTER env presence did not differ"
+  fi
+
+  # NOTES no longer warn about skipped LWQL at replicas>1
+  if ! grep -q "chart did NOT wire LangWatchQL" <<< "$ch_repl"; then
+    pass "repl-ch: NOTES does not warn about skipped LWQL"
+  else
+    fail "repl-ch: NOTES still contains old LWQL-skip warning"
+  fi
 
   # local-images: pullPolicy Never
   local local_img
@@ -1320,6 +1395,49 @@ load_images() {
   if docker image inspect "$ch_image" &>/dev/null 2>&1; then
     info "Loading $ch_image into Kind"
     kind load docker-image "$ch_image" --name "$CLUSTER_NAME"
+  fi
+
+  # The values-local.yaml profile (examples/values-local.yaml:16) pins
+  # images.app: { tag: local, pullPolicy: Never }, so test_install_profile_local
+  # needs langwatch/langwatch:local in the cluster. The workflow builds and
+  # kind-loads only the real app image (langwatch/langwatch:3.17.0); nothing
+  # produces :local. Under app.replicaCount=0 (values-e2e.yaml) the LWQL render
+  # Job is the first workload to need the app image, and its ClickHouse mount is
+  # now optional: false, so a missing :local blocks the whole install rather than
+  # merely leaving the app scaled to zero.
+  #
+  # $APP_IMAGE is NOT trustworthy as the source: charts/langwatch/Makefile:10 sets
+  # `APP_IMAGE := langwatch/langwatch:local`, and GNU make re-exports any variable
+  # that came from the environment with the makefile's own value. So even though
+  # the workflow exports APP_IMAGE=langwatch/langwatch:3.17.0, invoking this script
+  # via `make` runs it with APP_IMAGE=langwatch/langwatch:local — a tag nobody
+  # built. Resolve the source image without trusting APP_IMAGE alone.
+  if docker image inspect langwatch/langwatch:local &>/dev/null 2>&1; then
+    info "langwatch/langwatch:local already present; loading into Kind"
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  elif [[ -n "${APP_IMAGE:-}" && "$APP_IMAGE" != "langwatch/langwatch:local" ]] \
+    && docker image inspect "$APP_IMAGE" &>/dev/null 2>&1; then
+    info "Tagging $APP_IMAGE as langwatch/langwatch:local and loading into Kind"
+    docker tag "$APP_IMAGE" langwatch/langwatch:local
+    kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+  else
+    # Derive the chart default the same way the workflow's Resolve step does.
+    # Read helm's (multi-KB) output ONCE into a variable, then extract with
+    # here-strings: piping it straight into `awk '...exit'` makes awk close the
+    # pipe on the first match while helm is still writing, and under `pipefail`
+    # (set at the top) the SIGPIPE fails the $(...) and set -e aborts (exit 141).
+    local repo tag default_image values
+    values=$(helm show values "$CHART_DIR" 2>/dev/null) || values=""
+    repo=$(awk '/^ *repository:/{print $2; exit}' <<<"$values")
+    tag=$(awk '/^ *tag:/{print $2; exit}' <<<"$values")
+    default_image="${repo}:${tag}"
+    if [[ -n "$repo" && -n "$tag" ]] && docker image inspect "$default_image" &>/dev/null 2>&1; then
+      info "Tagging chart default $default_image as langwatch/langwatch:local and loading into Kind"
+      docker tag "$default_image" langwatch/langwatch:local
+      kind load docker-image langwatch/langwatch:local --name "$CLUSTER_NAME"
+    else
+      fail "cannot produce langwatch/langwatch:local — the values-local.yaml profile pins images.app.tag=local (pullPolicy: Never) and the LWQL render Job needs it; tried: existing :local (absent), \$APP_IMAGE='${APP_IMAGE:-}' (absent or itself :local), chart default '${default_image}' (absent). Build/load the app image before running the install suites"
+    fi
   fi
 
   pass "Images loaded"

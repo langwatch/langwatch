@@ -292,6 +292,13 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
       });
     });
 
+    describe("when the type is file", () => {
+      it("keeps the attachment reference verbatim", () => {
+        const ref = "/api/files/project-1/object-1/report.pdf";
+        expect(convertValueToColumnType(ref, "file")).toBe(ref);
+      });
+    });
+
     describe("when the type is json/list", () => {
       it("parses valid JSON and keeps the original on a parse error", () => {
         expect(convertValueToColumnType("[1,2]", "list")).toEqual([1, 2]);

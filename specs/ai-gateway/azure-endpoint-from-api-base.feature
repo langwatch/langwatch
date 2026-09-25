@@ -47,3 +47,63 @@ Feature: Azure OpenAI provider routing through in-app dispatch paths
     Given an Azure provider slot on a virtual key whose endpoint arrives under "endpoint"
     When a chat completion is sent through the gateway
     Then the upstream request is sent to the configured Azure resource endpoint
+
+  Rule: The gateway resolves the Azure deployment the same way the in-app paths do
+
+    An Azure provider row names a deployment explicitly only when that name
+    differs from the model id, which is the exception rather than the rule; by
+    default the model id is the deployment name. The in-app dispatch paths fill
+    that gap, and gateway traffic must resolve the deployment identically, on
+    the streaming lane as well as the plain one. A customer whose deployment is
+    named differently from the model must not have that name dropped on the way
+    out: Azure has no such deployment and refuses the call.
+
+    A deployment belongs to the credential that named it. Dispatch retries walk
+    a chain of credentials over one request, so a deployment resolved for one
+    attempt must not decide what a later attempt sends: the next resource, or a
+    provider that is not Azure at all, would be asked for a deployment it does
+    not have.
+
+    Background:
+      Given an Azure provider credential with a correct endpoint and API key reaches dispatch
+
+    @integration
+    Scenario: Gateway chat completion for an Azure model reaches the deployment named by the model id
+      Given the provider names no deployment of its own
+      When a chat completion for that model is dispatched
+      Then the upstream request targets the deployment named by the model id
+      And the request the customer sent is forwarded unaltered
+
+    @integration
+    Scenario: Gateway streaming chat completion for an Azure model reaches the deployment named by the model id
+      Given the provider names no deployment of its own
+      When a streaming chat completion for that model is dispatched
+      Then the upstream request targets the deployment named by the model id
+      And the stream drains without error
+
+    @integration
+    Scenario: An explicit deployment mapping still decides the deployment on the gateway lane
+      Given the provider maps the model to a deployment name that differs from the model id
+      When a chat completion for that model is dispatched
+      Then the upstream request targets the mapped deployment name
+
+    @integration
+    Scenario: The streaming lane honors an explicit deployment name too
+      Given the provider names a deployment that differs from the model id
+      When a streaming chat completion for that model is dispatched
+      Then the upstream request targets that deployment name
+
+    @integration
+    Scenario: A deployment resolved for one credential does not leak into the next attempt
+      Given the provider maps the model to a deployment name that differs from the model id
+      And a second Azure credential that names no deployment of its own follows it in the chain
+      When the request fails over to that second credential
+      Then the second resource is asked for the deployment named by the model id
+      And the request the customer sent is left unaltered for the next attempt
+
+    @integration
+    Scenario: An Azure deployment does not leak into a non-Azure fallback
+      Given the provider maps the model to a deployment name that differs from the model id
+      And a credential for a provider that is not Azure follows it in the chain
+      When the request fails over to that credential
+      Then that provider is asked for the model id and not the Azure deployment name

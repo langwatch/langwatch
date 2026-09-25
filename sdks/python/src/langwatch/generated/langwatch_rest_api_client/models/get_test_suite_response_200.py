@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
+    from ..models.get_test_suite_response_200_evaluators_item import GetTestSuiteResponse200EvaluatorsItem
+    from ..models.get_test_suite_response_200_fields_item import GetTestSuiteResponse200FieldsItem
     from ..models.get_test_suite_response_200_scenarios_item import GetTestSuiteResponse200ScenariosItem
 
 
@@ -28,6 +32,10 @@ class GetTestSuiteResponse200:
         platform_url (str): Where to open this test suite in the LangWatch platform.
         scenarios (list[GetTestSuiteResponse200ScenariosItem]): The active scenarios filed in this suite. An archived
             scenario is left out.
+        fields (list[GetTestSuiteResponse200FieldsItem] | Unset): The fields the test suite declares. Absent on servers
+            that predate fields on this family.
+        evaluators (list[GetTestSuiteResponse200EvaluatorsItem] | Unset): The evaluators attached to the test suite.
+            Absent on servers that predate evaluators on this family.
     """
 
     id: str
@@ -40,6 +48,8 @@ class GetTestSuiteResponse200:
     updated_at: str
     platform_url: str
     scenarios: list[GetTestSuiteResponse200ScenariosItem]
+    fields: list[GetTestSuiteResponse200FieldsItem] | Unset = UNSET
+    evaluators: list[GetTestSuiteResponse200EvaluatorsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -67,6 +77,20 @@ class GetTestSuiteResponse200:
             scenarios_item = scenarios_item_data.to_dict()
             scenarios.append(scenarios_item)
 
+        fields: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.fields, Unset):
+            fields = []
+            for fields_item_data in self.fields:
+                fields_item = fields_item_data.to_dict()
+                fields.append(fields_item)
+
+        evaluators: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.evaluators, Unset):
+            evaluators = []
+            for evaluators_item_data in self.evaluators:
+                evaluators_item = evaluators_item_data.to_dict()
+                evaluators.append(evaluators_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -83,11 +107,17 @@ class GetTestSuiteResponse200:
                 "scenarios": scenarios,
             }
         )
+        if fields is not UNSET:
+            field_dict["fields"] = fields
+        if evaluators is not UNSET:
+            field_dict["evaluators"] = evaluators
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_test_suite_response_200_evaluators_item import GetTestSuiteResponse200EvaluatorsItem
+        from ..models.get_test_suite_response_200_fields_item import GetTestSuiteResponse200FieldsItem
         from ..models.get_test_suite_response_200_scenarios_item import GetTestSuiteResponse200ScenariosItem
 
         d = dict(src_dict)
@@ -121,6 +151,24 @@ class GetTestSuiteResponse200:
 
             scenarios.append(scenarios_item)
 
+        _fields = d.pop("fields", UNSET)
+        fields: list[GetTestSuiteResponse200FieldsItem] | Unset = UNSET
+        if _fields is not UNSET:
+            fields = []
+            for fields_item_data in _fields:
+                fields_item = GetTestSuiteResponse200FieldsItem.from_dict(fields_item_data)
+
+                fields.append(fields_item)
+
+        _evaluators = d.pop("evaluators", UNSET)
+        evaluators: list[GetTestSuiteResponse200EvaluatorsItem] | Unset = UNSET
+        if _evaluators is not UNSET:
+            evaluators = []
+            for evaluators_item_data in _evaluators:
+                evaluators_item = GetTestSuiteResponse200EvaluatorsItem.from_dict(evaluators_item_data)
+
+                evaluators.append(evaluators_item)
+
         get_test_suite_response_200 = cls(
             id=id,
             name=name,
@@ -132,6 +180,8 @@ class GetTestSuiteResponse200:
             updated_at=updated_at,
             platform_url=platform_url,
             scenarios=scenarios,
+            fields=fields,
+            evaluators=evaluators,
         )
 
         get_test_suite_response_200.additional_properties = d

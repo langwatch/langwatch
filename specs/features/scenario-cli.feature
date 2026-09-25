@@ -16,11 +16,13 @@ Feature: Scenario CLI Commands
     When I run "langwatch scenario list"
     Then I see a message indicating no scenarios were found
 
+  @unit
   Scenario: Get scenario details by ID
     Given my project has a scenario with name "Login Flow"
     When I run "langwatch scenario get <scenario-id>"
     Then I see scenario details including name, situation, criteria, and labels
 
+  @unit
   Scenario: Get scenario that does not exist
     When I run "langwatch scenario get nonexistent-id"
     Then I see an error that the scenario was not found
@@ -47,14 +49,66 @@ Feature: Scenario CLI Commands
     When I run "langwatch scenario update <scenario-id> --criteria 'New criterion 1,New criterion 2'"
     Then the scenario criteria are replaced with the new values
 
+  @unit
   Scenario: Delete (archive) a scenario
     Given my project has a scenario with name "Login Flow"
     When I run "langwatch scenario delete <scenario-id>"
     Then the scenario is archived and I see confirmation
 
+  @unit
   Scenario: Delete a scenario that does not exist
     When I run "langwatch scenario delete nonexistent-id"
     Then I see an error that the scenario was not found
+
+  # ============================================================================
+  # Naming a scenario
+  # ============================================================================
+  # get, update, delete and run take a reference: an id, or the scenario's
+  # name. The reading is the one test-suite commands give a suite reference
+  # (specs/features/test-suite-cli.feature), so the two families rhyme.
+
+  @unit
+  Scenario: Get a scenario by its name
+    Given my project has a scenario with name "Login Flow"
+    When I run "langwatch scenario get 'Login Flow'"
+    Then I see the details of that scenario
+
+  @unit
+  Scenario: Get a scenario by its name ignoring case
+    Given my project has a scenario with name "Login Flow" and none named "login flow"
+    When I run "langwatch scenario get 'login flow'"
+    Then I see the details of that scenario
+
+  @unit
+  Scenario: A name two scenarios share is refused with both ids
+    Given my project has two scenarios named "Login Flow"
+    When I run "langwatch scenario get 'Login Flow'"
+    Then I see an error naming both ids and asking for the id
+
+  @unit
+  Scenario: A reference that names no scenario is not found
+    Given my project has no scenario named "Checkout"
+    When I run "langwatch scenario update Checkout --name 'Checkout v2'"
+    Then I see an error that the scenario was not found, pointing at "langwatch scenario list"
+    And nothing is updated
+
+  @unit
+  Scenario: Update a scenario by its name
+    Given my project has a scenario with name "Login Flow"
+    When I run "langwatch scenario update 'Login Flow' --name 'Updated Login Flow'"
+    Then that scenario is updated
+
+  @unit
+  Scenario: Delete a scenario by its name
+    Given my project has a scenario with name "Login Flow"
+    When I run "langwatch scenario delete 'Login Flow'"
+    Then that scenario is archived
+
+  @unit
+  Scenario: Run a scenario by its name
+    Given my project has a scenario with name "Refund a paid order" and an HTTP agent
+    When I run "langwatch scenario run 'Refund a paid order' --target http:agent_abc"
+    Then the run is scoped to that scenario
 
   Scenario: Run scenario command without API key
     Given LANGWATCH_API_KEY is not set
@@ -94,6 +148,33 @@ Feature: Scenario CLI Commands
     When I run "langwatch scenario create 'Login Flow' --situation 'User logs in' --test-suite nonexistent-id"
     Then I see an error that the test suite was not found
     And no scenario is created
+
+  @unit
+  Scenario: Create a scenario with field values coerced by the suite
+    Given the test suite "Case lookups" declares golden_sql as text and row_limit as number
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field golden_sql='SELECT 1' --field row_limit=10"
+    Then the scenario is created with golden_sql as the text and row_limit as the number 10
+
+  @unit
+  Scenario: A field value the suite does not declare is refused
+    Given the test suite "Case lookups" declares golden_sql
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field golden=SELECT"
+    Then the command refuses the flag naming the fields the suite declares
+    And no scenario is created
+
+  @unit
+  Scenario: A field value that does not read as its type is refused
+    Given the test suite "Case lookups" declares row_limit as number
+    When I run "langwatch scenario create 'Chargebacks' --situation '...' --test-suite 'Case lookups' --field row_limit=ten"
+    Then the command refuses the flag naming the field's type
+    And no scenario is created
+
+  @unit
+  Scenario: Update the field values of a scenario in place
+    Given a scenario filed in a test suite that declares golden_sql
+    When I run "langwatch scenario update <id> --field golden_sql='SELECT 2'"
+    Then the suite the scenario is in is read for its field types
+    And the scenario is updated with the new values and nothing else
 
   @unit
   Scenario: Combining --test-suite and --no-test-suite is rejected

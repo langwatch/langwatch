@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { modelOverrideSchema } from "~/server/modelProviders/modelOverrideSchema";
+import { evaluatorAttachmentsSchema } from "~/server/scenarios/evaluator-attachments";
+import { suiteFieldDefinitionsSchema } from "~/server/scenarios/suite-fields";
 import { suiteScopeSchema } from "~/server/suites/scope";
 import { suiteTargetSchema } from "~/server/suites/types";
 
@@ -61,4 +63,16 @@ export const updateSuiteSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
   simulatorModel: modelOverrideSchema.nullish(),
   judgeModel: modelOverrideSchema.nullish(),
+  // The fields a test suite declares. Refused on a run plan.
+  fields: suiteFieldDefinitionsSchema.optional(),
+  // The evaluators attached to the suite or the plan, the full list.
+  evaluators: evaluatorAttachmentsSchema.optional(),
+});
+
+/** What the test suite editor saves: any of the name, the fields, the evaluators. */
+export const updateTestSuiteSchema = projectSchema.extend({
+  testSuiteId: z.string(),
+  name: z.string().trim().min(1).optional(),
+  fields: suiteFieldDefinitionsSchema.optional(),
+  evaluators: evaluatorAttachmentsSchema.optional(),
 });

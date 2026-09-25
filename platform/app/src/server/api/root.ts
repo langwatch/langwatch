@@ -3,25 +3,38 @@ import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { departmentsRouter } from "@ee/governance/routers/departments";
 import { governanceRouter } from "@ee/governance/routers/governance";
+import { governanceAgentsRouter } from "@ee/governance/routers/governanceAgents";
+import { governanceCostRouter } from "@ee/governance/routers/governanceCost";
+import { governancePeopleRouter } from "@ee/governance/routers/governancePeople";
 import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
 import { ingestionSourcesRouter } from "@ee/governance/routers/ingestionSources";
 import { ingestionTemplatesRouter } from "@ee/governance/routers/ingestionTemplates";
 import { personalSessionsRouter } from "@ee/governance/routers/personalSessions";
 import { sessionPolicyRouter } from "@ee/governance/routers/sessionPolicy";
+import { scimOversightRouter } from "@ee/scim/routers/scimOversight";
+import { scimReconciliationRouter } from "@ee/scim/routers/scimReconciliation";
+import { scimTokenRouter } from "@ee/scim/routers/scimToken";
+import { ssoConnectionsRouter } from "@ee/sso/routers/ssoConnections";
+import { ssoSetupRouter } from "@ee/sso/routers/ssoSetup";
 import { createTRPCRouter } from "~/server/api/trpc";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
+import { authRouter } from "./routers/auth";
 import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
+import { checkupRouter } from "./routers/checkup";
 import { codingAgentsRouter } from "./routers/codingAgents";
+import { connectRouter } from "./routers/connect";
+import { connectedBillingRouter } from "./routers/connectedBilling";
 import { costsRouter } from "./routers/costs";
 import { currencyRouter } from "./routers/currency";
 import { dashboardsRouter } from "./routers/dashboards";
+import { dashboardWidgetsRouter } from "./routers/dashboardWidgets";
 import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
@@ -32,7 +45,6 @@ import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
-import { frontDoorRouter } from "./routers/frontDoor";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
@@ -44,12 +56,15 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { identityRouter } from "./routers/identity";
+import { identityLookupRouter } from "./routers/identityLookup";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { inviteRouter } from "./routers/invite";
 import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
+import { licenseRegistryRouter } from "./routers/licenseRegistry";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
@@ -72,13 +87,13 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
-import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
+import { selfHostedInstancesRouter } from "./routers/selfHostedInstances";
 import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
+import { signInSecurityRouter } from "./routers/signInSecurity";
 import { spansRouter } from "./routers/spans";
-import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -88,6 +103,7 @@ import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
+import { twoStepVerificationRouter } from "./routers/twoStepVerification";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
@@ -98,7 +114,10 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  invite: inviteRouter,
   joinRequests: joinRequestsRouter,
+  twoStepVerification: twoStepVerificationRouter,
+  signInSecurity: signInSecurityRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -115,6 +134,7 @@ const coreRouters = {
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboardWidgets: dashboardWidgetsRouter,
   dashboards: dashboardsRouter,
   home: homeRouter,
   evaluations: evaluationsRouter,
@@ -124,7 +144,8 @@ const coreRouters = {
   automation: automationRouter,
   authz: authzRouter,
   identity: identityRouter,
-  frontDoor: frontDoorRouter,
+  identityLookup: identityLookupRouter,
+  auth: authRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
@@ -133,6 +154,7 @@ const coreRouters = {
   user: userRouter,
   bugReports: bugReportsRouter,
   ssoConnections: ssoConnectionsRouter,
+  ssoSetup: ssoSetupRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
@@ -155,7 +177,14 @@ const coreRouters = {
   savedViews: savedViewsRouter,
   secrets: secretsRouter,
   license: licenseRouter,
+  licenseRegistry: licenseRegistryRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  selfHostedInstances: selfHostedInstancesRouter,
+  connect: connectRouter,
+  checkup: checkupRouter,
+  connectedBilling: connectedBillingRouter,
+  scimOversight: scimOversightRouter,
+  scimReconciliation: scimReconciliationRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,
@@ -174,6 +203,9 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
+  governanceAgents: governanceAgentsRouter,
+  governanceCost: governanceCostRouter,
+  governancePeople: governancePeopleRouter,
   personalSessions: personalSessionsRouter,
   sessionPolicy: sessionPolicyRouter,
   gatewayBudgets: gatewayBudgetsRouter,

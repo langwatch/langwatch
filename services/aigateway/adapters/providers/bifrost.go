@@ -71,6 +71,10 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// langWatchClient forwards calls to another LangWatch gateway for a
+	// connected self-hosted install (no overall timeout, same reason as the
+	// codex client: a streamed completion runs for minutes).
+	langWatchClient *http.Client
 	// realtimeClient makes the one bounded REST call a voice session mint
 	// needs. Its own client because the mint must not follow redirects and
 	// re-checks every dialed address against the endpoint policy: it carries
@@ -157,6 +161,7 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		langWatchClient: newLangWatchClient(),
 		realtimeClient:  newRealtimeClient(endpointPolicy),
 
 		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
@@ -234,6 +239,8 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = domain.WithDeploymentSelfMap(cred, model)
+	req = requestWithResolvedDeployment(req, cred, model)
 
 	// Voyage is not a Bifrost ModelProvider (its enum doesn't include
 	// Voyage). The gateway proxies directly to api.voyageai.com — wire
@@ -242,6 +249,13 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// clean unsupported-type error.
 	if cred.ProviderID == domain.ProviderVoyage {
 		return r.dispatchVoyageDirect(ctx, req, model, cred)
+	}
+
+	// The LangWatch provider is another LangWatch gateway. Both sides speak
+	// the OpenAI-compatible wire, so the body goes over as it arrived and the
+	// answer comes back as it came. See langwatch.go.
+	if cred.ProviderID == domain.ProviderLangWatch {
+		return r.dispatchLangWatch(ctx, langWatchDispatch{req: req, model: model, cred: cred})
 	}
 
 	// Codex streams upstream always (the backend is SSE-only); the
@@ -621,6 +635,8 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
 	}
+	cred = domain.WithDeploymentSelfMap(cred, model)
+	req = requestWithResolvedDeployment(req, cred, model)
 
 	// The image routes answer with one JSON body, so no credential and no
 	// provider lane streams them. This sits above every provider-specific
@@ -641,6 +657,12 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 			return r.dispatchMessagesTranslatedCodexStream(ctx, req, model, cred)
 		}
 		return r.dispatchCodexStream(ctx, req, model, cred)
+	}
+
+	// The far LangWatch gateway streams the dialect the caller asked for, so
+	// its frames are forwarded as they arrive. See langwatch.go.
+	if cred.ProviderID == domain.ProviderLangWatch {
+		return r.dispatchLangWatchStream(ctx, langWatchDispatch{req: req, model: model, cred: cred})
 	}
 
 	provider := r.mapProviderForDispatch(cred)

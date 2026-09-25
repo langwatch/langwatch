@@ -42,15 +42,21 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   return { ...actual, enforceLicenseLimit: vi.fn() };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The gate itself, stubbed per test: this suite is about what each procedure
 // DOES with the answer, not about how the flag resolves (which `access.ts` and
@@ -59,6 +65,14 @@ const lwqlEnabledMock = vi.fn();
 vi.mock("~/server/analytics/lwql/access", () => ({
   lwqlEnabled: (args: unknown) => lwqlEnabledMock(args),
   LWQL_FLAG: "release_lwql_workbench",
+}));
+
+// This suite is about the workbench flag alone; the playground flag is
+// pinned off so its own `dashboard_srcdoc` kind never enters these clauses
+// (that combination is `graphs.playgroundGate.unit.test.ts`'s job).
+vi.mock("~/server/analytics/dashboard-widgets/access", () => ({
+  customChartPlaygroundEnabled: vi.fn().mockResolvedValue(false),
+  CUSTOM_CHART_PLAYGROUND_FLAG: "release_custom_chart_playground",
 }));
 
 const findUnique = vi.fn();

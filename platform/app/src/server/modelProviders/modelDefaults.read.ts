@@ -2,14 +2,13 @@ import type {
   ModelDefaultScopeType,
   PrismaClient,
 } from "~/generated/prisma/client";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
   probeTeamPermission,
 } from "~/server/app-layer/permissions/imperative";
-
 import type { Session } from "~/server/auth";
-import { batchScopePermissions } from "../api/rbac";
 import {
   allFeatures,
   featureByKey,
@@ -203,7 +202,10 @@ export async function getDefaultModelsSnapshot(
         orderBy: { name: "asc" },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, name: true, teamId: true },
         orderBy: { name: "asc" },
       }),
@@ -279,7 +281,13 @@ export async function getDefaultModelsSnapshot(
         select: { id: true },
       }),
       ctx.prisma.project.findMany({
-        where: { team: { organizationId } },
+        // The READABLE set, which decides whose policy rows come back. Filter
+        // it too: leaving the home here would surface a rule scoped to it
+        // even with the writable picker above already clean.
+        where: {
+          team: { organizationId },
+          kind: { not: "internal_governance" },
+        },
         select: { id: true, teamId: true },
       }),
     ]);

@@ -20,6 +20,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **lwql-workbench.md** - LangWatchQL workbench + LangWatchQL Vega-Lite chart patterns: request-state discipline, backend-only validation, value fidelity, the chart governance chain, the lazy Vega boundary
 - **logging-and-tracing.md** - Logging infrastructure and context propagation
 - **local-observability.md** - Local LGTM stack (Grafana/Loki/Tempo/Prometheus); querying logs/traces as an agent with `gcx`
+- **dogfooding-isolation.md** - Dogfooding the CLI against a local instance without rewriting the machine's global agent wiring
 - **dependency-age-gates.md** - Dependency release-age gates and emergency security exceptions
 - **vitest-performance.md** - Vitest pool/isolation settings and the RAM guardrails they protect
 - **typescript.md** - TypeScript patterns

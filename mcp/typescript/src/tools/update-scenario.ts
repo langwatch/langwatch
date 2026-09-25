@@ -1,4 +1,6 @@
 import { updateScenario as apiUpdateScenario } from "../langwatch-api-scenarios.js";
+import type { ScenarioFieldValues } from "../schemas/suite-fields.js";
+import { formatScenarioFields } from "./format-scenario.js";
 
 /**
  * Handles the platform_update_scenario MCP tool invocation.
@@ -13,6 +15,7 @@ export async function handleUpdateScenario(params: {
   criteria?: string[];
   labels?: string[];
   testSuiteId?: string | null;
+  fields?: ScenarioFieldValues;
 }): Promise<string> {
   const { scenarioId, ...data } = params;
   const result = await apiUpdateScenario({ id: scenarioId, ...data });
@@ -31,6 +34,7 @@ export async function handleUpdateScenario(params: {
   if (result.testSuiteId) {
     lines.push(`**Test suite**: ${result.testSuiteId}`);
   }
+  lines.push(...formatScenarioFields(result.fields));
 
   return lines.join("\n");
 }

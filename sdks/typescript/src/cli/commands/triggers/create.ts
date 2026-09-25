@@ -10,6 +10,7 @@ import { buildAuthHeaders } from "@/internal/api/auth";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type { CommandResult } from "../../utils/output";
 import { redactTriggerSecrets } from "./redact";
+import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
  * Returns the created trigger rather than printing it: the output port renders
@@ -51,7 +52,7 @@ export const createTriggerCommand = async (
     const actionParams: Record<string, unknown> = {};
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    const response = await fetch(`${endpoint}/api/triggers`, {
+    const response = await langwatchFetch(`${endpoint}/api/triggers`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

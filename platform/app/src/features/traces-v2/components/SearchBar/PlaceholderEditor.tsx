@@ -13,16 +13,13 @@ import {
 } from "./filterHighlight";
 
 /**
- * The search bar's at-rest invitation, parameterised on who answers the ask —
- * "Ask AI" for the inline composer, "Ask Langy" when Langy owns the
- * affordance. One builder so the cold placeholder here and the live TipTap
- * editor's placeholder can never drift apart.
+ * The search bar's at-rest invitation. One constant so the cold placeholder
+ * here and the live TipTap editor's placeholder can never drift apart. It
+ * names both things Enter takes: a filter, or a sentence the search decides
+ * about. The ask button, not the placeholder, is the way to Langy.
  */
-export function searchBarPlaceholder(askLabel: string): string {
-  return `Search filters, free text, or ${askLabel}…`;
-}
-
-const PLACEHOLDER_TEXT = searchBarPlaceholder("Ask AI");
+export const SEARCH_BAR_PLACEHOLDER =
+  "Search filters or type what you are looking for";
 
 type DecoratedSegment =
   | {
@@ -121,12 +118,6 @@ interface PlaceholderEditorProps {
    * value-picker popover; if absent, clicks fall through to the
    * activation behaviour. */
   onTokenClick?: (payload: TokenClickPayload) => void;
-  /**
-   * Placeholder shown while the bar is empty. Defaults to the Ask AI
-   * wording; the SearchBar passes the Ask Langy variant when Langy owns
-   * the ask affordance.
-   */
-  placeholderText?: string;
 }
 
 /**
@@ -140,8 +131,8 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   onActivate,
   onApplyQueryText,
   onTokenClick,
-  placeholderText = PLACEHOLDER_TEXT,
 }) => {
+  const placeholderText = SEARCH_BAR_PLACEHOLDER;
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key !== "/") return;
@@ -165,8 +156,9 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   const segments = useMemo(() => buildSegments(queryText), [queryText]);
   // Chips store the raw id (unique) but display the resolved facet label
   // (readable) — same source the sidebar uses. The label is painted by the
-  // shared CSS overlay (see editorStyles), field prefix intact, and the raw
-  // id slides back into view on hover — identical to the live editor.
+  // shared CSS overlay (see editorStyles), field prefix intact; the raw id
+  // stays in the tooltip so the chip never resizes under the pointer —
+  // identical to the live editor.
   const resolveLabel = useFacetValueLabelResolver();
 
   return (

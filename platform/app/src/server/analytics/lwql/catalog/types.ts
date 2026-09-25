@@ -9,7 +9,7 @@
  *    keys, types and descriptions;
  *  - the AST validator, whose `allowedTables` and `gatedColumns` come from
  *    {@link lwqlAllowedTables} and {@link lwqlGatedColumns};
- *  - the provisioning generators in `../views.ts`, which turn an entry into its
+ *  - the provisioning generators in `../provisioning/catalogStatements.ts`, which turn an entry into its
  *    `CREATE VIEW`, its column grants and its row policy.
  *
  * Nothing here holds SQL text or database names. A view's *source database* is
@@ -18,7 +18,7 @@
  * that would then be wrong everywhere else.
  *
  * @see ./lwqlViews.ts — the catalog itself
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import type { FieldProtection } from "../../../traces/projection/catalog";
@@ -43,7 +43,7 @@ export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
  *
  * A choice with a measurement behind it rather than a preference, so it is a
  * parameter: the isolation suite measures each against the real tables and the
- * shipped default is whichever won. See `../views.ts` for the measurement, and
+ * shipped default is whichever won. See `../provisioning/catalogStatements.ts` for the measurement, and
  * {@link LangWatchQLViewDedup.strategy} for the entry that pins its own.
  *
  *  - `in-tuple` — the repository pattern from
@@ -60,7 +60,7 @@ export type LangWatchQLColumnUnit = (typeof LWQL_COLUMN_UNITS)[number];
  *    which silently doubles aggregates. Here to be measured against, never to
  *    be shipped, and never to be pinned on an entry.
  *
- * @see ../views.ts — how each is rendered, and the measurement that chose the default
+ * @see ../provisioning/catalogStatements.ts — how each is rendered, and the measurement that chose the default
  */
 export type LangWatchQLDedupStrategy = "in-tuple" | "final" | "none";
 
@@ -135,8 +135,105 @@ export interface LangWatchQLViewColumn {
    * unfiltered one; written bare, the second reference picked up the first's
    * alias and `CapturedInput` came back empty for every span. Passing the
    * qualifier in is what makes forgetting impossible rather than remembered.
+   *
+   * `joined` qualifies a column of the view's {@link LangWatchQLViewJoin} table,
+   * present only when the view declares a join. A column read from the joined
+   * side leaves {@link sourceColumns} empty and reads through `joined` — the
+   * grant on that side is driven by {@link LangWatchQLViewJoin.sourceColumns}
+   * instead, so its columns are not granted on the primary table.
    */
-  readonly expression?: (source: (column: string) => string) => string;
+  readonly expression?: (
+    source: (column: string) => string,
+    joined?: (column: string) => string,
+  ) => string;
+  /**
+   * Columns of the view's {@link LangWatchQLViewJoin} table this column reads.
+   *
+   * The joined-side analogue of {@link sourceColumns}: a column built entirely
+   * from the joined relation (its {@link sourceColumns} empty, its
+   * {@link expression} reading only `joined(...)`) is not a constant — it reads
+   * a real column, just on the other table. Declared so the shape guard can see
+   * it reads *something*, and so the map-content guard knows a gate on this
+   * column is justified by the joined content it pulls rather than by any key it
+   * reads on the primary side. The grant on those columns is driven by
+   * {@link LangWatchQLViewJoin.sourceColumns}, not by this list.
+   */
+  readonly joinedSourceColumns?: readonly string[];
+  /**
+   * Set when this column reads an aggregate-function state and is finalised
+   * with a merge combinator (or a plain simple-aggregate) under the view's
+   * `GROUP BY`.
+   *
+   * Like {@link summed} it marks a column safe to project under a grouped
+   * render, but where `summed` re-sums a `SimpleAggregateFunction(sum, T)` this
+   * carries an {@link expression} that names the exact combinator the state
+   * requires — `sumMerge`, `argMaxMerge`, `countMerge`, a plain `max` for a
+   * `SimpleAggregateFunction`. The grouped render calls that expression rather
+   * than refusing the column as an arbitrary value from its group.
+   */
+  readonly aggregate?: boolean;
+}
+
+/**
+ * A second physical table a view joins, so one view can be rendered from two
+ * sources.
+ *
+ * Absent on every shipped view but the ones that genuinely span two tables. The
+ * tenant boundary covers both sides: {@link LangWatchQLViewJoin.table} is listed
+ * as a source table alongside the primary, so a row policy is created on it too
+ * (`lwqlSourceTables` in `../provisioning/catalogStatements.ts`). Only a
+ * ClickHouse-resident view may declare a join — a PostgreSQL-resident view
+ * reaches ClickHouse through its own engine table and cannot.
+ */
+export interface LangWatchQLViewJoin {
+  /** The joined table, in the same source database as the primary. */
+  readonly table: string;
+  /**
+   * Alias the view body gives the joined table, used in {@link on}, the view's
+   * {@link LangWatchQLViewDefinition.where} and the `joined` qualifier that
+   * column expressions receive.
+   */
+  readonly alias: string;
+  /**
+   * The `ON` predicate, as SQL over the primary alias (`LWQL_SOURCE_ALIAS`) and
+   * {@link alias}. Assembled as text, so it must reference only those two
+   * aliases and validated identifiers — never a caller-supplied value.
+   */
+  readonly on: string;
+  /** Join kind. `INNER` when absent. */
+  readonly kind?: "INNER" | "LEFT";
+  /**
+   * Columns of {@link table} the view reads, granted to the restricted identity
+   * on that table — the joined-side counterpart of {@link lwqlViewSourceColumns}.
+   * Must include every column {@link on} and the joined column expressions read.
+   */
+  readonly sourceColumns: readonly string[];
+  /**
+   * Columns referenced only by {@link on} (not by any exposed column's
+   * `sourceColumns`), split by table so each is granted where it lives.
+   *
+   * `ON` reaches both tables and a bare name like `TenantId` exists on both, so
+   * the two sides are named explicitly rather than parsed out of the SQL.
+   * Required whenever a join is declared; provisioning refuses a join without it.
+   */
+  readonly onSourceColumns?: {
+    /** Columns of the primary {@link LangWatchQLViewDefinition.sourceTable}. */
+    readonly primary?: readonly string[];
+    /** Columns of the joined {@link table}. */
+    readonly joined?: readonly string[];
+  };
+  /**
+   * The joined table's column holding the owning project, when it is not the
+   * default `TenantId`.
+   *
+   * The joined-side counterpart of {@link LangWatchQLViewDefinition.tenantColumn}:
+   * a join reaches a second fact table, which is tenant-policed alongside the
+   * primary, and a joined source that spells its project column differently
+   * (`project_id`) declares it here so its row policy filters the right column
+   * rather than one it does not carry. Absent means the default `TenantId`, so
+   * every existing single-tenant-column join renders unchanged.
+   */
+  readonly tenantColumn?: string;
 }
 
 /** What identifies one row of a view, and how the source's versions collapse to it. */
@@ -144,9 +241,9 @@ export interface LangWatchQLViewDedup {
   /**
    * The source table's `ORDER BY` — the key its engine collapses on.
    *
-   * A statement about the *table*, not about the dataset: `FINAL` merges by this
+   * A statement about the *table*, not about the view: `FINAL` merges by this
    * key and nothing else, so it is what the `final` strategy can promise. What
-   * one row of the dataset *is* — the grain a join has to match to avoid
+   * one row of the view *is* — the grain a join has to match to avoid
    * multiplying rows — is {@link LangWatchQLViewDefinition.grainColumns}, which is
    * the same list on every source whose sort key holds still and a narrower one
    * where it does not.
@@ -157,7 +254,7 @@ export interface LangWatchQLViewDedup {
    */
   readonly keyColumns: readonly string[];
   /**
-   * The strategy this dataset needs, when the shipped default is wrong for it.
+   * The strategy this view needs, when the shipped default is wrong for it.
    *
    * Absent on almost every entry: the default is measured and applies to every
    * source whose sort key is stable. Present where a source's sort key carries a
@@ -176,7 +273,7 @@ export interface LangWatchQLViewDedup {
    * The engine's version column: `argMax`/`max` over this picks the survivor.
    *
    * Absent when the source keeps exactly one row per key and there is nothing
-   * to collapse — every PostgreSQL-resident dataset, where the row *is* the
+   * to collapse — every PostgreSQL-resident view, where the row *is* the
    * current state. Omitted rather than defaulted, so that a `ReplacingMergeTree`
    * whose version column was forgotten is a missing field rather than a view
    * that silently double-counts.
@@ -188,7 +285,7 @@ export interface LangWatchQLViewDedup {
    *
    * The third answer to "which row survives", and it has to be declared because
    * it cannot be inferred from the other two. An absent `versionColumn` already
-   * means "nothing to collapse" (the PostgreSQL-resident datasets), and reading
+   * means "nothing to collapse" (the PostgreSQL-resident views), and reading
    * this engine that way would expose every unmerged partial row as its own
    * result row — a caller's `SELECT CostSum` would see a fraction of the
    * bucket's cost, which looks like a real number rather than like an error.
@@ -206,9 +303,9 @@ export interface LangWatchQLViewDedup {
 }
 
 /**
- * How a PostgreSQL-resident dataset reaches the LangWatchQL ClickHouse schema.
+ * How a PostgreSQL-resident view reaches the LangWatchQL ClickHouse schema.
  *
- * Its presence on an entry is what makes that dataset PostgreSQL-resident —
+ * Its presence on an entry is what makes that view PostgreSQL-resident —
  * there is no separate residence flag to disagree with it. The chain is:
  *
  *  1. `baseRelation` — the application's own table, which the analytics reader
@@ -222,8 +319,8 @@ export interface LangWatchQLViewDedup {
  *     server-side named collection. The row policy sits here.
  *  4. The LangWatchQL view the caller names, over that engine table.
  *
- * @see ../provisioning.ts — the approved view, the engine table and the role
- * @see ../views.ts — the LangWatchQL view and its tenant predicate
+ * @see ../provisioning/accessModel.ts — the approved view, the engine table and the role
+ * @see ../provisioning/catalogStatements.ts — the LangWatchQL view and its tenant predicate
  */
 export interface LangWatchQLPostgresMapping {
   /** Table in the application's PostgreSQL schema. Never granted to the reader. */
@@ -236,8 +333,52 @@ export interface LangWatchQLPostgresMapping {
    * Named separately from the exposed `TenantId` because the application's
    * schema calls it something else on every table, and the approved view is
    * what reconciles the two.
+   *
+   * Read on the last alias of {@link tenantPath} — the base relation itself
+   * when the path is empty or absent.
    */
   readonly tenantSourceColumn: string;
+  /**
+   * The join chain from {@link baseRelation} to the relation that carries the
+   * owning project, one hop per entry.
+   *
+   * Postgres tables are scoped at three levels and a table carrying no project
+   * column reaches one by joining upward. The org path is
+   * Organization -> Team -> Project rather than a direct hop because `Project`
+   * carries `teamId`, not `organizationId`: there is no column to join an
+   * org-scoped table straight onto a project, so it goes through the
+   * organization's teams' projects. Absent (or empty) means the base relation
+   * carries the project column itself, and the approved view reads
+   * {@link tenantSourceColumn} straight off it.
+   */
+  readonly tenantPath?: readonly {
+    /** Relation joined (application table name, e.g. "Team"). */
+    readonly relation: string;
+    /** Alias this hop's relation gets in the view body. */
+    readonly alias: string;
+    /**
+     * The equijoin: `<previous alias>.<from> = <alias>.<to>`. `from` is a
+     * column of the previous alias (the base relation for the first hop, the
+     * prior hop's relation afterwards); `to` is a column of this hop's relation.
+     */
+    readonly on: { readonly from: string; readonly to: string };
+  }[];
+  /**
+   * A visibility rule the application's own repository enforces in code
+   * (e.g. "only rows the caller owns or that are shared"), rendered into the
+   * approved view's WHERE clause because the reader role sees only the view —
+   * there is no other layer left to enforce it at.
+   *
+   * A boolean predicate over the base alias `"m"` (see
+   * `POSTGRES_BASE_ALIAS` in `../provisioning/postgresMapping.ts`), ANDed
+   * onto the view's join chain. May reference a sibling relation via the
+   * `{{schema}}` token (resolved to the deploying schema at provisioning
+   * time — see `postgresApprovedViewStatement`), since this predicate is
+   * written once, before any deployment's actual schema is known. Absent
+   * means the base relation's rows are visible to every project member the
+   * tenant predicate already admits.
+   */
+  readonly rowFilter?: string;
 }
 
 /**
@@ -250,31 +391,31 @@ export interface LangWatchQLViewDefinition {
   /**
    * Table the view reads.
    *
-   * For a ClickHouse-resident dataset, the fact table in the application's
+   * For a ClickHouse-resident view, the fact table in the application's
    * database. For a PostgreSQL-resident one, the PostgreSQL-engine table in the
    * LangWatchQL database — see {@link LangWatchQLViewDefinition.postgres}.
    */
   readonly sourceTable: string;
   /**
-   * How this dataset reaches ClickHouse, when it does not live there.
+   * How this view reaches ClickHouse, when it does not live there.
    *
-   * Absent for a ClickHouse-resident dataset, which is most of them.
+   * Absent for a ClickHouse-resident view, which is most of them.
    */
   readonly postgres?: LangWatchQLPostgresMapping;
   /** One line for the schema endpoint. */
   readonly description: string;
   /**
-   * Permissions a caller must hold to reach the dataset at all.
+   * Permissions a caller must hold to reach the view at all.
    *
    * Every column inherits them ({@link lwqlColumnGates}), which is what
-   * makes a dataset the caller may not reach *absent* from the published
+   * makes a view the caller may not reach *absent* from the published
    * schema and refused by the validator, rather than merely awkward to use.
-   * Declared explicitly rather than defaulted, so that adding a dataset means
+   * Declared explicitly rather than defaulted, so that adding a view means
    * answering the question.
    *
-   * Empty for every dataset shipped today: none of them is content in its
+   * Empty for every view shipped today: none of them is content in its
    * entirety — a caller with no content permission can still count runs, read
-   * verdicts and group by model. A dataset that *is* content end to end — a raw
+   * verdicts and group by model. A view that *is* content end to end — a raw
    * conversation store — is what this exists for.
    */
   readonly gates: readonly FieldProtection[];
@@ -286,8 +427,8 @@ export interface LangWatchQLViewDefinition {
    *
    * Three consumers read it, and they are the reason it is separate from
    * {@link LangWatchQLViewDedup.keyColumns}. The fanout diagnostic asks whether a
-   * join matched enough of a dataset's identity for one row to meet one row —
-   * a question about the *dataset*, where the engine's sort key can be wider
+   * join matched enough of a view's identity for one row to meet one row —
+   * a question about the *view*, where the engine's sort key can be wider
    * and reporting the surplus as unmatched is a false alarm on the join the
    * schema endpoint itself advertises. The `in-tuple` strategy groups by it, so
    * what the view collapses on and what the diagnostic calls a row are one
@@ -297,7 +438,7 @@ export interface LangWatchQLViewDefinition {
    *
    * Declaring it is therefore a claim the strategy has to be able to honour:
    * under plain `FINAL` the engine collapses to its own sort key and nothing
-   * narrower, so a `FINAL` dataset whose declared grain is narrower than the
+   * narrower, so a `FINAL` view whose declared grain is narrower than the
    * key would publish a grain the view cannot deliver. The catalog guard
    * enforces this.
    *
@@ -305,7 +446,7 @@ export interface LangWatchQLViewDefinition {
    * wherever the two are the same list, which is most of the catalog.
    *
    * Always a subset of the sort key: a grain *wider* than the key the engine
-   * collapses on would mean the engine merges rows the dataset considers
+   * collapses on would mean the engine merges rows the view considers
    * distinct, which is lost data rather than a duplicate.
    */
   readonly grainColumns?: readonly string[];
@@ -316,21 +457,60 @@ export interface LangWatchQLViewDefinition {
    *
    * The source table partitions on a function of this column, so a query
    * without a predicate on it reads every partition the tenant has, including
-   * whatever has aged onto object storage.
+   * whatever has aged onto object storage. Absent for a view with no temporal
+   * column and no explicit override: it has nothing to prune on, and naming an
+   * opaque key here would advertise it as a time dimension it is not.
    */
-  readonly timeColumn: string;
+  readonly timeColumn?: string;
   /** How far behind the write path this view can be, for the schema endpoint. */
   readonly freshness: string;
   readonly dedup: LangWatchQLViewDedup;
   readonly columns: readonly LangWatchQLViewColumn[];
+  /**
+   * The source table's column holding the owning project, when it is not the
+   * default `TenantId`.
+   *
+   * Almost every fact table names it `TenantId` and the row-policy generator
+   * uses that literal; a source that spells it differently (`stored_objects`
+   * carries `project_id`) declares it here so its policy filters the right
+   * column. Absent means the default. Read by the row-policy generator; a
+   * derived view ({@link ./defineDatasetFromTable}) passes it through.
+   */
+  readonly tenantColumn?: string;
+  /**
+   * A second physical table this view joins, so the view spans two sources.
+   *
+   * Absent on a single-table view, which is all of them today. Present, its
+   * table is tenant-policed alongside {@link sourceTable} and its columns are
+   * granted separately — see {@link LangWatchQLViewJoin}.
+   */
+  readonly join?: LangWatchQLViewJoin;
+  /**
+   * A pre-filter applied in the view body, as SQL over the source aliases.
+   *
+   * Needed where a physical table multiplexes record kinds and the view exposes
+   * one of them — `EventName = 'api_request_body'`, `SpanName = 'claude_code.tool'`
+   * — so the predicate runs before any projection or extraction. Absent means
+   * no pre-filter, which keeps every existing view's SQL byte-for-byte the same.
+   * Assembled as text: reference only the source aliases and validated literals.
+   */
+  readonly where?: string;
+  /**
+   * Columns {@link where} references, granted on {@link sourceTable}.
+   *
+   * Listed explicitly rather than parsed out of the predicate SQL. Required
+   * whenever {@link where} is set (provisioning refuses a `where` without it),
+   * so a column used only to filter is granted like one that is projected.
+   */
+  readonly whereSourceColumns?: readonly string[];
 }
 
 /**
  * Whether a column carries captured customer content.
  *
  * Reads the column's own gates only. The view generator uses this to decide
- * what a view's SQL must filter out, and a dataset-level gate says who may read
- * the dataset rather than what the values are — a distinction that matters,
+ * what a view's SQL must filter out, and a view-level gate says who may read
+ * the view rather than what the values are — a distinction that matters,
  * because a view has no viewer and cannot filter by permission.
  */
 export function isContentGated(column: LangWatchQLViewColumn): boolean {
@@ -338,11 +518,11 @@ export function isContentGated(column: LangWatchQLViewColumn): boolean {
 }
 
 /**
- * Every permission a caller needs to reference one column: the dataset's, then
+ * Every permission a caller needs to reference one column: the view's, then
  * the column's own.
  *
  * The union rather than either half, because both are real. A column of a
- * gated dataset is unreadable for two independent reasons and the schema
+ * gated view is unreadable for two independent reasons and the schema
  * endpoint publishes both, so a caller told what to ask for is told all of it.
  */
 export function lwqlColumnGates({
@@ -367,17 +547,37 @@ export function lwqlColumnGates({
 const SUMMED_COLUMN_TYPE = /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64))$/;
 
 /**
- * The columns identifying one logical row of a dataset.
+ * The columns identifying one logical row of a view.
  *
  * The declared grain where an entry has one, and the source's sort key
  * otherwise — which is the same list wherever the engine collapses on exactly
- * what the dataset calls a row. Read by the fanout diagnostic and by the
+ * what the view calls a row. Read by the fanout diagnostic and by the
  * `in-tuple` view body, so both mean the same thing by construction.
  */
 export function lwqlGrainColumns(
   view: LangWatchQLViewDefinition,
 ): readonly string[] {
   return view.grainColumns ?? view.dedup.keyColumns;
+}
+
+/**
+ * The physical source column an exposed grain/key column reads.
+ *
+ * Grain and key columns are named the way a caller sees them (`TraceId`), but
+ * the dedup body and `GROUP BY` run against the source table, whose column may
+ * be aliased (`CorrelationTraceId`). Resolves the exposed name to the single
+ * source column its view column reads, falling back to the name itself for a
+ * key column no exposed column renames.
+ */
+export function lwqlPhysicalColumn(
+  view: LangWatchQLViewDefinition,
+  exposedName: string,
+): string {
+  const column = view.columns.find(
+    (candidate) => candidate.name === exposedName,
+  );
+  const source = column?.sourceColumns[0];
+  return source && source.length > 0 ? source : exposedName;
 }
 
 /**
@@ -390,10 +590,13 @@ export function lwqlGrainColumns(
 export function columnExpression({
   column,
   source,
+  joined,
   isAggregated = false,
 }: {
   readonly column: LangWatchQLViewColumn;
   readonly source: (name: string) => string;
+  /** Qualifies a joined-table column; present only for a view with a join. */
+  readonly joined?: (name: string) => string;
   readonly isAggregated?: boolean;
 }): string {
   if (column.expression) {
@@ -407,7 +610,7 @@ export function columnExpression({
           `expression; the cast is derived from the column itself, so an expression could name another one`,
       );
     }
-    return column.expression(source);
+    return column.expression(source, joined);
   }
   if (column.sourceColumns.length !== 1) {
     throw new Error(
@@ -454,14 +657,19 @@ export function lwqlViewSourceColumns(
   return [
     ...new Set([
       ...view.columns.flatMap((column) => column.sourceColumns),
-      ...view.dedup.keyColumns,
+      ...view.dedup.keyColumns.map((key) => lwqlPhysicalColumn(view, key)),
       ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
+      // A column read only to filter (`where`) or to match the join (`on`, its
+      // primary side) is a source column the view reads just as a projected one
+      // is, and must be granted or the restricted read is denied on it.
+      ...(view.whereSourceColumns ?? []),
+      ...(view.join?.onSourceColumns?.primary ?? []),
     ]),
   ].sort();
 }
 
 /**
- * Whether a dataset's rows live in PostgreSQL and reach ClickHouse through the
+ * Whether a view's rows live in PostgreSQL and reach ClickHouse through the
  * named-collection mapping.
  *
  * Reads the mapping's presence rather than a flag beside it, so there is
@@ -475,7 +683,7 @@ export function isPostgresResident(
   return view.postgres !== undefined;
 }
 
-/** The PostgreSQL-resident datasets of a catalog, in catalog order. */
+/** The PostgreSQL-resident views of a catalog, in catalog order. */
 export function lwqlPostgresViews(
   views: readonly LangWatchQLViewDefinition[],
 ): readonly (LangWatchQLViewDefinition & {
@@ -516,7 +724,7 @@ export function lwqlGatedColumns({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly string[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   const withheld = views.flatMap((view) =>
     view.columns
       .filter((column) =>
@@ -533,8 +741,17 @@ export function lwqlGatedColumns({
  * Fail-closed: only an explicit `true` counts, so the shape
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
+ *
+ * The positive twin of {@link lwqlGatedColumns}, and three callers need it. A
+ * gated *column* can be decided from the withheld set alone, because a column
+ * is in it or it is not; an app function has no column to look up, so the only
+ * question there is which permissions the caller holds. The query reference
+ * answers the same question one level up: whether a published EXAMPLE is
+ * runnable by this caller. Deriving either from the protections a second time
+ * is how they would come to disagree with the schema about who may read a cost
+ * column.
  */
-function heldPermissions(
+export function lwqlHeldPermissions(
   protections: Protections,
 ): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
@@ -545,16 +762,16 @@ function heldPermissions(
 }
 
 /**
- * The datasets a caller can reach, in catalog order.
+ * The views a caller can reach, in catalog order.
  *
- * A dataset drops out when the caller may read nothing in it — either because
- * the dataset itself is gated on a permission they lack, or because every one
+ * A view drops out when the caller may read nothing in it — either because
+ * the view itself is gated on a permission they lack, or because every one
  * of its columns is. Those are the same fact from two directions, so they are
- * one rule rather than two: what makes a dataset absent is that there is
+ * one rule rather than two: what makes a view absent is that there is
  * nothing in it for this caller, however that came about.
  *
  * The schema endpoint publishes exactly these. The validator needs no separate
- * arrangement — every column of an absent dataset is in
+ * arrangement — every column of an absent view is in
  * {@link lwqlGatedColumns}, so referencing one is refused.
  */
 export function lwqlVisibleViews({
@@ -564,7 +781,7 @@ export function lwqlVisibleViews({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly LangWatchQLViewDefinition[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   return views.filter((view) =>
     view.columns.some((column) =>
       lwqlColumnGates({ view, column }).every((gate) => held.has(gate)),

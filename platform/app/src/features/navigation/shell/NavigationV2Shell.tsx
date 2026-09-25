@@ -199,6 +199,7 @@ function ShellContentRow({
           minHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
           maxHeight={`calc(100vh - ${APP_HEADER_HEIGHT}px)`}
           position="relative"
+          data-tour="main-content"
         >
           {children}
         </Box>

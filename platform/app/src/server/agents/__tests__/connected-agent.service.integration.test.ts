@@ -347,4 +347,48 @@ describe("connected agent rows", () => {
       ).rejects.toMatchObject({ code: "agent_register_only" });
     });
   });
+  describe("when one name and one environment hold a personal row and a host-scoped row", () => {
+    /** @scenario "A listing carries every row of a name, whoever holds it" */
+    it("lists both rows, whoever the caller is", async () => {
+      const user = await getTestUser();
+      const name = `two-owners-${nanoid(6)}`;
+      const personal = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name,
+        config,
+        identity: {
+          environment: "development",
+          ownerUserId: user.id,
+          hostLabel: null,
+          identityKey: `${name}@development/user:${user.id}`,
+        },
+      });
+      const hosted = await service.registerConnected({
+        id: `agent_${nanoid()}`,
+        projectId,
+        name,
+        config,
+        identity: {
+          environment: "development",
+          ownerUserId: null,
+          hostLabel: "acme-laptop",
+          identityKey: `${name}@development/host:acme-laptop`,
+        },
+      });
+
+      const listed = await service.listAgents({
+        projectId,
+        page: 1,
+        limit: 100,
+      });
+      const ids = listed.data
+        .filter((row) => row.name === name)
+        .map((row) => row.id);
+
+      expect(ids).toHaveLength(2);
+      expect(ids).toContain(personal.id);
+      expect(ids).toContain(hosted.id);
+    });
+  });
 });

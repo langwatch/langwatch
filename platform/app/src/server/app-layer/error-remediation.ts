@@ -82,6 +82,12 @@ const registry = {
       "Check the filter syntax near the indicated position; filters are field:value pairs combined with AND/OR",
     ],
   },
+  filter_too_complex: {
+    tips: [
+      "Wrap a sentence in double quotes so it counts as one phrase instead of one term per word",
+      "Keep the filter under meta.maxNodes nodes in total; every term, operator, negation and pair of parentheses counts as one",
+    ],
+  },
   filter_field_unknown: {
     tips: [
       "Use one of the fields listed in meta.knownFields",
@@ -108,26 +114,33 @@ const registry = {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
-      "`period_start` and `period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
-      "`period_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are the exception; send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`dashboard_context_granularity_seconds` is also an exception; send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names the request set for itself",
-      "`period_start` and `period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_period_start` and `dashboard_context_period_end` are supplied by the surface showing the chart; send `timeWindow: { start, end }` instead and drop them from `parameters`",
+      "`dashboard_context_granularity_seconds` is likewise supplied by the surface; drop it from `parameters` and send it as the request's own `granularitySeconds` field instead",
     ],
   },
   lwql_reserved_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the reserved names declared with the wrong type",
-      "Declare each as `DateTime` or `DateTime64`, for example `{period_start:DateTime}`; the interval they describe is half-open, `>= {period_start:DateTime} AND < {period_end:DateTime}`",
+      "Declare each as `DateTime` or `DateTime64`, for example `{dashboard_context_period_start:DateTime}`; the interval they describe is half-open, `>= {dashboard_context_period_start:DateTime} AND < {dashboard_context_period_end:DateTime}`",
+    ],
+  },
+  lwql_result_too_large: {
+    tips: [
+      "Read `meta.maxResultBytes`; the response exceeded that byte ceiling",
+      "Select fewer columns, or a smaller LIMIT, so the result fits under the cap",
     ],
   },
   lwql_granularity_parameter_type: {
     tips: [
       "Read `meta.parameters`; it lists the parameter whose declaration was refused",
-      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}",
+      "Declare dashboard_context_granularity_seconds as UInt32, for example {dashboard_context_granularity_seconds:UInt32}",
       "When the surface supplies the step itself, it must be one of the offered steps: 1 second, 1 minute, or 1 hour",
     ],
   },
@@ -139,7 +152,7 @@ const registry = {
   },
   lwql_granularity_requires_window: {
     tips: [
-      "A chart declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}",
+      "A chart declaring dashboard_context_granularity_seconds must also declare {dashboard_context_period_start:DateTime} and {dashboard_context_period_end:DateTime}",
       "The bucket budget is computed against the period those two bounds describe",
     ],
   },
@@ -147,6 +160,18 @@ const registry = {
     tips: [
       "The LangWatchQL feature is not enabled for this project; retrying will not help",
       "Ask an administrator to enable the SQL workbench for this project",
+    ],
+  },
+  custom_chart_playground_not_enabled: {
+    tips: [
+      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
+    ],
+  },
+  custom_graph_writes_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -180,6 +205,12 @@ const registry = {
       "Save the chart again from the workbench to replace the unreadable definition",
     ],
   },
+  saved_workbench_charts_disabled_for_playground: {
+    tips: [
+      "The custom-chart-playground is enabled for this project, which turns off saved workbench charts; retrying will not help",
+      "Use the playground-widgets skill / `langwatch playground-widget` commands instead",
+    ],
+  },
   lwql_unknown_identifier: {
     tips: [
       "Check the column name against the dataset's columns; a typo is the usual cause",
@@ -190,6 +221,111 @@ const registry = {
     tips: [
       "The LangWatchQL analytics SQL API is not provisioned on this deployment; retrying will not help",
       "Contact support to have it enabled for this workspace",
+    ],
+  },
+  instant_eval_questions_too_long: {
+    tips: [
+      "Read `meta.questionTokens` against `meta.stateTokens`; the questions alone fill the judge's state, so no text could be sent beside them",
+      "Shorten the question texts, or split them across several eval calls run as separate queries",
+    ],
+  },
+  instant_eval_query_budget_exceeded: {
+    tips: [
+      "Read `meta.estimatedTokens` against `meta.budget`; that is the text the whole query would send to be judged, summed across its rows",
+      "Lower the query's LIMIT, or extract less text per row by passing a smaller token budget to the extraction function inside the eval call",
+      "To judge the whole selection rather than a sample, run the same statement as a job instead of on this endpoint",
+    ],
+  },
+  instant_eval_classifier_unavailable: {
+    tips: [
+      "The query itself was accepted and ran; judging the text it projected is what failed",
+      "Retry shortly; if it persists, the judgements can be made later by running the same statement as a job",
+    ],
+  },
+  instant_eval_not_enabled: {
+    tips: [
+      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+    ],
+  },
+  instant_eval_not_found: {
+    tips: [
+      "Read `meta.runId`; no run of the authenticated project carries that id",
+      "List the project's runs to find the id you meant",
+    ],
+  },
+  instant_eval_query_invalid: {
+    tips: [
+      "Read `meta.parameters`; those names are set by whichever surface shows a chart, and a job has no surface to fill them",
+      "Write the period into the statement's own WHERE clause instead of declaring the dashboard parameters",
+    ],
+  },
+  instant_eval_query_missing_columns: {
+    tips: [
+      "Read `meta.missing`; a run needs TraceId so every judgement can be tied back to its trace",
+      "Project at least one eval function, such as `eval(conversation_bounded(ConversationId, 8000, ''), '…') AS annoyed`",
+      "ThreadId, SpanId and OccurredAt are optional and are carried onto the judgements when the statement projects them",
+    ],
+  },
+  instant_eval_row_cap_exceeded: {
+    tips: [
+      "Read `meta.cap` against `meta.maxCap`; the first is what this plan judges in one run and the second is the ceiling any plan offers",
+      "Lower the requested limit, or split the selection across more than one run with a keyset predicate on (TraceId, SpanId) where the statement projects SpanId, and on TraceId alone where it does not",
+    ],
+  },
+  instant_eval_free_budget_exhausted: {
+    tips: [
+      "Read `meta.spentUsd` against `meta.budgetUsd`; the organization has spent its free Instant Evals allowance across every project",
+      "Upgrade the organization to a paid plan under Settings, Subscription; judged queries and runs are then billed per input token",
+    ],
+  },
+  instant_eval_already_finished: {
+    tips: [
+      "Read `meta.status`; the run reached that state before the cancel arrived",
+    ],
+  },
+  instant_eval_estimate_unavailable: {
+    tips: [
+      "The statement was accepted; working out how many rows it matches is what failed",
+      "Retry shortly, or start the run without an estimate and read its total once it is planned",
+    ],
+  },
+  instant_eval_stalled: {
+    tips: [
+      "The run went fifteen minutes without a judged page and was stopped",
+      "Run it again; if it stalls repeatedly, narrow the statement so each page reads less",
+    ],
+  },
+  lwql_app_function_key_cap: {
+    tips: [
+      "Read `meta.cap` and `meta.distinct`; the query needs more distinct keys than one run may read",
+      "Lower the query's LIMIT, or group more coarsely so fewer conversations, traces or spans are projected",
+      "To read them all, page with a keyset predicate on the dataset's time column and trace id and run the query once per page",
+      "`meta.keyKind` says which cap it was, and `meta.functions` which calls count against it; the schema endpoint publishes every cap",
+    ],
+  },
+  lwql_app_function_read_budget: {
+    tips: [
+      "Read `meta.budgetBytes` and `meta.readBytes`; the traces the query names weigh more than one run may read",
+      "Lower the query's LIMIT so each run names fewer traces, and page with a keyset predicate on the dataset's time column and trace id",
+      "The budget counts the traces' stored content, so a query over long conversations needs smaller pages than one over short ones",
+    ],
+  },
+  lwql_app_function_hydration_failed: {
+    tips: [
+      "The query itself was accepted and ran; loading the conversation or trace content it projected is what failed",
+      "This is a platform-side failure, not a query to rewrite; retry shortly, and contact support if it persists",
+    ],
+  },
+  lwql_app_function_unavailable: {
+    tips: [
+      "The app functions are not provisioned on this deployment, so retrying the same query will not help",
+      "They are created at deploy time; a redeploy converges them, and the query works unchanged afterwards",
+    ],
+  },
+  lwql_provisioning_incomplete: {
+    tips: [
+      "The deployment's LangWatchQL access is provisioned, but the identity's grants on one dataset this query needs are incomplete",
+      "This is a platform-side gap, not a per-workspace setting; retry shortly, and contact support if it persists",
     ],
   },
   page_too_deep: {
@@ -218,6 +354,36 @@ const registry = {
       "List the keys on the organization to find the right id",
     ],
     docsPath: "/api-reference/api-keys/overview",
+  },
+
+  // ---- ingestion keys ----
+  ingestion_key_not_found: {
+    tips: [
+      "Check the key id against your own ingestion keys; another person's key and a key outside this organization both read as not found",
+      "List your ingestion keys to find the right id",
+    ],
+  },
+  ingestion_key_revoke_incomplete: {
+    tips: [
+      "Retry the rotation; keys already revoked stay revoked and only the survivors named in meta.survivors are attempted again",
+      "No new key was minted, so the tokens in use are unchanged",
+    ],
+  },
+  ingestion_key_session_revoked: {
+    tips: [
+      "Run `langwatch login --device` on this machine to start a new session, then mint again",
+    ],
+  },
+  ingestion_key_source_not_allowed: {
+    tips: [
+      "A tool the CLI wraps gets its key from `langwatch instrument <tool>` on the machine that runs it",
+      "Any other source needs a published ingestion template that names it; pass that template's id",
+    ],
+  },
+  ingestion_key_workspace_missing: {
+    tips: [
+      "Sign in to the organization once so your personal workspace is created, then mint again",
+    ],
   },
   api_key_not_owned: {
     tips: ["Ask the key's owner or an organization admin to make this change"],
@@ -366,6 +532,7 @@ const registry = {
     tips: [
       "connected:<name> runs the agent in development, or in the one other environment it is online in; when more than one is online, name it as connected:<name>@<environment>",
       "Start the process that runs the decorated function; the agent shows Online in the agents list once it connects",
+      "An agent started in development with a personal key is visible only to its owner, so other keys never find it online; set LANGWATCH_AGENT_ENVIRONMENT to a shared name such as dev-shared and start it again",
     ],
     docsPath: "/agent-testing/connect-your-agent",
   },
@@ -385,6 +552,7 @@ const registry = {
   },
   agent_owner_only: {
     tips: [
+      "Run it with the same key that connected the agent; a project or service key names no person, so it never reaches a personal agent, even the caller's own",
       "A development agent registered with a personal key belongs to that person; connect your own process to get your own copy",
       "To share one development agent with the team, register it with a project key or name its environment, for example dev-shared",
     ],
@@ -586,6 +754,11 @@ const registry = {
   langy_model_not_configured: {
     tips: ["Pick a model in the project's model settings, then retry"],
   },
+  langy_skill_not_available: {
+    tips: [
+      "This skill is gated by a feature flag that is off for this project — use an available alternative instead of retrying",
+    ],
+  },
   langy_model_not_allowed: {
     tips: ["Choose one of the models configured for this project and retry"],
   },
@@ -636,6 +809,11 @@ const registry = {
   langy_ui_save_failed: {
     tips: [
       "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_page_not_ready: {
+    tips: [
+      "The page was open but still loading and never became ready; run the same action once more, and if it fails again tell the user the page did not load",
     ],
   },
   langy_ui_timeout: {
@@ -750,6 +928,25 @@ const registry = {
   },
   langy_worker_restarting: {
     tips: ["An update interrupted this reply; resend the message"],
+  },
+
+  // ---- guided onboarding ----
+  guided_onboarding_path_unknown: {
+    tips: [
+      "Use one of the paths in meta.knownPaths: llmops, coding, gateway or governance",
+    ],
+  },
+
+  // ---- one-time secret reveal ----
+  secret_already_revealed: {
+    tips: [
+      "The reveal id was already read and the secret is gone; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
+  },
+  secret_reveal_expired: {
+    tips: [
+      "A reveal id serves its secret for 24 hours after the key is created; create a new key with `langwatch virtual-keys create --reveal-once` when the value was not saved",
+    ],
   },
 
   // ---- licensing ----

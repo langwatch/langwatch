@@ -63,11 +63,35 @@ const configFor = (
         scopes?: string[];
         pkce?: boolean;
         redirectURI?: string;
+        requireIdTokenVerification?: boolean;
         mapProfileToUser?: (p: Record<string, any>) => { name?: string };
       }
     | undefined;
 
 describe("buildGenericOAuthConfigs", () => {
+  /** @scenario Supported enterprise providers require ID-token verification */
+  it.each([
+    "auth0",
+    "okta",
+  ])("requires cryptographic ID-token verification for %s", (provider) => {
+    const configs = buildGenericOAuthConfigs(
+      envWith({
+        NEXTAUTH_PROVIDER: provider,
+        AUTH0_CLIENT_ID: "auth0-client-id",
+        AUTH0_CLIENT_SECRET: "auth0-client-secret",
+        AUTH0_ISSUER: "https://tenant.eu.auth0.com",
+        OKTA_CLIENT_ID: "okta-client-id",
+        OKTA_CLIENT_SECRET: "okta-client-secret",
+        OKTA_ISSUER: "https://acme.okta.com",
+        OIDC_CLIENT_ID: "oidc-client-id",
+        OIDC_CLIENT_SECRET: "oidc-client-secret",
+        OIDC_ISSUER: "https://idp.acme.com",
+      }),
+    );
+
+    expect(configFor(configs, provider)?.requireIdTokenVerification).toBe(true);
+  });
+
   describe("when NEXTAUTH_PROVIDER is cognito", () => {
     /** @scenario Cognito mode */
     it("mounts a cognito provider that discovers its endpoints from the issuer", () => {

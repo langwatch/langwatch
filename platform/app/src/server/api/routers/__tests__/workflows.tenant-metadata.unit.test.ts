@@ -15,15 +15,21 @@ vi.mock("~/server/app-layer/app", async () => {
   return appPermissionsMock();
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The router's imperative check goes through the app-layer facade.
 vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {

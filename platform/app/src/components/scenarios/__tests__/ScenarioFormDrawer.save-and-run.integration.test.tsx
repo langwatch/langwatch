@@ -198,6 +198,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },

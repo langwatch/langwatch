@@ -1,4 +1,4 @@
-import scenario from "@langwatch/scenario";
+import scenario, { assertSkillWasRead, bashCommands } from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -7,20 +7,18 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
-  copyFixtureToWorkDir,
-  createClaudeCodeAgent,
-  createSkillTestWorkDir,
-  toolCallFix,
-  assertSkillWasRead,
-  bashCommands,
-  installSkillToWorkDir,
-  removeSkillTestWorkDir,
-  SKILL_TESTS_SET_ID,
+	copyFixtureToWorkDir,
+	createClaudeCodeAgent,
+	createSkillTestWorkDir,
+	installSkillToWorkDir,
+	removeSkillTestWorkDir,
+	SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 import {
 	type RunningConnectedAgent,
 	startConnectedAgentFixture,
 } from "./helpers/connected-agent-fixture";
+import { archiveTestSuite } from "./helpers/test-suite-cleanup";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -87,7 +85,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -170,7 +167,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.test\.ts$/);
@@ -236,7 +232,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
@@ -288,7 +283,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -353,7 +347,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
@@ -421,7 +414,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
@@ -483,7 +475,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             // In platform mode, no test files should be created.
             // The agent should use the langwatch CLI instead.
@@ -545,7 +536,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(testFiles.length).toBeGreaterThan(0);
@@ -597,7 +587,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
@@ -667,7 +656,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             // Verify test files were created
@@ -747,7 +735,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -847,7 +834,6 @@ describe("Scenarios Skill", () => {
           ),
           scenario.agent(),
           (state) => {
-            toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
@@ -964,7 +950,6 @@ describe("Scenarios Skill", () => {
               ),
               scenario.agent(),
               (state) => {
-                toolCallFix(state);
                 assertSkillWasRead(state, "scenarios");
 
                 // Read from the commands that ran, not from the transcript, so a
@@ -995,6 +980,110 @@ describe("Scenarios Skill", () => {
           expect(result.success).toBe(true);
         } finally {
           await running?.stop();
+          removeSkillTestWorkDir(tempFolder);
+        }
+      },
+      3_600_000
+    );
+
+    /** @scenario "Langy names the looked-up identifier in the situation it writes" */
+    it.skipIf(isCI || !process.env.LANGWATCH_API_KEY || !process.env.OPENAI_API_KEY)(
+      "names one colleague email the connected agent can look up in the situation it writes",
+      async () => {
+        const tempFolder = createSkillTestWorkDir("langwatch-skill-scenarios-grounding-");
+        console.log(`[scenarios grounding dogfood] working dir: ${tempFolder}`);
+
+        copyFixtureToWorkDir({
+          fixtureSubpath: "python-connected-agent",
+          workingDirectory: tempFolder,
+        });
+        copySkillToWorkDir(tempFolder);
+
+        const apiKey = process.env.LANGWATCH_API_KEY!.trim();
+        const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
+        fs.writeFileSync(
+          path.join(tempFolder, ".env"),
+          `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+        );
+
+        // The one email the fixture agent can look up. The situation has to
+        // name it: an unnamed colleague leaves the simulated user to invent an
+        // address on every run, and the lookup then misses.
+        const colleagueEmail = "priya.raman@northwind.example";
+        const stamp = Date.now().toString(36);
+        const agentName = `skill-test-handoff-${stamp}`;
+        // One suite per run: a suite left behind by an earlier run would be
+        // reused, and the run would then create nothing.
+        const suiteName = `Handoffs ${stamp}`;
+        let running: RunningConnectedAgent | undefined;
+
+        try {
+          running = await startConnectedAgentFixture({
+            workingDirectory: tempFolder,
+            name: agentName,
+            env: process.env,
+          });
+
+          const result = await scenario.run({
+            setId: SKILL_TESTS_SET_ID,
+            name: "A reproduced failure names an identifier the agent can look up",
+            description:
+              "The user's support agent is connected to LangWatch and can look a colleague up by " +
+              "email. A production conversation failed: the customer asked for a colleague to be looped " +
+              "in and the agent claimed to have forwarded the request without looking anyone up. The " +
+              "scenarios skill must reproduce that failure as a platform scenario whose situation names " +
+              "one concrete colleague email the agent can look up, and report the created scenario " +
+              "together with the proposed target and the question whether to run it.",
+            agents: [
+              createClaudeCodeAgent({ workingDirectory: tempFolder }),
+              scenario.userSimulatorAgent({ model: judgeModel }),
+              scenario.judgeAgent({
+                model: judgeModel,
+                criteria: [
+                  "Agent read the scenarios skill instructions before acting",
+                  "Agent created the scenario on the platform with the langwatch CLI, and the situation text names one concrete colleague email the agent can look up rather than leaving the colleague unnamed",
+                  "Agent reported the created scenario and, in the same reply, named the connected agent as the proposed target and asked whether to run it, instead of running unasked or asking without naming a target",
+                  "If creating the scenario on the platform failed, the agent reported that failure instead of claiming the scenario was created; a command it retried with different flags while exploring does not count",
+                ],
+              }),
+            ],
+            script: [
+              scenario.user(
+                `My support agent is connected to LangWatch as "${agentName}" and it is online right now. ` +
+                  "A production conversation went wrong. The customer wrote: \"I am not the workspace admin, " +
+                  `my colleague Priya Raman handles SSO, her email is ${colleagueEmail}, send her the SAML steps ` +
+                  "and loop her in.\" The agent answered \"Done, I forwarded the steps to Priya\" without " +
+                  "looking her up or calling any tool. Reproduce that failure as a platform scenario in a " +
+                  `test suite called "${suiteName}" so we can prove the fix. Do not write test files.`,
+              ),
+              scenario.agent(),
+              (state) => {
+                assertSkillWasRead(state, "scenarios");
+
+                const creates = bashCommands(state).filter((command) =>
+                  command.includes("langwatch scenario create"),
+                );
+                expect(
+                  creates.length,
+                  "Expected the agent to create the scenario on the platform with `langwatch scenario create`",
+                ).toBeGreaterThan(0);
+                expect(
+                  creates.some((command) => command.includes(colleagueEmail)),
+                  "Expected the situation to name the colleague email the fixture can look up",
+                ).toBe(true);
+                expect(
+                  findTestFiles(tempFolder, /^test_.*\.py$|\.test\.ts$/).length,
+                  "Expected no test files: the platform approach uses the CLI only",
+                ).toBe(0);
+              },
+              scenario.judge(),
+            ],
+          });
+
+          expect(result.success, result.reasoning).toBe(true);
+        } finally {
+          await running?.stop();
+          archiveTestSuite({ workingDirectory: tempFolder, name: suiteName });
           removeSkillTestWorkDir(tempFolder);
         }
       },

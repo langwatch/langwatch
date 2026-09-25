@@ -1,5 +1,7 @@
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
+import { parseOnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import { registerOnboardingExperiment } from "~/utils/onboardingExperimentRegistration";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
 export function usePostHogIdentify({
@@ -8,7 +10,7 @@ export function usePostHogIdentify({
   planType,
 }: {
   session: { user?: { id: string; email?: string | null } } | null;
-  organization: { id: string; name: string } | undefined;
+  organization: { id: string; name: string; signupData?: unknown } | undefined;
   planType: string | undefined;
 }) {
   const prevUserIdRef = useRef<string | null>(null);
@@ -47,7 +49,18 @@ export function usePostHogIdentify({
     });
   }, [session?.user?.id, organization?.id, organization?.name, planType]);
 
-  // 3. Track upgrade modal opens via Zustand subscribe
+  // 3. Register the onboarding experiment variant the organization recorded,
+  // so every event captured from the browser carries it (re-runs on org
+  // switch). An organization without a variant clears the property.
+  const onboardingVariant = parseOnboardingVariant(organization?.signupData);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!session?.user?.id || !organization?.id) return;
+
+    registerOnboardingExperiment(onboardingVariant);
+  }, [session?.user?.id, organization?.id, onboardingVariant]);
+
+  // 4. Track upgrade modal opens via Zustand subscribe
   useEffect(() => {
     const unsubscribe = useUpgradeModalStore.subscribe((state, prevState) => {
       if (typeof window === "undefined") return;

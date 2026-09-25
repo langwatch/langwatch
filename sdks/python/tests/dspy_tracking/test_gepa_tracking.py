@@ -11,6 +11,8 @@ import pytest
 from dspy.teleprompt import GEPA
 
 import langwatch
+import httpx
+from langwatch.http_client import create_client
 import langwatch.dspy
 from langwatch.dspy import (
     DSPyExample,
@@ -51,17 +53,17 @@ def sent_steps(monkeypatch) -> list[DSPyStep]:
 class TestWhenInitReceivesAGepaOptimizer:
     # @scenario "init recognises a GEPA optimizer"
     def test_patches_the_optimizer_for_tracking(self, monkeypatch, capsys):
-        class Response:
-            status_code = 200
-
-            def json(self):
-                return {"path": "/project/experiments/experiment"}
-
-            def raise_for_status(self):
-                return None
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200, json={"path": "/project/experiments/experiment"}
+            )
 
         monkeypatch.setattr(langwatch, "get_api_key", lambda: "key")
-        monkeypatch.setattr(langwatch.dspy.httpx, "post", lambda *a, **k: Response())
+        monkeypatch.setattr(
+            langwatch.dspy,
+            "create_client",
+            lambda **kwargs: create_client(transport=httpx.MockTransport(handler)),
+        )
         optimizer = build_optimizer()
 
         langwatch.dspy.init(experiment="experiment", optimizer=optimizer, run_id="run")

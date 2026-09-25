@@ -30,6 +30,11 @@ const ROLLBACK_EFFECT_STATUSES: readonly TenantMigrationStatus[] = [
   "rolled_back",
 ];
 
+const TERMINAL_STATUSES: readonly (TenantMigrationStatus | null)[] = [
+  "finalized",
+  "rolled_back",
+];
+
 const logger = createLogger("langwatch:ops:system-migrations");
 
 /**
@@ -185,6 +190,11 @@ function sample<T>({ pool, count }: { pool: T[]; count: number }): T[] {
  * lever over them. Routes call this and nothing else - the state repository
  * stays behind the app layer.
  */
+export type SystemMigrationTarget = { migrationName: string } & (
+  | { organizationId: string }
+  | { userId: string }
+);
+
 export class SystemMigrationsService {
   constructor(
     private readonly deps: {
@@ -243,10 +253,9 @@ export class SystemMigrationsService {
        * composition supplies it because only the composition can build a
        * runner scoped to a single (tenant, migration) pair.
        */
-      runTargetedPass: (args: {
-        organizationId: string;
-        migrationName: string;
-      }) => Promise<MigrationPassSummary>;
+      runTargetedPass: (
+        args: SystemMigrationTarget,
+      ) => Promise<MigrationPassSummary>;
       /**
        * Whether a migration's stored report means it merely WAITED, per
        * migration name. The state machine has no waiting status, so a
@@ -650,6 +659,54 @@ export class SystemMigrationsService {
       return { status: statusOfMemberSummary(summary), waiting: false };
     }
     return this.organizationRecordStatus({ migrationName, organizationId });
+  }
+
+  /** Adopt one authenticated user through the same cohort, lease and parity
+   * checks as startup. A bounded retry observes the asynchronous projection;
+   * only the runner's persisted finalized state opens the identity gate. */
+  async runForUser({
+    userId,
+    migrationName,
+  }: {
+    userId: string;
+    migrationName: string;
+  }): Promise<{ status: TenantMigrationStatus | null }> {
+    const migration = this.requireRegisteredMigration(migrationName);
+    if (migration.tenant !== "user") {
+      throw new MigrationUnknownError();
+    }
+
+    let status: TenantMigrationStatus | null = null;
+    for (let pass = 0; pass < 20; pass++) {
+      const before = await this.deps.state.findRecord({
+        migrationName,
+        tenantId: userId,
+      });
+      status = before?.status ?? null;
+      if (TERMINAL_STATUSES.includes(status)) {
+        return { status };
+      }
+
+      const summary = await this.deps.runTargetedPass({
+        userId,
+        migrationName,
+      });
+      const after = await this.deps.state.findRecord({
+        migrationName,
+        tenantId: userId,
+      });
+      status = after?.status ?? null;
+      if (
+        TERMINAL_STATUSES.includes(status) ||
+        summary.skipped > 0 ||
+        summary.tenantsSeen === 0 ||
+        summary.parked > 0
+      ) {
+        return { status };
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 250));
+    }
+    return { status };
   }
 
   private async requireRunnableForOrganization({

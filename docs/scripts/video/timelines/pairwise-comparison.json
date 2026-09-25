@@ -1,0 +1,128 @@
+{
+  "input": "../../../../.claude/tmp/video/raw/pairwise/pairwise.webm",
+  "output": "../../../media/videos/pairwise-comparison.webm",
+  "fps": 30,
+  "page": {
+    "width": 1440,
+    "height": 900
+  },
+  "size": {
+    "width": 1664,
+    "height": 1040
+  },
+  "frame": {
+    "background": "backgrounds/default.webp",
+    "fit": "native"
+  },
+  "quality": {
+    "crf": 38,
+    "cpuUsed": 2
+  },
+  "cut": {
+    "speed": 1.6,
+    "segments": [
+      [
+        40.02,
+        46.56
+      ],
+      [
+        50.56,
+        68.56
+      ],
+      [
+        293.93,
+        301.51
+      ],
+      [
+        329.16,
+        347.76
+      ]
+    ]
+  },
+  "cursor": {
+    "start": {
+      "x": 700,
+      "y": 480
+    }
+  },
+  "beats": [
+    {
+      "tRaw": 45.01,
+      "x": 1382,
+      "y": 93,
+      "zoom": 1.9,
+      "zoomAt": {
+        "x": 1240,
+        "y": 120
+      },
+      "hold": 0.3,
+      "pause": {
+        "before": 0.8,
+        "after": 0.5
+      },
+      "note": "run the dataset against all three prompts at once, a corner, so it earns the zoom"
+    },
+    {
+      "tRaw": 58.56,
+      "x": 1000,
+      "y": 520,
+      "zoom": 1,
+      "click": false,
+      "arc": 0,
+      "note": "three prompts answer every row, and the judge compares them as they land"
+    },
+    {
+      "tRaw": 294.73,
+      "x": 1240,
+      "y": 250,
+      "zoom": 1.45,
+      "zoomAt": {
+        "x": 1150,
+        "y": 310
+      },
+      "hold": 0.9,
+      "click": false,
+      "arc": 0,
+      "note": "the verdict column: which prompt won this row, and the judge's reason under it"
+    },
+    {
+      "tRaw": 301.06,
+      "x": 1194,
+      "y": 93,
+      "zoom": 1,
+      "note": "Results"
+    },
+    {
+      "tRaw": 337.18,
+      "x": 995,
+      "y": 265,
+      "zoom": 1.35,
+      "zoomAt": {
+        "x": 995,
+        "y": 275
+      },
+      "hold": 0.6,
+      "click": false,
+      "arc": 0,
+      "note": "the win rate, prompt by prompt"
+    },
+    {
+      "tRaw": 343.68,
+      "x": 1290,
+      "y": 270,
+      "zoom": 1.35,
+      "zoomAt": {
+        "x": 1285,
+        "y": 280
+      },
+      "hold": 1.8,
+      "click": false,
+      "arc": 0,
+      "note": "the Bradley-Terry leaderboard, and the call it makes"
+    },
+    {
+      "tRaw": 347.18,
+      "hide": true
+    }
+  ]
+}

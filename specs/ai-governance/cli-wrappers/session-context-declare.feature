@@ -5,7 +5,7 @@
 #   sdks/typescript/src/cli/utils/governance/codex-live-session.ts      (which codex session is live on this machine)
 #   sdks/typescript/src/cli/utils/governance/codex-agents-md.ts         (the guidance block in ~/.codex/AGENTS.md)
 #   sdks/typescript/src/cli/utils/governance/session-guidance.ts        (the one guidance text every channel carries)
-#   sdks/typescript/src/cli/plugin/session-guidance-entry.ts            (the plugin hook that injects the guidance)
+#   plugins/langwatch/scripts/launch.mjs                                (the plugin hook that runs the guidance command)
 #   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts   (the raw-hooks guidance entry)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts       (logout removal)
 #
@@ -154,6 +154,18 @@ Rule: The agent can declare its working context itself
     When the declare command runs inside a checkout with a detached HEAD
     Then the record carries the repository identity and no branch
 
+  # A tool pinned with `langwatch instrument <tool> --key/--project` has no
+  # personal ingest key to fall back on, so a declaration that read only the
+  # personal path had nowhere to go. The pin, and the endpoint it carries,
+  # decide where the declaration lands, exactly as they do for the hooks.
+
+  @unit
+  Scenario: A pinned tool declares to the project it is pinned to
+    Given a resolvable coding-agent session and a tool pinned to a project key
+    When the declare command runs inside a git worktree with an origin remote
+    Then the record is posted to the pinned endpoint
+    And it is authorized with the pinned key
+
   @unit
   Scenario: Without telemetry configuration nothing is posted
     Given a resolvable coding-agent session and a CLI that is not signed in
@@ -260,6 +272,21 @@ Rule: The agent is told when to declare
     Then AGENTS.md carries exactly one LangWatch block
     And the block names the declare command
 
+  # A login walks every tool's persisted wiring and skips the pinned ones,
+  # because a pin is deliberate scope and a login must not re-point it at the
+  # personal path. The guidance names no endpoint and no key, so it was being
+  # withheld for a reason that does not apply to it: a background agent pinned
+  # to a project, which is the case that most needs to declare the checkout it
+  # moved to, was the one never told to.
+
+  @unit
+  Scenario: A codex pinned to a project still gets the guidance on login
+    Given a codex wired for telemetry and pinned to a project key
+    And an AGENTS.md with no LangWatch block
+    When a new login refreshes the telemetry wiring
+    Then AGENTS.md carries the guidance block
+    And the pinned codex wiring is left as it was
+
   @unit
   Scenario: User content in AGENTS.md survives install and removal untouched
     Given an AGENTS.md with the user's own instructions
@@ -278,9 +305,9 @@ Rule: The agent is told when to declare
     When the guidance is removed
     Then the file is gone
 
-  @unit
+  @integration
   Scenario: The plugin's guidance hook emits the guidance as session context
-    When the plugin's session guidance entry runs
+    When the plugin's launcher runs the session guidance hook against the installed CLI
     Then stdout is one JSON object whose additionalContext carries the guidance
     And the exit code is zero
 

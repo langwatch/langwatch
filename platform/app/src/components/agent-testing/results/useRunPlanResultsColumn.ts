@@ -17,6 +17,7 @@ import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import { summarizeEvaluations } from "./evaluation-summaries";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailRun } from "./RunPlanDetailHeader";
 import type { RunPlan } from "./run-plans";
@@ -134,6 +135,10 @@ export function useRunPlanResultsColumn({
     [selectedRuns],
   );
   const targets = useBatchTargets(selectedRuns);
+  const evaluatorSummaries = useMemo(
+    () => summarizeEvaluations({ runs: selectedRuns }),
+    [selectedRuns],
+  );
 
   // The date as well as the age: the runs rail already says "2h ago", and a
   // person reading the settings of an old run wants the day it ran.
@@ -176,6 +181,7 @@ export function useRunPlanResultsColumn({
           // two targets says nothing about either, and each column carries
           // its own.
           summary: isComparison(targets) ? null : selection.summary,
+          evaluators: evaluatorSummaries,
         }
       : null,
     runSettings,

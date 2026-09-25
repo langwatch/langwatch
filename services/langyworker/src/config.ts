@@ -42,6 +42,9 @@ const configSchema = z.object({
    * warm/probe-MISS re-warm, not on a live worker (flip latency is a non-goal).
    */
   deleteGateEnabled: z.boolean().optional(),
+  /** Skill ids the control plane has flag-gated off for this turn — hidden
+   * from both the model's skill inventory and execution (see skill.ts). */
+  disabledSkills: z.array(z.string()).optional(),
 });
 
 export type LangyWorkerModelConfig = z.infer<typeof modelConfigSchema>;

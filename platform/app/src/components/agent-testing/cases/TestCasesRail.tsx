@@ -28,7 +28,7 @@ export function TestCasesRail({ model }: { model: TestCasesTabModel }) {
       onNewSuite={suiteDialog.openNew}
       onNewTestCase={(suiteId) => base.onNewTestCase(suiteId)}
       onRunSuite={run.runSuiteById}
-      onRenameSuite={suiteDialog.openRename}
+      onEditSuite={(suiteId) => base.openSuiteEditor({ testSuiteId: suiteId })}
       onArchiveSuite={suiteMutations.archiveSuite}
       isArchiving={suiteMutations.isArchiving}
       period={periodPicker.period}

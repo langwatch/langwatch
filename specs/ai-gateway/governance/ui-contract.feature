@@ -88,8 +88,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       filtered view over the existing log-records UI
 
   @bdd @ui @ui-contract @drill-down @uniformity
-  Scenario: The user cannot tell from the events feed which row will
-            route to which destination
+  Scenario: The user cannot tell from the events feed which row routes where
     When the admin scrolls the events feed
     Then every row shows the same columns (timestamp, source, actor,
       action, target, cost, tokens, severity)
@@ -102,9 +101,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # Hidden internal Governance Project — invisible at every consumer
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in the
-            ProjectSelector dropdown
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in the ProjectSelector dropdown
     Given the org has at least one IngestionSource (so the hidden
       Governance Project has been auto-created)
     When the admin opens the ProjectSelector dropdown anywhere in
@@ -114,9 +112,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     And the dropdown count matches the count of user-visible projects
       (the hidden project is not counted)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in
-            /api/v1/projects responses
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in /api/v1/projects responses
     When any client (UI, CLI, customer integration) calls
       GET /api/v1/projects with a token scoped to the org
     Then the response body lists only Projects with kind != "internal_governance"
@@ -124,9 +121,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
     And no metadata field hints at its existence (no count delta,
       no opaque ID reference, no error condition revealing it)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in billing
-            exports or invoice line-items
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in billing exports or invoice line-items
     When the org's monthly billing export is generated
     Then per-Project rollup lines list only Projects with
       kind != "internal_governance"
@@ -134,9 +130,8 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       Project is folded into the org-level total (NOT a separate line
       item that would reveal the hidden project's existence)
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in RBAC role
-            binding pickers
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in RBAC role binding pickers
     When an admin opens any RBAC role-binding composer
       (RoleBinding scope picker, custom role assignments, project ACL UI)
     Then the project picker lists only Projects with
@@ -147,15 +142,14 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       by Sergey's backend at IngestionSource mint), NOT via UI-visible
       role binding flows
 
-  @bdd @ui @ui-contract @hidden-project @critical
-  Scenario: The hidden Governance Project never appears in any other
-            user-visible Project surface
+  @bdd @ui @ui-contract @hidden-project @critical @integration
+  Scenario: The hidden Governance Project never appears in any other user-visible Project surface
     When any UI component renders a Project (badge, dropdown, list,
       breadcrumb, search result, deep link target)
     Then it filters out kind == "internal_governance" rows
     And any leak of the hidden project to a user surface is treated
       as a bug (regression test in
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/server/__tests__/projectFilter.invariant.integration.test.ts
       asserts every Project consumer applies the filter)
 
   # ---------------------------------------------------------------------------
@@ -163,8 +157,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @composer @critical
-  Scenario: The IngestionSource composer does NOT show a Project
-            selection field
+  Scenario: The IngestionSource composer does NOT show a Project selection field
     When the admin opens the "Create ingestion source" composer at
       "/governance/inventory/new"
     Then the composer asks for: name, source type, per-platform config
@@ -192,8 +185,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
       same helper text), set by the receiver layer, not by users
 
   @bdd @ui @ui-contract @namespaces
-  Scenario: The events feed displays langwatch.origin.* and
-            langwatch.governance.* as system-derived (read-only)
+  Scenario: The events feed displays governance attributes as system-derived and read-only
     When the events feed renders an event row's expanded attributes
     Then attributes in the langwatch.origin.* and langwatch.governance.*
       namespaces are visually grouped under a "System metadata"
@@ -246,8 +238,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @anomaly-rules
-  Scenario: The anomaly rule composer's scope picker still works against
-            IngestionSource IDs after the cutover
+  Scenario: The anomaly rule scope picker still works against IngestionSource IDs after the cutover
     Given Sergey's anomaly subscriber has rebased on governance_kpis fold
     When the admin opens the AnomalyRule composer at
       "/governance/anomaly-rules/new"
@@ -290,8 +281,7 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @trace-viewer-embed
-  Scenario: The per-source detail page embeds the existing trace
-            viewer (does NOT build a bespoke event renderer)
+  Scenario: The per-source detail page embeds the existing trace viewer, not a bespoke renderer
     When the admin navigates to a per-source detail page with events
     Then the events feed reuses the existing
       platform/app/src/components/messages/MessagesList component
@@ -321,10 +311,9 @@ Feature: AI Gateway Governance — UI Contract (Lane B)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @ui-contract @regression
-  Scenario: Lane-B test suite asserts every Project consumer filters
-            kind=internal_governance
+  Scenario: The Lane-B suite asserts every Project consumer filters out internal governance projects
     When the test suite runs
-      platform/app/src/components/__tests__/projectFilter.invariant.test.ts
+      platform/app/src/server/__tests__/projectFilter.invariant.integration.test.ts
     Then it enumerates every component / API / hook / repository
       method that loads or renders Projects
     And for each, asserts that a Project with kind="internal_governance"

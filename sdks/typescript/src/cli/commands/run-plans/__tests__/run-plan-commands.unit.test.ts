@@ -9,6 +9,7 @@
  * Spec: specs/features/run-plan-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { stdoutDocuments, stdoutLines } from "../../../utils/__tests__/stdout-documents";
 import { RunPlansApiError } from "@/client-sdk/services/run-plans";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
@@ -104,16 +105,6 @@ const makePlan = (overrides: Record<string, unknown> = {}) => ({
  */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
-/** Every JSON document the command printed on stdout. */
-const printedDocuments = (): string[] =>
-  vi
-    .mocked(console.log)
-    .mock.calls.map((call) => call[0] as unknown)
-    .filter(
-      (line): line is string =>
-        typeof line === "string" && line.trimStart().startsWith("{"),
-    );
-
 beforeEach(() => {
   vi.clearAllMocks();
   savedAgentEnv = Object.fromEntries(
@@ -141,6 +132,100 @@ afterEach(() => {
   // The wait paths set the exit code; a leftover value would fail the whole
   // vitest process at the end of the run.
   process.exitCode = undefined;
+});
+
+describe("runRunPlanCommand() with --evaluators-json", () => {
+  /** @scenario "Run with a plan evaluator" */
+  it("sends the plan's own evaluators inside the configuration", async () => {
+    await runRunPlanCommand({
+      all: true,
+      target: ["http:agent_abc"],
+      evaluatorsJson: JSON.stringify([
+        {
+          evaluatorId: "evaluator_pii",
+          required: false,
+          mappings: {
+            input: {
+              type: "source",
+              sourceId: "conversation",
+              path: ["first_user_message"],
+            },
+          },
+        },
+      ]),
+    });
+
+    expect(runSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          evaluators: [
+            expect.objectContaining({
+              evaluatorId: "evaluator_pii",
+              required: false,
+            }),
+          ],
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "Run with a plan evaluator" */
+  it("refuses a mapping to a scenario field, which a plan never reads", async () => {
+    await expect(
+      runRunPlanCommand({
+        all: true,
+        target: ["http:agent_abc"],
+        evaluatorsJson: JSON.stringify([
+          {
+            evaluatorId: "evaluator_sql",
+            mappings: {
+              expected_output: {
+                type: "source",
+                sourceId: "scenario",
+                path: ["fields", "golden_sql"],
+              },
+            },
+          },
+        ]),
+      }),
+    ).rejects.toThrow(ProcessExitError);
+    expect(runSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("getRunPlanCommand() with evaluators", () => {
+  /** @scenario "Read a run plan shows its evaluators" */
+  it("shows each evaluator with its gate and its mappings", async () => {
+    getSpy.mockResolvedValue(
+      makePlan({
+        evaluators: [
+          {
+            id: "att_pii",
+            evaluatorId: "evaluator_pii",
+            required: false,
+            mappings: {
+              input: {
+                type: "source",
+                sourceId: "conversation",
+                path: ["transcript"],
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await getRunPlanCommand("plan_abc");
+    result?.table();
+
+    const printed = vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n");
+    expect(printed).toContain("evaluator_pii");
+    expect(printed).toContain("reports only");
+    expect(printed).toContain("conversation.transcript");
+  });
 });
 
 /**
@@ -526,7 +611,7 @@ describe("runRunPlanCommand()", () => {
         format: "json",
       });
 
-      expect(printedDocuments()).toEqual([
+      expect(stdoutDocuments()).toEqual([
         JSON.stringify({ ...result, outcome: "scheduled" }, null, 2),
       ]);
     });
@@ -555,7 +640,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.batchRunId).toBe("batch_123");
@@ -592,7 +677,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 45 * 60 * 1000 + 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
@@ -608,7 +693,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ wait: "1", advanceMs: 60 * 1000 + 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("timeout");
@@ -643,7 +728,7 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 5 * 3000 });
 
-      const documents = printedDocuments();
+      const documents = stdoutDocuments();
       expect(documents).toHaveLength(1);
       const document = JSON.parse(documents[0]!) as Record<string, unknown>;
       expect(document.outcome).toBe("poll_failure");
@@ -667,7 +752,15 @@ describe("runRunPlanCommand()", () => {
 
       await runWithFakeTimers({ advanceMs: 3000, format: "table" });
 
-      expect(printedDocuments()).toHaveLength(0);
+      const machineDocuments = stdoutLines().filter((line) => {
+        try {
+          JSON.parse(line);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      expect(machineDocuments).toHaveLength(0);
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining("batch_123"),
       );

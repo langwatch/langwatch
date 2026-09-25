@@ -30,6 +30,10 @@ import {
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
+import {
+  type PullRunSummary,
+  sourcePullStatus,
+} from "@ee/governance/services/pullers/sourcePullStatus";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -58,6 +62,7 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
 export function toIngestionSourceDto({
   row,
   liveTraceProjectIds,
+  pullRun,
 }: {
   row: {
     id: string;
@@ -79,6 +84,19 @@ export function toIngestionSourceDto({
     pullSchedule: string | null;
     status: string;
     traceProjectId: string | null;
+    // Required, not optional, for the reason above: health is derived from
+    // these two, and a `select` that stopped fetching them would silently
+    // report every source as healthy.
+    errorCount: number;
+    lastSuccessAt: Date | null;
+    /**
+     * How far the last run read, and whether it reached the end. Required for
+     * the reason the two above are: the badge is derived from them, and a
+     * `select` that stopped fetching them would report every half-read source
+     * as fully collected.
+     */
+    lastReadThroughAt: Date | null;
+    lastRunCompleteness: string | null;
     lastEventAt: Date | null;
     archivedAt: Date | null;
     createdAt: Date;
@@ -92,6 +110,7 @@ export function toIngestionSourceDto({
    * is the one thing the drawer must say and cannot work out for itself.
    */
   liveTraceProjectIds: ReadonlySet<string>;
+  pullRun?: PullRunSummary | null;
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
@@ -135,6 +154,34 @@ export function toIngestionSourceDto({
      */
     pullSchedule: row.pullSchedule,
     status: row.status,
+    /**
+     * The two facts the health badge is derived from (ADR-128).
+     *
+     * Health is not a fourth `status` value, so the client needs the inputs
+     * rather than a verdict: how many runs in a row have failed, and when one
+     * last worked. Neither is a secret — a failure count and a timestamp say
+     * that we could not reach a provider, not what we reached it with.
+     */
+    errorCount: row.errorCount,
+    lastSuccessAt: row.lastSuccessAt,
+    /**
+     * How far the last run got, and whether it finished.
+     *
+     * A run stopped by a page limit or a deadline reports no error, so the
+     * failure count says the source is fine while it is quietly collecting a
+     * fraction of its data. These two are the only evidence that separates it
+     * from a healthy quiet source, which is why the badge reads them.
+     *
+     * Null on both means unknown — every row written before runs said how far
+     * they read — and unknown must never render as either answer.
+     */
+    lastReadThroughAt: row.lastReadThroughAt,
+    lastRunCompleteness: row.lastRunCompleteness,
+    pullStatus: sourcePullStatus({
+      sourceType: row.sourceType,
+      cursor: row.pollerCursor,
+      pullRun,
+    }),
     traceProjectId: row.traceProjectId,
     traceProjectArchived: row.traceProjectId
       ? !liveTraceProjectIds.has(row.traceProjectId)
@@ -189,7 +236,17 @@ export const ingestionSourcesRouter = createTRPCRouter({
         // client has to sniff out of the tRPC envelope.
         throw new IngestionSourceNotFoundError(input.id);
       }
-      return dtoForRow(service, row, input.organizationId);
+      const pullRun = row.pullSchedule
+        ? await service.lastPullRun({
+            sourceId: row.id,
+            organizationId: input.organizationId,
+          })
+        : null;
+      const liveTraceProjectIds = await service.liveTraceProjectIds(
+        [row],
+        input.organizationId,
+      );
+      return toIngestionSourceDto({ row, liveTraceProjectIds, pullRun });
     }),
 
   /**

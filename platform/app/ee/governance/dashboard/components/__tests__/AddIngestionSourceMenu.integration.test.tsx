@@ -64,10 +64,8 @@ describe("given the Add source menu", () => {
         "Anthropic Claude (Cowork)",
         "Workato",
         "Microsoft Copilot Studio",
-        "OpenAI Enterprise Compliance",
         "OpenAI Admin",
-        "Anthropic Claude Enterprise Compliance",
-        "Anthropic Admin API (usage & cost)",
+        "Anthropic Admin API",
         "Databricks AI/BI Genie",
         "Custom S3 audit log",
         "Custom HTTP audit-log API",
@@ -80,6 +78,31 @@ describe("given the Add source menu", () => {
       expect(
         screen.queryByText("Microsoft Copilot Studio (Purview)"),
       ).toBeNull();
+
+      // The two Enterprise Compliance types are defined but never offered:
+      // neither has a finished data path, so picking one buys a source that
+      // stays silent. The loop above is what proves this menu renders its
+      // items at all, so their absence here reads as filtering rather than
+      // an empty menu.
+      for (const withheld of [
+        "OpenAI Enterprise Compliance",
+        "Anthropic Claude Enterprise Compliance",
+      ]) {
+        expect(screen.queryByText(withheld)).toBeNull();
+      }
+    });
+
+    /** @scenario "A type is named after the product, not after what it returns" */
+    it("names the Anthropic type after the product, not after its reports", async () => {
+      renderMenu({ isEnterprise: true });
+      await openMenu();
+
+      // The label was "Anthropic Admin API (usage & cost)". A menu is for
+      // picking a product; which report a source pulls is a question the
+      // composer asks two fields later, where the admin can actually answer
+      // it. The parenthetical was an answer offered where no choice was.
+      expect(screen.getByText("Anthropic Admin API")).toBeTruthy();
+      expect(screen.queryByText(/usage\s*&\s*cost/i)).toBeNull();
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */

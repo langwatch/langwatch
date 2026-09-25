@@ -8,6 +8,8 @@ import {
   MessageSnapshotCommand,
   QueueRunCommand,
   RecordAgentInstanceCommand,
+  RecordCutAtLimitCommand,
+  RecordEvaluationsCommand,
   StartRunCommand,
   TextMessageEndCommand,
   TextMessageStartCommand,
@@ -32,6 +34,14 @@ import {
   createCustomerIoSimulationSyncSubscriber,
 } from "./subscribers/customerIoSimulationSync.subscriber";
 import {
+  createScenarioEvaluationsSubscriber,
+  type ScenarioEvaluationsSubscriberDeps,
+} from "./subscribers/scenarioEvaluations.subscriber";
+import {
+  createScenarioRunMilestonesSubscriber,
+  type ScenarioRunMilestonesSubscriberDeps,
+} from "./subscribers/scenarioRunMilestones.subscriber";
+import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
 } from "./subscribers/snapshotUpdateBroadcast.subscriber";
@@ -48,14 +58,21 @@ export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;
   /** Append store backing the simulationRunMetrics map projection. */
   simulationRunMetricsStore: AppendStore<SimulationRunMetricsProjectionRecord>;
+  /** Pre-constructed with `loadRunAttachments`, pins the run's evaluators. */
+  queueRunCommand: QueueRunCommand;
   /** Pre-constructed with `loadPriorEvents` for ECST backfill. */
   finishRunCommand: FinishRunCommand;
+  /** Pre-constructed with `loadPriorEvents`, reads the run's verdict from its finished event. */
+  recordEvaluationsCommand: RecordEvaluationsCommand;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
   /** Dispatch deps for the simulationRunExecution process manager (ADR-052). */
   simulationRunExecution: SimulationRunExecutionDispatchDeps;
   snapshotUpdateBroadcast: SnapshotUpdateBroadcastSubscriberDeps;
   suiteRunSync: SuiteRunSyncSubscriberDeps;
   traceMetricsSync: TraceMetricsSyncSubscriberDeps;
+  /** Queues the evaluators attached to a finished run's suite and plan. */
+  scenarioEvaluations: ScenarioEvaluationsSubscriberDeps;
+  scenarioRunMilestones: ScenarioRunMilestonesSubscriberDeps;
   customerIoSimulationSync?: CustomerIoSimulationSyncSubscriberDeps;
 }
 
@@ -75,7 +92,8 @@ export interface SimulationProcessingPipelineDeps {
  *   metrics_computed event (metrics are computed upstream by
  *   ComputeRunMetricsCommand and carried on the event).
  * - Subscribers own side effects (SSE broadcast, suite-run sync, trace
- *   metrics pull, Customer.io sync) from event payloads only.
+ *   metrics pull, scenario evaluations queueing, Customer.io sync) from
+ *   event payloads only.
  * - The simulationRunExecution process manager owns the execution
  *   lifecycle: dispatch to the worker pool, cancellation broadcast with a
  *   force-terminal backstop, and the stall watchdog.
@@ -85,12 +103,20 @@ export interface SimulationProcessingPipelineDeps {
  * - startRun: Emits SimulationRunStartedEvent when run begins
  * - messageSnapshot: Emits SimulationMessageSnapshotEvent for message updates
  * - finishRun: Emits SimulationRunFinishedEvent when run completes
+ * - recordEvaluations: Emits SimulationRunEvaluatedEvent with the evaluator
+ *   results of a finished run and the verdict after the gate
  * - recordAgentInstance: Emits SimulationRunAgentInstanceRecordedEvent with
  *   the connected agent instance that served the run
+ * - recordCutAtLimit: Emits SimulationRunCutAtLimitRecordedEvent when the run
+ *   was ended at the maximum call duration (AC28)
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
-export function createSimulationProcessingPipeline(
+/**
+ * Builds the pipeline's projections, subscribers and process manager, before
+ * any commands are wired in.
+ */
+function createSimulationProcessingBuilder(
   deps: SimulationProcessingPipelineDeps,
 ) {
   let builder = definePipeline<SimulationProcessingEvent>()
@@ -120,6 +146,14 @@ export function createSimulationProcessingPipeline(
       "traceMetricsSync",
       createTraceMetricsSyncSubscriber(deps.traceMetricsSync),
     )
+    .withSubscriber(
+      "scenarioEvaluations",
+      createScenarioEvaluationsSubscriber(deps.scenarioEvaluations),
+    )
+    .withSubscriber(
+      "scenarioRunMilestones",
+      createScenarioRunMilestonesSubscriber(deps.scenarioRunMilestones),
+    )
     .withProcessManager(
       SIMULATION_RUN_EXECUTION_PROCESS_NAME,
       simulationRunExecutionPM(deps.simulationRunExecution),
@@ -132,14 +166,26 @@ export function createSimulationProcessingPipeline(
     );
   }
 
-  return builder
-    .withCommand("queueRun", QueueRunCommand)
+  return builder;
+}
+
+export function createSimulationProcessingPipeline(
+  deps: SimulationProcessingPipelineDeps,
+) {
+  return createSimulationProcessingBuilder(deps)
+    .withCommandInstance("queueRun", QueueRunCommand, deps.queueRunCommand)
     .withCommand("startRun", StartRunCommand)
     .withCommand("messageSnapshot", MessageSnapshotCommand)
     .withCommand("textMessageStart", TextMessageStartCommand)
     .withCommand("textMessageEnd", TextMessageEndCommand)
     .withCommandInstance("finishRun", FinishRunCommand, deps.finishRunCommand)
+    .withCommandInstance(
+      "recordEvaluations",
+      RecordEvaluationsCommand,
+      deps.recordEvaluationsCommand,
+    )
     .withCommand("recordAgentInstance", RecordAgentInstanceCommand)
+    .withCommand("recordCutAtLimit", RecordCutAtLimitCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
     .withCommandInstance(

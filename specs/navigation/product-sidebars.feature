@@ -46,6 +46,28 @@ Feature: Product sidebars
     Then the sidebar shows the personal pages
     And the Govern group is not there
 
+  # A personal workspace belongs to one organization, so a reader in several
+  # organizations owns several of them. The Traces entry addresses one by
+  # project slug, and the header reads the organization back off that slug, so
+  # an entry pointing at the wrong workspace also switches the organization.
+  @integration
+  Scenario: The Me sidebar's Traces entry stays inside the selected organization
+    Given I own a personal workspace in more than one organization
+    When I am on a Me page with one of them selected
+    Then the Traces entry addresses that organization's personal workspace
+
+  # Visiting a Me page creates the personal workspace in the selected
+  # organization if it is missing, but the payload the sidebar reads is
+  # already loaded and is not refetched, so the entry stays absent for the
+  # rest of the session. Absent is the wanted outcome either way: an entry
+  # addressing another organization's workspace would move the reader
+  # between organizations, which is the failure the scenario above pins.
+  @integration
+  Scenario: The Me sidebar offers no Traces entry until it can see one here
+    Given the loaded organization holds no personal workspace of mine
+    When I am on a Me page
+    Then there is no Traces entry
+
   @integration
   Scenario: The Gateway sidebar promotes the gateway pages
     Given I am on a Gateway page

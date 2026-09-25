@@ -18,7 +18,11 @@ import {
   TEST_CLICKHOUSE_TUNING,
   TEST_CLICKHOUSE_TUNING_LABEL,
 } from "~/test-utils/clickhouseTestEndpoints";
-import { shardSawFailure } from "~/test-utils/shardFailureReporter";
+import {
+  hardFloorReport,
+  shardModuleTally,
+  shardSawFailure,
+} from "~/test-utils/shardFailureReporter";
 
 const TEST_DATABASE = "test_langwatch";
 
@@ -265,15 +269,24 @@ export async function setup(): Promise<void> {
   // step) flags any failed result on globalThis as results stream, so the
   // floor knows.
   if (process.env.CI) {
-    const HARD_FLOOR_MS = 20 * 60 * 1000;
-    const timer = setTimeout(() => {
-      const failed = shardSawFailure();
-      // eslint-disable-next-line no-console
-      console.log(
-        `[globalSetup] hard floor reached at ${HARD_FLOOR_MS / 60_000} min after start — forcing process.exit(${failed ? 1 : 0}) to release the CI step from a vitest finalize wedge${failed ? " (failures were reported before the wedge)" : ""}`,
+    const hardFloorMs = Number(
+      process.env.LANGWATCH_INTEGRATION_HARD_FLOOR_MS ?? 20 * 60 * 1000,
+    );
+    if (!Number.isFinite(hardFloorMs) || hardFloorMs <= 0) {
+      throw new Error(
+        "LANGWATCH_INTEGRATION_HARD_FLOOR_MS must be positive milliseconds",
       );
-      process.exit(failed ? 1 : 0);
-    }, HARD_FLOOR_MS);
+    }
+    const timer = setTimeout(() => {
+      const { exitCode, lines } = hardFloorReport({
+        hardFloorMs,
+        sawFailure: shardSawFailure(),
+        modules: shardModuleTally(),
+        label: "integration globalSetup",
+      });
+      for (const line of lines) console.log(line);
+      process.exit(exitCode);
+    }, hardFloorMs);
     timer.unref();
   }
 

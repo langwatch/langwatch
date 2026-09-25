@@ -118,6 +118,17 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   return base;
 }
 
+/**
+ * What a rotation is about to cost, in the terms the person has to act on:
+ * how many keys stop working and which machines are holding them. A key with
+ * no machine behind its name still counts, so it is named rather than
+ * dropped from the list.
+ */
+export function rotationWarning(installedOn: (string | null)[]): string {
+  const machines = installedOn.map((label) => label ?? "unknown device");
+  return `Rotating revokes the ${machines.length} ${machines.length === 1 ? "key" : "keys"} for this source (${machines.join(", ")}). Paste the new token wherever you wired the old one.`;
+}
+
 export type IngestionTemplateMeta = {
   slug: string;
   displayName: string;
@@ -168,7 +179,7 @@ export function IngestionTemplateInstallDrawer({
   installResult,
   isInstalling,
   installError,
-  hasExistingKey,
+  installedOn,
   onInstall,
   onRotate,
   onMarkInstalled,
@@ -182,12 +193,14 @@ export function IngestionTemplateInstallDrawer({
   /** The install/rotate mutation's error, passed straight through. */
   installError: unknown;
   /**
-   * True when the user already has an ingestion key for this source. Drives
-   * the CTA copy: 'Use this template' (fresh) vs 'Rotate token' (replace).
-   * Without this signal the drawer would mint-only on every
-   * already-connected source.
+   * The machine behind every live key for this source, one entry per key,
+   * null where the key carries no label. Empty means the source is not
+   * connected yet, which is what drives the CTA copy: 'Use this template'
+   * (fresh) vs 'Rotate token' (replace). The count matters because a
+   * rotation kills every one of them, and the person needs to know how many
+   * places they are about to have to paste the new token.
    */
-  hasExistingKey: boolean;
+  installedOn: (string | null)[];
   /**
    * Called when the drawer mounts (or the user clicks 'Install') for the
    * given template. Parent owns the tRPC mutation
@@ -208,6 +221,7 @@ export function IngestionTemplateInstallDrawer({
   onMarkInstalled: () => void;
 }) {
   const [showSecret, setShowSecret] = useState(false);
+  const hasExistingKey = installedOn.length > 0;
 
   const copy = (value: string, label: string) => {
     void navigator.clipboard.writeText(value);
@@ -269,14 +283,11 @@ export function IngestionTemplateInstallDrawer({
                   <Alert.Root status="warning" variant="surface">
                     <Alert.Indicator />
                     <Alert.Content>
-                      <Text fontSize="sm">
-                        An ingestion key already exists for this source.
-                        Rotating will invalidate the existing token immediately.
-                      </Text>
+                      <Text fontSize="sm">{rotationWarning(installedOn)}</Text>
                     </Alert.Content>
                   </Alert.Root>
                   <Button onClick={onRotate} colorPalette="orange">
-                    Rotate token
+                    Rotate token (revokes {installedOn.length})
                   </Button>
                 </VStack>
               ) : (

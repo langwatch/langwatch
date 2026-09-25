@@ -318,6 +318,21 @@ export class ScenarioRepository {
    * (a suite run classifies archived references itself) sees one consistent
    * set of rows.
    */
+  /**
+   * The test suite each scenario is filed in, for the given ids. Feeds the
+   * evaluator attachments a run carries, which live on the test suite.
+   */
+  async findTestSuiteIdsByIds(input: {
+    ids: string[];
+    projectId: string;
+  }): Promise<{ id: string; testSuiteId: string | null }[]> {
+    if (input.ids.length === 0) return [];
+    return this.prisma.scenario.findMany({
+      where: { id: { in: input.ids }, projectId: input.projectId },
+      select: { id: true, testSuiteId: true },
+    });
+  }
+
   async findRunConfigByIds(input: {
     ids: string[];
     projectId: string;

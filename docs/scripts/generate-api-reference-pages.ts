@@ -83,6 +83,12 @@ const UNDOCUMENTED_LANGY_LOCAL_CONTROL =
 const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
   "Not yet documented in the API reference: the saved workbench chart routes require the analytics:view permission and have no reference pages yet.";
 
+const UNDOCUMENTED_CHECKUP =
+  "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
+
+const UNDOCUMENTED_DASHBOARD_WIDGETS =
+  "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -94,6 +100,8 @@ const SKIP_PATHS: Record<string, string> = {
     "Retired surface, intentionally undocumented: superseded by /api/traces/search.",
   "/api/trace/{id}":
     "Retired surface, intentionally undocumented: superseded by /api/traces/{traceId}.",
+  "/api/checkup": UNDOCUMENTED_CHECKUP,
+  "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
@@ -120,6 +128,12 @@ const SKIP_PATHS: Record<string, string> = {
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -225,6 +239,23 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Query simulation run results. List runs, get batch summaries, and retrieve individual run details.",
   },
   {
+    name: "Instant Evals",
+    dirName: "instant-evals",
+    pathPrefixes: ["/api/v1/instant-evals"],
+    overviewDescription:
+      "Judge a LangWatchQL statement across your whole production history as a job. Start a run, price one before you start it, poll its progress, read its judgements page by page, sample the text that was judged, and cancel a run that is still going.",
+    endpointOrder: [
+      "POST /api/v1/instant-evals/estimate",
+      "POST /api/v1/instant-evals",
+      "GET /api/v1/instant-evals",
+      "GET /api/v1/instant-evals/{id}",
+      "GET /api/v1/instant-evals/{id}/results",
+      "GET /api/v1/instant-evals/{id}/sample",
+      "POST /api/v1/instant-evals/{id}/cancel",
+    ],
+    extraPages: ["api-reference/instant-evals/running-an-instant-eval"],
+  },
+  {
     name: "Run Plans",
     dirName: "run-plans",
     pathPrefixes: ["/api/v1/run-plans"],
@@ -283,7 +314,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // workflow run, and reads as part of the same family.
     pathPrefixes: ["/api/workflows", "/api/optimization"],
     overviewDescription:
-      "Manage Optimization Studio workflows. List, update, and archive workflows used for prompt optimization and agent design.",
+      "List, run and archive the workflows you build in the LangWatch workflow editor, and update their name, icon and description.",
   },
   {
     name: "Dashboards",
@@ -312,6 +343,9 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/v1/query"],
     overviewDescription:
       "Run a read-only LangWatchQL SELECT over your project's analytics datasets, or discover which datasets and columns your key can query.",
+    // The extraction functions are a feature of the query language rather than
+    // an endpoint, so no OpenAPI operation describes them.
+    extraPages: ["api-reference/query/extraction-functions"],
   },
   {
     name: "Secrets",
