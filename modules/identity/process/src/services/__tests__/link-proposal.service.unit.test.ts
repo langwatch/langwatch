@@ -1,5 +1,8 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AuthApi } from "@langwatch/auth-contract";
 import {
   type IdentityActor,
+  LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
   LINK_REJECTED_EVENT_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
@@ -18,9 +21,21 @@ const OLIVE: IdentityActor = { type: "user", id: "user_olive" };
 const OSCAR: IdentityActor = { type: "user", id: "user_oscar" };
 const T0 = 1_756_000_000_000;
 
+type LinkInput = Parameters<AuthApi["linkProviderAccount"]>[0];
+
 let store: MemoryIdentityStore;
 let commands: number;
+let linked: LinkInput[];
 let links: LinkProposalService;
+
+/** Auth's account creation as the confirm path calls it, recording each link it made. */
+function recordingAccounts(): Pick<AuthApi, "linkProviderAccount"> {
+  return createApiFixture<Pick<AuthApi, "linkProviderAccount">>({
+    linkProviderAccount: async (input) => {
+      linked.push(input);
+    },
+  });
+}
 
 /** The ledger as the memory tier keeps it: the facts land on the store's log. */
 function memoryLedger(): IdentityLedger {
@@ -88,11 +103,13 @@ function decision({ proposalId, actor }: { proposalId: string; actor: IdentityAc
 beforeEach(() => {
   store = MemoryIdentityStore.create();
   commands = 0;
+  linked = [];
+  const proposals = MemoryIdentityHistoryRepository.create(store);
   links = LinkProposalService.create({
-    guards: LinkProposalGuardsService.create({
-      proposals: MemoryIdentityHistoryRepository.create(store),
-    }),
+    guards: LinkProposalGuardsService.create({ proposals }),
     ledger: memoryLedger(),
+    proposals,
+    accounts: recordingAccounts(),
   });
 });
 
@@ -117,13 +134,49 @@ describe("LinkProposalService", () => {
       });
     });
 
-    describe("when olive confirms it before sign-in linking is available", () => {
-      it("refuses by name and states nothing, so the proposal stays waiting", async () => {
+    describe("when olive confirms it", () => {
+      it("links the proposed account through auth, then states the confirmation naming olive", async () => {
+        const facts = await links.confirmLink(decision({ proposalId: "prop_1", actor: OLIVE }));
+
+        expect(linked).toEqual([
+          {
+            userId: SAM,
+            connectionId: "ssoc_1",
+            provider: "oidc",
+            subject: "sub_sam",
+            normalizedEmail: "sam@acme.com",
+          },
+        ]);
+        expect(facts.map((fact) => fact.type)).toEqual([LINK_CONFIRMED_EVENT_TYPE]);
+        expect(facts[0]?.data).toEqual({ proposalId: "prop_1", userId: SAM, actor: OLIVE });
+        const [proposal] = await MemoryIdentityHistoryRepository.create(store).findProposals({
+          userId: SAM,
+        });
+        expect(proposal?.decision?.outcome).toBe("confirmed");
+      });
+    });
+
+    describe("when auth cannot make the link", () => {
+      it("states nothing, so the proposal stays waiting for a retry", async () => {
+        const proposals = MemoryIdentityHistoryRepository.create(store);
+        const failing = LinkProposalService.create({
+          guards: LinkProposalGuardsService.create({ proposals }),
+          ledger: memoryLedger(),
+          proposals,
+          accounts: createApiFixture<Pick<AuthApi, "linkProviderAccount">>({
+            linkProviderAccount: async () => {
+              throw new Error("account create failed");
+            },
+          }),
+        });
+
         await expect(
-          links.confirmLink(decision({ proposalId: "prop_1", actor: OLIVE })),
-        ).rejects.toMatchObject({ code: "service_unavailable" });
+          failing.confirmLink(decision({ proposalId: "prop_1", actor: OLIVE })),
+        ).rejects.toThrow("account create failed");
 
         expect(commands).toBe(0);
+        const [proposal] = await proposals.findProposals({ userId: SAM });
+        expect(proposal?.decision).toBeNull();
       });
     });
   });
@@ -145,6 +198,7 @@ describe("LinkProposalService", () => {
         });
       }
       expect(commands).toBe(1);
+      expect(linked).toEqual([]);
     });
   });
 
@@ -153,19 +207,6 @@ describe("LinkProposalService", () => {
       await expect(
         links.rejectLink(decision({ proposalId: "prop_missing", actor: OLIVE })),
       ).rejects.toMatchObject({ code: "identity_link_proposal_not_found" });
-    });
-  });
-
-  describe("given no identity history in this process", () => {
-    it("refuses by name rather than reading every proposal as missing", async () => {
-      const blind = LinkProposalService.create({
-        guards: LinkProposalGuardsService.create({ proposals: null }),
-        ledger: memoryLedger(),
-      });
-
-      await expect(
-        blind.rejectLink(decision({ proposalId: "prop_1", actor: OLIVE })),
-      ).rejects.toMatchObject({ code: "service_unavailable" });
     });
   });
 });

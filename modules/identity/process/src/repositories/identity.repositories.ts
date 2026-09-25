@@ -8,6 +8,7 @@ import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.pr
 import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 import type { IdentityBackfillRepository } from "./identity-backfill.repository.ts";
 import type { IdentityHeadsRepository } from "./identity-heads.repository.ts";
+import type { IdentityHistoryRepository } from "./identity-history.repository.ts";
 import type { IdentityLatchRepository } from "./identity-latch.repository.ts";
 import type { IdentityLookupRepository } from "./identity-lookup.repository.ts";
 import type { IdentityNewbornRepository } from "./identity-newborn.repository.ts";
@@ -37,6 +38,7 @@ import type { SsoDomainReproofTargetRepository } from "./sso-domain-reproof.repo
 import type { SsoEngineProviderRepository } from "./sso-engine-provider.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "./sso-migration-evidence.repository.ts";
 import type { SsoRegistrantReadRepository } from "./sso-registrant.repository.ts";
+import type { TwoStepVerificationRepository } from "./two-step-verification.repository.ts";
 
 /**
  * The rows the identity module owns, chosen once at boot. One tier over
@@ -54,6 +56,8 @@ export interface IdentityRepositories {
   readonly verification: IdentityVerificationRepository;
   readonly backfill: IdentityBackfillRepository;
   readonly mfaEnrollment: MfaEnrollmentRepository;
+  /** The account-level second-factor evidence and the seats it is asked across (D06). */
+  readonly twoStepVerification: TwoStepVerificationRepository;
   readonly joinRequests: JoinRequestListReadRepository;
   readonly joinCandidates: JoinCandidateRepository;
   readonly ssoConnections: SsoConnectionReadRepository;
@@ -91,6 +95,8 @@ export interface IdentityRepositories {
   readonly ssoDomainOwnership: SsoDomainOwnershipRepository;
   /** The cross-organization reads the operator identity lookup takes (D05). */
   readonly identityLookup: IdentityLookupRepository;
+  /** A person's identity log, read: the lookup's history panel and its waiting proposals. */
+  readonly identityHistory: IdentityHistoryRepository;
 }
 
 /** The rows a one-shot migration pass reads, none of which needs the deployment's encryption. */

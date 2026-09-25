@@ -28,6 +28,9 @@ import {
   type LookupPersonDetail,
   type IdentityServerConfig,
   type MethodsLastUsed,
+  type OrganizationMemberFactor,
+  type TwoStepAccountStanding,
+  type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -93,6 +96,7 @@ import { JoinRequestsService } from "../services/join-requests.service.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { LinkProposalService } from "../services/link-proposal.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { OrganizationMfaService } from "../services/organization-mfa.service.ts";
 import { OrganizationSsoConnectionsService } from "../services/organization-sso-connections.service.ts";
 import { CachedIdentityLatchService } from "../services/per-subject-cached-latch.service.ts";
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
@@ -135,6 +139,7 @@ import {
 } from "../services/sso-test-arrival.service.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 import { IdentitySecretHealMigrationService } from "../services/system-migration-identity-secret-heal.service.ts";
+import { TwoStepAccountService } from "../services/two-step-account.service.ts";
 import { VerificationCeremonyService } from "../services/verification-ceremony.service.ts";
 import {
   buildIdentityInfrastructure,
@@ -199,6 +204,8 @@ type IdentityAppParts = {
   scimSyncGuards: ScimSyncGuardsService;
   scimSyncReads: ScimSyncReadsService;
   lookup: IdentityLookupService;
+  twoStepAccounts: TwoStepAccountService;
+  organizationMfa: OrganizationMfaService;
   pipelines: IdentityPipelineBuilders;
 };
 
@@ -366,7 +373,7 @@ function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit
   };
 }
 
-export class IdentityApp implements IdentityApi, IdentityLookupApi {
+export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -666,12 +673,16 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
       scimSyncReads,
       lookup: IdentityLookupService.create({
         reads: setup.repositories.identityLookup,
-        history: infrastructure.identityHistory,
+        history: setup.repositories.identityHistory,
         router: setup.dependencies.auth,
         identity: () => identity,
         links: LinkProposalService.create({
-          guards: LinkProposalGuardsService.create({ proposals: infrastructure.identityHistory }),
+          guards: LinkProposalGuardsService.create({
+            proposals: setup.repositories.identityHistory,
+          }),
           ledger: infrastructure.ledger,
+          proposals: setup.repositories.identityHistory,
+          accounts: setup.dependencies.auth,
         }),
         platformOperators: setup.repositories.ssoPlatformOperators,
         auditLog: setup.dependencies.auditLog,
@@ -679,14 +690,15 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
         sessions: setup.dependencies.auth,
         invitations: setup.dependencies.organizations,
       }),
+      twoStepAccounts: TwoStepAccountService.create({
+        accounts: setup.repositories.twoStepVerification,
+        deployment: setup.dependencies.auth,
+      }),
+      organizationMfa: OrganizationMfaService.create(setup.repositories.twoStepVerification),
       pipelines: {
         eventing: identityEventing,
         producer: IdentityProducerPipelines.create({ processName: "identity" }),
-        identity: () =>
-          composeIdentityPipeline({
-            repositories: setup.repositories,
-            history: infrastructure.identityHistory,
-          }),
+        identity: () => composeIdentityPipeline({ repositories: setup.repositories }),
         joinRequests: () =>
           composeJoinRequestPipeline({
             repositories: setup.repositories,
@@ -799,6 +811,16 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
 
   getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {
     return this.#parts.accountIdentifiers.getMethodsLastUsed(input);
+  }
+
+  getTwoStepAccountStanding(input: { userId: string }): Promise<TwoStepAccountStanding> {
+    return this.#parts.twoStepAccounts.getStanding(input);
+  }
+
+  findOrganizationMemberFactors(input: {
+    organizationId: string;
+  }): Promise<OrganizationMemberFactor[]> {
+    return this.#parts.organizationMfa.findMemberFactors(input);
   }
 
   guards(): IdentityGuardsService {

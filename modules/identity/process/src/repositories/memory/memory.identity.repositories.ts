@@ -3,6 +3,7 @@ import type { JoinRequestFoldState } from "../../eventing/join-request-state.pro
 import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
 import type { SsoConnectionFoldState } from "../../eventing/sso-connection-state.projection.ts";
 import type { IdentityRepositories } from "../identity.repositories.ts";
+import { MemoryIdentityHistoryRepository } from "./memory.identity-history.repository.ts";
 import { MemoryIdentityLatchRepository } from "./memory.identity-latch.repository.ts";
 import { MemoryIdentityLookupRepository } from "./memory.identity-lookup.repository.ts";
 import { MemoryIdentitySecretCarryRepository } from "./memory.identity-secret-carry.repository.ts";
@@ -39,6 +40,7 @@ import { MemorySsoMigrationEvidenceRepository } from "./memory.sso-migration-evi
 import { MemorySsoPlatformOperatorsRepository } from "./memory.sso-platform-operators.repository.ts";
 import { MemorySsoRegistrantReadRepository } from "./memory.sso-registrant.repository.ts";
 import { MemoryStateProjectionRepository } from "./memory.state-projection.repository.ts";
+import { MemoryTwoStepVerificationRepository } from "./memory.two-step-verification.repository.ts";
 
 /**
  * The "memory" tier: every identity repository the app is tested without a
@@ -68,6 +70,7 @@ export function identityRepositoriesOverMemory(
     verification: MemoryIdentityVerificationRepository.create(store),
     backfill: MemoryIdentityBackfillRepository.create(store),
     mfaEnrollment: MemoryMfaEnrollmentRepository.create(store),
+    twoStepVerification: MemoryTwoStepVerificationRepository.create(),
     joinRequests: MemoryJoinRequestReadRepository.create(store),
     joinCandidates: MemoryJoinCandidateRepository.create(store),
     ssoConnections: MemorySsoConnectionReadRepository.create(store),
@@ -91,5 +94,6 @@ export function identityRepositoriesOverMemory(
     ssoPlatformOperators: MemorySsoPlatformOperatorsRepository.create({ store, adminEmails }),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
+    identityHistory: MemoryIdentityHistoryRepository.create(store),
   };
 }

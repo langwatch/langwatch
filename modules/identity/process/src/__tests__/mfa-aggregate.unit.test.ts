@@ -20,6 +20,8 @@ import {
   RegenerateBackupCodesCommand,
 } from "../eventing/mfa.intent.ts";
 import { defineIdentityPipeline } from "../eventing/user-identity.pipeline.ts";
+import { MemoryIdentityHistoryRepository } from "../repositories/memory/memory.identity-history.repository.ts";
+import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
@@ -183,7 +185,9 @@ describe("two-step verification event aggregate type", () => {
       const declared = defineIdentityPipeline({
         identityProjectionStore: noopStore,
         identityGuards: null as never,
-        linkProposalGuards: LinkProposalGuardsService.create({ proposals: null }),
+        linkProposalGuards: LinkProposalGuardsService.create({
+          proposals: MemoryIdentityHistoryRepository.create(MemoryIdentityStore.create()),
+        }),
         mfaProjectionStore: noopStore,
         mfaGuards: MfaGuardsService.create(new EnrollmentOf(ENABLED)),
       }).metadata.aggregateType;

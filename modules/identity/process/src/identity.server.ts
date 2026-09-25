@@ -9,11 +9,16 @@ import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
 import { identityTrpcTransport } from "./transport/identity.trpc.ts";
+import { twoStepVerificationTrpcTransport } from "./transport/two-step-verification.trpc.ts";
 
 export const identityServer = defineServerModule("identity")
   .withRepositories(identityRepositories)
   .withApp(IdentityApp)
-  .withTransports(identityLookupTrpcTransport, identityTrpcTransport)
+  .withTransports(
+    identityLookupTrpcTransport,
+    identityTrpcTransport,
+    twoStepVerificationTrpcTransport,
+  )
   .withEventing(identityEventing)
   .withEventing(identityPipelineEventing)
   .withEventing(joinRequestEventing)

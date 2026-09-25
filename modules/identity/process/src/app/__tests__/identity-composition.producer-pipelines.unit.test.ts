@@ -68,7 +68,6 @@ describe("given a process that produces identity commands without consuming them
       }).identityPipeline();
       const consumer = composeIdentityPipeline({
         repositories: liveRepositories(prismaDouble({})),
-        history: null,
       });
 
       expect(commandNamesOf(producer as never)).toEqual(commandNamesOf(consumer as never));

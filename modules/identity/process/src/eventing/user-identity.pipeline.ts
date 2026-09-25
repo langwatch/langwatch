@@ -11,7 +11,6 @@ import {
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 import type { IdentityApp } from "../app/identity.app.ts";
-import type { IdentityHistoryRepository } from "../repositories/identity-history.repository.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
@@ -213,17 +212,17 @@ export function composeIdentityGuards(
 /** The identity pipeline a draining process runs, over the module's own rows. */
 export function composeIdentityPipeline({
   repositories,
-  history,
 }: {
   repositories: IdentityGuardRepositories &
-    Pick<IdentityRepositories, "identityProjection" | "mfaProjection">;
-  history: IdentityHistoryRepository | null;
+    Pick<IdentityRepositories, "identityProjection" | "mfaProjection" | "identityHistory">;
 }): IdentityPipeline {
   const { identityGuards, mfaGuards } = composeIdentityGuards(repositories);
   return defineIdentityPipeline({
     identityProjectionStore: repositories.identityProjection,
     identityGuards,
-    linkProposalGuards: LinkProposalGuardsService.create({ proposals: history }),
+    linkProposalGuards: LinkProposalGuardsService.create({
+      proposals: repositories.identityHistory,
+    }),
     mfaProjectionStore: repositories.mfaProjection,
     mfaGuards,
   });

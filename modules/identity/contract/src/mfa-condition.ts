@@ -113,15 +113,21 @@ export interface SecondFactorEvidence {
  * Why a member reaches an organization's data, or does not. Named rather than
  * boolean: the enrollment gate must say WHAT would let them through.
  */
-export type SecondFactorSatisfaction =
+export const secondFactorSatisfactionSchema = z.discriminatedUnion("by", [
   /** The organization does not require one. */
-  | { satisfied: true; by: "not_required" }
+  z.object({ satisfied: z.literal(true), by: z.literal("not_required") }),
   /** Set up on the person's own account. */
-  | { satisfied: true; by: "account_enrollment" }
+  z.object({ satisfied: z.literal(true), by: z.literal("account_enrollment") }),
   /** Proved on this sign-in — a passkey, or a provider that asserted one. */
-  | { satisfied: true; by: "sign_in"; factors: readonly Amr[] }
+  z.object({
+    satisfied: z.literal(true),
+    by: z.literal("sign_in"),
+    factors: z.array(amrSchema).readonly(),
+  }),
   /** Held at the enrollment gate for this organization alone. */
-  | { satisfied: false; by: "none" };
+  z.object({ satisfied: z.literal(false), by: z.literal("none") }),
+]);
+export type SecondFactorSatisfaction = z.infer<typeof secondFactorSatisfactionSchema>;
 
 /** Evaluates whether a member satisfies the organization's MFA requirement at access time. Checks
  * account enrollment first because it is the durable answer across sessions.

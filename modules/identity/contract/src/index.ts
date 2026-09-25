@@ -588,6 +588,7 @@ export {
   satisfiesOrganizationMfaRequirement,
   type SecondFactorEvidence,
   type SecondFactorSatisfaction,
+  secondFactorSatisfactionSchema,
   secondFactorsIn,
   signInProvedSecondFactor,
   TOTP_AMR,
@@ -753,4 +754,6 @@ export * from "./identity-lookup.ts";
 export * from "./identity-lookup.trpc.ts";
 export * from "./account-identifiers.ts";
 export * from "./identity.trpc.ts";
+export * from "./two-step-verification.ts";
+export * from "./two-step-verification.trpc.ts";
 export * from "./identity.config.ts";

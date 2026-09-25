@@ -127,9 +127,6 @@ export class TestUserApi implements UserApi {
     this.overrides.revokeOtherBrowserSessions?.(input) ??
     this.unimplemented("revokeOtherBrowserSessions");
 
-  testArrivalStanding: UserApi["testArrivalStanding"] = (input) =>
-    this.overrides.testArrivalStanding?.(input) ?? this.unimplemented("testArrivalStanding");
-
   revokeAllBrowserSessions: UserApi["revokeAllBrowserSessions"] = (input) =>
     this.overrides.revokeAllBrowserSessions?.(input) ??
     this.unimplemented("revokeAllBrowserSessions");
@@ -188,10 +185,6 @@ export class TestUserApi implements UserApi {
 
   getCliBootstrap: UserApi["getCliBootstrap"] = (input) =>
     this.overrides.getCliBootstrap?.(input) ?? this.unimplemented("getCliBootstrap");
-
-  completeEmailVerification: UserApi["completeEmailVerification"] = (input) =>
-    this.overrides.completeEmailVerification?.(input) ??
-    this.unimplemented("completeEmailVerification");
 
   getPersonalUsage: UserApi["getPersonalUsage"] = (input) =>
     this.overrides.getPersonalUsage?.(input) ?? this.unimplemented("getPersonalUsage");

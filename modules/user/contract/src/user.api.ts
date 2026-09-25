@@ -33,7 +33,6 @@ import type {
 } from "./user.schemas.ts";
 import type {
   ChangeOwnPasswordInput,
-  CompleteUserVerificationInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
@@ -65,9 +64,7 @@ import type {
   UserSecureAccountOffer,
   UserProfile,
   UserSsoStatus,
-  UserTestArrival,
   UserTourPreference,
-  UserVerificationCompleted,
 } from "./user.ts";
 
 /**
@@ -146,12 +143,6 @@ export interface UserApi {
     currentSessionId?: string | undefined;
   }): Promise<UserBrowserSessionEnded>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
-  /**
-   * Where this person's own sign-in leaves them: the connection they were
-   * testing while it is not live yet, and nothing for everybody else —
-   * identity's answer, since it owns the connection (ADR-129).
-   */
-  testArrivalStanding(input: { userId: string }): Promise<UserTestArrival>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   deactivate(input: UserIdInput): Promise<UserProfile>;
   reactivate(input: UserIdInput): Promise<UserProfile>;
@@ -192,12 +183,6 @@ export interface UserApi {
   ): Promise<GovernanceBudgetOverviewForUser>;
   /** What the CLI's login ceremony renders: the caller's providers and monthly budget. */
   getCliBootstrap(input: { userId: string; organizationId: string }): Promise<CliBootstrapResult>;
-
-  // -- the identity ceremony -------------------------------------------------
-
-  completeEmailVerification(
-    input: CompleteUserVerificationInput,
-  ): Promise<UserVerificationCompleted>;
 
   // -- the two REST doors ----------------------------------------------------
 

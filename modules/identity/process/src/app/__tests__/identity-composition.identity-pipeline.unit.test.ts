@@ -75,7 +75,6 @@ function compose() {
   const recording = recordingDatabase();
   const pipeline: IdentityPipeline = composeIdentityPipeline({
     repositories: liveRepositories(recording.database),
-    history: null,
   });
   return { ...recording, pipeline };
 }

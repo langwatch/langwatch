@@ -1,6 +1,5 @@
 import {
   type ConfirmLinkCommandData,
-  IdentityCapabilityUnavailableError,
   type IdentityFactInputOf,
   IdentityLinkProposalNotFoundError,
   IdentityLinkProposalResolvedError,
@@ -17,14 +16,11 @@ import type { IdentityHistoryRepository } from "../repositories/identity-history
  * decided once, and a second operator is told what the first decided.
  */
 export class LinkProposalGuardsService {
-  static create(deps: {
-    /** Null where this process composed no event stack; deciding then refuses by name. */
-    proposals: IdentityHistoryRepository | null;
-  }): LinkProposalGuardsService {
+  static create(deps: { proposals: IdentityHistoryRepository }): LinkProposalGuardsService {
     return new LinkProposalGuardsService(deps.proposals);
   }
 
-  private constructor(private readonly proposals: IdentityHistoryRepository | null) {}
+  private constructor(private readonly proposals: IdentityHistoryRepository) {}
 
   async confirmLink(
     data: ConfirmLinkCommandData,
@@ -52,7 +48,6 @@ export class LinkProposalGuardsService {
     proposalId: string;
     verb: string;
   }): Promise<LinkProposalRecord> {
-    if (!this.proposals) throw new IdentityCapabilityUnavailableError("identity history");
     const proposals = await this.proposals.findProposals({ userId });
     const proposal = proposals.find((held) => held.proposalId === proposalId);
     if (!proposal) {

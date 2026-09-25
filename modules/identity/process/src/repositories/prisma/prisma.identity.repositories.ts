@@ -1,7 +1,9 @@
+import type { EventSourcing } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores/members";
 
 import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.rules.ts";
+import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
 import type {
   IdentityMigrationRepositories,
   IdentityRepositories,
@@ -42,16 +44,18 @@ import { PrismaSsoEngineProviderRepository } from "./prisma.sso-engine-provider.
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
 import { AdminEmailPlatformOperatorsRepository } from "./prisma.sso-platform-operators.repository.ts";
 import { PrismaSsoRegistrantReadRepository } from "./prisma.sso-registrant.repository.ts";
+import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma", "encryption", "adminEmails"] as const;
+  static readonly requires = ["prisma", "encryption", "adminEmails", "eventing"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       encryption: Encryption;
       adminEmails: readonly string[];
+      eventing: EventSourcing;
     }>,
   ): IdentityRepositories {
     const database = members.prisma;
@@ -69,6 +73,7 @@ export class PostgresIdentityRepositories {
       verification: PrismaIdentityVerificationRepository.create(database),
       backfill: PrismaIdentityBackfillRepository.create(database),
       mfaEnrollment: PrismaMfaEnrollmentRepository.create(database),
+      twoStepVerification: PrismaTwoStepVerificationRepository.create(database),
       joinRequests: PrismaJoinRequestReadRepository.create(database),
       joinCandidates: PrismaJoinCandidateRepository.create(database),
       ssoConnections: PrismaSsoConnectionReadRepository.create(database),
@@ -101,6 +106,7 @@ export class PostgresIdentityRepositories {
       }),
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
       identityLookup: PrismaIdentityLookupRepository.create(database),
+      identityHistory: EventingIdentityHistoryRepository.create({ eventing: members.eventing }),
     };
   }
 }

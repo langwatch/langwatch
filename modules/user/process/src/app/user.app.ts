@@ -30,7 +30,6 @@ import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   ChangeOwnPasswordInput,
-  CompleteUserVerificationInput,
   CreateCredentialUserInput,
   CreatePasskeyUserInput,
   CreateUserInput,
@@ -72,10 +71,8 @@ import type {
   UserProfile,
   UserProfilesInput,
   UserSsoStatus,
-  UserTestArrival,
   UserTourPreference,
   UserCodeAccessPreference,
-  UserVerificationCompleted,
   UpdateUserProfileInput,
   UserApiBudgetOverviewInput,
   UserApiPersonalUsageInput,
@@ -961,27 +958,6 @@ export class UserApp implements UserApi {
     organizationId: string;
   }): Promise<CliBootstrapResult> {
     return this.#peers.governance.cliBootstrap({ organizationId }, { id: userId });
-  }
-
-  // -- the identity ceremony -------------------------------------------------
-
-  /**
-   * Spends an email-verification ceremony. Both proofs travel together, so a
-   * link opened on its own — forwarded, or followed by a mail scanner — can
-   * never verify anything.
-   */
-  async completeEmailVerification(
-    input: CompleteUserVerificationInput,
-  ): Promise<UserVerificationCompleted> {
-    await this.#peers.identity.completeEmailVerification(input);
-
-    return { verified: true };
-  }
-
-  /** Where the caller's own sign-in leaves them: identity answers from the
-   *  account it left behind and the connection's own state, never the browser. */
-  testArrivalStanding(input: { userId: string }): Promise<UserTestArrival> {
-    return this.#peers.identity.ssoTestArrival().standingFor(input);
   }
 
   // -- the two REST doors ----------------------------------------------------

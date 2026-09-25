@@ -4,7 +4,6 @@ import {
   DOMAIN_CLAIM_QUEUE_LIMIT,
   IDENTITY_LOOKUP_AUDIT_PREFIX,
   IDENTITY_LOOKUP_HISTORY_LIMIT,
-  IdentityCapabilityUnavailableError,
   type IdentityLookupAnswer,
   type IdentityLookupOperator,
   type LookupDomainClaim,
@@ -37,8 +36,7 @@ import type { LinkProposalService } from "./link-proposal.service.ts";
 
 export interface IdentityLookupServiceDeps {
   reads: IdentityLookupRepository;
-  /** Null where this process composed no event stack; the person panel then refuses by name. */
-  history: IdentityHistoryRepository | null;
+  history: IdentityHistoryRepository;
   /** The auth screens' own router, so this answer cannot drift from theirs. */
   router: Pick<AuthApi, "route">;
   identity: () => Pick<IdentityService, "detachIdentifier">;
@@ -133,7 +131,6 @@ export class IdentityLookupService {
     });
 
     const history = this.deps.history;
-    if (!history) throw new IdentityCapabilityUnavailableError("identity history");
 
     const identifierRows = await this.deps.reads.findIdentifiersForUser({ userId });
     const [people, entries, sessions] = await Promise.all([

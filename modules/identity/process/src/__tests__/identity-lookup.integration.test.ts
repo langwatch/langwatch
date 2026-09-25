@@ -4,9 +4,11 @@ import type {
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
 } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import {
   type IdentifierFact,
   type IdentityHistoryEntry,
+  LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
   LINK_REJECTED_EVENT_TYPE,
   type LinkProposalRecord,
@@ -396,6 +398,7 @@ function invitationRow({ inviteId, expiration }: { inviteId: string; expiration:
 
 describe("identity lookup, deciding a sign-in waiting on a human", () => {
   const SAM = "user_sam";
+  let linked: Parameters<AuthApi["linkProviderAccount"]>[0][] = [];
 
   function decidingService(): IdentityLookupService {
     const history = MemoryIdentityHistoryRepository.create(store);
@@ -413,6 +416,12 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
             return events;
           },
         },
+        proposals: history,
+        accounts: createApiFixture<Pick<AuthApi, "linkProviderAccount">>({
+          linkProviderAccount: async (input) => {
+            linked.push(input);
+          },
+        }),
       }),
       platformOperators: new FakeOperators(new Set([OLIVE.userId])),
       auditLog,
@@ -425,6 +434,7 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
   }
 
   beforeEach(() => {
+    linked = [];
     const actor = { type: "system" as const, id: null };
     store.identityEvents.push(
       ...identityEventsFor({
@@ -462,6 +472,42 @@ describe("identity lookup, deciding a sign-in waiting on a human", () => {
         ],
       }),
     );
+  });
+
+  describe("when olive confirms it", () => {
+    /** @scenario "Confirming a proposed sign-in attaches the method and lets the person in" */
+    it("records the act, links the account through auth's ceremony, and states the confirmation naming olive", async () => {
+      const service = decidingService();
+
+      await service.confirmProposedSignIn({ userId: SAM, proposalId: "prop_1", operator: OLIVE });
+
+      expect(auditLog.rows[0]).toMatchObject({
+        userId: OLIVE.userId,
+        action: "identityLookup.confirmProposedSignIn",
+        targetId: SAM,
+      });
+      expect(linked).toEqual([
+        {
+          userId: SAM,
+          connectionId: "ssoc_1",
+          provider: "oidc",
+          subject: "sub_sam",
+          normalizedEmail: "sam@acme.com",
+        },
+      ]);
+      const decided = store.identityEvents.filter(
+        (event) => event.type === LINK_CONFIRMED_EVENT_TYPE,
+      );
+      expect(decided.map((event) => event.data)).toEqual([
+        { proposalId: "prop_1", userId: SAM, actor: { type: "user", id: OLIVE.userId } },
+      ]);
+      const after = await service.getLookupPerson({
+        userId: SAM,
+        address: "sam@acme.com",
+        operator: OLIVE,
+      });
+      expect(after.waiting.proposals).toEqual([]);
+    });
   });
 
   describe("when olive rejects it", () => {
