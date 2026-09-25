@@ -43,10 +43,24 @@ const FRESH_INVITE_REQUEST = publicRoute({
     "asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP",
 });
 
+const PROOF_HOLDER_ENROLLMENT = publicRoute({
+  reason: "returns enrollment methods only to a visitor holding this address's proof",
+});
+
+const OWN_ADDRESS_STATE =
+  "reads the session user's own address confirmation state; no tenant scope is involved and no other account is reachable";
+
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
 
 export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
+  /** The methods a proven address may enrol. The proof is the authorization and is not spent. */
+  .procedure("signUpEnrollment")
+  .withAccess(PROOF_HOLDER_ENROLLMENT)
+  .handle(({ app, input }) =>
+    app.getSignUpEnrollment({ email: input.email, addressProof: input.addressProof }),
+  )
+
   /**
    * Where this address signs in. A mutation, not a query: a per-address cache
    * entry is an account-existence oracle built out of network timing, and the
@@ -150,6 +164,12 @@ export const authTrpcTransport = defineTrpcRouter(AuthApi, authTrpc)
 
     return { asked: true };
   })
+
+  /** Whether the caller's own address is confirmed, behind the "not confirmed yet" nudge. */
+  .procedure("myAddressConfirmation")
+  .withFacts(callerEmailFact)
+  .noPermission({ reason: OWN_ADDRESS_STATE })
+  .handle(({ app }, email) => app.getMyAddressConfirmation({ email }))
 
   /**
    * Sends the confirmation link for the CALLER'S OWN address. Authenticated,

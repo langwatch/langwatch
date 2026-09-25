@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   requestVerificationMock,
   completeVerificationMock,
+  enrollmentMock,
   sendConfirmationMock,
   routeMock,
   registerMock,
@@ -23,6 +24,7 @@ const {
 } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
+  enrollmentMock: vi.fn(),
   sendConfirmationMock: vi.fn(),
   routeMock: vi.fn(),
   registerMock: vi.fn(),
@@ -77,6 +79,7 @@ vi.mock("../../../behavior/auth-api.ts", async () => {
         completeSignUpVerification: {
           useMutation: useFakeMutation(completeVerificationMock),
         },
+        signUpEnrollment: { useMutation: useFakeMutation(enrollmentMock) },
         sendMyAddressConfirmation: {
           useMutation: useFakeMutation(sendConfirmationMock),
         },
@@ -158,6 +161,11 @@ describe("given the sign-up screen", () => {
     publicEnvRef.current = { IS_SAAS: true };
     requestVerificationMock.mockResolvedValue({ sent: true });
     routeMock.mockResolvedValue(localPicker);
+    enrollmentMock.mockResolvedValue({
+      outcome: "enroll",
+      methodSet: localPicker.methodSet,
+      reasonCode: "no_domain_match",
+    });
   });
 
   afterEach(() => cleanup());
@@ -277,10 +285,60 @@ describe("given the sign-up screen", () => {
       await waitFor(() => {
         expect(container.querySelector('input[type="password"]')).not.toBeNull();
       });
-      expect(routeMock).toHaveBeenCalledWith({
-        identifier: "sam@acme.com",
-        breakGlass: false,
+      expect(enrollmentMock).toHaveBeenCalledWith({
+        email: "sam@acme.com",
+        addressProof: "proof-1",
       });
+    });
+  });
+
+  describe("when deciding where a proven address goes fails", () => {
+    beforeEach(() => {
+      searchParamsRef.current = new URLSearchParams("verify=a-token");
+      completeVerificationMock.mockResolvedValue({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+        addressProof: "proof-1",
+      });
+    });
+
+    /** @scenario Post-link routing still governs credential enrollment */
+    it("offers no credential and retries the same proof", async () => {
+      enrollmentMock.mockRejectedValueOnce(new Error("router down"));
+      const { container } = renderScreen();
+
+      expect(await screen.findByTestId("post-link-routing-failure")).toBeTruthy();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(enrollmentMock).toHaveBeenLastCalledWith({
+        email: "sam@acme.com",
+        addressProof: "proof-1",
+      });
+    });
+
+    /** @scenario Post-link routing still governs credential enrollment */
+    it("hands a domain now routed to a provider to it, offering no local credential", async () => {
+      const okta = { id: "okta", kind: "federated" as const, connectionId: "conn_acme" };
+      enrollmentMock.mockResolvedValueOnce({
+        outcome: "redirect",
+        methodSet: [okta],
+        reasonCode: "domain_routed",
+      });
+      routeMock.mockResolvedValue({
+        outcome: "redirect_to_connection",
+        connectionId: "conn_acme",
+        methodSet: [okta],
+        reasonCode: "domain_routed",
+      });
+      const { container } = renderScreen();
+
+      expect(await screen.findByTestId("welcome-back")).toBeTruthy();
+      expect(container.querySelector('input[type="password"]')).toBeNull();
+      expect(screen.queryByTestId("verified-address")).toBeNull();
     });
   });
 

@@ -28,6 +28,8 @@ import {
   type SignUpVerificationResult,
   type VerifiedBrowserSession,
   type AuthUsageCount,
+  type AddressConfirmation,
+  type SignUpEnrollment,
 } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -48,6 +50,7 @@ import {
   type IdentityEmailService,
   type RoutingDecision,
   type SignedInWith,
+  SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -64,6 +67,7 @@ import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.b
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
+import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
 import { BrowserSessionService } from "../services/browser-session.service.ts";
 import {
   CliDeviceFlowService,
@@ -94,6 +98,7 @@ import {
   type SignInSecurityPlanGate,
   type SignInSecurityReleaseEvidence,
 } from "../services/sign-in-security-settings.service.ts";
+import { SignUpEnrollmentService } from "../services/sign-up-enrollment.service.ts";
 import {
   SignUpVerificationService,
   type SignUpAccountDirectory,
@@ -252,6 +257,10 @@ export class AuthApp implements AuthApiContract {
   readonly #signInSecurity: SignInSecuritySettingsService;
   /** A confirmed link proposal's provider account, written through Better Auth. */
   readonly #providerAccountLinks: ProviderAccountLinkService;
+  /** The methods a proven sign-up address may enrol. */
+  readonly #signUpEnrollment: SignUpEnrollmentService;
+  /** Whether the caller's own address is confirmed. */
+  readonly #addressConfirmation: AddressConfirmationService;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -305,6 +314,8 @@ export class AuthApp implements AuthApiContract {
     federatedAccounts,
     signInSecurity,
     connectionIssuers,
+    signUpEnrollment,
+    addressConfirmation,
   }: {
     sessions: BrowserSessionService;
     cliSessions: CliDeviceSessionService;
@@ -316,6 +327,8 @@ export class AuthApp implements AuthApiContract {
     federatedAccounts: FederatedAccountReadsService;
     signInSecurity: SignInSecuritySettingsService;
     connectionIssuers: Pick<SsoIssuerDirectory, "findIssuersForConnection">;
+    signUpEnrollment: SignUpEnrollmentService;
+    addressConfirmation: AddressConfirmationService;
   }) {
     this.#sessions = sessions;
     this.#cliSessions = cliSessions;
@@ -328,6 +341,8 @@ export class AuthApp implements AuthApiContract {
     this.#legacySsoAccess = legacySsoAccess;
     this.#federatedAccounts = federatedAccounts;
     this.#signInSecurity = signInSecurity;
+    this.#signUpEnrollment = signUpEnrollment;
+    this.#addressConfirmation = addressConfirmation;
     this.#providerAccountLinks = ProviderAccountLinkService.create({
       issuers: connectionIssuers,
       accounts: { createAccount: (row) => this.#createProviderAccount(row) },
@@ -394,6 +409,28 @@ export class AuthApp implements AuthApiContract {
         findIssuersForConnection: (args) =>
           dependencies.identity.ssoIssuers().findIssuersForConnection(args),
       },
+      signUpEnrollment: SignUpEnrollmentService.create({
+        validateAddressProof: (input) => app.requireSignUp().validateAddressProof(input),
+        route: (input) => app.route(input),
+        addressIsTaken: async ({ email }) =>
+          (await dependencies.users.findByEmail({ email })) !== null,
+        resolveDefaultMethods: async () => {
+          const policy = await SignInMethodPolicyService.create({
+            resolveAuthProvider: () => app.resolveAuthProvider(),
+            federationLicensed: () => dependencies.licensing.isPlatformSsoLicensed(),
+            offersPasskeys: () => config.passkeysEnabled,
+            issuesOwnPasswords: () => config.localPasswords,
+            selfHosted: () => !members.isSaas,
+          }).resolvePolicy();
+          return policy.defaultMethods;
+        },
+        passwordIsAllowed: async () =>
+          (await app.resolveAuthProvider()) === "email" || config.localPasswords,
+      }),
+      addressConfirmation: AddressConfirmationService.create({
+        isConfirmed: async ({ email }) =>
+          (await dependencies.users.findByEmail({ email }))?.emailVerified === true,
+      }),
     });
 
     app.#offersPasskeys = config.passkeysEnabled;
@@ -804,6 +841,18 @@ export class AuthApp implements AuthApiContract {
     }
 
     await this.requestSignUpVerification({ email: input.email });
+  }
+
+  getMyAddressConfirmation(
+    input: Readonly<{ email: string | null }>,
+  ): Promise<AddressConfirmation> {
+    return this.#addressConfirmation.getForCaller(input);
+  }
+
+  getSignUpEnrollment(
+    input: Readonly<{ email: string; addressProof: string }>,
+  ): Promise<SignUpEnrollment> {
+    return this.#signUpEnrollment.getEnrollment(input);
   }
 
   async completeSignUpVerification(

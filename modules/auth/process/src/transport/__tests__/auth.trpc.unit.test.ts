@@ -25,6 +25,8 @@ const sendMyAddressConfirmation = vi.fn<AuthApi["sendMyAddressConfirmation"]>();
 const completeSignUpVerification = vi.fn<AuthApi["completeSignUpVerification"]>();
 const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
 const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
+const getSignUpEnrollment = vi.fn<AuthApi["getSignUpEnrollment"]>();
+const getMyAddressConfirmation = vi.fn<AuthApi["getMyAddressConfirmation"]>();
 
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
@@ -41,6 +43,8 @@ const door: AuthApi = {
   sendMyAddressConfirmation,
   completeSignUpVerification,
   claimSignUpAddressProof: () => unreached("claimSignUpAddressProof"),
+  getSignUpEnrollment,
+  getMyAddressConfirmation,
   linkProviderAccount: () => unreached("linkProviderAccount"),
   readInviteLanding,
   requestFreshInvite,
@@ -97,10 +101,12 @@ describe("the signed-out front door", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "completeSignUpVerification",
         "inviteLanding",
+        "myAddressConfirmation",
         "requestFreshInvite",
         "requestSignUpVerification",
         "route",
         "sendMyAddressConfirmation",
+        "signUpEnrollment",
       ]);
     });
 
@@ -119,6 +125,8 @@ describe("the signed-out front door", () => {
         inviteLanding: "query",
         requestFreshInvite: "mutation",
         sendMyAddressConfirmation: "mutation",
+        myAddressConfirmation: "query",
+        signUpEnrollment: "mutation",
       });
     });
   });
@@ -253,6 +261,45 @@ describe("the signed-out front door", () => {
         "This account has no email address to confirm.",
       );
       expect(sendMyAddressConfirmation).toHaveBeenCalledWith({ actorId: "user_ana", email: null });
+    });
+  });
+
+  describe("when a signed-in person asks whether their own address is confirmed", () => {
+    it("asks about the address the session named, never one the caller typed", async () => {
+      getMyAddressConfirmation.mockResolvedValueOnce({ email: "ana@acme.com", confirmed: true });
+      const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
+
+      await expect(signedIn.myAddressConfirmation()).resolves.toEqual({
+        email: "ana@acme.com",
+        confirmed: true,
+      });
+      expect(getMyAddressConfirmation).toHaveBeenCalledWith({ email: "ana@acme.com" });
+    });
+  });
+
+  describe("when a visitor holding an address proof asks what they may enrol", () => {
+    it("hands over the address and its proof, and answers the enrollment", async () => {
+      getSignUpEnrollment.mockResolvedValueOnce({
+        outcome: "enroll",
+        methodSet: [{ id: "password", kind: "password", connectionId: null }],
+        reasonCode: "no_domain_match",
+      });
+
+      await expect(
+        visitor.signUpEnrollment({ email: "sam@example.com", addressProof: "proof-1" }),
+      ).resolves.toMatchObject({ outcome: "enroll" });
+      expect(getSignUpEnrollment).toHaveBeenCalledWith({
+        email: "sam@example.com",
+        addressProof: "proof-1",
+      });
+    });
+
+    it("refuses a proof that does not hold, by its code", async () => {
+      getSignUpEnrollment.mockRejectedValueOnce(new NoAddressToConfirmError());
+
+      await expect(
+        visitor.signUpEnrollment({ email: "sam@example.com", addressProof: "stale" }),
+      ).rejects.toMatchObject({ cause: { code: "auth_no_address_to_confirm" } });
     });
   });
 

@@ -1,6 +1,7 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import type { SignUpEnrollment, SignUpVerificationResult } from "@langwatch/auth-contract";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn } from "../../behavior/auth-client.tsx";
@@ -61,7 +62,6 @@ export function VerificationFirstSignUp() {
   const [addressProof, setAddressProof] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
-  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
   const showsAllSocial = useShowsAllSocialMethods();
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   // Every failure this card can have shows in one place, at the top. A
@@ -69,7 +69,16 @@ export function VerificationFirstSignUp() {
   // an alert opening there pushes the rest of the rail down the page.
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
   const spent = useRef(false);
-  const askedOnMount = useRef(false);
+  const proofEnrollment = useProofEnrollment({
+    decide,
+    routingError: routing.error,
+    onWelcomeBack: setWelcomeBackEmail,
+    onEnrolled: (email, proof) => {
+      setVerifiedEmail(email);
+      setAddressProof(proof);
+    },
+  });
+  const { enrollment, failedLink, resolveEnrollment, settleSpentLink } = proofEnrollment;
 
   // The emailed link is spent once, on arrival. Guarded by a ref rather than
   // by mutation state because the token is single-use: a second attempt would
@@ -79,32 +88,27 @@ export function VerificationFirstSignUp() {
     spent.current = true;
     completeVerification
       .mutateAsync({ token: verifyToken })
-      .then(async ({ email, accountCreated, accountExists, addressProof: proof }) => {
-        setVerifiedEmail(email);
-        setAddressProof(proof);
-        // "Ready" means there is nothing left to choose. An account that was
-        // already there is just as ready as one this link created — sign-up
-        // made it and the link is the address catching up, so asking such a
-        // person to pick a sign-in method would be asking twice.
-        setAccountIsReady(accountCreated || accountExists);
-        await decide({ identifier: email });
-      })
+      .then((result) =>
+        settleSpentLink(
+          result,
+          async ({ email, accountCreated, accountExists, addressProof: proof }) => {
+            setVerifiedEmail(email);
+            setAddressProof(proof);
+            // "Ready" means there is nothing left to choose. An account that was
+            // already there is just as ready as one this link created — sign-up
+            // made it and the link is the address catching up, so asking such a
+            // person to pick a sign-in method would be asking twice.
+            setAccountIsReady(accountCreated || accountExists);
+            await decide({ identifier: email });
+          },
+        ),
+      )
       .catch(() => {
         // Rendered from the mutation's error below, through the registry.
       });
-  }, [verifyToken, completeVerification, decide]);
+  }, [verifyToken, completeVerification, decide, settleSpentLink]);
 
-  // What this instance offers with no address in hand, so the same social
-  // buttons the log-in screen shows are available here from the first step.
-  useEffect(() => {
-    if (askedOnMount.current || verifyToken) return;
-    askedOnMount.current = true;
-    void decide({ identifier: null }).then((decision) => {
-      if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
-      }
-    });
-  }, [decide, verifyToken]);
+  const instanceMethods = useInstanceMethods({ decide, verifyToken });
 
   const dialFederated = (method: SignInMethod) => {
     rememberPendingMethod(method);
@@ -165,12 +169,21 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (verifiedEmail && addressProof) {
+  if (failedLink) {
+    return (
+      <PostLinkRoutingFailure
+        error={proofEnrollment.failure}
+        onRetry={() => resolveEnrollment(failedLink.email, failedLink.addressProof)}
+      />
+    );
+  }
+
+  if (verifiedEmail && addressProof && enrollment) {
     return (
       <MethodChoice
         verifiedEmail={verifiedEmail}
         addressProof={addressProof}
-        decision={routing.decision}
+        enrollment={enrollment}
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
         onFederatedMethodChosen={dialFederated}
@@ -382,14 +395,14 @@ const noPasskeyOnThisStep = () => undefined;
 function MethodChoice({
   verifiedEmail,
   addressProof,
-  decision,
+  enrollment,
   lastUsedMethodId,
   callbackUrl,
   onFederatedMethodChosen,
 }: {
   verifiedEmail: string;
   addressProof: string;
-  decision: RoutingDecision | null;
+  enrollment: SignUpEnrollment;
   lastUsedMethodId: string | null;
   callbackUrl: string;
   onFederatedMethodChosen: (method: SignInMethod) => void;
@@ -400,14 +413,14 @@ function MethodChoice({
         <SuccessPulse label="Email address confirmed" />
         <Text data-testid="verified-address">{verifiedEmail} is confirmed.</Text>
       </HStack>
-      {decision ? (
+      {enrollment ? (
         <SignInMethodPicker
           // Every way in EXCEPT a passkey. This step belongs to an account
           // being made: there is no credential on this device to find yet, so
           // the ceremony would open a prompt with nothing in it. A passkey
           // becomes an offer once there is one to enrol (D07).
-          methodSet={decision.methodSet.filter((method) => method.kind !== "passkey")}
-          reasonCode={decision.reasonCode}
+          methodSet={enrollment.methodSet.filter((method) => method.kind !== "passkey")}
+          reasonCode={enrollment.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}
@@ -430,6 +443,142 @@ function MethodChoice({
           }
         />
       ) : null}
+    </AuthCard>
+  );
+}
+
+/**
+ * What this instance offers with no address in hand, so the same social
+ * buttons the log-in screen shows are available here from the first step.
+ */
+function useInstanceMethods({
+  decide,
+  verifyToken,
+}: {
+  decide: (input: { identifier: null }) => Promise<RoutingDecision | null>;
+  verifyToken: string | null | undefined;
+}): readonly SignInMethod[] {
+  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
+  const askedOnMount = useRef(false);
+
+  useEffect(() => {
+    if (askedOnMount.current || verifyToken) return;
+    askedOnMount.current = true;
+    void decide({ identifier: null }).then((decision) => {
+      if (decision?.outcome === "method_picker") {
+        setInstanceMethods(decision.methodSet);
+      }
+    });
+  }, [decide, verifyToken]);
+
+  return instanceMethods;
+}
+
+/** The proven address's enrollment, and the failed link a retry re-asks with. */
+function useProofEnrollment({
+  decide,
+  routingError,
+  onWelcomeBack,
+  onEnrolled,
+}: {
+  decide: (input: { identifier: string }) => Promise<RoutingDecision | null>;
+  routingError: unknown;
+  onWelcomeBack: (email: string) => void;
+  onEnrolled: (email: string, proof: string) => void;
+}) {
+  const { mutateAsync: requestEnrollment, error } = api.auth.signUpEnrollment.useMutation();
+  const [enrollment, setEnrollment] = useState<SignUpEnrollment | null>(null);
+  const [failedLink, setFailedLink] = useState<{ email: string; addressProof: string } | null>(
+    null,
+  );
+
+  const resolveEnrollment = useCallback(
+    async (email: string, proof: string) => {
+      const next = await nextStepForProof({ email, proof, requestEnrollment, decide });
+      setFailedLink(next.kind === "retry" ? { email, addressProof: proof } : null);
+      if (next.kind === "welcome_back") onWelcomeBack(email);
+      if (next.kind !== "enroll") return;
+
+      setEnrollment(next.enrollment);
+      onEnrolled(email, proof);
+    },
+    [decide, requestEnrollment, onWelcomeBack, onEnrolled],
+  );
+
+  /** A link that proved an address with no account asks for its enrollment; any other settles. */
+  const settleSpentLink = useCallback(
+    async (
+      result: SignUpVerificationResult,
+      settle: (result: SignUpVerificationResult) => Promise<void>,
+    ) => {
+      const { email, accountCreated, accountExists, addressProof } = result;
+      if (addressProof && !accountCreated && !accountExists) {
+        return resolveEnrollment(email, addressProof);
+      }
+      return settle(result);
+    },
+    [resolveEnrollment],
+  );
+
+  return {
+    enrollment,
+    failedLink,
+    resolveEnrollment,
+    settleSpentLink,
+    failure: error ?? routingError,
+  };
+}
+
+type ProofStep =
+  | { kind: "enroll"; enrollment: SignUpEnrollment }
+  | { kind: "welcome_back" }
+  | { kind: "retry" };
+
+/** Where a proven address goes: its enrollment, the log-in step, or a retry that offers nothing. */
+async function nextStepForProof({
+  email,
+  proof,
+  requestEnrollment,
+  decide,
+}: {
+  email: string;
+  proof: string;
+  requestEnrollment: (input: { email: string; addressProof: string }) => Promise<SignUpEnrollment>;
+  decide: (input: { identifier: string }) => Promise<RoutingDecision | null>;
+}): Promise<ProofStep> {
+  try {
+    const answer = await requestEnrollment({ email, addressProof: proof });
+    if (answer.outcome === "enroll") return { kind: "enroll", enrollment: answer };
+    if (answer.outcome === "unavailable") return { kind: "retry" };
+
+    const routed = await decide({ identifier: email });
+    const signsInElsewhere =
+      routed?.outcome === "redirect_to_connection" || routed?.outcome === "method_picker";
+    return signsInElsewhere ? { kind: "welcome_back" } : { kind: "retry" };
+  } catch {
+    return { kind: "retry" };
+  }
+}
+
+/** The address is confirmed but where it signs in could not be decided: retry, offer nothing. */
+function PostLinkRoutingFailure({
+  error,
+  onRetry,
+}: {
+  error: unknown;
+  onRetry: () => Promise<void>;
+}) {
+  return (
+    <AuthCard title="Your email is confirmed">
+      <div data-testid="post-link-routing-failure" hidden />
+      {error ? (
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't check how you should sign in" />
+      ) : (
+        <Text>We couldn't check how this address should sign in.</Text>
+      )}
+      <Button className="lw-front-door-primary" width="full" onClick={() => void onRetry()}>
+        Try again
+      </Button>
     </AuthCard>
   );
 }

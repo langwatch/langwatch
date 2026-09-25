@@ -35,3 +35,10 @@ export type FrontDoorTokenInput = z.infer<typeof frontDoorTokenInputSchema>;
 /** The invitation code whose landing page is being read, or reissued. */
 export const frontDoorInviteCodeInputSchema = z.object({ inviteCode: z.string().min(1) });
 export type FrontDoorInviteCodeInput = z.infer<typeof frontDoorInviteCodeInputSchema>;
+
+/** A confirmed address and the proof its spent link minted, asking what it may enrol. */
+export const signUpEnrollmentInputSchema = z.object({
+  email: z.string().email(),
+  addressProof: z.string().min(1),
+});
+export type SignUpEnrollmentInput = z.infer<typeof signUpEnrollmentInputSchema>;

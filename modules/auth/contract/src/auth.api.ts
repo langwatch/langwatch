@@ -6,7 +6,12 @@ import type {
   BrowserSessionInventoryEntry,
   VerifiedBrowserSession,
 } from "./browser-session.ts";
-import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
+import type {
+  AddressConfirmation,
+  InviteLanding,
+  SignUpEnrollment,
+  SignUpVerificationResult,
+} from "./front-door.responses.ts";
 import type {
   ReleaseHeldAccountResult,
   SaveSignInSecurityInput,
@@ -168,6 +173,15 @@ export interface AuthApi {
   sendMyAddressConfirmation(
     input: Readonly<{ actorId: string; email: string | null }>,
   ): Promise<void>;
+  /** The caller's own address and whether it is confirmed; unconfirmed where it has none. */
+  getMyAddressConfirmation(input: Readonly<{ email: string | null }>): Promise<AddressConfirmation>;
+  /**
+   * The methods a proven address may enrol, validating the proof without spending it;
+   * a proof that is missing, expired or another address's raises `auth_no_address_to_confirm`.
+   */
+  getSignUpEnrollment(
+    input: Readonly<{ email: string; addressProof: string }>,
+  ): Promise<SignUpEnrollment>;
   /** Spends a confirmation link and answers the address it confirmed. */
   completeSignUpVerification(input: Readonly<{ token: string }>): Promise<SignUpVerificationResult>;
   /**

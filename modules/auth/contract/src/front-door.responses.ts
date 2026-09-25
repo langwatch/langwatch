@@ -2,6 +2,7 @@
  * Schemas for signed-out front door responses. Deliberately small for
  * unauthenticated users; routing decisions live in identity's routingDecisionSchema.
  */
+import { SIGNIN_ROUTING_REASON_CODES, signInMethodSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 /** A mail was asked for. The same answer whether or not one was needed. */
@@ -40,3 +41,26 @@ export const inviteLandingSchema = z
   })
   .strict();
 export type InviteLanding = z.infer<typeof inviteLandingSchema>;
+
+/** The caller's own address and whether it is confirmed; null where the session carries none. */
+export const addressConfirmationSchema = z
+  .object({ email: z.string().nullable(), confirmed: z.boolean() })
+  .strict();
+export type AddressConfirmation = z.infer<typeof addressConfirmationSchema>;
+
+export const SIGN_UP_ENROLLMENT_OUTCOMES = [
+  "enroll",
+  "redirect",
+  "existing_account",
+  "unavailable",
+] as const;
+
+/** What a proven address may enrol: the methods on offer, or why it goes elsewhere. */
+export const signUpEnrollmentSchema = z
+  .object({
+    outcome: z.enum(SIGN_UP_ENROLLMENT_OUTCOMES),
+    methodSet: z.array(signInMethodSchema).readonly(),
+    reasonCode: z.enum(SIGNIN_ROUTING_REASON_CODES),
+  })
+  .strict();
+export type SignUpEnrollment = z.infer<typeof signUpEnrollmentSchema>;

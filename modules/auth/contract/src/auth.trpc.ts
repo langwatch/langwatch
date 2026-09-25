@@ -5,11 +5,14 @@
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { routingDecisionSchema } from "@langwatch/identity-contract";
+import { z } from "zod";
 
 import {
+  addressConfirmationSchema,
   frontDoorAskedSchema,
   frontDoorSentSchema,
   inviteLandingSchema,
+  signUpEnrollmentSchema,
   signUpVerificationResultSchema,
 } from "./front-door.responses.ts";
 import {
@@ -18,9 +21,15 @@ import {
   frontDoorOwnAddressInputSchema,
   frontDoorRouteInputSchema,
   frontDoorTokenInputSchema,
+  signUpEnrollmentInputSchema,
 } from "./front-door.schemas.ts";
 
 export const authTrpc = defineTrpcContract("auth")
+  /** The methods a proven address may enrol; the proof is validated, not spent. */
+  .mutation("signUpEnrollment")
+  .withInput(signUpEnrollmentInputSchema)
+  .withOutput(signUpEnrollmentSchema)
+
   /**
    * A mutation rather than a query on purpose: a query would be cached and
    * refetched per address, and a per-address cache entry is an
@@ -45,6 +54,10 @@ export const authTrpc = defineTrpcContract("auth")
   .mutation("requestFreshInvite")
   .withInput(frontDoorInviteCodeInputSchema)
   .withOutput(frontDoorAskedSchema)
+
+  .query("myAddressConfirmation")
+  .withInput(z.void())
+  .withOutput(addressConfirmationSchema)
 
   .mutation("sendMyAddressConfirmation")
   .withInput(frontDoorOwnAddressInputSchema)
