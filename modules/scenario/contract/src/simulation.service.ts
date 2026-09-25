@@ -61,6 +61,7 @@ export type SimulationScenarioSetRunsInput = {
   cursor?: string;
   startDate?: number;
   endDate?: number;
+  shouldIncludeMessages?: boolean;
 };
 
 export type SimulationScenarioSetInput = {
@@ -82,6 +83,7 @@ export type SimulationAllSuitesInput = {
   startDate?: number;
   endDate?: number;
   sinceTimestamp?: number;
+  shouldIncludeMessages?: boolean;
 };
 
 export type SimulationLastUpdatedInput = {

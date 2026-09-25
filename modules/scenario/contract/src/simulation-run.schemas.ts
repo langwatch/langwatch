@@ -33,6 +33,12 @@ export const scenarioRunRestResponseSchema = z.object({
       content: z.string(),
     }),
   ),
+  messagesTruncated: z
+    .boolean()
+    .optional()
+    .describe(
+      "True when `messages` holds only the first few messages of a longer conversation. Pass `include=messages` to read them all.",
+    ),
   timestamp: z.number(),
   updatedAt: z.number(),
   durationInMs: z.number(),
@@ -92,6 +98,12 @@ export const simulationRunListQuerySchema = z.object({
   batchRunId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(100).optional().default(20),
   cursor: z.string().optional(),
+  include: z
+    .literal("messages")
+    .optional()
+    .describe(
+      "Pass `messages` to read whole conversations instead of the first few messages of each run. The page size is capped at 20 runs when set, and ends on a batch boundary.",
+    ),
 });
 
 export const simulationBatchQuerySchema = z.object({

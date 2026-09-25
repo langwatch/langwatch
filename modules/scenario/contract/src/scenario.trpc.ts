@@ -42,6 +42,7 @@ import {
   simulationSetDataSchema,
   simulationStreamFrameSchema,
 } from "./simulation.ts";
+import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
 
 /** The project every procedure below is asked of. */
@@ -71,6 +72,7 @@ export const scenarioTrpcCreateSchema = z.object({
   // Turn config (ADR-015); null clears back to SDK default.
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  fields: scenarioFieldValuesSchema.optional(),
   // The test suite this case is filed in; absent or null = unfiled.
   testSuiteId: z.string().nullish(),
   // The simulated caller's voice for a voice target. Absent leaves it unset;
@@ -91,6 +93,8 @@ export const scenarioTrpcUpdateSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),
+  // Sent, this replaces the whole record; an empty record clears every value.
+  fields: scenarioFieldValuesSchema.optional(),
   // Absent = keep the current test suite; null = unfile; a test suite id = move.
   testSuiteId: z.string().nullish(),
   // The simulated caller's voice for a voice target. Absent keeps the

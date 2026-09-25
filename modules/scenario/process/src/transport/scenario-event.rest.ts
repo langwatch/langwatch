@@ -14,6 +14,9 @@ import {
   ScenarioApi,
 } from "@langwatch/scenario-contract";
 
+/** Main's ceiling for one event, sized for inline media payloads. */
+const SCENARIO_EVENT_MAX_BYTES = 50 * 1024 * 1024;
+
 /** Scenario-run event reporting, live-tab handoff, and scoped archival. */
 export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withNamespace("scenario-events")
@@ -23,6 +26,7 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withPermission("scenarios:create")
   .withOutput(responseSchemas.success)
   .withStatus(201)
+  .withBodyLimit({ maxBytes: SCENARIO_EVENT_MAX_BYTES })
   .withDocs({
     description: "Create a new scenario event",
     responses: {

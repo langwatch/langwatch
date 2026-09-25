@@ -14,14 +14,17 @@ function buildSimulationRunsFamily(
   options: {
     findBatchSummary?: SimulationService["findBatchSummary"];
     getRunDataForBatchRun?: SimulationService["getRunDataForBatchRun"];
+    getRunDataForScenarioSet?: SimulationService["getRunDataForScenarioSet"];
   } = {},
 ) {
   const findBatchSummary =
     options.findBatchSummary ?? vi.fn<SimulationService["findBatchSummary"]>();
   const getRunDataForBatchRun =
     options.getRunDataForBatchRun ?? vi.fn<SimulationService["getRunDataForBatchRun"]>();
+  const getRunDataForScenarioSet =
+    options.getRunDataForScenarioSet ?? vi.fn<SimulationService["getRunDataForScenarioSet"]>();
   const world = createScenarioRestTestApp({
-    simulations: { findBatchSummary, getRunDataForBatchRun },
+    simulations: { findBatchSummary, getRunDataForBatchRun, getRunDataForScenarioSet },
   });
   const { runtime, projectFacts } = createScenarioRestTestRuntime();
   const declaration = createSimulationRunsRest();
@@ -165,6 +168,48 @@ describe("the simulation-runs REST declaration", () => {
         scenarioSetId: void 0,
         batchRunId: "batch-a",
       });
+    });
+  });
+
+  describe("when a set-level list is read", () => {
+    it("reports a trimmed run as messagesTruncated", async () => {
+      const getRunDataForScenarioSet = vi.fn<SimulationService["getRunDataForScenarioSet"]>(
+        async () => ({
+          runs: [{ ...run("run-a", "batch-a"), messagesTruncated: true }],
+          hasMore: false,
+        }),
+      );
+      const family = buildSimulationRunsFamily({ getRunDataForScenarioSet });
+
+      const response = await family.request("/api/simulation-runs?scenarioSetId=set-a");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        runs: [{ scenarioRunId: "run-a", messagesTruncated: true }],
+        hasMore: false,
+      });
+      expect(getRunDataForScenarioSet).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioSetId: "set-a", shouldIncludeMessages: false }),
+      );
+    });
+
+    it("asks for whole conversations when include=messages is passed", async () => {
+      const getRunDataForScenarioSet = vi.fn<SimulationService["getRunDataForScenarioSet"]>(
+        async () => ({ runs: [], hasMore: true, nextCursor: "next" }),
+      );
+      const family = buildSimulationRunsFamily({ getRunDataForScenarioSet });
+
+      const response = await family.request(
+        "/api/simulation-runs?scenarioSetId=set-a&include=messages",
+      );
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        runs: [],
+        hasMore: true,
+        nextCursor: "next",
+      });
+      expect(getRunDataForScenarioSet).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioSetId: "set-a", shouldIncludeMessages: true }),
+      );
     });
   });
 });

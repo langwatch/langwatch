@@ -132,11 +132,12 @@ export function createSimulationRunsRest(): Readonly<{
     .withPermission("scenarios:view")
     .withOutput(simulationRunListResponseSchema)
     .withDocs({
-      description: "List simulation runs, optionally filtered by scenarioSetId or batchRunId",
+      description:
+        "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     })
     .withMiddleware(projectRestFacts)
     .handle(async ({ app, input, scope }, project) => {
-      const { scenarioSetId, batchRunId, limit, cursor } = input;
+      const { scenarioSetId, batchRunId, limit, cursor, include } = input;
       const projectId = scope.id;
       logger.info({ projectId, scenarioSetId, batchRunId }, "Listing simulation runs");
 
@@ -156,16 +157,22 @@ export function createSimulationRunsRest(): Readonly<{
           scenarioSetId,
           limit,
           cursor,
+          shouldIncludeMessages: include === "messages",
         });
 
         return {
           runs: result.runs.map((r) => withPlatformUrl(app, r, project.projectSlug)),
-          hasMore: result.nextCursor !== null,
+          hasMore: result.hasMore,
           nextCursor: result.nextCursor ?? undefined,
         };
       }
 
-      const result = await app.getRunDataForAllSuites({ projectId, limit, cursor });
+      const result = await app.getRunDataForAllSuites({
+        projectId,
+        limit,
+        cursor,
+        shouldIncludeMessages: include === "messages",
+      });
 
       if (!result.changed) return { runs: [], hasMore: false };
 

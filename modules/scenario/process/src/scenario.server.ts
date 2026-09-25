@@ -6,23 +6,21 @@ import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipelin
 import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { StalledRunsBackfillTask } from "./tasks/stalled-runs-backfill.task.ts";
+import { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
 import { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
 import { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";
 import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 import { createSimulationRunsRest } from "./transport/simulation-run.rest.ts";
 
-/**
- * `scenarios.*`: repositories, the app, its tRPC namespace, and the two REST
- * families whose only process port was `platformUrl` (now `ScenarioApi`'s).
- * The other three still need ports `ScenarioApi` lacks; see the module handover.
- */
+/** `scenarios.*`: repositories, the app, its tRPC namespace and REST families. */
 export const scenarioServer = defineServerModule("scenario")
   .withRepositories(scenarioRepositories)
   .withApp(ScenarioApp)
   .withTransports(
     createScenarioRest(),
     createSimulationRunsRest(),
+    scenarioEventsRest,
     scenarioGenerateRest,
     scenarioRunExportRest,
     scenarioTrpcTransport,
