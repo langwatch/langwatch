@@ -70,7 +70,12 @@ export function withReadableAnnotationAnchor<T extends AnnotationAnchorStorage>(
 
 export type AnnotationSuggestionField = "input" | "output";
 
-export function resolveAnnotationSuggestionTarget({
+export type AnnotationSuggestionTarget =
+  | { kind: "trace"; field: AnnotationSuggestionField }
+  | { kind: "span"; spanId: string; field: AnnotationSuggestionField };
+
+/** The field an annotation's expected output suggests into; none when its anchor is not one. */
+export function findAnnotationSuggestionTargets({
   traceId,
   anchorKind,
   anchorId,
@@ -80,25 +85,24 @@ export function resolveAnnotationSuggestionTarget({
   anchorKind?: string | null;
   anchorId?: string | null;
   anchorPath?: string | null;
-}):
-  | { kind: "trace"; field: AnnotationSuggestionField }
-  | { kind: "span"; spanId: string; field: AnnotationSuggestionField }
-  | null {
+}): AnnotationSuggestionTarget[] {
   const anchor = readableAnnotationAnchor({
     anchorKind: anchorKind ?? null,
     anchorId: anchorId ?? null,
     anchorPath: anchorPath ?? null,
   });
 
-  if (!anchor.anchorKind) return { kind: "trace", field: "output" };
+  if (!anchor.anchorKind) return [{ kind: "trace", field: "output" }];
 
-  if (anchor.anchorKind !== "field" || !anchor.anchorId) return null;
+  if (anchor.anchorKind !== "field" || !anchor.anchorId) return [];
 
-  if (anchor.anchorPath !== "input" && anchor.anchorPath !== "output") return null;
+  if (anchor.anchorPath !== "input" && anchor.anchorPath !== "output") return [];
 
-  return anchor.anchorId === traceId
-    ? { kind: "trace", field: anchor.anchorPath }
-    : { kind: "span", spanId: anchor.anchorId, field: anchor.anchorPath };
+  return [
+    anchor.anchorId === traceId
+      ? { kind: "trace", field: anchor.anchorPath }
+      : { kind: "span", spanId: anchor.anchorId, field: anchor.anchorPath },
+  ];
 }
 
 export interface AnnotationSuggestionSource {

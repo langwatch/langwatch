@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { AesGcmSecretEncryptionAdapter } from "../aes-gcm-secret-encryption.service.ts";
+import { AesGcmSecretEncryptionService } from "../aes-gcm-secret-encryption.service.ts";
 
 const KEY = "0f".repeat(32);
 const OTHER_KEY = "a1".repeat(32);
@@ -14,11 +14,11 @@ const STORED_ROW =
   "aabbccddeeff001122334455:72b43a4bc9e43c4de7e3e7ed18f9dbe02327fe68fd:59a8bc427deba94b3e94aa08ce8ab785";
 const STORED_VALUE = "sk-live-fixture-value";
 
-function cipher(key = KEY): AesGcmSecretEncryptionAdapter {
-  return AesGcmSecretEncryptionAdapter.create({ key });
+function cipher(key = KEY): AesGcmSecretEncryptionService {
+  return AesGcmSecretEncryptionService.create({ key });
 }
 
-describe("AesGcmSecretEncryptionAdapter", () => {
+describe("AesGcmSecretEncryptionService", () => {
   describe("given a key of the wrong shape", () => {
     /** @scenario "A key that is not the key refuses rather than guesses" */
     it("refuses at construction rather than at the first secret read", () => {

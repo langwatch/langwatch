@@ -29,13 +29,13 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../../services/personal-workspace-identity.service.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
 describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace", () => {
-  const identities = PersonalWorkspaceIdentityAdapter.create();
+  const identities = PersonalWorkspaceIdentityService.create();
   const testNamespace = `ensure-idempotent-${nanoid(8)}`;
 
   const connection = PrismaConnectionService.create({

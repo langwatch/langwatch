@@ -26,12 +26,10 @@ import type { OrganizationSettingsSecret } from "../app/organization.members.ts"
 import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
 import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
 import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
+import { GroupIdentityService } from "../services/group-identity.service.ts";
 import { OrganizationService } from "../services/organization.service.ts";
-import {
-  GroupIdentityAdapter,
-  PersonalWorkspaceIdentityAdapter,
-  TeamIdentityAdapter,
-} from "../services/resource-identifiers.service.ts";
+import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
+import { TeamIdentityService } from "../services/team-identity.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -100,9 +98,9 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
     repository: PrismaOrganizationRepository.create(prisma),
     teams: PrismaTeamRepository.create(prisma),
     groups: PrismaGroupRepository.create(prisma),
-    identities: PersonalWorkspaceIdentityAdapter.create(),
-    teamIdentities: TeamIdentityAdapter.create(),
-    groupIdentities: GroupIdentityAdapter.create(),
+    identities: PersonalWorkspaceIdentityService.create(),
+    teamIdentities: TeamIdentityService.create(),
+    groupIdentities: GroupIdentityService.create(),
     authz: authzApi,
     grants: authzApi,
     settingsSecrets: passthroughSecrets,

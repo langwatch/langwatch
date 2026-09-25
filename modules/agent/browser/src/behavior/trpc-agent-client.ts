@@ -29,6 +29,9 @@ import type {
   AgentSyncFromSourceInput,
 } from "../model/agent-client.ts";
 
+const agentCopiesSchema = agentCopySchema.array();
+const agentHistoryEntriesSchema = agentHistoryEntrySchema.array();
+
 export class TrpcAgentClient implements AgentClient {
   static create(rpc: UiRpc): TrpcAgentClient {
     return new TrpcAgentClient(rpc);
@@ -68,7 +71,7 @@ export class TrpcAgentClient implements AgentClient {
 
   async getCopies(input: AgentCopiesInput) {
     const output = await this.rpc.query("agents.getCopies", input);
-    return agentCopySchema.array().parse(output);
+    return agentCopiesSchema.parse(output);
   }
 
   async copy(input: AgentCopyInput) {
@@ -88,6 +91,6 @@ export class TrpcAgentClient implements AgentClient {
 
   async getHistory(input: AgentHistoryInput) {
     const output = await this.rpc.query("agents.getHistory", input);
-    return agentHistoryEntrySchema.array().parse(output);
+    return agentHistoryEntriesSchema.parse(output);
   }
 }

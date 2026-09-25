@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 type Query = { query: string; query_params?: Record<string, unknown> };
 
@@ -21,11 +21,11 @@ function repositoryOver(rows: unknown[] = []) {
 
   return {
     queries,
-    repository: GatewaySpendEventsRepository.create(async () => client as never),
+    repository: ClickHouseGatewaySpendEventsRepository.create(async () => client as never),
   };
 }
 
-describe("GatewaySpendEventsRepository image quantities", () => {
+describe("ClickHouseGatewaySpendEventsRepository image quantities", () => {
   describe("readSpendSummaries()", () => {
     it("selects the image columns alongside the token columns", async () => {
       const { repository, queries } = repositoryOver([]);

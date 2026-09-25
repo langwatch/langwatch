@@ -1,5 +1,5 @@
 import {
-  linkedWorkflowId,
+  findLinkedWorkflowIds,
   type Agent,
   type AgentFields,
   type AgentWithFields,
@@ -32,7 +32,7 @@ export function agentWithResolvedFields(
     };
   }
 
-  const workflowId = linkedWorkflowId(agent);
+  const [workflowId] = findLinkedWorkflowIds(agent);
   if (workflowId && fields[workflowId]) {
     return { ...agent, ...fields[workflowId] };
   }

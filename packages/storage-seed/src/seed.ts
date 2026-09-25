@@ -24,7 +24,7 @@ import {
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-process";
+import { AesGcmSecretEncryptionService } from "@langwatch/secret-process";
 import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 
@@ -463,7 +463,7 @@ const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
  * `@langwatch/secret-process` owns the format; the key comes from the boot seam.
  */
 function encryptCredentials(value: string, key: string): string {
-  return AesGcmSecretEncryptionAdapter.create({ key }).encrypt(value);
+  return AesGcmSecretEncryptionService.create({ key }).encrypt(value);
 }
 
 // loadSeedEnv merges dotenv layers with process env winning over the

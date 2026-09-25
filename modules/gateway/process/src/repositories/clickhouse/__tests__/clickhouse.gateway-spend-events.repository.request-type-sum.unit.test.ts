@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 
 type Query = { query: string; query_params: Record<string, unknown> };
 
@@ -24,7 +24,7 @@ function repositoryOver(rows: unknown[] = []) {
   return {
     queries,
     resolvedFor,
-    repository: GatewaySpendEventsRepository.create(async (tenantId: string) => {
+    repository: ClickHouseGatewaySpendEventsRepository.create(async (tenantId: string) => {
       resolvedFor.push(tenantId);
 
       return client as never;

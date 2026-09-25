@@ -124,19 +124,19 @@ export class PrismaPersonalTeamScopeRepository {
       ? { OR: [{ ownerUserId: null }, { ownerUserId: { not: ownerUserId } }] }
       : {};
   }
-}
 
-/**
- * Binds Postgres to the two personal-workspace reads, for a process that
- * wants the narrow {@link PersonalTeamScopeReader} shape without booting the
- * whole organization module. Replaces the deleted `PostgresPersonalTeamScopeAdapter`.
- */
-export function bindPersonalTeamScopeReader(database: PrismaClient): PersonalTeamScopeReader {
-  const scopes = PrismaPersonalTeamScopeRepository.create();
-  return {
-    findPersonalTeamsInScopes: (input) =>
-      scopes.findPersonalTeamsInScopes({ client: database, ...input }),
-    findForeignPersonalTeamsInScopes: (input) =>
-      scopes.findForeignPersonalTeamsInScopes({ client: database, ...input }),
-  };
+  /**
+   * Binds Postgres to the two personal-workspace reads, for a process that
+   * wants the narrow {@link PersonalTeamScopeReader} shape without booting the
+   * whole organization module. Replaces the deleted `PostgresPersonalTeamScopeAdapter`.
+   */
+  static bindReader(database: PrismaClient): PersonalTeamScopeReader {
+    const scopes = PrismaPersonalTeamScopeRepository.create();
+    return {
+      findPersonalTeamsInScopes: (input) =>
+        scopes.findPersonalTeamsInScopes({ client: database, ...input }),
+      findForeignPersonalTeamsInScopes: (input) =>
+        scopes.findForeignPersonalTeamsInScopes({ client: database, ...input }),
+    };
+  }
 }

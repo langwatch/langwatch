@@ -9,7 +9,7 @@ import {
 } from "@langwatch/eventing";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
-import type { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
 import type { SettleSpendCommandData } from "./gateway-spend-commands.process.ts";
 import {
@@ -53,7 +53,7 @@ export interface EventingGatewaySpendAdapterOptions {
   /** The spend ledger the fold reads and writes. The `FoldProjectionStore`
    *  built over it stays private to this feature, which is what
    *  `private-runtime-export` requires of a feature server root. */
-  spendEvents: GatewaySpendEvents;
+  spendEvents: GatewaySpendEventsRepository;
   /** Wraps this feature's own fold store before it is mounted, so the
    *  composition root can put its Redis read-through cache in front of a
    *  store it is never handed. Identity when absent. */

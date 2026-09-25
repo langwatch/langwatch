@@ -16,7 +16,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../../services/personal-workspace-identity.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
@@ -28,7 +28,7 @@ const noopGrantsWriter = createApiFixture<AuthzGrantsService>({
 });
 
 describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
-  const identities = PersonalWorkspaceIdentityAdapter.create();
+  const identities = PersonalWorkspaceIdentityService.create();
   const testNamespace = `pw-lifecycle-${nanoid(8)}`;
 
   let organizationId: string;

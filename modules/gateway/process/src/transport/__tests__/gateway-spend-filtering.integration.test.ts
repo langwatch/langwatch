@@ -14,7 +14,7 @@ import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -55,8 +55,8 @@ function ch(): ClickHouseClient {
   return client;
 }
 
-function repository(): GatewaySpendEventsRepository {
-  return new GatewaySpendEventsRepository(async () => ch());
+function repository(): ClickHouseGatewaySpendEventsRepository {
+  return new ClickHouseGatewaySpendEventsRepository(async () => ch());
 }
 
 let eventTimestamp = 1;
@@ -125,8 +125,8 @@ async function insertSpend({
 
 /** Every group key the rollup served, for the whole seeded window. */
 async function summariseBy(
-  groupBy: Parameters<GatewaySpendEventsRepository["readSpendSummaries"]>[0]["groupBy"],
-  extra: Partial<Parameters<GatewaySpendEventsRepository["readSpendSummaries"]>[0]> = {},
+  groupBy: Parameters<ClickHouseGatewaySpendEventsRepository["readSpendSummaries"]>[0]["groupBy"],
+  extra: Partial<Parameters<ClickHouseGatewaySpendEventsRepository["readSpendSummaries"]>[0]> = {},
 ): Promise<string[]> {
   const page = await repository().readSpendSummaries({
     tenantIds: [PROJECT_A_ID, PROJECT_B_ID],

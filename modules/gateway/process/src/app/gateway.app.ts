@@ -89,7 +89,7 @@ import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.t
 import { EventingGatewaySpendAdapter } from "../eventing/gateway-spend.adapter.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
-import type { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
+import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.repository.ts";
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
@@ -556,7 +556,7 @@ function spendCommandRecord(command: string, payload: unknown): Record<string, u
 
 /** The ledger gateway_spend folds into and the senders registration hands back. */
 type GatewaySpendPipelineParts = Readonly<{
-  ledger: GatewaySpendEvents;
+  ledger: GatewaySpendEventsRepository;
   commands: Record<string, GatewaySpendCommandSender | undefined>;
   webhooks: Pick<WebhookApi, "requestSpendDelivery">;
 }>;

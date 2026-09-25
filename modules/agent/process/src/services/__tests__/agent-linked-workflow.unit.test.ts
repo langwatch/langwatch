@@ -57,7 +57,6 @@ describe("AgentApp linked workflow operations", () => {
         sourceProjectId: "project_1",
         targetProjectId: "project_2",
         copiedFromWorkflowId: "workflow_1",
-        authorId: "user_1",
       },
       { id: "user_1" },
     );

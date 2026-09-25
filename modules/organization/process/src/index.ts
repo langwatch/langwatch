@@ -25,7 +25,6 @@ export type {
   RoleBindingScope,
 } from "./services/personal-team-scope.service.ts";
 export type { TenantOwnershipReader } from "./services/tenant-directory.service.ts";
-export { bindTenantDirectoryReader } from "./repositories/prisma/prisma.tenant-directory.repository.ts";
 export type {
   AuditLogFilters,
   CreateAndAssignInput,

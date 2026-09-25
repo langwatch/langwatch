@@ -196,6 +196,15 @@ export class MemoryAgentRepository implements AgentRepository {
     );
   }
 
+  async findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]> {
+    return structuredClone(
+      input.projectIds
+        .flatMap((projectId) => this.#visible(projectId))
+        .filter((agent) => agent.type === "connected")
+        .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime()),
+    );
+  }
+
   async registerConnected(input: RegisterPersistedAgentInput): Promise<Agent> {
     const existing = [...this.#agents.values()].find(
       (agent) =>

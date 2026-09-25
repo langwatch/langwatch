@@ -4,11 +4,11 @@ import { type PersonalWorkspaceDiagnostics } from "../app/organization.members.t
 
 /**
  * Where a personal-workspace warning goes. The port takes `(message, context)` and the
- * repository's logger takes `(context, message)`; this adapter does that swap once.
+ * repository's logger takes `(context, message)`; this service does that swap once.
  */
-export class PersonalWorkspaceDiagnosticsAdapter implements PersonalWorkspaceDiagnostics {
-  static create(logger: Pick<Logger, "warn">): PersonalWorkspaceDiagnosticsAdapter {
-    return new PersonalWorkspaceDiagnosticsAdapter(logger);
+export class PersonalWorkspaceDiagnosticsService implements PersonalWorkspaceDiagnostics {
+  static create(logger: Pick<Logger, "warn">): PersonalWorkspaceDiagnosticsService {
+    return new PersonalWorkspaceDiagnosticsService(logger);
   }
 
   private constructor(private readonly logger: Pick<Logger, "warn">) {}

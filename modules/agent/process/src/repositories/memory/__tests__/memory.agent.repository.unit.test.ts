@@ -253,4 +253,31 @@ describe("MemoryAgentRepository", () => {
       workflowId: "workflow-new",
     });
   });
+
+  /** @scenario "The organization's agents read leaves out what does not belong on it" */
+  it("reads only live, recently seen connected agents in the projects asked about", async () => {
+    const repository = MemoryAgentRepository.create();
+    const other = (id: string) => ({
+      ...connected(id),
+      identity: { ...connected(id).identity, identityKey: id },
+    });
+    await repository.registerConnected(connected("a"));
+    await repository.registerConnected(connected("b", "project-b"));
+    await repository.registerConnected(connected("c", "project-c"));
+    await repository.registerConnected(other("archived"));
+    await repository.archive({ id: "archived", projectId: "project-a" });
+    await repository.registerConnected(other("stale"));
+    await repository.touchLastSeenAt({
+      id: "stale",
+      projectId: "project-a",
+      at: nowInstant().subtract({ milliseconds: 31 * 86_400_000 }),
+    });
+    await repository.create(agent("workflow"));
+
+    const found = await repository.findConnectedInProjects({
+      projectIds: ["project-a", "project-b"],
+    });
+
+    expect(found.map((row) => row.id).toSorted()).toEqual(["a", "b"]);
+  });
 });

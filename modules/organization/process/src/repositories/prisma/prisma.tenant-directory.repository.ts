@@ -68,29 +68,27 @@ export class PrismaTenantDirectoryRepository {
 
     return user !== null;
   }
-}
 
-/**
- * Binds Postgres to the routing directory, for a process that wants the
- * {@link TenantDirectory} shape without booting the whole organization
- * module. Replaces the deleted `PostgresTenantDirectoryAdapter` class.
- */
-export function bindTenantDirectoryReader(
-  database: PrismaClient,
-): TenantDirectory & TenantOwnershipReader {
-  const tenants = PrismaTenantDirectoryRepository.create();
-  const reader: TenantOwnershipReader = {
-    getProjectOrganizationId: (tenantId) =>
-      tenants.getProjectOrganizationId({ client: database, tenantId }),
-    organizationExists: (tenantId) => tenants.organizationExists({ client: database, tenantId }),
-    userExists: (tenantId) => tenants.userExists({ client: database, tenantId }),
-  };
-  const directory = TenantDirectoryService.create(reader);
-  return {
-    ...reader,
-    organizationForTenant: async (tenantId) => {
-      const placement = await directory.getTenantPlacement(tenantId);
-      return placement.kind === "placed" ? placement.organizationId : null;
-    },
-  };
+  /**
+   * Binds Postgres to the routing directory, for a process that wants the
+   * {@link TenantDirectory} shape without booting the whole organization
+   * module. Replaces the deleted `PostgresTenantDirectoryAdapter` class.
+   */
+  static bindReader(database: PrismaClient): TenantDirectory & TenantOwnershipReader {
+    const tenants = PrismaTenantDirectoryRepository.create();
+    const reader: TenantOwnershipReader = {
+      getProjectOrganizationId: (tenantId) =>
+        tenants.getProjectOrganizationId({ client: database, tenantId }),
+      organizationExists: (tenantId) => tenants.organizationExists({ client: database, tenantId }),
+      userExists: (tenantId) => tenants.userExists({ client: database, tenantId }),
+    };
+    const directory = TenantDirectoryService.create(reader);
+    return {
+      ...reader,
+      organizationForTenant: async (tenantId) => {
+        const placement = await directory.getTenantPlacement(tenantId);
+        return placement.kind === "placed" ? placement.organizationId : null;
+      },
+    };
+  }
 }

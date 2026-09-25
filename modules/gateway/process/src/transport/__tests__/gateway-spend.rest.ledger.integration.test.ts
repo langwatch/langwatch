@@ -18,7 +18,7 @@ import {
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
@@ -44,7 +44,7 @@ const USER_ID = `usr-${ns}`;
 const baseTime = Date.UTC(2026, 0, 10, 12, 0, 0);
 
 let client: ClickHouseClient;
-let repo: GatewaySpendEventsRepository;
+let repo: ClickHouseGatewaySpendEventsRepository;
 let budgets: GatewayBudgetClickHouseRepository;
 let app: ReturnType<typeof mountSpendFamily>;
 
@@ -89,7 +89,7 @@ function mountSpendFamily(spend: GatewaySpendApp) {
 }
 
 function buildApp(): void {
-  repo = new GatewaySpendEventsRepository(async () => client);
+  repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
   budgets = new GatewayBudgetClickHouseRepository(async () => client);
   const scope = PrismaGatewaySpendScopeRepository.create({ database: prisma });
   const refuse = () => {

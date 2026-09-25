@@ -1,21 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  GroupIdentityAdapter,
-  PersonalWorkspaceIdentityAdapter,
-  TeamIdentityAdapter,
-} from "../resource-identifiers.service.ts";
+import { GroupIdentityService } from "../group-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../personal-workspace-identity.service.ts";
+import { TeamIdentityService } from "../team-identity.service.ts";
 
 /**
  * Every value asserted below is written into a row the customer then owns,
  * so each assertion pins a persisted format — the KSUID prefixes are what
  * the platform application has always minted; a second root must match.
  */
-describe("PersonalWorkspaceIdentityAdapter", () => {
+describe("PersonalWorkspaceIdentityService", () => {
   describe("when a personal workspace is created", () => {
     /** @scenario "A personal workspace is born with packaged identifiers" */
     it("mints the resource-prefixed identifiers the platform has always written", () => {
-      const resources = PersonalWorkspaceIdentityAdapter.create().create({
+      const resources = PersonalWorkspaceIdentityService.create().create({
         userId: "USER_ABCDEFGHIJKLMNOP",
         organizationId: "organization_1",
       });
@@ -28,7 +26,7 @@ describe("PersonalWorkspaceIdentityAdapter", () => {
 
     /** @scenario "A personal workspace is born with packaged identifiers" */
     it("seeds both slugs from the lower-cased first twelve characters of the user id", () => {
-      const resources = PersonalWorkspaceIdentityAdapter.create().create({
+      const resources = PersonalWorkspaceIdentityService.create().create({
         userId: "USER_ABCDEFGHIJKLMNOP",
         organizationId: "organization_1",
       });
@@ -39,7 +37,7 @@ describe("PersonalWorkspaceIdentityAdapter", () => {
 
     /** @scenario "A personal workspace is born with packaged identifiers" */
     it("gives the team and the project separate slugs", () => {
-      const resources = PersonalWorkspaceIdentityAdapter.create().create({
+      const resources = PersonalWorkspaceIdentityService.create().create({
         userId: "user_1",
         organizationId: "organization_1",
       });
@@ -49,7 +47,7 @@ describe("PersonalWorkspaceIdentityAdapter", () => {
 
     /** @scenario "A personal workspace is born with packaged identifiers" */
     it("mints a distinct set for every call", () => {
-      const adapter = PersonalWorkspaceIdentityAdapter.create();
+      const adapter = PersonalWorkspaceIdentityService.create();
       const input = { userId: "user_1", organizationId: "organization_1" };
 
       const first = adapter.create(input);
@@ -63,25 +61,25 @@ describe("PersonalWorkspaceIdentityAdapter", () => {
   });
 });
 
-describe("TeamIdentityAdapter", () => {
+describe("TeamIdentityService", () => {
   describe("when a shared team is created", () => {
     /** @scenario "A shared team is born with packaged identifiers" */
     it("mints the nanoid team id shape the Team rows already carry", () => {
-      const { teamId } = TeamIdentityAdapter.create().createTeam({ name: "Platform" });
+      const { teamId } = TeamIdentityService.create().createTeam({ name: "Platform" });
 
       expect(teamId).toMatch(/^team_[A-Za-z0-9_-]{21}$/);
     });
 
     /** @scenario "A shared team is born with packaged identifiers" */
     it("suffixes the slug with the first eleven characters of the team id", () => {
-      const { teamId, slug } = TeamIdentityAdapter.create().createTeam({ name: "Platform" });
+      const { teamId, slug } = TeamIdentityService.create().createTeam({ name: "Platform" });
 
       expect(slug).toBe(`platform-${teamId.substring(0, 11)}`);
     });
 
     /** @scenario "A team or group slug survives a URL" */
     it("reduces separators, accents and symbols to a single dash-joined ASCII word", () => {
-      const { teamId, slug } = TeamIdentityAdapter.create().createTeam({
+      const { teamId, slug } = TeamIdentityService.create().createTeam({
         name: "Crème_Brûlée: R&D?",
       });
 
@@ -92,7 +90,7 @@ describe("TeamIdentityAdapter", () => {
   describe("when a role binding is minted for a team", () => {
     /** @scenario "A shared team is born with packaged identifiers" */
     it("uses the same rolebinding resource every other binding carries", () => {
-      const adapter = TeamIdentityAdapter.create();
+      const adapter = TeamIdentityService.create();
 
       expect(adapter.createBindingId()).toMatch(/^rolebinding_/);
       expect(adapter.createBindingId()).not.toBe(adapter.createBindingId());
@@ -100,11 +98,11 @@ describe("TeamIdentityAdapter", () => {
   });
 });
 
-describe("GroupIdentityAdapter", () => {
+describe("GroupIdentityService", () => {
   describe("when a group is created", () => {
     /** @scenario "An organization group is born with packaged identifiers" */
     it("mints a group-prefixed KSUID", () => {
-      const adapter = GroupIdentityAdapter.create();
+      const adapter = GroupIdentityService.create();
 
       expect(adapter.createGroupId()).toMatch(/^group_/);
       expect(adapter.createGroupId()).not.toBe(adapter.createGroupId());
@@ -112,21 +110,21 @@ describe("GroupIdentityAdapter", () => {
 
     /** @scenario "An organization group is born with packaged identifiers" */
     it("mints role bindings under the shared rolebinding resource", () => {
-      expect(GroupIdentityAdapter.create().createBindingId()).toMatch(/^rolebinding_/);
+      expect(GroupIdentityService.create().createBindingId()).toMatch(/^rolebinding_/);
     });
 
     /** @scenario "A team or group slug survives a URL" */
     it("returns a base slug with no identifier tail for the service to disambiguate", () => {
-      expect(GroupIdentityAdapter.create().slugify("Crème_Brûlée: R&D?")).toBe("creme-brulee-r-d");
+      expect(GroupIdentityService.create().slugify("Crème_Brûlée: R&D?")).toBe("creme-brulee-r-d");
     });
 
     /** @scenario "A team or group slug survives a URL" */
     it("slugs a name identically for a group and for a team", () => {
-      const { teamId, slug } = TeamIdentityAdapter.create().createTeam({
+      const { teamId, slug } = TeamIdentityService.create().createTeam({
         name: "Platform Engineering",
       });
 
-      expect(GroupIdentityAdapter.create().slugify("Platform Engineering")).toBe(
+      expect(GroupIdentityService.create().slugify("Platform Engineering")).toBe(
         "platform-engineering",
       );
       expect(slug).toBe(`platform-engineering-${teamId.substring(0, 11)}`);

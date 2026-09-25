@@ -21,13 +21,11 @@ import { MemoryOrganizationMembershipRepository } from "../../repositories/memor
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import { MemoryTeamRepository } from "../../repositories/memory/memory.team.repository.ts";
+import { GroupIdentityService } from "../../services/group-identity.service.ts";
 import { OrganizationMembershipService } from "../../services/organization-membership.service.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
-import {
-  GroupIdentityAdapter,
-  PersonalWorkspaceIdentityAdapter,
-  TeamIdentityAdapter,
-} from "../../services/resource-identifiers.service.ts";
+import { PersonalWorkspaceIdentityService } from "../../services/personal-workspace-identity.service.ts";
+import { TeamIdentityService } from "../../services/team-identity.service.ts";
 import { TestAuthzApi } from "./support/test-authz-api.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import {
@@ -233,9 +231,9 @@ function application() {
     repository: MemoryOrganizationRepository.create({ memory }),
     teams: MemoryTeamRepository.create({ memory }),
     groups: MemoryGroupRepository.create({ memory }),
-    identities: PersonalWorkspaceIdentityAdapter.create(),
-    teamIdentities: TeamIdentityAdapter.create(),
-    groupIdentities: GroupIdentityAdapter.create(),
+    identities: PersonalWorkspaceIdentityService.create(),
+    teamIdentities: TeamIdentityService.create(),
+    groupIdentities: GroupIdentityService.create(),
     authz: permissions,
     grants: permissions,
     settingsSecrets: passthroughSecrets,

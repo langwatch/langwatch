@@ -12,7 +12,7 @@ import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewaySpendStore } from "../../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -58,7 +58,7 @@ describe.skipIf(!chUrl)("settlement on the spend record (real ClickHouse)", () =
 
   /** @scenario "The full settlement sequence: silent admission settles, a late confirmation supersedes" */
   it("folds admit, settle, then a late confirm superseding the settled row", async () => {
-    const repo = new GatewaySpendEventsRepository(async () => client!);
+    const repo = new ClickHouseGatewaySpendEventsRepository(async () => client!);
     const foldStore = GatewaySpendStore.create(repo);
     const projection = new GatewaySpendFoldProjection({ store: foldStore });
     const context = { tenantId: createTenantId(TENANT), aggregateId: REQUEST_ID };

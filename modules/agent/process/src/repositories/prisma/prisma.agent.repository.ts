@@ -286,6 +286,20 @@ export class PrismaAgentRepository
     return rows.map(mapAgentRow);
   }
 
+  async findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]> {
+    const rows = await this.prisma.agent.findMany({
+      where: {
+        projectId: { in: input.projectIds },
+        type: "connected",
+        archivedAt: null,
+        AND: [connectedAgentVisibleWhere()],
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return rows.map(mapAgentRow);
+  }
+
   async registerConnected(input: RegisterPersistedAgentInput): Promise<Agent> {
     const config = configSchema.parse(input.config);
     const lastSeenAt = new Date();

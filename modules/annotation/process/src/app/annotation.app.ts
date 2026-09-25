@@ -6,7 +6,7 @@ import {
   AnnotationAnnotatorReferenceInvalidError,
   AnnotationQueueMemberInvalidError,
   AnnotationScoreInvalidError,
-  resolveAnnotationSuggestionTarget,
+  findAnnotationSuggestionTargets,
   withReadableAnnotationAnchor,
   type Annotation,
   type CreateAnnotationInput,
@@ -501,8 +501,8 @@ export class AnnotationApp implements AnnotationApi {
     const previous = previousExpectedOutput ?? "";
     if (next === previous) return;
 
-    const target = resolveAnnotationSuggestionTarget(input);
-    if (target === null) return;
+    const [target] = findAnnotationSuggestionTargets(input);
+    if (!target) return;
 
     const mayUpdate = await this.#permissions.hasProjectPermission({
       userId: input.actorId,

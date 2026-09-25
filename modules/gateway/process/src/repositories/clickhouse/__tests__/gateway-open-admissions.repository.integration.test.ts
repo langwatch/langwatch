@@ -20,7 +20,7 @@ import type { GatewaySpendState } from "../../../eventing/gateway-spend.projecti
 import type { OpenAdmission } from "../../../repositories/gateway-open-admissions.repository.ts";
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../../rules/gateway-spend-settlement.rules.ts";
 import { ClickHouseGatewayOpenAdmissionsRepository } from "../clickhouse.gateway-open-admissions.repository.ts";
-import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -45,7 +45,7 @@ const HOUR = 60 * MINUTE;
 const SWEEP = { now: BASE + 2 * HOUR, graceMs: HOUR, lookbackMs: 3 * HOUR };
 
 let client: ClickHouseClient;
-let repo: GatewaySpendEventsRepository;
+let repo: ClickHouseGatewaySpendEventsRepository;
 let finder: ClickHouseGatewayOpenAdmissionsRepository;
 
 function foldState({
@@ -108,7 +108,7 @@ const ALREADY_SETTLED = id("already-settled");
 describe.skipIf(!chUrl)("open admissions on the spend record (real ClickHouse)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
-    repo = new GatewaySpendEventsRepository(async () => client);
+    repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
     finder = ClickHouseGatewayOpenAdmissionsRepository.create(client);
     // The superseded versions are the whole point of the dedup scenarios, and
     // a background merge collapses them on its own schedule — which would

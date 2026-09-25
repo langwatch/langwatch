@@ -1,7 +1,7 @@
 import type { GatewayUsageCount, SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 import type {
-  GatewaySpendEvents,
+  GatewaySpendEventsRepository,
   SpendBucket,
   SpendEventsPageCursor,
   SpendGroupByKey,
@@ -9,9 +9,9 @@ import type {
 } from "../repositories/gateway-spend-events.repository.ts";
 
 export class GatewaySpendEventsService {
-  private constructor(private readonly repository: GatewaySpendEvents) {}
+  private constructor(private readonly repository: GatewaySpendEventsRepository) {}
 
-  static create(repository: GatewaySpendEvents): GatewaySpendEventsService {
+  static create(repository: GatewaySpendEventsRepository): GatewaySpendEventsService {
     return new GatewaySpendEventsService(repository);
   }
 

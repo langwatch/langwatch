@@ -34,15 +34,13 @@ import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { GroupIdentityService } from "../services/group-identity.service.ts";
 import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
 import { InviteService } from "../services/invite.service.ts";
-import { PersonalWorkspaceDiagnosticsAdapter } from "../services/personal-workspace-diagnostics.service.ts";
-import {
-  GroupIdentityAdapter,
-  PersonalWorkspaceIdentityAdapter,
-  TeamIdentityAdapter,
-} from "../services/resource-identifiers.service.ts";
+import { PersonalWorkspaceDiagnosticsService } from "../services/personal-workspace-diagnostics.service.ts";
+import { PersonalWorkspaceIdentityService } from "../services/personal-workspace-identity.service.ts";
+import { TeamIdentityService } from "../services/team-identity.service.ts";
 import type { OrganizationInfrastructure } from "./organization.app.ts";
 import type {
   OrganizationCeremony,
@@ -599,14 +597,14 @@ export function buildOrganizationInfrastructure(input: {
   const baseHost = input.publicBaseUrl ?? "";
 
   return {
-    identities: PersonalWorkspaceIdentityAdapter.create(),
-    teamIdentities: TeamIdentityAdapter.create(),
-    groupIdentities: GroupIdentityAdapter.create(),
+    identities: PersonalWorkspaceIdentityService.create(),
+    teamIdentities: TeamIdentityService.create(),
+    groupIdentities: GroupIdentityService.create(),
     // An organization's stored settings and a project's stored secret are
     // encrypted by ONE algorithm under ONE key: the process's own cipher is
     // that key, so the settings this writes stay readable everywhere else.
     settingsSecrets: input.encryption,
-    diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
+    diagnostics: PersonalWorkspaceDiagnosticsService.create(logger),
     prompts: LoggedOrganizationPromptSeed.create({ processName: input.processName, logger }),
     seats: EntitlementOrganizationSeatLicense.create({
       plans: dependencies.entitlement,

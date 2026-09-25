@@ -60,11 +60,11 @@ function valueImports(source: string): string[] {
 const DECLARATION_SOURCES = [
   "contract/src/annotation.trpc.ts",
   "contract/src/annotation-score.trpc.ts",
-  "server/src/transport/annotation.trpc.ts",
-  "server/src/transport/annotation-score.trpc.ts",
-  "server/src/transport/annotation.rest.ts",
-  "web/src/behavior/annotation-api.ts",
-  "web/src/behavior/annotation-scores-api.ts",
+  "process/src/transport/annotation.trpc.ts",
+  "process/src/transport/annotation-score.trpc.ts",
+  "process/src/transport/annotation.rest.ts",
+  "browser/src/behavior/annotation-api.ts",
+  "browser/src/behavior/annotation-scores-api.ts",
 ];
 
 describe("the annotation tRPC declaration", () => {
@@ -167,12 +167,12 @@ describe("the annotation tRPC declaration", () => {
 
     /** @scenario "The browser derives its client from the contract" */
     it("writes no hand-rolled map for the namespaces the contract declares", () => {
-      const web = sourceOf("web/src/behavior/annotation-api.ts");
+      const web = sourceOf("browser/src/behavior/annotation-api.ts");
       expect(web).toContain("ContractApiMap<typeof annotationTrpc>");
       expect(web).toContain("ContractApiMap<typeof annotationScoreTrpc>");
       expect(web).not.toMatch(/AnnotationApiMap/);
 
-      expect(sourceOf("web/src/behavior/annotation-scores-api.ts")).not.toMatch(
+      expect(sourceOf("browser/src/behavior/annotation-scores-api.ts")).not.toMatch(
         /AnnotationScoresApiMap/,
       );
     });

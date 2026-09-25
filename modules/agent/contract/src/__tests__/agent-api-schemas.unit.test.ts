@@ -29,6 +29,11 @@ const validRequestFor: Record<string, Record<string, unknown>> = {
       sdk: { name: "langwatch", version: "1.0.0", language: "python" },
     },
   },
+  voice: {
+    name: "Receptionist",
+    type: "voice",
+    config: { transport: "elevenlabs_convai", agentId: "agent-1" },
+  },
 };
 
 describe("the Agents create schemas", () => {

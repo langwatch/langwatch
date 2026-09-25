@@ -122,7 +122,7 @@ export type TypedAgent = Agent & {
   _count?: { copiedAgents: number };
 };
 
-export function linkedWorkflowId(agent: Pick<Agent, "workflowId" | "config">): string | undefined {
-  if (agent.workflowId) return agent.workflowId;
-  return (agent.config as { workflow_id?: string }).workflow_id;
+export function findLinkedWorkflowIds(agent: Pick<Agent, "workflowId" | "config">): string[] {
+  const linked = agent.workflowId || (agent.config as { workflow_id?: string }).workflow_id;
+  return linked ? [linked] : [];
 }

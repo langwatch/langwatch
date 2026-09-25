@@ -4,28 +4,28 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { linkedWorkflowId } from "../agent.ts";
+import { findLinkedWorkflowIds } from "../agent.ts";
 
-describe("linkedWorkflowId", () => {
+describe("findLinkedWorkflowIds", () => {
   describe("when the agent row carries a workflowId", () => {
     it("prefers the column over the config", () => {
       expect(
-        linkedWorkflowId({
+        findLinkedWorkflowIds({
           workflowId: "wf_column",
           config: { name: "a", workflow_id: "wf_config" },
         }),
-      ).toBe("wf_column");
+      ).toEqual(["wf_column"]);
     });
   });
 
   describe("when only the config carries one", () => {
     it("falls back to the config, as older agents have no column", () => {
       expect(
-        linkedWorkflowId({
+        findLinkedWorkflowIds({
           workflowId: null,
           config: { name: "a", workflow_id: "wf_config" },
         }),
-      ).toBe("wf_config");
+      ).toEqual(["wf_config"]);
     });
   });
 });

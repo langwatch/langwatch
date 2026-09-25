@@ -2,7 +2,7 @@
   "name": "@langwatch/storage-seed",
   "version": "0.1.0",
   "private": true,
-  "description": "The idempotent local-dev / CI seed across this deployment's data stores (fixed-id Organization, Team, Project, admin User, API tokens) and its seed-only support modules. Prisma/Postgres is the only store it seeds today; the package is named and shaped to grow into ClickHouse/Redis seeding rather than staying Prisma-specific. Split out of prisma-client so the schema/client package can depend on it instead of the other way round: the seed's API-key hashing, license and AesGcmSecretEncryptionAdapter imports are what put prisma-client in a workspace cycle with those server packages.",
+  "description": "The idempotent local-dev / CI seed across this deployment's data stores (fixed-id Organization, Team, Project, admin User, API tokens) and its seed-only support modules. Prisma/Postgres is the only store it seeds today; the package is named and shaped to grow into ClickHouse/Redis seeding rather than staying Prisma-specific. Split out of prisma-client so the schema/client package can depend on it instead of the other way round: the seed's API-key hashing, license and AesGcmSecretEncryptionService imports are what put prisma-client in a workspace cycle with those server packages.",
   "license": "MIT",
   "type": "module",
   "scripts": {

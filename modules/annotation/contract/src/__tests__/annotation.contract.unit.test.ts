@@ -5,7 +5,7 @@ import {
   annotationAnchorColumnsSchema,
   createAnnotationInputSchema,
   readableAnnotationAnchor,
-  resolveAnnotationSuggestionTarget,
+  findAnnotationSuggestionTargets,
 } from "../index.ts";
 
 describe("annotation contract", () => {
@@ -39,21 +39,21 @@ describe("annotation contract", () => {
 
   it("resolves suggestions only to supported trace or span IO fields", () => {
     expect(
-      resolveAnnotationSuggestionTarget({
+      findAnnotationSuggestionTargets({
         traceId: "trace-1",
         anchorKind: "field",
         anchorId: "span-1",
         anchorPath: "output",
       }),
-    ).toEqual({ kind: "span", spanId: "span-1", field: "output" });
+    ).toEqual([{ kind: "span", spanId: "span-1", field: "output" }]);
 
     expect(
-      resolveAnnotationSuggestionTarget({
+      findAnnotationSuggestionTargets({
         traceId: "trace-1",
         anchorKind: "message",
         anchorId: "trace-1",
         anchorPath: "message-1",
       }),
-    ).toBeNull();
+    ).toEqual([]);
   });
 });

@@ -57,6 +57,7 @@ export interface AgentRepository {
   updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void>;
   findConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]>;
   findConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]>;
+  findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
   registerConnected(input: RegisterPersistedAgentInput): Promise<Agent>;
   touchLastSeenAt(input: AgentPresenceInput): Promise<void>;
 }

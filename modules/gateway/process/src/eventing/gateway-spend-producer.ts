@@ -1,4 +1,4 @@
-import { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
+import { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 /**
  * One pipeline definition, two registrations. A producer takes only the command
  * dispatchers — passing no process managers here is load-bearing: mounting any
@@ -18,7 +18,7 @@ function producerOnly(processName: string, capability: string): Error {
  * a real read here means the graph wired the reconciliation door to this
  * stand-in instead of the real ledger, worth failing loudly.
  */
-class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
+class ProducerOnlyGatewaySpendEvents extends GatewaySpendEventsRepository {
   constructor(private readonly processName: string) {
     super();
   }

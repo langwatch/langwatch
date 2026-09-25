@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   annotationAnchorColumnsSchema,
   readableAnnotationAnchor,
-  resolveAnnotationSuggestionTarget,
+  findAnnotationSuggestionTargets,
   withReadableAnnotationAnchor,
 } from "../index.ts";
 
@@ -65,23 +65,21 @@ describe("the anchor a comment is written with", () => {
 
   describe("given half an anchor", () => {
     it("refuses a kind with nothing named", () => {
-      expect(anchorInput.safeParse({ anchorKind: "span" }).success).toBe(false);
+      expect(anchorInput.validate({ anchorKind: "span" })).toBe(false);
     });
 
     it("refuses a named part with no kind", () => {
-      expect(anchorInput.safeParse({ anchorId: "span-1" }).success).toBe(false);
+      expect(anchorInput.validate({ anchorId: "span-1" })).toBe(false);
     });
 
     it("refuses a path with no kind", () => {
-      expect(anchorInput.safeParse({ anchorPath: "output" }).success).toBe(false);
+      expect(anchorInput.validate({ anchorPath: "output" })).toBe(false);
     });
   });
 
   describe("given a kind that is not a part of a trace", () => {
     it("refuses it on the way in", () => {
-      expect(anchorInput.safeParse({ anchorKind: "gizmo", anchorId: "whatever" }).success).toBe(
-        false,
-      );
+      expect(anchorInput.validate({ anchorKind: "gizmo", anchorId: "whatever" })).toBe(false);
     });
   });
 });
@@ -148,23 +146,22 @@ describe("where a suggestion left with a comment belongs", () => {
 
   describe("given a comment about the whole trace", () => {
     it("corrects the trace output", () => {
-      expect(resolveAnnotationSuggestionTarget({ traceId })).toEqual({
-        kind: "trace",
-        field: "output",
-      });
+      expect(findAnnotationSuggestionTargets({ traceId })).toEqual([
+        { kind: "trace", field: "output" },
+      ]);
     });
   });
 
   describe("given a comment on the trace's own output", () => {
     it("corrects the trace output", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: traceId,
           anchorPath: "output",
         }),
-      ).toEqual({ kind: "trace", field: "output" });
+      ).toEqual([{ kind: "trace", field: "output" }]);
     });
   });
 
@@ -172,94 +169,94 @@ describe("where a suggestion left with a comment belongs", () => {
     /** @scenario "A suggestion on the trace's own input becomes the corrected trace input" */
     it("corrects the trace input", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: traceId,
           anchorPath: "input",
         }),
-      ).toEqual({ kind: "trace", field: "input" });
+      ).toEqual([{ kind: "trace", field: "input" }]);
     });
   });
 
   describe("given a comment on a span's field", () => {
     it("corrects that field of that span", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: "span-1",
           anchorPath: "output",
         }),
-      ).toEqual({ kind: "span", spanId: "span-1", field: "output" });
+      ).toEqual([{ kind: "span", spanId: "span-1", field: "output" }]);
     });
 
     it("corrects the input when the comment is on the input", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: "span-1",
           anchorPath: "input",
         }),
-      ).toEqual({ kind: "span", spanId: "span-1", field: "input" });
+      ).toEqual([{ kind: "span", spanId: "span-1", field: "input" }]);
     });
   });
 
   describe("given an anchor with nothing for a suggestion to correct", () => {
     it("carries no correction for an attribute row", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: "span-1",
           anchorPath: "params.temperature",
         }),
-      ).toBeNull();
+      ).toEqual([]);
     });
 
     it("carries no correction for a message", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "message",
           anchorId: traceId,
           anchorPath: "assistant-2-9f1c",
         }),
-      ).toBeNull();
+      ).toEqual([]);
     });
 
     it("carries no correction for a whole span", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "span",
           anchorId: "span-1",
         }),
-      ).toBeNull();
+      ).toEqual([]);
     });
 
     it("carries no correction for a trace field other than its input or output", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "field",
           anchorId: traceId,
           anchorPath: "metadata.environment",
         }),
-      ).toBeNull();
+      ).toEqual([]);
     });
   });
 
   describe("given an anchor this build does not recognise", () => {
     it("corrects the trace output, the same way the comment reads", () => {
       expect(
-        resolveAnnotationSuggestionTarget({
+        findAnnotationSuggestionTargets({
           traceId,
           anchorKind: "gizmo",
           anchorId: "gizmo-1",
         }),
-      ).toEqual({ kind: "trace", field: "output" });
+      ).toEqual([{ kind: "trace", field: "output" }]);
     });
   });
 });

@@ -223,9 +223,9 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
           new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
       })
       .withMiddleware(projectRestFacts, agentTraceparent)
-      .handle(({ app, input, scope, signal }, facts, header) =>
+      .handle(({ app, input: { agentId, ...turn }, scope, signal }, facts, header) =>
         app.call(
-          { ...input, id: input.agentId, projectId: scope.id },
+          { ...turn, id: agentId, projectId: scope.id },
           { viewerUserId: facts.viewerUserId, traceparent: header, signal },
         ),
       )

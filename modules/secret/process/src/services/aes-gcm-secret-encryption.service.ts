@@ -6,7 +6,7 @@ import type { SecretEncryption } from "../app/secret.app.ts";
  * Stores AES-256-GCM as hex `iv:ciphertext:authTag`; keep compatible with
  * platform/app/src/utils/encryption.ts.
  */
-export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
+export class AesGcmSecretEncryptionService implements SecretEncryption {
   private static readonly ALGORITHM = "aes-256-gcm";
   private static readonly KEY_BYTES = 32;
   private static readonly IV_BYTES = 12;
@@ -15,20 +15,20 @@ export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
    * Validate at construction so a bad or rotated key fails boot instead of the
    * first customer request.
    */
-  static create(options: { key: string }): AesGcmSecretEncryptionAdapter {
+  static create(options: { key: string }): AesGcmSecretEncryptionService {
     const key = new Uint8Array(Buffer.from(options.key, "hex"));
-    if (key.length !== AesGcmSecretEncryptionAdapter.KEY_BYTES) {
+    if (key.length !== AesGcmSecretEncryptionService.KEY_BYTES) {
       throw new Error("Stored-secret encryption requires a 32-byte hex key.");
     }
-    return new AesGcmSecretEncryptionAdapter(key);
+    return new AesGcmSecretEncryptionService(key);
   }
 
   private constructor(private readonly key: Uint8Array) {}
 
   encrypt(value: string): string {
-    const iv = randomBytes(AesGcmSecretEncryptionAdapter.IV_BYTES);
+    const iv = randomBytes(AesGcmSecretEncryptionService.IV_BYTES);
     const cipher = createCipheriv(
-      AesGcmSecretEncryptionAdapter.ALGORITHM,
+      AesGcmSecretEncryptionService.ALGORITHM,
       this.key,
       new Uint8Array(iv),
     );
@@ -52,7 +52,7 @@ export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
 
     try {
       const decipher = createDecipheriv(
-        AesGcmSecretEncryptionAdapter.ALGORITHM,
+        AesGcmSecretEncryptionService.ALGORITHM,
         this.key,
         new Uint8Array(Buffer.from(ivHex, "hex")),
       );

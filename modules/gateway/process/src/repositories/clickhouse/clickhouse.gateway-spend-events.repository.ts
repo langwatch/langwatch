@@ -23,7 +23,7 @@ import {
 } from "../../eventing/gateway-spend-commands.process.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
-  GatewaySpendEvents,
+  GatewaySpendEventsRepository,
   type SpendBucket,
   type SpendEventsPageCursor,
   type SpendGroupByKey,
@@ -77,9 +77,9 @@ interface SummaryDimension {
 const spendFilters = GatewaySpendFiltersAdapter.create();
 const spendGrouping = GatewaySpendGroupingAdapter.create();
 
-export class GatewaySpendEventsRepository extends GatewaySpendEvents {
-  static create(resolveClient: GatewayClickHouseResolver): GatewaySpendEventsRepository {
-    return new GatewaySpendEventsRepository(resolveClient);
+export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRepository {
+  static create(resolveClient: GatewayClickHouseResolver): ClickHouseGatewaySpendEventsRepository {
+    return new ClickHouseGatewaySpendEventsRepository(resolveClient);
   }
 
   constructor(private readonly resolveClient: GatewayClickHouseResolver) {
@@ -101,7 +101,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     if (entries.length === 0) return;
     const tenantId = entries[0]!.tenantId;
     if (entries.some((e) => e.tenantId !== tenantId)) {
-      throw new Error("GatewaySpendEventsRepository.upsertFromFold: entries span multiple tenants");
+      throw new Error(
+        "ClickHouseGatewaySpendEventsRepository.upsertFromFold: entries span multiple tenants",
+      );
     }
     const client = await this.resolveClient(tenantId);
     const records = entries.map(({ gatewayRequestId, state }) => ({
@@ -120,7 +122,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       HttpStatus: state.httpStatus,
       NeedsReconciliation: state.needsReconciliation ? 1 : 0,
       SettleReason: state.settleReason,
-      ...GatewaySpendEventsRepository.usageColumns(state.usage),
+      ...ClickHouseGatewaySpendEventsRepository.usageColumns(state.usage),
       CostNanoUSD: state.costNanoUsd,
       RateVersion: state.rateVersion,
       Labels: state.labels,
@@ -184,8 +186,8 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
       return null;
     }
-    const row = GatewaySpendEventsRepository.mapSpendEventRow(r);
-    const usage = GatewaySpendEventsRepository.foldUsage(row, r);
+    const row = ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(r);
+    const usage = ClickHouseGatewaySpendEventsRepository.foldUsage(row, r);
     return {
       status: row.status,
       organizationId: row.organizationId,
@@ -268,7 +270,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Record<string, unknown>[];
-    const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
+    const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = rows[rows.length - 1];
     return {
       rows,
@@ -311,7 +313,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Record<string, unknown>[];
-    return raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
+    return raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
   }
 
   /**
@@ -338,12 +340,13 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     const client = await this.resolveClient(tenantIds[0]!);
     const decoded = cursor ? spendCursors.decodeSpendEventsCursor(cursor) : null;
 
-    const { clauses, params: filterParams } = GatewaySpendEventsRepository.spendEventsWalkFilter({
-      decoded,
-      fromMs,
-      toMs,
-      filters,
-    });
+    const { clauses, params: filterParams } =
+      ClickHouseGatewaySpendEventsRepository.spendEventsWalkFilter({
+        decoded,
+        fromMs,
+        toMs,
+        filters,
+      });
     const params: Record<string, unknown> = {
       tenantIds,
       limit,
@@ -363,7 +366,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
       format: "JSONEachRow",
     });
     const raw = (await result.json()) as Record<string, unknown>[];
-    const rows = raw.map((row) => GatewaySpendEventsRepository.mapSpendEventRow(row));
+    const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));
     const last = raw[raw.length - 1];
     return {
       rows,
@@ -419,11 +422,14 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     const client = await this.resolveClient(tenantIds[0]!);
 
     const params: Record<string, unknown> = { tenantIds, fromMs, toMs, limit };
-    const dimensions = GatewaySpendEventsRepository.summaryDimensions({ groupBy, bucket });
+    const dimensions = ClickHouseGatewaySpendEventsRepository.summaryDimensions({
+      groupBy,
+      bucket,
+    });
     if (bucket !== "none") params.timezone = timezone;
 
     const clauses: string[] = [];
-    const walk = GatewaySpendEventsRepository.summariesWalkClause({
+    const walk = ClickHouseGatewaySpendEventsRepository.summariesWalkClause({
       cursor: cursor ? spendCursors.decodeSpendSummariesCursor(cursor) : null,
       dimensions,
     });
@@ -483,7 +489,7 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
         ? spendCursors.encodeSpendSummariesCursor(dimensions.map((d) => asString(last[d.alias])))
         : null;
     const rows = raw.map((r) =>
-      GatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
+      ClickHouseGatewaySpendEventsRepository.mapSummaryRow({ raw: r, groupBy, bucket }),
     );
     return { rows, nextCursor };
   }
@@ -780,23 +786,25 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
     const nano = parseSummedNanoUsd(raw.CostNanoUSD);
     const group: Record<string, string> = {};
     for (const [index, key] of groupBy.entries()) {
-      group[key] = GatewaySpendEventsRepository.grouped(raw, `GroupKey${index}`);
+      group[key] = ClickHouseGatewaySpendEventsRepository.grouped(raw, `GroupKey${index}`);
     }
     return {
-      key: GatewaySpendEventsRepository.grouped(raw, "GroupKey0"),
+      key: ClickHouseGatewaySpendEventsRepository.grouped(raw, "GroupKey0"),
       group,
       bucketStart:
-        bucket === "none" ? null : GatewaySpendEventsRepository.grouped(raw, "GroupBucket"),
-      eventCount: GatewaySpendEventsRepository.summed(raw, "EventCount"),
-      settledCount: GatewaySpendEventsRepository.summed(raw, "SettledCount"),
-      tokensInput: GatewaySpendEventsRepository.summed(raw, "TokensInput"),
-      tokensOutput: GatewaySpendEventsRepository.summed(raw, "TokensOutput"),
-      tokensCacheRead: GatewaySpendEventsRepository.summed(raw, "TokensCacheRead"),
-      tokensCacheWrite: GatewaySpendEventsRepository.summed(raw, "TokensCacheWrite"),
-      tokensReasoning: GatewaySpendEventsRepository.summed(raw, "TokensReasoning"),
-      tokensInputImage: GatewaySpendEventsRepository.summed(raw, "TokensInputImage"),
-      tokensOutputImage: GatewaySpendEventsRepository.summed(raw, "TokensOutputImage"),
-      imageCount: GatewaySpendEventsRepository.summed(raw, "ImageCount"),
+        bucket === "none"
+          ? null
+          : ClickHouseGatewaySpendEventsRepository.grouped(raw, "GroupBucket"),
+      eventCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "EventCount"),
+      settledCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "SettledCount"),
+      tokensInput: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensInput"),
+      tokensOutput: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensOutput"),
+      tokensCacheRead: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensCacheRead"),
+      tokensCacheWrite: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensCacheWrite"),
+      tokensReasoning: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensReasoning"),
+      tokensInputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensInputImage"),
+      tokensOutputImage: ClickHouseGatewaySpendEventsRepository.summed(raw, "TokensOutputImage"),
+      imageCount: ClickHouseGatewaySpendEventsRepository.summed(raw, "ImageCount"),
       costNanoUsd: nano,
       costUsd: nanoUsdToDecimalString(nano),
     };

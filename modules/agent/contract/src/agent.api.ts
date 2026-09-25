@@ -145,6 +145,8 @@ export interface AgentApi {
     environment: string;
   }): Promise<Agent[]>;
   getConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]>;
+  /** Unarchived, recently seen connected agents in these projects, newest registration first. */
+  findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
   testTurn(input: {
     id: string;
     projectId: string;

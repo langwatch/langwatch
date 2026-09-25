@@ -129,6 +129,10 @@ export class AgentService {
     return this.#repository.findConnectedByName(input);
   }
 
+  findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]> {
+    return this.#repository.findConnectedInProjects(input);
+  }
+
   touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
     return this.#repository.touchLastSeenAt(input);
   }

@@ -86,7 +86,7 @@ export type {
 export * from "./services/fixed-gateway-settlement-policy.service.ts";
 export { GatewayBudgetClickHouseRepository } from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export * from "./eventing/gateway-spend.intent.ts";
-export { GatewaySpendEventsRepository } from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+export { ClickHouseGatewaySpendEventsRepository } from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 export * from "./rules/gateway-spend-cursor.rules.ts";
 export * from "./services/gateway-budget-dto.service.ts";
 export * from "./services/gateway-virtual-key-dto.service.ts";

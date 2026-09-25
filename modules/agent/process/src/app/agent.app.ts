@@ -5,7 +5,7 @@ import {
   type UpdateAgentWorkflowConfigInput,
   agentServerConfig,
   type AgentServerConfig,
-  linkedWorkflowId,
+  findLinkedWorkflowIds,
   type Agent,
   type AgentWithFields,
   type AgentProjectInput,
@@ -145,7 +145,10 @@ export class AgentApp implements AgentApi {
 
   private constructor({ repositories, dependencies, members, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
-    this.#copies = AgentCopyService.create(repositories.agents, dependencies.workflows);
+    this.#copies = AgentCopyService.create({
+      repository: repositories.agents,
+      workflows: dependencies.workflows,
+    });
     this.#publicBaseUrl = members.publicBaseUrl ?? "";
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
@@ -245,19 +248,20 @@ export class AgentApp implements AgentApi {
   getConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]> {
     return this.#agents.getConnectedByName(input);
   }
+  findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]> {
+    return this.#agents.findConnectedInProjects(input);
+  }
   getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]> {
     return this.#agents.getConnectedByNameAndEnvironment(input);
   }
 
   async relatedEntities(input: GetAgentInput): Promise<RelatedAgentEntities> {
     const agent = await this.#agents.getById(input);
-    const workflowId = linkedWorkflowId(agent);
-    const workflows = workflowId
-      ? await this.#workflows.listSummaries({
-          projectId: input.projectId,
-          workflowIds: [workflowId],
-        })
-      : [];
+    const workflowIds = findLinkedWorkflowIds(agent);
+    const workflows =
+      workflowIds.length > 0
+        ? await this.#workflows.listSummaries({ projectId: input.projectId, workflowIds })
+        : [];
     return { workflow: workflows[0] ?? null };
   }
 
@@ -268,7 +272,7 @@ export class AgentApp implements AgentApi {
     } | null;
   }> {
     const agent = await this.#agents.getById(input);
-    const workflowId = linkedWorkflowId(agent);
+    const [workflowId] = findLinkedWorkflowIds(agent);
     const archivedWorkflow = workflowId
       ? await this.#workflows.archiveLinked({ workflowId, projectId: input.projectId })
       : null;
@@ -527,20 +531,17 @@ export class AgentApp implements AgentApi {
   }
 
   async #withFields(agent: Agent): Promise<AgentWithFields> {
-    const workflowId = linkedWorkflowId(agent);
-    const fields = workflowId
-      ? await this.#workflows.listFields({ projectId: agent.projectId, workflowIds: [workflowId] })
-      : {};
+    const workflowIds = findLinkedWorkflowIds(agent);
+    const fields =
+      workflowIds.length > 0
+        ? await this.#workflows.listFields({ projectId: agent.projectId, workflowIds })
+        : {};
     return agentWithResolvedFields(agent, fields);
   }
 
   async #enrich(agents: Agent[], input: AgentProjectInput & { viewerUserId?: string | null }) {
     const owned = agents.map((agent) => ({ ...agent, ownerUserId: agent.ownerUserId ?? null }));
-    const workflowIds = [
-      ...new Set(
-        agents.flatMap((agent) => (linkedWorkflowId(agent) ? [linkedWorkflowId(agent)!] : [])),
-      ),
-    ];
+    const workflowIds = [...new Set(agents.flatMap((agent) => findLinkedWorkflowIds(agent)))];
     const [owners, presence, fields] = await Promise.all([
       this.ownersOf(owned),
       this.#connected?.listPresence({ projectId: input.projectId, agents }) ??

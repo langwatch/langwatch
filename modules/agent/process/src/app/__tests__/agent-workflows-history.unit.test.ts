@@ -1,11 +1,13 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
-import { createLogger } from "@langwatch/observability";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
+import { AgentCopyService } from "../../services/agent-copy.service.ts";
 import { agentWorkflowCopyFixture, createAgentAppFixture } from "./agent.fixture.ts";
 
 const reference = { id: "agent_1", projectId: "project_1" };
@@ -278,7 +280,6 @@ describe("AgentApp workflow and audit ownership", () => {
         sourceProjectId: "project_1",
         targetProjectId: "project_2",
         copiedFromWorkflowId: "workflow_1",
-        authorId: "user_1",
       },
       { id: "user_1" },
     );
@@ -312,29 +313,26 @@ describe("AgentApp workflow and audit ownership", () => {
   /** @scenario "Failed persistence compensates the graph copy" */
   it("logs a failed graph cleanup without replacing the original persistence failure", async () => {
     const rollbackError = new Error("workflow cleanup refused");
-    const { app, repositories } = createAgentAppFixture({
+    const repositories = MemoryAgentRepositories.create();
+    const { logger, lines } = createTestLogger();
+    const copies = AgentCopyService.create({
+      repository: repositories.agents,
       workflows: createApiFixture<WorkflowApi>({
         copy: async () => agentWorkflowCopyFixture(),
         deleteUncommitted: async () => {
           throw rollbackError;
         },
       }),
+      logger,
     });
     await repositories.agents.create(workflowAgent);
     const failure = new Error("agent row rejected");
     vi.spyOn(repositories.agents, "create").mockRejectedValueOnce(failure);
-    const logged = vi
-      .spyOn(createLogger("langwatch:agent:copy"), "error")
-      .mockImplementation(() => {});
-    try {
-      await expect(app.copy(copyInput)).rejects.toBe(failure);
-      expect(logged).toHaveBeenCalledWith(
-        { error: rollbackError, workflowId: "workflow_copy" },
-        "Failed to remove uncommitted workflow copy",
-      );
-      expect(await repositories.agents.findAll({ projectId: "project_2" })).toEqual([]);
-    } finally {
-      logged.mockRestore();
-    }
+
+    await expect(copies.copy(copyInput)).rejects.toBe(failure);
+    expect(lines.findLine("error", "Failed to remove uncommitted workflow copy")).toMatchObject({
+      workflowId: "workflow_copy",
+    });
+    expect(await repositories.agents.findAll({ projectId: "project_2" })).toEqual([]);
   });
 });

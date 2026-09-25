@@ -7,7 +7,7 @@ import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
@@ -172,7 +172,7 @@ export type GatewayControlPlane = GatewayAppDependencies &
     internalChanges: PrismaGatewayChangeEventsRepository;
     internalScopeResolution: GatewayScopeResolutionService;
     /** The spend ledger the gateway_spend fold writes, over the same routing client. */
-    spendLedger: GatewaySpendEventsRepository;
+    spendLedger: ClickHouseGatewaySpendEventsRepository;
   }>;
 
 /**
@@ -211,7 +211,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
 
   const budgetSpend = GatewayBudgetClickHouseRepository.create(resolveClickHouse);
   const virtualKeySpend = GatewayVirtualKeySpendRepository.create(resolveClickHouse);
-  const spendLedger = GatewaySpendEventsRepository.create(resolveClickHouse);
+  const spendLedger = ClickHouseGatewaySpendEventsRepository.create(resolveClickHouse);
   const spendEvents = GatewaySpendEventsService.create(spendLedger);
 
   const budgetDecisions = PrismaGatewayAdapter.create({

@@ -28,10 +28,8 @@ describe("the frame contract", () => {
         },
         agents: [{ name: "support-agent", environment: "development" }],
       };
-      expect(registerFrameSchema.safeParse(frame).success).toBe(false);
-      expect(registerFrameSchema.safeParse({ ...frame, protocol: PROTOCOL_VERSION }).success).toBe(
-        true,
-      );
+      expect(registerFrameSchema.validate(frame)).toBe(false);
+      expect(registerFrameSchema.validate({ ...frame, protocol: PROTOCOL_VERSION })).toBe(true);
     });
   });
 
@@ -45,15 +43,15 @@ describe("the frame contract", () => {
         output: "hello",
         error: { code: "boom", message: "it broke" },
       };
-      expect(resultFrameSchema.safeParse(both).success).toBe(false);
-      expect(resultFrameSchema.safeParse({ ...both, error: undefined }).success).toBe(true);
-      expect(resultFrameSchema.safeParse({ ...both, output: undefined }).success).toBe(true);
+      expect(resultFrameSchema.validate(both)).toBe(false);
+      expect(resultFrameSchema.validate({ ...both, error: undefined })).toBe(true);
+      expect(resultFrameSchema.validate({ ...both, output: undefined })).toBe(true);
       expect(
-        resultFrameSchema.safeParse({
+        resultFrameSchema.validate({
           type: "result",
           protocol: PROTOCOL_VERSION,
           callId: "call_1",
-        }).success,
+        }),
       ).toBe(false);
     });
   });
