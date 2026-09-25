@@ -14,6 +14,7 @@ const NAMESPACE_EXCEPTIONS = {
   langy: "langy",
   licensing: "licensing",
   ops: "ops",
+  "enterprise-ops": "enterprise-ops",
   presence: "presence",
   saas: "saas",
   scim: "scim",

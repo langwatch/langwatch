@@ -57,6 +57,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   workflow: "workflows",
   "audit-log": "audit-logs",
   billing: "billing",
+  "enterprise-ops": "enterprise-ops",
   governance: "governance",
   licensing: "licensing",
   "managed-provider": "managed-providers",
