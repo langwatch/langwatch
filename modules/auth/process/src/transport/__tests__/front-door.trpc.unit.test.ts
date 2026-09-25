@@ -51,6 +51,7 @@ const door: AuthApi = {
   revokeCliTokens: () => unreached("revokeCliTokens"),
   listBrowserSessions: () => unreached("listBrowserSessions"),
   endBrowserSession: () => unreached("endBrowserSession"),
+  endBrowserSessionsForIdentifier: () => unreached("endBrowserSessionsForIdentifier"),
   revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
   revokeBrowserSession: () => unreached("revokeBrowserSession"),
   revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),

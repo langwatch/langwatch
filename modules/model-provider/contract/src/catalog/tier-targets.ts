@@ -4,7 +4,7 @@ import { findAliasTarget } from "./latest-aliases.ts";
 import { llmModels } from "./model-catalog.ts";
 import type { LLMModelEntry } from "./model-catalog.types.ts";
 
-const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
+export const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
 type ModelTier = (typeof MODEL_TIERS)[number];
 
 function isModelTier(name: string): name is ModelTier {

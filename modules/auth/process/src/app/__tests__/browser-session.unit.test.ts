@@ -395,6 +395,44 @@ describe("BrowserSessionService", () => {
       ).resolves.toEqual({ ended: 1 });
       expect(sessions.deletedById).toHaveBeenCalledWith({ id: "session-1" });
     });
+
+    const mintedByTwoMethods = () => {
+      const sessions = new Sessions();
+      sessions.records = [
+        record({ id: "session-1", identifierId: "identifier-1" }),
+        record({ id: "session-2", identifierId: "identifier-2" }),
+        record({ id: "session-3", identifierId: "identifier-1" }),
+      ];
+      return sessions;
+    };
+
+    /** @scenario "Ending the sessions one sign-in method minted leaves the others alone" */
+    it("ends the sessions one identifier minted and keeps the rest", async () => {
+      const sessions = mintedByTwoMethods();
+      const { service: subject } = service({ sessions });
+
+      await expect(
+        subject.endBrowserSessionsForIdentifier({ userId: "user-1", identifierId: "identifier-1" }),
+      ).resolves.toEqual({ ended: 2 });
+      expect(sessions.deletedById.mock.calls).toEqual([
+        [{ id: "session-1" }],
+        [{ id: "session-3" }],
+      ]);
+    });
+
+    /** @scenario "Ending sessions for a sign-in method that is not yours ends nothing" */
+    it("ends nothing for an identifier that minted none of the caller's sessions", async () => {
+      const sessions = mintedByTwoMethods();
+      const { service: subject } = service({ sessions });
+
+      await expect(
+        subject.endBrowserSessionsForIdentifier({
+          userId: "user-1",
+          identifierId: "somebody-elses",
+        }),
+      ).resolves.toEqual({ ended: 0 });
+      expect(sessions.deletedById).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the deployment composed no session cache", () => {

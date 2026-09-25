@@ -1,5 +1,10 @@
+import type { BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 import type { EntitlementOperator } from "@langwatch/entitlement-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type {
+  SuggestTierTargetsInput,
+  TierTargetSuggestion,
+} from "@langwatch/model-provider-contract";
 
 import type {
   RecordWorkspaceViewInput,
@@ -512,6 +517,9 @@ export interface GovernanceRestApi {
   templateCloneFromPlatform(input: CloneIngestionTemplateInput): Promise<IngestionTemplate>;
   listRoutingPolicies(input: ListRoutingPoliciesInput): Promise<RoutingPolicy[]>;
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy>;
+  routingPolicyTierSuggestions(
+    input: Omit<SuggestTierTargetsInput, "limit">,
+  ): TierTargetSuggestion[];
   createRoutingPolicy(
     input: Omit<CreateRoutingPolicyInput, "actorUserId">,
     by: GovernanceCaller,
@@ -567,6 +575,19 @@ export interface GovernanceRestApi {
   cliSessionListForUser(input: CliUserInput): Promise<CliSessionCard[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<CliSessionRevocation>;
   cliSessionRevokeAll(input: CliUserInput): Promise<CliSessionRevocation>;
+  personalWebSessionList(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<BrowserSessionInventoryEntry[]>;
+  personalWebSessionEnd(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<{ ended: number }>;
+  personalWebSessionsEndForIdentifier(input: {
+    userId: string;
+    identifierId: string;
+  }): Promise<{ ended: number }>;
   ingestionSourceList(input: { organizationId: string }): Promise<IngestionSourceDto[]>;
   ingestionSourceGet(input: { id: string; organizationId: string }): Promise<IngestionSourceDto>;
   ingestionSourceCreate(

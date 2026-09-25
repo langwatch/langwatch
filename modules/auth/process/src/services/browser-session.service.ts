@@ -262,6 +262,31 @@ export class BrowserSessionService {
     return { ended };
   }
 
+  /**
+   * Scoped to the person: the user id comes from the caller, never the
+   * identifier, so naming somebody else's identifier ends nothing.
+   */
+  async endBrowserSessionsForIdentifier({
+    userId,
+    identifierId,
+  }: {
+    userId: string;
+    identifierId: string;
+  }): Promise<{ ended: number }> {
+    const records = await this.deps.sessions.findForUser({ userId });
+    const minted = records.filter((record) => record.identifierId === identifierId);
+    if (minted.length === 0) return { ended: 0 };
+
+    let ended = 0;
+    for (const record of minted) {
+      ended += await this.deps.sessions.deleteById({ id: record.id });
+    }
+    await this.clearCachedSessions({ userId });
+    logger.info({ ended, identifierId, userId }, "Ended the sessions one sign-in method minted");
+
+    return { ended };
+  }
+
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
     await this.clearCachedSessions({ userId });
     const deleted = await this.deps.sessions.deleteAllForUser({ userId });

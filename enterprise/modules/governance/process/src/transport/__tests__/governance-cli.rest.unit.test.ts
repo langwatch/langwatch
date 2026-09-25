@@ -205,11 +205,17 @@ function mountCli(world: World = {}) {
     cliSessionListForUser: unavailable,
     cliSessionRevoke: unavailable,
     cliSessionRevokeAll: unavailable,
+    personalWebSessionList: unavailable,
+    personalWebSessionEnd: unavailable,
+    personalWebSessionsEndForIdentifier: unavailable,
     listPersonalVirtualKeys: unavailable,
     issuePersonalVirtualKey: unavailable,
     revokePersonalVirtualKey: unavailable,
     listRoutingPolicies: unavailable,
     getRoutingPolicy: unavailable,
+    routingPolicyTierSuggestions: () => {
+      throw new Error("not reachable through the CLI door");
+    },
     createRoutingPolicy: unavailable,
     updateRoutingPolicy: unavailable,
     setDefaultRoutingPolicy: unavailable,

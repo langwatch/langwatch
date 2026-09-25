@@ -4,8 +4,9 @@
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   activityMonitorTrpc,
+  governanceAgentsTrpc,
+  governancePeopleTrpc,
   sessionPolicyTrpc,
-  AgentsListingOutcome,
   AiToolEntry,
   AiToolProviderOption,
   AiToolType,
@@ -75,26 +76,6 @@ export type GovernanceAgentView = {
   lastActiveMinutesAgo: number | null;
   health: "responding" | "idle" | "erroring" | null;
   registeredDaysAgo: number | null;
-};
-
-export type GovernancePersonView = {
-  id: string;
-  provider: string;
-  kind: string;
-  displayText: string;
-  rawActorId: string;
-  directoryDepartment: string | null;
-  firstSeenAt: string;
-  lastSeenAt: string;
-  erasedAt: string | null;
-  suspendedAt: string | null;
-  suspendedReason: string | null;
-  link: {
-    userId: string;
-    evidenceKind: string;
-    memberName: string | null;
-    departmentName: string | null;
-  } | null;
 };
 
 /**
@@ -216,7 +197,9 @@ export type GovernanceOrganizationGraph = {
 };
 
 export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
-  ContractApiMap<typeof sessionPolicyTrpc> & {
+  ContractApiMap<typeof sessionPolicyTrpc> &
+  ContractApiMap<typeof governancePeopleTrpc> &
+  ContractApiMap<typeof governanceAgentsTrpc> & {
     modelProvider: {
       getResolvedDefault: {
         query: {
@@ -235,50 +218,6 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
     };
     governanceAgents: {
       list: { query: { input: { organizationId: string }; output: GovernanceAgentView[] } };
-      syncSources: {
-        query: {
-          input: { organizationId: string };
-          output: {
-            id: string;
-            name: string;
-            sourceType: string;
-            lastListing: AgentsListingOutcome | null;
-          }[];
-        };
-      };
-      requestListing: {
-        mutation: {
-          input: { organizationId: string };
-          output: { requested: number; sources: { id: string; name: string }[] };
-        };
-      };
-    };
-    governancePeople: {
-      list: { query: { input: { organizationId: string }; output: GovernancePersonView[] } };
-      suggestions: {
-        query: {
-          input: { organizationId: string };
-          output: {
-            id: string;
-            personDisplayText: string;
-            personProvider: string;
-            memberName: string | null;
-            userId: string;
-          }[];
-        };
-      };
-      runMatch: {
-        mutation: {
-          input: { organizationId: string };
-          output: { linked: number; unproven: number };
-        };
-      };
-      confirmSuggestion: {
-        mutation: {
-          input: { organizationId: string; suggestionId: string };
-          output: GovernanceAcknowledgement;
-        };
-      };
     };
     aiTools: {
       adminList: {

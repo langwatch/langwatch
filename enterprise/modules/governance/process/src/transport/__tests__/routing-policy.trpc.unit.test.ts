@@ -26,6 +26,10 @@ function mount(permits: (permission: string) => boolean = () => true) {
     deleteRoutingPolicy: async (input) => {
       calls.push(input);
     },
+    routingPolicyTierSuggestions: (input) => {
+      calls.push(input);
+      return [{ modelId: "openai/gpt-5", name: "GPT-5", provider: "openai", recommended: true }];
+    },
   });
   const router = governanceTrpcRuntime(governanceTrpcMembers({ permits, asked })).mount(
     routingPolicyTrpcTransport,
@@ -39,6 +43,7 @@ describe("the routingPolicy tRPC namespace", () => {
     expect(procedureKinds(mount().router._def.procedures)).toEqual({
       list: "query",
       get: "query",
+      tierSuggestions: "query",
       create: "mutation",
       update: "mutation",
       setDefault: "mutation",
@@ -53,6 +58,18 @@ describe("the routingPolicy tRPC namespace", () => {
 
     expect(asked).toEqual(["routingPolicies:view"]);
     expect(calls).toEqual([{ organizationId: "org_1" }]);
+  });
+
+  it("suggests tier targets under routingPolicies:view, defaulting the bound providers", async () => {
+    const { caller, asked, calls } = mount();
+
+    await expect(
+      caller.tierSuggestions({ organizationId: "org_1", tier: "fast" }),
+    ).resolves.toEqual([
+      { modelId: "openai/gpt-5", name: "GPT-5", provider: "openai", recommended: true },
+    ]);
+    expect(asked).toEqual(["routingPolicies:view"]);
+    expect(calls).toEqual([{ tier: "fast", boundProviderTypes: [] }]);
   });
 
   it("deletes under routingPolicies:manage and answers main's acknowledgement", async () => {

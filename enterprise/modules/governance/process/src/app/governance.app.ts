@@ -2,7 +2,11 @@
 
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthApi, type CliAccessSession } from "@langwatch/auth-contract";
+import {
+  AuthApi,
+  type BrowserSessionInventoryEntry,
+  type CliAccessSession,
+} from "@langwatch/auth-contract";
 /**
  * The governance feature's application: what all three of its doors call.
  *
@@ -163,7 +167,12 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  ModelProviderApi,
+  suggestTierTargets,
+  type SuggestTierTargetsInput,
+  type TierTargetSuggestion,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OrganizationApi,
@@ -395,6 +404,9 @@ export interface GovernanceAppDependencies {
     | "revokeCliAccessToken"
     | "findCliTokenRecordsForUser"
     | "revokeCliTokens"
+    | "listBrowserSessions"
+    | "endBrowserSession"
+    | "endBrowserSessionsForIdentifier"
   >;
   /** Entitlements resolve the actual caller organization, never a deployment-global plan. */
   entitlements: Pick<EntitlementApi, "getActivePlan">;
@@ -1368,9 +1380,11 @@ export class GovernanceApp implements GovernanceRestApi {
     return this.agentSync.listableSourcesWithLastListing(input);
   }
 
-  governanceAgentsRequestListing(input: {
+  /** Main resolved the pull pipeline before reading a source, so its absence refuses even with nothing to list. */
+  async governanceAgentsRequestListing(input: {
     organizationId: string;
   }): Promise<AgentListingRequestResult> {
+    this.agentListingSender();
     return this.agentSync.requestListing(input);
   }
 
@@ -1393,6 +1407,30 @@ export class GovernanceApp implements GovernanceRestApi {
     suggestionId: string;
   }): Promise<IdentityMatchConfirmed> {
     return this.identityMatches.confirmSuggestion(input);
+  }
+
+  // ── Personal web sessions: the caller's own browsers, which auth owns ──
+
+  async personalWebSessionList(input: {
+    userId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<BrowserSessionInventoryEntry[]> {
+    return [...(await this.dependencies.auth.listBrowserSessions(input))];
+  }
+
+  personalWebSessionEnd(input: {
+    userId: string;
+    sessionId: string;
+    currentSessionId?: string | undefined;
+  }): Promise<{ ended: number }> {
+    return this.dependencies.auth.endBrowserSession(input);
+  }
+
+  personalWebSessionsEndForIdentifier(input: {
+    userId: string;
+    identifierId: string;
+  }): Promise<{ ended: number }> {
+    return this.dependencies.auth.endBrowserSessionsForIdentifier(input);
   }
 
   // ── Personal CLI sessions: the caller's own devices, answered for their user id alone ──
@@ -1918,6 +1956,16 @@ export class GovernanceApp implements GovernanceRestApi {
   /** One policy by id, including its scope rows. */
   getRoutingPolicy(input: FindRoutingPolicyInput): Promise<RoutingPolicy> {
     return this.routingPolicies.getById(input);
+  }
+
+  /** Models worth pointing a tier at, ranked from the catalogue. */
+  routingPolicyTierSuggestions(
+    input: Omit<SuggestTierTargetsInput, "limit">,
+  ): TierTargetSuggestion[] {
+    return suggestTierTargets({
+      tier: input.tier,
+      boundProviderTypes: input.boundProviderTypes,
+    });
   }
 
   /** Creates a policy, attributed to the caller who asked for it. */

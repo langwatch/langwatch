@@ -644,6 +644,13 @@ export class AuthApp implements AuthApiContract {
     return this.#sessions.endBrowserSession(input);
   }
 
+  endBrowserSessionsForIdentifier(input: {
+    userId: string;
+    identifierId: string;
+  }): Promise<{ ended: number }> {
+    return this.#sessions.endBrowserSessionsForIdentifier(input);
+  }
+
   revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
     return this.#sessions.revokeAllBrowserSessions(input);
   }

@@ -137,6 +137,11 @@ export interface AuthApi {
     sessionId: string;
     currentSessionId?: string | undefined;
   }): Promise<{ ended: number }>;
+  /** Ends every one of this person's sessions one sign-in method minted, and no others. */
+  endBrowserSessionsForIdentifier(input: {
+    userId: string;
+    identifierId: string;
+  }): Promise<{ ended: number }>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;

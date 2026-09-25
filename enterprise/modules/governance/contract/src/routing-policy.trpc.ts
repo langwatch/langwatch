@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every served `routingPolicy.*` procedure, declared once, at main's wire names and caps. */
 import { defineTrpcContract } from "@langwatch/api/contract";
+import { MODEL_TIERS, tierTargetSuggestionSchema } from "@langwatch/model-provider-contract";
 import { z } from "zod";
 
 import { governanceWriteAcknowledgedSchema } from "./governance.responses.ts";
@@ -30,6 +31,16 @@ export const routingPolicyTrpc = defineTrpcContract("routingPolicy")
   .query("get")
   .withInput(policyInOrganization)
   .withOutput(routingPolicySchema)
+
+  .query("tierSuggestions")
+  .withInput(
+    z.object({
+      organizationId: z.string(),
+      tier: z.enum(MODEL_TIERS),
+      boundProviderTypes: z.array(z.string()).default([]),
+    }),
+  )
+  .withOutput(tierTargetSuggestionSchema.array())
 
   .mutation("create")
   .withInput(

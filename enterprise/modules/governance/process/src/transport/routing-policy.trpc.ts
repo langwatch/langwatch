@@ -12,6 +12,15 @@ export const routingPolicyTrpcTransport = defineTrpcRouter(GovernanceRestApi, ro
   .withPermission("routingPolicies:view")
   .handle(({ app, input }) => app.getRoutingPolicy(input))
 
+  .procedure("tierSuggestions")
+  .withPermission("routingPolicies:view")
+  .handle(({ app, input }) =>
+    app.routingPolicyTierSuggestions({
+      tier: input.tier,
+      boundProviderTypes: input.boundProviderTypes,
+    }),
+  )
+
   .procedure("create")
   .withPermission("routingPolicies:manage")
   .handle(({ app, input, actor }) => app.createRoutingPolicy(input, { id: actor.id }))

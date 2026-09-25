@@ -158,3 +158,10 @@ Feature: Enterprise governance package boundary
     Then the panels follow the choice, and forgetting it returns them to their default
     And everything already rendering a sample affordance hears about the change
     And no peer imports governance's own state to do it
+
+  @unit
+  Scenario: Asking for an agent listing without the pull pipeline is refused by name
+    Given this process runs no ingestion pull pipeline
+    And the organization has no source that can list agents
+    When an admin asks every source for its agents
+    Then the ask is refused with agent_listing_unavailable, as on main
