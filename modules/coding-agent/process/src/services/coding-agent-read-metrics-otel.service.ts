@@ -9,9 +9,9 @@ export const CODING_AGENT_SESSION_LIST_READ_METRIC_NAME =
   "coding_agent_session_list_read_duration_milliseconds";
 
 /** Read-duration histogram; unpublished until root passes readMetrics. */
-export class OtelCodingAgentReadMetricsAdapter implements CodingAgentReadMetrics {
-  static create(): OtelCodingAgentReadMetricsAdapter {
-    return new OtelCodingAgentReadMetricsAdapter(
+export class OtelCodingAgentReadMetricsService implements CodingAgentReadMetrics {
+  static create(): OtelCodingAgentReadMetricsService {
+    return new OtelCodingAgentReadMetricsService(
       histogram({
         name: CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
         description: "Duration of the bounded coding-agent session-list storage read",

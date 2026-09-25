@@ -8,8 +8,8 @@ import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
-import type { BillingWebhookSubscription } from "../repositories/billing-webhook-subscription.repository.ts";
+import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscriptionRepository } from "../repositories/billing-webhook-subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import {
   BillingCheckoutCompletionService,
@@ -79,8 +79,8 @@ export interface ConnectedBillingInvoiceEvents {
 }
 
 export class EEWebhookService implements WebhookService {
-  private readonly subscriptionRepository: BillingWebhookSubscription;
-  private readonly organizationRepository: BillingWebhookOrganization;
+  private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
+  private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly stripe: Stripe;
   private readonly itemCalculator: ItemCalculator;
   private readonly inviteApprover?: InviteApprover;
@@ -107,8 +107,8 @@ export class EEWebhookService implements WebhookService {
     host,
     connectedBilling,
   }: {
-    subscriptionRepository: BillingWebhookSubscription;
-    organizationRepository: BillingWebhookOrganization;
+    subscriptionRepository: BillingWebhookSubscriptionRepository;
+    organizationRepository: BillingWebhookOrganizationRepository;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
@@ -149,8 +149,8 @@ export class EEWebhookService implements WebhookService {
   }
 
   static create(options: {
-    subscriptionRepository: BillingWebhookSubscription;
-    organizationRepository: BillingWebhookOrganization;
+    subscriptionRepository: BillingWebhookSubscriptionRepository;
+    organizationRepository: BillingWebhookOrganizationRepository;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;

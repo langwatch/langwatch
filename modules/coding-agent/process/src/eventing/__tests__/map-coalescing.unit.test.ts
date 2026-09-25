@@ -3,8 +3,8 @@ import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-c
 import { describe, expect, it } from "vitest";
 
 import {
-  EventingCodingAgentTraceSessionAppendAdapter,
-  EventingSessionMetricSeriesAppendAdapter,
+  EventingCodingAgentTraceSessionAppendService,
+  EventingSessionMetricSeriesAppendService,
 } from "../../services/coding-agent-projection-append.service.ts";
 import { CodingAgentTraceSessionsMapProjection } from "../coding-agent-trace-sessions.projection.ts";
 import { SessionMetricSeriesMapProjection } from "../session-metric-series.projection.ts";
@@ -27,7 +27,7 @@ describe("coding-agent map coalescing", () => {
   describe("when the trace-sessions map projection is constructed", () => {
     it("declares the shared map coalesce ceiling", () => {
       const projection = CodingAgentTraceSessionsMapProjection.create({
-        store: EventingCodingAgentTraceSessionAppendAdapter.create({
+        store: EventingCodingAgentTraceSessionAppendService.create({
           persistence,
           defaultRetentionDays: () => 365,
         }),
@@ -36,7 +36,7 @@ describe("coding-agent map coalescing", () => {
     });
 
     it("backs the ceiling with a bulkAppend-capable store", () => {
-      const store = EventingCodingAgentTraceSessionAppendAdapter.create({
+      const store = EventingCodingAgentTraceSessionAppendService.create({
         persistence,
         defaultRetentionDays: () => 365,
       });
@@ -47,7 +47,7 @@ describe("coding-agent map coalescing", () => {
   describe("when the session-metric-series map projection is constructed", () => {
     it("declares the shared map coalesce ceiling", () => {
       const projection = SessionMetricSeriesMapProjection.create({
-        store: EventingSessionMetricSeriesAppendAdapter.create({
+        store: EventingSessionMetricSeriesAppendService.create({
           persistence,
           defaultRetentionDays: () => 365,
         }),

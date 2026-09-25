@@ -27,7 +27,7 @@ abstract class CodingAgentAppendStore<TRecord> implements AppendStore<TRecord> {
   }
 }
 
-export class EventingCodingAgentTraceSessionAppendAdapter extends CodingAgentAppendStore<CodingAgentTraceSessionRecord> {
+export class EventingCodingAgentTraceSessionAppendService extends CodingAgentAppendStore<CodingAgentTraceSessionRecord> {
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
     defaultRetentionDays: () => number,
@@ -38,8 +38,8 @@ export class EventingCodingAgentTraceSessionAppendAdapter extends CodingAgentApp
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
-  }): EventingCodingAgentTraceSessionAppendAdapter {
-    return new EventingCodingAgentTraceSessionAppendAdapter(
+  }): EventingCodingAgentTraceSessionAppendService {
+    return new EventingCodingAgentTraceSessionAppendService(
       input.persistence,
       input.defaultRetentionDays,
     );
@@ -53,7 +53,7 @@ export class EventingCodingAgentTraceSessionAppendAdapter extends CodingAgentApp
   }
 }
 
-export class EventingCodingAgentSessionEventsAppendAdapter extends CodingAgentAppendStore<CodingAgentSessionEventRecord> {
+export class EventingCodingAgentSessionEventsAppendService extends CodingAgentAppendStore<CodingAgentSessionEventRecord> {
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
     defaultRetentionDays: () => number,
@@ -64,8 +64,8 @@ export class EventingCodingAgentSessionEventsAppendAdapter extends CodingAgentAp
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
-  }): EventingCodingAgentSessionEventsAppendAdapter {
-    return new EventingCodingAgentSessionEventsAppendAdapter(
+  }): EventingCodingAgentSessionEventsAppendService {
+    return new EventingCodingAgentSessionEventsAppendService(
       input.persistence,
       input.defaultRetentionDays,
     );
@@ -79,7 +79,7 @@ export class EventingCodingAgentSessionEventsAppendAdapter extends CodingAgentAp
   }
 }
 
-export class EventingSessionMetricSeriesAppendAdapter extends CodingAgentAppendStore<SessionMetricSeriesRecord> {
+export class EventingSessionMetricSeriesAppendService extends CodingAgentAppendStore<SessionMetricSeriesRecord> {
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
     defaultRetentionDays: () => number,
@@ -90,8 +90,8 @@ export class EventingSessionMetricSeriesAppendAdapter extends CodingAgentAppendS
   static create(input: {
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
-  }): EventingSessionMetricSeriesAppendAdapter {
-    return new EventingSessionMetricSeriesAppendAdapter(
+  }): EventingSessionMetricSeriesAppendService {
+    return new EventingSessionMetricSeriesAppendService(
       input.persistence,
       input.defaultRetentionDays,
     );

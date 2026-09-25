@@ -10,8 +10,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
 
 import type { BillingCheckpointRepository } from "../repositories/billing-checkpoint.repository.ts";
-import type { BillingOrganizationCache } from "../repositories/organization/billing-organization-cache.repository.ts";
-import type { BillingReportOrganizationRepository } from "../repositories/organization/billing-report-organization.repository.ts";
+import type { BillingOrganizationCacheRepository } from "../repositories/billing-organization-cache.repository.ts";
+import type { BillingReportOrganizationRepository } from "../repositories/billing-report-organization.repository.ts";
 import {
   instantEvalMeterIdentifier,
   instantEvalMeterUnitsToUsd,
@@ -81,7 +81,7 @@ export interface ReportUsageForMonthCommandDeps {
   queryInstantEvalSpendTotal: InstantEvalSpendQueryService["queryInstantEvalSpendTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
-  organizationCache: BillingOrganizationCache;
+  organizationCache: BillingOrganizationCacheRepository;
   /** Where an unexpected failure in this handler is reported. */
   errorReporter: BillingErrorReporter;
   /**

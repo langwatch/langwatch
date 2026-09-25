@@ -11,7 +11,7 @@ import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 
 import type {
-  BillableEventsMeter,
+  BillableEventsMeterRepository,
   BillableEventRecord,
 } from "../repositories/billable-events-meter.repository.ts";
 import type { BillingTenantOrganizationService } from "../services/tenant-organization.service.ts";
@@ -57,14 +57,14 @@ export const BILLABLE_EVENTS_METER_PROJECTION_NAME = "orgBillableEventsMeter";
  */
 export class BillableEventsMeterProjection {
   static create(options: {
-    meter: BillableEventsMeter;
+    meter: BillableEventsMeterRepository;
     organizations: BillingTenantOrganizationService;
   }): BillableEventsMeterProjection {
     return new BillableEventsMeterProjection(options.meter, options.organizations);
   }
 
   private constructor(
-    private readonly meter: BillableEventsMeter,
+    private readonly meter: BillableEventsMeterRepository,
     private readonly organizations: BillingTenantOrganizationService,
   ) {}
 

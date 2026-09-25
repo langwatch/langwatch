@@ -22,7 +22,7 @@ import type { BillingSubscriptionNotifier } from "../channels/billing-subscripti
 import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscription,
+  BillingSubscriptionRepository,
 } from "../repositories/subscription.repository.ts";
 import type { SeatEventSubscriptionService } from "./seat-event-subscription.service.ts";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
@@ -41,7 +41,7 @@ export const RECENT_INVOICES_LIMIT = 4;
  * never creates clients, reads configuration, or touches application globals.
  */
 export class BillingSubscriptionService {
-  private readonly repository: BillingSubscription;
+  private readonly repository: BillingSubscriptionRepository;
   private readonly organizationRepository: BillingAccountFactsRepository;
   private readonly stripe: Stripe;
   private readonly itemCalculator: SubscriptionItemCalculatorService;
@@ -58,7 +58,7 @@ export class BillingSubscriptionService {
     notifier,
     stripeErrors,
   }: {
-    repository: BillingSubscription;
+    repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
@@ -76,7 +76,7 @@ export class BillingSubscriptionService {
   }
 
   static create(options: {
-    repository: BillingSubscription;
+    repository: BillingSubscriptionRepository;
     organizationRepository: BillingAccountFactsRepository;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;

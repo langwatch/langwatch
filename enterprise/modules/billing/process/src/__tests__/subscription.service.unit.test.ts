@@ -3,7 +3,7 @@ import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import Stripe from "stripe";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type BillingSubscription, type BillingSubscriptionNotifier } from "../index.ts";
+import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
@@ -37,7 +37,7 @@ const createMockStripe = () => ({
 });
 
 const createMockRepository = (): {
-  [K in keyof BillingSubscription]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingSubscriptionRepository]: ReturnType<typeof vi.fn>;
 } => ({
   findActive: vi.fn(),
   findLastNonCancelled: vi.fn(),
@@ -95,7 +95,7 @@ const createServiceWithSeatEventFns = ({
   seatEventService: ReturnType<typeof createMockSeatEventService>;
 }) =>
   BillingSubscriptionService.create({
-    repository: repository as unknown as BillingSubscription,
+    repository: repository as unknown as BillingSubscriptionRepository,
     organizationRepository: orgRepo as unknown as BillingAccountFactsRepository,
     stripe: stripeDouble(stripeInstance),
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
@@ -115,7 +115,7 @@ describe("BillingSubscriptionService", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({
-        repository: createMockRepository() as unknown as BillingSubscription,
+        repository: createMockRepository() as unknown as BillingSubscriptionRepository,
         organizationRepository:
           createMockOrganizationRepository() as unknown as BillingAccountFactsRepository,
         stripe: stripeDouble(createMockStripe()),
@@ -139,7 +139,7 @@ describe("BillingSubscriptionService", () => {
     itemCalculator = createMockItemCalculator();
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
-      repository: repository as unknown as BillingSubscription,
+      repository: repository as unknown as BillingSubscriptionRepository,
       organizationRepository: organizationRepository as unknown as BillingAccountFactsRepository,
       stripe: stripeDouble(stripe),
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,

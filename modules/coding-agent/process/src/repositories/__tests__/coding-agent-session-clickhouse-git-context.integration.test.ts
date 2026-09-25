@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { session } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
-import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
+import { NoopCodingAgentReadMetricsService } from "../../services/coding-agent-read-metrics-noop.service.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -73,7 +73,7 @@ beforeAll(() => {
   sessions = CodingAgentSessionClickHouseRepository.create({
     clickhouse: queryClient(ch),
     defaultTraceRetentionDays: 30,
-    metrics: NoopCodingAgentReadMetrics.create(),
+    metrics: NoopCodingAgentReadMetricsService.create(),
     clock: new FixedClock(),
   });
   traceSessions = CodingAgentTraceSessionClickHouseRepository.create({

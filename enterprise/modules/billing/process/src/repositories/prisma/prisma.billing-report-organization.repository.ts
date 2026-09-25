@@ -6,7 +6,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,
-} from "../organization/billing-report-organization.repository.ts";
+} from "../billing-report-organization.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

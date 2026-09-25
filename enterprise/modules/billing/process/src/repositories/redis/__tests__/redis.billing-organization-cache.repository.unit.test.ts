@@ -2,9 +2,9 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { BillingReportOrganizationLookup } from "../../organization/billing-report-organization.repository.ts";
+import type { BillingReportOrganizationLookup } from "../../billing-report-organization.repository.ts";
 import {
-  RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "../redis.billing-organization-cache.repository.ts";
 
@@ -20,12 +20,12 @@ const ORGANIZATION: BillingReportOrganizationLookup = {
 };
 
 function cacheOver(redis: Partial<BillingOrganizationCacheRedis>) {
-  return RedisBillingOrganizationCacheAdapter.create({
+  return RedisBillingOrganizationCacheRepository.create({
     redis: redis as BillingOrganizationCacheRedis,
   });
 }
 
-describe("RedisBillingOrganizationCacheAdapter", () => {
+describe("RedisBillingOrganizationCacheRepository", () => {
   describe("given the keyspace the App's own cache writes", () => {
     /**
      * Frozen twin: the App caches this read through

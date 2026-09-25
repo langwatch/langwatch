@@ -7,7 +7,7 @@ import type {
 import { fromDate } from "@langwatch/time";
 
 import {
-  BillingSubscription,
+  BillingSubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
@@ -48,7 +48,7 @@ function subscriptionRecordOf(row: SubscriptionRow): BillingSubscriptionRecord {
 }
 
 /**
- * Prisma-backed implementation of BillingSubscription (subscription-table
+ * Prisma-backed implementation of BillingSubscriptionRepository (subscription-table
  * CRUD only). `BillingSubscriptionDatabase` below is the narrow client
  * slice composition needs, not the whole generated client.
  */
@@ -57,13 +57,13 @@ export type BillingSubscriptionDatabase = Pick<
   "organization" | "subscription" | "$transaction"
 >;
 
-export class PrismaBillingSubscription extends BillingSubscription {
+export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepository {
   private constructor(private readonly prisma: BillingSubscriptionDatabase) {
     super();
   }
 
-  static create(database: BillingSubscriptionDatabase): PrismaBillingSubscription {
-    return new PrismaBillingSubscription(database);
+  static create(database: BillingSubscriptionDatabase): PrismaBillingSubscriptionRepository {
+    return new PrismaBillingSubscriptionRepository(database);
   }
 
   async findActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {

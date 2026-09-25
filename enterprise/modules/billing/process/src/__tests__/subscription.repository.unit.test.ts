@@ -2,16 +2,16 @@ import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-import { PrismaBillingSubscription } from "../repositories/prisma/prisma.subscription.repository.ts";
+import { PrismaBillingSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
 import { NUMERIC_OVERRIDE_FIELDS } from "../services/plan-provider.service.ts";
 
-describe("PrismaBillingSubscription", () => {
+describe("PrismaBillingSubscriptionRepository", () => {
   let update: Mock<(args: unknown) => Promise<object>>;
-  let repo: PrismaBillingSubscription;
+  let repo: PrismaBillingSubscriptionRepository;
 
   beforeEach(() => {
     update = vi.fn(async (_args: unknown) => ({}));
-    repo = PrismaBillingSubscription.create(prismaDouble({ subscription: { update } }));
+    repo = PrismaBillingSubscriptionRepository.create(prismaDouble({ subscription: { update } }));
   });
 
   describe("cancel()", () => {

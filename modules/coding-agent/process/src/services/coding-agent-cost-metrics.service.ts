@@ -3,7 +3,7 @@ import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import type { CodingAgentCostMetrics, CodingAgentCostMetric } from "../app/coding-agent.members.ts";
 
 /** Cost-drift canary comparing registry vs agent pricing; see coding-agent-cost.feature. */
-export class OtelCodingAgentCostMetricsAdapter implements CodingAgentCostMetrics {
+export class OtelCodingAgentCostMetricsService implements CodingAgentCostMetrics {
   private readonly recorded = new Set<string>();
 
   private constructor(
@@ -11,8 +11,8 @@ export class OtelCodingAgentCostMetricsAdapter implements CodingAgentCostMetrics
     private readonly reported: CounterHandle,
   ) {}
 
-  static create(): OtelCodingAgentCostMetricsAdapter {
-    return new OtelCodingAgentCostMetricsAdapter(
+  static create(): OtelCodingAgentCostMetricsService {
+    return new OtelCodingAgentCostMetricsService(
       counter({
         name: "coding_agent_cost_computed_usd_total",
         description: "Coding-agent cost computed from tokens against the model registry, in USD",

@@ -5,9 +5,12 @@ import {
   type CancelledSubscription,
   type SubscriptionMutationResult,
   type SubscriptionWithOrg,
-  BillingWebhookSubscription,
+  BillingWebhookSubscriptionRepository,
 } from "../billing-webhook-subscription.repository.ts";
-import type { BillingSubscription, BillingSubscriptionRecord } from "../subscription.repository.ts";
+import type {
+  BillingSubscriptionRepository,
+  BillingSubscriptionRecord,
+} from "../subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /**
@@ -15,19 +18,19 @@ import type { MemoryBillingStore } from "./memory.billing.store.ts";
  * means only one thing here, as it does in the Prisma twin: the row Stripe
  * named is gone.
  */
-export class MemoryBillingWebhookBillingSubscription extends BillingWebhookSubscription {
+export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionRepository {
   private constructor(
-    private readonly subscriptions: BillingSubscription,
+    private readonly subscriptions: BillingSubscriptionRepository,
     private readonly store: MemoryBillingStore,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: BillingSubscription;
+    subscriptions: BillingSubscriptionRepository;
     store: MemoryBillingStore;
-  }): MemoryBillingWebhookBillingSubscription {
-    return new MemoryBillingWebhookBillingSubscription(options.subscriptions, options.store);
+  }): MemoryBillingWebhookSubscriptionRepository {
+    return new MemoryBillingWebhookSubscriptionRepository(options.subscriptions, options.store);
   }
 
   async findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {

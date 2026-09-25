@@ -20,7 +20,7 @@ export type ActivateSubscriptionResult =
   | { outcome: "activated"; subscription: SubscriptionWithOrg }
   | { outcome: "missing_subscription" };
 
-export abstract class BillingWebhookSubscription {
+export abstract class BillingWebhookSubscriptionRepository {
   abstract findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
 
   abstract createPending(input: {
@@ -68,70 +68,4 @@ export abstract class BillingWebhookSubscription {
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
   }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>>;
-}
-
-export class NullBillingWebhookSubscriptionAdapter extends BillingWebhookSubscription {
-  async findLastNonCancelled(_organizationId: string): Promise<BillingSubscriptionRecord | null> {
-    return null;
-  }
-
-  async createPending(_input: {
-    organizationId: string;
-    plan: string;
-  }): Promise<BillingSubscriptionRecord> {
-    throw new Error("NullBillingWebhookSubscriptionAdapter cannot create a subscription");
-  }
-
-  async updateStatus(_input: {
-    id: string;
-    status: string;
-  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
-    return { outcome: "missing_subscription" };
-  }
-
-  async updatePlan(_input: {
-    id: string;
-    plan: string;
-  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
-    return { outcome: "missing_subscription" };
-  }
-
-  async findByStripeId(_stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
-    return null;
-  }
-
-  async linkStripeId(_input: {
-    id: string;
-    stripeSubscriptionId: string;
-  }): Promise<{ count: number }> {
-    return { count: 0 };
-  }
-
-  async activate(_input: {
-    id: string;
-    previousStatus: string;
-  }): Promise<ActivateSubscriptionResult> {
-    return { outcome: "missing_subscription" };
-  }
-
-  async recordPaymentFailure(_input: { id: string; currentStatus: string }): Promise<void> {}
-
-  async cancel(_input: { id: string }): Promise<void> {}
-
-  async cancelTrialSubscriptions(_organizationId: string): Promise<void> {}
-
-  async migrateToSeatEvent(_input: {
-    organizationId: string;
-    excludeSubscriptionId: string;
-  }): Promise<CancelledSubscription[]> {
-    return [];
-  }
-
-  async updateQuantities(_input: {
-    id: string;
-    maxMembers: number | null;
-    maxMessagesPerMonth: number | null;
-  }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
-    return { outcome: "missing_subscription" };
-  }
 }

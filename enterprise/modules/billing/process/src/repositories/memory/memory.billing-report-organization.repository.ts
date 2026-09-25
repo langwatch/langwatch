@@ -5,7 +5,7 @@ import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import {
   type BillingReportOrganizationLookup,
   BillingReportOrganizationRepository,
-} from "../organization/billing-report-organization.repository.ts";
+} from "../billing-report-organization.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** The one pricing model that makes a month reportable at all. */

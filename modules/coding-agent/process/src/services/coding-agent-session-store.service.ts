@@ -29,7 +29,7 @@ function carriesReadBackColumns(row: CodingAgentSessionRow): boolean {
 }
 
 /** Store adapter; no agent gate (dispatchers gate upstream), read-back decoding per ADR-066. */
-export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionStore<CodingAgentSessionState> {
+export class EventingCodingAgentSessionStoreService implements FoldProjectionStore<CodingAgentSessionState> {
   private constructor(
     private readonly persistence: CodingAgentProjectionPersistence,
     private readonly hooks: {
@@ -47,8 +47,8 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
     persistence: CodingAgentProjectionPersistence;
     defaultRetentionDays: () => number;
     onSessionsStored?: (tenantIds: string[]) => Promise<void>;
-  }): EventingCodingAgentSessionStoreAdapter {
-    return new EventingCodingAgentSessionStoreAdapter(input.persistence, {
+  }): EventingCodingAgentSessionStoreService {
+    return new EventingCodingAgentSessionStoreService(input.persistence, {
       defaultRetentionDays: input.defaultRetentionDays,
       onSessionsStored: input.onSessionsStored,
     });

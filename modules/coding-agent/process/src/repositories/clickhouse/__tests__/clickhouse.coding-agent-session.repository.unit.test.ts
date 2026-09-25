@@ -5,7 +5,7 @@ import {
   TestClock,
   session,
 } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
-import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+import { NoopCodingAgentReadMetricsService } from "../../../services/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const endpoints: TestClickHouseEndpoint[] = [];
@@ -22,7 +22,7 @@ async function createRepository() {
     repository: CodingAgentSessionClickHouseRepository.create({
       clickhouse: endpoint.clickhouse,
       defaultTraceRetentionDays: 30,
-      metrics: NoopCodingAgentReadMetrics.create(),
+      metrics: NoopCodingAgentReadMetricsService.create(),
       clock: new TestClock(),
     }),
   };

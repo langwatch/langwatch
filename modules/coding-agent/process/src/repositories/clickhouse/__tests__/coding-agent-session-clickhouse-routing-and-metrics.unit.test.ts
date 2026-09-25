@@ -1,14 +1,15 @@
+import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * How the branch-list read names its tenants, and the list-read cost signal
  * ADR-071 step 3's deferred pruning promise leans on.
  * @see specs/coding-agent/session-aggregate.feature
  */
-import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { TestClock } from "../../../__tests__/fixtures/coding-agent.fixture.ts";
 import type { CodingAgentReadMetrics } from "../../../app/coding-agent.members.ts";
-import { NoopCodingAgentReadMetrics } from "../../../services/coding-agent-read-metrics-noop.service.ts";
+import { NoopCodingAgentReadMetricsService } from "../../../services/coding-agent-read-metrics-noop.service.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 
 const WINDOW_FROM = new Date("2026-07-24T00:00:00.000Z").getTime();
@@ -36,13 +37,13 @@ function recordingClient(rows: Record<string, unknown>[]): {
 } {
   const named: string[] = [];
   const scopedTo: string[][] = [];
-  const client = {
+  const client = clickHouseQueryClientDouble({
     query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
       named.push(request.tenantId);
       scopedTo.push((request.params?.tenantIds ?? []) as string[]);
       return { rows };
     },
-  } as unknown as ClickHouseQueryClient;
+  });
   return { client, named: () => named, scopedTo: () => scopedTo };
 }
 
@@ -71,7 +72,7 @@ function branchSession({
 
 function makeRepository(
   clickhouse: ClickHouseQueryClient,
-  metrics: CodingAgentReadMetrics = NoopCodingAgentReadMetrics.create(),
+  metrics: CodingAgentReadMetrics = NoopCodingAgentReadMetricsService.create(),
 ) {
   return CodingAgentSessionClickHouseRepository.create({
     clickhouse,
@@ -162,9 +163,9 @@ function version({
 }
 
 function listClient(rows: Record<string, unknown>[]): ClickHouseQueryClient {
-  return {
+  return clickHouseQueryClientDouble({
     query: async () => ({ rows }),
-  } as unknown as ClickHouseQueryClient;
+  });
 }
 
 /**

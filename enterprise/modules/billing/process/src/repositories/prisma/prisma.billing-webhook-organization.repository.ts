@@ -1,15 +1,15 @@
 /**
  * The four organization reads and writes a Stripe webhook makes, in
- * Postgres — via `BillingWebhookOrganization`'s narrow shape, since the
+ * Postgres — via `BillingWebhookOrganizationRepository`'s narrow shape, since the
  * organization aggregate belongs to a core feature, not billing's own repository.
  */
 import type { Currency, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { BillingWebhookOrganization } from "../billing-webhook-organization.repository.ts";
+import { BillingWebhookOrganizationRepository } from "../billing-webhook-organization.repository.ts";
 
 export type BillingWebhookOrganizationDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOrganization {
+export class PrismaBillingWebhookOrganizationRepository extends BillingWebhookOrganizationRepository {
   private constructor(private readonly database: BillingWebhookOrganizationDatabase) {
     super();
   }

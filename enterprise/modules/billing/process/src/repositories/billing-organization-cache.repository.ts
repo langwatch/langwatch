@@ -30,7 +30,7 @@ export const BILLING_ORG_CACHE_PREFIX = "ttlcache:billing:orgData:";
  * dispatches the previous month alongside the current one, and those carry
  * different dedup keys, so both run.
  */
-export interface BillingOrganizationCache {
+export interface BillingOrganizationCacheRepository {
   find(key: string): Promise<BillingReportOrganizationLookup | undefined>;
   set(key: string, value: BillingReportOrganizationLookup): Promise<void>;
 }

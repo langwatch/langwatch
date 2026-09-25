@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  BillableEventsMeter,
+  BillableEventsMeterRepository,
   type BillableEventRecord,
 } from "../billable-events-meter.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
 /** In-memory write twin of the billable-events ClickHouse table. */
-export class MemoryBillableEventsMeterRepository extends BillableEventsMeter {
+export class MemoryBillableEventsMeterRepository extends BillableEventsMeterRepository {
   readonly #store: MemoryBillingStore;
 
   private constructor(store: MemoryBillingStore) {

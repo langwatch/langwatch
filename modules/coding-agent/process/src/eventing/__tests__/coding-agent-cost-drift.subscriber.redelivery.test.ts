@@ -8,7 +8,7 @@ import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
-import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
+import { OtelCodingAgentCostMetricsService } from "../../services/coding-agent-cost-metrics.service.ts";
 import { createCodingAgentCostDriftSubscriber } from "../coding-agent-cost-drift.subscriber.ts";
 
 describe("codingAgentCostDrift subscriber redelivery", () => {
@@ -24,7 +24,7 @@ describe("codingAgentCostDrift subscriber redelivery", () => {
   });
 
   it("increments the real reported-cost counter once for same-process redelivery", async () => {
-    const metrics = OtelCodingAgentCostMetricsAdapter.create();
+    const metrics = OtelCodingAgentCostMetricsService.create();
     const subscriber = createCodingAgentCostDriftSubscriber({
       metrics,
       modelProviders: new TestModelProviderService(),

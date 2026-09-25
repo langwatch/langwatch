@@ -20,12 +20,12 @@ export {
 } from "./transport/subscription.trpc.ts";
 export type { PostgresBillingPersistence } from "./repositories/prisma/prisma.postgres.repository.ts";
 export type { BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
-export type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
+export type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 export {
   ReportUsageForMonthCommandHandler,
   type ReportUsageForMonthCommandDeps,
 } from "./eventing/report-usage-for-month.commands.ts";
-export type { BillingReportOrganization } from "./repositories/organization/billing-report-organization.repository.ts";
+export type { BillingReportOrganization } from "./repositories/billing-report-organization.repository.ts";
 export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
 export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export type { BillingOrganizationCacheRedis } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
@@ -92,7 +92,7 @@ export {
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
 export type {
   BillableEventRecord,
-  BillableEventsMeter,
+  BillableEventsMeterRepository,
 } from "./repositories/billable-events-meter.repository.ts";
 export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 /**
@@ -120,7 +120,7 @@ export {
   type BillingTenantOrganizationCacheRedis,
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
-export type { BillingSubscription } from "./repositories/subscription.repository.ts";
+export type { BillingSubscriptionRepository } from "./repositories/subscription.repository.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";
 export type {
   GeneratedLicense,

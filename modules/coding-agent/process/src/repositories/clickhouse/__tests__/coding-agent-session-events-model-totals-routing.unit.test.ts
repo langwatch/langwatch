@@ -1,8 +1,9 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * How the per-call fact table's cross-tenant read reaches ClickHouse.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
 
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
@@ -21,13 +22,13 @@ function recordingClient(rows: Record<string, unknown>[]): {
 } {
   const named: string[] = [];
   const scopedTo: string[][] = [];
-  const client = {
+  const client = clickHouseQueryClientDouble({
     query: async (request: { tenantId: string; params?: Record<string, unknown> }) => {
       named.push(request.tenantId);
       scopedTo.push((request.params?.tenantIds ?? []) as string[]);
       return { rows };
     },
-  } as unknown as ClickHouseQueryClient;
+  });
   return { client, named: () => named, scopedTo: () => scopedTo };
 }
 

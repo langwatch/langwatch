@@ -21,9 +21,9 @@ import { nowInstant } from "@langwatch/time";
 import type Stripe from "stripe";
 
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
-import type { BillingWebhookOrganization } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookOrganizationRepository } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
-  BillingWebhookSubscription,
+  BillingWebhookSubscriptionRepository,
   SubscriptionWithOrg,
 } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
@@ -40,8 +40,8 @@ const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
 type BillingSubscriptionLifecycleOptions = {
-  subscriptionRepository: BillingWebhookSubscription;
-  organizationRepository: BillingWebhookOrganization;
+  subscriptionRepository: BillingWebhookSubscriptionRepository;
+  organizationRepository: BillingWebhookOrganizationRepository;
   stripe: Stripe;
   itemCalculator: Pick<SubscriptionItemCalculatorService, "calculateQuantityForPrice"> & {
     prices: StripePriceMap;
@@ -54,8 +54,8 @@ export class BillingSubscriptionLifecycleService {
     return new BillingSubscriptionLifecycleService(options);
   }
 
-  private readonly subscriptionRepository: BillingWebhookSubscription;
-  private readonly organizationRepository: BillingWebhookOrganization;
+  private readonly subscriptionRepository: BillingWebhookSubscriptionRepository;
+  private readonly organizationRepository: BillingWebhookOrganizationRepository;
   private readonly stripe: Stripe;
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;

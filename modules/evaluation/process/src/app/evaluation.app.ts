@@ -54,6 +54,7 @@ import type {
   EvaluationWarmupProbe,
 } from "../app/evaluation.members.ts";
 import { langevalsChannels } from "../channels/langevals-channels.registry.ts";
+import { NullLangevalsChannel } from "../channels/null.langevals.channel.ts";
 import { ObjectStorageLangevalsPayloadStaging } from "../channels/object-storage.langevals-payload-staging.channel.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
@@ -91,8 +92,8 @@ import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.
 import { EvaluationService } from "../services/evaluation.service.ts";
 import { EvaluatorEnvironmentService } from "../services/evaluator-environment.service.ts";
 import { EvaluatorModelEnvService } from "../services/evaluator-model-env.service.ts";
-import { HttpLangevalsEvaluatorAdapter } from "../services/http.langevals-evaluator.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
+import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
 import { OtelEvaluationExecutionMetricsService } from "../services/otel.evaluation-execution-metrics.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
@@ -126,9 +127,7 @@ export type EvaluationInfrastructure = Readonly<{
 }>;
 
 /** Closed evaluation capabilities for a process that installs reads but no evaluator runtime. */
-export function createUnavailableEvaluationInfrastructure(
-  processName: string,
-): EvaluationInfrastructure {
+function createUnavailableEvaluationInfrastructure(processName: string): EvaluationInfrastructure {
   const unavailable = (capability: string): never => {
     throw new Error(`${processName} composes no ${capability}`);
   };
@@ -356,12 +355,14 @@ export class EvaluationApp implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationApp {
     const commands = EvaluationCommandDispatcherService.create();
-    const langevals = langevalsChannels.live.create({
-      config,
-      staging: ObjectStorageLangevalsPayloadStaging.create({
-        objectStorage: members.objectStorage,
-      }),
-    });
+    const langevals = config.langevalsEndpoint
+      ? langevalsChannels.live.create({
+          config,
+          staging: ObjectStorageLangevalsPayloadStaging.create({
+            objectStorage: members.objectStorage,
+          }),
+        })
+      : NullLangevalsChannel.create();
     const telemetry = OtelEvaluationExecutionMetricsService.create();
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
@@ -380,7 +381,8 @@ export class EvaluationApp implements EvaluationApiContract {
         azureSafety,
         environment,
       }),
-      langevalsClient: HttpLangevalsEvaluatorAdapter.create({
+      langevalsClient: LangevalsEvaluatorService.create({
+        langevals,
         config: {
           endpoint: config.langevalsEndpoint,
           maxRetries: LANGEVALS_MAX_RETRIES,

@@ -10,9 +10,9 @@ export type {
   CodingAgentBackfillProjects,
   CodingAgentSessionReads,
 } from "./services/coding-agent-pull-request-mapping-backfill.service.ts";
-export { SystemCodingAgentClockAdapter } from "./services/coding-agent-clock.service.ts";
-export { ModelCatalogCostEstimatorAdapter } from "./services/model-catalog-cost-estimator.service.ts";
-export { OtelCodingAgentCostMetricsAdapter } from "./services/coding-agent-cost-metrics.service.ts";
+export { SystemCodingAgentClockService } from "./services/coding-agent-clock.service.ts";
+export { ModelCatalogCostEstimatorService } from "./services/model-catalog-cost-estimator.service.ts";
+export { OtelCodingAgentCostMetricsService } from "./services/coding-agent-cost-metrics.service.ts";
 export type {
   CodingAgentCostMetrics,
   CodingAgentTraceProcessor,
@@ -20,7 +20,7 @@ export type {
 export { createCodingAgentLogFactsDispatchSubscriber } from "./eventing/coding-agent-log-facts-dispatch.subscriber.ts";
 export { createCodingAgentMetricFactsDispatchSubscriber } from "./eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
 export { createPullRequestMappingSubscriber } from "./eventing/pull-request-mapping.subscriber.ts";
-export { NoopCodingAgentReadMetrics } from "./services/coding-agent-read-metrics-noop.service.ts";
+export { NoopCodingAgentReadMetricsService } from "./services/coding-agent-read-metrics-noop.service.ts";
 export {
   type CodingAgentReadMetrics,
   type CodingAgentSessionListReadOutcome,
@@ -58,7 +58,7 @@ export { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-a
 export { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 export {
   CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
-  OtelCodingAgentReadMetricsAdapter,
+  OtelCodingAgentReadMetricsService,
 } from "./services/coding-agent-read-metrics-otel.service.ts";
 export type {
   CodingAgentAuditSink,

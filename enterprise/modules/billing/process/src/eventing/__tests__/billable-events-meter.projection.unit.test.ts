@@ -14,7 +14,7 @@ import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.bi
 import {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisBillingTenantOrganizationCacheAdapter,
+  RedisBillingTenantOrganizationCacheRepository,
 } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import {
@@ -69,7 +69,7 @@ function compose(options: {
     organizations: PostgresBillingRepositories.create({
       prisma: { project: { findUnique } } as never,
     }).tenantOrganizations,
-    cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: redis as never }),
+    cache: RedisBillingTenantOrganizationCacheRepository.create({ redis: redis as never }),
   });
 
   const projection = BillableEventsMeterProjection.create({

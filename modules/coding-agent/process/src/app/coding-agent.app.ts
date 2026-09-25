@@ -53,15 +53,15 @@ import {
 } from "../rules/coding-agent-gates.rules.ts";
 import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
-import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.service.ts";
+import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
-import { OtelCodingAgentCostMetricsAdapter } from "../services/coding-agent-cost-metrics.service.ts";
+import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import {
   type CodingAgentSessionService,
   CodingAgentFeatureService,
 } from "../services/coding-agent.service.ts";
-import { ModelCatalogCostEstimatorAdapter } from "../services/model-catalog-cost-estimator.service.ts";
+import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost-estimator.service.ts";
 import type {
   CodingAgentBillingPolicy,
   CodingAgentCallerScopeDirectory,
@@ -187,7 +187,7 @@ export class CodingAgentApp implements CodingAgentApi {
         github: dependencies.github,
         projects: dependencies.projects,
         billing: members.billing,
-        clock: SystemCodingAgentClockAdapter.create(),
+        clock: SystemCodingAgentClockService.create(),
       });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: members.scopeDirectory,
@@ -206,11 +206,11 @@ export class CodingAgentApp implements CodingAgentApi {
     const commands = CodingAgentCommandDispatcherService.create();
     const processing = EventingCodingAgentProcessingAdapter.create({
       traceCanonicalisation: dependencies.traces,
-      modelProviders: ModelCatalogCostEstimatorAdapter.create(),
-      costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
+      modelProviders: ModelCatalogCostEstimatorService.create(),
+      costMetrics: OtelCodingAgentCostMetricsService.create(),
       projections: CodingAgentProjectionPersistenceService.create(repositories),
       projects: dependencies.projects,
-      clock: SystemCodingAgentClockAdapter.create(),
+      clock: SystemCodingAgentClockService.create(),
       defaultRetentionDays: () => dependencies.retention.getPlatformDefaultRetentionDays(),
       sessionContextMemo: repositories.sessionContextMemo,
       sessionFoldCache: repositories.sessionFoldCache,

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { BillingOrganizationCache } from "../organization/billing-organization-cache.repository.ts";
-import type { BillingReportOrganizationLookup } from "../organization/billing-report-organization.repository.ts";
+import type { BillingOrganizationCacheRepository } from "../billing-organization-cache.repository.ts";
+import type { BillingReportOrganizationLookup } from "../billing-report-organization.repository.ts";
 
 /** The Redis read-through cache's twin: one map per install, no expiry. */
-export class MemoryBillingOrganizationCacheRepository implements BillingOrganizationCache {
+export class MemoryBillingOrganizationCacheRepository implements BillingOrganizationCacheRepository {
   static create(): MemoryBillingOrganizationCacheRepository {
     return new MemoryBillingOrganizationCacheRepository();
   }

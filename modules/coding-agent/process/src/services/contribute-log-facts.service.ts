@@ -18,16 +18,18 @@ import { CodingAgentSessionEventsMapProjection } from "../eventing/coding-agent-
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 
 /** Log facts contribution with stamped context; stamping exclusive to this lane. */
-export class EventingContributeLogFactsAdapter implements CommandHandler<
+export class EventingContributeLogFactsService implements CommandHandler<
   Command<ContributeLogFactsCommandData>,
   LogFactsContributedEvent
 > {
-  constructor(private readonly deps: { contextMemo: CodingAgentSessionContextMemoRepository }) {}
+  private constructor(
+    private readonly deps: { contextMemo: CodingAgentSessionContextMemoRepository },
+  ) {}
 
   static create(deps: {
     contextMemo: CodingAgentSessionContextMemoRepository;
-  }): EventingContributeLogFactsAdapter {
-    return new EventingContributeLogFactsAdapter(deps);
+  }): EventingContributeLogFactsService {
+    return new EventingContributeLogFactsService(deps);
   }
 
   static readonly schema = defineCommandSchema(

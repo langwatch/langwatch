@@ -24,7 +24,7 @@ export type BillingSubscriptionWithOrganization = BillingSubscriptionRecord & {
   organization: BillingOrganizationRecord;
 };
 
-export abstract class BillingSubscription {
+export abstract class BillingSubscriptionRepository {
   abstract findActive(organizationId: string): Promise<BillingSubscriptionRecord | null>;
   abstract findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null>;
   abstract createPending(input: {

@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { BillableEventsMeter } from "../../repositories/billable-events-meter.repository.ts";
+import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import type { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import { BillableEventsMeterProjection } from "../billable-events-meter.projection.ts";
 
@@ -79,7 +79,7 @@ function pricingFaqAnswer(): string {
 }
 
 const meteredEventTypes = BillableEventsMeterProjection.create({
-  meter: { insert: vi.fn<BillableEventsMeter["insert"]>() },
+  meter: { insert: vi.fn<BillableEventsMeterRepository["insert"]>() },
   organizations: {} as unknown as BillingTenantOrganizationService,
 }).build().eventTypes;
 

@@ -29,15 +29,15 @@ import type { CodingAgentSessionFoldCacheRepository } from "../repositories/codi
 import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 import {
-  EventingCodingAgentSessionEventsAppendAdapter,
-  EventingCodingAgentTraceSessionAppendAdapter,
-  EventingSessionMetricSeriesAppendAdapter,
+  EventingCodingAgentSessionEventsAppendService,
+  EventingCodingAgentTraceSessionAppendService,
+  EventingSessionMetricSeriesAppendService,
 } from "../services/coding-agent-projection-append.service.ts";
 import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
-import { EventingCodingAgentSessionStoreAdapter } from "../services/coding-agent-session-store.service.ts";
-import { EventingContributeLogFactsAdapter } from "../services/contribute-log-facts.service.ts";
-import { EventingContributeMetricFactsAdapter } from "../services/contribute-metric-facts.service.ts";
-import { EventingContributeSpanFactsAdapter } from "../services/contribute-span-facts.service.ts";
+import { EventingCodingAgentSessionStoreService } from "../services/coding-agent-session-store.service.ts";
+import { EventingContributeLogFactsService } from "../services/contribute-log-facts.service.ts";
+import { EventingContributeMetricFactsService } from "../services/contribute-metric-facts.service.ts";
+import { EventingContributeSpanFactsService } from "../services/contribute-span-facts.service.ts";
 import { createCodingAgentCostDriftSubscriber } from "./coding-agent-cost-drift.subscriber.ts";
 import { CodingAgentSessionEventsMapProjection } from "./coding-agent-session-events.projection.ts";
 import {
@@ -86,7 +86,7 @@ export class EventingCodingAgentProcessingAdapter {
       clock: deps.clock,
     });
     const sessionStore = deps.sessionFoldCache.cached<CodingAgentSessionState>(
-      EventingCodingAgentSessionStoreAdapter.create({
+      EventingCodingAgentSessionStoreService.create({
         persistence: deps.projections,
         defaultRetentionDays: deps.defaultRetentionDays,
         onSessionsStored: (tenantIds) => sessionSeen.record(tenantIds),
@@ -115,7 +115,7 @@ export class EventingCodingAgentProcessingAdapter {
       )
       .withClickHouseMapProjection(
         CodingAgentTraceSessionsMapProjection.create({
-          store: EventingCodingAgentTraceSessionAppendAdapter.create({
+          store: EventingCodingAgentTraceSessionAppendService.create({
             persistence: deps.projections,
             defaultRetentionDays: deps.defaultRetentionDays,
           }),
@@ -123,7 +123,7 @@ export class EventingCodingAgentProcessingAdapter {
       )
       .withClickHouseMapProjection(
         SessionMetricSeriesMapProjection.create({
-          store: EventingSessionMetricSeriesAppendAdapter.create({
+          store: EventingSessionMetricSeriesAppendService.create({
             persistence: deps.projections,
             defaultRetentionDays: deps.defaultRetentionDays,
           }),
@@ -131,7 +131,7 @@ export class EventingCodingAgentProcessingAdapter {
       )
       .withClickHouseMapProjection(
         CodingAgentSessionEventsMapProjection.create({
-          store: EventingCodingAgentSessionEventsAppendAdapter.create({
+          store: EventingCodingAgentSessionEventsAppendService.create({
             persistence: deps.projections,
             defaultRetentionDays: deps.defaultRetentionDays,
           }),
@@ -150,19 +150,24 @@ export class EventingCodingAgentProcessingAdapter {
       // memo from a declaration; the span lane only reads it.
       .withCommandInstance(
         "contributeSpanFacts",
-        EventingContributeSpanFactsAdapter,
-        EventingContributeSpanFactsAdapter.create({ contextMemo }),
+        EventingContributeSpanFactsService,
+        EventingContributeSpanFactsService.create({ contextMemo }),
         { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
       )
       .withCommandInstance(
         "contributeLogFacts",
-        EventingContributeLogFactsAdapter,
-        EventingContributeLogFactsAdapter.create({ contextMemo }),
+        EventingContributeLogFactsService,
+        EventingContributeLogFactsService.create({ contextMemo }),
         { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
       )
-      .withCommand("contributeMetricFacts", EventingContributeMetricFactsAdapter, {
-        coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
-      });
+      .withCommandInstance(
+        "contributeMetricFacts",
+        EventingContributeMetricFactsService,
+        EventingContributeMetricFactsService.create(),
+        {
+          coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+        },
+      );
 
     const configured = github
       ? builder.withProjectionSubscriber(

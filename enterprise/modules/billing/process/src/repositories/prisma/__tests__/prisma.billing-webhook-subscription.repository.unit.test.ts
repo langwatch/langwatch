@@ -6,11 +6,11 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  type BillingSubscription,
+  type BillingSubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../../subscription.repository.ts";
-import { PrismaBillingWebhookBillingSubscription } from "../prisma.billing-webhook-subscription.repository.ts";
+import { PrismaBillingWebhookSubscriptionRepository } from "../prisma.billing-webhook-subscription.repository.ts";
 
 const SUBSCRIPTION: BillingSubscriptionRecord = {
   id: "subscription-1",
@@ -38,7 +38,9 @@ function recordNotFound(): Error & { code: string } {
   return Object.assign(new Error("No Subscription found"), { code: "P2025" });
 }
 
-function repositoryDouble(overrides: Partial<BillingSubscription> = {}): BillingSubscription {
+function repositoryDouble(
+  overrides: Partial<BillingSubscriptionRepository> = {},
+): BillingSubscriptionRepository {
   return {
     findActive: vi.fn(),
     findLastNonCancelled: vi.fn(() => Promise.resolve(SUBSCRIPTION)),
@@ -59,7 +61,7 @@ function repositoryDouble(overrides: Partial<BillingSubscription> = {}): Billing
 
 function compose(
   options: {
-    repository?: BillingSubscription;
+    repository?: BillingSubscriptionRepository;
     license?: string | null;
   } = {},
 ) {
@@ -72,11 +74,11 @@ function compose(
 
   return {
     subscriptions,
-    adapter: PrismaBillingWebhookBillingSubscription.create({ subscriptions, database }),
+    adapter: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions, database }),
   };
 }
 
-describe("PrismaBillingWebhookBillingSubscription", () => {
+describe("PrismaBillingWebhookSubscriptionRepository", () => {
   describe("when a payment activates the subscription", () => {
     /** @scenario "An activation carries the organization's trial licence to the webhook" */
     it("carries the organization's trial licence beside the activated row", async () => {
@@ -137,7 +139,7 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(recordNotFound())),
-        } as Partial<BillingSubscription>),
+        } as Partial<BillingSubscriptionRepository>),
       });
 
       await expect(
@@ -152,7 +154,7 @@ describe("PrismaBillingWebhookBillingSubscription", () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(new Error("connection refused"))),
-        } as Partial<BillingSubscription>),
+        } as Partial<BillingSubscriptionRepository>),
       });
 
       await expect(

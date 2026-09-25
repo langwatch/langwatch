@@ -6,7 +6,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-  BillingSubscription,
+  BillingSubscriptionRepository,
 } from "../subscription.repository.ts";
 import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -30,13 +30,13 @@ const TIERED_PLANS: readonly string[] = [
  * The subscription aggregate, held in the shared store. Ordering matches the
  * Prisma twin: newest created first, so a second pending row shadows the first.
  */
-export class MemoryBillingSubscription extends BillingSubscription {
+export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepository {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }
 
-  static create(store: MemoryBillingStore): MemoryBillingSubscription {
-    return new MemoryBillingSubscription(store);
+  static create(store: MemoryBillingStore): MemoryBillingSubscriptionRepository {
+    return new MemoryBillingSubscriptionRepository(store);
   }
 
   async findActive(organizationId: string): Promise<BillingSubscriptionRecord | null> {

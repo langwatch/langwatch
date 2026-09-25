@@ -21,9 +21,9 @@ import { describe, expect, it } from "vitest";
 
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../../repositories/session-context-memo.repository.ts";
-import { EventingContributeLogFactsAdapter } from "../contribute-log-facts.service.ts";
-import { EventingContributeMetricFactsAdapter } from "../contribute-metric-facts.service.ts";
-import { EventingContributeSpanFactsAdapter } from "../contribute-span-facts.service.ts";
+import { EventingContributeLogFactsService } from "../contribute-log-facts.service.ts";
+import { EventingContributeMetricFactsService } from "../contribute-metric-facts.service.ts";
+import { EventingContributeSpanFactsService } from "../contribute-span-facts.service.ts";
 
 const TENANT = "tenant-1";
 const SESSION = "8f2c9a1e-session";
@@ -93,7 +93,7 @@ function makeCommand<T>(type: string, data: T) {
   };
 }
 
-describe("EventingContributeSpanFactsAdapter", () => {
+describe("EventingContributeSpanFactsService", () => {
   describe("when a coding-agent span's facts are contributed", () => {
     it("emits one session-keyed span_facts_contributed event", async () => {
       const handler = spanFactsHandler();
@@ -247,7 +247,7 @@ describe("EventingContributeSpanFactsAdapter", () => {
   });
 
   it("routes the command by session, not by trace", () => {
-    expect(EventingContributeSpanFactsAdapter.getAggregateId(spanFactsData())).toBe(SESSION);
+    expect(EventingContributeSpanFactsService.getAggregateId(spanFactsData())).toBe(SESSION);
   });
 
   describe("given a nested interactive session launched from inside another", () => {
@@ -278,13 +278,13 @@ describe("EventingContributeSpanFactsAdapter", () => {
 });
 
 function spanFactsHandler(memo?: CodingAgentSessionContextMemoRepository) {
-  return EventingContributeSpanFactsAdapter.create({
+  return EventingContributeSpanFactsService.create({
     contextMemo: memo ?? new MemorySessionContextMemoRepository(),
   });
 }
 
 function logFactsHandler(memo?: CodingAgentSessionContextMemoRepository) {
-  return EventingContributeLogFactsAdapter.create({
+  return EventingContributeLogFactsService.create({
     contextMemo: memo ?? new MemorySessionContextMemoRepository(),
   });
 }
@@ -319,7 +319,7 @@ function modelCallData(overrides?: Record<string, unknown>) {
   });
 }
 
-describe("EventingContributeLogFactsAdapter", () => {
+describe("EventingContributeLogFactsService", () => {
   describe("when a log with no correlation contributes", () => {
     /** @scenario a denied tool is part of the session story */
     it("carries the facts with a null trace id", async () => {
@@ -483,11 +483,11 @@ describe("EventingContributeLogFactsAdapter", () => {
   });
 });
 
-describe("EventingContributeMetricFactsAdapter", () => {
+describe("EventingContributeMetricFactsService", () => {
   describe("when a series' converged totals are contributed", () => {
     /** @scenario a session that sent only metrics still appears */
     it("emits one session-keyed metric_facts_contributed event", async () => {
-      const handler = EventingContributeMetricFactsAdapter.create();
+      const handler = EventingContributeMetricFactsService.create();
       const events = await handler.handle(
         makeCommand(CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE, metricFactsData()),
       );
@@ -503,7 +503,7 @@ describe("EventingContributeMetricFactsAdapter", () => {
   describe("when the same converged observation is re-delivered", () => {
     /** @scenario re-delivered telemetry does not inflate a session */
     it("collapses re-deliveries; a newer observation is a new fact", async () => {
-      const handler = EventingContributeMetricFactsAdapter.create();
+      const handler = EventingContributeMetricFactsService.create();
       const [same1] = await handler.handle(
         makeCommand(CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE, metricFactsData()),
       );

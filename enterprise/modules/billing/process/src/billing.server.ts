@@ -10,18 +10,18 @@ import { BillingApp } from "./app/billing.app.ts";
 import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
 import { billingReportingEventing } from "./eventing/billing-reporting.pipeline.ts";
 import { connectedBillingEventing } from "./eventing/connected-billing.pipeline.ts";
-import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
+import type { BillableEventsMeterRepository } from "./repositories/billable-events-meter.repository.ts";
+import type { BillingOrganizationCacheRepository } from "./repositories/billing-organization-cache.repository.ts";
 import {
   billingClickhouseRepositories,
   billingRepositories,
 } from "./repositories/billing-repositories.registry.ts";
-import type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
 import {
-  RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 import {
-  RedisBillingTenantOrganizationCacheAdapter,
+  RedisBillingTenantOrganizationCacheRepository,
   type BillingTenantOrganizationCacheRedis,
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 import type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
@@ -67,7 +67,7 @@ export function createBillableEventsQuery(options: {
 /** Where a billable event is metered, over the process's own tenant-keyed endpoint. */
 export function createBillableEventsMeter(options: {
   clickhouse: ClickHouseQueryClient;
-}): BillableEventsMeter {
+}): BillableEventsMeterRepository {
   return liveClickhouseRepositories(options.clickhouse).billableEventsMeter;
 }
 
@@ -96,8 +96,8 @@ function liveClickhouseRepositories(clickhouse: ClickHouseQueryClient) {
 /** The organization cache a reporting run reads, over the process's own Redis. */
 export function createBillingOrganizationCache(options: {
   redis: BillingOrganizationCacheRedis;
-}): BillingOrganizationCache {
-  return RedisBillingOrganizationCacheAdapter.create(options);
+}): BillingOrganizationCacheRepository {
+  return RedisBillingOrganizationCacheRepository.create(options);
 }
 
 /** Tenant-to-organization resolution, cached on the process's own Redis. */
@@ -107,7 +107,7 @@ export function createBillingTenantOrganizations(options: {
 }): BillingTenantOrganizationService {
   return BillingTenantOrganizationService.create({
     organizations: options.organizations,
-    cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: options.redis }),
+    cache: RedisBillingTenantOrganizationCacheRepository.create({ redis: options.redis }),
   });
 }
 

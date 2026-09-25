@@ -8,8 +8,8 @@ import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { type BillingWebhookHost, type SubscriptionWithOrg } from "../../index.ts";
-import { type BillingWebhookOrganization } from "../../repositories/billing-webhook-organization.repository.ts";
-import { type BillingWebhookSubscription } from "../../repositories/billing-webhook-subscription.repository.ts";
+import { type BillingWebhookOrganizationRepository } from "../../repositories/billing-webhook-organization.repository.ts";
+import { type BillingWebhookSubscriptionRepository } from "../../repositories/billing-webhook-subscription.repository.ts";
 import { type BillingSubscriptionRecord } from "../../repositories/subscription.repository.ts";
 import { ANNUAL_EVENTS_BILLING_THRESHOLD } from "../annual-events-billing-threshold.service.ts";
 import { EEWebhookService } from "../billing-stripe-webhook.service.ts";
@@ -32,7 +32,7 @@ const createMockHost = (): {
 });
 
 const createMockBillingSubscription = (): {
-  [K in keyof BillingWebhookSubscription]: Mock<BillingWebhookSubscription[K]>;
+  [K in keyof BillingWebhookSubscriptionRepository]: Mock<BillingWebhookSubscriptionRepository[K]>;
 } => ({
   findLastNonCancelled: vi.fn(),
   createPending: vi.fn(),
@@ -49,7 +49,7 @@ const createMockBillingSubscription = (): {
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingWebhookOrganization]: Mock<BillingWebhookOrganization[K]>;
+  [K in keyof BillingWebhookOrganizationRepository]: Mock<BillingWebhookOrganizationRepository[K]>;
 } => ({
   findByStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),

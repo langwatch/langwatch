@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
-  BillingWebhookSubscription,
+  BillingWebhookSubscriptionRepository,
   type ActivateSubscriptionResult,
   type CancelledSubscription,
   type SubscriptionMutationResult,
@@ -14,7 +14,7 @@ import {
 } from "../billing-webhook-subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscription,
+  BillingSubscriptionRepository,
   BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
 
@@ -23,19 +23,19 @@ const logger = createLogger("langwatch:billing:webhook-subscription-adapter");
 /** The one organization column the port carries that the repository does not select. */
 export type BillingWebhookTrialLicenseDatabase = Pick<PrismaClient, "organization">;
 
-export class PrismaBillingWebhookBillingSubscription extends BillingWebhookSubscription {
+export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSubscriptionRepository {
   private constructor(
-    private readonly subscriptions: BillingSubscription,
+    private readonly subscriptions: BillingSubscriptionRepository,
     private readonly database: BillingWebhookTrialLicenseDatabase,
   ) {
     super();
   }
 
   static create(options: {
-    subscriptions: BillingSubscription;
+    subscriptions: BillingSubscriptionRepository;
     database: BillingWebhookTrialLicenseDatabase;
-  }): PrismaBillingWebhookBillingSubscription {
-    return new PrismaBillingWebhookBillingSubscription(options.subscriptions, options.database);
+  }): PrismaBillingWebhookSubscriptionRepository {
+    return new PrismaBillingWebhookSubscriptionRepository(options.subscriptions, options.database);
   }
 
   findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {

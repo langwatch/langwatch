@@ -4,7 +4,7 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { PostgresBillingRepositories } from "../../repositories/prisma/prisma.billing.repositories.ts";
-import { RedisBillingTenantOrganizationCacheAdapter } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
+import { RedisBillingTenantOrganizationCacheRepository } from "../../repositories/redis/redis.tenant-organization-cache.repository.ts";
 import { BillingTenantOrganizationService } from "../../services/tenant-organization.service.ts";
 import {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
@@ -27,7 +27,7 @@ function compose(
       organizations: PostgresBillingRepositories.create({
         prisma: { project: { findUnique } } as never,
       }).tenantOrganizations,
-      cache: RedisBillingTenantOrganizationCacheAdapter.create({
+      cache: RedisBillingTenantOrganizationCacheRepository.create({
         redis: { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") } as never,
       }),
     }),

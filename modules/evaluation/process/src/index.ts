@@ -1,8 +1,5 @@
 export { EvaluationApp } from "./app/evaluation.app.ts";
-export {
-  createUnavailableEvaluationInfrastructure,
-  evaluationServer,
-} from "./evaluation.server.ts";
+export { evaluationServer } from "./evaluation.server.ts";
 export { ExecuteEvaluationCommand } from "./eventing/evaluation-execution.intent.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 
@@ -43,7 +40,6 @@ export {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "./services/evaluation-execution.service.ts";
-export { HttpLangevalsEvaluatorAdapter } from "./services/http.langevals-evaluator.service.ts";
 export { OtelEvaluationExecutionMetricsService } from "./services/otel.evaluation-execution-metrics.service.ts";
 export { DirectEvaluationExecutionReceiptService } from "./services/direct.evaluation-execution-receipt.service.ts";
 export { ClickhouseMonitorPerformanceRepository as MonitorPerformanceAdapter } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";

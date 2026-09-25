@@ -9,13 +9,15 @@ import {
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 
-export class EventingContributeMetricFactsAdapter implements CommandHandler<
+export class EventingContributeMetricFactsService implements CommandHandler<
   Command<ContributeMetricFactsCommandData>,
   MetricFactsContributedEvent
 > {
-  static create(): EventingContributeMetricFactsAdapter {
-    return new EventingContributeMetricFactsAdapter();
+  static create(): EventingContributeMetricFactsService {
+    return new EventingContributeMetricFactsService();
   }
+
+  private constructor() {}
 
   static readonly schema = defineCommandSchema(
     CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE,

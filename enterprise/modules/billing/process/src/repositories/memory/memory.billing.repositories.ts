@@ -7,14 +7,14 @@ import { MemoryBillingCheckpointRepository } from "./memory.billing-checkpoint.r
 import { MemoryBillingOrganizationCacheRepository } from "./memory.billing-organization-cache.repository.ts";
 import { MemoryBillingReportOrganizationRepository } from "./memory.billing-report-organization.repository.ts";
 import { MemoryBillingWebhookOrganizationRepository } from "./memory.billing-webhook-organization.repository.ts";
-import { MemoryBillingWebhookBillingSubscription } from "./memory.billing-webhook-subscription.repository.ts";
+import { MemoryBillingWebhookSubscriptionRepository } from "./memory.billing-webhook-subscription.repository.ts";
 import { MemoryBillingStore } from "./memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "./memory.connected-billing.repository.ts";
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
 import { MemoryNurturingProfileRepository } from "./memory.nurturing-profile.repository.ts";
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
 import { MemoryProjectActiveDayRepository } from "./memory.project-active-day.repository.ts";
-import { MemoryBillingSubscription } from "./memory.subscription.repository.ts";
+import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
 import { MemoryBillingTenantOrganizationRepository } from "./memory.tenant-organization.repository.ts";
 
 /** The "memory" tier: every billing repository, with no database behind it. */
@@ -26,7 +26,7 @@ export class MemoryBillingRepositories {
     // Prisma tier: a subscription written here is what the report, the pricing
     // and the nurturing rows answer from.
     const store = MemoryBillingStore.create();
-    const subscriptions = MemoryBillingSubscription.create(store);
+    const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
     return {
       billableEvents: MemoryBillableEventsRepository.create(store),
@@ -42,7 +42,7 @@ export class MemoryBillingRepositories {
       subscriptions,
       tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),
       webhookOrganizations: MemoryBillingWebhookOrganizationRepository.create(store),
-      webhookSubscriptions: MemoryBillingWebhookBillingSubscription.create({
+      webhookSubscriptions: MemoryBillingWebhookSubscriptionRepository.create({
         subscriptions,
         store,
       }),

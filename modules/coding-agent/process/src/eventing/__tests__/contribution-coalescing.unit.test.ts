@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { MemorySessionContextMemoRepository } from "../../repositories/memory/memory.session-context-memo.repository.ts";
-import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
+import { EventingContributeLogFactsService } from "../../services/contribute-log-facts.service.ts";
 import { CodingAgentSessionLogProjection } from "../coding-agent-session-log.projection.ts";
 import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
 
@@ -74,13 +74,13 @@ function batchParamsFor({
   return {
     payloads,
     commandType: CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
-    commandSchema: EventingContributeLogFactsAdapter.schema,
-    handler: EventingContributeLogFactsAdapter.create({
+    commandSchema: EventingContributeLogFactsService.schema,
+    handler: EventingContributeLogFactsService.create({
       contextMemo: new MemorySessionContextMemoRepository(),
     }),
     getAggregateId: (
-      command: Parameters<typeof EventingContributeLogFactsAdapter.getAggregateId>[0],
-    ) => EventingContributeLogFactsAdapter.getAggregateId(command),
+      command: Parameters<typeof EventingContributeLogFactsService.getAggregateId>[0],
+    ) => EventingContributeLogFactsService.getAggregateId(command),
     storeEventsFn: storeEventsFn as never,
     aggregateType: "coding_agent_session" as const,
     commandName: "contributeLogFacts",

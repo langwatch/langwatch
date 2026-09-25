@@ -8,10 +8,10 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
-import { MemoryBillingSubscription } from "../../repositories/memory/memory.subscription.repository.ts";
+import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import type {
   BillingSubscriptionRecord,
-  BillingSubscription,
+  BillingSubscriptionRepository,
 } from "../../repositories/subscription.repository.ts";
 import { DeploymentPlanSourcesService } from "../deployment-plan-sources.service.ts";
 
@@ -38,10 +38,10 @@ const subscription = (
 });
 
 /** The one read the subscription source makes; nothing else is exercised. */
-function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscription {
+function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscriptionRepository {
   const store = MemoryBillingStore.create();
   if (active) store.subscriptions.push(active);
-  return MemoryBillingSubscription.create(store);
+  return MemoryBillingSubscriptionRepository.create(store);
 }
 
 describe("given the plan sources a deployment resolves through", () => {

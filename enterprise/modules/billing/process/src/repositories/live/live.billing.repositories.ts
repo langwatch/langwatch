@@ -6,7 +6,7 @@ import type { BillingRepositories } from "../billing.repositories.ts";
 import { BillableEventsClickHouseRepository } from "../clickhouse/clickhouse.billable-events.repository.ts";
 import { PostgresBillingRepositories } from "../prisma/prisma.billing.repositories.ts";
 import {
-  RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
 } from "../redis/redis.billing-organization-cache.repository.ts";
 
@@ -26,7 +26,7 @@ export class LiveBillingRepositories {
     return {
       ...PostgresBillingRepositories.create({ prisma }),
       billableEvents: BillableEventsClickHouseRepository.create(clickhouse),
-      organizationCache: RedisBillingOrganizationCacheAdapter.create({ redis }),
+      organizationCache: RedisBillingOrganizationCacheRepository.create({ redis }),
     };
   }
 }

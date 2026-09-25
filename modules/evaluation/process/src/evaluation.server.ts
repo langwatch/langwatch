@@ -36,10 +36,7 @@ import { EvaluationNameAutoslugService } from "./services/evaluation-name-autosl
 import { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 import { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";
 
-export {
-  createUnavailableEvaluationInfrastructure,
-  type EvaluationInfrastructure,
-} from "./app/evaluation.app.ts";
+export type { EvaluationInfrastructure } from "./app/evaluation.app.ts";
 
 export const evaluationServer = defineServerModule("evaluation")
   .withRepositories(evaluationRepositories)

@@ -15,7 +15,7 @@ import {
   type EvaluationExecutionTelemetry,
   type LangevalsEvaluateParams,
 } from "../app/evaluation.members.ts";
-import { NullLangevalsEvaluatorClient } from "./null.langevals-evaluator.service.ts";
+import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -24,12 +24,19 @@ function throwFetchFailure({
   url,
   timeoutMs,
   evaluatorType,
+  onTooLarge,
 }: {
   error: unknown;
   url: string;
   timeoutMs: number;
   evaluatorType: string;
+  onTooLarge: () => void;
 }): never {
+  if (error instanceof PayloadTooLargeError) {
+    onTooLarge();
+    throw new EvaluatorInputTooLargeError({ meta: { evaluatorType } });
+  }
+
   if (error instanceof Error && error.name === "AbortError") {
     logger.warn({ url, timeoutMs }, "Evaluator request timed out");
     // The address dialled stays in the log line above: `meta` rides the
@@ -60,25 +67,19 @@ export type LangevalsRuntimeConfig = Readonly<{
   timeoutMs: number;
 }>;
 
-/**
- * Process-owned HTTP evaluator transport. It owns no durable connection or
- * socket: each request uses the platform fetch implementation and its abort
- * controller is released before the request settles.
- */
-export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
+/** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
+export class LangevalsEvaluatorService implements EvaluationLangevals {
   static create(input: {
     config: LangevalsRuntimeConfig;
+    langevals: LangevalsChannel;
     telemetry?: EvaluationExecutionTelemetry;
-  }): HttpLangevalsEvaluatorAdapter | NullLangevalsEvaluatorClient {
-    if (!input.config.endpoint) {
-      return new NullLangevalsEvaluatorClient();
-    }
-
-    return new HttpLangevalsEvaluatorAdapter(input.config, input.telemetry);
+  }): LangevalsEvaluatorService {
+    return new LangevalsEvaluatorService(input.config, input.langevals, input.telemetry);
   }
 
   private constructor(
     private readonly config: LangevalsRuntimeConfig,
+    private readonly langevals: LangevalsChannel,
     private readonly telemetry: EvaluationExecutionTelemetry | undefined,
   ) {}
 
@@ -98,14 +99,12 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
 
     let response: Response;
     try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-        },
+      response = await this.langevals.post({
+        url,
+        kind: "evaluation",
+        headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
         signal: controller.signal,
-        body: JSON.stringify({
+        body: {
           data: [
             {
               input: tryAndConvertTo(data.input, "string"),
@@ -118,10 +117,21 @@ export class HttpLangevalsEvaluatorAdapter implements EvaluationLangevals {
           ],
           settings: settings ?? {},
           env,
-        }),
+        },
       });
     } catch (error) {
-      throwFetchFailure({ error, url, timeoutMs: this.config.timeoutMs, evaluatorType });
+      throwFetchFailure({
+        error,
+        url,
+        timeoutMs: this.config.timeoutMs,
+        evaluatorType,
+        onTooLarge: () =>
+          this.telemetry?.record({
+            evaluatorType,
+            status: "skipped",
+            durationMs: performance.now() - startTime,
+          }),
+      });
     } finally {
       clearTimeout(timeout);
     }

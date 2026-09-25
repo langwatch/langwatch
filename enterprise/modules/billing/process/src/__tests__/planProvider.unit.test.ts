@@ -8,7 +8,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PrismaBillingSubscription } from "../repositories/prisma/prisma.subscription.repository.ts";
+import { PrismaBillingSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
 import {
   NUMERIC_OVERRIDE_FIELDS,
   SaaSPlanProviderService,
@@ -21,7 +21,7 @@ const mockEnv: {
 
 const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProviderService =>
   SaaSPlanProviderService.create({
-    subscriptions: PrismaBillingSubscription.create(db),
+    subscriptions: PrismaBillingSubscriptionRepository.create(db),
     isSaas: mockEnv.IS_SAAS ?? false,
     adminEmails: mockEnv.ADMIN_EMAILS,
   });

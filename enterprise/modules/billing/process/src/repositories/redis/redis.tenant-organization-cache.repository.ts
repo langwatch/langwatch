@@ -34,11 +34,11 @@ export type BillingTenantOrganizationCacheRedis = Pick<Redis | Cluster, "get" | 
  * reassignable — so an unreachable Redis has to degrade to the database rather
  * than stop a billable event from being counted.
  */
-export class RedisBillingTenantOrganizationCacheAdapter implements BillingTenantOrganizationCache {
+export class RedisBillingTenantOrganizationCacheRepository implements BillingTenantOrganizationCache {
   static create(options: {
     redis: BillingTenantOrganizationCacheRedis;
-  }): RedisBillingTenantOrganizationCacheAdapter {
-    return new RedisBillingTenantOrganizationCacheAdapter(options.redis);
+  }): RedisBillingTenantOrganizationCacheRepository {
+    return new RedisBillingTenantOrganizationCacheRepository(options.redis);
   }
 
   private constructor(private readonly redis: BillingTenantOrganizationCacheRedis) {}

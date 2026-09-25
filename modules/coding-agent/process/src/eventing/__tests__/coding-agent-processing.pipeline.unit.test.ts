@@ -8,10 +8,10 @@ import type {
   CodingAgentPullRequestMapping,
 } from "../../app/coding-agent.members.ts";
 import { LiveCodingAgentRepositories } from "../../repositories/live/live.coding-agent.repositories.ts";
-import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
-import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
+import { SystemCodingAgentClockService } from "../../services/coding-agent-clock.service.ts";
+import { OtelCodingAgentCostMetricsService } from "../../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
-import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../services/model-catalog-cost-estimator.service.ts";
 import {
   type CodingAgentProcessingPipeline,
   EventingCodingAgentProcessingAdapter,
@@ -112,11 +112,11 @@ function compose(
     "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything();
   const pipeline: CodingAgentProcessingPipeline = EventingCodingAgentProcessingAdapter.create({
     traceCanonicalisation: new TestTraceCanonicalisation(),
-    modelProviders: ModelCatalogCostEstimatorAdapter.create(),
-    costMetrics: OtelCodingAgentCostMetricsAdapter.create(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
+    costMetrics: OtelCodingAgentCostMetricsService.create(),
     projections: CodingAgentProjectionPersistenceService.create(repositories),
     projects: projectActivity,
-    clock: SystemCodingAgentClockAdapter.create(),
+    clock: SystemCodingAgentClockService.create(),
     defaultRetentionDays: () => 49,
     sessionContextMemo: repositories.sessionContextMemo,
     sessionFoldCache: repositories.sessionFoldCache,
@@ -260,7 +260,7 @@ describe("coding_agent_processing over the live repositories", () => {
   describe("when a model call is priced", () => {
     /** @scenario "A model call is priced from the platform catalog alone" */
     it("prices a catalogued model from the catalog's own rates", () => {
-      const estimator = ModelCatalogCostEstimatorAdapter.create();
+      const estimator = ModelCatalogCostEstimatorService.create();
 
       const cost = estimator.estimateCost({
         attrs: {},
@@ -277,7 +277,7 @@ describe("coding_agent_processing over the live repositories", () => {
 
     /** @scenario "A model call is priced from the platform catalog alone" */
     it("prefers custom per-token rates carried on the call's own attributes", () => {
-      const estimator = ModelCatalogCostEstimatorAdapter.create();
+      const estimator = ModelCatalogCostEstimatorService.create();
 
       const cost = estimator.estimateCost({
         attrs: {

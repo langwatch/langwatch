@@ -5,9 +5,9 @@ import type { Cluster, Redis } from "ioredis";
 import {
   BILLING_ORG_CACHE_PREFIX,
   BILLING_ORG_CACHE_TTL_MS,
-  type BillingOrganizationCache,
-} from "../organization/billing-organization-cache.repository.ts";
-import type { BillingReportOrganizationLookup } from "../organization/billing-report-organization.repository.ts";
+  type BillingOrganizationCacheRepository,
+} from "../billing-organization-cache.repository.ts";
+import type { BillingReportOrganizationLookup } from "../billing-report-organization.repository.ts";
 
 /** Only what this cache calls, so a test double is a two-method object. */
 export type BillingOrganizationCacheRedis = Pick<Redis | Cluster, "get" | "setex">;
@@ -29,11 +29,11 @@ export type BillingOrganizationCacheRedis = Pick<Redis | Cluster, "get" | "setex
  * spare Postgres one lookup per organization per minute; an unreachable Redis
  * has to degrade to the database rather than stop a month being reported.
  */
-export class RedisBillingOrganizationCacheAdapter implements BillingOrganizationCache {
+export class RedisBillingOrganizationCacheRepository implements BillingOrganizationCacheRepository {
   static create(options: {
     redis: BillingOrganizationCacheRedis;
-  }): RedisBillingOrganizationCacheAdapter {
-    return new RedisBillingOrganizationCacheAdapter(options.redis);
+  }): RedisBillingOrganizationCacheRepository {
+    return new RedisBillingOrganizationCacheRepository(options.redis);
   }
 
   private constructor(private readonly redis: BillingOrganizationCacheRedis) {}

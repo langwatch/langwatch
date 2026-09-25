@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The organization-keyed pull-request usage door, driven through the runtime a
@@ -216,11 +217,11 @@ function mount(overrides: Overrides) {
 
   const hono = runtime.mount(codingAgentV1Rest.router(), {
     app: () =>
-      ({
+      createApiFixture<CodingAgentApi>({
         githubWebBase: () => "https://github.com",
         getOrganizationPullRequestUsage,
         recordPullRequestUsageRead,
-      }) as unknown as CodingAgentApi,
+      }),
     ...(overrides.credential ? { credential: overrides.credential } : {}),
     onError: renderHandled,
     facts: [

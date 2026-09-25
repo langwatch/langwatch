@@ -4,14 +4,14 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {
-  BillableEventsMeter,
+  BillableEventsMeterRepository,
   type BillableEventRecord,
 } from "../billable-events-meter.repository.ts";
 
 const TABLE_NAME = "billable_events" as const;
 
 /** ClickHouse write side for deduplicated usage counting. */
-export class BillableEventsMeterClickHouseRepository extends BillableEventsMeter {
+export class BillableEventsMeterClickHouseRepository extends BillableEventsMeterRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
   private constructor(clickhouse: ClickHouseQueryClient) {

@@ -7,13 +7,13 @@ import { PrismaBillingOrganizationRepository } from "./prisma.billing-account-fa
 import { PrismaBillingCheckpointRepository } from "./prisma.billing-checkpoint.repository.ts";
 import { PrismaBillingReportOrganizationRepository } from "./prisma.billing-report-organization.repository.ts";
 import { PrismaBillingWebhookOrganizationRepository } from "./prisma.billing-webhook-organization.repository.ts";
-import { PrismaBillingWebhookBillingSubscription } from "./prisma.billing-webhook-subscription.repository.ts";
+import { PrismaBillingWebhookSubscriptionRepository } from "./prisma.billing-webhook-subscription.repository.ts";
 import { PrismaConnectedBillingRepository } from "./prisma.connected-billing.repository.ts";
 import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate-subscriptions-report.repository.ts";
 import { PrismaNurturingProfileRepository } from "./prisma.nurturing-profile.repository.ts";
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
 import { PrismaProjectActiveDayRepository } from "./prisma.project-active-day.repository.ts";
-import { PrismaBillingSubscription } from "./prisma.subscription.repository.ts";
+import { PrismaBillingSubscriptionRepository } from "./prisma.subscription.repository.ts";
 import { PrismaBillingTenantOrganizationRepository } from "./prisma.tenant-organization.repository.ts";
 
 /**
@@ -26,7 +26,7 @@ export class PostgresBillingRepositories {
   static create(members: Readonly<{ prisma: PrismaClient }>): BillingPostgresRepositories {
     const { prisma } = members;
 
-    const subscriptions = PrismaBillingSubscription.create(prisma);
+    const subscriptions = PrismaBillingSubscriptionRepository.create(prisma);
 
     return {
       checkpoints: PrismaBillingCheckpointRepository.create(prisma),
@@ -42,7 +42,7 @@ export class PostgresBillingRepositories {
       subscriptions,
       tenantOrganizations: PrismaBillingTenantOrganizationRepository.create(prisma),
       webhookOrganizations: PrismaBillingWebhookOrganizationRepository.create({ database: prisma }),
-      webhookSubscriptions: PrismaBillingWebhookBillingSubscription.create({
+      webhookSubscriptions: PrismaBillingWebhookSubscriptionRepository.create({
         subscriptions,
         database: prisma,
       }),

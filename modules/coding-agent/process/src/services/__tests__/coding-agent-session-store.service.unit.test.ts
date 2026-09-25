@@ -16,7 +16,7 @@ import {
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
-import { EventingCodingAgentSessionStoreAdapter } from "../coding-agent-session-store.service.ts";
+import { EventingCodingAgentSessionStoreService } from "../coding-agent-session-store.service.ts";
 
 const tenantId = createTenantId("tenant-1");
 
@@ -104,8 +104,8 @@ const context = (over: Partial<ProjectionStoreContext> = {}): ProjectionStoreCon
 function storeWith(
   persistence: FakePersistence,
   hooks: { onSessionsStored?: (tenantIds: string[]) => Promise<void> } = {},
-): EventingCodingAgentSessionStoreAdapter {
-  return EventingCodingAgentSessionStoreAdapter.create({
+): EventingCodingAgentSessionStoreService {
+  return EventingCodingAgentSessionStoreService.create({
     persistence,
     defaultRetentionDays: () => 30,
     onSessionsStored: hooks.onSessionsStored,
@@ -178,7 +178,7 @@ describe("the session persist gate", () => {
   });
 });
 
-describe("EventingCodingAgentSessionStoreAdapter durable dedup", () => {
+describe("EventingCodingAgentSessionStoreService durable dedup", () => {
   describe("given a fold step commits state", () => {
     describe("when the context carries applied event ids", () => {
       it("forwards them to the repository upsert as the durable watermark", async () => {
@@ -337,7 +337,7 @@ describe("EventingCodingAgentSessionStoreAdapter durable dedup", () => {
  * trustworthy after 00053; an older row decodes them as an indistinguishable
  * ClickHouse default, so the store reports a miss and rebuilds once.
  */
-describe("EventingCodingAgentSessionStoreAdapter read-back gate", () => {
+describe("EventingCodingAgentSessionStoreService read-back gate", () => {
   /** A session with every read-back column carrying real, non-default values. */
   function committedState(): CodingAgentSessionState {
     return makeState({

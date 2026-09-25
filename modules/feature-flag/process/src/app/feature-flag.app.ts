@@ -1,7 +1,6 @@
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
-  FEATURE_FLAGS,
   FeatureFlagApi,
   featureFlagConfig,
   type FeatureFlagApi as FeatureFlagApiContract,
@@ -11,8 +10,6 @@ import {
   type ExperimentEnrolmentForCaller,
   type ExperimentTenantPolicyForCaller,
   type ExperimentTenantScope,
-  type FeatureFlagConfig,
-  type FeatureFlagDefinition,
   type FeatureFlagKey,
   type FeatureFlagReadForCaller,
   type FeatureFlagRules,
@@ -32,6 +29,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
+import { assembleFeatureFlagConfig } from "../rules/feature-flag-config.rules.ts";
 import { CachedFeatureFlagRowService } from "../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
@@ -57,26 +55,6 @@ export interface FeatureFlagCache {
   findSlot(key: string): Promise<FeatureFlagCacheSlot | undefined>;
   set(key: string, slot: FeatureFlagCacheSlot): Promise<void>;
   delete(key: string): Promise<void>;
-}
-
-function isEnvOverridable(definition: FeatureFlagDefinition): boolean {
-  return definition.envOverridable !== false;
-}
-
-/**
- * Turns the parsed slice's per-flag leaves into the service's `Map`/`Set`
- * pair: the derived variable wins where it states one, the legacy alias
- * only where it does not.
- */
-export function assembleFeatureFlagConfig(config: FeatureFlagServerConfig): FeatureFlagConfig {
-  const overrides = new Map<FeatureFlagKey, boolean>();
-  for (const definition of FEATURE_FLAGS) {
-    if (!isEnvOverridable(definition)) continue;
-    const value = config.overrides[definition.key] ?? config.legacy[definition.key];
-    if (value !== undefined) overrides.set(definition.key, value);
-  }
-
-  return { overrides, forceEnabled: new Set<FeatureFlagKey>(config.forceEnable) };
 }
 
 type FeatureFlagSetup = FeatureSetup<

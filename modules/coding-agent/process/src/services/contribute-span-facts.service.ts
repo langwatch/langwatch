@@ -19,16 +19,18 @@ import type { CodingAgentSessionContextMemoRepository } from "../repositories/se
  * log lane stamps a row-bearing record, so the fold can charge the call's tokens where they were
  * spent. Only reads the memo: the declaration that fills it is a log record.
  */
-export class EventingContributeSpanFactsAdapter implements CommandHandler<
+export class EventingContributeSpanFactsService implements CommandHandler<
   Command<ContributeSpanFactsCommandData>,
   SpanFactsContributedEvent
 > {
-  constructor(private readonly deps: { contextMemo: CodingAgentSessionContextMemoRepository }) {}
+  private constructor(
+    private readonly deps: { contextMemo: CodingAgentSessionContextMemoRepository },
+  ) {}
 
   static create(deps: {
     contextMemo: CodingAgentSessionContextMemoRepository;
-  }): EventingContributeSpanFactsAdapter {
-    return new EventingContributeSpanFactsAdapter(deps);
+  }): EventingContributeSpanFactsService {
+    return new EventingContributeSpanFactsService(deps);
   }
 
   static readonly schema = defineCommandSchema(
