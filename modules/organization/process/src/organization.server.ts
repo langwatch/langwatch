@@ -6,6 +6,7 @@ import { ServerOrganizationApp } from "./app/organization.app.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
+import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
 import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import {
   organizationManagementEnterpriseGate,
@@ -22,6 +23,7 @@ export const organizationServer = defineServerModule("organization")
   .withApp(ServerOrganizationApp)
   .withTransports(
     organizationTrpcTransport,
+    inviteTrpcTransport,
     teamTrpcTransport,
     groupTrpcTransport,
     joinRequestTrpcTransport,

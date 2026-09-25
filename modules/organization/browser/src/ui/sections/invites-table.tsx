@@ -8,7 +8,7 @@ import { Link } from "../elements/link.tsx";
 import { orgRoleOptions } from "../elements/organization-user-role-field.tsx";
 import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
 
-type OrganizationInvite = RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
+type OrganizationInvite = RouterOutputs["invite"]["getOrganizationPendingInvites"][number];
 
 interface InvitesTableProps {
   invites: OrganizationInvite[];

@@ -59,7 +59,7 @@ const AUDIT_LOG_VIEW: AuthzDeclaration = {
 };
 
 /** Who is asking, as every write on this namespace is attributed. */
-function callerOf(actor: TrpcHandlerActor, person: SessionPerson): OrganizationCaller {
+export function callerOf(actor: TrpcHandlerActor, person: SessionPerson): OrganizationCaller {
   return { id: actor.id, name: person?.name ?? null, email: person?.email ?? null };
 }
 
@@ -173,36 +173,6 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .procedure("getMemberProvenance")
   .withPermission("organization:manage")
   .handle(({ app, input }) => app.getMemberProvenance(input))
-
-  /**
-   * Lenient, as the invite form has always done: an ungrantable team
-   * assignment is dropped and the rest are still created, rather than losing
-   * a hand-typed batch. `organization-management.rest.ts` asks for `strict`.
-   */
-  .procedure("createInvites")
-  .withFacts(organizationSessionPersonFact)
-  .withPermission("organization:manage")
-  .handle(({ app, input, actor }, person) =>
-    app.createInvitations({ ...input, validation: "lenient" }, callerOf(actor, person)),
-  )
-
-  .procedure("deleteInvite")
-  .withPermission("organization:manage")
-  .handle(async ({ app, input }) => {
-    await app.revokeInvitation(input);
-  })
-
-  .procedure("resendInvite")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => app.resendInvitation(input))
-
-  /**
-   * Pending invitations expose admin intent - who is being added, with what
-   * role, to which teams - so this is a manage read rather than a view one.
-   */
-  .procedure("getOrganizationPendingInvites")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => app.listPendingInvitations(input))
 
   .procedure("acceptInvite")
   .withFacts(organizationSessionPersonFact)

@@ -1,4 +1,4 @@
-/** All organization, membership, and invitation procedures in one namespace. */
+/** Organization and membership procedures; `invite.*` is its own namespace (`invite.trpc.ts`). */
 
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
@@ -7,9 +7,6 @@ import {
   organizationAuditLogPageSchema,
   organizationCreatedSchema,
   organizationInviteAcceptedSchema,
-  organizationInviteResentSchema,
-  organizationInvitesCreatedSchema,
-  organizationListedInvitesSchema,
   organizationMemberProvenanceByUserSchema,
   organizationMemberRoleChangedSchema,
   organizationUserRowsSchema,
@@ -18,9 +15,7 @@ import {
 import {
   organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
-  organizationApiCreateInvitesInputSchema,
   organizationApiGetAllInputSchema,
-  organizationApiInviteScopeSchema,
   organizationApiMemberScopeSchema,
   organizationApiScopeSchema,
   organizationApiSetMemberDisabledInputSchema,
@@ -100,21 +95,6 @@ export const organizationTrpc = defineTrpcContract("organization")
   .query("getMemberProvenance")
   .withInput(organizationApiScopeSchema)
   .withOutput(organizationMemberProvenanceByUserSchema)
-
-  .mutation("createInvites")
-  .withInput(organizationApiCreateInvitesInputSchema)
-  .withOutput(organizationInvitesCreatedSchema)
-
-  .mutation("deleteInvite")
-  .withInput(organizationApiInviteScopeSchema)
-
-  .mutation("resendInvite")
-  .withInput(organizationApiInviteScopeSchema)
-  .withOutput(organizationInviteResentSchema)
-
-  .query("getOrganizationPendingInvites")
-  .withInput(organizationApiScopeSchema)
-  .withOutput(organizationListedInvitesSchema)
 
   .mutation("acceptInvite")
   .withInput(organizationApiAcceptInviteInputSchema)

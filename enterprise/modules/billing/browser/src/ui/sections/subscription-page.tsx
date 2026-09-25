@@ -158,13 +158,13 @@ export function SubscriptionPage() {
     );
 
   // Fetch pending invites for seat counting
-  const pendingInvites = billingApi.organization.getOrganizationPendingInvites.useQuery(
+  const pendingInvites = billingApi.invite.getOrganizationPendingInvites.useQuery(
     { organizationId: organization?.id ?? "" },
     { enabled: !!organization },
   );
 
   // Mutation for sending invites to already-paid seats
-  const createInvitesMutation = billingApi.organization.createInvites.useMutation();
+  const createInvitesMutation = billingApi.invite.createInvites.useMutation();
 
   // Map organization members to subscription users format
   const users: SubscriptionUser[] = useMemo(() => {

@@ -43,7 +43,7 @@ export function InviteMemberDrawer({
     // the drawer's job is to create and close, not to host the link list.
     onInviteCreated: () => {},
     onClose: closeDrawer,
-    refetchInvites: () => void queryClient.organization.getOrganizationPendingInvites.invalidate(),
+    refetchInvites: () => void queryClient.invite.getOrganizationPendingInvites.invalidate(),
     pricingModel: (organization as { pricingModel?: string } | undefined)?.pricingModel,
     activePlanFree: activePlan.data?.free ?? true,
     activePlanType: activePlan.data?.type ?? "",

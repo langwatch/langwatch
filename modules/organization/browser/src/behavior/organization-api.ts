@@ -308,6 +308,38 @@ export type OrganizationApiMap = {
       };
     };
 
+    /** Removes a seat outright. */
+    deleteMember: {
+      mutation: { input: { organizationId: string; userId: string }; output: unknown };
+    };
+
+    /** Frees a seat reversibly, which is what a licence counts. */
+    setMemberDisabled: {
+      mutation: {
+        input: { organizationId: string; userId: string; disabled: boolean };
+        output: unknown;
+      };
+    };
+
+    updateMemberRole: {
+      mutation: {
+        input: {
+          organizationId: string;
+          userId: string;
+          role: OrganizationUserRole;
+          customRoleId?: string | null;
+        };
+        /**
+         * Named rather than counted: the dialog lists them, and a warning
+         * saying "three teams" without which three is one an administrator
+         * cannot act on.
+         */
+        output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
+      };
+    };
+  };
+
+  invite: {
     getOrganizationPendingInvites: {
       query: { input: { organizationId: string }; output: OrganizationInviteReading[] };
     };
@@ -342,36 +374,6 @@ export type OrganizationApiMap = {
       mutation: {
         input: { organizationId: string; inviteId: string };
         output: { invite: OrganizationInviteReading; emailNotSent?: boolean };
-      };
-    };
-
-    /** Removes a seat outright. */
-    deleteMember: {
-      mutation: { input: { organizationId: string; userId: string }; output: unknown };
-    };
-
-    /** Frees a seat reversibly, which is what a licence counts. */
-    setMemberDisabled: {
-      mutation: {
-        input: { organizationId: string; userId: string; disabled: boolean };
-        output: unknown;
-      };
-    };
-
-    updateMemberRole: {
-      mutation: {
-        input: {
-          organizationId: string;
-          userId: string;
-          role: OrganizationUserRole;
-          customRoleId?: string | null;
-        };
-        /**
-         * Named rather than counted: the dialog lists them, and a warning
-         * saying "three teams" without which three is one an administrator
-         * cannot act on.
-         */
-        output: { teamsLeftWithoutAdmin?: { id: string; name: string }[] };
       };
     };
   };

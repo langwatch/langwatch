@@ -113,6 +113,8 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationWithMembersAndTheirTeams: {
           useQuery: () => setup.mockGetOrganizationWithMembers(),
         },
+      },
+      invite: {
         getOrganizationPendingInvites: {
           useQuery: () => ({
             ...setup.mockGetPendingInvites(),

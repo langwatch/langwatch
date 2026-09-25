@@ -24,7 +24,7 @@ vi.mock("../../../behavior/organization-api.ts", () => {
     useQuery: () => ({ data: answers[path] ?? [], isLoading: false, refetch: vi.fn() }),
     useMutation: () => ({
       mutate: (input: unknown, handlers?: { onSuccess?: (data: unknown) => void }) => {
-        if (path === "organization.createInvites") {
+        if (path === "invite.createInvites") {
           calls.createInvites(input);
           handlers?.onSuccess?.([]);
           return;

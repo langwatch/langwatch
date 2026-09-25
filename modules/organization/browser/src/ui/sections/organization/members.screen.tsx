@@ -146,7 +146,7 @@ function MembersList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const pendingInvites = api.organization.getOrganizationPendingInvites.useQuery(
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
     {
       organizationId: organization?.id ?? "",
     },

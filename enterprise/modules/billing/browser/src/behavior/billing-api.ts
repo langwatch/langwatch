@@ -43,7 +43,7 @@ export type PendingInviteRead = {
   status: string;
 };
 
-/** Procedures from features not yet split: plan, limits, license, organization. */
+/** Procedures from features not yet split: plan, limits, license, organization, invite. */
 type BorrowedProcedures = {
   plan: {
     getActivePlan: { query: { input: OrganizationScope; output: ActivePlan } };
@@ -76,6 +76,9 @@ type BorrowedProcedures = {
     getOrganizationWithMembersAndTheirTeams: {
       query: { input: OrganizationScope; output: { members: OrganizationMemberRead[] } };
     };
+  };
+
+  invite: {
     getOrganizationPendingInvites: {
       query: { input: OrganizationScope; output: PendingInviteRead[] };
     };
@@ -94,7 +97,7 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespaces plus the borrowed four. */
+/** Everything this family calls: the declared namespaces plus the borrowed five. */
 export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> &
   ContractApiMap<typeof currencyTrpc> &
   BorrowedProcedures;

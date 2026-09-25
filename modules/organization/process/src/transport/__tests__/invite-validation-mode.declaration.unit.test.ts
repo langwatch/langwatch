@@ -7,8 +7,8 @@ import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/
 import { TeamNotInOrganizationError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { inviteTrpcTransport } from "../invite.trpc.ts";
 import { organizationManagementRest } from "../organization-management.rest.ts";
-import { organizationTrpcTransport } from "../organization.trpc.ts";
 
 const ORGANIZATION_ID = "organization-1";
 
@@ -69,7 +69,7 @@ function trpcProcedure(dottedName: string): TrpcProcedureRequest<object> {
     router: (record) => record,
   };
 
-  organizationTrpcTransport.router(factory, () => {
+  inviteTrpcTransport.router(factory, () => {
     throw new Error("the wire table never resolves an application");
   });
 
@@ -121,7 +121,7 @@ describe("given the browser's invite form over tRPC", () => {
       const app = recordingApp();
 
       await (
-        trpcProcedure("organization.createInvites").handle as (
+        trpcProcedure("invite.createInvites").handle as (
           args: unknown,
           ...facts: unknown[]
         ) => Promise<unknown>

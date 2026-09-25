@@ -39,7 +39,7 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       members: [member("sam", "Sam"), member("ana", "Ana")],
       teams: [],
     },
-    "organization.getOrganizationPendingInvites": [
+    "invite.getOrganizationPendingInvites": [
       invite("ivy", "PENDING"),
       invite("ian", "PENDING"),
       invite("old", "ACCEPTED"),
