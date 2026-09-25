@@ -52,66 +52,74 @@ const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
  * command position.
  */
 function tokenize(command: string): string[] {
-  const tokens: string[] = [];
-  let current = "";
-  let quote: '"' | "'" | null = null;
+  const scan: TokenScan = { command, at: 0, tokens: [], current: "", quote: null };
+  for (; scan.at < command.length; scan.at++) scanChar(scan, command[scan.at]!);
+  flushWord(scan);
+  return scan.tokens;
+}
 
-  const flush = () => {
-    if (current.length > 0) {
-      tokens.push(current);
-      current = "";
-    }
-  };
+type TokenScan = {
+  command: string;
+  at: number;
+  tokens: string[];
+  current: string;
+  quote: '"' | "'" | null;
+};
 
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i]!;
+function flushWord(scan: TokenScan): void {
+  if (scan.current.length === 0) return;
+  scan.tokens.push(scan.current);
+  scan.current = "";
+}
 
-    if (quote) {
-      if (char === "\\" && quote === '"' && i + 1 < command.length) {
-        current += command[++i]!;
-      } else if (char === quote) {
-        quote = null;
-      } else {
-        current += char;
-      }
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      continue;
-    }
-    if (char === "\\" && i + 1 < command.length) {
-      // A line continuation folds away; any other escape keeps the next char.
-      const next = command[++i]!;
-      if (next !== "\n") current += next;
-      continue;
-    }
-    if (char === "\n" || char === ";" || char === "(") {
-      flush();
-      tokens.push(char === "\n" ? "\n" : char);
-      continue;
-    }
-    if (char === ")") {
-      flush();
-      tokens.push(char);
-      continue;
-    }
-    if (char === "&" || char === "|") {
-      flush();
-      const doubled = command[i + 1] === char;
-      tokens.push(doubled ? char + char : char);
-      if (doubled) i++;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      flush();
-      continue;
-    }
-    current += char;
+function scanChar(scan: TokenScan, char: string): void {
+  if (scan.quote) {
+    scanQuoted(scan, char);
+    return;
   }
-  flush();
-  return tokens;
+  if (char === '"' || char === "'") {
+    scan.quote = char;
+    return;
+  }
+  if (char === "\\" && scan.at + 1 < scan.command.length) {
+    // A line continuation folds away; any other escape keeps the next char.
+    const next = scan.command[++scan.at]!;
+    if (next !== "\n") scan.current += next;
+    return;
+  }
+  if (scanOperator(scan, char)) return;
+  scan.current += char;
+}
+
+function scanQuoted(scan: TokenScan, char: string): void {
+  if (char === "\\" && scan.quote === '"' && scan.at + 1 < scan.command.length) {
+    scan.current += scan.command[++scan.at]!;
+    return;
+  }
+  if (char === scan.quote) {
+    scan.quote = null;
+    return;
+  }
+  scan.current += char;
+}
+
+/** Ends the current word on an operator or whitespace; false for a word character. */
+function scanOperator(scan: TokenScan, char: string): boolean {
+  if (char === "\n" || char === ";" || char === "(" || char === ")") {
+    flushWord(scan);
+    scan.tokens.push(char);
+    return true;
+  }
+  if (char === "&" || char === "|") {
+    flushWord(scan);
+    const doubled = scan.command[scan.at + 1] === char;
+    scan.tokens.push(doubled ? char + char : char);
+    if (doubled) scan.at++;
+    return true;
+  }
+  if (!/\s/.test(char)) return false;
+  flushWord(scan);
+  return true;
 }
 
 /**
@@ -160,49 +168,77 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
   const args: Record<string, unknown> = {};
   const positionals: string[] = [];
 
-  const put = (name: string, value: unknown) => {
-    const existing = args[name];
-    if (existing === undefined) args[name] = value;
-    else if (Array.isArray(existing)) existing.push(value);
-    else args[name] = [existing, value];
-  };
-
   for (let i = from; i < tokens.length; i++) {
     const token = tokens[i]!;
     if (COMMAND_SEPARATORS.has(token)) break;
-
-    if (!isFlagToken(token)) {
-      positionals.push(token);
-      continue;
-    }
-
-    const equals = token.indexOf("=");
-    const name = (equals === -1 ? token : token.slice(0, equals)).replace(/^-+/, "");
-    if (!name) continue; // a bare `--`
-
-    if (equals !== -1) {
-      put(name, token.slice(equals + 1));
-      continue;
-    }
-    const next = tokens[i + 1];
-    if (next === undefined) {
-      put(name, true);
-      continue;
-    }
-    if (COMMAND_SEPARATORS.has(next)) {
-      put(name, true);
-      continue;
-    }
-    if (isFlagToken(next)) {
-      put(name, true);
-      continue;
-    }
-    put(name, next);
-    i++;
+    if (isFlagToken(token)) i += putFlag({ args, token, next: tokens[i + 1] });
+    else positionals.push(token);
   }
 
   if (positionals.length > 0) args._ = positionals;
   return args;
+}
+
+/** The value a flag without `=` takes: the next token, or `true` when that is no value. */
+function flagValue(next: string | undefined): string | true {
+  if (next === undefined || COMMAND_SEPARATORS.has(next) || isFlagToken(next)) return true;
+  return next;
+}
+
+function appendArg({
+  args,
+  name,
+  value,
+}: {
+  args: Record<string, unknown>;
+  name: string;
+  value: unknown;
+}): void {
+  const existing = args[name];
+  if (existing === undefined) args[name] = value;
+  else if (Array.isArray(existing)) existing.push(value);
+  else args[name] = [existing, value];
+}
+
+/** Records one flag; answers how many extra tokens it consumed. */
+function putFlag({
+  args,
+  token,
+  next,
+}: {
+  args: Record<string, unknown>;
+  token: string;
+  next: string | undefined;
+}): number {
+  const equals = token.indexOf("=");
+  const name = (equals === -1 ? token : token.slice(0, equals)).replace(/^-+/, "");
+  if (!name) return 0; // a bare `--`
+  if (equals !== -1) {
+    appendArg({ args, name, value: token.slice(equals + 1) });
+    return 0;
+  }
+  const value = flagValue(next);
+  appendArg({ args, name, value });
+  return value === true ? 0 : 1;
+}
+
+/**
+ * Skip root-position global flags before the resource (`lw --output json monitor list`).
+ * Which flags take a value is read from a list, not guessed, or a BOOLEAN global would
+ * swallow the resource.
+ */
+function skipGlobalFlags(tokens: string[], from: number): number {
+  let at = from;
+  while (at < tokens.length && isFlagToken(tokens[at]!)) {
+    const flag = tokens[at]!;
+    const takesValue = !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(flag);
+    at += takesValue && flagValue(tokens[at + 1]) !== true ? 2 : 1;
+  }
+  return at;
+}
+
+function isLangwatchInvocation(tokens: string[], index: number): boolean {
+  return isLangwatchProgram(tokens[index]!) && isInCommandPosition(tokens, index);
 }
 
 /**
@@ -220,42 +256,11 @@ export class LangwatchCommandService {
 
     const tokens = tokenize(command);
     for (let i = 0; i < tokens.length; i++) {
-      if (!isLangwatchProgram(tokens[i]!)) continue;
-      if (!isInCommandPosition(tokens, i)) continue;
-
-      // Skip root-position global flags before the resource (`lw --output json
-      // monitor list`). Which flags take a value is read from a list, not
-      // guessed, or a BOOLEAN global would swallow the resource.
-      let at = i + 1;
-      while (at < tokens.length && isFlagToken(tokens[at]!)) {
-        const flag = tokens[at]!;
-        const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
-        const takesValue = !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
-        const next = tokens[at + 1];
-        if (!takesValue) {
-          at += 1;
-          continue;
-        }
-        if (next === undefined) {
-          at += 1;
-          continue;
-        }
-        if (isFlagToken(next)) {
-          at += 1;
-          continue;
-        }
-        if (COMMAND_SEPARATORS.has(next)) {
-          at += 1;
-          continue;
-        }
-        at += 2;
-      }
-
+      if (!isLangwatchInvocation(tokens, i)) continue;
+      const at = skipGlobalFlags(tokens, i + 1);
       const resource = tokens[at];
       const verb = tokens[at + 1];
-      if (!resource || !verb) return null;
-      if (!IDENTIFIER.test(resource)) return null;
-      if (!IDENTIFIER.test(verb)) return null;
+      if (!resource || !verb || !IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
       return { resource, verb, args: parseArgs(tokens, at + 2) };
     }
     return null;

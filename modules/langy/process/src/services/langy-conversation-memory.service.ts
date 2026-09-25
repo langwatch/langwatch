@@ -42,58 +42,56 @@ export class LangyConversationMemoryService {
     let turn = 0;
 
     for (const message of messages) {
-      if (message.role !== "assistant") {
-        continue;
-      }
-
+      if (message.role !== "assistant") continue;
       turn += 1;
-      for (const part of message.parts) {
-        if (LangyConversationMemoryService.isErrored(part)) {
-          continue;
-        }
-
-        const digest = LangyConversationMemoryService.digestOf(part);
-        if (!digest) {
-          continue;
-        }
-
-        const ids = (digest.primaryId ? [digest.primaryId] : (digest.ids ?? []))
-          .map((value) => LangyConversationMemoryService.cleanId(value))
-          .filter((id): id is string => id !== null)
-          .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
-        if (ids.length === 0) {
-          continue;
-        }
-
-        const resource = sanitizeLangyPromptValue(digest.resource, MAX_MEMORY_TERM_LENGTH);
-        const verb = sanitizeLangyPromptValue(digest.verb, MAX_MEMORY_TERM_LENGTH);
-        if (!resource || !verb) {
-          continue;
-        }
-
-        const name = digest.name
-          ? sanitizeLangyPromptValue(digest.name, MAX_LANGY_CONTEXT_LABEL_LENGTH)
-          : "";
-        const total = digest.counts?.total;
-
-        const entry: LangyConversationMemoryEntry = {
-          resource,
-          verb,
-          turn,
-          ids,
-          ...(name ? { name } : {}),
-          ...(typeof total === "number" && total > ids.length ? { total } : {}),
-        };
-        const key = `${resource}\u0000${ids.join(",")}`;
+      for (const entry of message.parts.flatMap((part) =>
+        LangyConversationMemoryService.memoryEntriesOf({ part, turn }),
+      )) {
+        const key = `${entry.resource}\u0000${entry.ids.join(",")}`;
         // Delete-then-set so the re-inserted entry also moves to the END of the
-        // insertion order — "most recent" has to mean the latest TOUCH, not the
-        // first sighting.
+        // insertion order — "most recent" has to mean the latest TOUCH, not the first sighting.
         byResource.delete(key);
         byResource.set(key, entry);
       }
     }
 
     return [...byResource.values()].reverse().slice(0, Math.max(0, limit));
+  }
+
+  /** The memory entry one message part contributes: none when it errored or names nothing. */
+  private static memoryEntriesOf({
+    part,
+    turn,
+  }: {
+    part: LangyMessageRow["parts"][number];
+    turn: number;
+  }): LangyConversationMemoryEntry[] {
+    if (LangyConversationMemoryService.isErrored(part)) return [];
+    const digest = LangyConversationMemoryService.digestOf(part);
+    if (!digest) return [];
+
+    const ids = (digest.primaryId ? [digest.primaryId] : (digest.ids ?? []))
+      .map((value) => LangyConversationMemoryService.cleanId(value))
+      .filter((id): id is string => id !== null)
+      .slice(0, MAX_MEMORY_IDS_PER_ENTRY);
+    const resource = sanitizeLangyPromptValue(digest.resource, MAX_MEMORY_TERM_LENGTH);
+    const verb = sanitizeLangyPromptValue(digest.verb, MAX_MEMORY_TERM_LENGTH);
+    if (ids.length === 0 || !resource || !verb) return [];
+
+    const name = digest.name
+      ? sanitizeLangyPromptValue(digest.name, MAX_LANGY_CONTEXT_LABEL_LENGTH)
+      : "";
+    const total = digest.counts?.total;
+    return [
+      {
+        resource,
+        verb,
+        turn,
+        ids,
+        ...(name ? { name } : {}),
+        ...(typeof total === "number" && total > ids.length ? { total } : {}),
+      },
+    ];
   }
 
   /**
@@ -123,6 +121,19 @@ export class LangyConversationMemoryService {
     ].join("\n\n");
   }
 
+  /** The user and assistant messages that said something, sanitised, oldest first. */
+  private static spokenMessages(
+    messages: LangyMessageRow[],
+  ): { role: "user" | "assistant"; text: string }[] {
+    return messages.flatMap((message) => {
+      if (message.role !== "user" && message.role !== "assistant") return [];
+      const text = LangyConversationMemoryService.sanitizeTranscriptText(
+        extractLangyTextFromParts(message.parts),
+      );
+      return text ? [{ role: message.role, text }] : [];
+    });
+  }
+
   /**
    * Render the conversation's durable messages as the transcript block (what has already been said,
    * oldest first), or null when there is nothing to say.
@@ -134,22 +145,7 @@ export class LangyConversationMemoryService {
     messages: LangyMessageRow[];
     currentPrompt?: string;
   }): string | null {
-    const spoken: { role: "user" | "assistant"; text: string }[] = [];
-    for (const message of messages) {
-      if (message.role !== "user" && message.role !== "assistant") {
-        continue;
-      }
-
-      const text = LangyConversationMemoryService.sanitizeTranscriptText(
-        extractLangyTextFromParts(message.parts),
-      );
-      if (!text) {
-        continue;
-      }
-
-      spoken.push({ role: message.role, text });
-    }
-
+    const spoken = LangyConversationMemoryService.spokenMessages(messages);
     const last = spoken[spoken.length - 1];
     if (
       last &&

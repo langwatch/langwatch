@@ -103,25 +103,35 @@ const ITEM_ID_KEYS = ["id", "scenarioRunId", "batchRunId", "runId"] as const;
  */
 function collectItemPlatformLinks(payload: unknown): { id: string; href: string }[] {
   const links = new Map<string, string>();
-  const walk = (node: unknown, depth: number): void => {
-    if (!node || typeof node !== "object" || depth > 4) return;
-    if (Array.isArray(node)) {
-      for (const item of node) walk(item, depth + 1);
-      return;
-    }
-    const obj = node as Record<string, unknown>;
-    const href = typeof obj.platformUrl === "string" ? obj.platformUrl : null;
-    if (href && isPreciseResourceHref(href)) {
-      for (const id of nestedResourceIds(href)) links.set(id, href);
-      for (const key of ITEM_ID_KEYS) {
-        const value = obj[key];
-        if (typeof value === "string" && value) links.set(value, href);
-      }
-    }
-    for (const value of Object.values(obj)) walk(value, depth + 1);
-  };
-  walk(payload, 0);
+  walkPlatformLinks({ node: payload, depth: 0, links });
   return Array.from(links, ([id, href]) => ({ id, href }));
+}
+
+function walkPlatformLinks({
+  node,
+  depth,
+  links,
+}: {
+  node: unknown;
+  depth: number;
+  links: Map<string, string>;
+}): void {
+  if (!node || typeof node !== "object" || depth > 4) return;
+  const children = Array.isArray(node) ? node : Object.values(node);
+  if (!Array.isArray(node)) recordItemLinks({ item: node, links });
+  for (const child of children) walkPlatformLinks({ node: child, depth: depth + 1, links });
+}
+
+/** An item carrying its own precise `platformUrl`, keyed by each id it answers to. */
+function recordItemLinks({ item, links }: { item: object; links: Map<string, string> }): void {
+  const record: Record<string, unknown> = Object.fromEntries(Object.entries(item));
+  const href = record.platformUrl;
+  if (typeof href !== "string" || !href || !isPreciseResourceHref(href)) return;
+  for (const id of nestedResourceIds(href)) links.set(id, href);
+  for (const key of ITEM_ID_KEYS) {
+    const value = record[key];
+    if (typeof value === "string" && value) links.set(value, href);
+  }
 }
 
 /** The slice of the token buffer the relay writes (the live edge). */
@@ -526,41 +536,10 @@ export class RedisLangyTurnRelayRepository {
         return { status: "applied" };
 
       case "progress":
-        await this.deps.buffer.appendProgress({
-          ...at,
-          ...(frame.message !== undefined ? { message: frame.message } : {}),
-          ...(frame.progress !== undefined ? { progress: frame.progress } : {}),
-          ...(frame.current !== undefined ? { current: frame.current } : {}),
-          ...(frame.total !== undefined ? { total: frame.total } : {}),
-          ...(frame.batchItems !== undefined ? { batchItems: frame.batchItems } : {}),
-          ...(frame.batchDurationMs !== undefined
-            ? { batchDurationMs: frame.batchDurationMs }
-            : {}),
-        });
-        return { status: "applied" };
+        return this.applyProgress(envelope, frame);
 
       case "heartbeat":
-        // Liveness only — refresh the turn's freshness, write no content.
-        await this.deps.buffer.heartbeat(at);
-        // The same proof of life extends the handoff. One EXPIRE, never a
-        // rewrite of the record: this frame says the worker is alive, not that
-        // anything about the turn's resume inputs changed.
-        try {
-          await this.deps.refreshHandoffTtl?.(at);
-        } catch (error) {
-          // A heartbeat that reached the buffer has done its job. Failing the
-          // frame over the handoff would report a live worker as unreachable,
-          // which is the fault this refresh exists to prevent.
-          this.deps.logger?.warn(
-            {
-              projectId,
-              ...at,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "langy relay handoff ttl refresh failed; the handoff keeps its current expiry",
-          );
-        }
-        return { status: "applied" };
+        return this.applyHeartbeat(envelope);
 
       case "plan":
         // A full plan snapshot. Both a LIVE checklist (buffer) and a DURABLE
@@ -586,91 +565,168 @@ export class RedisLangyTurnRelayRepository {
         });
         return { status: "applied" };
 
-      case "tool": {
-        // A SOLE `langwatch navigate open <resourceId>` call is not a lookup —
-        // it is the agent naming WHICH already-surfaced resource to open. It
-        // never becomes a visible tool card or a durable event (live-only,
-        // see `resourceLinks`); everything else goes through the normal path.
-        const invocation = this.soleNavigateInvocationOf(frame);
-        if (invocation) {
-          return this.applyNavigateTool({ projectId, at, frame, invocation });
-        }
+      case "tool":
+        return this.applyToolFrame(envelope, frame);
 
-        // The model sometimes CHAINS the navigate onto its lookup (`…get X --format json &&
-        // langwatch navigate open X`). The chained call keeps its normal life — card, durable
-        // record; the other segments are real work — but each navigate segment still fires: the id
-        // comes from the command string and the address only ever from the link store, so compound
-        // stdout changes nothing here.
-        if (frame.phase === "end" && !frame.isError) {
-          for (const chained of this.chainedNavigateInvocationsOf(frame)) {
-            await this.applyNavigateTool({ projectId, at, frame, invocation: chained });
-          }
-        }
-        return this.applyTool(projectId, at, frame);
-      }
+      case "final":
+        return this.applyFinal(envelope, frame);
 
-      case "final": {
-        // The one terminal meaning the turn finished (Stop/handoff end the
-        // stream but never claim no reply). Only place that sees both the
-        // durable message and the live stream, so the backstop decides both.
-        const { backstopped, text: backstopText } = await this.deps.buffer.markEnd({
-          ...at,
-          backstopSilentTurn: (frame.text ?? "").trim() === "",
-        });
-        const text = backstopped ? (backstopText ?? LANGY_EMPTY_TURN_FALLBACK) : frame.text;
-        // markEnd first: it flushes the last tokens, so the turn's own account
-        // of what happened when is complete on the stream before the ingest
-        // reads it back to record the parts in that order.
-        await this.deps.conversations.ingestAgentTurnResult({
-          projectId,
-          conversationId,
-          turnId,
-          status: "completed",
-          ...(text !== undefined ? { text } : {}),
-          ...(frame.toolCalls !== undefined ? { toolCalls: frame.toolCalls } : {}),
-        });
-        return { status: "terminal" };
-      }
-
-      case "error": {
-        // The LIVE edge must carry the SAME classified, serialized domain error the durable path
-        // records — not the raw frame message. The browser reads the error off the stream as a JSON
-        // domain error (readLangyStreamError); a raw string parses as null and collapses every
-        // named failure into the generic "Something went wrong".
-        const classified = LangyTurnErrors.fromErrorFrame({
-          code: frame.code ?? frame.error,
-          ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
-        });
-        await this.deps.buffer.markError({
-          ...at,
-          error: LangyTurnErrors.serialize(classified),
-        });
-        await this.deps.conversations.ingestAgentTurnResult({
-          projectId,
-          conversationId,
-          turnId,
-          status: "failed",
-          ...(frame.code !== undefined ? { errorCode: frame.code } : {}),
-          ...(frame.herr !== undefined ? { errorCause: frame.herr } : {}),
-        });
-        return { status: "terminal" };
-      }
+      case "error":
+        return this.applyError(envelope, frame);
 
       case "handoff":
-        // ADR-048: the worker checkpointed on shutdown. End the live stream and
-        // persist the opaque resume token so the next turn resumes from it. The
-        // turn is NOT failed — it will be re-driven on a fresh worker.
-        await this.deps.buffer.markEnd(at);
-        if (frame.resumeToken !== undefined && frame.resumeToken !== "") {
-          await this.deps.conversations.recordTurnHandoff({
-            projectId,
-            conversationId,
-            turnId,
-            token: frame.resumeToken,
-          });
-        }
-        return { status: "terminal" };
+        return this.applyHandoff(envelope, frame);
     }
+  }
+
+  private async applyProgress(
+    envelope: LangyFrameEnvelope,
+    frame: Extract<LangyRelayFrame, { type: "progress" }>,
+  ): Promise<LangyRelayOutcome> {
+    const { conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    await this.deps.buffer.appendProgress({
+      ...at,
+      ...(frame.message !== undefined ? { message: frame.message } : {}),
+      ...(frame.progress !== undefined ? { progress: frame.progress } : {}),
+      ...(frame.current !== undefined ? { current: frame.current } : {}),
+      ...(frame.total !== undefined ? { total: frame.total } : {}),
+      ...(frame.batchItems !== undefined ? { batchItems: frame.batchItems } : {}),
+      ...(frame.batchDurationMs !== undefined ? { batchDurationMs: frame.batchDurationMs } : {}),
+    });
+    return { status: "applied" };
+  }
+
+  private async applyHeartbeat(envelope: LangyFrameEnvelope): Promise<LangyRelayOutcome> {
+    const { projectId, conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    // Liveness only — refresh the turn's freshness, write no content.
+    await this.deps.buffer.heartbeat(at);
+    // The same proof of life extends the handoff. One EXPIRE, never a
+    // rewrite of the record: this frame says the worker is alive, not that
+    // anything about the turn's resume inputs changed.
+    try {
+      await this.deps.refreshHandoffTtl?.(at);
+    } catch (error) {
+      // A heartbeat that reached the buffer has done its job. Failing the
+      // frame over the handoff would report a live worker as unreachable,
+      // which is the fault this refresh exists to prevent.
+      this.deps.logger?.warn(
+        {
+          projectId,
+          ...at,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "langy relay handoff ttl refresh failed; the handoff keeps its current expiry",
+      );
+    }
+    return { status: "applied" };
+  }
+
+  private async applyToolFrame(
+    envelope: LangyFrameEnvelope,
+    frame: Extract<LangyRelayFrame, { type: "tool" }>,
+  ): Promise<LangyRelayOutcome> {
+    const { projectId, conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    // A SOLE `langwatch navigate open <resourceId>` call is not a lookup —
+    // it is the agent naming WHICH already-surfaced resource to open. It
+    // never becomes a visible tool card or a durable event (live-only,
+    // see `resourceLinks`); everything else goes through the normal path.
+    const invocation = this.soleNavigateInvocationOf(frame);
+    if (invocation) {
+      return this.applyNavigateTool({ projectId, at, frame, invocation });
+    }
+
+    // The model sometimes CHAINS the navigate onto its lookup (`…get X --format json &&
+    // langwatch navigate open X`). The chained call keeps its normal life — card, durable
+    // record; the other segments are real work — but each navigate segment still fires: the id
+    // comes from the command string and the address only ever from the link store, so compound
+    // stdout changes nothing here.
+    if (frame.phase === "end" && !frame.isError) {
+      for (const chained of this.chainedNavigateInvocationsOf(frame)) {
+        await this.applyNavigateTool({ projectId, at, frame, invocation: chained });
+      }
+    }
+    return this.applyTool(projectId, at, frame);
+  }
+
+  private async applyFinal(
+    envelope: LangyFrameEnvelope,
+    frame: Extract<LangyRelayFrame, { type: "final" }>,
+  ): Promise<LangyRelayOutcome> {
+    const { projectId, conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    // The one terminal meaning the turn finished (Stop/handoff end the
+    // stream but never claim no reply). Only place that sees both the
+    // durable message and the live stream, so the backstop decides both.
+    const { backstopped, text: backstopText } = await this.deps.buffer.markEnd({
+      ...at,
+      backstopSilentTurn: (frame.text ?? "").trim() === "",
+    });
+    const text = backstopped ? (backstopText ?? LANGY_EMPTY_TURN_FALLBACK) : frame.text;
+    // markEnd first: it flushes the last tokens, so the turn's own account
+    // of what happened when is complete on the stream before the ingest
+    // reads it back to record the parts in that order.
+    await this.deps.conversations.ingestAgentTurnResult({
+      projectId,
+      conversationId,
+      turnId,
+      status: "completed",
+      ...(text !== undefined ? { text } : {}),
+      ...(frame.toolCalls !== undefined ? { toolCalls: frame.toolCalls } : {}),
+    });
+    return { status: "terminal" };
+  }
+
+  private async applyError(
+    envelope: LangyFrameEnvelope,
+    frame: Extract<LangyRelayFrame, { type: "error" }>,
+  ): Promise<LangyRelayOutcome> {
+    const { projectId, conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    // The LIVE edge must carry the SAME classified, serialized domain error the durable path
+    // records — not the raw frame message. The browser reads the error off the stream as a JSON
+    // domain error (readLangyStreamError); a raw string parses as null and collapses every
+    // named failure into the generic "Something went wrong".
+    const classified = LangyTurnErrors.fromErrorFrame({
+      code: frame.code ?? frame.error,
+      ...(frame.herr !== undefined ? { cause: frame.herr } : {}),
+    });
+    await this.deps.buffer.markError({
+      ...at,
+      error: LangyTurnErrors.serialize(classified),
+    });
+    await this.deps.conversations.ingestAgentTurnResult({
+      projectId,
+      conversationId,
+      turnId,
+      status: "failed",
+      ...(frame.code !== undefined ? { errorCode: frame.code } : {}),
+      ...(frame.herr !== undefined ? { errorCause: frame.herr } : {}),
+    });
+    return { status: "terminal" };
+  }
+
+  private async applyHandoff(
+    envelope: LangyFrameEnvelope,
+    frame: Extract<LangyRelayFrame, { type: "handoff" }>,
+  ): Promise<LangyRelayOutcome> {
+    const { projectId, conversationId, turnId } = envelope;
+    const at = { conversationId, turnId };
+    // ADR-048: the worker checkpointed on shutdown. End the live stream and
+    // persist the opaque resume token so the next turn resumes from it. The
+    // turn is NOT failed — it will be re-driven on a fresh worker.
+    await this.deps.buffer.markEnd(at);
+    if (frame.resumeToken !== undefined && frame.resumeToken !== "") {
+      await this.deps.conversations.recordTurnHandoff({
+        projectId,
+        conversationId,
+        turnId,
+        token: frame.resumeToken,
+      });
+    }
+    return { status: "terminal" };
   }
 
   private async applyTool(
@@ -695,34 +751,10 @@ export class RedisLangyTurnRelayRepository {
       },
     });
 
-    // Remember this resource's platform link — the ONLY thing a later `navigate` instruction may
-    // resolve an address from.
-    if (frame.phase === "end" && !call.isError) {
-      const command = this.cliEnvelope.extractShellCommand({
-        id: frame.id,
-        name: frame.name,
-        phase: frame.phase,
-        ...(frame.input !== undefined ? { input: frame.input } : {}),
-      });
-      if (command && isSoleLangwatchInvocation(command)) {
-        await this.rememberResourceLink(at, call);
-      }
-    }
+    await this.rememberSoleInvocationLink({ at, frame, call });
 
     // Live card first so it opens as promptly as the tokens flow…
-    await this.deps.buffer.appendTool({
-      ...at,
-      id: call.id,
-      name: call.name,
-      phase: frame.phase,
-      ...(call.title !== undefined ? { title: call.title } : {}),
-      ...(call.input !== undefined ? { input: call.input } : {}),
-      ...(call.output !== undefined ? { output: call.output } : {}),
-      ...(call.isError !== undefined ? { isError: call.isError } : {}),
-      ...(call.digest !== undefined ? { digest: call.digest } : {}),
-      ...(call.result !== undefined ? { result: call.result } : {}),
-      ...(call.local !== undefined ? { local: call.local } : {}),
-    });
+    await this.appendLiveTool({ at, frame, call });
     // A capability's present-continuous sub-status ("Searching traces…") for the
     // live status line — emitted AFTER the tool frame so the cold-start clear (it
     // fires on the tool entry, once per turn) cannot wipe it, and cleared with an
@@ -737,29 +769,114 @@ export class RedisLangyTurnRelayRepository {
     }
 
     // …then the durable milestone (a tool call is a meaningful audit event).
-    if (frame.phase === "start") {
-      await this.deps.conversations.recordToolCallStarted({
-        projectId,
-        ...at,
-        toolCallId: call.id,
-        toolName: call.name,
-        ...(frame.command !== undefined ? { command: frame.command } : {}),
-        ...(call.input !== undefined ? { input: call.input } : {}),
-      });
-    } else {
-      await this.deps.conversations.recordToolCallCompleted({
-        projectId,
-        ...at,
-        toolCallId: call.id,
-        toolName: call.name,
-        ...(call.isError !== undefined ? { isError: call.isError } : {}),
-        ...(frame.command !== undefined ? { command: frame.command } : {}),
-        ...(call.input !== undefined ? { input: call.input } : {}),
-        ...(frame.durationMs !== undefined ? { durationMs: frame.durationMs } : {}),
-        ...(call.isError && call.output !== undefined ? { errorText: call.output } : {}),
-      });
-    }
+    await this.recordToolMilestone({ projectId, at, frame, call });
     return { status: "applied" };
+  }
+
+  /** Remember a resource's platform link — the ONLY thing a later `navigate` may resolve from. */
+  private async rememberSoleInvocationLink({
+    at,
+    frame,
+    call,
+  }: {
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    if (frame.phase !== "end" || call.isError) return;
+    const command = this.cliEnvelope.extractShellCommand({
+      id: frame.id,
+      name: frame.name,
+      phase: frame.phase,
+      ...(frame.input !== undefined ? { input: frame.input } : {}),
+    });
+    if (command && isSoleLangwatchInvocation(command)) {
+      await this.rememberResourceLink(at, call);
+    }
+  }
+
+  private async appendLiveTool({
+    at,
+    frame,
+    call,
+  }: {
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    await this.deps.buffer.appendTool({
+      ...at,
+      id: call.id,
+      name: call.name,
+      phase: frame.phase,
+      ...(call.title !== undefined ? { title: call.title } : {}),
+      ...(call.input !== undefined ? { input: call.input } : {}),
+      ...(call.output !== undefined ? { output: call.output } : {}),
+      ...(call.isError !== undefined ? { isError: call.isError } : {}),
+      ...(call.digest !== undefined ? { digest: call.digest } : {}),
+      ...(call.result !== undefined ? { result: call.result } : {}),
+      ...(call.local !== undefined ? { local: call.local } : {}),
+    });
+  }
+
+  private async recordToolMilestone({
+    projectId,
+    at,
+    frame,
+    call,
+  }: {
+    projectId: string;
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    if (frame.phase === "start") await this.recordToolStarted({ projectId, at, frame, call });
+    else await this.recordToolCompleted({ projectId, at, frame, call });
+  }
+
+  private async recordToolStarted({
+    projectId,
+    at,
+    frame,
+    call,
+  }: {
+    projectId: string;
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    await this.deps.conversations.recordToolCallStarted({
+      projectId,
+      ...at,
+      toolCallId: call.id,
+      toolName: call.name,
+      ...(frame.command !== undefined ? { command: frame.command } : {}),
+      ...(call.input !== undefined ? { input: call.input } : {}),
+    });
+  }
+
+  private async recordToolCompleted({
+    projectId,
+    at,
+    frame,
+    call,
+  }: {
+    projectId: string;
+    at: { conversationId: string; turnId: string };
+    frame: Extract<LangyRelayFrame, { type: "tool" }>;
+    call: LangyToolFrame;
+  }): Promise<void> {
+    await this.deps.conversations.recordToolCallCompleted({
+      projectId,
+      ...at,
+      toolCallId: call.id,
+      toolName: call.name,
+      ...(call.isError !== undefined ? { isError: call.isError } : {}),
+      ...(frame.command !== undefined ? { command: frame.command } : {}),
+      ...(call.input !== undefined ? { input: call.input } : {}),
+      ...(frame.durationMs !== undefined ? { durationMs: frame.durationMs } : {}),
+      ...(call.isError && call.output !== undefined ? { errorText: call.output } : {}),
+    });
   }
 
   /**

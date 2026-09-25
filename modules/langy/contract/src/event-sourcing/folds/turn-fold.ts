@@ -359,6 +359,200 @@ function waitToolName(kind: LangyUserWaitKind): string {
   return kind === LANGY_USER_WAIT_KINDS.PERMISSION ? "local_bash" : "question";
 }
 
+function foldToolCallInitiated<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED }
+  >,
+): S {
+  const { toolCallId, toolName, command, input } = event.data;
+  const ToolCalls = upsertToolCall({
+    state,
+    toolCallId,
+    make: () => ({
+      toolCallId,
+      toolName,
+      status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+    }),
+    patch: (existing) => ({
+      ...existing,
+      toolName: existing.toolName || toolName,
+      // Only fill from the initiate frame; never regress a resolved status.
+      status: existing.status ?? LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+      ...(command !== undefined ? { command } : {}),
+      ...(input !== undefined ? { input } : {}),
+    }),
+  });
+  return { ...withIdentity(event, state), ToolCalls };
+}
+
+function foldToolCallSucceeded<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED }
+  >,
+): S {
+  const { toolCallId, toolName, command, input, durationMs } = event.data;
+  const ToolCalls = upsertToolCall({
+    state,
+    toolCallId,
+    make: () => ({
+      toolCallId,
+      toolName,
+      status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
+    }),
+    patch: (existing) => ({
+      ...existing,
+      toolName: existing.toolName || toolName,
+      status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
+      ...(command !== undefined ? { command } : {}),
+      ...(input !== undefined ? { input } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+    }),
+  });
+  return { ...withIdentity(event, state), ToolCalls };
+}
+
+function foldToolCallFailed<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED }
+  >,
+): S {
+  const { toolCallId, toolName, command, input, durationMs, errorText } = event.data;
+  const ToolCalls = upsertToolCall({
+    state,
+    toolCallId,
+    make: () => ({
+      toolCallId,
+      toolName,
+      status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
+    }),
+    patch: (existing) => ({
+      ...existing,
+      toolName: existing.toolName || toolName,
+      status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
+      ...(command !== undefined ? { command } : {}),
+      ...(input !== undefined ? { input } : {}),
+      ...(durationMs !== undefined ? { durationMs } : {}),
+      ...(errorText !== undefined ? { errorText } : {}),
+    }),
+  });
+  return { ...withIdentity(event, state), ToolCalls };
+}
+
+function foldUserWaitStarted<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED }
+  >,
+): S {
+  const started = pendingWait(event.data);
+  const key = event.data.toolCallId ?? started.waitId;
+  const ToolCalls = upsertToolCall({
+    state,
+    toolCallId: key,
+    make: () => ({
+      toolCallId: key,
+      toolName: waitToolName(started.kind),
+      status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+      wait: started,
+    }),
+    patch: (existing) => {
+      const current = existing.wait;
+      const settled = current?.waitId === started.waitId && current.status !== "pending";
+      return { ...existing, wait: settled ? current : started };
+    },
+  });
+  return { ...withIdentity(event, state), ToolCalls };
+}
+
+function foldUserWaitEnded<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED }
+  >,
+): S {
+  const data = event.data;
+  const key = data.toolCallId ?? data.waitId;
+  const blank = pendingWait({
+    conversationId: data.conversationId,
+    turnId: data.turnId,
+    waitId: data.waitId,
+    kind: data.kind,
+    expiresAt: 0,
+  });
+  const ToolCalls = upsertToolCall({
+    state,
+    toolCallId: key,
+    make: () => ({
+      toolCallId: key,
+      toolName: waitToolName(data.kind),
+      status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
+      wait: endedWait(blank, data, event.occurredAt),
+    }),
+    patch: (existing) => {
+      const current = existing.wait;
+      if (!current || current.waitId !== data.waitId) return existing;
+      if (current.status !== "pending") return existing;
+      return {
+        ...existing,
+        wait: endedWait(current, data, event.occurredAt),
+      };
+    },
+  });
+  return { ...withIdentity(event, state), ToolCalls };
+}
+
+function foldAgentResponded<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED }
+  >,
+): S {
+  // Three terminal outcomes on the one answer-carrying event: a user stop
+  // keeps the partial answer (AnswerParts) but renders distinctly from a
+  // clean finish, and is never an error (ADR-078). A `failed` outcome here
+  // is the ran-but-failed answer; the no-answer stall is
+  // agent_response_failed, handled above.
+  const outcome = event.data.outcome;
+  const settled =
+    outcome === "stopped"
+      ? LANGY_CONVERSATION_TURN_STATUS.STOPPED
+      : LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
+  const status = outcome === "failed" ? LANGY_CONVERSATION_TURN_STATUS.FAILED : settled;
+  return {
+    ...withIdentity(event, state),
+    AnswerParts: event.data.parts ?? [],
+    Status: status,
+    Error: outcome === "failed" ? (event.data.error ?? "unknown error") : state.Error,
+    EndedAt: event.occurredAt,
+  };
+}
+
+function foldAgentTurnAccepted<S extends LangyConversationTurnFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationTurnEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED }
+  >,
+): S {
+  const question = event.data.questionParts;
+  return {
+    ...withIdentity(event, state),
+    Status: LANGY_CONVERSATION_TURN_STATUS.RUNNING,
+    StartedAt: state.StartedAt ?? event.occurredAt,
+    // The question rides the start event so the turn doc is self-contained.
+    QuestionParts: question && question.length > 0 ? question : state.QuestionParts,
+  };
+}
+
 /**
  * Fold ONE turn event onto the turn document. Pure and total over the turn
  * vocabulary; unknown events must be filtered before the call.
@@ -369,78 +563,16 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
 ): S {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED: {
-      const question = event.data.questionParts;
-      return {
-        ...withIdentity(event, state),
-        Status: LANGY_CONVERSATION_TURN_STATUS.RUNNING,
-        StartedAt: state.StartedAt ?? event.occurredAt,
-        // The question rides the start event so the turn doc is self-contained.
-        QuestionParts: question && question.length > 0 ? question : state.QuestionParts,
-      };
+      return foldAgentTurnAccepted(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_INITIATED: {
-      const { toolCallId, toolName, command, input } = event.data;
-      const ToolCalls = upsertToolCall({
-        state,
-        toolCallId,
-        make: () => ({
-          toolCallId,
-          toolName,
-          status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
-        }),
-        patch: (existing) => ({
-          ...existing,
-          toolName: existing.toolName || toolName,
-          // Only fill from the initiate frame; never regress a resolved status.
-          status: existing.status ?? LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
-          ...(command !== undefined ? { command } : {}),
-          ...(input !== undefined ? { input } : {}),
-        }),
-      });
-      return { ...withIdentity(event, state), ToolCalls };
+      return foldToolCallInitiated(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_SUCCEEDED: {
-      const { toolCallId, toolName, command, input, durationMs } = event.data;
-      const ToolCalls = upsertToolCall({
-        state,
-        toolCallId,
-        make: () => ({
-          toolCallId,
-          toolName,
-          status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
-        }),
-        patch: (existing) => ({
-          ...existing,
-          toolName: existing.toolName || toolName,
-          status: LANGY_TURN_TOOL_CALL_STATUS.SUCCEEDED,
-          ...(command !== undefined ? { command } : {}),
-          ...(input !== undefined ? { input } : {}),
-          ...(durationMs !== undefined ? { durationMs } : {}),
-        }),
-      });
-      return { ...withIdentity(event, state), ToolCalls };
+      return foldToolCallSucceeded(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_FAILED: {
-      const { toolCallId, toolName, command, input, durationMs, errorText } = event.data;
-      const ToolCalls = upsertToolCall({
-        state,
-        toolCallId,
-        make: () => ({
-          toolCallId,
-          toolName,
-          status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
-        }),
-        patch: (existing) => ({
-          ...existing,
-          toolName: existing.toolName || toolName,
-          status: LANGY_TURN_TOOL_CALL_STATUS.FAILED,
-          ...(command !== undefined ? { command } : {}),
-          ...(input !== undefined ? { input } : {}),
-          ...(durationMs !== undefined ? { durationMs } : {}),
-          ...(errorText !== undefined ? { errorText } : {}),
-        }),
-      });
-      return { ...withIdentity(event, state), ToolCalls };
+      return foldToolCallFailed(state, event);
     }
     // Fold a plan snapshot onto the turn. Whole-list, last-write-wins: callers
     // re-fold events in occurredAt order, so the LATEST plan_updated is the
@@ -455,57 +587,12 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
     // A card went up in front of the developer, on the tool call that asked
     // for it. Idempotent: a redelivered start keeps the outcome an end wrote.
     case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED: {
-      const started = pendingWait(event.data);
-      const key = event.data.toolCallId ?? started.waitId;
-      const ToolCalls = upsertToolCall({
-        state,
-        toolCallId: key,
-        make: () => ({
-          toolCallId: key,
-          toolName: waitToolName(started.kind),
-          status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
-          wait: started,
-        }),
-        patch: (existing) => {
-          const current = existing.wait;
-          const settled = current?.waitId === started.waitId && current.status !== "pending";
-          return { ...existing, wait: settled ? current : started };
-        },
-      });
-      return { ...withIdentity(event, state), ToolCalls };
+      return foldUserWaitStarted(state, event);
     }
     // The card reached its one terminal. A second end never overwrites the
     // first, so a late answer to an expired card leaves the record alone.
     case LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_ENDED: {
-      const data = event.data;
-      const key = data.toolCallId ?? data.waitId;
-      const blank = pendingWait({
-        conversationId: data.conversationId,
-        turnId: data.turnId,
-        waitId: data.waitId,
-        kind: data.kind,
-        expiresAt: 0,
-      });
-      const ToolCalls = upsertToolCall({
-        state,
-        toolCallId: key,
-        make: () => ({
-          toolCallId: key,
-          toolName: waitToolName(data.kind),
-          status: LANGY_TURN_TOOL_CALL_STATUS.INITIATED,
-          wait: endedWait(blank, data, event.occurredAt),
-        }),
-        patch: (existing) => {
-          const current = existing.wait;
-          if (!current || current.waitId !== data.waitId) return existing;
-          if (current.status !== "pending") return existing;
-          return {
-            ...existing,
-            wait: endedWait(current, data, event.occurredAt),
-          };
-        },
-      });
-      return { ...withIdentity(event, state), ToolCalls };
+      return foldUserWaitEnded(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED: {
       return {
@@ -516,24 +603,7 @@ export function foldLangyConversationTurn<S extends LangyConversationTurnFoldSta
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED: {
-      // Three terminal outcomes on the one answer-carrying event: a user stop
-      // keeps the partial answer (AnswerParts) but renders distinctly from a
-      // clean finish, and is never an error (ADR-078). A `failed` outcome here
-      // is the ran-but-failed answer; the no-answer stall is
-      // agent_response_failed, handled above.
-      const outcome = event.data.outcome;
-      const settled =
-        outcome === "stopped"
-          ? LANGY_CONVERSATION_TURN_STATUS.STOPPED
-          : LANGY_CONVERSATION_TURN_STATUS.COMPLETED;
-      const status = outcome === "failed" ? LANGY_CONVERSATION_TURN_STATUS.FAILED : settled;
-      return {
-        ...withIdentity(event, state),
-        AnswerParts: event.data.parts ?? [],
-        Status: status,
-        Error: outcome === "failed" ? (event.data.error ?? "unknown error") : state.Error,
-        EndedAt: event.occurredAt,
-      };
+      return foldAgentResponded(state, event);
     }
   }
 }

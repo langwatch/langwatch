@@ -168,6 +168,169 @@ function nextStatus(state: LangyConversationStateFoldState, proposed: string): s
   return state.ArchivedAt != null ? LANGY_CONVERSATION_STATUS.ARCHIVED : proposed;
 }
 
+function foldConversationStarted<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED }
+  >,
+): S {
+  const eventTitle = event.data.title;
+  const initialTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
+  // First writer wins for owner/title; an explicit creation seeds them
+  // before any message, but never demotes an existing title source.
+  const title = state.Title ?? initialTitle;
+  const titleSource =
+    state.Title == null && initialTitle != null ? LANGY_TITLE_SOURCE.DERIVED : state.TitleSource;
+  return {
+    ...state,
+    ConversationId: state.ConversationId || event.data.conversationId,
+    UserId: state.UserId || event.data.userId,
+    Title: title,
+    TitleSource: titleSource,
+    Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
+    LastActivityAt: state.LastActivityAt ?? event.occurredAt,
+    // First-writer-wins: the runToken is minted once at creation and never
+    // rotated, so an already-set value survives a (retried) started event.
+    RunToken: state.RunToken ?? event.data.runToken ?? null,
+  };
+}
+
+function foldMessageRecorded<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED }
+  >,
+): S {
+  const eventTitle = event.data.title;
+  const derivedTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
+  // First non-empty title wins (a placeholder from the first message).
+  const title = state.Title ?? derivedTitle;
+  // Only stamp `derived` when THIS message is the one that first set the
+  // title. Once a title exists (derived/auto/user), the source is
+  // untouched — a later message must never demote a user/auto title.
+  const titleSource =
+    state.Title == null && derivedTitle != null ? LANGY_TITLE_SOURCE.DERIVED : state.TitleSource;
+  return {
+    ...state,
+    ConversationId: state.ConversationId || event.data.conversationId,
+    // First writer wins: the first message's userId owns the conversation.
+    UserId: state.UserId || event.data.userId,
+    Title: title,
+    TitleSource: titleSource,
+    // Only a message from the developer opens the conversation for a turn.
+    // A notice recorded by the platform (the shared folder disconnected,
+    // say) is news, not a question: it lands in the transcript and leaves
+    // the status where it was, so the panel does not sit on a working
+    // state waiting for an answer that nobody is writing.
+    Status:
+      event.data.role === "user"
+        ? nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE)
+        : nextStatus(state, state.Status),
+    MessageCount: state.MessageCount + 1,
+    LastActivityAt: event.occurredAt,
+  };
+}
+
+function foldAgentResponseFailed<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED }
+  >,
+): S {
+  // Only the turn CURRENTLY in flight can fail. A late failure for a turn
+  // that already reached a terminal must not overwrite a completed
+  // conversation with FAILED + LastError — that buried successful answers
+  // under an error card. The event still exists on the log (audit); the
+  // fold just refuses to let it regress the state.
+  if (event.data.turnId !== state.CurrentTurnId) {
+    return {
+      ...state,
+      ConversationId: state.ConversationId || event.data.conversationId,
+    };
+  }
+  return {
+    ...state,
+    ConversationId: state.ConversationId || event.data.conversationId,
+    Status: nextStatus(state, LANGY_CONVERSATION_STATUS.FAILED),
+    CurrentTurnId: null,
+    LastError: event.data.error,
+    LastActivityAt: event.occurredAt,
+  };
+}
+
+function foldAgentResponded<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED }
+  >,
+): S {
+  const failed = event.data.outcome === "failed";
+  return {
+    ...state,
+    ConversationId: state.ConversationId || event.data.conversationId,
+    // The final answer is one message on the conversation.
+    MessageCount: state.MessageCount + 1,
+    Status: nextStatus(
+      state,
+      failed ? LANGY_CONVERSATION_STATUS.FAILED : LANGY_CONVERSATION_STATUS.IDLE,
+    ),
+    CurrentTurnId: null,
+    LastError: failed ? (event.data.error ?? "unknown error") : null,
+    LastActivityAt: event.occurredAt,
+  };
+}
+
+function foldMetadataUpdated<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED }
+  >,
+): S {
+  const next = { ...state };
+  next.ConversationId = state.ConversationId || event.data.conversationId;
+  if (event.data.title !== undefined) {
+    next.Title = event.data.title;
+    // A manual rename is sticky: mark the source `user` so no later auto
+    // regeneration can override it. Clearing the title (null) still
+    // counts as a deliberate user choice.
+    next.TitleSource = LANGY_TITLE_SOURCE.USER;
+  }
+  if (event.data.isShared !== undefined) {
+    next.IsShared = event.data.isShared;
+    next.SharedAt = event.data.isShared ? event.occurredAt : null;
+    next.SharedById = event.data.isShared
+      ? (event.data.sharedById ?? state.SharedById ?? null)
+      : null;
+  }
+  return next;
+}
+
+function foldTitleGenerated<S extends LangyConversationStateFoldState>(
+  state: S,
+  event: Extract<
+    LangyConversationStateEvent,
+    { type: typeof LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED }
+  >,
+): S {
+  const base = {
+    ...state,
+    ConversationId: state.ConversationId || event.data.conversationId,
+  };
+  if (state.TitleSource === LANGY_TITLE_SOURCE.USER) {
+    return base;
+  }
+  return {
+    ...base,
+    Title: event.data.title,
+    TitleSource: LANGY_TITLE_SOURCE.AUTO,
+  };
+}
+
 /** Fold ONE spine event onto the conversation state. Pure and total. */
 export function foldLangyConversationState<S extends LangyConversationStateFoldState>(
   state: S,
@@ -175,27 +338,7 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
 ): S {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED: {
-      const eventTitle = event.data.title;
-      const initialTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
-      // First writer wins for owner/title; an explicit creation seeds them
-      // before any message, but never demotes an existing title source.
-      const title = state.Title ?? initialTitle;
-      const titleSource =
-        state.Title == null && initialTitle != null
-          ? LANGY_TITLE_SOURCE.DERIVED
-          : state.TitleSource;
-      return {
-        ...state,
-        ConversationId: state.ConversationId || event.data.conversationId,
-        UserId: state.UserId || event.data.userId,
-        Title: title,
-        TitleSource: titleSource,
-        Status: nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE),
-        LastActivityAt: state.LastActivityAt ?? event.occurredAt,
-        // First-writer-wins: the runToken is minted once at creation and never
-        // rotated, so an already-set value survives a (retried) started event.
-        RunToken: state.RunToken ?? event.data.runToken ?? null,
-      };
+      return foldConversationStarted(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_FORKED: {
       return {
@@ -212,36 +355,7 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED: {
-      const eventTitle = event.data.title;
-      const derivedTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
-      // First non-empty title wins (a placeholder from the first message).
-      const title = state.Title ?? derivedTitle;
-      // Only stamp `derived` when THIS message is the one that first set the
-      // title. Once a title exists (derived/auto/user), the source is
-      // untouched — a later message must never demote a user/auto title.
-      const titleSource =
-        state.Title == null && derivedTitle != null
-          ? LANGY_TITLE_SOURCE.DERIVED
-          : state.TitleSource;
-      return {
-        ...state,
-        ConversationId: state.ConversationId || event.data.conversationId,
-        // First writer wins: the first message's userId owns the conversation.
-        UserId: state.UserId || event.data.userId,
-        Title: title,
-        TitleSource: titleSource,
-        // Only a message from the developer opens the conversation for a turn.
-        // A notice recorded by the platform (the shared folder disconnected,
-        // say) is news, not a question: it lands in the transcript and leaves
-        // the status where it was, so the panel does not sit on a working
-        // state waiting for an answer that nobody is writing.
-        Status:
-          event.data.role === "user"
-            ? nextStatus(state, LANGY_CONVERSATION_STATUS.ACTIVE)
-            : nextStatus(state, state.Status),
-        MessageCount: state.MessageCount + 1,
-        LastActivityAt: event.occurredAt,
-      };
+      return foldMessageRecorded(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_IMPORTED: {
       return {
@@ -275,41 +389,10 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED: {
-      // Only the turn CURRENTLY in flight can fail. A late failure for a turn
-      // that already reached a terminal must not overwrite a completed
-      // conversation with FAILED + LastError — that buried successful answers
-      // under an error card. The event still exists on the log (audit); the
-      // fold just refuses to let it regress the state.
-      if (event.data.turnId !== state.CurrentTurnId) {
-        return {
-          ...state,
-          ConversationId: state.ConversationId || event.data.conversationId,
-        };
-      }
-      return {
-        ...state,
-        ConversationId: state.ConversationId || event.data.conversationId,
-        Status: nextStatus(state, LANGY_CONVERSATION_STATUS.FAILED),
-        CurrentTurnId: null,
-        LastError: event.data.error,
-        LastActivityAt: event.occurredAt,
-      };
+      return foldAgentResponseFailed(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED: {
-      const failed = event.data.outcome === "failed";
-      return {
-        ...state,
-        ConversationId: state.ConversationId || event.data.conversationId,
-        // The final answer is one message on the conversation.
-        MessageCount: state.MessageCount + 1,
-        Status: nextStatus(
-          state,
-          failed ? LANGY_CONVERSATION_STATUS.FAILED : LANGY_CONVERSATION_STATUS.IDLE,
-        ),
-        CurrentTurnId: null,
-        LastError: failed ? (event.data.error ?? "unknown error") : null,
-        LastActivityAt: event.occurredAt,
-      };
+      return foldAgentResponded(state, event);
     }
     case LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED: {
       return {
@@ -320,23 +403,7 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED: {
-      const next = { ...state };
-      next.ConversationId = state.ConversationId || event.data.conversationId;
-      if (event.data.title !== undefined) {
-        next.Title = event.data.title;
-        // A manual rename is sticky: mark the source `user` so no later auto
-        // regeneration can override it. Clearing the title (null) still
-        // counts as a deliberate user choice.
-        next.TitleSource = LANGY_TITLE_SOURCE.USER;
-      }
-      if (event.data.isShared !== undefined) {
-        next.IsShared = event.data.isShared;
-        next.SharedAt = event.data.isShared ? event.occurredAt : null;
-        next.SharedById = event.data.isShared
-          ? (event.data.sharedById ?? state.SharedById ?? null)
-          : null;
-      }
-      return next;
+      return foldMetadataUpdated(state, event);
     }
     // ADR-048: a turn checkpointed on shutdown. Store the opaque resume token
     // and the turn it belongs to, CLEAR CurrentTurnId (the turn handed off —
@@ -369,18 +436,7 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
     // sticky and wins over any auto title, even on replay. No activity bump /
     // count change: an auto title is metadata refinement, not activity.
     case LANGY_CONVERSATION_EVENT_TYPES.TITLE_GENERATED: {
-      const base = {
-        ...state,
-        ConversationId: state.ConversationId || event.data.conversationId,
-      };
-      if (state.TitleSource === LANGY_TITLE_SOURCE.USER) {
-        return base;
-      }
-      return {
-        ...base,
-        Title: event.data.title,
-        TitleSource: LANGY_TITLE_SOURCE.AUTO,
-      };
+      return foldTitleGenerated(state, event);
     }
   }
 }

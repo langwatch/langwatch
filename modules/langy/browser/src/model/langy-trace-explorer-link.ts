@@ -275,62 +275,71 @@ function splitFlag(token: string): [string, string | undefined] {
  * two flags and a stray word.
  */
 function tokenize(command: string): string[] {
-  const tokens: string[] = [];
-  let current = "";
-  let quote: '"' | "'" | null = null;
-  let hasContent = false;
+  const scan: ShellScan = {
+    command,
+    at: 0,
+    tokens: [],
+    current: "",
+    quote: null,
+    hasContent: false,
+  };
+  for (; scan.at < command.length; scan.at++) scanShellChar(scan, command[scan.at]!);
+  if (scan.current || scan.hasContent) scan.tokens.push(scan.current);
+  return scan.tokens;
+}
 
-  for (let i = 0; i < command.length; i++) {
-    const char = command[i]!;
+type ShellScan = {
+  command: string;
+  at: number;
+  tokens: string[];
+  current: string;
+  quote: '"' | "'" | null;
+  hasContent: boolean;
+};
 
-    if (quote === "'") {
-      // Single quotes are literal through and through — a backslash inside them
-      // is data, so this branch deliberately never looks at the next character.
-      if (char === "'") quote = null;
-      else current += char;
-      continue;
-    }
+/** What a backslash escapes inside double quotes; before anything else it stands for itself. */
+const DOUBLE_QUOTE_ESCAPABLE = ['"', "\\", "$", "`"];
 
-    if (char === "\\") {
-      const next = command[i + 1];
-      if (next === undefined) {
-        current += char;
-        continue;
-      }
-      // Inside double quotes a backslash only escapes the four characters the
-      // shell lets it; before anything else it stands for itself.
-      if (quote === '"' && !['"', "\\", "$", "`"].includes(next)) {
-        current += char;
-        continue;
-      }
-      current += next;
-      hasContent = true;
-      i++;
-      continue;
-    }
-
-    if (quote === '"') {
-      if (char === '"') quote = null;
-      else current += char;
-      continue;
-    }
-
-    if (char === '"' || char === "'") {
-      quote = char;
-      hasContent = true;
-      continue;
-    }
-    if (/\s/.test(char)) {
-      if (current || hasContent) tokens.push(current);
-      current = "";
-      hasContent = false;
-      continue;
-    }
-    current += char;
+function scanShellChar(scan: ShellScan, char: string): void {
+  if (scan.quote === "'") {
+    // Single quotes are literal through and through — a backslash inside them
+    // is data, so this branch deliberately never looks at the next character.
+    if (char === "'") scan.quote = null;
+    else scan.current += char;
+    return;
   }
-  if (current || hasContent) tokens.push(current);
+  if (char === "\\") {
+    scanBackslash(scan);
+    return;
+  }
+  if (scan.quote === '"') {
+    if (char === '"') scan.quote = null;
+    else scan.current += char;
+    return;
+  }
+  if (char === '"' || char === "'") {
+    scan.quote = char;
+    scan.hasContent = true;
+    return;
+  }
+  if (!/\s/.test(char)) {
+    scan.current += char;
+    return;
+  }
+  if (scan.current || scan.hasContent) scan.tokens.push(scan.current);
+  scan.current = "";
+  scan.hasContent = false;
+}
 
-  return tokens;
+function scanBackslash(scan: ShellScan): void {
+  const next = scan.command[scan.at + 1];
+  if (next === undefined || (scan.quote === '"' && !DOUBLE_QUOTE_ESCAPABLE.includes(next))) {
+    scan.current += "\\";
+    return;
+  }
+  scan.current += next;
+  scan.hasContent = true;
+  scan.at++;
 }
 
 /** Epoch ms from the CLI's "ISO string or epoch ms". */

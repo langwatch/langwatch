@@ -588,14 +588,12 @@ export class LangyTokenBufferRedisRepository extends LangyTokenBufferRepository 
         cursor,
       );
       if (!res) continue; // block timed out; loop re-checks the abort signal
-      for (const [, rows] of res) {
-        for (const [id, fields] of rows) {
-          cursor = id;
-          const entry = decodeFields(fields);
-          if (!entry) continue;
-          yield { id, entry };
-          if (entry.type === "end" || entry.type === "error") return;
-        }
+      for (const [id, fields] of res.flatMap(([, rows]) => rows)) {
+        cursor = id;
+        const entry = decodeFields(fields);
+        if (!entry) continue;
+        yield { id, entry };
+        if (entry.type === "end" || entry.type === "error") return;
       }
     }
   }

@@ -163,29 +163,44 @@ export function parseCliJson(output: string): unknown {
     // Not one whole document: scan the output for one printed inside it.
   }
 
+  return findEmbeddedDocument(output);
+}
+
+type CandidateRead =
+  | { kind: "document"; value: unknown }
+  | { kind: "truncated" }
+  | { kind: "not-json" };
+
+function findEmbeddedDocument(output: string): unknown {
   let candidates = 0;
   for (let i = 0; i < output.length; i++) {
-    const char = output[i]!;
-    if (char !== "{" && char !== "[") continue;
-    // Document starts at line boundary, not in prose (prevents help text from parsing as JSON).
-    if (!startsAtDocumentBoundary({ text: output, start: i })) continue;
+    if (!isDocumentStart({ text: output, start: i })) continue;
     if (++candidates > MAX_CANDIDATES) break;
-
-    const end = findBalancedEnd({ text: output, start: i });
-    if (end === -1) {
-      // A JSON-looking document that opens but never closes is a truncated
-      // OUTER result - don't walk into it and promote a complete nested
-      // object as the whole command's result (how an oversized trace search
-      // once rendered an unrelated sentence as its card). A log line opening
-      // a bracket without closing it is not that case, so it must not stop the scan.
-      if (opensJsonContent({ text: output, start: i })) return null;
-      continue;
-    }
-    try {
-      return JSON.parse(output.slice(i, end + 1)) as unknown;
-    } catch {
-      // A balanced bracket pair that is not JSON: keep scanning.
-    }
+    const read = readCandidate({ text: output, start: i });
+    if (read.kind === "document") return read.value;
+    if (read.kind === "truncated") return null;
   }
   return null;
+}
+
+/** Document starts at a line boundary, not in prose (keeps help text from parsing as JSON). */
+function isDocumentStart({ text, start }: { text: string; start: number }): boolean {
+  const char = text[start];
+  return (char === "{" || char === "[") && startsAtDocumentBoundary({ text, start });
+}
+
+function readCandidate({ text, start }: { text: string; start: number }): CandidateRead {
+  const end = findBalancedEnd({ text, start });
+  if (end === -1) {
+    // A JSON-looking document that opens but never closes is a truncated OUTER result - never
+    // promote a complete nested object as the whole result. A log line opening a bracket
+    // without closing it is not that case, so it must not stop the scan.
+    return opensJsonContent({ text, start }) ? { kind: "truncated" } : { kind: "not-json" };
+  }
+  try {
+    const value: unknown = JSON.parse(text.slice(start, end + 1));
+    return { kind: "document", value };
+  } catch {
+    return { kind: "not-json" };
+  }
 }

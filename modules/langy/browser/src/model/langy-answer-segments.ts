@@ -46,14 +46,6 @@ export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegme
   const segments: LangyAnswerSegment[] = [];
   let textBuffer: string[] = [];
 
-  const flushText = (): void => {
-    if (textBuffer.length === 0) return;
-    const text = textBuffer.join("\n\n");
-    textBuffer = [];
-    if (text.trim().length === 0) return;
-    segments.push({ type: "text", text });
-  };
-
   for (const rawPart of parts) {
     const parsedPart = answerPartSchema.safeParse(rawPart);
     if (!parsedPart.success) continue;
@@ -63,36 +55,48 @@ export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegme
       if ((part.text ?? "").length > 0) textBuffer.push(part.text ?? "");
       continue;
     }
-    if (part.type === LANGY_CARD_PART_TYPE) {
-      flushText();
-      const parsed = parseLangyCardPart(rawPart);
-      if (parsed) {
-        segments.push({ type: "card", part: parsed });
-      } else {
-        // A malformed stamp still surfaces — as the disclosure, with the
-        // part itself as the raw evidence.
-        segments.push({
-          type: "failed",
-          part: {
-            type: "langy-card-failed",
-            blockId: "malformed-part",
-            raw: safeStringify(rawPart),
-          },
-        });
-      }
-      continue;
-    }
-    if (part.type === LANGY_CARD_FAILED_PART_TYPE) {
-      flushText();
-      const parsed = parseLangyCardFailedPart(rawPart);
-      if (parsed) segments.push({ type: "failed", part: parsed });
-      continue;
-    }
-    // Tool parts and anything else render through their own surfaces
-    // (LangyToolActivity et al) — not part of the prose flow.
+    const stamp = stampedSegments({ type: part.type, rawPart });
+    if (stamp.kind === "other") continue;
+    segments.push(...proseSegments(textBuffer), ...stamp.segments);
+    textBuffer = [];
   }
-  flushText();
+  segments.push(...proseSegments(textBuffer));
   return segments;
+}
+
+type StampRead = { kind: "stamp"; segments: LangyAnswerSegment[] } | { kind: "other" };
+
+/** Consecutive text parts as one prose run, a paragraph break at each part boundary. */
+function proseSegments(textBuffer: string[]): LangyAnswerSegment[] {
+  const text = textBuffer.join("\n\n");
+  return text.trim().length === 0 ? [] : [{ type: "text", text }];
+}
+
+/**
+ * A card or failed-card stamp ends the prose run. Tool parts and anything else render through
+ * their own surfaces (LangyToolActivity et al) — not part of the prose flow.
+ */
+function stampedSegments({
+  type,
+  rawPart,
+}: {
+  type: string | undefined;
+  rawPart: unknown;
+}): StampRead {
+  if (type === LANGY_CARD_PART_TYPE) return { kind: "stamp", segments: [cardSegment(rawPart)] };
+  if (type !== LANGY_CARD_FAILED_PART_TYPE) return { kind: "other" };
+  const parsed = parseLangyCardFailedPart(rawPart);
+  return { kind: "stamp", segments: parsed ? [{ type: "failed", part: parsed }] : [] };
+}
+
+/** A malformed stamp still surfaces — as the disclosure, the part itself as raw evidence. */
+function cardSegment(rawPart: unknown): LangyAnswerSegment {
+  const parsed = parseLangyCardPart(rawPart);
+  if (parsed) return { type: "card", part: parsed };
+  return {
+    type: "failed",
+    part: { type: "langy-card-failed", blockId: "malformed-part", raw: safeStringify(rawPart) },
+  };
 }
 
 /**

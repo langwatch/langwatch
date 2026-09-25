@@ -138,6 +138,77 @@ interface ErrorBody {
   docUrl?: string;
 }
 
+/** True when a dialect's record carries a string `code`, or the given fallback discriminant. */
+const namesFailure = ({
+  record,
+  fallbackKey,
+}: {
+  record: Record<string, unknown>;
+  fallbackKey: "kind" | "type";
+}): boolean => typeof record.code === "string" || typeof record[fallbackKey] === "string";
+
+/** Dialect 2: the serialised HandledError, carried whole under `domainError`. */
+const serializedErrorBody = ({
+  record,
+  serialized,
+}: {
+  record: Record<string, unknown>;
+  serialized: Record<string, unknown>;
+}): ErrorBody => {
+  const telemetry = asRecord(serialized.telemetry);
+  return {
+    code: typeof serialized.code === "string" ? serialized.code : String(serialized.kind),
+    message: [record.error, record.message].find(isString),
+    meta: asRecord(serialized.meta) ?? {},
+    retryable: serialized.retryable === true,
+    traceId: [serialized.traceId, telemetry?.traceId].find(isString),
+    traceUrl: typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
+    logsUrl: typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
+    reasons: asReasons(serialized.reasons),
+    suggestions: asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
+    docUrl: [serialized.docsUrl, serialized.docUrl].find(isString),
+  };
+};
+
+/**
+ * Dialect 4: `{ error: { type, code, message, meta?, trace_id?, span_id? } }`, which the Go
+ * plane still answers with. None of the flat readings can see it, so it is read first.
+ */
+const canonicalErrorBody = (canonical: Record<string, unknown>): ErrorBody => {
+  const code = typeof canonical.code === "string" ? canonical.code : String(canonical.type);
+  const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+  return {
+    code,
+    retryable: canonical.retryable === true,
+    message:
+      typeof canonical.message === "string" && canonical.message !== code
+        ? canonical.message
+        : undefined,
+    meta,
+    traceId: typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+    reasons: asReasons(metaReasons),
+    suggestions: asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+    docUrl: typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
+  };
+};
+
+/**
+ * Dialects 1 and 3 (and the deprecated `kind`-only variant): the code that names the failure,
+ * or unnamed when this is not the platform's shape. Dialect 1 spreads meta FLAT, so a meta
+ * key named `code`/`type` must not shadow the real discriminant on `error`.
+ */
+const flatDialectCode = (record: Record<string, unknown>): FlatDialectRead => {
+  const envelopeCode = [record.code, record.type].find(isString);
+  if (typeof record.kind === "string") return { kind: "named", code: envelopeCode ?? record.kind };
+  if (typeof record.error === "string") return { kind: "named", code: record.error };
+  if (envelopeCode !== undefined && looksLikeErrorEnvelope(record)) {
+    return { kind: "named", code: envelopeCode };
+  }
+  return { kind: "unnamed" };
+};
+
+type FlatDialectRead = { kind: "named"; code: string } | { kind: "unnamed" };
+
 /**
  * Read the platform's error body. The REST surface speaks this in FOUR dialects, and all are
  * real — verified against the routes, not assumed: 1.
@@ -155,58 +226,24 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
 
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
-  if (serialized && (typeof serialized.code === "string" || typeof serialized.kind === "string")) {
-    const telemetry = asRecord(serialized.telemetry);
-    return {
-      code: typeof serialized.code === "string" ? serialized.code : (serialized.kind as string),
-      message: [record.error, record.message].find(isString),
-      meta: asRecord(serialized.meta) ?? {},
-      retryable: serialized.retryable === true,
-      traceId: [serialized.traceId, telemetry?.traceId].find(isString),
-      traceUrl: typeof serialized.traceUrl === "string" ? serialized.traceUrl : undefined,
-      logsUrl: typeof serialized.logsUrl === "string" ? serialized.logsUrl : undefined,
-      reasons: asReasons(serialized.reasons),
-      suggestions: asSuggestions(serialized.tips) ?? asSuggestions(serialized.suggestions),
-      docUrl: [serialized.docsUrl, serialized.docUrl].find(isString),
-    };
+  if (serialized && namesFailure({ record: serialized, fallbackKey: "kind" })) {
+    return serializedErrorBody({ record, serialized });
   }
 
-  // Dialect 4: the NESTED canonical envelope — `{ error: { type, code, message, meta?, trace_id?,
-  // span_id? } }` — which the Go plane still answers with. None of the flat readings below can see
-  // it, so it is read here first. The `/api/` REST surface no longer nests: it writes those same
-  // fields at the ROOT, and such a body falls through to the flat reading below, which finds `code`
-  // there. `looksLikeErrorEnvelope` admits it on `message`, which the envelope always carries.
+  // Dialect 4: the NESTED canonical envelope — see {@link canonicalErrorBody}. The `/api/` REST
+  // surface writes those fields at the ROOT instead, and falls through to the flat reading below.
   const canonical = asRecord(record.error);
-  if (canonical && !isSystemError(canonical)) {
-    if (typeof canonical.code === "string" || typeof canonical.type === "string") {
-      const code = typeof canonical.code === "string" ? canonical.code : (canonical.type as string);
-      const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
-      return {
-        code,
-        retryable: canonical.retryable === true,
-        message:
-          typeof canonical.message === "string" && canonical.message !== code
-            ? canonical.message
-            : undefined,
-        meta,
-        traceId: typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
-        reasons: asReasons(metaReasons),
-        suggestions: asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
-        docUrl: typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
-      };
-    }
+  if (
+    canonical &&
+    !isSystemError(canonical) &&
+    namesFailure({ record: canonical, fallbackKey: "type" })
+  ) {
+    return canonicalErrorBody(canonical);
   }
 
-  // Dialects 1 and 3 (and the deprecated `kind`-only variant). One of them must name the
-  // failure; without any, this is not the platform's shape at all. The ordering guards a
-  // hijack: dialect 1 spreads meta FLAT, so a meta bag holding a literal `code` (or `type`) key
-  // would shadow the real discriminant on `error` if it were read first.
-  const envelopeCode = [record.code, record.type].find(isString);
-  let named: string | undefined;
-  if (typeof record.kind === "string") named = envelopeCode ?? record.kind;
-  else if (typeof record.error === "string") named = record.error;
-  else if (looksLikeErrorEnvelope(record)) named = envelopeCode;
-  if (named === undefined) return null;
+  const flat = flatDialectCode(record);
+  if (flat.kind === "unnamed") return null;
+  const named = flat.code;
 
   // Everything the platform did NOT put in meta gets lifted out, so the flat
   // spread does not smuggle the envelope's own fields back in as domain context.
