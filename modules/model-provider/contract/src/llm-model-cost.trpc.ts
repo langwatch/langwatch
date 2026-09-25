@@ -29,7 +29,7 @@ export const llmModelCostTrpc = defineTrpcContract("llmModelCost")
   .withInput(modelCostDeleteTrpcInputSchema)
 
   /** The registry's context-window and output ceilings for a model id. */
-  .query("tryGetModelLimits")
+  .query("getModelLimits")
   .withInput(modelCostModelLimitsTrpcInputSchema)
   .withOutput(modelLimitsSchema.nullable())
 

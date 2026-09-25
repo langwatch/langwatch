@@ -89,7 +89,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
       getAllForProject: { useQuery: () => idleQuery },
       listAllForProjectForFrontend: { useQuery: () => idleQuery },
     },
-    llmModelCost: { tryGetModelLimits: { useQuery: () => idleQuery } },
+    llmModelCost: { getModelLimits: { useQuery: () => idleQuery } },
     prompts: {
       getByIdOrHandle: { useQuery: () => idleQuery },
       create: { useMutation: idleMutation },

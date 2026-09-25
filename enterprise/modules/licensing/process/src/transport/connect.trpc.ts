@@ -8,11 +8,11 @@ import { LicensingApi, connectTrpc } from "@langwatch/enterprise-licensing-contr
 
 /**
  * Reading is any member's: the page explains why hosted judging is or is not
- * running. The writes and the refresh are an organization management right:
- * what leaves the install, what it may spend, and the key it runs on.
+ * running. Both writes are an organization management right:
+ * what leaves the install and what it may spend.
  */
 export const connectTrpcTransport = defineTrpcRouter(LicensingApi, connectTrpc)
-  .procedure("getStatus")
+  .procedure("status")
   .withPermission("organization:view")
   .handle(({ app, input }) => app.getConnectStatus(input))
 
@@ -23,8 +23,4 @@ export const connectTrpcTransport = defineTrpcRouter(LicensingApi, connectTrpc)
   .procedure("setCap")
   .withPermission("organization:manage")
   .handle(({ app, input }) => app.setConnectCap(input))
-
-  .procedure("refreshLicense")
-  .withPermission("organization:manage")
-  .handle(({ app, input }) => app.refreshLicense(input))
   .build();

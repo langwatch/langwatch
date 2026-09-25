@@ -22,7 +22,7 @@ const mutation = { mutate: vi.fn(), isPending: false };
 vi.mock("../../../behavior/connect-api.ts", () => ({
   connectApi: {
     connect: {
-      getStatus: {
+      status: {
         useQuery: () => ({ isLoading: false, error: null, data: answer.status, refetch: vi.fn() }),
       },
       setService: { useMutation: () => mutation },

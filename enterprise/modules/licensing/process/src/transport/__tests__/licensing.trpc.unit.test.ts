@@ -35,6 +35,7 @@ describe("the license tRPC namespace", () => {
         "activate",
         "getSsoGateStatus",
         "getStatus",
+        "refresh",
         "remove",
         "upload",
       ]);
@@ -55,6 +56,7 @@ describe("the license tRPC namespace", () => {
         upload: "mutation",
         activate: "mutation",
         remove: "mutation",
+        refresh: "mutation",
       });
     });
   });

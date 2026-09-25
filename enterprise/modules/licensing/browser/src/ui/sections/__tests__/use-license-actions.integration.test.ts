@@ -64,14 +64,7 @@ vi.mock("../../../behavior/licensing-api.ts", () => ({
           return { mutate: vi.fn(), isPending: false };
         },
       },
-    },
-  },
-}));
-
-vi.mock("../../../behavior/connect-api.ts", () => ({
-  connectApi: {
-    connect: {
-      refreshLicense: {
+      refresh: {
         useMutation: (options: Record<string, any>) => {
           refreshMutationOptions.current = options;
           return { mutate: vi.fn(), isPending: false };

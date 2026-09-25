@@ -5,6 +5,7 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { licenseRefreshOutcomeSchema } from "./connect-install.ts";
 import { storeLicenseInputSchema } from "./license.commands.ts";
 import { licenseOrganizationQuerySchema } from "./license.queries.ts";
 import {
@@ -42,5 +43,10 @@ export const licenseTrpc = defineTrpcContract("license")
   .mutation("remove")
   .withInput(licenseOrganizationQuerySchema)
   .withOutput(licenseRemovedSchema)
+
+  /** The daily sync, run by hand, so a seat change lands without waiting a day. */
+  .mutation("refresh")
+  .withInput(licenseOrganizationQuerySchema)
+  .withOutput(licenseRefreshOutcomeSchema)
 
   .build();

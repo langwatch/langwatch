@@ -25,7 +25,7 @@ export default function ConnectScreen() {
 
 function ConnectStatusPanel({ organizationId }: { organizationId: string }) {
   const host = useLicensingHost();
-  const status = connectApi.connect.getStatus.useQuery(
+  const status = connectApi.connect.status.useQuery(
     { organizationId },
     { refetchOnWindowFocus: false },
   );

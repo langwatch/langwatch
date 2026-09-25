@@ -68,7 +68,7 @@ export const llmModelCostTrpcTransport = defineTrpcRouter(ModelProviderApi, llmM
 
   // Behind project:view because tRPC asks every procedure for a declaration,
   // not because a model's ceilings are a tenant's secret.
-  .procedure("tryGetModelLimits")
+  .procedure("getModelLimits")
   .withPermission("project:view")
   .handle(({ app, input }) => app.findModelLimits({ model: input.model }))
 

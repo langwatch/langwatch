@@ -30,16 +30,18 @@ describe("the connect tRPC namespace", () => {
   it("exposes exactly the procedure names the settings page calls", async () => {
     const { router } = await mount();
 
-    expect(Object.keys(router._def.procedures).toSorted()).toEqual(
-      ["getStatus", "setCap", "setService", "refreshLicense"].toSorted(),
-    );
+    expect(Object.keys(router._def.procedures).toSorted()).toEqual([
+      "setCap",
+      "setService",
+      "status",
+    ]);
   });
 
   /** @scenario "A member who is not an admin cannot switch a service on" */
   it("lets any member read the status but refuses both writes", async () => {
     const { caller } = await mount({ permits: (permission) => permission === "organization:view" });
 
-    await expect(caller.getStatus({ organizationId: "org-acme" })).resolves.toBeDefined();
+    await expect(caller.status({ organizationId: "org-acme" })).resolves.toBeDefined();
     await expect(
       caller.setService({ organizationId: "org-acme", service: "instant_evals", enabled: true }),
     ).rejects.toBeDefined();

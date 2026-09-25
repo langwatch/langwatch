@@ -1,4 +1,3 @@
-import { connectApi } from "../../behavior/connect-api.ts";
 import { licensingApi } from "../../behavior/licensing-api.ts";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 
@@ -63,7 +62,7 @@ export function useLicenseActions({
     onError: (error) => host.failed({ error, fallbackTitle: "Couldn't remove license" }),
   });
 
-  const refreshMutation = connectApi.connect.refreshLicense.useMutation({
+  const refreshMutation = licensingApi.license.refresh.useMutation({
     onSuccess: (result) => {
       if (result.outcome !== "updated") {
         host.succeeded({

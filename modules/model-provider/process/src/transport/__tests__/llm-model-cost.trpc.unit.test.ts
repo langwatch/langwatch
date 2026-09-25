@@ -49,8 +49,8 @@ describe("the llmModelCost tRPC namespace", () => {
         "createOrUpdate",
         "delete",
         "getAllForProject",
+        "getModelLimits",
         "previewMatchingSpans",
-        "tryGetModelLimits",
       ]);
     });
   });
@@ -125,7 +125,7 @@ describe("the llmModelCost tRPC namespace", () => {
       const { caller } = mount();
 
       await expect(
-        caller.tryGetModelLimits({ projectId: PROJECT_ID, model: "no-such-model" }),
+        caller.getModelLimits({ projectId: PROJECT_ID, model: "no-such-model" }),
       ).resolves.toBeNull();
     });
   });

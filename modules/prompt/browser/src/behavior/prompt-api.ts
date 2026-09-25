@@ -160,7 +160,7 @@ export type PromptApiMap = {
 
   llmModelCost: {
     /** The context window and output ceiling the token gauge is drawn against. */
-    tryGetModelLimits: {
+    getModelLimits: {
       query: {
         input: ProjectScope & { model: string };
         output: { maxInputTokens?: number; maxOutputTokens?: number } | null;

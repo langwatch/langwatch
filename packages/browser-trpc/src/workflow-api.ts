@@ -219,7 +219,7 @@ type BorrowedProcedures = {
   };
   featureFlag: ContractApiMap<typeof featureFlagTrpc>["featureFlag"];
   httpProxy: { execute: UnpublishedMutation };
-  llmModelCost: { tryGetModelLimits: UnpublishedQuery };
+  llmModelCost: { getModelLimits: UnpublishedQuery };
   modelProvider: {
     getAllForProject: UnpublishedQuery;
     getAllForProjectForFrontend: UnpublishedQuery;

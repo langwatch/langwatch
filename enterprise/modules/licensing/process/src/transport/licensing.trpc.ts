@@ -44,4 +44,8 @@ export const licenseTrpcTransport = defineTrpcRouter(LicensingApi, licenseTrpc)
     return { success: true as const, removed: result.removed };
   })
 
+  .procedure("refresh")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.refreshLicense(input))
+
   .build();
