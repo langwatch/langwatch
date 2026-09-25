@@ -6,8 +6,8 @@ import type {
   Department,
   IngestionTemplate,
   RoutingPolicy,
-import type { Instant } from "@langwatch/time";
 } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
 
 /** A seat in an organization, and whether it still answers as active. */
 export type MemoryGovernanceMember = {
