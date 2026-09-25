@@ -1,4 +1,4 @@
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
 
@@ -12,7 +12,10 @@ declare global {
  * The public configuration PostHog needs — the composing application
  * resolves and passes it; this behaviour never reads the environment itself.
  */
-export type PostHogPublicConfig = Pick<PublicAppConfig, "mode" | "telemetry">;
+export type PostHogPublicConfig = Readonly<{
+  mode: ProcessWebConfig["mode"];
+  telemetry: Readonly<{ posthog?: Readonly<{ key: string; host?: string }> }>;
+}>;
 
 // Returns a cancel function so a torn-down (or re-run) effect can drop
 // pending work — otherwise a stale callback could start recording after

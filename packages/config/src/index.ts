@@ -15,12 +15,16 @@ export {
 export {
   allowedProxyHosts,
   blockLocalHttpCalls,
+  gatewayAddressOf,
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  isSaas,
   langevalsStagingThresholdBytes,
   langevalsStagingTtlSeconds,
   langwatchDefaultModel,
+  LOCAL_GATEWAY_URL,
+  SAAS_GATEWAY_URL,
   signInProviders,
 } from "./deployment-facts.ts";
 export {

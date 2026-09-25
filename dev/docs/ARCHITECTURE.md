@@ -907,7 +907,22 @@ every installed module's projection and injects it into the served page;
 first render**, so a missing value is a boot refusal naming the module, not
 an `undefined` deep in a component. The same drilling rule applies on the
 browser: screens receive values as props, nothing reads the injected blob
-directly.
+directly. The contract exports `xBrowserConfig = defineBrowserConfig({ schema: xWebConfigSchema,
+project })`; the App attaches `static readonly publicConfig = xBrowserConfig.project`. The process
+owner's slice is `process` (address, mode, deployment, nlp, browser tracing). A browser module reads
+any owner's slice by that owner's name: `withConfig({ process: schema })` (2026-09-25).
+
+**No config endpoint: the page carries it** (Alex, 2026-09-25: "for public
+env, that endpoint should be removed, and config injected directly into the
+html on render, secrets never hitting it, and only the config needed. then
+it's instant and doesn't require a backend call."). main's `publicEnv` query
+is not ported and no browser code fetches its config. The api injects the
+projection above into the document it renders; the projection carries only
+fields some browser code reads and never a secret handle or value, so the
+browser has its config before first render with no loading state. A browser
+module reads deployment facts through the shell's `useUiDeployment()`
+capability or its own `*HostApi` — never a fetch, never its own parse of
+the meta tag.
 
 ---
 

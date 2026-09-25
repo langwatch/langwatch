@@ -73,10 +73,7 @@ export const annotationWeb = defineWebModule("annotation")
   })
   /**
    * The deployment mode decides which documentation host an annotation screen
-   * links into: the one injected value this module declares. The supply parses
-   * it before a component renders, and refuses the boot naming this module.
+   * links into, read off the process owner's slice. The supply parses it before
+   * a component renders, and refuses the boot naming this module.
    */
-  .withConfig(
-    z.strictObject({ mode: z.enum(["development", "test", "production"]) }),
-    (config) => ({ mode: config.mode }),
-  );
+  .withConfig({ process: z.object({ mode: z.enum(["development", "test", "production"]) }) });

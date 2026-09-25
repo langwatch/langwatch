@@ -241,16 +241,11 @@ function splitGuidedResume(resume: ReturnType<typeof resolveGuidedResume>) {
 function isLastWelcomeScreen({
   currentVisibleIndex,
   visibleCount,
-  variant,
-  isPublicEnvLoading,
 }: {
   currentVisibleIndex: number;
   visibleCount: number;
-  variant: string;
-  isPublicEnvLoading: boolean;
 }): boolean {
-  if (currentVisibleIndex < 0 || currentVisibleIndex !== visibleCount - 1) return false;
-  return variant !== "self_hosted" || !isPublicEnvLoading;
+  return currentVisibleIndex >= 0 && currentVisibleIndex === visibleCount - 1;
 }
 
 export const WelcomeScreen: React.FC = () => {
@@ -274,7 +269,6 @@ export const WelcomeScreen: React.FC = () => {
     navigation,
     getFormData,
     formContextValue,
-    isPublicEnvLoading,
     onboardingVariant,
   } = useOnboardingFlow();
 
@@ -374,8 +368,6 @@ export const WelcomeScreen: React.FC = () => {
   const isLastScreen = isLastWelcomeScreen({
     currentVisibleIndex,
     visibleCount: flow.visibleScreens.length,
-    variant: flow.variant,
-    isPublicEnvLoading,
   });
 
   const screenSurface = {

@@ -10,6 +10,11 @@ import { environmentOneOrTrueSchema } from "./env-schemas.ts";
 
 const positiveInteger = z.coerce.number().int().positive();
 
+/** Whether this deployment is the hosted product; gateway's browser projection reads it too. */
+export const { isSaas } = Config.define((c) => ({
+  isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
+}));
+
 export const { langevalsStagingThresholdBytes, langevalsStagingTtlSeconds } = Config.define(
   (c) => ({
     /** Unset keeps every payload inline: only a Lambda-fronted langevals has a body cap. */
@@ -64,6 +69,22 @@ export const { gatewayPublicUrl, gatewayInternalUrl, gatewayLegacyUrl } = Config
   gatewayInternalUrl: c.env("LW_GATEWAY_INTERNAL_URL", z.string().optional()),
   gatewayLegacyUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
 }));
+
+export const SAAS_GATEWAY_URL = "https://gateway.langwatch.ai" as const;
+export const LOCAL_GATEWAY_URL = "http://localhost:5563" as const;
+
+/** Where apps reach the gateway: public URL, then legacy URL, then the deployment default. */
+export function gatewayAddressOf({
+  publicUrl,
+  legacyUrl,
+  isSaas,
+}: {
+  publicUrl: string | undefined;
+  legacyUrl: string | undefined;
+  isSaas: boolean;
+}): string {
+  return publicUrl || legacyUrl || (isSaas ? SAAS_GATEWAY_URL : LOCAL_GATEWAY_URL);
+}
 
 const publicProviderField = z.string().min(1).optional();
 

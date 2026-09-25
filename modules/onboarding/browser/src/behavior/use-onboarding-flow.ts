@@ -1,5 +1,5 @@
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { usePublicEnv } from "@langwatch/onboarding-browser-kit";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { useMemo, useState } from "react";
 
@@ -48,8 +48,7 @@ function isBasicInfoComplete({
 }
 
 export const useOnboardingFlow = () => {
-  const publicEnv = usePublicEnv();
-  const isSaaS = publicEnv.data?.IS_SAAS;
+  const { isSaaS } = useUiDeployment();
 
   const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
   const [agreement, setAgreement] = useState<boolean>(false);
@@ -95,7 +94,7 @@ export const useOnboardingFlow = () => {
   const flow = useMemo(
     () =>
       getOnboardingFlowConfig({
-        isSaaS: Boolean(isSaaS),
+        isSaaS,
         intent,
         intentForkEnabled,
         guided,
@@ -227,7 +226,6 @@ export const useOnboardingFlow = () => {
     currentScreenIndex,
     direction,
     flow,
-    isPublicEnvLoading: publicEnv.isLoading,
     isSaaS: Boolean(isSaaS),
     /** Which onboarding this user goes through, recorded on the organization. */
     onboardingVariant: guided ? ("guided" as const) : ("classic" as const),

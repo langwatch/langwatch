@@ -19,7 +19,6 @@ export * from "./features/guided-onboarding/model/guided-providers.ts";
 export * from "./ui/elements/link.tsx";
 export * from "./ui/elements/shared/selectable-icon-card.tsx";
 export * from "./model/shared/accent-surface.ts";
-export * from "./behavior/use-public-env.ts";
 export * from "./behavior/use-project-by-slug-or-latest.ts";
 export * from "./model/code-prompts.ts";
 export * from "./ui/sections/observability/codegen/snippets.ts";

@@ -3,55 +3,69 @@
  * because both the API (builds and injects the meta tag) and browser (reads it) need it and they
  * are different processes. Does not read env vars; `./public-app-config.projection` does that.
  */
-import { z } from "zod";
+import { z, type input, type output, type ZodType } from "zod";
 
 export const PUBLIC_APP_CONFIG_META_NAME = "langwatch-public-config";
 
-export const publicAppConfigSchema = z.strictObject({
-  appBaseUrl: z.string().min(1),
-  gatewayBaseUrl: z.string().min(1),
-  deployment: z.enum(["saas", "self-hosted"]),
-  demoProjectSlug: z.string().min(1).optional(),
+/**
+ * One slice per owner, keyed by the owner's name (ARCHITECTURE.md §6). The
+ * envelope checks only the namespacing; each owner's schema judges its slice.
+ */
+export const publicAppConfigSchema = z.record(z.string().min(1), z.record(z.string(), z.unknown()));
+
+export type PublicAppConfig = z.infer<typeof publicAppConfigSchema>;
+
+/** The process owner's slice: the facts the process, not a module, knows. */
+export const processWebConfigSchema = z.strictObject({
+  appBaseUrl: z.string().min(1).optional(),
   mode: z.enum(["development", "test", "production"]),
-  telemetry: z.strictObject({
-    browserTracing: z.boolean(),
-    sampleRatio: z.number().min(0).max(1),
-    posthog: z
-      .strictObject({
-        key: z.string().min(1),
-        host: z.string().min(1).optional(),
-      })
-      .optional(),
-  }),
-  capabilities: z.strictObject({
-    email: z.boolean(),
-    nlp: z.boolean(),
-    langevals: z.boolean(),
-  }),
-  /**
-   * Whether this deployment mounted the passkey plugin at boot. A derived
-   * boolean rather than the raw setting, because the only thing a browser may
-   * act on is "is there an endpoint behind the button".
-   */
-  passkeys: z.boolean(),
-  /**
-   * Whether the identifier-first screens are the front door on this
-   * deployment (ADR-117 §7). Derived rather than the flag's value: the router
-   * also runs in shadow, and the screens never render then.
-   */
-  identityFrontDoor: z.boolean(),
-  licensePaymentUrl: z.string().min(1).optional(),
-  /**
-   * `"email"`, or the federated provider id this deployment mounted. Absent
-   * means email mode (ADR-027). A provider name, not a secret, so it rides
-   * the shell alongside the rest of the deployment's public shape.
-   */
-  authProvider: z.string().min(1).optional(),
+  deployment: z.enum(["saas", "self-hosted"]),
+  nlp: z.boolean(),
+  browserTracing: z.boolean(),
+  sampleRatio: z.number().min(0).max(1),
   /** Keeps the development badge off a development build (demos, screenshots). */
   hideDevIndicator: z.boolean().optional(),
 });
 
-export type PublicAppConfig = z.infer<typeof publicAppConfigSchema>;
+export type ProcessWebConfig = z.infer<typeof processWebConfigSchema>;
+
+/** A contract's browser projection: its schema, and its parsed slice to the values it admits. */
+export type BrowserConfigDeclaration<Config, Schema extends ZodType> = Readonly<{
+  schema: Schema;
+  project: (config: Config) => output<Schema>;
+}>;
+
+/**
+ * Declares an owner's browser projection. `project` reads the owner's parsed
+ * config only, which never holds a secret (`ConfigClaimsSecretError`), and its
+ * answer is parsed by the strict schema, so an undeclared key refuses boot.
+ */
+export function defineBrowserConfig<Config, Schema extends ZodType>(declaration: {
+  schema: Schema;
+  project: (config: Config) => input<Schema>;
+}): BrowserConfigDeclaration<Config, Schema> {
+  return {
+    schema: declaration.schema,
+    project: (config) => declaration.schema.parse(declaration.project(config)),
+  };
+}
+
+/** One owner's slice of the page's config, through the schema that owner declared. */
+export function parsePublicConfigSlice<Schema extends ZodType>({
+  config,
+  owner,
+  schema,
+}: {
+  config: PublicAppConfig;
+  owner: string;
+  schema: Schema;
+}): output<Schema> {
+  const parsed = schema.safeParse(config[owner]);
+  if (!parsed.success) {
+    throw new Error(`The page's browser config for "${owner}" is missing or was refused.`);
+  }
+  return parsed.data;
+}
 
 const BASE64URL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
 
@@ -103,7 +117,8 @@ export function injectPublicAppConfigIntoHtml({
   return `${html.slice(0, headEnd)}${element}${html.slice(headEnd)}`;
 }
 
-export function createPublicAppConfigMetaTag(config: PublicAppConfig): string {
+/** Refuses anything not namespaced by owner before it reaches the page. */
+export function createPublicAppConfigMetaTag(config: Readonly<Record<string, unknown>>): string {
   const parsed = publicAppConfigSchema.parse(config);
   const payload = encodeBase64Url(JSON.stringify(parsed));
   return `<meta name="${PUBLIC_APP_CONFIG_META_NAME}" content="${payload}">`;

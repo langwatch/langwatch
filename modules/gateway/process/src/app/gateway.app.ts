@@ -45,6 +45,7 @@ import {
   type GatewaySpendEventEnvelope,
   gatewaySpendEventEnvelopeSchema,
   type GatewayUsageCount,
+  gatewayBrowserConfig,
   gatewayConfig,
   type GatewayDeploymentAddresses,
   type GatewayConnectUpstream,
@@ -704,6 +705,7 @@ export class GatewayApp implements GatewayApi {
     oneTimeReveals: SecretApi,
   };
   static readonly config = gatewayConfig;
+  static readonly publicConfig = gatewayBrowserConfig.project;
   /**
    * The three AI Gateway credentials, all-or-none per
    * `assertGatewaySecretsAllOrNone` — optional here because a deployment that

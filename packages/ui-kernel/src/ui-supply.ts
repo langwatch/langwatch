@@ -229,7 +229,11 @@ export class UiSupply<
       const declaration = module.installation.config;
       if (!declaration) continue;
       try {
-        slices[module.name] = declaration.schema.parse(declaration.project(envelope));
+        const read: Record<string, unknown> = {};
+        for (const [owner, schema] of Object.entries(declaration.slices)) {
+          read[owner] = schema.parse(envelope[owner]);
+        }
+        slices[module.name] = read;
       } catch {
         throw new BrowserConfigRefusedError(module.name);
       }

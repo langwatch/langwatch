@@ -255,10 +255,9 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
         deployment: {
           isSaas: deployment.isSaaS,
           appBaseUrl: deployment.appBaseUrl,
-          // No capability carries these three yet — see the handoff for the
-          // widening this host is waiting on.
-          passkeysEnabled: false,
-          authProvider: void 0,
+          passkeysEnabled: deployment.passkeysEnabled ?? false,
+          authProvider: deployment.authProvider,
+          // No capability carries this yet: main's EMAIL_PASSWORD_ENABLED is not ported.
           emailPasswordEnabled: false,
         },
         organization,
@@ -274,6 +273,8 @@ export default function PersonalWorkspaceHostMount({ children }: { children?: Re
       organizationRole,
       deployment.isSaaS,
       deployment.appBaseUrl,
+      deployment.passkeysEnabled,
+      deployment.authProvider,
       organization,
       project,
     ],

@@ -154,10 +154,7 @@ export abstract class OnboardingHostApi {
     options?: { replace?: boolean },
   ): void;
 
-  /**
-   * Deployment config is not here; see use-public-env to support modules shared
-   * with packages that don't mount this host.
-   */
+  /** Deployment config is not here: it is the shell's `useUiDeployment()` capability. */
 
   abstract featureFlag(flag: string): OnboardingFlagReading;
 

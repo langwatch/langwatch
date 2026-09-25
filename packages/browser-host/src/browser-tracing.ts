@@ -3,13 +3,13 @@
  * on the server, so the caller passes resolved values in. See ADR-058.
  */
 
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 import { RUM_DEFAULT_SAMPLE_RATIO, startBrowserTracing } from "@langwatch/react-rum";
 import { useEffect } from "react";
 
 export type BrowserTracingPublicConfig = {
   enabled: boolean | undefined;
-  environment: PublicAppConfig["mode"] | undefined;
+  environment: ProcessWebConfig["mode"] | undefined;
   sampleRatio: number | undefined;
 };
 

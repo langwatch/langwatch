@@ -1,46 +1,65 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
 
-import { parseUiFeatureConfig } from "../ui-feature-config";
+import { parseUiFeatureConfig, uiDeploymentOf } from "../ui-feature-config";
 
 const served: PublicAppConfig = {
-  appBaseUrl: "https://app.langwatch.test",
-  gatewayBaseUrl: "https://gateway.langwatch.test",
-  deployment: "saas",
-  mode: "production",
-  telemetry: { browserTracing: true, sampleRatio: 0.1 },
-  capabilities: { email: true, nlp: false, langevals: true },
-  passkeys: true,
-  identityFrontDoor: false,
+  process: {
+    appBaseUrl: "https://app.langwatch.test",
+    mode: "production",
+    deployment: "saas",
+    nlp: false,
+    browserTracing: true,
+    sampleRatio: 0.1,
+  },
+  auth: { passkeys: true, identityFrontDoor: false, authProvider: "auth0" },
+  authz: {},
+  billing: {},
+  evaluation: { langevals: true },
+  gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
+  notification: { email: true },
+  ops: {},
 };
 
 describe("browser feature configuration", () => {
   describe("given the configuration the HTML shell carries", () => {
     /** @scenario "The browser validates its configuration before the first render" */
-    it("hands each feature the slice its own schema accepts", () => {
-      expect(parseUiFeatureConfig(served)).toEqual({
-        auth: { passkeys: true, identityFrontDoor: false },
-        billing: { licensePaymentUrl: undefined },
-        deployment: { deployment: "saas" },
-        evaluation: { langevals: true },
-        gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
-        notification: { email: true },
-        observability: { browserTracing: true, sampleRatio: 0.1 },
-        workflow: { nlp: false },
+    it("hands each owner's slice through the schema its contract declared", () => {
+      expect(parseUiFeatureConfig(served)).toEqual(served);
+    });
+
+    it("reads the deployment capability off those slices", () => {
+      const deployment = uiDeploymentOf({
+        config: parseUiFeatureConfig(served),
+        origin: "https://page.langwatch.test",
+      });
+
+      expect(deployment).toMatchObject({
+        isSaaS: true,
+        appBaseUrl: "https://app.langwatch.test",
+        hasNlpService: false,
+        hasLangevals: true,
+        hasEmailProvider: true,
+        authProvider: "auth0",
+        passkeysEnabled: true,
       });
     });
   });
 
-  describe("given a slice a feature's own schema refuses", () => {
+  describe("given a slice its owner's schema refuses", () => {
     /** @scenario "The browser validates its configuration before the first render" */
-    it("throws rather than handing the feature a value it cannot act on", () => {
+    it("throws naming the owner rather than handing a feature a value it cannot act on", () => {
       expect(() =>
-        parseUiFeatureConfig({
-          ...served,
-          telemetry: { ...served.telemetry, sampleRatio: 2 },
-        }),
-      ).toThrow(ZodError);
+        parseUiFeatureConfig({ ...served, process: { ...served.process, sampleRatio: 2 } }),
+      ).toThrow(/"process"/);
+    });
+  });
+
+  describe("given a page that carries no slice for an installed owner", () => {
+    it("throws naming the missing owner", () => {
+      const { notification: _dropped, ...withoutMail } = served;
+
+      expect(() => parseUiFeatureConfig(withoutMail)).toThrow(/"notification"/);
     });
   });
 });

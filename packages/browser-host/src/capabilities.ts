@@ -288,6 +288,10 @@ export type UiDeployment = {
    * was not sent when it was.
    */
   hasEmailProvider: boolean;
+  /** `"email"`, or the federated provider id this deployment mounted; absent means email. */
+  authProvider?: string;
+  /** Whether this deployment mounted passkeys; absent reads as no. */
+  passkeysEnabled?: boolean;
 };
 
 /** What a composition that declared no deployment is read as. */

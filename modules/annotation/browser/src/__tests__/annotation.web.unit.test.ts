@@ -5,16 +5,15 @@ import { describe, expect, it } from "vitest";
 
 import { annotationWeb } from "../annotation.web.ts";
 
-/** The shell's own shape, read where the reader's type names it. */
+/** The page's config as the api serves it: one slice per owner, by name. */
 const publicAppConfig = () => ({
-  appBaseUrl: "https://app.example.test",
-  gatewayBaseUrl: "https://gateway.example.test",
-  deployment: "self-hosted" as const,
-  mode: "test" as const,
-  telemetry: { browserTracing: false, sampleRatio: 0 },
-  capabilities: { email: true, nlp: true, langevals: false },
-  passkeys: false,
-  identityFrontDoor: false,
+  process: {
+    mode: "test",
+    deployment: "self-hosted",
+    nlp: true,
+    browserTracing: false,
+    sampleRatio: 0,
+  },
 });
 
 function browserDocument() {
@@ -27,14 +26,14 @@ function browserDocument() {
 
 describe("given a browser that installs annotation", () => {
   describe("when the supply reads the injected configuration", () => {
-    it("hands the module the slice its declaration projected", async () => {
+    it("hands the module the process owner's mode, and nothing else of that slice", async () => {
       const installed = await createUi({ document: browserDocument(), mount: "root" })
         .withModules([annotationWeb] as const)
         .withTransport({ query: () => Promise.resolve(null) })
         .withInjectedConfig(publicAppConfig)
         .render();
 
-      expect(installed.config).toEqual({ annotation: { mode: "test" } });
+      expect(installed.config).toEqual({ annotation: { process: { mode: "test" } } });
     });
   });
 

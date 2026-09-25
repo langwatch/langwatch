@@ -14,8 +14,9 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("../../../use-public-env.ts", () => ({
-  usePublicEnv: () => ({ data: { IS_SAAS: false, NODE_ENV: "test" } }),
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUiDeployment: () => ({ isSaaS: false, isDevelopment: false, appBaseUrl: "" }),
 }));
 
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({

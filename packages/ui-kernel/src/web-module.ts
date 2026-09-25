@@ -1,5 +1,4 @@
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
-import type { input, output, ZodType } from "zod";
+import type { output, ZodType } from "zod";
 
 import type { Merge } from "./ui-supply.types.ts";
 
@@ -93,10 +92,8 @@ type EmptyDeclaration = Readonly<{
   capabilities: Empty;
 }>;
 
-export type WebModuleConfig = Readonly<{
-  schema: ZodType;
-  project: (config: PublicAppConfig) => unknown;
-}>;
+/** The page's config slices a module reads, each by its owner's name and that owner's schema. */
+export type WebModuleConfig = Readonly<{ slices: Readonly<Record<string, ZodType>> }>;
 
 export type WebModuleInstallation = Readonly<{
   name: string;
@@ -277,19 +274,21 @@ export class WebModule<
     });
   }
 
-  withConfig<Schema extends ZodType>(
-    schema: Schema,
-    project: (config: PublicAppConfig) => input<Schema>,
+  withConfig<const Slices extends Readonly<Record<string, ZodType>>>(
+    slices: Slices,
   ): WebModule<
     Name,
     Merge<Requirements, RequirementFields<"injected-config">>,
-    Merge<Config, { readonly [Key in Name]: output<Schema> }>,
+    Merge<
+      Config,
+      { readonly [Key in Name]: { readonly [Owner in keyof Slices]: output<Slices[Owner]> } }
+    >,
     Declaration,
     Precise
   > {
     return this.#next({
       ...this.#installation,
-      config: { schema, project },
+      config: { slices },
       requirements: mergeNames(this.#installation.requirements, ["injected-config"]),
     });
   }

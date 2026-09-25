@@ -1,11 +1,11 @@
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Info } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { buildMcpJson, findLangwatchEnvLines } from "../../model/shared/build-mcp-config.ts";
 import { TabButton } from "../elements/shared/tab-button.tsx";
 import { useActiveProject } from "./active-project-context.tsx";
@@ -57,10 +57,10 @@ const PLACEHOLDER_API_KEY = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
 
 export function ViaMcpClientScreen(): React.ReactElement {
   const { project, freshToken } = useActiveProject();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const [activeApp, setActiveApp] = useState<AppKey>("claude-desktop");
 
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveEndpoint = appBaseUrl;
   const effectiveProjectId = project?.id;
 
   // Only use a freshly-minted token. If none has been minted this session,

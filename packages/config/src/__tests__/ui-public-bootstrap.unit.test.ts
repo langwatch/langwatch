@@ -21,13 +21,14 @@ describe("UI public bootstrap", () => {
     expect(boot).toEqual({
       processRole: "ui",
       publicConfig: expect.objectContaining({
-        appBaseUrl: "https://app.example.test",
-        mode: "production",
-        capabilities: expect.objectContaining({ email: true }),
+        process: expect.objectContaining({
+          appBaseUrl: "https://app.example.test",
+          mode: "production",
+        }),
+        notification: { email: true },
       }),
     });
-    expect(boot.publicConfig).not.toHaveProperty("NEXTAUTH_SECRET");
-    expect(boot.publicConfig).not.toHaveProperty("RESEND_API_KEY");
+    expect(JSON.stringify(boot.publicConfig)).not.toContain("must-not-cross-the-browser-boundary");
   });
 
   it("fails before browser boot when the required public host is missing", () => {

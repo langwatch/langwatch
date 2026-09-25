@@ -3,6 +3,7 @@
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   BillingApi,
+  billingBrowserConfig,
   billingConfig,
   BillingPriceCatalogue,
   billingSecrets,
@@ -132,6 +133,7 @@ export class BillingApp implements BillingApi {
     projects: ProjectApi,
   };
   static readonly config = billingConfig;
+  static readonly publicConfig = billingBrowserConfig.project;
   static readonly secrets = { stripeSecretKey: billingSecrets.stripeSecretKey } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 

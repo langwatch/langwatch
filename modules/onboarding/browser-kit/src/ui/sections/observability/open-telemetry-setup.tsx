@@ -1,19 +1,19 @@
 import { Separator, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import type React from "react";
 import { useState } from "react";
 
-import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useActiveProject } from "../active-project-context.tsx";
 import { CodePreview } from "./code-preview.tsx";
 import { parseSnippet } from "./codegen/snippets.ts";
 
 export function OpenTelemetrySetup(): React.ReactElement {
   const { project } = useActiveProject();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const [isVisible, setIsVisible] = useState(false);
 
   const effectiveApiKey = project?.apiKey ?? "";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+  const effectiveEndpoint = appBaseUrl;
 
   function toggleVisibility(): void {
     setIsVisible((prev) => !prev);

@@ -102,6 +102,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       controlPlaneUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
+      isSaas: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

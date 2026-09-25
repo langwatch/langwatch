@@ -23,8 +23,6 @@ import { type PostHogPublicConfig, usePostHog } from "../posthog.ts";
 let publicEnvData: PostHogPublicConfig | undefined = {
   mode: "test",
   telemetry: {
-    browserTracing: false,
-    sampleRatio: 0,
     posthog: { key: "test-key", host: "https://eu.i.posthog.com" },
   },
 };
@@ -42,8 +40,6 @@ describe("usePostHog", () => {
     publicEnvData = {
       mode: "test",
       telemetry: {
-        browserTracing: false,
-        sampleRatio: 0,
         posthog: { key: "test-key", host: "https://eu.i.posthog.com" },
       },
     };
@@ -78,7 +74,7 @@ describe("usePostHog", () => {
     it("does not call posthog.init", () => {
       publicEnvData = {
         mode: "test",
-        telemetry: { browserTracing: false, sampleRatio: 0, posthog: void 0 },
+        telemetry: { posthog: void 0 },
       };
 
       renderHook(() => usePostHog(publicEnvData));
@@ -89,7 +85,7 @@ describe("usePostHog", () => {
     it("returns undefined", () => {
       publicEnvData = {
         mode: "test",
-        telemetry: { browserTracing: false, sampleRatio: 0, posthog: void 0 },
+        telemetry: { posthog: void 0 },
       };
 
       const { result } = renderHook(() => usePostHog(publicEnvData));
@@ -149,8 +145,6 @@ describe("usePostHog", () => {
       publicEnvData = {
         mode: "test",
         telemetry: {
-          browserTracing: false,
-          sampleRatio: 0,
           posthog: { key: "test-key", host: "https://self-hosted.example.com" },
         },
       };
@@ -170,7 +164,7 @@ describe("usePostHog", () => {
     it("defaults api_host to the EU PostHog endpoint", () => {
       publicEnvData = {
         mode: "test",
-        telemetry: { browserTracing: false, sampleRatio: 0, posthog: { key: "test-key" } },
+        telemetry: { posthog: { key: "test-key" } },
       };
 
       renderHook(() => usePostHog(publicEnvData));
@@ -197,7 +191,7 @@ describe("usePostHog", () => {
       it("enables posthog debug logging", () => {
         publicEnvData = {
           mode: "development",
-          telemetry: { browserTracing: false, sampleRatio: 0, posthog: { key: "test-key" } },
+          telemetry: { posthog: { key: "test-key" } },
         };
 
         renderHook(() => usePostHog(publicEnvData));
@@ -211,7 +205,7 @@ describe("usePostHog", () => {
       it("does not enable posthog debug logging", () => {
         publicEnvData = {
           mode: "production",
-          telemetry: { browserTracing: false, sampleRatio: 0, posthog: { key: "test-key" } },
+          telemetry: { posthog: { key: "test-key" } },
         };
 
         renderHook(() => usePostHog(publicEnvData));

@@ -1,4 +1,5 @@
 import { Config, environmentOneOrTrueSchema, type ConfigOf } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
 /** Operator surfaces and config; bearers are optional and blank means the
@@ -39,11 +40,15 @@ export type ProductAnalyticsTarget = Readonly<{ key: string; host?: string }>;
 
 /** What a browser is told about product analytics and browser tracing. */
 export const opsWebConfigSchema = z.strictObject({
-  browserTracing: z.boolean(),
-  sampleRatio: z.number().min(0).max(1),
   posthog: z
     .strictObject({ key: z.string().min(1), host: z.string().min(1).optional() })
     .optional(),
 });
 
 export type OpsWebConfig = z.infer<typeof opsWebConfigSchema>;
+
+export const opsBrowserConfig = defineBrowserConfig({
+  schema: opsWebConfigSchema,
+  project: ({ productAnalytics: { key, host } }: OpsServerConfig) =>
+    key ? { posthog: { key, ...(host ? { host } : {}) } } : {},
+});

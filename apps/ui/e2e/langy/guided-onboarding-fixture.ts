@@ -11,6 +11,11 @@ import * as path from "node:path";
 import { openai } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import {
+  parsePublicAppConfigMetaContent,
+  parsePublicConfigSlice,
+} from "@langwatch/config/public-app-config";
+import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
+import {
   findLatestFlagshipForProvider,
   getProviderModelOptions,
 } from "@langwatch/model-provider-contract";
@@ -1041,17 +1046,19 @@ export async function conversationMessages(
 
 /**
  * This instance's public gateway base URL, without the /v1 suffix: what the
- * app's own snippets print, and what the gateway path's snippet has to name.
+ * app's own snippets print, read off the gateway slice the served page carries.
  */
 export async function gatewayPublicUrl(): Promise<string> {
-  const cookie = await getSessionCookie();
-  const publicEnv = await trpcQuery<{ GATEWAY_BASE_URL?: string }>({
-    cookie,
-    path: "publicEnv",
-    input: {},
+  const page = await (await fetch(`${APP_BASE}/`)).text();
+  const content = /<meta name="langwatch-public-config" content="([^"]+)">/.exec(page)?.[1];
+  if (!content) throw new Error("The served page carries no browser config");
+  const { gatewayBaseUrl } = parsePublicConfigSlice({
+    config: parsePublicAppConfigMetaContent(content),
+    owner: "gateway",
+    schema: gatewayWebConfigSchema,
   });
-  const url = publicEnv.GATEWAY_BASE_URL?.replace(/\/+$/, "");
-  if (!url) throw new Error("publicEnv names no GATEWAY_BASE_URL");
+  const url = gatewayBaseUrl.replace(/\/+$/, "");
+  if (!url) throw new Error("The served page names no gateway URL");
   return url;
 }
 

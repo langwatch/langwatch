@@ -123,6 +123,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
         controlPlaneUrl: undefined,
         baseUrl: undefined,
         publicUrl: undefined,
+        isSaas: false,
       },
     })
     .withRelational(database())

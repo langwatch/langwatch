@@ -9,15 +9,7 @@ describe("given the deployment's demo project slug", () => {
   describe("when the HTML shell declares one", () => {
     it("reads it out of the shell", () => {
       const meta = createPublicAppConfigMetaTag({
-        appBaseUrl: "https://app.example.com",
-        gatewayBaseUrl: "https://gateway.example.com",
-        deployment: "saas",
-        demoProjectSlug: "demo-project",
-        mode: "test",
-        telemetry: { browserTracing: false, sampleRatio: 0 },
-        capabilities: { email: false, nlp: false, langevals: false },
-        passkeys: false,
-        identityFrontDoor: false,
+        authz: { demoProjectSlug: "demo-project" },
       });
       const documentRoot = {
         querySelector: () => ({
@@ -26,6 +18,19 @@ describe("given the deployment's demo project slug", () => {
       };
 
       expect(readUiDemoProjectSlug(documentRoot)).toBe("demo-project");
+    });
+  });
+
+  describe("when the authz slice names none", () => {
+    it("reads no demo project", () => {
+      const meta = createPublicAppConfigMetaTag({ authz: {} });
+      const documentRoot = {
+        querySelector: () => ({
+          getAttribute: () => /content="([^"]+)"/.exec(meta)?.[1] ?? null,
+        }),
+      };
+
+      expect(readUiDemoProjectSlug(documentRoot)).toBeUndefined();
     });
   });
 

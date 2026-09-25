@@ -48,12 +48,11 @@ async function waitForApp(): Promise<void> {
 }
 
 // A 200 from vite's `/` only proves the dev server's shell is up; the API
-// (proxied, on-demand compiled in dev) can still be cold. The signin page
-// renders blank until the public `publicEnv` tRPC query resolves, so tests
-// race a not-yet-ready backend. Wait for that exact endpoint to serve 200.
+// (proxied, on-demand compiled in dev) can still be cold. Any answer below
+// 500 from the tRPC door proves the API itself routed the request; a proxy
+// that cannot reach it answers 500 or refuses the connection.
 async function waitForApi(): Promise<void> {
-  const url =
-    `${BASE_URL}/api/trpc/publicEnv?batch=1` + `&input=${encodeURIComponent('{"0":{"json":{}}}')}`;
+  const url = `${BASE_URL}/api/trpc/readiness`;
   console.log(`\n🔍 Checking API readiness at ${url}...`);
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -62,7 +61,7 @@ async function waitForApi(): Promise<void> {
         method: "GET",
         signal: AbortSignal.timeout(10000),
       });
-      if (response.ok) {
+      if (response.status < 500) {
         console.log(`✅ API is ready (status: ${response.status})`);
         return;
       }
@@ -81,7 +80,7 @@ async function waitForApi(): Promise<void> {
 
   throw new Error(
     `\n❌ API not ready at ${url} after ${MAX_RETRIES} attempts.\n` +
-      `The app shell loaded but the backend never served publicEnv.\n`,
+      `The app shell loaded but the backend never answered its tRPC door.\n`,
   );
 }
 

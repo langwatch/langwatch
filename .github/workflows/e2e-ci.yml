@@ -218,7 +218,7 @@ jobs:
       # lanes cold-download the toolchain and the full module graph while
       # tsx is booting the API server — starving it past global-setup's
       # 60s readiness window on the 2-core runner (intermittent
-      # "API not ready ... backend never served publicEnv" failures).
+      # "API not ready ... backend never answered its tRPC door" failures).
       - name: Setup Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:

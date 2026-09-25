@@ -11,7 +11,6 @@ import type {
   UiFeedback,
   UiSessionCapabilities,
 } from "@langwatch/browser-host/capabilities";
-import { deriveUiDeployment } from "@langwatch/browser-host/deployment";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
@@ -20,7 +19,6 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser-host/transport";
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
 import {
@@ -53,6 +51,12 @@ import { uiDesignSystem } from "./design-system";
 import { installedUiDeclarations } from "./shell/ui-declarations";
 import { uiRouteTable } from "./shell/ui-route-table";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
+import {
+  parseUiFeatureConfig,
+  uiDeploymentOf,
+  uiTelemetryOf,
+  type UiFeatureConfig,
+} from "./ui-feature-config";
 
 import "nprogress/nprogress.css";
 import "./styles/globals.scss";
@@ -129,7 +133,7 @@ class BrowserUiShell extends UiShell {
     transport,
     hosts,
   }: {
-    config: PublicAppConfig;
+    config: UiFeatureConfig;
     isDevelopment: boolean;
     deployment: UiDeployment;
     screens: UiModuleScreens;
@@ -138,6 +142,7 @@ class BrowserUiShell extends UiShell {
     transport: UiFeatureApiTransport;
     hosts: readonly UiModuleHostMount[];
   }): BrowserUiShell {
+    const telemetry = uiTelemetryOf(config);
     return new BrowserUiShell(
       createUiApplication({
         sessionQueryKey: UI_SESSION_QUERY_KEY,
@@ -175,7 +180,7 @@ class BrowserUiShell extends UiShell {
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           footer: UiNoFooter,
-          usePublicAppConfig: () => ({ data: config }),
+          usePublicAppConfig: () => ({ data: telemetry }),
           useNavigationTracking: useNoNavigationTracking,
           isDevelopment,
         },
@@ -217,23 +222,24 @@ class BrowserUiShell extends UiShell {
  * mounts over what it returns. Installing a module edits the catalogue.
  */
 export async function startUi(): Promise<void> {
-  const config = readPublicAppConfig(document);
+  const served = readPublicAppConfig(document);
+  const config = parseUiFeatureConfig(served);
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient();
   const installed = await createUi({ document, mount: "root" })
     .withModules(webModules)
     .withTransport(transport)
-    .withInjectedConfig(() => config)
+    .withInjectedConfig(() => served)
     .render();
 
-  configureDocsRuntime({ mode: config.mode, hostname: window.location.hostname });
+  configureDocsRuntime({ mode: config.process.mode, hostname: window.location.hostname });
   UiRuntime.create({
     document,
     shell: BrowserUiShell.create({
       config,
-      isDevelopment: config.mode === "development",
-      deployment: deriveUiDeployment(config),
+      isDevelopment: config.process.mode === "development",
+      deployment: uiDeploymentOf({ config, origin: window.location.origin }),
       screens: installedModuleScreens(installed.modules),
       apis: installedModuleApis(installed.modules),
       drawers: installedModuleDrawers(installed.modules),

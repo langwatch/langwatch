@@ -1,4 +1,5 @@
 import { Config, type ConfigOf } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
@@ -9,6 +10,14 @@ import { z } from "zod";
  */
 export const billingConfig = Config.define((c) => ({
   licensePaymentLinkId: c.env("STRIPE_LICENSE_PAYMENT_LINK_ID", z.string().optional()),
+  /** Where a self-hosted operator buys a licence; blank means none. */
+  licensePaymentUrl: c.env(
+    "STRIPE_LICENSE_PAYMENT_LINK_URL",
+    z
+      .string()
+      .optional()
+      .transform((value) => value?.trim() || void 0),
+  ),
   slackSubscriptionsChannel: c.env("SLACK_CHANNEL_SUBSCRIPTIONS", z.string().optional()),
   slackSignupsChannel: c.env("SLACK_CHANNEL_SIGNUPS", z.string().optional()),
   slackSelfHostedChannel: c.env("SLACK_CHANNEL_SELF_HOSTED", z.string().optional()),
@@ -49,3 +58,9 @@ export const billingWebConfigSchema = z.strictObject({
 });
 
 export type BillingWebConfig = z.infer<typeof billingWebConfigSchema>;
+
+export const billingBrowserConfig = defineBrowserConfig({
+  schema: billingWebConfigSchema,
+  project: (config: BillingServerConfig) =>
+    config.licensePaymentUrl ? { licensePaymentUrl: config.licensePaymentUrl } : {},
+});

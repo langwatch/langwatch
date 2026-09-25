@@ -1,4 +1,5 @@
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Check, Clipboard, Terminal } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -10,7 +11,6 @@ const MotionVStack = motion.create(VStack);
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
 import { copyToClipboard } from "../../behavior/shared/copy-to-clipboard.ts";
-import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import {
   PROMPT_AGENT_PERFORMANCE,
   PROMPT_EXPERIMENTS,
@@ -533,7 +533,7 @@ export function ViaClaudeCodeScreen({
   showMcpTab = true,
 }: ViaClaudeCodeScreenProps = {}): React.ReactElement {
   const { project } = useActiveProject();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const [activeTab, setActiveTab] = useState<TabKey>("prompt");
   const { emit } = useAnalytics();
 
@@ -543,7 +543,7 @@ export function ViaClaudeCodeScreen({
   };
 
   const effectiveApiKey = project?.apiKey ?? "";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST;
+  const effectiveEndpoint = appBaseUrl;
   const effectiveProjectId = project?.id;
 
   const maskedApiKey = maskApiKey(effectiveApiKey);

@@ -1,12 +1,12 @@
 import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
 import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
 import {
   type UiFeatureInstall,
   uiRoutePageKeys,
   type UiPageLoaderRegistry,
 } from "@langwatch/ui-kernel/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";
@@ -16,15 +16,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";
 
-const publicAppConfig: PublicAppConfig = {
-  appBaseUrl: "http://localhost",
-  gatewayBaseUrl: "http://localhost:5563",
-  deployment: "self-hosted",
+const publicAppConfig: UiPublicTelemetry = {
   mode: "test",
   telemetry: { browserTracing: false, sampleRatio: 0 },
-  capabilities: { email: false, nlp: false, langevals: false },
-  passkeys: false,
-  identityFrontDoor: false,
 };
 
 function PassThrough({ children }: { children: ReactNode }) {

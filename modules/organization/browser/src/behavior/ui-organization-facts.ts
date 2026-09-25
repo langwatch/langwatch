@@ -5,11 +5,12 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import {
-  parsePublicAppConfigMetaContent,
-  PUBLIC_APP_CONFIG_META_NAME,
-} from "@langwatch/config/public-app-config";
+  useUiCapabilities,
+  useUiDeployment,
+  useUiRpc,
+  useUiScope,
+} from "@langwatch/browser-host/capabilities";
 import { useQuery } from "@tanstack/react-query";
 
 export const UI_ACTIVE_PLAN_PROCEDURE = "limits.getUsage";
@@ -28,36 +29,6 @@ type OrganizationsRead = readonly {
   members?: readonly { role?: string }[];
 }[];
 
-/**
- * The static shell config's one field this reads — same meta tag every
- * module-local reader parses on its own; record 10.1 rules out an apps/ui
- * import here, so this package reads it directly.
- */
-function readUiDeployment(
-  documentRoot: {
-    querySelector(selector: string): { getAttribute(name: string): string | null } | null;
-  } = document,
-): string | undefined {
-  const content = documentRoot
-    .querySelector(`meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]`)
-    ?.getAttribute("content");
-  if (!content) return void 0;
-  try {
-    return parsePublicAppConfigMetaContent(content).deployment;
-  } catch {
-    return void 0;
-  }
-}
-
-/**
- * Whether this deployment is the hosted product — decides one menu
- * entry, Subscription vs License. No config reads as self-hosted, never
- * a crash, the same shape `readUiDemoProjectSlug` takes.
- */
-export function readUiIsSaaS(documentRoot?: Parameters<typeof readUiDeployment>[0]): boolean {
-  return readUiDeployment(documentRoot) === "saas";
-}
-
 export type UiOrganizationFacts = {
   /** Enterprise, or self-hosted, which resolves to enterprise. */
   isEnterprise: boolean;
@@ -74,6 +45,7 @@ export type UiOrganizationFacts = {
  */
 export function useUiOrganizationFacts(): UiOrganizationFacts {
   const { session } = useUiCapabilities();
+  const { isSaaS } = useUiDeployment();
   const rpc = useUiRpc();
   const { organizationId } = useUiScope().activeScope();
   const mayReadPlan = organizationId !== null && session.hasPermission("organization:view");
@@ -108,7 +80,7 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
     isEnterprise: plan.data?.activePlan?.type === "ENTERPRISE",
     isPlanLoading: mayReadPlan && plan.isLoading,
     isLiteMember: role === UI_LITE_MEMBER_ROLE,
-    isSaaS: readUiIsSaaS(),
+    isSaaS,
   };
 }
 

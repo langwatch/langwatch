@@ -1,4 +1,5 @@
 import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
 /**
@@ -68,6 +69,22 @@ export function assertAuthServerConfig(
 export const authWebConfigSchema = z.strictObject({
   passkeys: z.boolean(),
   identityFrontDoor: z.boolean(),
+  /** `AUTH_PROVIDER` (or its NextAuth-era name): a provider id, never a credential. */
+  authProvider: z.string().min(1).optional(),
 });
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
+
+/** The sign-in router is off in every process, so the identifier-first screens never front. */
+export const authBrowserConfig = defineBrowserConfig({
+  schema: authWebConfigSchema,
+  project: (config: AuthServerConfig) => {
+    const authProvider =
+      config.signInProviders.authProvider ?? config.signInProviders.legacyProvider;
+    return {
+      passkeys: config.passkeysEnabled,
+      identityFrontDoor: false,
+      ...(authProvider ? { authProvider } : {}),
+    };
+  },
+});

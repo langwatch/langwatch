@@ -7,6 +7,8 @@
 import type { NavigationDeployment } from "@langwatch/navigation-browser/navigation";
 import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
 
+import { parseUiFeatureConfig } from "../ui-feature-config";
+
 /**
  * A document with no config makes no claim about the analysis services, and
  * warning that two settings are unset on the strength of a missing config
@@ -21,14 +23,14 @@ const UNCONFIGURED: NavigationDeployment = {
 
 export function readNavigationDeployment(): NavigationDeployment {
   try {
-    const config = readPublicAppConfig();
+    const { process, authz, evaluation } = parseUiFeatureConfig(readPublicAppConfig());
     return {
-      isSaaS: config.deployment === "saas",
-      isDevelopment: config.mode === "development",
-      ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
-      ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
-      hasNlpService: config.capabilities.nlp,
-      hasLangevals: config.capabilities.langevals,
+      isSaaS: process.deployment === "saas",
+      isDevelopment: process.mode === "development",
+      ...(process.hideDevIndicator ? { hideDevIndicator: true } : {}),
+      ...authz,
+      hasNlpService: process.nlp,
+      hasLangevals: evaluation.langevals,
     };
   } catch {
     return UNCONFIGURED;

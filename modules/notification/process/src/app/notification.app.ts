@@ -1,6 +1,7 @@
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
   NotificationService as NotificationApi,
+  notificationBrowserConfig,
   notificationConfig,
   type NotificationService as NotificationApiContract,
   type CreateNotificationCommand,
@@ -27,6 +28,7 @@ export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
   static readonly config = notificationConfig;
+  static readonly publicConfig = notificationBrowserConfig.project;
   /** Resolved while the module constructs, before boot seals them. */
   static readonly secrets = {
     sendgrid: Secret.load("SENDGRID_API_KEY", { optional: true }),

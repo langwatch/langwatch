@@ -7,6 +7,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   AuthApi,
   assertAuthServerConfig,
+  authBrowserConfig,
   authServerConfig,
   AuthUnavailableError,
   AuthValidateRateLimitedError,
@@ -228,6 +229,7 @@ export class AuthApp implements AuthApiContract {
     authz: AuthzApi,
   };
   static readonly config = authServerConfig;
+  static readonly publicConfig = authBrowserConfig.project;
   /** `secrets` resolves NEXTAUTH_SECRET (ADR-132); `publicBaseUrl` is the
    * process's own fact. A process that cannot supply one refuses at boot. */
   static readonly reads = [

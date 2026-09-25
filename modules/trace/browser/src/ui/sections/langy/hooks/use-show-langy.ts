@@ -1,9 +1,10 @@
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+
 import { useRequiredSession } from "../../../../behavior/auth-session.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag.ts";
 import { OrganizationUserRole } from "../../../../model/prisma-types.ts";
 import { useFeatureFlag } from "../../use-feature-flag.ts";
-import { usePublicEnv } from "../../use-public-env.ts";
 
 /**
  * Langy's visibility gate — "does this user have Langy?". Three layers:
@@ -32,13 +33,12 @@ export function useLangyVisibility(): LangyVisibility {
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
-  const publicEnv = usePublicEnv();
+  const { demoProjectSlug } = useUiDeployment();
 
   const user = session?.user;
   // The server refuses Langy on the demo project outright, so rendering the panel there
   // would only produce a chat where every send 403s.
-  const isDemoProject =
-    !!publicEnv.data?.DEMO_PROJECT_SLUG && publicEnv.data.DEMO_PROJECT_SLUG === project?.slug;
+  const isDemoProject = !!demoProjectSlug && demoProjectSlug === project?.slug;
   const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
   const userIsPartOfTeam =
     isOnOwnPersonalProject ||

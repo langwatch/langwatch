@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { CLOUD_ENDPOINT, CodePreview, InlineCopyButton } from "@langwatch/onboarding-browser-kit";
 import { Key, Sparkles } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -8,7 +9,6 @@ import { api } from "../../../../behavior/trace-api.ts";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
 import { RoleBindingScopeType, TeamUserRole } from "../../../../model/prisma-types.ts";
 import { showErrorToast } from "../../errors/index.ts";
-import { usePublicEnv } from "../../use-public-env.ts";
 
 interface ApiKeyIntegrationInfoCardProps {
   organizationId: string;
@@ -89,10 +89,9 @@ export function ApiKeyIntegrationInfoCard({
   token,
   onTokenGenerated,
 }: ApiKeyIntegrationInfoCardProps) {
-  const publicEnv = usePublicEnv();
   // Mirror the onboarding ApiIntegrationInfoCard / codegen logic: only
   // surface LANGWATCH_ENDPOINT on a self-hosted deployment.
-  const selfHosted = selfHostedEndpoint(publicEnv.data?.BASE_HOST);
+  const selfHosted = selfHostedEndpoint(useUiDeployment().appBaseUrl);
   const endpoint = selfHosted ?? CLOUD_ENDPOINT;
   const showEndpoint = !!selfHosted;
 

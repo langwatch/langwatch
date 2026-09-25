@@ -1,5 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { usePublicEnv, CLOUD_ENDPOINT, useActiveProject } from "@langwatch/onboarding-browser-kit";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { CLOUD_ENDPOINT, useActiveProject } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
@@ -8,10 +9,10 @@ import { CopyableInputWithPrefix } from "../../elements/observability/copyable-i
 export function ApiIntegrationInfoCard(): React.ReactElement {
   const host = useOnboardingHost();
   const { project } = useActiveProject();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
 
   const effectiveApiKey = project?.apiKey ?? "";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+  const effectiveEndpoint = appBaseUrl;
 
   async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     // The clipboard is a browser singleton and the confirmation is the

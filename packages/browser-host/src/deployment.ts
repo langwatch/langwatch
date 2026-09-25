@@ -1,21 +1,45 @@
 /**
- * The one decoder off the injected public config, so a module never reads the
- * meta tag itself — a host reaching past this is the side door §3.4 shut.
+ * The one reading of the page's config slices into the deployment capability,
+ * so a module never reads the meta tag itself — a host reaching past this is
+ * the side door §3.4 shut.
  */
 
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
+import type { ProcessWebConfig } from "@langwatch/config/public-app-config";
 
 import type { UiDeployment } from "./capabilities.ts";
 
-export function deriveUiDeployment(config: PublicAppConfig): UiDeployment {
+/** The validated slices the shell read, and the page origin for an address the process left out. */
+export type UiDeploymentSlices = Readonly<{
+  process: ProcessWebConfig;
+  origin: string;
+  demoProjectSlug?: string;
+  licensePaymentUrl?: string;
+  hasLangevals: boolean;
+  hasEmailProvider: boolean;
+  authProvider?: string;
+  passkeysEnabled: boolean;
+}>;
+
+export function deriveUiDeployment({
+  process,
+  origin,
+  demoProjectSlug,
+  licensePaymentUrl,
+  hasLangevals,
+  hasEmailProvider,
+  authProvider,
+  passkeysEnabled,
+}: UiDeploymentSlices): UiDeployment {
   return {
-    isDevelopment: config.mode === "development",
-    isSaaS: config.deployment === "saas",
-    appBaseUrl: config.appBaseUrl,
-    ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
-    ...(config.licensePaymentUrl ? { licensePaymentUrl: config.licensePaymentUrl } : {}),
-    hasNlpService: config.capabilities.nlp,
-    hasLangevals: config.capabilities.langevals,
-    hasEmailProvider: config.capabilities.email,
+    isDevelopment: process.mode === "development",
+    isSaaS: process.deployment === "saas",
+    appBaseUrl: process.appBaseUrl ?? origin,
+    ...(demoProjectSlug ? { demoProjectSlug } : {}),
+    ...(licensePaymentUrl ? { licensePaymentUrl } : {}),
+    hasNlpService: process.nlp,
+    hasLangevals,
+    hasEmailProvider,
+    ...(authProvider ? { authProvider } : {}),
+    passkeysEnabled,
   };
 }

@@ -9,22 +9,10 @@ export const documentRoot: UiDocument = {
   querySelector: () => null,
 };
 
+/** The page's config as the api serves it: one slice per owner, by name. */
 export const publicAppConfig: PublicAppConfig = {
-  appBaseUrl: "https://app.example.test",
-  gatewayBaseUrl: "https://gateway.example.test",
-  deployment: "self-hosted",
-  mode: "test",
-  telemetry: {
-    browserTracing: false,
-    sampleRatio: 0,
-  },
-  capabilities: {
-    email: true,
-    nlp: true,
-    langevals: false,
-  },
-  passkeys: false,
-  identityFrontDoor: false,
+  process: { mode: "test" },
+  notification: { email: true },
 };
 
 export const transportModule = defineWebModule("screen").withScreens({
@@ -35,10 +23,9 @@ export const transportModule = defineWebModule("screen").withScreens({
 
 export const sessionModule = defineWebModule("session-only").requires(["session"] as const);
 
-export const configModule = defineWebModule("configuration").withConfig(
-  z.strictObject({ mode: z.enum(["development", "test", "production"]) }),
-  (config) => ({ mode: config.mode }),
-);
+export const configModule = defineWebModule("configuration").withConfig({
+  process: z.strictObject({ mode: z.enum(["development", "test", "production"]) }),
+});
 
 export const facilityModule = defineWebModule("facilities").requires([
   "feedback",

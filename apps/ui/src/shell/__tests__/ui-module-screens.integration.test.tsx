@@ -18,15 +18,15 @@ vi.mock("../../../../../modules/annotation/browser/src/ui/sections/annotations-s
   ),
 }));
 
+/** The page's config as the api serves it: the process owner's slice is all a module reads. */
 const injectedConfig = {
-  appBaseUrl: "https://app.example.test",
-  gatewayBaseUrl: "https://gateway.example.test",
-  deployment: "self-hosted",
-  mode: "test",
-  telemetry: { browserTracing: false, sampleRatio: 0 },
-  capabilities: { email: true, nlp: true, langevals: false },
-  passkeys: false,
-  identityFrontDoor: false,
+  process: {
+    mode: "test",
+    deployment: "self-hosted",
+    nlp: true,
+    browserTracing: false,
+    sampleRatio: 0,
+  },
 } as const;
 
 /** The one anchor a project-scoped declaration mounts below. */
@@ -155,10 +155,10 @@ describe("given the installed web modules", () => {
   });
 
   describe("when the shell injects its public configuration", () => {
-    it("hands each module the slice its declaration projected", async () => {
+    it("hands each module the owner slices its declaration reads", async () => {
       const installed = await installModules();
 
-      expect(installed.config).toEqual({ annotation: { mode: "test" } });
+      expect(installed.config).toEqual({ annotation: { process: { mode: "test" } } });
     });
   });
 });

@@ -9,6 +9,7 @@ describe("AuthzApp.isDemoProject", () => {
       epochCacheEnabled: true,
       demoProjectId: "project_demo",
       demoProjectUserId: undefined,
+      demoProjectSlug: undefined,
     };
     const app = createAuthzTestApp({ config });
 

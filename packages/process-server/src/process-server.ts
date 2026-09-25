@@ -35,6 +35,7 @@ import {
   type ServerLogger,
 } from "./server.ts";
 import { assetBaseOrigin, normalizeAssetBase } from "./transport/asset-base.ts";
+import { projectPublicConfig } from "./transport/bundle-config.ts";
 import { apiOwner, type ApiHostConfig } from "./transport/config-owner.ts";
 import { processSurface } from "./transport/process-surface.ts";
 
@@ -139,7 +140,7 @@ export class ProcessServer implements ProcessBoot {
           members,
           secrets: this.resolver.scopeTo(apiOwner.name, Object.values(apiOwner.secrets)),
           selection: transports,
-          publicConfig: this.publicConfig(modules),
+          publicConfig: projectPublicConfig({ modules, config: this.config }),
           sockets,
         });
         this.server.with(sockets);
@@ -197,15 +198,6 @@ export class ProcessServer implements ProcessBoot {
   /** Derived, not declared: `NODE_ENV` has one owner, the process slice. */
   private get production(): boolean {
     return this.settings.nodeEnvironment === "production";
-  }
-
-  private publicConfig(modules: readonly ProcessModule[]): Readonly<Record<string, unknown>> {
-    const projected: Record<string, unknown> = {};
-    for (const module of modules) {
-      if (module.publicConfig)
-        projected[module.name] = module.publicConfig(this.config[module.name]);
-    }
-    return projected;
   }
 
   serve(application: ServedApplication): Promise<void> {

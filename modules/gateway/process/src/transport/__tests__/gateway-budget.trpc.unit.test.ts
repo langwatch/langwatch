@@ -202,6 +202,7 @@ async function callerFor(budgets: Record<string, unknown>[]) {
       controlPlaneUrl: void 0,
       baseUrl: undefined,
       publicUrl: undefined,
+      isSaas: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

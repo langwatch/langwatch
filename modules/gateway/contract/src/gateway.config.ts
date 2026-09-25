@@ -1,10 +1,13 @@
 import {
   Config,
+  gatewayAddressOf,
   gatewayInternalUrl,
   gatewayLegacyUrl,
   gatewayPublicUrl,
+  isSaas,
   type ConfigOf,
 } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
 import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
@@ -26,6 +29,8 @@ export const gatewayConfig = Config.define((c) => ({
   baseUrl: gatewayLegacyUrl,
   /** Where apps outside the deployment reach the gateway. */
   publicUrl: gatewayPublicUrl,
+  /** The process's own leaf, read here only to pick the browser's default address. */
+  isSaas,
 }));
 
 export type GatewayServerConfig = ConfigOf<typeof gatewayConfig>;
@@ -111,6 +116,17 @@ export const gatewayWebConfigSchema = z.strictObject({
 });
 
 export type GatewayWebConfig = z.infer<typeof gatewayWebConfigSchema>;
+
+export const gatewayBrowserConfig = defineBrowserConfig({
+  schema: gatewayWebConfigSchema,
+  project: (config: GatewayServerConfig) => ({
+    gatewayBaseUrl: gatewayAddressOf({
+      publicUrl: config.publicUrl,
+      legacyUrl: config.baseUrl,
+      isSaas: config.isSaas,
+    }),
+  }),
+});
 
 /** One direction's guardrail references, as a key's configuration names them. */
 export type GatewayConfigGuardrailAttachment = {

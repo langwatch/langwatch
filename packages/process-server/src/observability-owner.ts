@@ -20,6 +20,15 @@ export const observabilityOwner = {
   name: "observability",
   config: Config.define((c) => ({
     otlpEndpoint: c.env("OTEL_EXPORTER_OTLP_ENDPOINT", optionalString),
+    /** Browser tracing (ADR-058): on only with an OTLP endpoint to send to. */
+    rumEnabled: c.env("RUM_ENABLED", truthy),
+    rumSampleRatio: c.env(
+      "RUM_SAMPLE_RATIO",
+      z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().min(0).max(1).default(1).catch(1),
+      ),
+    ),
     environment: c.env("ENVIRONMENT", z.string().min(1).default("local")),
     serviceVersion: c.env("SERVICE_VERSION", optionalString),
     resourceAttributes: c.env("OTEL_RESOURCE_ATTRIBUTES", optionalString),

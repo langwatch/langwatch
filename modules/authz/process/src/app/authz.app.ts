@@ -1,5 +1,6 @@
 import {
   AuthzApi as AuthzApiToken,
+  authzBrowserConfig,
   authzServerConfig,
   type AuthzApi,
   type AuthzAttachBindingsInput,
@@ -71,6 +72,7 @@ export class AuthzApp implements AuthzApi {
   static readonly contract = AuthzApiToken;
   static readonly dependencies = {} as const;
   static readonly config = authzServerConfig;
+  static readonly publicConfig = authzBrowserConfig.project;
   /**
    * `redis` is read rather than optional: the permission cache's epoch
    * counter lives on it, and every process installing AuthZ opens Redis

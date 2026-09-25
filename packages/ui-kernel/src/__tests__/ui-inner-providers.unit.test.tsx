@@ -1,23 +1,16 @@
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createUiInnerProvider } from "../ui-inner-providers.tsx";
+import { createUiInnerProvider, type UiPublicTelemetry } from "../ui-inner-providers.tsx";
 
 let root: Root | undefined;
 
-const publicAppConfig: PublicAppConfig = {
-  appBaseUrl: "http://localhost",
-  gatewayBaseUrl: "http://localhost:5563",
-  deployment: "self-hosted",
+const publicAppConfig: UiPublicTelemetry = {
   mode: "test",
   telemetry: { browserTracing: false, sampleRatio: 0 },
-  capabilities: { email: false, nlp: false, langevals: false },
-  passkeys: false,
-  identityFrontDoor: false,
 };
 
 afterEach(async () => {

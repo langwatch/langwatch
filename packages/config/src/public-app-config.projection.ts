@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import { Config, parseProcessConfig, type ConfigOf, type ConfigSlice } from "./config.ts";
-import { publicAppConfigSchema, type PublicAppConfig } from "./public-app-config.ts";
+import { gatewayAddressOf } from "./deployment-facts.ts";
+import {
+  processWebConfigSchema,
+  publicAppConfigSchema,
+  type PublicAppConfig,
+} from "./public-app-config.ts";
 
 /**
  * Deployment's private inputs, projected to the browser-safe contract. A separate module
@@ -9,8 +14,7 @@ import { publicAppConfigSchema, type PublicAppConfig } from "./public-app-config
  * and the config runtime would reach the browser despite `sideEffects: false`.
  */
 
-export const SAAS_GATEWAY_URL = "https://gateway.langwatch.ai" as const;
-export const LOCAL_GATEWAY_URL = "http://localhost:5563" as const;
+export { LOCAL_GATEWAY_URL, SAAS_GATEWAY_URL } from "./deployment-facts.ts";
 const DEFAULT_RUM_SAMPLE_RATIO = 1;
 
 const exactTrue = z
@@ -155,7 +159,11 @@ export function resolveGatewayBaseUrl(source: GatewayBaseUrlSource): string {
         };
   const isSaas = "isSaas" in source ? source.isSaas : source.IS_SAAS;
 
-  return gateway.publicUrl ?? gateway.legacyUrl ?? (isSaas ? SAAS_GATEWAY_URL : LOCAL_GATEWAY_URL);
+  return gatewayAddressOf({
+    publicUrl: gateway.publicUrl,
+    legacyUrl: gateway.legacyUrl,
+    isSaas: Boolean(isSaas),
+  });
 }
 
 /**
@@ -208,36 +216,38 @@ export function resolveUiPublicBootstrap(
   };
 }
 
+/**
+ * The dev server's copy of each owner's projection, namespaced as the api
+ * serves it. It cannot import the contracts that declare them (they import
+ * this package), so a slice changed there changes here too.
+ */
 function projectPublicAppConfig(
   config: PublicAppConfigValues,
   credentials: CredentialPresence,
 ): PublicAppConfig {
   return publicAppConfigSchema.parse({
-    appBaseUrl: config.appBaseUrl,
-    gatewayBaseUrl: resolveGatewayBaseUrl(config),
-    deployment: config.isSaas ? "saas" : "self-hosted",
-    demoProjectSlug: config.demoProjectSlug,
-    mode: config.nodeEnvironment,
-    telemetry: {
+    process: processWebConfigSchema.parse({
+      appBaseUrl: config.appBaseUrl,
+      mode: config.nodeEnvironment,
+      deployment: config.isSaas ? "saas" : "self-hosted",
+      nlp: Boolean(config.capabilities.nlpService || credentials.nlpLambdaConfig),
       browserTracing: config.telemetry.rumEnabled && Boolean(config.telemetry.otlpEndpoint),
       sampleRatio: config.telemetry.sampleRatio,
-      posthog: config.telemetry.posthogKey
-        ? { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost }
-        : void 0,
+      ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
+    }),
+    auth: {
+      passkeys: config.identity.passkeys === "on",
+      identityFrontDoor: config.identity.router === "enforce",
+      authProvider: config.authProviderName ?? config.authProvider,
     },
-    capabilities: {
-      email: hasConfiguredEmailDelivery(config, credentials),
-      nlp: Boolean(config.capabilities.nlpService || credentials.nlpLambdaConfig),
-      langevals: Boolean(config.capabilities.langevalsEndpoint),
-    },
-    // `deploymentOffersPasskeys()` and `signInRouterMode()` are the server
-    // halves of these two reads; keeping the derivation identical is what
-    // stops the button and the endpoint behind it from disagreeing.
-    passkeys: config.identity.passkeys === "on",
-    identityFrontDoor: config.identity.router === "enforce",
-    licensePaymentUrl: config.licensePaymentUrl,
-    authProvider: config.authProviderName ?? config.authProvider,
-    ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
+    authz: { demoProjectSlug: config.demoProjectSlug },
+    billing: { licensePaymentUrl: config.licensePaymentUrl },
+    evaluation: { langevals: Boolean(config.capabilities.langevalsEndpoint) },
+    gateway: { gatewayBaseUrl: resolveGatewayBaseUrl(config) },
+    notification: { email: hasConfiguredEmailDelivery(config, credentials) },
+    ops: config.telemetry.posthogKey
+      ? { posthog: { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost } }
+      : {},
   });
 }
 

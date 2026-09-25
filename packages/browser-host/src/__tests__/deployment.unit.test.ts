@@ -1,36 +1,69 @@
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { describe, expect, it } from "vitest";
 
-import { deriveUiDeployment } from "../deployment.ts";
+import { deriveUiDeployment, type UiDeploymentSlices } from "../deployment.ts";
 
-/** A whole config, so a field the decoder stops reading fails here rather than being cast away. */
-function configWith(overrides: Partial<PublicAppConfig>): PublicAppConfig {
+/** Whole slices, so a field the reading stops using fails here rather than being cast away. */
+function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices {
   return {
-    appBaseUrl: "https://app.example",
-    gatewayBaseUrl: "https://gateway.example",
-    deployment: "self-hosted",
-    mode: "production",
-    telemetry: { browserTracing: false, sampleRatio: 0 },
-    capabilities: { email: true, nlp: true, langevals: true },
-    passkeys: false,
-    identityFrontDoor: false,
+    process: {
+      appBaseUrl: "https://app.example",
+      mode: "production",
+      deployment: "self-hosted",
+      nlp: true,
+      browserTracing: false,
+      sampleRatio: 0,
+    },
+    origin: "https://page.example",
+    hasLangevals: true,
+    hasEmailProvider: true,
+    passkeysEnabled: false,
     ...overrides,
   };
 }
 
 describe("deriveUiDeployment", () => {
-  it("reads the deployment shape off the injected config", () => {
-    const deployment = deriveUiDeployment(configWith({ mode: "development", deployment: "saas" }));
+  it("reads the deployment shape off the process slice", () => {
+    const deployment = deriveUiDeployment(
+      slicesWith({
+        process: {
+          appBaseUrl: "https://app.example",
+          mode: "development",
+          deployment: "saas",
+          nlp: false,
+          browserTracing: false,
+          sampleRatio: 0,
+        },
+      }),
+    );
 
     expect(deployment.isDevelopment).toBe(true);
     expect(deployment.isSaaS).toBe(true);
+    expect(deployment.hasNlpService).toBe(false);
     expect(deployment.appBaseUrl).toBe("https://app.example");
+  });
+
+  describe("given a process that named no public address", () => {
+    it("answers the page's own origin rather than an empty link", () => {
+      const deployment = deriveUiDeployment(
+        slicesWith({
+          process: {
+            mode: "production",
+            deployment: "self-hosted",
+            nlp: true,
+            browserTracing: false,
+            sampleRatio: 1,
+          },
+        }),
+      );
+
+      expect(deployment.appBaseUrl).toBe("https://page.example");
+    });
   });
 
   describe("given a deployment that sells a licence", () => {
     it("carries the purchase address, so a host never reads the meta tag itself", () => {
       const deployment = deriveUiDeployment(
-        configWith({ licensePaymentUrl: "https://buy.example/licence" }),
+        slicesWith({ licensePaymentUrl: "https://buy.example/licence" }),
       );
 
       expect(deployment.licensePaymentUrl).toBe("https://buy.example/licence");
@@ -39,29 +72,32 @@ describe("deriveUiDeployment", () => {
 
   describe("given a deployment that sells none", () => {
     it("omits the field rather than carrying an empty one", () => {
-      expect("licensePaymentUrl" in deriveUiDeployment(configWith({}))).toBe(false);
-    });
-  });
-
-  describe("given a deployment with mail configured", () => {
-    it("says so, so the invite flow can claim the message went out", () => {
-      expect(deriveUiDeployment(configWith({})).hasEmailProvider).toBe(true);
+      expect("licensePaymentUrl" in deriveUiDeployment(slicesWith({}))).toBe(false);
     });
   });
 
   describe("given a deployment with no mail provider", () => {
     it("says so, so the invite flow offers a link instead of claiming a send", () => {
+      expect(deriveUiDeployment(slicesWith({ hasEmailProvider: false })).hasEmailProvider).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("given a deployment behind a federated sign-in provider", () => {
+    it("names the provider, so the security screen offers to link it", () => {
       const deployment = deriveUiDeployment(
-        configWith({ capabilities: { email: false, nlp: true, langevals: true } }),
+        slicesWith({ authProvider: "auth0", passkeysEnabled: true }),
       );
 
-      expect(deployment.hasEmailProvider).toBe(false);
+      expect(deployment.authProvider).toBe("auth0");
+      expect(deployment.passkeysEnabled).toBe(true);
     });
   });
 
   describe("given no demo project", () => {
     it("omits the slug", () => {
-      expect("demoProjectSlug" in deriveUiDeployment(configWith({}))).toBe(false);
+      expect("demoProjectSlug" in deriveUiDeployment(slicesWith({}))).toBe(false);
     });
   });
 });

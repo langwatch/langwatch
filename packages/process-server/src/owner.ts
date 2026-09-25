@@ -2,7 +2,7 @@
  * The process-server's own declaration (§6): framework globals declare at
  * their framework owner, with the same primitive a module uses.
  */
-import { Config, environmentOneOrTrueSchema } from "@langwatch/config";
+import { Config, isSaas } from "@langwatch/config";
 import { z } from "zod";
 
 export const processOwner = {
@@ -23,7 +23,7 @@ export const processOwner = {
      * Whether this deployment is the hosted product. One owner for a fact five
      * modules read; the eventual signed-licence replacement is then one edit.
      */
-    isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
+    isSaas,
     /**
      * The platform-operator list, parsed once. Blank means none rather than
      * refusing boot; several modules read it, so it has one owner here.
@@ -50,6 +50,14 @@ export const processOwner = {
         .string()
         .optional()
         .transform((value) => value?.trim() || void 0),
+    ),
+    /** Keeps the development badge off a development build (demos, screenshots). */
+    hideDevIndicator: c.env(
+      "HIDE_DEV_INDICATOR",
+      z
+        .enum(["0", "1", "false", "true"])
+        .optional()
+        .transform((value) => value === "1" || value === "true"),
     ),
     /**
      * This deployment's public origin: a process fact drilled to the modules

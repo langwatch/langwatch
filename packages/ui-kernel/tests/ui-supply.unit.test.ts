@@ -34,10 +34,9 @@ describe("UI supply", () => {
   });
 
   it("reads and parses every declared config slice before resolving", async () => {
-    const secondConfig = defineWebModule("second-config").withConfig(
-      z.strictObject({ email: z.boolean() }),
-      (config) => ({ email: config.capabilities.email }),
-    );
+    const secondConfig = defineWebModule("second-config").withConfig({
+      notification: z.strictObject({ email: z.boolean() }),
+    });
     const reader = vi.fn(() => publicAppConfig);
 
     const rendered = await createUi({ document: documentRoot, mount: "root" })
@@ -48,8 +47,8 @@ describe("UI supply", () => {
     expect(reader).toHaveBeenCalledOnce();
     expect(reader).toHaveBeenCalledWith(documentRoot);
     expect(rendered.config).toEqual({
-      configuration: { mode: "test" },
-      "second-config": { email: true },
+      configuration: { process: { mode: "test" } },
+      "second-config": { notification: { email: true } },
     });
   });
 
@@ -67,10 +66,9 @@ describe("UI supply", () => {
   });
 
   it("names the module refusing a slice and never repeats the value", async () => {
-    const refusing = defineWebModule("refusing").withConfig(
-      z.strictObject({ mode: z.string().refine((mode) => mode === "production") }),
-      (config) => ({ mode: config.mode }),
-    );
+    const refusing = defineWebModule("refusing").withConfig({
+      process: z.strictObject({ mode: z.string().refine((mode) => mode === "production") }),
+    });
     const render = createUi({ document: documentRoot, mount: "root" })
       .withModules([refusing])
       .withInjectedConfig(() => publicAppConfig)
@@ -79,7 +77,7 @@ describe("UI supply", () => {
     const error = await render.catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(BrowserConfigRefusedError);
     expect(error).toMatchObject({ code: "browser_config_refused", module: "refusing" });
-    expect(String(error)).not.toContain(publicAppConfig.mode);
+    expect(String(error)).not.toContain('"test"');
   });
 
   it("keeps builder branches independent", async () => {

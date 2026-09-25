@@ -13,7 +13,7 @@ describe("gateway server configuration", () => {
   describe("given a deployment sets nothing", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("reads its one deployment fact absent, and declares no credential", () => {
-      expect(read({})).toEqual({ spendSettlementGraceMs: undefined });
+      expect(read({})).toEqual({ spendSettlementGraceMs: undefined, isSaas: false });
     });
   });
 

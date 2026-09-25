@@ -3,6 +3,7 @@
  * Spec: specs/traces-v2/integrate-pane.feature
  */
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
@@ -19,7 +20,6 @@ import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
 import { IntegratePaneShell } from "../../../elements/explorer/traces-page/integrate-pane-shell.tsx";
 import { SetupWithAgentButton } from "../../setup-with-agent-button.tsx";
-import { usePublicEnv } from "../../use-public-env.ts";
 import { ApiKeyIntegrationInfoCard } from "../onboarding/api-key-integration-info-card.tsx";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
 import { SearchBar } from "../search-bar/search-bar.tsx";
@@ -30,12 +30,12 @@ export const IntegratePane: React.FC = () => {
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
   const { project, organization } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const [token, setToken] = useState<string | null>(null);
   const [showSdk, setShowSdk] = useState(false);
   // The same endpoint rule the env block above the actions follows, so
   // the keys the agent gets and the keys on screen are the same keys.
-  const endpoint = selfHostedEndpoint(publicEnv.data?.BASE_HOST);
+  const endpoint = selfHostedEndpoint(appBaseUrl);
 
   if (!project || !organization) return null;
 

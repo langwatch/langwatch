@@ -12,37 +12,38 @@ import {
   type AuthRouteReading,
 } from "@langwatch/auth-browser/auth";
 import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 import { useMemo } from "react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 
+import { parseUiFeatureConfig, type UiFeatureConfig } from "../ui-feature-config";
+
 /** Auth restates the public shape to break a cycle, so the projection lives here. */
-function authPublicEnvironment(config: PublicAppConfig): AuthPublicEnvironment {
+function authPublicEnvironment(config: UiFeatureConfig): AuthPublicEnvironment {
   return {
-    BASE_HOST: config.appBaseUrl,
-    DEMO_PROJECT_SLUG: config.demoProjectSlug,
-    NODE_ENV: config.mode,
-    IDENTITY_FRONT_DOOR: config.identityFrontDoor,
-    PASSKEYS_ENABLED: config.passkeys,
-    HAS_EMAIL_PROVIDER_KEY: config.capabilities.email,
-    IS_SAAS: config.deployment === "saas",
-    GATEWAY_BASE_URL: config.gatewayBaseUrl,
-    POSTHOG_KEY: config.telemetry.posthog?.key,
-    POSTHOG_HOST: config.telemetry.posthog?.host,
-    RUM_ENABLED: config.telemetry.browserTracing,
-    RUM_SAMPLE_RATIO: config.telemetry.sampleRatio,
-    HAS_LANGWATCH_NLP_SERVICE: config.capabilities.nlp,
-    HAS_LANGEVALS_ENDPOINT: config.capabilities.langevals,
-    STRIPE_LICENSE_PAYMENT_LINK_URL: config.licensePaymentUrl,
-    NEXTAUTH_PROVIDER: config.authProvider,
+    BASE_HOST: config.process.appBaseUrl ?? window.location.origin,
+    DEMO_PROJECT_SLUG: config.authz.demoProjectSlug,
+    NODE_ENV: config.process.mode,
+    IDENTITY_FRONT_DOOR: config.auth.identityFrontDoor,
+    PASSKEYS_ENABLED: config.auth.passkeys,
+    HAS_EMAIL_PROVIDER_KEY: config.notification.email,
+    IS_SAAS: config.process.deployment === "saas",
+    GATEWAY_BASE_URL: config.gateway.gatewayBaseUrl,
+    POSTHOG_KEY: config.ops.posthog?.key,
+    POSTHOG_HOST: config.ops.posthog?.host,
+    RUM_ENABLED: config.process.browserTracing,
+    RUM_SAMPLE_RATIO: config.process.sampleRatio,
+    HAS_LANGWATCH_NLP_SERVICE: config.process.nlp,
+    HAS_LANGEVALS_ENDPOINT: config.evaluation.langevals,
+    STRIPE_LICENSE_PAYMENT_LINK_URL: config.billing.licensePaymentUrl,
+    NEXTAUTH_PROVIDER: config.auth.authProvider,
   };
 }
 
 class ShellAuthHost extends AuthHostApi {
   constructor(
-    private readonly config: PublicAppConfig,
+    private readonly config: UiFeatureConfig,
     private readonly reading: AuthRouteReading,
     private readonly report: (failure: AuthFailureNotice) => void,
   ) {
@@ -67,7 +68,7 @@ export default function UiAuthHost() {
   const location = useLocation();
   const params = useParams();
   const [search] = useSearchParams();
-  const [config] = useMemo(() => [readPublicAppConfig(document)], []);
+  const [config] = useMemo(() => [parseUiFeatureConfig(readPublicAppConfig(document))], []);
 
   const host = useMemo(() => {
     const reading: AuthRouteReading = {

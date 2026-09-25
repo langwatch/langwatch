@@ -55,11 +55,6 @@ vi.mock("../../blocks/loading-screen.tsx", () => ({
   LoadingScreen: () => <div data-testid="loading" />,
 }));
 
-vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  usePublicEnv: () => ({ data: { IS_SAAS: true, BASE_HOST: "" }, isLoading: false }),
-}));
-
 const routerState: { query: Record<string, string> } = { query: {} };
 const push = vi.fn();
 
@@ -118,7 +113,10 @@ vi.mock("../../../features/guided-onboarding/ui/takeover/guided-takeover.tsx", (
   ),
 }));
 
-import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  UiCapabilityContextProvider,
+  type UiDeployment,
+} from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 
 import {
@@ -130,6 +128,15 @@ import {
   type OnboardingScope,
 } from "../../../model/onboarding-host.ts";
 import { WelcomeScreen } from "../welcome-screen.tsx";
+
+const SAAS_DEPLOYMENT: UiDeployment = {
+  isDevelopment: false,
+  isSaaS: true,
+  appBaseUrl: "https://app.langwatch.ai",
+  hasNlpService: true,
+  hasLangevals: true,
+  hasEmailProvider: true,
+};
 
 const flags: Record<string, boolean> = {};
 const failures: OnboardingFailureNotice[] = [];
@@ -197,10 +204,17 @@ function renderWelcome() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <UiCapabilityContextProvider
-        value={createUiCapabilitiesFromHost({
-          route: () => ({ params: {}, query: routerState.query, pathname: "/onboarding/welcome" }),
-          navigate: (to: string) => push(to),
-        })}
+        value={{
+          ...createUiCapabilitiesFromHost({
+            route: () => ({
+              params: {},
+              query: routerState.query,
+              pathname: "/onboarding/welcome",
+            }),
+            navigate: (to: string) => push(to),
+          }),
+          deployment: SAAS_DEPLOYMENT,
+        }}
       >
         <OnboardingHostProvider value={new WelcomeTestHost()}>
           <WelcomeScreen />

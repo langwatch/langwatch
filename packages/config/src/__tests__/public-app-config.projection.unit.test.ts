@@ -26,29 +26,32 @@ describe("public application configuration projection", () => {
     );
 
     expect(config).toMatchObject({
-      appBaseUrl: "https://app.example.test",
-      gatewayBaseUrl: "https://gateway.example.test",
-      deployment: "self-hosted",
-      telemetry: { browserTracing: true, sampleRatio: 1 },
-      capabilities: { email: true },
+      process: {
+        appBaseUrl: "https://app.example.test",
+        deployment: "self-hosted",
+        browserTracing: true,
+        sampleRatio: 1,
+      },
+      gateway: { gatewayBaseUrl: "https://gateway.example.test" },
+      notification: { email: true },
     });
-    expect(config).not.toHaveProperty("NEXTAUTH_SECRET");
-    expect(config).not.toHaveProperty("RESEND_API_KEY");
+    expect(JSON.stringify(config)).not.toContain("must-not-cross-the-browser-boundary");
   });
 
   it("hands the browser HIDE_DEV_INDICATOR only when it is switched on", () => {
     const base = { BASE_HOST: "https://app.example.test", NODE_ENV: "development" };
+    const processSlice = (source: Record<string, string>) => resolvePublicAppConfig(source).process;
 
-    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "1" })).toMatchObject({
+    expect(processSlice({ ...base, HIDE_DEV_INDICATOR: "1" })).toMatchObject({
       hideDevIndicator: true,
     });
-    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "true" })).toMatchObject({
+    expect(processSlice({ ...base, HIDE_DEV_INDICATOR: "true" })).toMatchObject({
       hideDevIndicator: true,
     });
-    expect(resolvePublicAppConfig({ ...base, HIDE_DEV_INDICATOR: "false" })).not.toHaveProperty(
+    expect(processSlice({ ...base, HIDE_DEV_INDICATOR: "false" })).not.toHaveProperty(
       "hideDevIndicator",
     );
-    expect(resolvePublicAppConfig(base)).not.toHaveProperty("hideDevIndicator");
+    expect(processSlice(base)).not.toHaveProperty("hideDevIndicator");
   });
 
   it("retains the gateway public-url, legacy-url, and deployment-default precedence", () => {

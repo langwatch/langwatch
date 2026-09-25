@@ -2,25 +2,19 @@
  * The application a composing host actually gets from `@langwatch/ui`.
  */
 
-import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 import { webModules } from "@langwatch/installed-web-modules";
 import { createUiApplication } from "@langwatch/ui-kernel/application";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
 import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";
 
-const publicAppConfig: PublicAppConfig = {
-  appBaseUrl: "http://localhost",
-  gatewayBaseUrl: "http://localhost:5563",
-  deployment: "self-hosted",
+const publicAppConfig: UiPublicTelemetry = {
   mode: "test",
   telemetry: { browserTracing: false, sampleRatio: 0 },
-  capabilities: { email: false, nlp: false, langevals: false },
-  passkeys: false,
-  identityFrontDoor: false,
 };
 
 function PassThrough({ children }: { children: ReactNode }) {

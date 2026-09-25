@@ -25,8 +25,9 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../use-public-env.ts", () => ({
-  usePublicEnv: () => ({ data: { BASE_HOST: mockBaseHost } }),
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useUiDeployment: () => ({ appBaseUrl: mockBaseHost }),
 }));
 
 vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({

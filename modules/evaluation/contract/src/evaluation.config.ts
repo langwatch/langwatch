@@ -4,6 +4,7 @@ import {
   langevalsStagingTtlSeconds,
   type ConfigOf,
 } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
 const positiveInteger = z.coerce.number().int().positive();
@@ -33,3 +34,8 @@ export type EvaluationServerConfig = ConfigOf<typeof evaluationConfig>;
 export const evaluationWebConfigSchema = z.strictObject({ langevals: z.boolean() });
 
 export type EvaluationWebConfig = z.infer<typeof evaluationWebConfigSchema>;
+
+export const evaluationBrowserConfig = defineBrowserConfig({
+  schema: evaluationWebConfigSchema,
+  project: (config: EvaluationServerConfig) => ({ langevals: Boolean(config.langevalsEndpoint) }),
+});

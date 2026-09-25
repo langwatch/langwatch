@@ -1,4 +1,5 @@
 import { Config, type ConfigOf } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { z } from "zod";
 
 /**
@@ -28,3 +29,16 @@ export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;
 export const notificationWebConfigSchema = z.strictObject({ email: z.boolean() });
 
 export type NotificationWebConfig = z.infer<typeof notificationWebConfigSchema>;
+
+/** Config alone: a provider's key is a secret, so a named provider is taken at its word. */
+export const notificationBrowserConfig = defineBrowserConfig({
+  schema: notificationWebConfigSchema,
+  project: (config: NotificationServerConfig) => {
+    const ses = Boolean(config.ses.enabled && config.ses.region);
+    const provider = config.provider?.trim().toLowerCase();
+    if (!provider) return { email: ses || Boolean(config.smtp.host) };
+    if (provider === "ses") return { email: ses };
+    if (provider === "smtp") return { email: Boolean(config.smtp.host) };
+    return { email: provider === "sendgrid" || provider === "resend" };
+  },
+});

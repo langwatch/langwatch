@@ -4,6 +4,7 @@
  * CLOSED — nothing reads `ready` until the graph it resolved against landed.
  */
 
+import { authzWebConfigSchema } from "@langwatch/authz-contract";
 import { UiScope, type UiActiveScope, type UiSession } from "@langwatch/browser-host/capabilities";
 import type {
   UiActiveScopeReading,
@@ -16,6 +17,7 @@ import {
 } from "@langwatch/browser-host/use-organization-team-project";
 import {
   parsePublicAppConfigMetaContent,
+  parsePublicConfigSlice,
   PUBLIC_APP_CONFIG_META_NAME,
 } from "@langwatch/config/public-app-config";
 import type { UiResolvedScope, UiScopeProject } from "@langwatch/organization-contract";
@@ -58,7 +60,11 @@ export function readUiDemoProjectSlug(
     ?.getAttribute("content");
   if (!content) return void 0;
   try {
-    return parsePublicAppConfigMetaContent(content).demoProjectSlug;
+    return parsePublicConfigSlice({
+      config: parsePublicAppConfigMetaContent(content),
+      owner: "authz",
+      schema: authzWebConfigSchema,
+    }).demoProjectSlug;
   } catch {
     return void 0;
   }

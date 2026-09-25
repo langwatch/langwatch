@@ -9,9 +9,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OnboardingScreenIndex } from "../types.ts";
 import { useOnboardingFlow } from "../use-onboarding-flow.ts";
 
-vi.mock("@langwatch/onboarding-browser-kit", async (importOriginal) => ({
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  usePublicEnv: () => ({ data: { IS_SAAS: true }, isLoading: false }),
+  useUiDeployment: () => ({ isSaaS: true }),
 }));
 
 const flagState = vi.hoisted(() => ({ enabled: true, isLoading: false }));

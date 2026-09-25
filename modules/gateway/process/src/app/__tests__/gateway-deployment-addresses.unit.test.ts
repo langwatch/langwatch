@@ -47,7 +47,14 @@ function gatewayApp({
       encryption: createApiFixture<Encryption>(),
       publicBaseUrl: "https://app.acme.example",
     },
-    config: { spendSettlementGraceMs: void 0, internalUrl, controlPlaneUrl, baseUrl, publicUrl },
+    config: {
+      spendSettlementGraceMs: void 0,
+      internalUrl,
+      controlPlaneUrl,
+      baseUrl,
+      publicUrl,
+      isSaas: false,
+    },
     resources: new ResourceScope(),
     secrets: noSecrets,
   });

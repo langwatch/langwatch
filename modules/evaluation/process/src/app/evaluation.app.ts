@@ -4,6 +4,7 @@ import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
   EvaluationApi,
+  evaluationBrowserConfig,
   evaluationConfig,
   isAzureEvaluatorType,
   type CustomEvaluator,
@@ -241,6 +242,7 @@ export class EvaluationApp implements EvaluationApiContract {
   static readonly contract = EvaluationApi;
   /** `langevalsEndpoint`: where this deployment's evaluator and clustering service answers. */
   static readonly config = evaluationConfig;
+  static readonly publicConfig = evaluationBrowserConfig.project;
   static readonly dependencies = {
     workflows: WorkflowApi,
     traces: TraceApi,

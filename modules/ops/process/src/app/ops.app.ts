@@ -50,6 +50,7 @@ import {
   OpsCapabilityUnavailableError,
   type StartupNoticeState,
   type UsageReportAnswer,
+  opsBrowserConfig,
   opsConfig,
   type AdminIdentity,
   type AggregateDiscovery,
@@ -641,6 +642,7 @@ export class OpsApp implements OpsApi {
     analytics: AnalyticsApi,
   };
   static readonly config = opsConfig;
+  static readonly publicConfig = opsBrowserConfig.project;
   static readonly reads = [
     "prisma",
     "redis",

@@ -1,4 +1,5 @@
-import { usePublicEnv } from "../../../../behavior/use-public-env.ts";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+
 import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
 import { useActiveProject } from "../../active-project-context.tsx";
 import { getRegistryEntry } from "./registry.tsx";
@@ -28,10 +29,10 @@ function getFrameworkCode(language: PlatformKey, framework: FrameworkKey): Codeg
 
 // React hook wrapper that injects project-specific substitutions
 export function useCodegen(language: PlatformKey, framework: FrameworkKey): CodegenResult | null {
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const { project } = useActiveProject();
   const projectName = project?.name ?? "my-llm-app";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+  const effectiveEndpoint = appBaseUrl;
 
   const base = getFrameworkCode(language, framework);
   if (!base) return null;

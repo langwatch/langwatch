@@ -1,5 +1,6 @@
 import { Alert, Box, Heading, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
-import { usePublicEnv, Link } from "@langwatch/onboarding-browser-kit";
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { Link } from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 
@@ -14,12 +15,12 @@ import { useIntegrationChecks } from "../integration-checks.tsx";
  */
 const APICard: React.FC = () => {
   const host = useOnboardingHost();
-  const publicEnv = usePublicEnv();
+  const { appBaseUrl } = useUiDeployment();
   const integrationChecks = useIntegrationChecks();
   const hasFirstMessage = Boolean(integrationChecks.data?.firstMessage);
 
   const effectiveApiKey = host.revealProjectApiKey() ?? "";
-  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+  const effectiveEndpoint = appBaseUrl;
 
   async function copyApiKey({ withBashPrefix }: { withBashPrefix: boolean }): Promise<void> {
     await host.copyToClipboard({
