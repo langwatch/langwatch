@@ -18,7 +18,11 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import {
+  formatBudgetUsd,
+  type VirtualKeyCamelDtoResponse,
+  type VirtualKeySpendThisMonth,
+} from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
 import {
   Ban,
@@ -50,6 +54,7 @@ import {
 import { VirtualKeyCreateDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-create-drawer.tsx";
 import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
+import type { GatewayTeam } from "../../../model/gateway-host.ts";
 import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
@@ -118,39 +123,18 @@ function VirtualKeysPage() {
     { organizationId: orgId },
     { enabled: !!orgId },
   );
-  const spendByKeyId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const row of spendQuery.data ?? []) {
-      map.set(row.virtualKeyId, row.spentUsd);
-    }
-    return map;
-  }, [spendQuery.data]);
-  const budgetByKeyId = useMemo(() => {
-    const map = new Map<string, VirtualKeyBudgetBarValue>();
-    for (const row of spendQuery.data ?? []) {
-      if (row.budget) map.set(row.virtualKeyId, row.budget);
-    }
-    return map;
-  }, [spendQuery.data]);
-  const policyNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const p of policiesQuery.data ?? []) {
-      map.set(p.id, p.name);
-    }
-    return map;
-  }, [policiesQuery.data]);
-  const teamNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of organization?.teams ?? []) map.set(t.id, t.name);
-    return map;
-  }, [organization?.teams]);
-  const projectNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const t of organization?.teams ?? []) {
-      for (const p of t.projects) map.set(p.id, p.name);
-    }
-    return map;
-  }, [organization?.teams]);
+  const { spendByKeyId, budgetByKeyId } = useMemo(
+    () => indexSpendRows(spendQuery.data ?? []),
+    [spendQuery.data],
+  );
+  const policyNameById = useMemo(
+    () => new Map((policiesQuery.data ?? []).map((policy) => [policy.id, policy.name])),
+    [policiesQuery.data],
+  );
+  const { teamNameById, projectNameById } = useMemo(
+    () => indexScopeNames(organization?.teams ?? []),
+    [organization?.teams],
+  );
   const scopeEntriesWithNames = (scopes: ScopeEntry[]) =>
     scopes.map((s) => ({
       scopeType: s.scopeType,
@@ -196,37 +180,23 @@ function VirtualKeysPage() {
   // Keys whose traces can actually be opened. A key missing from this map
   // gets no "View traces" action, because the link would only lead to a
   // bounce or to a project that no longer serves anything.
-  const traceHrefByKeyId = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const vk of allRows) {
-      const href = resolveTracesHrefForKey({
-        teams: organization?.teams ?? [],
-        virtualKeyId: vk.id,
-        traceProjectId: vk.traceProjectId,
-        traceProjectArchived: vk.traceProjectArchived,
-      });
-      if (href) map.set(vk.id, href);
-    }
-    return map;
-  }, [allRows, organization?.teams]);
+  const traceHrefByKeyId = useMemo(
+    () => traceHrefsByKeyId({ rows: allRows, teams: organization?.teams ?? [] }),
+    [allRows, organization?.teams],
+  );
 
   const confirmRotate = async () => {
     if (!rotating || !orgId) return;
-    try {
-      const result = await rotateMutation.mutateAsync({
-        organizationId: orgId,
-        id: rotating.id,
-      });
-      setRevealSecret({
-        id: result.virtualKey.id,
-        name: rotating.name,
-        secret: result.secret,
-        kind: "rotate",
-      });
-      setRotating(null);
-    } catch (err) {
-      showErrorToast({ error: err, fallbackTitle: "Couldn't rotate the key" });
-    }
+    await rotateAndReveal({
+      rotate: rotateMutation.mutateAsync,
+      organizationId: orgId,
+      key: rotating,
+      onRotated: (secret) => {
+        setRevealSecret(secret);
+        setRotating(null);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't rotate the key" }),
+    });
   };
 
   const confirmRevoke = async () => {
@@ -265,26 +235,7 @@ function VirtualKeysPage() {
             />
           )}
           {listView === "empty" && (
-            <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
-              <EmptyState.Root>
-                <EmptyState.Content>
-                  <EmptyState.Indicator>
-                    <KeyRound size={32} />
-                  </EmptyState.Indicator>
-                  <EmptyState.Title>No virtual keys yet</EmptyState.Title>
-                  <EmptyState.Description>
-                    Mint your first virtual key to route requests through the LangWatch AI Gateway
-                    with budgets, guardrails, and per-tenant tracing attached.
-                  </EmptyState.Description>
-                  {canCreate && (
-                    <Button colorPalette="orange" onClick={() => setCreateOpen(true)} mt={2}>
-                      <Plus size={14} /> New virtual key
-                    </Button>
-                  )}
-                </EmptyState.Content>
-              </EmptyState.Root>
-              <GatewayCapabilityPreview />
-            </VStack>
+            <VirtualKeysEmptyState canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
           )}
           {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
@@ -353,211 +304,24 @@ function VirtualKeysPage() {
                       </Table.Header>
                       <Table.Body>
                         {rows.map((vk) => (
-                          <Table.Row
+                          <VirtualKeyTableRow
                             key={vk.id}
-                            cursor="pointer"
-                            _hover={{ bg: "bg.subtle" }}
-                            onClick={() => router.push(`/gateway/virtual-keys/${vk.id}`)}
-                          >
-                            <Table.Cell>
-                              <VStack align="start" gap={1}>
-                                <HStack gap={2} align="center">
-                                  <Link href={`/gateway/virtual-keys/${vk.id}`} fontWeight="medium">
-                                    {vk.name}
-                                  </Link>
-                                </HStack>
-                                {vk.description && (
-                                  <Text fontSize="xs" color="fg.muted">
-                                    {vk.description}
-                                  </Text>
-                                )}
-                                {(() => {
-                                  const tags =
-                                    (
-                                      vk.config as {
-                                        metadata?: { tags?: string[] };
-                                      }
-                                    )?.metadata?.tags ?? [];
-                                  if (tags.length === 0) return null;
-                                  return (
-                                    <HStack gap={1} flexWrap="wrap">
-                                      {tags.map((t) => (
-                                        <Badge
-                                          key={t}
-                                          variant="subtle"
-                                          colorPalette="gray"
-                                          fontSize="2xs"
-                                        >
-                                          {t}
-                                        </Badge>
-                                      ))}
-                                    </HStack>
-                                  );
-                                })()}
-                              </VStack>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Text fontFamily="mono" fontSize="xs">
-                                {vk.displayPrefix}…
-                              </Text>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {(() => {
-                                const badge = statusBadge(vk);
-                                return (
-                                  <Badge
-                                    colorPalette={badge.colorPalette}
-                                    data-testid={`vk-status-${vk.id}`}
-                                  >
-                                    {badge.label}
-                                  </Badge>
-                                );
-                              })()}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <ProviderScopeChips
-                                scopes={scopeEntriesWithNames(vk.scopes)}
-                                size="xs"
-                                principal={
-                                  vk.principalUserId && vk.principalUser
-                                    ? {
-                                        name: vk.principalUser.name,
-                                        email: vk.principalUser.email,
-                                      }
-                                    : undefined
-                                }
-                              />
-                            </Table.Cell>
-                            <Table.Cell>
-                              <RoutingPolicyCell
-                                routingPolicyId={vk.routingPolicyId}
-                                routingMode={vk.routingMode}
-                                policyNameById={policyNameById}
-                              />
-                            </Table.Cell>
-                            <Table.Cell
-                              onClick={(e) => e.stopPropagation()}
-                              cursor="default"
-                              minWidth="140px"
-                            >
-                              <VStack align="stretch" gap={1.5} width="full">
-                                <Link
-                                  className="group"
-                                  href={usageHrefForKey(vk.id)}
-                                  data-testid={`vk-spend-${vk.id}`}
-                                  aria-label={`Usage for ${vk.name}, this month`}
-                                  width="full"
-                                >
-                                  <HStack gap={1} justify="space-between" width="full">
-                                    <Text
-                                      fontSize="sm"
-                                      fontVariantNumeric="tabular-nums"
-                                      color={spendTone(spendByKeyId.get(vk.id))}
-                                      _groupHover={{
-                                        textDecoration: "underline",
-                                      }}
-                                    >
-                                      {spendLabel({
-                                        isLoading: spendQuery.isLoading,
-                                        isError: spendQuery.isError,
-                                        spend: spendByKeyId.get(vk.id),
-                                      })}
-                                    </Text>
-                                    <Box
-                                      as="span"
-                                      data-testid={`vk-spend-chart-${vk.id}`}
-                                      color="fg.muted"
-                                      aria-hidden
-                                      _groupHover={{ color: "fg" }}
-                                    >
-                                      <LineChart size={14} />
-                                    </Box>
-                                  </HStack>
-                                </Link>
-                                <VirtualKeyBudgetBar
-                                  value={budgetByKeyId.get(vk.id)}
-                                  virtualKeyId={vk.id}
-                                />
-                              </VStack>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {vk.lastUsedAt ? (
-                                <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
-                                  <Text fontSize="sm">
-                                    {formatTimeAgo(toEpochMs(vk.lastUsedAt))}
-                                  </Text>
-                                </Tooltip>
-                              ) : (
-                                <Text fontSize="sm" color="fg.muted">
-                                  never
-                                </Text>
-                              )}
-                            </Table.Cell>
-                            <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
-                              {vk.status !== "revoked" && (
-                                <Menu.Root>
-                                  <Menu.Trigger asChild>
-                                    <Button variant="ghost" size="xs" aria-label="Actions">
-                                      <MoreVertical size={14} />
-                                    </Button>
-                                  </Menu.Trigger>
-                                  <Menu.Content>
-                                    <Menu.Item
-                                      value="details"
-                                      onClick={() => router.push(`/gateway/virtual-keys/${vk.id}`)}
-                                    >
-                                      <Eye size={14} /> Details
-                                    </Menu.Item>
-                                    {traceHrefByKeyId.has(vk.id) && (
-                                      <Menu.Item
-                                        value="view-traces"
-                                        data-testid={`vk-view-traces-${vk.id}`}
-                                        onClick={() => router.push(traceHrefByKeyId.get(vk.id)!)}
-                                      >
-                                        <Bird size={14} /> View traces
-                                      </Menu.Item>
-                                    )}
-                                    {/* Editing and rotating a paused key
-                                        would take effect the moment it is
-                                        enabled again, so both wait for the
-                                        key to be live. Its detail page has
-                                        the Enable button. */}
-                                    {canUpdate && vk.status === "active" && (
-                                      <Menu.Item value="edit" onClick={() => setEditing(vk)}>
-                                        <Pencil size={14} /> Edit
-                                      </Menu.Item>
-                                    )}
-                                    {canRotate && vk.status === "active" && (
-                                      <Menu.Item
-                                        value="rotate"
-                                        onClick={() =>
-                                          setRotating({
-                                            id: vk.id,
-                                            name: vk.name,
-                                          })
-                                        }
-                                      >
-                                        <RotateCw size={14} /> Rotate secret
-                                      </Menu.Item>
-                                    )}
-                                    {canRevoke && (
-                                      <Menu.Item
-                                        value="revoke"
-                                        onClick={() =>
-                                          setRevoking({
-                                            id: vk.id,
-                                            name: vk.name,
-                                          })
-                                        }
-                                      >
-                                        <Trash2 size={14} /> Revoke
-                                      </Menu.Item>
-                                    )}
-                                  </Menu.Content>
-                                </Menu.Root>
-                              )}
-                            </Table.Cell>
-                          </Table.Row>
+                            vk={vk}
+                            scopes={scopeEntriesWithNames(vk.scopes)}
+                            policyNameById={policyNameById}
+                            spend={spendByKeyId.get(vk.id)}
+                            spendIsLoading={spendQuery.isLoading}
+                            spendIsError={spendQuery.isError}
+                            budget={budgetByKeyId.get(vk.id)}
+                            traceHref={traceHrefByKeyId.get(vk.id)}
+                            canUpdate={canUpdate}
+                            canRotate={canRotate}
+                            canRevoke={canRevoke}
+                            onNavigate={(href) => router.push(href)}
+                            onEdit={() => setEditing(vk)}
+                            onRotate={() => setRotating({ id: vk.id, name: vk.name })}
+                            onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
+                          />
                         ))}
                       </Table.Body>
                     </Table.Root>
@@ -624,6 +388,318 @@ function VirtualKeysPage() {
       />
     </AiGatewayLayout>
   );
+}
+
+/** The list's row as the client receives it: the wire leaves an unset `config` out. */
+type VirtualKeyListRow = Omit<VirtualKeyCamelDtoResponse, "config"> &
+  Partial<Pick<VirtualKeyCamelDtoResponse, "config">>;
+
+function VirtualKeyTableRow({
+  vk,
+  scopes,
+  policyNameById,
+  spend,
+  spendIsLoading,
+  spendIsError,
+  budget,
+  traceHref,
+  canUpdate,
+  canRotate,
+  canRevoke,
+  onNavigate,
+  onEdit,
+  onRotate,
+  onRevoke,
+}: {
+  vk: VirtualKeyListRow;
+  scopes: Parameters<typeof ProviderScopeChips>[0]["scopes"];
+  policyNameById: Map<string, string>;
+  spend: string | undefined;
+  spendIsLoading: boolean;
+  spendIsError: boolean;
+  budget: VirtualKeyBudgetBarValue | undefined;
+  traceHref: string | undefined;
+  canUpdate: boolean;
+  canRotate: boolean;
+  canRevoke: boolean;
+  onNavigate: (href: string) => void;
+  onEdit: () => void;
+  onRotate: () => void;
+  onRevoke: () => void;
+}) {
+  return (
+    <Table.Row
+      cursor="pointer"
+      _hover={{ bg: "bg.subtle" }}
+      onClick={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}
+    >
+      <Table.Cell>
+        <VStack align="start" gap={1}>
+          <HStack gap={2} align="center">
+            <Link href={`/gateway/virtual-keys/${vk.id}`} fontWeight="medium">
+              {vk.name}
+            </Link>
+          </HStack>
+          {vk.description && (
+            <Text fontSize="xs" color="fg.muted">
+              {vk.description}
+            </Text>
+          )}
+          {(() => {
+            const tags =
+              (
+                vk.config as {
+                  metadata?: { tags?: string[] };
+                }
+              )?.metadata?.tags ?? [];
+            if (tags.length === 0) return null;
+            return (
+              <HStack gap={1} flexWrap="wrap">
+                {tags.map((t) => (
+                  <Badge key={t} variant="subtle" colorPalette="gray" fontSize="2xs">
+                    {t}
+                  </Badge>
+                ))}
+              </HStack>
+            );
+          })()}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Text fontFamily="mono" fontSize="xs">
+          {vk.displayPrefix}…
+        </Text>
+      </Table.Cell>
+      <Table.Cell>
+        {(() => {
+          const badge = statusBadge(vk);
+          return (
+            <Badge colorPalette={badge.colorPalette} data-testid={`vk-status-${vk.id}`}>
+              {badge.label}
+            </Badge>
+          );
+        })()}
+      </Table.Cell>
+      <Table.Cell>
+        <ProviderScopeChips
+          scopes={scopes}
+          size="xs"
+          principal={
+            vk.principalUserId && vk.principalUser
+              ? {
+                  name: vk.principalUser.name,
+                  email: vk.principalUser.email,
+                }
+              : undefined
+          }
+        />
+      </Table.Cell>
+      <Table.Cell>
+        <RoutingPolicyCell
+          routingPolicyId={vk.routingPolicyId}
+          routingMode={vk.routingMode}
+          policyNameById={policyNameById}
+        />
+      </Table.Cell>
+      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default" minWidth="140px">
+        <VStack align="stretch" gap={1.5} width="full">
+          <Link
+            className="group"
+            href={usageHrefForKey(vk.id)}
+            data-testid={`vk-spend-${vk.id}`}
+            aria-label={`Usage for ${vk.name}, this month`}
+            width="full"
+          >
+            <HStack gap={1} justify="space-between" width="full">
+              <Text
+                fontSize="sm"
+                fontVariantNumeric="tabular-nums"
+                color={spendTone(spend)}
+                _groupHover={{
+                  textDecoration: "underline",
+                }}
+              >
+                {spendLabel({
+                  isLoading: spendIsLoading,
+                  isError: spendIsError,
+                  spend,
+                })}
+              </Text>
+              <Box
+                as="span"
+                data-testid={`vk-spend-chart-${vk.id}`}
+                color="fg.muted"
+                aria-hidden
+                _groupHover={{ color: "fg" }}
+              >
+                <LineChart size={14} />
+              </Box>
+            </HStack>
+          </Link>
+          <VirtualKeyBudgetBar value={budget} virtualKeyId={vk.id} />
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        {vk.lastUsedAt ? (
+          <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
+            <Text fontSize="sm">{formatTimeAgo(toEpochMs(vk.lastUsedAt))}</Text>
+          </Tooltip>
+        ) : (
+          <Text fontSize="sm" color="fg.muted">
+            never
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+        {vk.status !== "revoked" && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button variant="ghost" size="xs" aria-label="Actions">
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item
+                value="details"
+                onClick={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}
+              >
+                <Eye size={14} /> Details
+              </Menu.Item>
+              {traceHref && (
+                <Menu.Item
+                  value="view-traces"
+                  data-testid={`vk-view-traces-${vk.id}`}
+                  onClick={() => onNavigate(traceHref)}
+                >
+                  <Bird size={14} /> View traces
+                </Menu.Item>
+              )}
+              {/* Editing and rotating a paused key
+                  would take effect the moment it is
+                  enabled again, so both wait for the
+                  key to be live. Its detail page has
+                  the Enable button. */}
+              {canUpdate && vk.status === "active" && (
+                <Menu.Item value="edit" onClick={onEdit}>
+                  <Pencil size={14} /> Edit
+                </Menu.Item>
+              )}
+              {canRotate && vk.status === "active" && (
+                <Menu.Item value="rotate" onClick={onRotate}>
+                  <RotateCw size={14} /> Rotate secret
+                </Menu.Item>
+              )}
+              {canRevoke && (
+                <Menu.Item value="revoke" onClick={onRevoke}>
+                  <Trash2 size={14} /> Revoke
+                </Menu.Item>
+              )}
+            </Menu.Content>
+          </Menu.Root>
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+type SpendRow = VirtualKeySpendThisMonth[number];
+
+function indexSpendRows(rows: SpendRow[]): {
+  spendByKeyId: Map<string, string>;
+  budgetByKeyId: Map<string, VirtualKeyBudgetBarValue>;
+} {
+  const spendByKeyId = new Map<string, string>();
+  const budgetByKeyId = new Map<string, VirtualKeyBudgetBarValue>();
+  for (const row of rows) {
+    spendByKeyId.set(row.virtualKeyId, row.spentUsd);
+    if (row.budget) budgetByKeyId.set(row.virtualKeyId, row.budget);
+  }
+  return { spendByKeyId, budgetByKeyId };
+}
+
+function indexScopeNames(teams: readonly GatewayTeam[]): {
+  teamNameById: Map<string, string>;
+  projectNameById: Map<string, string>;
+} {
+  const teamNameById = new Map<string, string>();
+  const projectNameById = new Map<string, string>();
+  for (const team of teams) {
+    teamNameById.set(team.id, team.name);
+    for (const project of team.projects) projectNameById.set(project.id, project.name);
+  }
+  return { teamNameById, projectNameById };
+}
+
+/** Keys whose traces can be opened; a key missing here gets no "View traces" action. */
+function traceHrefsByKeyId(input: {
+  rows: VirtualKeyListRow[];
+  teams: readonly GatewayTeam[];
+}): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const vk of input.rows) {
+    const href = resolveTracesHrefForKey({
+      teams: input.teams,
+      virtualKeyId: vk.id,
+      traceProjectId: vk.traceProjectId,
+      traceProjectArchived: vk.traceProjectArchived,
+    });
+    if (href) map.set(vk.id, href);
+  }
+  return map;
+}
+
+function VirtualKeysEmptyState({
+  canCreate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
+      <EmptyState.Root>
+        <EmptyState.Content>
+          <EmptyState.Indicator>
+            <KeyRound size={32} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>No virtual keys yet</EmptyState.Title>
+          <EmptyState.Description>
+            Mint your first virtual key to route requests through the LangWatch AI Gateway with
+            budgets, guardrails, and per-tenant tracing attached.
+          </EmptyState.Description>
+          {canCreate && (
+            <Button colorPalette="orange" onClick={onCreate} mt={2}>
+              <Plus size={14} /> New virtual key
+            </Button>
+          )}
+        </EmptyState.Content>
+      </EmptyState.Root>
+      <GatewayCapabilityPreview />
+    </VStack>
+  );
+}
+
+type RotateVirtualKey = ReturnType<typeof api.virtualKeys.rotate.useMutation>["mutateAsync"];
+
+/** Rotates a key's secret and hands the new one over to be shown once. */
+async function rotateAndReveal(input: {
+  rotate: RotateVirtualKey;
+  organizationId: string;
+  key: { id: string; name: string };
+  onRotated: (secret: CreatedSecret) => void;
+  onFailure: (error: unknown) => void;
+}): Promise<void> {
+  try {
+    const result = await input.rotate({ organizationId: input.organizationId, id: input.key.id });
+    input.onRotated({
+      id: result.virtualKey.id,
+      name: input.key.name,
+      secret: result.secret,
+      kind: "rotate",
+    });
+  } catch (err) {
+    input.onFailure(err);
+  }
 }
 
 function GatewayCapabilityPreview() {

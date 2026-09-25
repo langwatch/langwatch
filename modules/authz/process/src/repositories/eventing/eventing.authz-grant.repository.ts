@@ -29,8 +29,10 @@ import {
   PRINCIPAL_TO_DB,
 } from "../prisma/prisma.authz-grant.mapper.ts";
 import {
+  type GrantWriteRecord,
   PrismaAuthzGrantRepository,
   type PrismaAuthzGrantDatabase,
+  type WriteDelegate,
 } from "../prisma/prisma.authz-grant.repository.ts";
 import {
   isRecordNotFound,
@@ -74,25 +76,17 @@ const OFFBOARD_MEMBERSHIP_TXN_OPTIONS = {
   maxWait: 10_000,
 } as const;
 
-type WriteDelegate = {
-  findFirst(args: unknown): Promise<any>;
-  findMany(args: unknown): Promise<any[]>;
-  count(args: unknown): Promise<number>;
-  deleteMany(args: unknown): Promise<{ count: number }>;
-  findUnique(args: unknown): Promise<any>;
-};
-
 export type AuthzGrantWriteDatabase = Omit<
   AuthzDatabase,
   "roleBinding" | "grant" | "groupMembership" | "teamUser" | "organizationUser" | "user"
 > & {
   roleBinding: WriteDelegate;
-  grant: WriteDelegate;
+  grant: WriteDelegate<GrantWriteRecord>;
   groupMembership: WriteDelegate;
   teamUser: WriteDelegate;
   organizationUser: WriteDelegate;
   organizationInvite: WriteDelegate;
-  user: WriteDelegate;
+  user: WriteDelegate<{ email: string | null }>;
   $transaction<T>(
     write: (transaction: AuthzGrantWriteDatabase) => Promise<T>,
     options: { timeout: number; maxWait: number },

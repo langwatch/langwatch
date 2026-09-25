@@ -23,6 +23,22 @@ export type PrismaAuthzGrantDatabase = Pick<
   "roleBinding" | "customRole" | "team" | "project" | "apiKey"
 >;
 
+/** A table the grant writes read and delete through, typed by the columns its readers select. */
+export type WriteDelegate<Row = unknown> = {
+  findFirst(args: unknown): Promise<Row | null>;
+  findMany(args: unknown): Promise<Row[]>;
+  count(args: unknown): Promise<number>;
+  deleteMany(args: unknown): Promise<{ count: number }>;
+  findUnique(args: unknown): Promise<Row | null>;
+};
+
+export type GrantWriteRecord = {
+  id: string;
+  principalId: string | null;
+  createdAt: Date;
+  revokedAt: Date | null;
+};
+
 export class PrismaAuthzGrantRepository implements AuthzGrantsReadRepository {
   static create(database: PrismaAuthzGrantDatabase): PrismaAuthzGrantRepository {
     return new PrismaAuthzGrantRepository(database);

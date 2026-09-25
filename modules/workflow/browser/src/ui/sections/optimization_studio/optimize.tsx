@@ -38,6 +38,7 @@ import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import type { WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { OptimizationStudioLLMConfigField } from "./properties/llm-configs/optimization-studio-llm-config-field.tsx";
@@ -137,6 +138,139 @@ function optimizeDisabledReason({
   return false;
 }
 
+/** The numeric tuning inputs the chosen optimizer takes. */
+function OptimizerParamsFields({
+  form,
+  optimizerParams,
+}: {
+  form: UseFormReturn<OptimizeForm>;
+  optimizerParams: OptimizeForm["params"];
+}) {
+  return (
+    <Grid templateColumns="repeat(2, 1fr)" gap={5}>
+      {"num_candidates" in optimizerParams && (
+        <GridItem>
+          <VStack align="start" gap={2}>
+            <HStack>
+              <SmallLabel>Number of Candidate Prompts</SmallLabel>
+              <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                <Info size={16} />
+              </Tooltip>
+            </HStack>
+            <Input {...form.register("params.num_candidates")} type="number" min={1} max={100} />
+          </VStack>
+        </GridItem>
+      )}
+      {"max_bootstrapped_demos" in optimizerParams && (
+        <GridItem>
+          <VStack align="start" width="full" gap={2}>
+            <HStack>
+              <SmallLabel>Max Bootstrapped Demos</SmallLabel>
+              <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                <Info size={16} />
+              </Tooltip>
+            </HStack>
+            <Input
+              {...form.register("params.max_bootstrapped_demos")}
+              type="number"
+              min={1}
+              max={100}
+            />
+          </VStack>
+        </GridItem>
+      )}
+      {"max_labeled_demos" in optimizerParams && (
+        <GridItem>
+          <VStack align="start" width="full" gap={2}>
+            <HStack>
+              <SmallLabel>Max Labeled Demos</SmallLabel>
+              <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
+                <Info size={16} />
+              </Tooltip>
+            </HStack>
+            <Input {...form.register("params.max_labeled_demos")} type="number" min={1} max={100} />
+          </VStack>
+        </GridItem>
+      )}
+    </Grid>
+  );
+}
+
+/** Whether the optimization set's size lets a run start, asking the user past 300 entries. */
+function confirmOptimizationSetSize(trainLength: number): boolean {
+  if (!trainLength) return false;
+  if (
+    trainLength >= 300 &&
+    !confirm(`Going to optimize on ${trainLength} entries. Are you sure?`)
+  ) {
+    return false;
+  }
+  if (trainLength >= 3000) {
+    alert(
+      "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more.",
+    );
+    return false;
+  }
+  return true;
+}
+
+/** The form's params with every unset one filled from the optimizer's defaults. */
+function withOptimizerDefaults({
+  optimizerParams,
+  params,
+}: {
+  optimizerParams: OptimizeForm["params"];
+  params: OptimizeForm["params"];
+}): OptimizeForm["params"] {
+  return Object.entries({ ...optimizerParams, ...params }).reduce(
+    (acc, [key, value]) => {
+      // @ts-expect-error: accumulator keyed by optimizer's dynamic param names
+      acc[key] = value ? value : optimizerParams[key];
+      return acc;
+    },
+    {} as OptimizeForm["params"],
+  );
+}
+
+type CommitVersion = ReturnType<typeof api.workflow.commitVersion.useMutation>["mutateAsync"];
+
+/** Saves the workflow as a new version and makes it current, telling the user either way. */
+async function commitNewVersion(input: {
+  commitVersion: CommitVersion;
+  store: Pick<WorkflowStore, "getWorkflow" | "setLastCommittedWorkflow" | "setCurrentVersionId">;
+  projectId: string;
+  workflowId: string;
+  version: string;
+  commitMessage: string;
+}): Promise<string> {
+  try {
+    const versionResponse = await input.commitVersion({
+      projectId: input.projectId,
+      workflowId: input.workflowId,
+      commitMessage: input.commitMessage,
+      dsl: {
+        ...input.store.getWorkflow(),
+        version: input.version,
+      },
+    });
+    input.store.setLastCommittedWorkflow(input.store.getWorkflow());
+    input.store.setCurrentVersionId(versionResponse.id);
+    toaster.create({
+      title: "Version saved",
+      description: "New version has been saved successfully",
+      type: "success",
+    });
+    return versionResponse.id;
+  } catch (error) {
+    toaster.create({
+      error,
+      title: "Couldn't save the version",
+      type: "error",
+    });
+    throw error;
+  }
+}
+
 export function OptimizeModalContent({
   form,
   onClose,
@@ -198,17 +332,7 @@ export function OptimizeModalContent({
 
   useEffect(() => {
     if (!optimizer) return;
-    form.setValue(
-      "params",
-      Object.entries({ ...optimizer.params, ...params }).reduce(
-        (acc, [key, value]) => {
-          // @ts-expect-error: accumulator keyed by optimizer's dynamic param names
-          acc[key] = value ? value : optimizer.params[key];
-          return acc;
-        },
-        {} as OptimizeForm["params"],
-      ),
-    );
+    form.setValue("params", withOptimizerDefaults({ optimizerParams: optimizer.params, params }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, optimizer]);
 
@@ -252,57 +376,18 @@ export function OptimizeModalContent({
   const onSubmit = useCallback(
     async ({ version, commitMessage, optimizer, params }: OptimizeForm) => {
       if (!project || !workflowId) return;
+      if (!confirmOptimizationSetSize(train.length)) return;
 
-      if (!train.length) {
-        return;
-      }
-
-      if (
-        train.length >= 300 &&
-        !confirm(`Going to optimize on ${train.length} entries. Are you sure?`)
-      ) {
-        return;
-      }
-
-      if (train.length >= 3000) {
-        alert(
-          "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more.",
-        );
-        return;
-      }
-
-      let versionId: string | undefined;
-
-      if (canSave) {
-        try {
-          const versionResponse = await commitVersion.mutateAsync({
+      const versionId = canSave
+        ? await commitNewVersion({
+            commitVersion: commitVersion.mutateAsync,
+            store: { getWorkflow, setLastCommittedWorkflow, setCurrentVersionId },
             projectId: project.id,
             workflowId,
+            version,
             commitMessage,
-            dsl: {
-              ...getWorkflow(),
-              version,
-            },
-          });
-          versionId = versionResponse.id;
-          setLastCommittedWorkflow(getWorkflow());
-          setCurrentVersionId(versionId);
-          toaster.create({
-            title: "Version saved",
-            description: "New version has been saved successfully",
-            type: "success",
-          });
-        } catch (error) {
-          toaster.create({
-            error,
-            title: "Couldn't save the version",
-            type: "error",
-          });
-          throw error;
-        }
-      } else {
-        versionId = currentVersionId;
-      }
+          })
+        : currentVersionId;
 
       if (!versionId) {
         toaster.create({
@@ -424,62 +509,7 @@ export function OptimizeModalContent({
               </VStack>
             )}
           </VStack>
-          <Grid templateColumns="repeat(2, 1fr)" gap={5}>
-            {"num_candidates" in optimizer.params && (
-              <GridItem>
-                <VStack align="start" gap={2}>
-                  <HStack>
-                    <SmallLabel>Number of Candidate Prompts</SmallLabel>
-                    <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
-                      <Info size={16} />
-                    </Tooltip>
-                  </HStack>
-                  <Input
-                    {...form.register("params.num_candidates")}
-                    type="number"
-                    min={1}
-                    max={100}
-                  />
-                </VStack>
-              </GridItem>
-            )}
-            {"max_bootstrapped_demos" in optimizer.params && (
-              <GridItem>
-                <VStack align="start" width="full" gap={2}>
-                  <HStack>
-                    <SmallLabel>Max Bootstrapped Demos</SmallLabel>
-                    <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
-                      <Info size={16} />
-                    </Tooltip>
-                  </HStack>
-                  <Input
-                    {...form.register("params.max_bootstrapped_demos")}
-                    type="number"
-                    min={1}
-                    max={100}
-                  />
-                </VStack>
-              </GridItem>
-            )}
-            {"max_labeled_demos" in optimizer.params && (
-              <GridItem>
-                <VStack align="start" width="full" gap={2}>
-                  <HStack>
-                    <SmallLabel>Max Labeled Demos</SmallLabel>
-                    <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
-                      <Info size={16} />
-                    </Tooltip>
-                  </HStack>
-                  <Input
-                    {...form.register("params.max_labeled_demos")}
-                    type="number"
-                    min={1}
-                    max={100}
-                  />
-                </VStack>
-              </GridItem>
-            )}
-          </Grid>
+          <OptimizerParamsFields form={form} optimizerParams={optimizer.params} />
           {/* Max rounds field disabled */}
           {hasProvidersWithoutCustomKeys && (
             <AddModelProviderKey
