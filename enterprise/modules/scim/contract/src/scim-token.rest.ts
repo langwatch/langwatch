@@ -12,7 +12,7 @@ export const scimTokenRestSummarySchema = z.object({
   lastUsedAt: z.date().nullable(),
 });
 
-export const scimTokenIdParamsSchema = z.object({ scimTokenId: z.string().min(1) });
+export const scimTokenIdParamsSchema = z.object({ id: z.string().min(1) });
 
 export const scimTokenCreateRestInputSchema = z.object({
   description: z.string().trim().min(1).max(255).optional(),

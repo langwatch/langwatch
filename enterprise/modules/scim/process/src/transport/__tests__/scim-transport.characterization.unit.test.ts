@@ -49,7 +49,7 @@ describe("SCIM transport characterization", () => {
     expect(tokens.routes.map((route) => `${route.method} ${route.path}`)).toEqual([
       "get /",
       "post /",
-      "delete /:scimTokenId",
+      "delete /:id",
     ]);
     expect(tokens.routes.every((route) => route.permission === "organization:manage")).toBe(true);
   });

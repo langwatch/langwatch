@@ -30,9 +30,9 @@ describe("the api-keys REST declaration", () => {
       ).toEqual([
         ["get", "/", "listApiKeys", "organization:view"],
         ["post", "/", "createApiKey", "organization:manage"],
-        ["get", "/:apiKeyId", "getApiKey", "organization:view"],
-        ["patch", "/:apiKeyId", "updateApiKey", "organization:manage"],
-        ["delete", "/:apiKeyId", "revokeApiKey", "organization:manage"],
+        ["get", "/:id", "getApiKey", "organization:view"],
+        ["patch", "/:id", "updateApiKey", "organization:manage"],
+        ["delete", "/:id", "revokeApiKey", "organization:manage"],
       ]);
     });
 

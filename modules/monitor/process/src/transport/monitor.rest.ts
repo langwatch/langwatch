@@ -83,7 +83,7 @@ export function createMonitorsRest(): Readonly<{
         ),
       )
 
-      .get("/:monitorId", "getApiMonitorsById")
+      .get("/:id", "getApiMonitorsById")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:view")
       .withOutput(monitorRestResponseSchema)
@@ -97,7 +97,7 @@ export function createMonitorsRest(): Readonly<{
         monitorWire({
           app,
           projectSlug: project.projectSlug,
-          monitor: await app.getById({ id: input.monitorId, projectId: scope.id }),
+          monitor: await app.getById({ id: input.id, projectId: scope.id }),
         }),
       )
 
@@ -137,7 +137,7 @@ export function createMonitorsRest(): Readonly<{
         }),
       )
 
-      .patch("/:monitorId", "patchApiMonitorsById")
+      .patch("/:id", "patchApiMonitorsById")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
@@ -149,7 +149,7 @@ export function createMonitorsRest(): Readonly<{
       })
       .withMiddleware(projectRestFacts)
       .handle(async ({ app, input, scope }, project) => {
-        const { monitorId: id, ...changes } = input;
+        const { id, ...changes } = input;
 
         return monitorWire({
           app,
@@ -159,7 +159,7 @@ export function createMonitorsRest(): Readonly<{
       })
 
       // Enabling or disabling changes the monitor that already exists — an `:update`.
-      .post("/:monitorId/toggle", "postApiMonitorsByIdToggle")
+      .post("/:id/toggle", "postApiMonitorsByIdToggle")
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
@@ -170,13 +170,13 @@ export function createMonitorsRest(): Readonly<{
         responses: notFound,
       })
       .handle(async ({ app, input, scope }) => {
-        await app.toggle({ id: input.monitorId, projectId: scope.id, enabled: input.enabled });
+        await app.toggle({ id: input.id, projectId: scope.id, enabled: input.enabled });
 
-        return { id: input.monitorId, enabled: input.enabled };
+        return { id: input.id, enabled: input.enabled };
       })
 
       // Destruction deliberately stays at `:manage`.
-      .delete("/:monitorId", "deleteApiMonitorsById")
+      .delete("/:id", "deleteApiMonitorsById")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
       .withOutput(monitorRestDeletedSchema)
@@ -186,9 +186,9 @@ export function createMonitorsRest(): Readonly<{
         responses: notFound,
       })
       .handle(async ({ app, input, scope }) => {
-        await app.delete({ id: input.monitorId, projectId: scope.id });
+        await app.delete({ id: input.id, projectId: scope.id });
 
-        return { id: input.monitorId, deleted: true };
+        return { id: input.id, deleted: true };
       })
       .build()
   );

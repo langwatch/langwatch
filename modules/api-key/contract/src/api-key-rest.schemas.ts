@@ -36,7 +36,7 @@ const permissionModeSchema = z
   );
 
 /** The key named in the path of every by-id route. */
-export const apiKeyRestParamsSchema = z.object({ apiKeyId: z.string().min(1) });
+export const apiKeyRestParamsSchema = z.object({ id: z.string().min(1) });
 
 export const apiKeyRestCreateSchema = z
   .object({

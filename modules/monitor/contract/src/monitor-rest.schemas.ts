@@ -4,7 +4,7 @@ import { z } from "zod";
 import { monitorExecutionModeSchema, monitorMappingStateSchema } from "./monitor.ts";
 
 export const monitorRestIdParamsSchema = z.object({
-  monitorId: z.string().min(1).describe("The monitor id."),
+  id: z.string().min(1).describe("The monitor id."),
 });
 
 /** Optional and nullable as on main; a legacy `{}` reads as an empty mapping. */

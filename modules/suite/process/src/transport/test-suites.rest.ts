@@ -126,11 +126,11 @@ async function updateTestSuite(params: {
 }): Promise<z.infer<typeof testSuiteWireSchema>> {
   await readTestSuite({
     app: params.app,
-    id: params.input.testSuiteId,
+    id: params.input.id,
     projectId: params.projectId,
   });
   const suite = await params.app.updateTestSuite({
-    testSuiteId: params.input.testSuiteId,
+    testSuiteId: params.input.id,
     projectId: params.projectId,
     ...(params.input.name !== undefined && { name: params.input.name }),
     ...(params.input.fields !== undefined && { fields: params.input.fields }),
@@ -165,7 +165,7 @@ async function runTestSuite(params: {
   surface: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
-  await readTestSuite({ app, id: input.testSuiteId, projectId });
+  await readTestSuite({ app, id: input.id, projectId });
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
@@ -174,7 +174,7 @@ async function runTestSuite(params: {
     projectId,
     ...(input.name !== undefined && { name: input.name }),
     config: {
-      scope: { mode: "test_suites", testSuiteIds: [input.testSuiteId] },
+      scope: { mode: "test_suites", testSuiteIds: [input.id] },
       targets: input.targets,
       ...(input.repeatCount !== undefined && { repeatCount: input.repeatCount }),
       ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
@@ -256,7 +256,7 @@ export function createTestSuitesRest(): Readonly<{
       }),
     )
 
-    .get("/:testSuiteId", "getTestSuite")
+    .get("/:id", "getTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(testSuiteDetailWireSchema)
@@ -271,13 +271,13 @@ export function createTestSuitesRest(): Readonly<{
     .handle(({ app, input, scope }, project) =>
       readTestSuiteDetail({
         app,
-        id: input.testSuiteId,
+        id: input.id,
         projectId: scope.id,
         projectSlug: project.projectSlug,
       }),
     )
 
-    .patch("/:testSuiteId", "updateTestSuite")
+    .patch("/:id", "updateTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
@@ -298,7 +298,7 @@ export function createTestSuitesRest(): Readonly<{
       }),
     )
 
-    .delete("/:testSuiteId", "archiveTestSuite")
+    .delete("/:id", "archiveTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
     .withOutput(testSuiteArchiveResultSchema)
@@ -308,11 +308,9 @@ export function createTestSuitesRest(): Readonly<{
         "Archive a test suite. The scenarios filed in it are archived with it, in one step, because the suite is where they live.",
       responses: notFound,
     })
-    .handle(({ app, input, scope }) =>
-      archiveTestSuite({ app, id: input.testSuiteId, projectId: scope.id }),
-    )
+    .handle(({ app, input, scope }) => archiveTestSuite({ app, id: input.id, projectId: scope.id }))
 
-    .post("/:testSuiteId/run", "runTestSuite")
+    .post("/:id/run", "runTestSuite")
     .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)
     .withPermission("scenarios:create")

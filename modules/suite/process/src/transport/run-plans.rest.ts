@@ -153,7 +153,7 @@ async function rerunStoredPlan(params: {
   surface: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
-  const suite = await readPlan({ app, id: input.runPlanId, projectId });
+  const suite = await readPlan({ app, id: input.id, projectId });
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
@@ -230,7 +230,7 @@ export function createRunPlansRest(): Readonly<{
       runConfiguration({ app, input, projectId: scope.id, project, surface }),
     )
 
-    .get("/:runPlanId", "getRunPlan")
+    .get("/:id", "getRunPlan")
     .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(runPlanWireSchema)
@@ -245,11 +245,11 @@ export function createRunPlansRest(): Readonly<{
       planWire({
         app,
         projectSlug: project.projectSlug,
-        suite: await readPlan({ app, id: input.runPlanId, projectId: scope.id }),
+        suite: await readPlan({ app, id: input.id, projectId: scope.id }),
       }),
     )
 
-    .post("/:runPlanId/run", "rerunRunPlan")
+    .post("/:id/run", "rerunRunPlan")
     .withParams(runPlanIdParamsSchema)
     .withInput(rerunInputSchema)
     .withPermission("scenarios:create")
@@ -266,7 +266,7 @@ export function createRunPlansRest(): Readonly<{
       rerunStoredPlan({ app, input, projectId: scope.id, project, surface }),
     )
 
-    .delete("/:runPlanId", "archiveRunPlan")
+    .delete("/:id", "archiveRunPlan")
     .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:manage")
     .withOutput(runPlanArchiveResultSchema)
@@ -276,8 +276,6 @@ export function createRunPlansRest(): Readonly<{
         "Archive a run plan. The plan stops being listed and its run history is kept. The scenarios it referenced are left where they are.",
       responses: notFound,
     })
-    .handle(({ app, input, scope }) =>
-      archivePlan({ app, id: input.runPlanId, projectId: scope.id }),
-    )
+    .handle(({ app, input, scope }) => archivePlan({ app, id: input.id, projectId: scope.id }))
     .build();
 }

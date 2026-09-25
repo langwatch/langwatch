@@ -18,7 +18,7 @@ export const agentCacheRest = defineRestRouter(GatewayApi)
   .withNamespace("agent-cache")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: true })
-  .get("/api/agent-cache/:agentCacheName", "getApiAgentCacheByName")
+  .get("/api/agent-cache/:name", "getApiAgentCacheByName")
   .withParams(gatewayAgentCacheNameParamsSchema)
   .withPermission("agentCache:manage")
   .withOutput(gatewayAgentCacheEntrySchema)
@@ -29,9 +29,9 @@ export const agentCacheRest = defineRestRouter(GatewayApi)
     responses: canonicalBaseResponses,
   })
   .handle(({ app, input, scope }) =>
-    app.getAgentCacheEntry({ projectId: scope.id, name: input.agentCacheName }),
+    app.getAgentCacheEntry({ projectId: scope.id, name: input.name }),
   )
-  .put("/api/agent-cache/:agentCacheName", "putApiAgentCacheByName")
+  .put("/api/agent-cache/:name", "putApiAgentCacheByName")
   .withParams(gatewayAgentCacheNameParamsSchema)
   .withInput(gatewayAgentCacheWriteSchema)
   .withPermission("agentCache:manage")
@@ -44,12 +44,12 @@ export const agentCacheRest = defineRestRouter(GatewayApi)
   .handle(({ app, input, scope }) =>
     app.putAgentCacheEntry({
       projectId: scope.id,
-      name: input.agentCacheName,
+      name: input.name,
       value: input.value,
       ttlSeconds: input.ttl_seconds,
     }),
   )
-  .post("/api/agent-cache/:agentCacheName/claim", "postApiAgentCacheByNameClaim")
+  .post("/api/agent-cache/:name/claim", "postApiAgentCacheByNameClaim")
   .withParams(gatewayAgentCacheNameParamsSchema)
   .withInput(gatewayAgentCacheWriteSchema)
   .withPermission("agentCache:manage")
@@ -63,12 +63,12 @@ export const agentCacheRest = defineRestRouter(GatewayApi)
   .handle(({ app, input, scope }) =>
     app.claimAgentCacheEntry({
       projectId: scope.id,
-      name: input.agentCacheName,
+      name: input.name,
       value: input.value,
       ttlSeconds: input.ttl_seconds,
     }),
   )
-  .delete("/api/agent-cache/:agentCacheName", "deleteApiAgentCacheByName")
+  .delete("/api/agent-cache/:name", "deleteApiAgentCacheByName")
   .withParams(gatewayAgentCacheNameParamsSchema)
   .withPermission("agentCache:manage")
   .withOutput(gatewayAgentCacheDeletedSchema)
@@ -78,7 +78,7 @@ export const agentCacheRest = defineRestRouter(GatewayApi)
     responses: canonicalBaseResponses,
   })
   .handle(async ({ app, input, scope }) => {
-    await app.deleteAgentCacheEntry({ projectId: scope.id, name: input.agentCacheName });
-    return { name: input.agentCacheName, deleted: true };
+    await app.deleteAgentCacheEntry({ projectId: scope.id, name: input.name });
+    return { name: input.name, deleted: true };
   })
   .build();

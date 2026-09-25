@@ -197,7 +197,7 @@ const endUserSpendQuerySchema = z.object({
   virtual_key_id: z.string().min(1).max(100).optional(),
 });
 
-const endUserSpendParamsSchema = z.object({ endUserId: z.string().min(1) });
+const endUserSpendParamsSchema = z.object({ id: z.string().min(1) });
 
 // ── Response DTO schemas ───────────────────────────────────────────────
 // These mirror the shapes the handlers below return. Without them the
@@ -668,7 +668,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     };
   })
 
-  .get("/api/gateway/v1/end-users/:endUserId/spend", "getGatewayEndUserSpend")
+  .get("/api/gateway/v1/end-users/:id/spend", "getGatewayEndUserSpend")
   .withParams(endUserSpendParamsSchema)
   .withQuery(endUserSpendQuerySchema)
   .withPermission("gatewaySpend:view")
@@ -681,7 +681,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     responses: spendResponses,
   })
   .handle(async ({ app, input, scope }) => {
-    const endUserId = input.endUserId;
+    const endUserId = input.id;
     const now = nowInstant().epochMilliseconds;
     const fromMs = input.from ?? now - END_USER_WINDOWS[input.window];
     const toMs = input.to ?? now;

@@ -317,7 +317,7 @@ export const apiKeyRest: Readonly<{
     };
   })
 
-  .get("/:apiKeyId", "getApiKey")
+  .get("/:id", "getApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:view")
   .withOutput(apiKeyRestDetailSchema)
@@ -340,7 +340,7 @@ export const apiKeyRest: Readonly<{
   .handle(async ({ app, input, scope }, caller) =>
     detailOf(
       await app.getByIdForCaller({
-        id: input.apiKeyId,
+        id: input.id,
         organizationId: scope.id,
         callerUserId: caller.userId,
         callerCanReadAnyKey: await callerCanReadAnyKey({
@@ -352,7 +352,7 @@ export const apiKeyRest: Readonly<{
     ),
   )
 
-  .patch("/:apiKeyId", "updateApiKey")
+  .patch("/:id", "updateApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withInput(apiKeyRestUpdateSchema)
   .withPermission("organization:manage")
@@ -384,7 +384,7 @@ export const apiKeyRest: Readonly<{
     const isAdmin = await callerIsAdmin({ app, caller, organizationId: scope.id });
 
     await app.updateAsCaller({
-      id: input.apiKeyId,
+      id: input.id,
       callerUserId: caller.userId,
       callerIsAdmin: isAdmin,
       organizationId: scope.id,
@@ -400,7 +400,7 @@ export const apiKeyRest: Readonly<{
     // adminness alone decides the ownership branch.
     return detailOf(
       await app.getByIdForCaller({
-        id: input.apiKeyId,
+        id: input.id,
         organizationId: scope.id,
         callerUserId: caller.userId,
         callerCanReadAnyKey: isAdmin,
@@ -408,7 +408,7 @@ export const apiKeyRest: Readonly<{
     );
   })
 
-  .delete("/:apiKeyId", "revokeApiKey")
+  .delete("/:id", "revokeApiKey")
   .withParams(apiKeyRestParamsSchema)
   .withPermission("organization:manage")
   .withOutput(apiKeyRestRevokedSchema)
@@ -433,7 +433,7 @@ export const apiKeyRest: Readonly<{
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.
     await app.revoke({
-      id: input.apiKeyId,
+      id: input.id,
       callerUserId: caller.userId,
       callerIsAdmin: await callerIsAdmin({ app, caller, organizationId: scope.id }),
       organizationId: scope.id,
