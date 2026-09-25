@@ -80,7 +80,7 @@ describe("auth.signUpEnrollment", () => {
     expect(localSignUpDecision).toHaveBeenCalledWith("Sam@Example.com");
   });
 
-  describe("given an installation with no email provider", () => {
+  describe("when the installation has no email provider", () => {
     beforeEach(() => {
       hasEmailProvider.mockReturnValue(false);
       isEmailUnconfigured.mockReturnValue(true);
@@ -139,7 +139,7 @@ describe("auth.signUpEnrollment", () => {
     });
   });
 
-  describe("given an installation that can send email", () => {
+  describe("when the installation can send email", () => {
     /** @scenario "An unconfirmed address proof is refused once the installation can send email" */
     it("refuses an unconfirmed proof", async () => {
       validateAddressProof.mockResolvedValue(false);

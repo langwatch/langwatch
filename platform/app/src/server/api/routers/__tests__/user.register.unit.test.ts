@@ -262,7 +262,7 @@ describe("userRouter.register()", () => {
     });
   });
 
-  describe("given an installation with no email provider", () => {
+  describe("when the installation has no email provider", () => {
     beforeEach(() => {
       hasEmailProviderMock.mockReturnValue(false);
       isEmailUnconfiguredMock.mockReturnValue(true);
@@ -321,7 +321,7 @@ describe("userRouter.register()", () => {
     });
   });
 
-  describe("given an installation that can send email again", () => {
+  describe("when the installation can send email again", () => {
     /** @scenario "An unconfirmed address proof is refused once the installation can send email" */
     it("refuses an unconfirmed proof without spending it", async () => {
       claimAddressProofMock.mockResolvedValue(false);
