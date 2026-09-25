@@ -128,8 +128,8 @@ export type AnnotationApiQueueBySlugOrIdInput = z.infer<
 export const annotationApiOptimizedQueuesInputSchema = z.object({
   projectId: z.string(),
   selectedAnnotations: annotationQueueItemStatusSchema,
-  pageSize: z.number().int().min(1).max(ANNOTATION_PAGE_SIZE_MAX),
-  pageOffset: z.number(),
+  pageSize: z.number().int().min(1).max(ANNOTATION_PAGE_SIZE_MAX).default(25),
+  pageOffset: z.number().int().min(0).default(0),
   queueId: z.string().optional(),
   queueIds: z.array(z.string()).optional(),
   showQueueAndUser: z.boolean().optional(),

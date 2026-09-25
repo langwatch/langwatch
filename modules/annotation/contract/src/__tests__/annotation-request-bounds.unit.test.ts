@@ -33,3 +33,27 @@ describe("annotationApiOptimizedQueuesInputSchema.pageSize", () => {
     expect(input(1.5).success).toBe(false);
   });
 });
+
+describe("annotationApiOptimizedQueuesInputSchema paging", () => {
+  it("reads the first page of 25 when the caller names no page", () => {
+    const parsed = annotationApiOptimizedQueuesInputSchema.parse({
+      projectId: "p1",
+      selectedAnnotations: "pending",
+    });
+
+    expect(parsed.pageSize).toBe(25);
+    expect(parsed.pageOffset).toBe(0);
+  });
+
+  it("refuses a negative or fractional page offset", () => {
+    const offset = (pageOffset: number) =>
+      annotationApiOptimizedQueuesInputSchema.validate({
+        projectId: "p1",
+        selectedAnnotations: "pending",
+        pageOffset,
+      });
+
+    expect(offset(-1)).toBe(false);
+    expect(offset(1.5)).toBe(false);
+  });
+});

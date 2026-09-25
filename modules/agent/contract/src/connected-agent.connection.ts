@@ -12,6 +12,7 @@ import {
   callFrameSchema,
   cancelFrameSchema,
   deregisterFrameSchema,
+  refusedFrameSchema,
   registerFrameSchema,
   registeredFrameSchema,
   resultFrameSchema,
@@ -27,7 +28,7 @@ export type AgentConnectCredentials = z.infer<typeof agentConnectCredentialsSche
 
 export const agentConnectRegisterInputSchema = registerFrameSchema;
 export const agentConnectRegisterOutputSchema = z.object({
-  frame: registeredFrameSchema,
+  frame: z.union([registeredFrameSchema, refusedFrameSchema]),
   instanceToken: z.string().optional(),
 });
 export const agentConnectPollQuerySchema = z.object({

@@ -48,6 +48,9 @@ describe("annotation REST transport declaration", () => {
 
     expect(list?.output.validate({ data: [] })).toBe(true);
     expect(get?.output.validate({ data: { id: "annotation-1" } })).toBe(false);
-    expect(remove?.output.validate(void 0)).toBe(true);
+    expect(remove?.output.validate({ status: "success", message: "Annotation deleted." })).toBe(
+      true,
+    );
+    expect(remove?.output.validate(void 0)).toBe(false);
   });
 });

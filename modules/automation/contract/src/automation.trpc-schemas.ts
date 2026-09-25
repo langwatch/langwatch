@@ -66,7 +66,7 @@ export const automationApiActionParamsSchema = z.object({
   slackBotTokenSet: z.boolean().optional(),
   datasetId: z.string().optional(),
   datasetMapping: z
-    .object({ mapping: z.unknown(), expansions: z.array(z.string()).optional() })
+    .object({ mapping: z.unknown().optional(), expansions: z.array(z.string()).optional() })
     .optional(),
   annotators: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
   // ADR-040 SEND_WEBHOOK destination — the per-action provider schema
@@ -97,7 +97,7 @@ export const automationApiCreateInputSchema = z.object({
     datasetId: z.string().optional(),
     datasetMapping: z
       .object({
-        mapping: z.unknown(),
+        mapping: z.unknown().optional(),
         expansions: z.array(z.string()).optional(),
       })
       .optional(),

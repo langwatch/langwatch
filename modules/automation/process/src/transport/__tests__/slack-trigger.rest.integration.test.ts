@@ -49,7 +49,7 @@ describe("given the Slack alert door", () => {
       const response = await api.post("/api/trigger/slack", {
         slack_webhook: "https://hooks.slack.com/services/abc",
         name: "Billing alerts",
-        filters: { topics: ["billing"] },
+        filters: { "topics.topics": ["billing"] },
         alert_type: "CRITICAL",
       });
 
@@ -63,7 +63,7 @@ describe("given the Slack alert door", () => {
           action: "SEND_SLACK_MESSAGE",
           name: "Billing alerts",
           message: undefined,
-          filters: { topics: ["billing"] },
+          filters: { "topics.topics": ["billing"] },
           actionParams: { slackWebhook: "https://hooks.slack.com/services/abc" },
           alertType: "CRITICAL",
         },
@@ -76,6 +76,21 @@ describe("given the Slack alert door", () => {
       const api = mount();
 
       const response = await api.post("/api/trigger/slack", { name: "No webhook" });
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({ code: "validation_error" });
+      expect(api.created).toEqual([]);
+    });
+
+    it("refuses a filter on a field traces cannot be filtered by", async () => {
+      const api = mount();
+
+      const response = await api.post("/api/trigger/slack", {
+        slack_webhook: "https://hooks.slack.com/services/abc",
+        name: "Billing alerts",
+        filters: { topics: ["billing"] },
+        alert_type: "CRITICAL",
+      });
 
       expect(response.status).toBe(422);
       expect(await response.json()).toMatchObject({ code: "validation_error" });

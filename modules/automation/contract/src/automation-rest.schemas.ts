@@ -5,6 +5,8 @@
  */
 import { z } from "zod";
 
+import { automationFiltersSchema } from "./automation-filters.ts";
+
 /** The four actions the REST family can create. It carries no webhook shape. */
 export const automationRestActionSchema = z.enum([
   "SEND_EMAIL",
@@ -70,8 +72,7 @@ export const slackAutomationRestInputSchema = z.object({
   slack_webhook: z.string().url().describe("Incoming webhook URL the alert is posted to"),
   name: z.string().describe("How the trigger is listed in the app"),
   message: z.string().optional().describe("Extra line included with each alert"),
-  filters: z
-    .record(z.string(), z.unknown())
+  filters: automationFiltersSchema
     .default({})
     .describe("Which traces the trigger fires on. An empty object fires on all of them."),
   alert_type: automationRestAlertTypeSchema,

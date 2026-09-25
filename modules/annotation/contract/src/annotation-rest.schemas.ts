@@ -29,3 +29,9 @@ export const annotationRestResponseSchema = z.object({ data: annotationRestRecor
 export const annotationRestListResponseSchema = z.object({
   data: z.array(annotationRestRecordSchema),
 });
+
+/** The acknowledgement `DELETE /api/annotations/:id` has always answered with. */
+export const annotationRestDeletedSchema = z.object({
+  status: z.string(),
+  message: z.string(),
+});
