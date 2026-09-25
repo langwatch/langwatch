@@ -11,6 +11,8 @@ import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
 import { EntitlementApi, isEnterpriseTier } from "@langwatch/entitlement-contract";
 import {
+  type AccountIdentifier,
+  type EmailIdentifierAdded,
   IdentityApi,
   IdentityCapabilityUnavailableError,
   identityConfig,
@@ -25,6 +27,7 @@ import {
   type LookupOperatorActivityRow,
   type LookupPersonDetail,
   type IdentityServerConfig,
+  type MethodsLastUsed,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
@@ -35,6 +38,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import { addressConfirmationMailChannels } from "../channels/address-confirmation-mail-channels.registry.ts";
 import { joinRequestNotificationMailChannels } from "../channels/join-request-notification-mail-channels.registry.ts";
 import { LoggedSsoBreakGlassWarningChannel } from "../channels/sso-break-glass-warning.channel.ts";
 import {
@@ -68,6 +72,7 @@ import type {
 } from "../rules/join-requests-contract.rules.ts";
 import type { SsoArrivalMemberships } from "../rules/sso-arrival-contract.rules.ts";
 import { newSsoBreakGlassBindingId } from "../rules/sso-connection-id.rules.ts";
+import { AccountIdentifiersService } from "../services/account-identifiers.service.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
 import { IdentityBackfillPlanService } from "../services/identity-backfill-plan.service.ts";
 import { IdentityBackfillService } from "../services/identity-backfill.service.ts";
@@ -168,6 +173,7 @@ type IdentityAppParts = {
   reservations: IdentityRepositories["reservations"];
   identity: IdentityService;
   verification: VerificationCeremonyService;
+  accountIdentifiers: AccountIdentifiersService;
   newbornSweep: IdentityNewbornReconciliationService;
   backfill: IdentityBackfillService;
   secrets: IdentitySecretCarryService;
@@ -623,6 +629,17 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
       reservations,
       identity,
       verification,
+      accountIdentifiers: AccountIdentifiersService.create({
+        heads: setup.repositories.heads,
+        identity,
+        ceremony: verification,
+        mail: addressConfirmationMailChannels.ses.create({
+          mailer: setup.members.mail,
+          baseUrl: setup.members.publicBaseUrl ?? "",
+        }),
+        rateLimiter: setup.members.rateLimiter,
+        sessions: setup.dependencies.auth,
+      }),
       newbornSweep,
       backfill,
       secrets,
@@ -754,6 +771,34 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi {
     codeVerifier: string;
   }): Promise<void> {
     return this.#parts.verification.completeEmailVerification(input);
+  }
+
+  listAccountIdentifiers(input: { userId: string }): Promise<AccountIdentifier[]> {
+    return this.#parts.accountIdentifiers.listIdentifiers(input);
+  }
+
+  addEmailIdentifier(input: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<EmailIdentifierAdded> {
+    return this.#parts.accountIdentifiers.addEmailIdentifier(input);
+  }
+
+  resendIdentifierConfirmation(input: {
+    userId: string;
+    identifierId: string;
+    codeChallenge: string;
+  }): Promise<void> {
+    return this.#parts.accountIdentifiers.resendConfirmation(input);
+  }
+
+  removeIdentifier(input: { userId: string; identifierId: string }): Promise<void> {
+    return this.#parts.accountIdentifiers.removeIdentifier(input);
+  }
+
+  getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed> {
+    return this.#parts.accountIdentifiers.getMethodsLastUsed(input);
   }
 
   guards(): IdentityGuardsService {

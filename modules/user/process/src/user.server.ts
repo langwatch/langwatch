@@ -4,7 +4,6 @@ import type { MePersonalCredential } from "@langwatch/user-contract";
 
 import { UserApp } from "./app/user.app.ts";
 import { userRepositories } from "./repositories/user-repositories.registry.ts";
-import { identityTrpcTransport } from "./transport/identity.trpc.ts";
 import { mePersonalCredential, meRest } from "./transport/me.rest.ts";
 import { userAvatarRest } from "./transport/user-avatar.rest.ts";
 import { userTrpcTransport } from "./transport/user.trpc.ts";
@@ -12,7 +11,7 @@ import { userTrpcTransport } from "./transport/user.trpc.ts";
 export const userServer = defineServerModule("user")
   .withRepositories(userRepositories)
   .withApp(UserApp)
-  .withTransports(meRest, userAvatarRest, userTrpcTransport, identityTrpcTransport)
+  .withTransports(meRest, userAvatarRest, userTrpcTransport)
   // The credential whole rather than in pieces: a personal-usage answer is
   // refused for a key that is not the asking member's own, and the door's
   // answer is the only place that can be read from.

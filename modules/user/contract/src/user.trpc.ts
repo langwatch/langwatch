@@ -27,7 +27,6 @@ import {
 import {
   userApiBudgetOverviewInputSchema,
   userApiChangePasswordInputSchema,
-  userApiCompleteVerificationInputSchema,
   userApiEmptyInputSchema,
   userApiEndBrowserSessionInputSchema,
   userApiOrganizationInputSchema,
@@ -43,12 +42,10 @@ import {
 } from "./user.schemas.ts";
 import {
   createdUserSchema,
-  identityVerificationCompletedSchema,
   userAccountInfoSchema,
   userSecureAccountOfferSchema,
   userAvatarResultSchema,
   userSsoStatusSchema,
-  userTestArrivalSchema,
   userTourPreferenceSchema,
 } from "./user.ts";
 
@@ -174,19 +171,4 @@ export const userTrpc = defineTrpcContract("user")
   .query("cliBootstrap")
   .withInput(userApiOrganizationInputSchema)
   .withOutput(cliBootstrapResultSchema)
-  .build();
-
-/**
- * Spending an email verification ceremony for the session user's own record.
- * The user module declares it because it acts on the caller's own account.
- * Spec: specs/identity/identifier-model.feature.
- */
-export const identityTrpc = defineTrpcContract("identity")
-  .mutation("completeVerification")
-  .withInput(userApiCompleteVerificationInputSchema)
-  .withOutput(identityVerificationCompletedSchema)
-
-  .query("myTestArrival")
-  .withInput(userApiEmptyInputSchema)
-  .withOutput(userTestArrivalSchema)
   .build();

@@ -2,6 +2,11 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type {
+  AccountIdentifier,
+  EmailIdentifierAdded,
+  MethodsLastUsed,
+} from "./account-identifiers.ts";
+import type {
   BreakGlassBinding,
   BreakGlassCandidateView,
   BreakGlassGrantView,
@@ -704,6 +709,24 @@ export interface IdentityApi {
     token: string;
     codeVerifier: string;
   }): Promise<void>;
+  /** Every live way into the account, with what the detach guard would say about losing each. */
+  listAccountIdentifiers(input: { userId: string }): Promise<AccountIdentifier[]>;
+  /** Attaches an address unverified and mails its confirmation link; 10 an hour per user. */
+  addEmailIdentifier(input: {
+    userId: string;
+    email: string;
+    codeChallenge: string;
+  }): Promise<EmailIdentifierAdded>;
+  /** A fresh confirmation ceremony for an unconfirmed address; 10 an hour per user. */
+  resendIdentifierConfirmation(input: {
+    userId: string;
+    identifierId: string;
+    codeChallenge: string;
+  }): Promise<void>;
+  /** Gives up a way in, demoting a primary first; the detach guard decides. */
+  removeIdentifier(input: { userId: string; identifierId: string }): Promise<void>;
+  /** When each sign-in method last minted a session, read from the user's sessions. */
+  getMethodsLastUsed(input: { userId: string }): Promise<MethodsLastUsed>;
   /** Operations, not properties: a module boundary carries callable members only. */
   guards(): IdentityGuardsApi;
   mfaGuards(): MfaGuardsApi;

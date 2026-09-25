@@ -39,6 +39,9 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {

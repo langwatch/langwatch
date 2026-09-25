@@ -5,7 +5,8 @@
  */
 
 import type { AgentType } from "@langwatch/agent-contract";
-import { createModuleApi } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { identityTrpc } from "@langwatch/identity-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
 
 export type NavigationHomeResolution = {
@@ -15,7 +16,7 @@ export type NavigationHomeResolution = {
   governanceUiEnabled: boolean;
 };
 
-export type NavigationApiMap = {
+export type NavigationApiMap = ContractApiMap<typeof identityTrpc> & {
   organization: {
     /**
      * The workspace graph the switcher offers and the landing decision reads.
@@ -151,15 +152,6 @@ export type NavigationApiMap = {
     /** Whether the reader still owes their organization an SSO link. */
     getSsoStatus: {
       query: { input: Record<string, never>; output: { pendingSsoSetup?: boolean } };
-    };
-  };
-  identity: {
-    /** Whether a reader with no organization is back from testing an SSO connection. */
-    myTestArrival: {
-      query: {
-        input: Record<string, never>;
-        output: { testing: true; organizationName: string } | { testing: false };
-      };
     };
   };
 

@@ -275,6 +275,7 @@ export const APP_ERROR_CODES = [
   "identity_email_in_use",
   "identity_engine_unavailable",
   "identity_erased",
+  "identity_identifier_already_held",
   "identity_identifier_not_found",
   "identity_identifier_not_verifiable",
   "identity_jit_disabled",

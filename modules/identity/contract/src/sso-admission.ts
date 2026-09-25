@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { SsoAssertionRefusedError } from "./identity.errors.ts";
 
 /** The person arriving, as every step of an admission names them. */
@@ -37,14 +39,18 @@ export type SsoAssertionDecision = Readonly<{ action: "continue" }> | SsoAsserti
  * gone live, named so a screen can say which organization was being proved.
  * A union rather than a nullable, so "not a tester" is an answer.
  */
-export type SsoTestArrivalStanding =
-  | Readonly<{
-      testing: true;
-      connectionId: string;
-      organizationId: string;
-      organizationName: string;
-    }>
-  | Readonly<{ testing: false }>;
+export const ssoTestArrivalStandingSchema = z.discriminatedUnion("testing", [
+  z
+    .object({
+      testing: z.literal(true),
+      connectionId: z.string(),
+      organizationId: z.string(),
+      organizationName: z.string(),
+    })
+    .strict(),
+  z.object({ testing: z.literal(false) }).strict(),
+]);
+export type SsoTestArrivalStanding = z.infer<typeof ssoTestArrivalStandingSchema>;
 
 /** The answer for everybody who is not proving a connection. */
 export const NOT_A_TEST_ARRIVAL: SsoTestArrivalStanding = { testing: false };

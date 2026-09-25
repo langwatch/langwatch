@@ -95,3 +95,11 @@ Feature: The transactional messages LangWatch sends
     Given a fragment that is not valid encoded props
     When the studio decodes it
     Then it falls back to the fixture's own props
+
+  @unit
+  Scenario: An added address's confirmation says what happened, and where to finish it
+    Given somebody added a second email address to their own account
+    When its confirmation email is sent
+    Then it goes to that address, carrying the confirmation link
+    And it says the address was added as a way to sign in, not that an account was created
+    And it says to open the link in the browser the address was added from

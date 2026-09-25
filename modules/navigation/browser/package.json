@@ -37,6 +37,7 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

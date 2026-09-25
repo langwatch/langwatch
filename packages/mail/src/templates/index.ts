@@ -1,3 +1,4 @@
+import { addressConfirmationEmailTemplate } from "./address-confirmation-email.tsx";
 import { automationLimitEmailTemplate } from "./automation-limit-email.tsx";
 import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email.tsx";
 import { connectedStatementEmailTemplate } from "./connected-statement-email.tsx";
@@ -28,6 +29,7 @@ import { usageLimitEmailTemplate } from "./usage-limit-email.tsx";
  */
 export const mailTemplates: readonly MailTemplate[] = [
   signUpVerificationEmailTemplate,
+  addressConfirmationEmailTemplate,
   resetPasswordEmailTemplate,
   inviteEmailTemplate,
   inviteReRequestEmailTemplate,

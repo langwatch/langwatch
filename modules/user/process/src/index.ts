@@ -1,4 +1,3 @@
-export { identityTrpcTransport } from "./transport/identity.trpc.ts";
 export { mePersonalCredential, meRest } from "./transport/me.rest.ts";
 export { userAvatarCaller, userAvatarRest } from "./transport/user-avatar.rest.ts";
 export { userTrpcTransport } from "./transport/user.trpc.ts";

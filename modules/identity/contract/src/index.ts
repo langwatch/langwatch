@@ -126,6 +126,7 @@ export {
   type SsoAssertionRefusalReason,
   NOT_A_TEST_ARRIVAL,
   type SsoTestArrivalStanding,
+  ssoTestArrivalStandingSchema,
 } from "./sso-admission.ts";
 export { SSO_CREDENTIAL_KINDS, type SsoCredentialKind } from "./sso-credential.ts";
 export {
@@ -270,6 +271,7 @@ export {
   IdentityCommandRefusedError,
   IdentityDetachStrandsUserError,
   IdentityEmailInUseError,
+  IdentityIdentifierAlreadyHeldError,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityLinkProposalNotFoundError,
@@ -749,4 +751,6 @@ export {
 export * from "./identity.api.ts";
 export * from "./identity-lookup.ts";
 export * from "./identity-lookup.trpc.ts";
+export * from "./account-identifiers.ts";
+export * from "./identity.trpc.ts";
 export * from "./identity.config.ts";

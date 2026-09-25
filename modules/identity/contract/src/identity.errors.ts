@@ -25,6 +25,19 @@ export class IdentityIdentifierNotFoundError extends IdentityCommandRefusedError
   }
 }
 
+/** The address being added is already live on this account. Never raised for anybody else's
+ *  address, so it answers nothing about who holds one. */
+export class IdentityIdentifierAlreadyHeldError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_identifier_already_held", "identity_identifier_already_held", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityIdentifierAlreadyHeldError";
+  }
+}
+
 /** The proposal named is not one this person has, or the operator holds a stale page. */
 export class IdentityLinkProposalNotFoundError extends IdentityCommandRefusedError {
   constructor(detail: string) {

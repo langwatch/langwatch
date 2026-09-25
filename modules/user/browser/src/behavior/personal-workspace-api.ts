@@ -5,7 +5,8 @@
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
-import type { userTrpc, identityTrpc } from "@langwatch/user-contract";
+import type { identityTrpc } from "@langwatch/identity-contract";
+import type { userTrpc } from "@langwatch/user-contract";
 
 import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
 

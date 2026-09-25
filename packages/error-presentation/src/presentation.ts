@@ -2644,6 +2644,11 @@ const presentations = {
     describe: () =>
       "Your confirmation went through and we're finishing up. Open the same link again in a moment.",
   },
+  identity_identifier_already_held: {
+    title: "That address is already on your account",
+    describe: () =>
+      "You can already sign in with it. To add another way in, use a different address.",
+  },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
     describe: () => "Refresh the page to see your current sign-in methods, then try again.",
