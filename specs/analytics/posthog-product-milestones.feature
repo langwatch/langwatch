@@ -124,3 +124,15 @@ Feature: PostHog product milestones
     When the user copies every copyable element on every tab
     Then no emitted analytics payload contains the API key
     And no emitted analytics payload contains the copied text
+
+  @unit
+  Scenario: the first signal of the day tracks the project's active day
+    Given a project that has sent no signal today
+    When its first signal of the day arrives
+    Then project_active_day is tracked with the days since signup and the experiment property
+
+  @unit
+  Scenario: subsequent signals the same day do not re-track
+    Given a project whose active day is already tracked today
+    When another signal arrives the same day
+    Then nothing is tracked

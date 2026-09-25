@@ -302,3 +302,47 @@ Feature: LangWatchQL query workbench
     Scenario: Chart controls expose no unsafe embed actions
       When a chart renders
       Then source, compiled-spec, export, and open-in-editor actions are not exposed
+
+  Rule: The protections a query runs under are resolved from the caller, never defaulted open
+
+    @unit
+    Scenario: A member permitted every declared check sees costs and captured content
+      Given a member whose project grants every check the workbench declares
+      When the workbench resolves what that member may see
+      Then costs and the default policy's captured content are both visible
+
+    @unit
+    Scenario: A member denied every declared check sees neither costs nor captured content
+      Given a member whose project grants none of the checks the workbench declares
+      When the workbench resolves what that member may see
+      Then costs and captured content are both hidden
+
+    @unit
+    Scenario: A thrown data-privacy read hides captured content rather than defaulting it open
+      Given a member whose data-privacy policy read fails
+      When the workbench resolves what that member may see
+      Then captured content is hidden rather than shown by default
+
+    @unit
+    Scenario: A run-caller resolution for a missing project refuses rather than running as no one
+      Given a project that no longer exists
+      When the workbench resolves who a query runs as
+      Then it refuses with the project-not-found code
+
+    @unit
+    Scenario: A run-caller resolution for a live project returns its restricted identity and protections
+      Given a project that exists
+      When the workbench resolves who a query runs as
+      Then it returns the project's own restricted identity with the caller's protections
+
+    @unit
+    Scenario: A thrown data-privacy read hides captured content from an api key rather than defaulting it open
+      Given an api key whose project's data-privacy policy read fails
+      When the query surface resolves what that key may see
+      Then captured content is hidden rather than shown by default
+
+    @unit
+    Scenario: A restrict policy visible to members answers false for an api key, which is never a member
+      Given a project whose policy shows captured content to members only
+      When the query surface resolves what an api key may see
+      Then captured content is hidden, because an api key reads the public cut

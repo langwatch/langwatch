@@ -15,12 +15,23 @@ Feature: The background worker owns automation settlement
     Given a background worker composed from its own database, ClickHouse and mail
 
   @unit
-  Scenario: The worker mounts every automation routing key
-    When the composition root builds the automations pipeline
-    Then it registers every routing key the frozen job registry lists for it
-    And it registers no routing key the registry does not list
-    And the graph-alert sweep and the webhook delivery prune wake on their own
-      schedules while registering no routing key at all
+  Scenario: The worker hosts every automation routing key
+    Given a process that installs the automation module over memory stores
+    When the process boots in the worker role
+    Then it claims the trigger-match command and the settlement process manager
+    And it claims no other automation routing key
+
+  @unit
+  Scenario: The worker runs trigger settlement itself
+    Given a process that installs the automation module over memory stores
+    When the process boots in the worker role
+    Then no automation process manager is left unrun
+
+  @unit
+  Scenario: The api registers trigger settlement without running it
+    Given a process that installs the automation module over memory stores
+    When the process boots in the api role
+    Then the settlement process manager is named among those it will not run
 
   @unit
   Scenario: A settled match reaches its recipients from this process

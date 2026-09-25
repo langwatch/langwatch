@@ -262,7 +262,7 @@ describe("resolveApiKeyProtections", () => {
   });
 
   describe("given a scoped api key granted cost:view", () => {
-    /** @scenario "A scoped api key granted cost:view sees costs" */
+    /** @scenario "A key carrying the cost grant reads the query surface with costs" */
     it("sees costs, asked through the credential's own scope", async () => {
       const { authz, hasApiKeyPermission } = authzApiKeyAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
@@ -286,7 +286,7 @@ describe("resolveApiKeyProtections", () => {
   });
 
   describe("given a scoped api key denied cost:view", () => {
-    /** @scenario "A scoped api key denied cost:view does not see costs" */
+    /** @scenario "A key without the cost grant reads the query surface with costs redacted" */
     it("does not see costs", async () => {
       const { authz } = authzApiKeyAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);

@@ -427,3 +427,32 @@ Feature: Customer.io nurturing integration
     Given a user completes onboarding with no attribution data
     When the onboarding flow completes
     Then the user traits sent to Customer.io do not include lead_source, utm_source, utm_medium, utm_campaign, utm_term, utm_content, or referrer keys
+
+  # ============================================================================
+  # Login backfill: a user who signed up before nurturing existed is synced once
+  # ============================================================================
+
+  @unit
+  Scenario: the first login backfill sends the full identify call
+    Given a user in an organization who has not been synced since this process started
+    When they log in
+    Then Customer.io receives the identify call with email, name and adoption traits
+
+  @unit
+  Scenario: a second login within the process lifetime skips the sync entirely
+    Given a user already synced since this process started
+    When they log in again
+    Then no profile is read and no Customer.io call is made
+
+  @unit
+  Scenario: a user the reader cannot find sends no Customer.io call
+    Given a user whose profile the reader cannot find
+    When they log in
+    Then no identify or group call is sent
+
+  @unit
+  Scenario: a profile-read failure never throws and clears the cache for a retry
+    Given a user whose profile read fails
+    When they log in
+    Then the login is not failed
+    And the user is cleared from the sync cache so the next login retries
