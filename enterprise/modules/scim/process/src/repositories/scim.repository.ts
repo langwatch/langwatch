@@ -9,6 +9,8 @@ import type {
 import type { Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
+import type { ScimTokenHashScheme } from "../rules/scim-token-digest.rules.ts";
+
 /** SCIM-owned persistence records. Prisma models do not cross this seam. */
 export type ScimUserRecord = UserProfile;
 /**
@@ -214,6 +216,7 @@ export abstract class ScimRepository extends ScimGrantRepository {
     organizationId: string;
     connectionId: string;
     hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
     description: string | null;
   }) => Promise<{ id: string }>;
   abstract findTokens(organizationId: string): Promise<ScimTokenRecord[]>;
@@ -226,7 +229,8 @@ export abstract class ScimRepository extends ScimGrantRepository {
     organizationId: string;
     connectionId: string;
   }): Promise<number>;
-  abstract findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
+  /** At most two rows; a token naming more than one authenticates nobody. */
+  abstract findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]>;
   abstract findTokenIdsForConnection(input: {
     organizationId: string;
     connectionId: string;

@@ -148,6 +148,7 @@ describe("SCIM PATCH operation casing parity", () => {
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     });
     await service.updateUser({
       id: "user-1",

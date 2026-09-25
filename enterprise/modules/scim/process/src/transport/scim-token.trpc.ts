@@ -36,6 +36,7 @@ export const scimTokenTrpcTransport = defineTrpcRouter(ScimApi, scimTokenTrpc)
       organizationId: input.organizationId,
       connectionId: input.connectionId,
       description: input.description,
+      secret: input.secret,
     }),
   )
 

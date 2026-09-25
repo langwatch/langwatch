@@ -89,6 +89,7 @@ function harness(
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: options.provenOffboarding ?? false,
+    tokenPepper: "scim-test-pepper",
   });
   if (options.membership !== void 0) {
     vi.mocked(repo.findMembership).mockResolvedValue(options.membership as never);

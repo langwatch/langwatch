@@ -119,6 +119,7 @@ function stack({ provenOffboarding, refuses }: { provenOffboarding: boolean; ref
       entitlements: new EnterprisePlan(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding,
+      tokenPepper: "scim-test-pepper",
     }),
   };
 }

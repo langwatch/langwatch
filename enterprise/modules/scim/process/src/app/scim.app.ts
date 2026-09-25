@@ -59,6 +59,7 @@ import {
   type RedriveRetiredApplyResult,
   type ScimOperator,
 } from "@langwatch/enterprise-scim-contract";
+import { scimTokenPepperSecrets } from "@langwatch/enterprise-scim-contract/token-pepper";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   EnterprisePlanRequiredError,
@@ -242,7 +243,7 @@ export class ScimApp implements ScimApiContract {
     operators: OpsApi,
   };
   static readonly config = scimConfig;
-  static readonly secrets = scimSecrets;
+  static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
   static readonly reads = reads();
 
   readonly #scim: ScimService;
@@ -281,6 +282,9 @@ export class ScimApp implements ScimApiContract {
   static async create(setup: ScimSetup): Promise<ScimApp> {
     const { dependencies, members, config, secrets, repositories } = setup;
     const auth0WebhookSecret = await secrets.into(scimSecrets.auth0WebhookSecret, (value) => value);
+    const tokenPepper = await secrets.into(ScimApp.secrets.tokenPepper, (credentials) =>
+      secrets.into(ScimApp.secrets.tokenPepperFallback, (session) => credentials ?? session),
+    );
     const scim = PostgresScimService.create({
       repository: repositories.scim,
       writer: dependencies.authorization,
@@ -290,6 +294,7 @@ export class ScimApp implements ScimApiContract {
       entitlements: dependencies.entitlements,
       lifecycle: members.lifecycle,
       provenOffboarding: config.provenOffboarding,
+      tokenPepper,
     });
 
     const connections = ScimConnectionsService.create(dependencies.identity);

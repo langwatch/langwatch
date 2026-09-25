@@ -65,6 +65,8 @@ export const generateScimTokenSchema = z.object({
   ...scimTokenScopeSchema.shape,
   description: z.string().optional(),
   connectionId: z.string().optional(),
+  /** A value the administrator already holds; floored by the service, capped here. */
+  secret: z.string().max(512).optional(),
 });
 
 /** Which of the organization's tokens is retired. */

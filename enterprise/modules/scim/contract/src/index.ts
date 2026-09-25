@@ -72,6 +72,8 @@ export {
   ScimConnectionRequiredError,
   ScimProtocolError,
   ScimTokenNotFoundError,
+  ScimTokenTooShortError,
+  ScimTokenUnavailableError,
   ScimWriteOutsideConnectionError,
 } from "./scim.errors.ts";
 export {

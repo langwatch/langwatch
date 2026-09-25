@@ -47,6 +47,7 @@ async function seed(directory: MemoryScimRepository) {
     organizationId: ORGANIZATION_ID,
     connectionId: LEGACY,
     hashedToken: "hash-1",
+    hashScheme: "hmac-sha256",
     description: null,
   });
   await directory.rememberDirectoryIdentity({
@@ -75,9 +76,9 @@ describe("when an update finishes and the previous connection's sync moves acros
 
     await finish();
 
-    await expect(directory.findTokenByHash("hash-1")).resolves.toMatchObject({
-      connectionId: REPLACEMENT,
-    });
+    await expect(directory.findTokensByHashes(["hash-1"])).resolves.toMatchObject([
+      { connectionId: REPLACEMENT },
+    ]);
     await expect(
       directory.findDirectoryUserId({ connectionId: REPLACEMENT, externalId: "ext-ana" }),
     ).resolves.toBe("user_ana");

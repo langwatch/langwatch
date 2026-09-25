@@ -26,6 +26,7 @@ export abstract class ScimService {
     organizationId: string;
     connectionId?: string | null;
     description?: string;
+    secret?: string;
   }): Promise<{ token: string; tokenId: string; connectionId: string }>;
   abstract listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]>;
   abstract revokeToken(input: {

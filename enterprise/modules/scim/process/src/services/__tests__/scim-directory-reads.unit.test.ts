@@ -141,6 +141,7 @@ function serviceOver(repository: ReturnType<typeof directory>) {
     entitlements: new EnterpriseEntitlements(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
+    tokenPepper: "scim-test-pepper",
   });
 }
 

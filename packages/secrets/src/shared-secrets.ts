@@ -7,6 +7,9 @@ import { Secret } from "./secret.ts";
 /** The browser-session key: auth builds sessions from it, automation signs unsubscribe links. */
 export const sessionSecret = Secret.load("NEXTAUTH_SECRET", { optional: true });
 
+/** The stored-credential key: stores seal with it, scim peppers directory token digests with it. */
+export const credentialsSecret = Secret.load("CREDENTIALS_SECRET", { optional: true });
+
 /** Signs calls to the gateway's internal surface: gateway checks, governance's OTTL signs. */
 export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", { optional: true });
 

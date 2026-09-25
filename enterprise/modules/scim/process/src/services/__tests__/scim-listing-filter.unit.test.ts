@@ -101,6 +101,7 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     }),
   };
 }

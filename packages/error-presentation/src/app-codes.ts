@@ -614,6 +614,8 @@ export const APP_ERROR_CODES = [
   "scim_protocol_refusal",
   "scim_sync_not_found",
   "scim_token_not_found",
+  "scim_token_too_short",
+  "scim_token_unavailable",
   "scim_write_outside_connection",
   "scope_input_mismatch",
   "scope_not_in_organization",

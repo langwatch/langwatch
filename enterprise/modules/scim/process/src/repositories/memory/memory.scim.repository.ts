@@ -7,6 +7,7 @@ import type {
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
+import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
   type ScimDirectoryIdentityRecord,
@@ -429,10 +430,12 @@ export class MemoryScimRepository extends ScimRepository {
     organizationId: string;
     connectionId: string;
     hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
     description: string | null;
   }): Promise<{ id: string }> => {
     const id = this.#nextId("scimtok");
-    this.tokens.push({ ...input, id, createdAt: toDate(this.now()), lastUsedAt: null });
+    const { hashScheme: _hashScheme, ...row } = input;
+    this.tokens.push({ ...row, id, createdAt: toDate(this.now()), lastUsedAt: null });
     return { id };
   };
 
@@ -520,9 +523,11 @@ export class MemoryScimRepository extends ScimRepository {
     this.directoryIdentities.splice(0, this.directoryIdentities.length, ...moved);
   }
 
-  async findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
-    const row = this.tokens.find((token) => token.hashedToken === hashedToken);
-    return row ? identityOf(row) : null;
+  async findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]> {
+    return this.tokens
+      .filter((token) => hashedTokens.includes(token.hashedToken))
+      .slice(0, 2)
+      .map(identityOf);
   }
 
   recordTokenUse = async (input: { tokenId: string; usedAt: Instant }): Promise<void> => {

@@ -2046,6 +2046,16 @@ const presentations = {
     describe: () =>
       "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
   },
+  scim_token_too_short: {
+    title: "That token is too short",
+    describe: () =>
+      "A token you choose yourself has to be at least 32 characters — it is the whole password your identity provider uses to reach us. Use a longer one, or let us generate it.",
+  },
+  scim_token_unavailable: {
+    title: "Choose a different token value",
+    describe: () =>
+      "That value cannot be used. Pick a different one, or let us generate a token for you.",
+  },
   scim_apply_not_redrivable: {
     title: "That operation cannot be sent through again",
     describe: () =>

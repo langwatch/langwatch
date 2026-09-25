@@ -4,6 +4,7 @@ export { REDACTED, secretLogRedactPaths } from "./redact.ts";
 export { ScopedSecrets, SecretsResolver } from "./resolver.ts";
 export { Secret, SecretHandle, type SecretSchema } from "./secret.ts";
 export {
+  credentialsSecret,
   gatewayInternalSecret,
   openAiApiKey,
   sessionSecret,

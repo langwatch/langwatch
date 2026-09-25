@@ -13,6 +13,7 @@ import {
 } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
+import type { ScimTokenHashScheme } from "../../rules/scim-token-digest.rules.ts";
 import {
   ScimRepository,
   type ScimGrantBindingScope,
@@ -545,6 +546,7 @@ export class PrismaScimRepository extends ScimRepository {
     organizationId: string;
     connectionId: string;
     hashedToken: string;
+    hashScheme: ScimTokenHashScheme;
     description: string | null;
   }): Promise<{ id: string }> => {
     return this.prisma.scimToken.create({ data: input, select: { id: true } });
@@ -631,10 +633,11 @@ export class PrismaScimRepository extends ScimRepository {
     });
   }
 
-  findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null> {
-    return this.prisma.scimToken.findFirst({
-      where: { hashedToken },
+  findTokensByHashes(hashedTokens: string[]): Promise<ScimTokenIdentity[]> {
+    return this.prisma.scimToken.findMany({
+      where: { hashedToken: { in: hashedTokens } },
       select: { id: true, organizationId: true, connectionId: true },
+      take: 2,
     });
   }
   // Arrow instance property to match the base class's property-typed

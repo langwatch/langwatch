@@ -82,6 +82,7 @@ export interface ScimApi {
     organizationId: string;
     connectionId?: string | undefined;
     description?: string | undefined;
+    secret?: string | undefined;
   }): Promise<IssuedScimToken>;
   /** Retires one token. Idempotent from the caller's side. */
   revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }>;

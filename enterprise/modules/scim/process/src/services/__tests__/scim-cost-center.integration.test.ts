@@ -113,6 +113,7 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
       entitlements: new EnterprisePlan(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     });
   };
 

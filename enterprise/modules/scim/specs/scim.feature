@@ -4,7 +4,7 @@ Feature: Enterprise SCIM package boundary
   @unit
   Scenario: Token values are stored only as hashes
     When an organization generates a SCIM token
-    Then the repository receives a SHA-256 hash rather than the token value
+    Then the repository receives an HMAC-SHA256 digest keyed on the deployment secret rather than the token value
 
   @unit
   Scenario: Entitlement is checked whenever a token is exercised
@@ -435,3 +435,39 @@ Feature: Enterprise SCIM package boundary
     Scenario: Every SCIM document publishes its schemas as a list of URNs
       When the SCIM API reference is generated
       Then every resource and collection declares schemas as an array of strings
+
+  Rule: Directory tokens hash as main hashed them, so no identity provider is cut off at deploy
+
+    @unit
+    Scenario: A token main minted under its keyed digest verifies
+      Given a token stored as HMAC-SHA256 keyed on CREDENTIALS_SECRET, falling back to NEXTAUTH_SECRET
+      When an identity provider presents it
+      Then verification succeeds for the token's organization
+
+    @unit
+    Scenario: A token minted before the keyed digest still verifies
+      Given a token stored as a bare SHA-256 digest
+      When an identity provider presents it
+      Then verification succeeds for the token's organization
+
+    @unit
+    Scenario: A presented token that names two rows authenticates nobody
+      Given one row stores a token's keyed digest and another row its bare digest
+      When an identity provider presents that token
+      Then verification reports invalid_token
+
+    @unit
+    Scenario: An administrator may supply the token value, stored only as a keyed digest
+      When an administrator mints a token with a secret of at least 32 characters
+      Then the answer is that secret and the repository receives only its HMAC-SHA256 digest
+
+    @unit
+    Scenario: A supplied token shorter than 32 characters is refused
+      When an administrator mints a token with a 31-character secret
+      Then minting is refused with scim_token_too_short and nothing is written
+
+    @unit
+    Scenario: A supplied token some existing token already hashes to is refused
+      Given a legacy token stored as the bare SHA-256 digest of a value
+      When an administrator mints a token with that value
+      Then minting is refused with scim_token_unavailable and nothing is written

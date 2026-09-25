@@ -52,6 +52,34 @@ export class ScimConnectionRequiredError extends HandledError {
   }
 }
 
+/** A token an administrator chose is shorter than a minted one is worth. */
+export class ScimTokenTooShortError extends HandledError {
+  declare readonly code: "scim_token_too_short";
+
+  constructor(minimum: number) {
+    super(
+      "scim_token_too_short",
+      `A directory token you choose yourself has to be at least ${minimum} characters`,
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "ScimTokenTooShortError";
+  }
+}
+
+/** A chosen value some token already hashes to; generic so it confirms nothing about its holder. */
+export class ScimTokenUnavailableError extends HandledError {
+  declare readonly code: "scim_token_unavailable";
+
+  constructor() {
+    super(
+      "scim_token_unavailable",
+      "That token value cannot be used. Choose a different one, or let LangWatch generate it",
+      { httpStatus: 409, fault: "customer" },
+    );
+    this.name = "ScimTokenUnavailableError";
+  }
+}
+
 export class ScimConnectionNotFoundError extends NotFoundError {
   declare readonly code: "scim_connection_not_found";
 

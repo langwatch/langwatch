@@ -18,15 +18,23 @@ import {
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
   ScimTokenNotFoundError,
+  ScimTokenTooShortError,
+  ScimTokenUnavailableError,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
 } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
 import type { ScimSyncLifecycle, ScimUserPushOperation } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
+import {
+  digestScimToken,
+  MINIMUM_SCIM_TOKEN_LENGTH,
+  scimTokenDigests,
+} from "../rules/scim-token-digest.rules.ts";
 import type { ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service.ts";
@@ -34,6 +42,8 @@ import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
 import { ScimRequestLogService } from "./scim-request-log.service.ts";
+
+const logger = createLogger("langwatch:scim:tokens");
 
 /**
  * Maps between SCIM 2.0 User resources and LangWatch User/OrganizationUser models.
@@ -57,6 +67,7 @@ export class ScimService extends ScimServiceContract {
   private readonly identities: ScimDirectoryIdentityService;
   private readonly lifecycle: ScimSyncLifecycle;
   private readonly requests: ScimRequestLogService;
+  private readonly tokenPepper: string | undefined;
 
   private constructor({
     prisma,
@@ -67,6 +78,7 @@ export class ScimService extends ScimServiceContract {
     entitlements,
     lifecycle,
     provenOffboarding,
+    tokenPepper,
   }: {
     prisma: ScimRepository;
     writer: AuthzGrantsService;
@@ -76,9 +88,11 @@ export class ScimService extends ScimServiceContract {
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
+    tokenPepper: string | undefined;
   }) {
     super();
     this.repository = prisma;
+    this.tokenPepper = tokenPepper;
     this.requests = ScimRequestLogService.create(prisma);
     this.identities = ScimDirectoryIdentityService.create(prisma);
     this.lifecycle = lifecycle;
@@ -111,6 +125,7 @@ export class ScimService extends ScimServiceContract {
     entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecycle;
     provenOffboarding: boolean;
+    tokenPepper: string | undefined;
   }): ScimService {
     return new ScimService(options);
   }
@@ -141,6 +156,7 @@ export class ScimService extends ScimServiceContract {
     organizationId: string;
     connectionId?: string | null;
     description?: string;
+    secret?: string;
   }): Promise<{ token: string; tokenId: string; connectionId: string }> {
     if (!input.connectionId) {
       throw new ScimConnectionRequiredError();
@@ -154,11 +170,23 @@ export class ScimService extends ScimServiceContract {
       throw new ScimConnectionNotFoundError(input.connectionId);
     }
 
-    const token = crypto.randomBytes(32).toString("hex");
+    if (input.secret !== undefined && input.secret.trim().length < MINIMUM_SCIM_TOKEN_LENGTH) {
+      throw new ScimTokenTooShortError(MINIMUM_SCIM_TOKEN_LENGTH);
+    }
+
+    const token = input.secret?.trim() ?? crypto.randomBytes(32).toString("hex");
+    const pepper = this.tokenHashKey();
+    // Both digests: a legacy sha256 row and a new HMAC row must never name one value.
+    const taken = await this.repository.findTokensByHashes(scimTokenDigests({ token, pepper }));
+    if (taken.length > 0) {
+      throw new ScimTokenUnavailableError();
+    }
+
     const stored = await this.repository.createToken({
       organizationId: input.organizationId,
       connectionId: input.connectionId,
-      hashedToken: this.hashToken(token),
+      hashedToken: digestScimToken({ token, scheme: "hmac-sha256", pepper }),
+      hashScheme: "hmac-sha256",
       description: input.description ?? null,
     });
     await this.lifecycle.tokenIssued({
@@ -210,7 +238,13 @@ export class ScimService extends ScimServiceContract {
   }
 
   async verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
-    const stored = await this.repository.findTokenByHash(this.hashToken(input.token));
+    const matches = await this.repository.findTokensByHashes(
+      scimTokenDigests({ token: input.token, pepper: this.tokenHashKey() }),
+    );
+    if (matches.length > 1) {
+      logger.error({ rows: matches.length }, "a presented SCIM token names more than one row");
+    }
+    const stored = matches.length === 1 ? matches[0] : undefined;
     if (!stored) {
       return { status: "invalid_token" };
     }
@@ -238,8 +272,11 @@ export class ScimService extends ScimServiceContract {
     await this.repository.recordTokenUse({ tokenId: input.tokenId, usedAt: nowInstant() });
   }
 
-  private hashToken(token: string): string {
-    return crypto.createHash("sha256").update(token).digest("hex");
+  private tokenHashKey(): string {
+    if (!this.tokenPepper) {
+      throw new Error("CREDENTIALS_SECRET (or NEXTAUTH_SECRET) must be set to hash SCIM tokens");
+    }
+    return this.tokenPepper;
   }
 
   /**

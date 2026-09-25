@@ -52,6 +52,7 @@ function service(repo: ScimRepository): ScimService {
     entitlements: new FixedEntitlementService(),
     lifecycle: new QuietScimSyncLifecycle(),
     provenOffboarding: false,
+    tokenPepper: "scim-test-pepper",
   });
 }
 

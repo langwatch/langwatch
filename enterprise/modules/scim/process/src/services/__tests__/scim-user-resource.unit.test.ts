@@ -219,6 +219,7 @@ function directory(store: DirectoryStore) {
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     }),
   };
 }
@@ -473,6 +474,7 @@ describe("the organization's own directory resource", () => {
       entitlements: new EnterpriseEntitlements(),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     });
 
     expect(

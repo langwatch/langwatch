@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 
 import type { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -26,7 +26,7 @@ function repository(overrides: Partial<ScimRepository> = {}): ScimRepository {
     revokeTokensForConnection: vi.fn(async () => 0),
     findTokenIdsForConnection: vi.fn(async () => []),
     moveDirectoryToConnection: vi.fn(async () => undefined),
-    findTokenByHash: vi.fn(async () => null),
+    findTokensByHashes: vi.fn(async () => []),
     recordTokenUse: vi.fn(async () => undefined),
     scimConnectionExists: vi.fn(async () => true),
     findDirectoryUserId: vi.fn(async () => null),
@@ -118,6 +118,7 @@ function service(
     entitlements: new FixedEntitlementService(enterprise),
     lifecycle,
     provenOffboarding: false,
+    tokenPepper: "scim-test-pepper",
   });
 }
 
@@ -135,11 +136,12 @@ describe("SCIM characterization: token lifecycle", () => {
           lastUsedAt: null,
         },
       ]),
-      findTokenByHash: vi.fn(async () => ({
-        id: "token_1",
-        organizationId: "org_1",
-        connectionId: "connection_1",
-      })),
+      findTokensByHashes: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([
+          { id: "token_1", organizationId: "org_1", connectionId: "connection_1" },
+        ]),
       revokeToken: vi.fn(async () => true),
     });
     const scim = service(repo);
@@ -152,7 +154,8 @@ describe("SCIM characterization: token lifecycle", () => {
     expect(repo.createToken).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: "org_1",
-        hashedToken: createHash("sha256").update(minted.token).digest("hex"),
+        hashedToken: createHmac("sha256", "scim-test-pepper").update(minted.token).digest("hex"),
+        hashScheme: "hmac-sha256",
       }),
     );
     expect(await scim.listTokens({ organizationId: "org_1" })).toEqual([
@@ -222,11 +225,9 @@ describe("SCIM characterization: token lifecycle", () => {
   /** @scenario "Entitlement is checked whenever a token is exercised" */
   it("distinguishes invalid credentials, lapsed plans, and unknown revocation", async () => {
     const repo = repository({
-      findTokenByHash: vi.fn(async () => ({
-        id: "token_1",
-        organizationId: "org_1",
-        connectionId: "connection_1",
-      })),
+      findTokensByHashes: vi.fn(async () => [
+        { id: "token_1", organizationId: "org_1", connectionId: "connection_1" },
+      ]),
     });
     expect(await service(repository()).verifyToken({ token: "bad" })).toEqual({
       status: "invalid_token",
@@ -314,6 +315,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       entitlements: new FixedEntitlementService(true),
       lifecycle: new QuietScimSyncLifecycle(),
       provenOffboarding: false,
+      tokenPepper: "scim-test-pepper",
     });
     await scim.createUser({
       organizationId: "org_1",
@@ -384,6 +386,7 @@ describe("SCIM characterization: provisioning invariants", () => {
           entitlements: new FixedEntitlementService(true),
           lifecycle,
           provenOffboarding: false,
+          tokenPepper: "scim-test-pepper",
         });
 
         await scim.createUser({
