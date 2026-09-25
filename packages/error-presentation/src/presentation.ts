@@ -2753,6 +2753,28 @@ const presentations = {
     describe: () =>
       "Set up two-step verification to continue here. You're still signed in, and your other organizations are unaffected.",
   },
+  identity_passkey_already_registered: {
+    title: "That passkey is already on your account",
+    describe: () =>
+      "You can sign in with it now. To add a different one, use another device or security key.",
+  },
+  identity_password_rejected: {
+    title: "That password wasn't accepted",
+    describe: () =>
+      "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_reset_link_invalid: {
+    // Expired, already spent and never issued collapse to one answer on purpose.
+    title: "That password reset link no longer works",
+    describe: () =>
+      "It may have expired or already been used. Request a new one and open the newest email.",
+  },
+  identity_sign_in_refused: {
+    // Never says which half was wrong: specs/auth/sign-in-failure-messages.feature.
+    title: "That email or password is wrong",
+    describe: () =>
+      "Check both and try again. If you have forgotten the password, reset it from the sign-in screen.",
+  },
   identity_passkey_ceremony_failed: {
     title: "That passkey attempt didn't finish",
     describe: () =>

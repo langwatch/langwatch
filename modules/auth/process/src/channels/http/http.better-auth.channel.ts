@@ -28,10 +28,7 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import {
-  isTwoFactorPath,
-  TWO_FACTOR_REFUSAL_CODES,
-} from "../../rules/better-auth-error-code.rules.ts";
+import { findRegisteredRefusals } from "../../rules/better-auth-error-code.rules.ts";
 import {
   findSubmittedAddresses,
   isLockoutCountedPath,
@@ -218,30 +215,32 @@ export async function countSignInAttempt({
 }
 
 /**
- * A two-factor refusal re-answered under its registered code, status and
- * headers kept, so the browser's registry has words for it (main's
- * handled-errors table). Server-side calls carry no request and stay untouched.
+ * A refusal on a translated route family re-answered under its registered code, status and
+ * headers kept, so the browser's registry has words for it (main's handled-errors table).
+ * Server-side calls carry no request and stay untouched.
  */
-export function answerTwoFactorRefusalByRegisteredCode(ctx: {
+export function answerAuthRefusalByRegisteredCode(ctx: {
   request?: { url?: string };
   context?: { returned?: unknown };
 }): void {
-  const pathname = normalizedRequestPathname(ctx.request?.url ?? "");
-  if (!isTwoFactorPath(pathname)) return;
+  const url = ctx.request?.url;
+  if (url === undefined) return;
 
   const returned = ctx.context?.returned;
   if (!(returned instanceof APIError)) return;
 
   const betterAuthCode = returned.body?.code;
-  const code =
-    betterAuthCode === undefined ? undefined : TWO_FACTOR_REFUSAL_CODES.get(betterAuthCode);
-  if (code === undefined) return;
+  if (betterAuthCode === undefined) return;
+
+  const pathname = normalizedRequestPathname(url);
+  const [refusal] = findRegisteredRefusals({ pathname, betterAuthCode });
+  if (refusal === undefined) return;
 
   logger.warn(
-    { path: pathname, betterAuthCode, code },
-    "a two-factor endpoint refused, and it is answered under its registered code",
+    { path: pathname, betterAuthCode, code: refusal.code },
+    "an auth endpoint refused, and it is answered under its registered code",
   );
-  throw APIError.from(returned.status, { code, message: code });
+  throw APIError.from(returned.status, { code: refusal.code, message: refusal.code });
 }
 
 /**
@@ -657,7 +656,7 @@ export const createAuthOptions = ({
      *  endpoint has already answered. */
     after: createAuthMiddleware(async (ctx) => {
       await countSignInAttempt({ ctx, signInLockout });
-      answerTwoFactorRefusalByRegisteredCode(ctx);
+      answerAuthRefusalByRegisteredCode(ctx);
     }),
   },
 });

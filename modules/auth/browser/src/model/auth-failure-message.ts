@@ -26,6 +26,7 @@ const CREDENTIAL_REJECTION_KEYS = new Set([
   "invalid_email_or_password",
   "credentialssignin",
   "user_not_found",
+  "identity_sign_in_refused",
 ]);
 
 /**

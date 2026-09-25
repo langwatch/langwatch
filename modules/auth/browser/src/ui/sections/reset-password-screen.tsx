@@ -52,7 +52,11 @@ function describeResetRefusal(error: {
 }): { message: string; linkIsDead: boolean } {
   const code = (error.code ?? "").toUpperCase();
   const message = (error.message ?? "").toLowerCase();
-  if (code.includes("TOKEN") || message.includes("token")) {
+  if (
+    code === "IDENTITY_RESET_LINK_INVALID" ||
+    code.includes("TOKEN") ||
+    message.includes("token")
+  ) {
     return { message: INVALID_LINK_MESSAGE, linkIsDead: true };
   }
   if (error.status === 429) {

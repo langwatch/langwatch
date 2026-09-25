@@ -7,10 +7,7 @@ import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/
 import { setSessionCookie } from "better-auth/cookies";
 import { describe, expect, it } from "vitest";
 
-import {
-  answerTwoFactorRefusalByRegisteredCode,
-  twoFactorPlugin,
-} from "../http.better-auth.channel.ts";
+import { answerAuthRefusalByRegisteredCode, twoFactorPlugin } from "../http.better-auth.channel.ts";
 
 const BASE = "http://localhost:3000/api/auth";
 
@@ -54,7 +51,7 @@ function twoStepHarness() {
     ],
     hooks: {
       after: createAuthMiddleware(async (ctx) => {
-        answerTwoFactorRefusalByRegisteredCode(ctx);
+        answerAuthRefusalByRegisteredCode(ctx);
       }),
     },
   });
@@ -134,7 +131,7 @@ describe("setting two-step verification up", () => {
   });
 });
 
-describe("answerTwoFactorRefusalByRegisteredCode", () => {
+describe("answerAuthRefusalByRegisteredCode", () => {
   /** @scenario "Too many wrong codes is refused as identity_mfa_locked_out" */
   it("re-answers better-auth's lockout at the status the endpoint chose", () => {
     const refused = APIError.from("TOO_MANY_REQUESTS", {
@@ -143,7 +140,7 @@ describe("answerTwoFactorRefusalByRegisteredCode", () => {
     });
     const answer = (() => {
       try {
-        answerTwoFactorRefusalByRegisteredCode({
+        answerAuthRefusalByRegisteredCode({
           request: { url: `${BASE}/two-factor/verify-totp` },
           context: { returned: refused },
         });
@@ -167,7 +164,7 @@ describe("answerTwoFactorRefusalByRegisteredCode", () => {
     });
 
     expect(() =>
-      answerTwoFactorRefusalByRegisteredCode({
+      answerAuthRefusalByRegisteredCode({
         request: { url: `${BASE}/change-password` },
         context: { returned: refused },
       }),
