@@ -199,14 +199,14 @@ function validateEvaluatorMappings({
   isPlanLevel?: boolean;
 }): void {
   for (const [input, mapping] of Object.entries(attachment.mappings)) {
-    const issue = scenarioMappingPathIssue({
+    const check = scenarioMappingPathIssue({
       mapping,
       ctx: { fields },
       isPlanLevel,
     });
-    if (issue) {
+    if (check.kind === "unreadable") {
       return rejectFlag(
-        `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${issue}`,
+        `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${check.reason}`,
       );
     }
   }

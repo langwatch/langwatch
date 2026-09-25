@@ -5,7 +5,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { Tooltip } from "../src/components/tooltip.tsx";
 import { TriggerAnchor } from "../src/components/trigger-anchor.tsx";
@@ -21,6 +21,20 @@ function renderTooltip(children: React.ReactNode) {
     </ChakraProvider>,
   );
 }
+
+// jsdom ships no ResizeObserver, and the tooltip's popper observes its anchor
+// once it opens, and keeps updating after the file's last test. Left stubbed:
+// the file's environment is torn down with it.
+beforeAll(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
 
 describe("given a tooltip wrapped around a trigger anchor", () => {
   describe("when the pointer rests on the control", () => {

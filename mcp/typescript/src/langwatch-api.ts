@@ -1,4 +1,5 @@
 import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-error";
+
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
 
@@ -173,12 +174,12 @@ const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "pro
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
     const parsed: unknown = JSON.parse(responseBody);
-    const envelope = asRecord(parsed);
-    if (envelope === null) return {};
+    if (!isRecord(parsed)) return {};
+    const envelope = parsed;
     // The canonical v1 envelope nests everything under `error`. Read the
     // nested object as the body so one parser serves both generations.
     const nestedValue = envelope.error;
-    const nested = asRecord(nestedValue) ? nestedValue : null;
+    const nested = isRecord(nestedValue) ? nestedValue : null;
     const body = nested ?? envelope;
     // `code` is the domain discriminant. The `error` fallback reads the
     // legacy envelope some non-framework families still send; the framework's
@@ -204,9 +205,8 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
   }
 }
 
-function asRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  return true;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function readErrorCode(body: Record<string, unknown>): string | undefined {
