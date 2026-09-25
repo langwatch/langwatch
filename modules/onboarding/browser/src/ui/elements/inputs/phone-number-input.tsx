@@ -47,17 +47,10 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
     onBlur,
   } = props;
 
-  const initialCountry: CountryCode = useMemo(() => {
-    if (value) {
-      const parsed = parsePhoneNumberFromString(value);
-
-      if (parsed?.country) return parsed.country;
-    }
-
-    return allowedCountries.includes(defaultCountry)
-      ? defaultCountry
-      : (allowedCountries[0] ?? defaultCountry);
-  }, [value, defaultCountry, allowedCountries]);
+  const initialCountry: CountryCode = useMemo(
+    () => pickInitialCountry({ value, defaultCountry, allowedCountries }),
+    [value, defaultCountry, allowedCountries],
+  );
 
   const [country, setCountry] = useState<CountryCode>(initialCountry);
   const [nationalInput, setNationalInput] = useState<string>("");
@@ -86,15 +79,7 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
     const formatted = formatNational(nationalInput.replace(/\D+/g, ""), next);
     setNationalInput(formatted);
 
-    const e164 = e164FromInput(formatted, next);
-    const valid = e164 ? isValidPhoneNumber(e164) : false;
-
-    onChange?.(e164, {
-      country: next,
-      national: parsedNational(formatted, next),
-      formatted,
-      isValid: Boolean(valid),
-    });
+    onChange?.(...describePhoneInput({ formatted, country: next }));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,54 +88,21 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
     setNationalInput(formatted);
     setHasUserInteracted(true);
 
-    const e164 = e164FromInput(formatted, country);
-    const valid = e164 ? isValidPhoneNumber(e164) : false;
-    onChange?.(e164, {
-      country,
-      national: parsedNational(formatted, country),
-      formatted,
-      isValid: Boolean(valid),
-    });
+    onChange?.(...describePhoneInput({ formatted, country }));
   };
 
   // Detect default country once on mount when enabled
   useEffect(() => {
-    if (!autoDetectDefaultCountry) return;
-    if (didDetectOnce) return;
-    if (value) return; // respect explicit value
-    if (props.defaultCountry !== void 0) return; // respect provided defaultCountry prop
-    if (hasUserInteracted) return;
-    if (nationalInput) return;
+    if (!autoDetectDefaultCountry || didDetectOnce) return;
+    // An explicit value or defaultCountry prop wins over detection.
+    if (value || props.defaultCountry !== void 0) return;
+    if (hasUserInteracted || nationalInput) return;
 
-    let cancelled = false;
+    const detected = detectAllowedCountry(allowedCountries);
+    if (!detected) return;
 
-    const choose = (c?: string) => {
-      if (cancelled || !c) return;
-
-      const candidate = (c || "").toUpperCase() as CountryCode;
-
-      if (!allowedCountries.includes(candidate)) return;
-
-      setCountry(candidate);
-      setDidDetectOnce(true);
-    };
-
-    const metaCountry = readMetaCountry();
-    if (metaCountry) {
-      choose(metaCountry);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const localeCountry = readLocaleCountry();
-    if (localeCountry) {
-      choose(localeCountry);
-    }
-
-    return () => {
-      cancelled = true;
-    };
+    setCountry(detected);
+    setDidDetectOnce(true);
   }, [
     autoDetectDefaultCountry,
     didDetectOnce,
@@ -185,30 +137,10 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
               },
             }}
           >
-            {(() => {
-              const renderOption = (code: CountryCode) => {
-                const calling = getCountryCallingCode(code);
-                const flag = countryCodeToFlagEmoji(code);
-                const countryName = countryCodeToName[code as keyof typeof countryCodeToName];
-                return (
-                  <option key={code} value={code}>
-                    {`${countryName} ${flag} (+${calling})`}
-                  </option>
-                );
-              };
-
-              if (groupFrequentlyUsedCountries) {
-                const { popular, others } = splitByPopularity(allowedCountries);
-                return (
-                  <>
-                    <optgroup label="Popular">{popular.map(renderOption)}</optgroup>
-                    <optgroup label="All countries">{others.map(renderOption)}</optgroup>
-                  </>
-                );
-              }
-
-              return allowedCountries.map(renderOption);
-            })()}
+            <CountryOptions
+              allowedCountries={allowedCountries}
+              grouped={groupFrequentlyUsedCountries}
+            />
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
@@ -239,6 +171,72 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
 }
 
 export default PhoneNumberInput;
+
+function CountryOptions({
+  allowedCountries,
+  grouped,
+}: {
+  allowedCountries: readonly CountryCode[];
+  grouped: boolean;
+}): React.JSX.Element {
+  if (!grouped) return <>{allowedCountries.map(renderCountryOption)}</>;
+
+  const { popular, others } = splitByPopularity(allowedCountries);
+  return (
+    <>
+      <optgroup label="Popular">{popular.map(renderCountryOption)}</optgroup>
+      <optgroup label="All countries">{others.map(renderCountryOption)}</optgroup>
+    </>
+  );
+}
+
+function renderCountryOption(code: CountryCode): React.JSX.Element {
+  const calling = getCountryCallingCode(code);
+  const flag = countryCodeToFlagEmoji(code);
+  const countryName = countryCodeToName[code as keyof typeof countryCodeToName];
+  return (
+    <option key={code} value={code}>
+      {`${countryName} ${flag} (+${calling})`}
+    </option>
+  );
+}
+
+function pickInitialCountry({
+  value,
+  defaultCountry,
+  allowedCountries,
+}: {
+  value: string | undefined;
+  defaultCountry: CountryCode;
+  allowedCountries: readonly CountryCode[];
+}): CountryCode {
+  const valueCountry = value ? parsePhoneNumberFromString(value)?.country : undefined;
+  if (valueCountry) return valueCountry;
+
+  return allowedCountries.includes(defaultCountry)
+    ? defaultCountry
+    : (allowedCountries[0] ?? defaultCountry);
+}
+
+function describePhoneInput({
+  formatted,
+  country,
+}: {
+  formatted: string;
+  country: CountryCode;
+}): Parameters<NonNullable<PhoneNumberInputProps["onChange"]>> {
+  const e164 = e164FromInput(formatted, country);
+  const valid = e164 ? isValidPhoneNumber(e164) : false;
+  return [
+    e164,
+    { country, national: parsedNational(formatted, country), formatted, isValid: Boolean(valid) },
+  ];
+}
+
+function detectAllowedCountry(allowedCountries: readonly CountryCode[]): CountryCode | undefined {
+  const detected = (readMetaCountry() || readLocaleCountry())?.toUpperCase();
+  return allowedCountries.find((code) => code === detected);
+}
 
 function formatNational(input: string, country: CountryCode): string {
   const formatter = new AsYouType(country);

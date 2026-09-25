@@ -8,7 +8,11 @@ import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react
 
 import { api } from "../../behavior/onboarding-api.ts";
 import { registerOnboardingExperiment } from "../../behavior/onboarding-experiment-registration.ts";
-import { type OnboardingAnalyticsSurface, OnboardingScreenIndex } from "../../behavior/types.ts";
+import {
+  type OnboardingAnalyticsSurface,
+  type OnboardingFormData,
+  OnboardingScreenIndex,
+} from "../../behavior/types.ts";
 import { useOnboardingFlow } from "../../behavior/use-onboarding-flow.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
@@ -147,6 +151,108 @@ function progressDotColor({ index, currentIndex }: { index: number; currentIndex
   return "gray.200";
 }
 
+/** Same-origin continuations only: a relative in-app path, never a protocol-relative URL. */
+function parseReturnTo(rawReturnTo: unknown): string | undefined {
+  if (typeof rawReturnTo !== "string") return undefined;
+  if (!rawReturnTo.startsWith("/") || rawReturnTo.startsWith("//")) return undefined;
+  return rawReturnTo;
+}
+
+function buildSignUpData({
+  form,
+  onboardingVariant,
+}: {
+  form: OnboardingFormData;
+  onboardingVariant: "guided" | "classic";
+}) {
+  // The governance track never shows the marketing screens, so its
+  // signUpData carries only terms + attribution. The LLMOps payload
+  // stays byte-identical to the pre-fork flow (ADR-038 I2).
+  if (form.intent === "AGENT_GOVERNANCE") {
+    return {
+      terms: form.agreement,
+      onboardingVariant,
+      ...form.attribution,
+    };
+  }
+  return {
+    onboardingVariant,
+    usage: form.usageStyle,
+    solution: form.solutionType,
+    terms: form.agreement,
+    companySize: form.companySize,
+    yourRole: form.role,
+    featureUsage: form.selectedDesires.join("\n"),
+    ...form.attribution,
+  };
+}
+
+function initializedLandingPath({
+  returnTo,
+  isGovernanceTrack,
+  projectSlug,
+}: {
+  returnTo: string | null;
+  isGovernanceTrack: boolean;
+  projectSlug: string | null | undefined;
+}): string {
+  // A pending continuation (CLI device approval) outranks both
+  // track landings: finish what the user actually came to do.
+  if (returnTo) return returnTo;
+  // Land via "/" so the home resolver applies the org-intent rule
+  // (including the kill-switch fallback) instead of hardcoding /me.
+  if (isGovernanceTrack) return "/";
+  // LLMOps signups always get a project; the null case is the
+  // governance track, which returned above.
+  const params = new URLSearchParams({ projectSlug: projectSlug ?? "" });
+  return `/onboarding/product?${params.toString()}`;
+}
+
+const SCREEN_SLIDE_VARIANTS = {
+  enter: (dir: number) => ({
+    opacity: 0,
+    x: dir > 0 ? 30 : -30,
+    filter: "blur(3px)",
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    filter: "blur(0px)",
+  },
+  exit: (dir: number) => ({
+    opacity: 0,
+    x: dir > 0 ? -30 : 30,
+    filter: "blur(3px)",
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    right: 0,
+  }),
+};
+
+function splitGuidedResume(resume: ReturnType<typeof resolveGuidedResume>) {
+  if (resume?.phase !== "landing") return { takeover: resume, landing: null };
+  return {
+    takeover: null,
+    landing: guidedPathLanding({ path: resume.landingPath, projectSlug: resume.projectSlug }),
+  };
+}
+
+function isLastWelcomeScreen({
+  currentVisibleIndex,
+  visibleCount,
+  variant,
+  isPublicEnvLoading,
+}: {
+  currentVisibleIndex: number;
+  visibleCount: number;
+  variant: string;
+  isPublicEnvLoading: boolean;
+}): boolean {
+  if (currentVisibleIndex < 0 || currentVisibleIndex !== visibleCount - 1) return false;
+  return variant !== "self_hosted" || !isPublicEnvLoading;
+}
+
 export const WelcomeScreen: React.FC = () => {
   const host = useOnboardingHost();
   const analytics = useUiAnalytics();
@@ -183,20 +289,12 @@ export const WelcomeScreen: React.FC = () => {
   // A guided organization whose takeover is unfinished resumes from the durable state instead of
   // being sent into the product; with the provider recorded, the resume is the landing.
   const resume = useMemo(() => resolveGuidedResume({ organizations }), [organizations]);
-  const takeover = resume?.phase === "landing" ? null : resume;
-  const landing =
-    resume?.phase === "landing"
-      ? guidedPathLanding({ path: resume.landingPath, projectSlug: resume.projectSlug })
-      : null;
+  const { takeover, landing } = splitGuidedResume(resume);
 
   // Same-origin continuation (e.g. the CLI device-approval page sends a
   // fresh signup here with return_to=/cli/auth?user_code=… so the approval
   // survives onboarding). Only relative in-app paths are honored.
-  const rawReturnTo = router.query.return_to;
-  const returnTo =
-    typeof rawReturnTo === "string" && rawReturnTo.startsWith("/") && !rawReturnTo.startsWith("//")
-      ? rawReturnTo
-      : null;
+  const returnTo = parseReturnTo(router.query.return_to) ?? null;
 
   useEffect(() => {
     // Nothing is decided while the org data loads, nor for the organization this page just
@@ -241,22 +339,7 @@ export const WelcomeScreen: React.FC = () => {
         // The governance track never shows the marketing screens, so its
         // signUpData carries only terms + attribution. The LLMOps payload
         // stays byte-identical to the pre-fork flow (ADR-038 I2).
-        signUpData: isGovernanceTrack
-          ? {
-              terms: form.agreement,
-              onboardingVariant,
-              ...form.attribution,
-            }
-          : {
-              onboardingVariant,
-              usage: form.usageStyle,
-              solution: form.solutionType,
-              terms: form.agreement,
-              companySize: form.companySize,
-              yourRole: form.role,
-              featureUsage: form.selectedDesires.join("\n"),
-              ...form.attribution,
-            },
+        signUpData: buildSignUpData({ form, onboardingVariant }),
       },
       {
         onSuccess: (response) => {
@@ -265,27 +348,13 @@ export const WelcomeScreen: React.FC = () => {
           // analytics is the application's, and a port method the host could only
           // answer with nothing is worse than its absence.
 
-          // A pending continuation (CLI device approval) outranks both
-          // track landings: finish what the user actually came to do.
-          if (returnTo) {
-            host.hardRedirect(returnTo);
-            return;
-          }
-
-          if (isGovernanceTrack) {
-            // Land via "/" so the home resolver applies the org-intent rule
-            // (including the kill-switch fallback) instead of hardcoding /me.
-            host.hardRedirect("/");
-            return;
-          }
-
-          // LLMOps signups always get a project; the null case is the
-          // governance track, which returned above.
-          const params = new URLSearchParams({
-            projectSlug: response.projectSlug ?? "",
-          });
-
-          host.hardRedirect(`/onboarding/product?${params.toString()}`);
+          host.hardRedirect(
+            initializedLandingPath({
+              returnTo,
+              isGovernanceTrack,
+              projectSlug: response.projectSlug,
+            }),
+          );
         },
         // Through the registry, not a hardcoded sentence. This threw the error away and told
         // everyone to "try again or contact support" — advice that cannot resolve a plan limit,
@@ -302,10 +371,12 @@ export const WelcomeScreen: React.FC = () => {
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
   const isFirstScreen = currentVisibleIndex <= 0;
-  const isLastScreen =
-    currentVisibleIndex >= 0 &&
-    currentVisibleIndex === flow.visibleScreens.length - 1 &&
-    (flow.variant !== "self_hosted" || !isPublicEnvLoading);
+  const isLastScreen = isLastWelcomeScreen({
+    currentVisibleIndex,
+    visibleCount: flow.visibleScreens.length,
+    variant: flow.variant,
+    isPublicEnvLoading,
+  });
 
   const screenSurface = {
     boundary: `${WELCOME_BOUNDARY}.${currentScreen?.id ?? "unknown"}`,
@@ -371,27 +442,7 @@ export const WelcomeScreen: React.FC = () => {
                 animate="center"
                 exit="exit"
                 layout
-                variants={{
-                  enter: (dir: number) => ({
-                    opacity: 0,
-                    x: dir > 0 ? 30 : -30,
-                    filter: "blur(3px)",
-                  }),
-                  center: {
-                    opacity: 1,
-                    x: 0,
-                    filter: "blur(0px)",
-                  },
-                  exit: (dir: number) => ({
-                    opacity: 0,
-                    x: dir > 0 ? -30 : 30,
-                    filter: "blur(3px)",
-                    position: "absolute" as const,
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                  }),
-                }}
+                variants={SCREEN_SLIDE_VARIANTS}
                 transition={{
                   duration: 0.3,
                   ease: [0.32, 0.72, 0, 1],

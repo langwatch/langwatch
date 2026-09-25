@@ -44,6 +44,25 @@ export function validatePasswordForm(
   return problems;
 }
 
+const DIALOG_COPY = {
+  set: {
+    title: "Set a password",
+    newPasswordLabel: "Password",
+    confirmLabel: "Confirm password",
+    submit: "Set password",
+    succeeded: "Password set",
+    failed: "Couldn't set your password",
+  },
+  change: {
+    title: "Change Password",
+    newPasswordLabel: "New Password",
+    confirmLabel: "Confirm New Password",
+    submit: "Change Password",
+    succeeded: "Password changed successfully",
+    failed: "Couldn't change your password",
+  },
+} as const;
+
 export function ChangePasswordDialog({
   open,
   onClose,
@@ -60,6 +79,7 @@ export function ChangePasswordDialog({
 }) {
   const host = usePersonalWorkspaceHost();
   const isSetting = mode === "set";
+  const copy = DIALOG_COPY[mode];
   const changePassword = api.user.changePassword.useMutation();
   const setPassword = api.user.setPassword.useMutation();
   const utils = api.useUtils();
@@ -79,6 +99,20 @@ export function ChangePasswordDialog({
     }
   }, [open]);
 
+  const savePassword = async () => {
+    if (!isSetting) {
+      await changePassword.mutateAsync({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      });
+      return;
+    }
+    await setPassword.mutateAsync({ password: values.newPassword });
+    // The section offered "Set a password" off this answer, so it has to be
+    // asked again — otherwise the button stays, for something now done.
+    await utils.user.hasPassword.invalidate();
+  };
+
   const submit = async () => {
     const found = validatePasswordForm(values, { isSetting });
     setProblems(found);
@@ -86,19 +120,9 @@ export function ChangePasswordDialog({
     if (Object.keys(found).length > 0) return;
 
     try {
-      if (isSetting) {
-        await setPassword.mutateAsync({ password: values.newPassword });
-        // The section offered "Set a password" off this answer, so it has to be
-        // asked again — otherwise the button stays, for something now done.
-        await utils.user.hasPassword.invalidate();
-      } else {
-        await changePassword.mutateAsync({
-          currentPassword: values.currentPassword,
-          newPassword: values.newPassword,
-        });
-      }
+      await savePassword();
       host.succeeded({
-        title: isSetting ? "Password set" : "Password changed successfully",
+        title: copy.succeeded,
       });
       onClose();
     } catch (error) {
@@ -116,7 +140,7 @@ export function ChangePasswordDialog({
       }
       host.failed({
         error,
-        fallbackTitle: isSetting ? "Couldn't set your password" : "Couldn't change your password",
+        fallbackTitle: copy.failed,
         // The one sentence this dialog cannot afford to lose: a 401 from
         // `changePassword` says WHICH password was wrong, and without it the
         // reader is told to try again in a moment for something that will never
@@ -138,7 +162,7 @@ export function ChangePasswordDialog({
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="md" fontWeight="500">
-            {isSetting ? "Set a password" : "Change Password"}
+            {copy.title}
           </Dialog.Title>
         </Dialog.Header>
         <form
@@ -190,7 +214,7 @@ export function ChangePasswordDialog({
                 </Field.Root>
               )}
               <Field.Root invalid={!!problems.newPassword}>
-                <Field.Label>{isSetting ? "Password" : "New Password"}</Field.Label>
+                <Field.Label>{copy.newPasswordLabel}</Field.Label>
                 <Input
                   type="password"
                   autoComplete="new-password"
@@ -202,7 +226,7 @@ export function ChangePasswordDialog({
                 {problems.newPassword && <Field.ErrorText>{problems.newPassword}</Field.ErrorText>}
               </Field.Root>
               <Field.Root invalid={!!problems.confirmPassword}>
-                <Field.Label>{isSetting ? "Confirm password" : "Confirm New Password"}</Field.Label>
+                <Field.Label>{copy.confirmLabel}</Field.Label>
                 <Input
                   type="password"
                   autoComplete="new-password"
@@ -226,7 +250,7 @@ export function ChangePasswordDialog({
                 Cancel
               </Button>
               <Button type="submit" colorPalette="orange" disabled={pending} loading={pending}>
-                {isSetting ? "Set password" : "Change Password"}
+                {copy.submit}
               </Button>
             </HStack>
           </Dialog.Footer>

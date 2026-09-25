@@ -6,6 +6,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { type ComponentType, createElement, forwardRef, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -132,6 +133,7 @@ import { WelcomeScreen } from "../welcome-screen.tsx";
 
 const flags: Record<string, boolean> = {};
 const failures: OnboardingFailureNotice[] = [];
+const hardRedirects: string[] = [];
 let organizations: OnboardingOrganization[] = [];
 
 class WelcomeTestHost extends OnboardingHostApi {
@@ -154,7 +156,9 @@ class WelcomeTestHost extends OnboardingHostApi {
   }
   navigate() {}
   replace() {}
-  hardRedirect() {}
+  hardRedirect(to: string) {
+    hardRedirects.push(to);
+  }
   setQuery() {}
   featureFlag(flag: string): OnboardingFlagReading {
     return { enabled: flags[flag] ?? false, isLoading: false };
@@ -259,9 +263,9 @@ describe("WelcomeScreen in the guided variant", () => {
         options.onSuccess?.({ organizationId: "org_new", projectSlug: "acme-proj" }),
       );
       await reachTailorStep();
-      fireEvent.click(usageRadio("Company"));
-      fireEvent.click(screen.getByRole("radio", { name: "11-50" }));
-      fireEvent.click(screen.getByRole("radio", { name: "Cloud" }));
+      await userEvent.click(screen.getByText("Company"));
+      await userEvent.click(await screen.findByRole("radio", { name: "11-50" }));
+      await userEvent.click(await screen.findByRole("radio", { name: "Cloud" }));
       fireEvent.click(next());
 
       expect(initializeOrganization).toHaveBeenCalledTimes(1);
@@ -292,16 +296,16 @@ describe("WelcomeScreen in the guided variant", () => {
         options.onError?.(new Error("plan_limit")),
       );
       await reachTailorStep();
-      fireEvent.click(usageRadio("Company"));
-      fireEvent.click(screen.getByRole("radio", { name: "1-10" }));
-      fireEvent.click(screen.getByRole("radio", { name: "Cloud" }));
+      await userEvent.click(screen.getByText("Company"));
+      await userEvent.click(await screen.findByRole("radio", { name: "1-10" }));
+      await userEvent.click(await screen.findByRole("radio", { name: "Cloud" }));
       fireEvent.click(next());
 
       expect(failures).toEqual([
         expect.objectContaining({ fallbackTitle: "Couldn't finish setting up your organization" }),
       ]);
       expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
-      expect(usageRadio("Company")).toHaveAttribute("aria-checked", "true");
+      expect(usageRadio("Company")).toBeChecked();
     });
   });
 
@@ -310,8 +314,10 @@ describe("WelcomeScreen in the guided variant", () => {
     it("leaves the tailor step without creating anything", async () => {
       flags.experiment_onboarding_langy_guided = false;
       await reachTailorStep();
-      fireEvent.click(usageRadio("Myself"));
+      await userEvent.click(screen.getByText("Myself"));
+      await waitFor(() => expect(next()).toBeEnabled());
       fireEvent.click(next());
+      await screen.findByText("What brings you to LangWatch?");
 
       expect(initializeOrganization).not.toHaveBeenCalled();
       expect(screen.queryByTestId("guided-takeover")).not.toBeInTheDocument();
@@ -391,6 +397,64 @@ describe("WelcomeScreen in the guided variant", () => {
         "data-return-to",
         "/cli/auth?user_code=ABCD",
       );
+    });
+  });
+});
+
+describe("WelcomeScreen in the classic variant", () => {
+  beforeEach(() => {
+    flags.experiment_onboarding_langy_guided = false;
+    flags.release_ui_ai_governance_enabled = false;
+    organizations = [];
+    routerState.query = {};
+    hardRedirects.length = 0;
+    initializeOrganization.mockReset();
+    initializeOrganization.mockImplementation((_input, options) =>
+      options.onSuccess?.({ organizationId: "org_new", projectSlug: "acme-proj" }),
+    );
+  });
+
+  async function finishClassicFlow() {
+    await reachTailorStep();
+    await userEvent.click(screen.getByText("Myself"));
+    await waitFor(() => expect(next()).toBeEnabled());
+    fireEvent.click(next());
+    await screen.findByText("What brings you to LangWatch?");
+    fireEvent.click(next());
+    const finish = await screen.findByRole("button", { name: "Finish" });
+    await waitFor(() => expect(finish).toBeEnabled());
+    fireEvent.click(finish);
+  }
+
+  describe("when the last screen is finished", () => {
+    it("creates the organization with the full sign-up answers and lands on the product step", async () => {
+      await finishClassicFlow();
+
+      expect(initializeOrganization.mock.calls[0]?.[0]).toMatchObject({
+        orgName: "ACME",
+        signUpData: expect.objectContaining({
+          usage: "For myself",
+          terms: true,
+          featureUsage: "",
+        }),
+      });
+      expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
+    });
+
+    it("finishes a pending continuation instead of the product step", async () => {
+      routerState.query = { return_to: "/cli/auth?user_code=ABCD" };
+
+      await finishClassicFlow();
+
+      expect(hardRedirects).toEqual(["/cli/auth?user_code=ABCD"]);
+    });
+
+    it("ignores a continuation that is not a same-origin path", async () => {
+      routerState.query = { return_to: "//evil.example/steal" };
+
+      await finishClassicFlow();
+
+      expect(hardRedirects).toEqual(["/onboarding/product?projectSlug=acme-proj"]);
     });
   });
 });

@@ -33,14 +33,14 @@ function popupFeatures(): string {
   ].join(",");
 }
 
-function tryReadConnectResult(event: MessageEvent): ConnectResult | null {
+function parseConnectResult(event: MessageEvent): ConnectResult | undefined {
   if (event.origin !== window.location.origin) {
-    return null;
+    return undefined;
   }
 
   const parsed = incomingMessageSchema.safeParse(event.data);
   if (!parsed.success) {
-    return null;
+    return undefined;
   }
 
   if (parsed.data.type === "github-connected") {
@@ -90,7 +90,7 @@ export function useGitHubConnectPopup() {
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
-      const result = tryReadConnectResult(event);
+      const result = parseConnectResult(event);
       if (!result) {
         return;
       }
