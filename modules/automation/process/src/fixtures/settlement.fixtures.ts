@@ -12,12 +12,12 @@ import { AutomationWebhookSecretsService } from "../services/automation-webhook-
 import type { AutomationClock } from "../app/automation.members.ts";
 import { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
-import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
-import { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
+import { AutomationDatasetMapper } from "../app/automation.members.ts";
+import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
+import { AutomationSettlementTraceRepository } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-match-confirmation.service.ts";
 import { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
-import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
 import { AutomationEmailCapService } from "../services/email-cap.service.ts";
 import { AutomationPersistActionService } from "../services/persist-action.service.ts";
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
@@ -136,11 +136,11 @@ export function settlementSummary(
 }
 
 /**
- * Exactly `AutomationSettlementLedger`'s ten methods -- the settlement
+ * Exactly `AutomationSettlementLedgerRepository`'s ten methods -- the settlement
  * dispatch path's whole dependency on Automation (ADR-133). No method
  * beyond the port belongs here; nothing in this suite reaches one.
  */
-class SettlementAutomationService implements AutomationSettlementLedger {
+class SettlementAutomationService implements AutomationSettlementLedgerRepository {
   readonly claims: { triggerId: string; traceId: string; projectId: string }[] = [];
   readonly lastRuns: { triggerId: string; projectId: string }[] = [];
   readonly capInputs: Record<string, unknown>[] = [];
@@ -268,7 +268,7 @@ export class SettlementProjectService extends TestProjectApi {
  * them -- not Trace's service, since inheriting that whole surface grows
  * a new `never` member every time Trace adds one settlement never calls.
  */
-class SettlementTraceService extends AutomationSettlementTraceReader {
+class SettlementTraceService extends AutomationSettlementTraceRepository {
   readonly summaries = new Map<string, TraceSummaryData>();
   readonly records = new Map<string, TraceRecord>();
   readonly recordErrors = new Map<string, unknown>();
@@ -374,7 +374,7 @@ class SettlementMapper extends AutomationDatasetMapper {
   }
 }
 
-class SettlementWriter extends AutomationPersistActionWriter {
+class SettlementWriter extends AutomationPersistActionRepository {
   readonly annotationWrites: Record<string, unknown>[] = [];
   readonly datasetWrites: { datasetRecords: { id: string }[] }[] = [];
   readonly errors = new Map<string, unknown>();

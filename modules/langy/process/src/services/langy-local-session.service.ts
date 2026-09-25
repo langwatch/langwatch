@@ -23,7 +23,7 @@ import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 import type {
-  LangyLocalPresence,
+  LangyLocalPresenceRepository,
   PresenceHeartbeat,
 } from "../repositories/langy-local-presence.repository.ts";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
@@ -69,7 +69,7 @@ export interface LocalControlSessionCoreOptions {
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
   store: SessionStateStore;
-  presence: LangyLocalPresence;
+  presence: LangyLocalPresenceRepository;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
   requests: ControlRequestService;
@@ -92,7 +92,7 @@ export class LocalControlSessionCoreService {
   private readonly conversations: () => ControlConversations;
   private readonly events: () => ControlEvents;
   private readonly buffer: () => ControlBuffer;
-  readonly presence: LangyLocalPresence;
+  readonly presence: LangyLocalPresenceRepository;
   readonly dispatcher: LocalCallDispatcherService;
   readonly waits: UserWaitService;
   readonly requests: ControlRequestService;

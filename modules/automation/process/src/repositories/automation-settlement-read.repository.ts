@@ -14,7 +14,7 @@ export class AutomationTraceRecordUnavailableError extends Error {
   readonly name = "AutomationTraceRecordUnavailableError";
 }
 
-export abstract class AutomationSettlementTraceReader {
+export abstract class AutomationSettlementTraceRepository {
   abstract findSummary(input: {
     projectId: string;
     traceId: string;
@@ -42,7 +42,7 @@ export abstract class AutomationSettlementTraceReader {
  * `EvaluationService` is ten methods over execution, monitor performance
  * and workflow; this reaches exactly one -- a ClickHouse read keyed by trace.
  */
-export abstract class AutomationSettlementEvaluationReader {
+export abstract class AutomationSettlementEvaluationRepository {
   abstract findRunsByTraceId(input: {
     tenantId: string;
     traceId: string;

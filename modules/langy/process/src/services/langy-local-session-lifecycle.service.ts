@@ -23,7 +23,7 @@ function parseWorkspaceNudge(raw: string): WorkspaceNudge | null {
     return null;
   }
 }
-import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import type {
   ControlBuffer,
   ControlConversations,
@@ -40,7 +40,7 @@ type LocalControlLifecycleOptions = {
   conversations: () => ControlConversations;
   events: () => ControlEvents;
   dispatcher: LocalCallDispatcherService;
-  presence: LangyLocalPresence;
+  presence: LangyLocalPresenceRepository;
   requests: ControlRequestService;
   now: () => number;
   /** The core's own staleness check, so both seams answer it the same way. */

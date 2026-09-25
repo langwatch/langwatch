@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../app/langy.members.ts";
 import type {
   LangyStreamRedis,
-  LangyTokenBuffer,
+  LangyTokenBufferRepository,
 } from "../repositories/langy-token-buffer.repository.ts";
 
 /**
@@ -110,7 +110,7 @@ export interface UiActionConversations {
 export type LangyUiActionServiceDependencies = {
   redis: UiActionRedis;
   conversations: UiActionConversations;
-  buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  buffer: Pick<LangyTokenBufferRepository, "appendUiAction">;
   /**
    * Which kinds exist and what each one's payload must look like. A port rather than an import: the
    * only catalogue that exists is the experiments workbench's, and a Langy server package may not
@@ -127,7 +127,7 @@ export class LangyUiActionService {
 
   private readonly redis: UiActionRedis;
   private readonly conversations: UiActionConversations;
-  private readonly buffer: Pick<LangyTokenBuffer, "appendUiAction">;
+  private readonly buffer: Pick<LangyTokenBufferRepository, "appendUiAction">;
   private readonly actions: LangyUiActionCatalog;
   private readonly backendRunner?: UiActionBackendRunner;
 

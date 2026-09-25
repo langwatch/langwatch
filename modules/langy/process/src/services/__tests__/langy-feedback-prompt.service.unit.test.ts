@@ -4,7 +4,7 @@ import type { LangyFeedbackPromptRedis } from "../../app/langy.members.ts";
 import {
   FEEDBACK_LONG_CONVERSATION_ANSWERS,
   FEEDBACK_QUIET_PERIOD_MS,
-  LangyFeedbackPromptPolicy,
+  LangyFeedbackPromptService,
 } from "../langy-feedback-prompt.service.ts";
 
 const NOW = 1_700_000_000_000;
@@ -21,11 +21,11 @@ function memoryRedis(): LangyFeedbackPromptRedis & { store: Map<string, string> 
   };
 }
 
-function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptPolicy {
-  return LangyFeedbackPromptPolicy.create({ redis, now: () => now });
+function service(redis: LangyFeedbackPromptRedis | null, now = NOW): LangyFeedbackPromptService {
+  return LangyFeedbackPromptService.create({ redis, now: () => now });
 }
 
-describe("LangyFeedbackPromptPolicy", () => {
+describe("LangyFeedbackPromptService", () => {
   /** @scenario "feedback prompt keeps its existing cadence" */
   it("does not ask before two assistant answers", async () => {
     await expect(

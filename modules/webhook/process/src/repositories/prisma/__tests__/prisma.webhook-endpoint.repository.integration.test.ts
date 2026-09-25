@@ -35,10 +35,7 @@ import {
   WEBHOOK_DISABLED_REASON_AUTO,
   WebhookEndpointConfiguration,
 } from "../../../services/webhook-endpoint-policy.service.ts";
-import {
-  disableEndpointForFailureStreak,
-  PrismaWebhookEndpointRepository,
-} from "../prisma.webhook-endpoint.repository.ts";
+import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 import { raceOnOneRow } from "./support/row-lock-race.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -491,7 +488,7 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository", () => {
       });
       const now = new Date();
       const flip = (tx: Prisma.TransactionClient) =>
-        disableEndpointForFailureStreak({
+        PrismaWebhookEndpointRepository.disableForFailureStreak({
           prisma: tx,
           organizationId: orgId,
           endpointId: endpoint.id,

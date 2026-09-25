@@ -6,7 +6,7 @@ import {
   type LangyWorkerDispatchInput,
   type LangyWorkerProbeInput,
   type LangyWorkerWarmInput,
-} from "../app/langy.members.ts";
+} from "./langy-worker.channel.ts";
 
 export class UnavailableLangyWorkerChannel extends LangyWorker {
   private constructor(private readonly metrics: LangyWorkerMetrics) {

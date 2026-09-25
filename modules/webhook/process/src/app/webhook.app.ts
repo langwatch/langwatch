@@ -23,7 +23,7 @@ import {
   buildWebhookDeliveryPipeline,
   type WebhookDeliveryDefinition,
 } from "../eventing/webhook-delivery.pipeline.ts";
-import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
+import type { WebhookEndpointRepository } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
 import {
   WebhookDeliveryService,
@@ -59,7 +59,7 @@ function testFireBody(now: Instant): string {
 /** Records a test fire's outcome. The test itself ran, so a delivery-log
  *  write failure must never turn the documented answer into a throw. */
 async function recordTestFire(
-  endpoints: WebhookEndpointRuntime,
+  endpoints: WebhookEndpointRepository,
   attempt: {
     organizationId: string;
     endpointId: string;
@@ -93,7 +93,7 @@ export type WebhookTestDispatch = (input: {
 /** What the process composes this feature's application from. */
 export interface WebhookAppDependencies {
   /** Endpoint mutation and read, constructed once with the process store. */
-  endpoints: WebhookEndpointRuntime;
+  endpoints: WebhookEndpointRepository;
   /** Endpoint delivery health, sharing the same durable process store. */
   health: Pick<WebhookHealthService, "health">;
   /**
@@ -135,7 +135,7 @@ type WebhookSetup = FeatureSetup<
 /** What the worker's delivery process manager is composed from; built only when consuming. */
 type WebhookDeliveryParts = Readonly<{
   processStore: WebhookRepositories["processStore"];
-  endpoints: WebhookEndpointRuntime;
+  endpoints: WebhookEndpointRepository;
   retention: WebhookRepositories["retention"];
   getPlan: WebhookDeliveryProcessDeps["getPlan"];
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
@@ -363,7 +363,7 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   /** Endpoint mutation and read. */
-  get endpoints(): WebhookEndpointRuntime {
+  get endpoints(): WebhookEndpointRepository {
     return this.#dependencies.endpoints;
   }
 

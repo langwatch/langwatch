@@ -8,7 +8,7 @@ import type { Instant } from "@langwatch/time";
 
 // Port for trigger settlement; extracts the ten methods it needs from the full
 // AutomationService into three concerns: triggers + send claims, persist ceiling, webhook log.
-export abstract class AutomationSettlementLedger {
+export abstract class AutomationSettlementLedgerRepository {
   /** The project's active trace automations, as the settled digest re-reads them. */
   abstract findActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]>;
 

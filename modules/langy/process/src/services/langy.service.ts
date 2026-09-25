@@ -29,7 +29,7 @@ import {
   type LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
-import type { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
+import type { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
 import {
   type LangyMessageService,
   type LangyTrustedMessageReader,
@@ -56,7 +56,7 @@ export { ADOPTABLE_CONVERSATION_ID };
  * ADR-133 (the flagged "contract-service" shape); now the sole definition.
  */
 export class LangyService {
-  private readonly feedbackPrompt: LangyFeedbackPromptPolicy;
+  private readonly feedbackPrompt: LangyFeedbackPromptService;
   private readonly conversations: LangyConversationService;
   private readonly turns: LangyTurnService;
   private readonly messages: LangyMessageService;
@@ -71,7 +71,7 @@ export class LangyService {
     credentials,
     openRelay = null,
   }: {
-    feedbackPrompt: LangyFeedbackPromptPolicy;
+    feedbackPrompt: LangyFeedbackPromptService;
     conversations: LangyConversationService;
     turns: LangyTurnService;
     messages: LangyMessageService;
@@ -92,7 +92,7 @@ export class LangyService {
     turns: LangyTurnService;
     messages: LangyMessageService;
     credentials: LangyCredentialService;
-    feedbackPrompt: LangyFeedbackPromptPolicy;
+    feedbackPrompt: LangyFeedbackPromptService;
     openRelay?: OpenLangyRelay;
   }): LangyService {
     return new LangyService({

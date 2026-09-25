@@ -71,26 +71,20 @@ import {
   createAutomationsPipeline,
   type AutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
-import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
+import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
-import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
 import { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "../services/automation-evaluation-trigger-filter.service.ts";
-import type {
-  AutomationDispatchError,
-  AutomationHeartbeat,
-  AutomationLogger,
-} from "../services/automation-graph-runtime.service.ts";
 import { AutomationMatchRecordMetricsService } from "../services/automation-match-record-metrics.service.ts";
 import {
   AutomationRulesService,
   type AutomationProjectIdentity,
 } from "../services/automation-rules.service.ts";
-import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
 import { AutomationSettlementObservabilityService } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 import { AutomationTemplateService } from "../services/automation-template.service.ts";
@@ -101,8 +95,10 @@ import { AutomationService } from "../services/automation.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
 import { ReportScheduleService } from "../services/report-schedule.service.ts";
 import { AutomationGraphService } from "../services/trigger-graph.service.ts";
-import { HmacUnsubscribeTokenAdapter } from "../services/unsubscribe-token.service.ts";
-import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
+import {
+  HmacUnsubscribeTokenAdapter,
+  type UnsubscribeTokenVerifier,
+} from "../services/unsubscribe-token.service.ts";
 import {
   buildAutomationInfrastructure,
   createAutomationSettlement,
@@ -113,7 +109,13 @@ import {
   type AutomationProcessMembers,
   type AutomationSettlement,
 } from "./automation-composition.build.ts";
-import type { AutomationClock } from "./automation.members.ts";
+import type {
+  AutomationDispatchError,
+  AutomationHeartbeat,
+  AutomationLogger,
+  AutomationRunawaySignals,
+  AutomationClock,
+} from "./automation.members.ts";
 
 export type { AutomationWebhookStoredParams };
 export type { AutomationProjectIdentity };
@@ -213,7 +215,7 @@ export type AutomationInfrastructure = Readonly<{
   slackTokens: AutomationSlackBotTokenDecryptor;
   dispatchErrors: AutomationDispatchError;
   heartbeat: AutomationHeartbeat;
-  runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
+  runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
   testFire: AutomationTestFire;
   persistCaps: AutomationPersistCapRepository;
   providers: AutomationProviderSecrets;
@@ -504,7 +506,11 @@ export class AutomationApp implements AutomationApi {
   }
 
   /** The `automations` pipeline, over the settlement {@link create} composed. */
-  eventingPipeline({ retention }: { retention: AutomationIntentRetention }): AutomationsPipeline {
+  eventingPipeline({
+    retention,
+  }: {
+    retention: AutomationIntentRetentionRepository;
+  }): AutomationsPipeline {
     if (!this.#settlement) {
       throw new Error("Automation was asked for its pipeline, but no settlement was composed");
     }

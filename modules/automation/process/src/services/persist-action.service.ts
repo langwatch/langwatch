@@ -9,11 +9,13 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 
-import type { AutomationProjectDirectory } from "../app/automation.members.ts";
-import type { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
-import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
-import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
-import type { AutomationDatasetMapper } from "./automation-dataset-mapper.service.ts";
+import type {
+  AutomationProjectDirectory,
+  AutomationDatasetMapper,
+} from "../app/automation.members.ts";
+import type { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceRepository } from "../repositories/automation-settlement-read.repository.ts";
 
 /** The project read this path makes: an existence check, and nothing else. */
 type PersistActionProject = { id: string; name: string; slug: string };
@@ -32,11 +34,11 @@ function sanitizeRecord(record: Record<string, string | number>): Record<string,
 /** Owns the persist-class trigger actions. Host code supplies only complete
  * project/trace services and named write/mapping ports. */
 export class AutomationPersistActionService {
-  private readonly automation: AutomationSettlementLedger;
+  private readonly automation: AutomationSettlementLedgerRepository;
   private readonly projects: AutomationProjectDirectory;
-  private readonly traces: AutomationSettlementTraceReader;
+  private readonly traces: AutomationSettlementTraceRepository;
   private readonly mapper: AutomationDatasetMapper;
-  private readonly writer: AutomationPersistActionWriter;
+  private readonly writer: AutomationPersistActionRepository;
 
   private constructor({
     automation,
@@ -45,11 +47,11 @@ export class AutomationPersistActionService {
     mapper,
     writer,
   }: {
-    automation: AutomationSettlementLedger;
+    automation: AutomationSettlementLedgerRepository;
     projects: AutomationProjectDirectory;
-    traces: AutomationSettlementTraceReader;
+    traces: AutomationSettlementTraceRepository;
     mapper: AutomationDatasetMapper;
-    writer: AutomationPersistActionWriter;
+    writer: AutomationPersistActionRepository;
   }) {
     this.automation = automation;
     this.projects = projects;
@@ -59,11 +61,11 @@ export class AutomationPersistActionService {
   }
 
   static create(input: {
-    automation: AutomationSettlementLedger;
+    automation: AutomationSettlementLedgerRepository;
     projects: AutomationProjectDirectory;
-    traces: AutomationSettlementTraceReader;
+    traces: AutomationSettlementTraceRepository;
     mapper: AutomationDatasetMapper;
-    writer: AutomationPersistActionWriter;
+    writer: AutomationPersistActionRepository;
   }): AutomationPersistActionService {
     return new AutomationPersistActionService({
       automation: input.automation,

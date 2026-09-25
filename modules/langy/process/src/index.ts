@@ -1,10 +1,10 @@
 export {
-  PostgresLangyAdapter,
+  LangyPostgresService,
   type LangyCredentialComposition,
   type LangyServiceCompositionOptions,
   LangyEventingMembers,
   LangyTrustedMessage,
-  type PostgresLangyAdapterOptions,
+  type LangyPostgresServiceOptions,
 } from "./services/langy-postgres.service.ts";
 export { langyServer } from "./langy.server.ts";
 export { type LangyNavigateProject } from "./app/langy.members.ts";
@@ -81,7 +81,7 @@ export {
 } from "./channels/http/http.langy-worker.channel.ts";
 export type {
   LangyDispatchOutcome,
-  LangyWorkerAdapterConfig,
+  LangyWorkerChannelConfig,
   LangyWorkerHttpConfig,
 } from "./channels/http/http.langy-worker.channel.ts";
 export { LangyWorkerMetricsNullService } from "./services/langy-worker-metrics-null.service.ts";
@@ -92,15 +92,14 @@ export {
   LangyBlockMetrics,
   LangyGithubPermit,
   LangyUiActionSurface,
-  LangyWorkerMetrics,
-  LangyWorker,
 } from "./app/langy.members.ts";
+export { LangyWorkerMetrics, LangyWorker } from "./channels/langy-worker.channel.ts";
 export type {
   LangyWorkerCancelInput,
   LangyWorkerDispatchInput,
   LangyWorkerProbeInput,
   LangyWorkerWarmInput,
-} from "./app/langy.members.ts";
+} from "./channels/langy-worker.channel.ts";
 export { LangyUiActionSurfaceService } from "./services/langy-ui-action-surface.service.ts";
 export { LangyConversationPipelineService } from "./services/langy-conversation-pipeline.service.ts";
 export type { LangyConversationProcessingPipelineDeps } from "./services/langy-conversation-pipeline.service.ts";

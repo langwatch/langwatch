@@ -3,8 +3,8 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { TraceApi, TraceSummaryData } from "@langwatch/trace-contract";
 
 import type {
-  AutomationSettlementEvaluationReader,
-  AutomationSettlementTraceReader,
+  AutomationSettlementEvaluationRepository,
+  AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 
 const EVENT_FILTER_FIELDS = new Set([
@@ -57,8 +57,8 @@ export interface AutomationSettlementMatchConfirmation {
 }
 
 type AutomationSettlementMatchConfirmationInput = Readonly<{
-  evaluations: AutomationSettlementEvaluationReader;
-  traces: AutomationSettlementTraceReader;
+  evaluations: AutomationSettlementEvaluationRepository;
+  traces: AutomationSettlementTraceRepository;
   traceFilters: AutomationSettlementTraceFilters;
   evaluationFilters: AutomationSettlementEvaluationFilters;
 }>;
@@ -67,8 +67,8 @@ type AutomationSettlementMatchConfirmationInput = Readonly<{
  * The service owns conditional reads and fail-closed sequencing; each data
  * owner's Api owns the matching over its own data. */
 export class AutomationSettlementMatchConfirmationService implements AutomationSettlementMatchConfirmation {
-  private readonly evaluations: AutomationSettlementEvaluationReader;
-  private readonly traces: AutomationSettlementTraceReader;
+  private readonly evaluations: AutomationSettlementEvaluationRepository;
+  private readonly traces: AutomationSettlementTraceRepository;
   private readonly traceFilters: AutomationSettlementTraceFilters;
   private readonly evaluationFilters: AutomationSettlementEvaluationFilters;
 

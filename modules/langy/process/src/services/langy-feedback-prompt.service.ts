@@ -20,7 +20,7 @@ interface LastAskRecord {
 
 const keyFor = (userId: string) => `langy:feedback:last-asked:${userId}`;
 
-export class LangyFeedbackPromptPolicy {
+export class LangyFeedbackPromptService {
   private constructor(
     private readonly deps: {
       redis: LangyFeedbackPromptRedis | null;
@@ -31,8 +31,8 @@ export class LangyFeedbackPromptPolicy {
   static create(options: {
     redis: LangyFeedbackPromptRedis | null;
     now?: () => number;
-  }): LangyFeedbackPromptPolicy {
-    return new LangyFeedbackPromptPolicy(options);
+  }): LangyFeedbackPromptService {
+    return new LangyFeedbackPromptService(options);
   }
 
   private now(): number {

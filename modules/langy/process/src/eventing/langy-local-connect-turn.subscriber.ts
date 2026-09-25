@@ -14,7 +14,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import type {
-  LangyLocalPresence,
+  LangyLocalPresenceRepository,
   OwedConnectTurn,
 } from "../repositories/langy-local-presence.repository.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
@@ -36,7 +36,7 @@ export interface LocalConnectTurnConversationReader {
 }
 
 export type LocalConnectTurnPresence = Pick<
-  LangyLocalPresence,
+  LangyLocalPresenceRepository,
   "getByConversationId" | "readOwedConnectTurn" | "settleOwedConnectTurn"
 >;
 

@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverRoot,
 } from "@langwatch/design-system/popover";
-import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -72,8 +72,7 @@ export function LegacyPill({
           paddingX={1.5}
           lineHeight={1.2}
           cursor="pointer"
-          tabIndex={0}
-          role="button"
+          asChild
           aria-haspopup="dialog"
           aria-expanded={open}
           onMouseEnter={handleOpen}
@@ -81,23 +80,14 @@ export function LegacyPill({
           onFocus={handleOpen}
           onBlur={handleClose}
           onClick={(e: MouseEvent) => {
-            // Pill renders inside SideMenuLink's <Link href>, so a bare
-            // stopPropagation still lets the browser follow the anchor.
-            // preventDefault on the mouse path (the keyboard path below
-            // already calls it) keeps the click purely a popover toggle.
+            // Pill renders inside SideMenuLink's <Link href>; preventDefault
+            // keeps the click a popover toggle rather than a navigation.
             e.stopPropagation();
             e.preventDefault();
             setOpen((prev) => !prev);
           }}
-          onKeyDown={(e: KeyboardEvent) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              e.preventDefault();
-              setOpen((prev) => !prev);
-            }
-          }}
         >
-          {label}
+          <button type="button">{label}</button>
         </Badge>
       </PopoverAnchor>
       <PopoverContent onMouseEnter={handlePopoverEnter} onMouseLeave={handlePopoverLeave}>

@@ -19,7 +19,7 @@ import {
   type LangyStreamRead,
   type LangyStreamRedis,
   type LangyTokenBufferConnection,
-  LangyTokenBuffer,
+  LangyTokenBufferRepository,
 } from "../langy-token-buffer.repository.ts";
 
 const PAYLOAD_FIELD = "p";
@@ -43,7 +43,7 @@ function decodeFields(fields: string[]): LangyStreamEntry | null {
   return null;
 }
 
-export class LangyTokenBufferRedisRepository extends LangyTokenBuffer {
+export class LangyTokenBufferRedisRepository extends LangyTokenBufferRepository {
   private readonly redis: LangyStreamRedis;
   private readonly blocking: LangyStreamBlockingRedis;
   /** Per-turn token accumulator, flushed on the hybrid size/time policy. */

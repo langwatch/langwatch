@@ -2,6 +2,8 @@ import type {
   AutomationLimitNextStep,
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
+  GraphTriggerSweepCandidate,
+  DatasetActionParams,
   SlackPayload,
   Trigger,
   TriggerMatchRecordedEventData,
@@ -10,26 +12,28 @@ import type {
   WebhookDeliveryInput,
   GraphAlertTemplateContext,
 } from "@langwatch/automation-contract";
+import type { IntentContext } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
-import type { TraceQueryClassification, TraceSummaryData } from "@langwatch/trace-contract";
+import type {
+  TraceQueryClassification,
+  TraceRecord,
+  TraceSummaryData,
+} from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { LimitEmailKind } from "../channels/automation-runaway-notice.channel.ts";
 import type {
-  AutomationDispatchError,
-  AutomationHeartbeat,
-  AutomationLogger,
-} from "../services/automation-graph-runtime.service.ts";
+  LogOverflowIntent,
+  NotifyDigestIntent,
+  PersistMatchIntent,
+} from "../eventing/trigger-settlement.intent.ts";
 import type { AutomationSlackBotTokenDecryptor } from "../services/automation-slack-secrets.service.ts";
 
 // Re-exported: several files in this module still import these names from
 // here rather than from where they are actually declared.
 export type {
-  AutomationDispatchError,
   AutomationGraphNotifier,
-  AutomationHeartbeat,
-  AutomationLogger,
   AutomationNotificationDelivery,
   AutomationSlackBotTokenDecryptor,
 };
@@ -277,3 +281,78 @@ export type UnsubscribeTokenPayload = {
   triggerId: string | null;
   email: string;
 };
+
+/** The ClickHouse query surface the runaway count reads through. */
+export type ClickHouseClient = {
+  query(input: {
+    query: string;
+    query_params: Record<string, string | number>;
+    format: "JSONEachRow";
+  }): Promise<{ json(): Promise<unknown> }>;
+};
+
+/** Process logger used by graph evaluation and heartbeat isolation. */
+export abstract class AutomationLogger {
+  abstract error(fields: Record<string, unknown>, message: string): void;
+  abstract debug(fields: Record<string, unknown>, message: string): void;
+  abstract info(fields: Record<string, unknown>, message: string): void;
+  abstract warn(fields: Record<string, unknown>, message: string): void;
+}
+
+/** Technical ClickHouse resolver used only by the heartbeat recency query. */
+export abstract class AutomationHeartbeat {
+  abstract findClickHouseClient(projectId: string): Promise<ClickHouseClient | null>;
+}
+
+/** Host transport semantics for retryable and terminal delivery failures. */
+export abstract class AutomationDispatchError {
+  abstract isTerminal(error: unknown): boolean;
+  abstract createTerminal(message: string): unknown;
+}
+
+export abstract class AutomationScheduledIntent {
+  abstract decideGraphTriggerHeartbeat(input: {
+    now: Instant;
+  }): Promise<GraphTriggerSweepCandidate[]>;
+
+  abstract evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult>;
+
+  abstract pruneWebhookDeliveries(now?: Instant): Promise<number>;
+}
+
+export abstract class AutomationSettlementExecutor {
+  abstract notifyDigest(payload: NotifyDigestIntent, context: IntentContext): Promise<void>;
+  abstract persistMatch(payload: PersistMatchIntent, context: IntentContext): Promise<void>;
+  abstract logOverflow(payload: LogOverflowIntent, context: IntentContext): Promise<void>;
+}
+
+export abstract class AutomationDatasetMapper {
+  abstract map(input: {
+    trace: TraceRecord;
+    mapping: DatasetActionParams["datasetMapping"]["mapping"];
+    expansions: readonly string[];
+  }): Record<string, string | number>[];
+}
+
+/** Telemetry and logging the containment policy reports as it runs. */
+export abstract class AutomationRunawaySignals {
+  abstract onCeilingBreach(): void;
+  abstract onAutoPaused(reason: string): void;
+  abstract onContainmentFailed(): void;
+  abstract error(fields: Record<string, unknown>, message: string): void;
+  abstract info(fields: Record<string, unknown>, message: string): void;
+}
+
+/**
+ * Three containment observations isolated so composition can use them without
+ * satisfying the whole `AutomationRunawayRepository` port; wiring per-root decides OTLP.
+ */
+export abstract class AutomationRunawayMetricsSink {
+  abstract onCeilingBreach(): void;
+  abstract onAutoPaused(reason: string): void;
+  abstract onContainmentFailed(): void;
+}

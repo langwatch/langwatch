@@ -5,11 +5,10 @@ import {
 } from "@langwatch/automation-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { AutomationClock } from "../app/automation.members.ts";
+import type { AutomationClock, AutomationRunawaySignals } from "../app/automation.members.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 
 export { RUNAWAY_PAUSE_REASON };
 
@@ -19,7 +18,9 @@ export const RUNAWAY_TRAFFIC_SHARE = 0.9;
 export const RUNAWAY_MIN_PROJECT_TRACES = 100;
 
 /** The full set of collaborator capabilities this service reads. */
-type RunawayCollaborator = AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
+type RunawayCollaborator = AutomationRunawayRepository &
+  AutomationRunawayNotice &
+  AutomationRunawaySignals;
 
 /** Private, process-lifetime collaborator for claim-gated containment. */
 export class RunawayContainmentService {

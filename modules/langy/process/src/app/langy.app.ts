@@ -80,7 +80,7 @@ import { LocalControlSessionCoreService } from "../services/langy-local-session.
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
-import { PostgresLangyAdapter } from "../services/langy-postgres.service.ts";
+import { LangyPostgresService } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
@@ -225,7 +225,7 @@ export class LangyApp implements LangyApiContract {
       worker: channel,
       repositories: setup.repositories,
     });
-    const adapter = PostgresLangyAdapter.create({ database: setup.members.prisma });
+    const adapter = LangyPostgresService.create({ database: setup.members.prisma });
     const commands = buildLangyConversationCommands({
       eventing: setup.members.eventing,
       processName: "langy",

@@ -6,13 +6,13 @@ import {
 } from "@langwatch/automation-contract";
 
 import type { AutomationTriggerMatchRecorder } from "../app/automation.members.ts";
-import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationMatchRecordMetricsSink } from "../services/automation-match-record-metrics.service.ts";
 
 /** Port of main's trace `triggerMatch` subscriber; trace applies its origin guard first. */
 export async function handleTraceAlertTriggerMatch(
   deps: {
-    triggers: Pick<AutomationTraceTriggerCatalogue, "findActiveTraceTriggersForProject">;
+    triggers: Pick<AutomationTraceTriggerCatalogueRepository, "findActiveTraceTriggersForProject">;
     triggerMatches: AutomationTriggerMatchRecorder;
     metrics: Pick<AutomationMatchRecordMetricsSink, "countRecorded">;
   },

@@ -8,7 +8,7 @@ import {
   AutomationEmailCapService,
   AutomationLogger,
   AutomationHeartbeat,
-  AutomationRunaway,
+  AutomationRunawayRepository,
   AutomationSlackBotTokenDecryptor,
   AutomationTestFire,
 } from "./index.ts";
@@ -66,7 +66,7 @@ class TestDispatchErrors extends AutomationDispatchError {
   }
 }
 class TestRunaway
-  extends AutomationRunaway
+  extends AutomationRunawayRepository
   implements AutomationRunawayNotice, AutomationRunawaySignals
 {
   async countProjectTraces24h() {

@@ -14,13 +14,13 @@ import type {
   AutomationLogger,
   AutomationSlackBotTokenDecryptor,
   AutomationClock,
+  AutomationRunawaySignals,
 } from "../app/automation.members.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { AutomationRunawaySignals } from "./automation-runaway-signals.service.ts";
 import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
 import { GraphTriggerHeartbeatService } from "./graph-trigger-heartbeat.service.ts";
 import { RunawayContainmentService } from "./runaway-containment.service.ts";
@@ -43,7 +43,7 @@ export class AutomationGraphService {
     logger: AutomationLogger;
     slackTokens: AutomationSlackBotTokenDecryptor;
     dispatchErrors: AutomationDispatchError;
-    runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals;
+    runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals;
     clock: AutomationClock;
     baseHost: string;
   }): AutomationGraphService {

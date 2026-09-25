@@ -17,7 +17,7 @@ import type {
   LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-process";
-import { LangyBlockMetricsOtelService, PostgresLangyAdapter } from "@langwatch/langy-process";
+import { LangyBlockMetricsOtelService, LangyPostgresService } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   createRecordingMeterProvider,
@@ -81,10 +81,10 @@ function composition(turns: LangyTurnTechnicalMembers) {
   };
 }
 
-describe("PostgresLangyAdapter", () => {
+describe("LangyPostgresService", () => {
   it("shares the memoized generic stores with every eventing consumer", () => {
     const database: LangyDatabase = undefined!;
-    const instance = PostgresLangyAdapter.create({ database });
+    const instance = LangyPostgresService.create({ database });
 
     const first: LangyEventingMembers = instance.eventing();
     const second = instance.eventing();
@@ -118,7 +118,7 @@ describe("PostgresLangyAdapter", () => {
       metrics: { count: vi.fn() },
     });
     const database: LangyDatabase = undefined!;
-    const instance = PostgresLangyAdapter.create({ database });
+    const instance = LangyPostgresService.create({ database });
 
     const first = instance.build(options);
     const second = instance.build(options);
@@ -134,7 +134,7 @@ describe("PostgresLangyAdapter", () => {
         const metrics: RecordingMeterProvider = createRecordingMeterProvider();
         metrics.install();
         try {
-          const instance = PostgresLangyAdapter.create({ database: undefined! });
+          const instance = LangyPostgresService.create({ database: undefined! });
           const service = instance.build({
             ...compositionOptions(),
             blockMetrics: LangyBlockMetricsOtelService.create(),
@@ -160,7 +160,7 @@ describe("PostgresLangyAdapter", () => {
     describe("when a transport asks the application for the capability", () => {
       /** @scenario "transports share one Langy capability" */
       it("hands back the one service the adapter built, not a second graph", async () => {
-        const instance = PostgresLangyAdapter.create({ database: undefined! });
+        const instance = LangyPostgresService.create({ database: undefined! });
         const service = instance.build(compositionOptions());
 
         const app = await createApp();
@@ -174,7 +174,7 @@ describe("PostgresLangyAdapter", () => {
     describe("when the composition root reads what it received", () => {
       /** @scenario "composition hides persistence" */
       it("receives the contract service, with no repository or database on its surface", () => {
-        const instance = PostgresLangyAdapter.create({ database: undefined! });
+        const instance = LangyPostgresService.create({ database: undefined! });
 
         const service = instance.build(compositionOptions());
 
@@ -184,7 +184,7 @@ describe("PostgresLangyAdapter", () => {
 
       /** @scenario "application transports use the flat contract" */
       it("publishes every capability as a flat method, naming no subordinate among them", () => {
-        const instance = PostgresLangyAdapter.create({ database: undefined! });
+        const instance = LangyPostgresService.create({ database: undefined! });
 
         const service = instance.build(compositionOptions());
         const surface = publicSurfaceOf(service);

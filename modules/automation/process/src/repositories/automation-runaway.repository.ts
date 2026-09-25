@@ -3,7 +3,7 @@ import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 export type ClaimLease = { key: string; token: string };
 
 /** The data this containment policy reads and the leases it claims. */
-export abstract class AutomationRunaway {
+export abstract class AutomationRunawayRepository {
   abstract countProjectTraces24h(projectId: string): Promise<number>;
   abstract notificationRecipients(params: {
     projectId: string;

@@ -37,7 +37,7 @@ import {
   type LangySessionKeyMintingService,
   type LangyVirtualKeyService,
 } from "./langy-credential.service.ts";
-import { LangyFeedbackPromptPolicy } from "./langy-feedback-prompt.service.ts";
+import { LangyFeedbackPromptService } from "./langy-feedback-prompt.service.ts";
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import { LangyMessageService } from "./langy-message.service.ts";
 import { LangySessionKeyService } from "./langy-session-key.service.ts";
@@ -114,7 +114,7 @@ export type LangyServiceCompositionOptions = {
   blockMetrics?: LangyBlockMetrics;
 };
 
-export interface PostgresLangyAdapterOptions {
+export interface LangyPostgresServiceOptions {
   database: LangyDatabase;
 }
 
@@ -130,13 +130,13 @@ interface LangyRepositories {
 }
 
 /** Composes the Langy capability graph while keeping persistence private. */
-export class PostgresLangyAdapter {
+export class LangyPostgresService {
   private readonly repositories: LangyRepositories;
   private readonly eventingCapabilities: LangyEventingMembers;
   private service: LangyService | null = null;
   private sessionKeys: LangySessionKeyService | null = null;
 
-  private constructor(options: PostgresLangyAdapterOptions) {
+  private constructor(options: LangyPostgresServiceOptions) {
     this.repositories = {
       conversations: PrismaLangyConversationRepository.create(options.database),
       messages: PrismaLangyMessageRepository.create(options.database),
@@ -158,8 +158,8 @@ export class PostgresLangyAdapter {
     });
   }
 
-  static create(options: PostgresLangyAdapterOptions): PostgresLangyAdapter {
-    return new PostgresLangyAdapter(options);
+  static create(options: LangyPostgresServiceOptions): LangyPostgresService {
+    return new LangyPostgresService(options);
   }
 
   /**
@@ -224,7 +224,7 @@ export class PostgresLangyAdapter {
       turns,
       messages,
       credentials,
-      feedbackPrompt: LangyFeedbackPromptPolicy.create({
+      feedbackPrompt: LangyFeedbackPromptService.create({
         redis: options.feedbackPromptRedis ?? null,
       }),
       ...(relay

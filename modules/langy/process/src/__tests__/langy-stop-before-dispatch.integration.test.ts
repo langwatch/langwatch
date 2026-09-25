@@ -8,7 +8,7 @@ import type { Redis } from "ioredis";
 import IORedis from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { LangyWorker } from "../app/langy.members.ts";
+import type { LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";

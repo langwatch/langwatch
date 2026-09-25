@@ -41,7 +41,7 @@ export type OwedConnectTurn = z.infer<typeof owedConnectTurnSchema>;
  * service depends on this abstract surface, never on the concrete Redis or
  * memory adapter behind it.
  */
-export abstract class LangyLocalPresence {
+export abstract class LangyLocalPresenceRepository {
   /** Writes the folder as connected, replacing whatever was there. */
   abstract register(workspace: ConnectedWorkspace): Promise<void>;
 

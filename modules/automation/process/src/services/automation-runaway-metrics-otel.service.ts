@@ -1,23 +1,15 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 
-/**
- * Three containment observations isolated so composition can use them without
- * satisfying the whole `AutomationRunaway` port; wiring per-root decides OTLP.
- */
-export abstract class AutomationRunawayMetricsSink {
-  abstract onCeilingBreach(): void;
-  abstract onAutoPaused(reason: string): void;
-  abstract onContainmentFailed(): void;
-}
+import { AutomationRunawayMetricsSink } from "../app/automation.members.ts";
 
 export const AUTOMATION_CEILING_BREACH_METRIC_NAME = "automation_ceiling_breach_total";
 export const AUTOMATION_AUTO_PAUSED_METRIC_NAME = "automation_auto_paused_total";
 export const AUTOMATION_CONTAINMENT_FAILED_METRIC_NAME = "automation_containment_failed_total";
 
 /** Containment counts, pushed over OTLP. */
-export class OtelAutomationRunawayMetricsAdapter extends AutomationRunawayMetricsSink {
-  static create(): OtelAutomationRunawayMetricsAdapter {
-    return new OtelAutomationRunawayMetricsAdapter(
+export class AutomationRunawayMetricsOtelService extends AutomationRunawayMetricsSink {
+  static create(): AutomationRunawayMetricsOtelService {
+    return new AutomationRunawayMetricsOtelService(
       counter({
         name: AUTOMATION_CEILING_BREACH_METRIC_NAME,
         description: "Confirmed automation matches dropped for passing their daily ceiling",
@@ -53,21 +45,4 @@ export class OtelAutomationRunawayMetricsAdapter extends AutomationRunawayMetric
   onContainmentFailed(): void {
     this.containmentFailed.inc({}, 1);
   }
-}
-
-/** Records nothing. The default for a process that publishes no containment metrics. */
-export class NoopAutomationRunawayMetrics extends AutomationRunawayMetricsSink {
-  static create(): NoopAutomationRunawayMetrics {
-    return new NoopAutomationRunawayMetrics();
-  }
-
-  private constructor() {
-    super();
-  }
-
-  onCeilingBreach(): void {}
-
-  onAutoPaused(): void {}
-
-  onContainmentFailed(): void {}
 }

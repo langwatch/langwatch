@@ -15,15 +15,14 @@ import {
   type LangyTurnContextRenderer,
   type LangyTurnMetrics,
   type LangyUiActionSurface,
-  type LangyWorker,
-  type LangyWorkerProbeInput,
 } from "../app/langy.members.ts";
+import { type LangyWorker, type LangyWorkerProbeInput } from "../channels/langy-worker.channel.ts";
 import type {
   LangyTurnAccessRepository,
   LangyTurnHandoffRepository,
 } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyMessageRepository } from "../repositories/langy-message.repository.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 import type { LangyTurnAdmissionRepository } from "../repositories/langy-turn-admission.repository.ts";
 import type { LangyConversationService } from "./langy-conversation.service.ts";
 import type { LangyCredentialService } from "./langy-credential.service.ts";
@@ -57,7 +56,7 @@ export interface LangyTurnServiceDeps {
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBuffer | null;
+  tokenBuffer: LangyTokenBufferRepository | null;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -81,7 +80,7 @@ export type LangyTurnTechnicalMembers = {
   promptProjectId?: string;
   models: LangyModel;
   worker: LangyWorker | null;
-  tokenBuffer: LangyTokenBuffer | null;
+  tokenBuffer: LangyTokenBufferRepository | null;
   permits: LangyGithubPermit;
   harness?: LangyHarness;
   perDayPrCap: number;
@@ -174,7 +173,7 @@ export class LangyTurnSharedService {
   }
 
   async reconstructPartialAnswer(
-    tokenBuffer: LangyTokenBuffer,
+    tokenBuffer: LangyTokenBufferRepository,
     { conversationId, turnId }: { conversationId: string; turnId: string },
   ): Promise<string> {
     const { reads } = await tokenBuffer.readTail({ conversationId, turnId });

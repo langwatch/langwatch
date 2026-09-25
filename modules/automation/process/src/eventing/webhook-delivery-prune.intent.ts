@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
-import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
+import type { AutomationScheduledIntent } from "../app/automation.members.ts";
+import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 
 const logger = createLogger("langwatch:automation:webhook-delivery-prune");
 const PRUNE_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -13,7 +13,7 @@ export const webhookDeliveryPruneIntentSchema = z.object({
 
 export function runWebhookDeliveryPrune(
   scheduledIntents: AutomationScheduledIntent,
-  retention: AutomationIntentRetention,
+  retention: AutomationIntentRetentionRepository,
 ): (input: z.infer<typeof webhookDeliveryPruneIntentSchema>) => Promise<void> {
   return async (input: z.infer<typeof webhookDeliveryPruneIntentSchema>): Promise<void> => {
     const deleted = await scheduledIntents.pruneWebhookDeliveries();

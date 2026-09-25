@@ -44,17 +44,17 @@ import type { AutomationRunawayNotice } from "../channels/automation-runaway-not
 import { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
-import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
+import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
-import type { AutomationRunaway } from "../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import type {
   AutomationScheduledJobRepository,
   ScheduledJobRecord,
 } from "../repositories/automation-scheduled-job.repository.ts";
 import { AutomationSettlementBreach } from "../repositories/automation-settlement-ledger.repository.ts";
 import type {
-  AutomationSettlementEvaluationReader,
-  AutomationSettlementTraceReader,
+  AutomationSettlementEvaluationRepository,
+  AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import {
@@ -75,18 +75,9 @@ import {
 } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../repositories/redis/redis.automation-persist-cap.repository.ts";
-import { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
-import type {
-  AutomationDispatchError,
-  AutomationHeartbeat,
-  AutomationLogger,
-} from "../services/automation-graph-runtime.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
-import type { AutomationRunawaySignals } from "../services/automation-runaway-signals.service.ts";
-import { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
-import type { AutomationSettlementExecutor } from "../services/automation-settlement-executor.service.ts";
 import type { AutomationSettlementLedgerService } from "../services/automation-settlement-ledger.service.ts";
 import {
   AutomationSettlementMatchConfirmationService,
@@ -116,10 +107,17 @@ import type {
   AutomationTraceFilterCompiler,
   AutomationWebhookStoredParams,
 } from "./automation.app.ts";
-import type {
-  AutomationClock,
-  AutomationGraphActivity,
-  AutomationProjectDirectory,
+import {
+  AutomationDatasetMapper,
+  type AutomationDispatchError,
+  type AutomationHeartbeat,
+  type AutomationLogger,
+  type AutomationRunawaySignals,
+  AutomationScheduledIntent,
+  type AutomationSettlementExecutor,
+  type AutomationClock,
+  type AutomationGraphActivity,
+  type AutomationProjectDirectory,
 } from "./automation.members.ts";
 
 /** What `buildAutomationInfrastructure` reads off process members. */
@@ -408,7 +406,7 @@ class UnmeasuredApiAutomationHeartbeat implements AutomationHeartbeat {
  * nobody actually counts against.
  */
 class UncontainedApiAutomationRunaway
-  implements AutomationRunaway, AutomationRunawayNotice, AutomationRunawaySignals
+  implements AutomationRunawayRepository, AutomationRunawayNotice, AutomationRunawaySignals
 {
   constructor(private readonly logger: Logger) {}
 
@@ -636,7 +634,7 @@ export type AutomationPersistCeiling =
     }>;
 
 /** Everything containment reads, once the ledger it filters through exists. */
-export type AutomationRunawayCollaborator = AutomationRunaway &
+export type AutomationRunawayCollaborator = AutomationRunawayRepository &
   AutomationRunawayNotice &
   AutomationRunawaySignals;
 
@@ -662,14 +660,14 @@ export function createAutomationSettlement(input: {
   /** Where the daily ceiling counts: a Redis one counts fleet-wide. */
   persistCapSlots: AutomationPersistCapRepository;
   projects: AutomationProjectDirectory;
-  traces: AutomationSettlementTraceReader;
-  evaluations: AutomationSettlementEvaluationReader;
+  traces: AutomationSettlementTraceRepository;
+  evaluations: AutomationSettlementEvaluationRepository;
   /** How a saved automation's own filters are re-checked against the trace it matched. */
   traceFilters: AutomationSettlementTraceFilters;
   evaluationFilters: AutomationSettlementEvaluationFilters;
   /** `ADD_TO_DATASET`'s row mapping, and the two persist writes. */
   mapper: AutomationDatasetMapper;
-  writer: AutomationPersistActionWriter;
+  writer: AutomationPersistActionRepository;
   /**
    * The process's outbound transports, the ceilings they spend, and the cipher
    * they read secrets with.
@@ -867,7 +865,7 @@ export class DatasetTraceMapper extends AutomationDatasetMapper {
 const ANNOTATOR_REFERENCE_INVALID = "annotation_annotator_reference_invalid";
 
 /** The two persist writes, through the dataset and annotation owners' own operations. */
-export class PeerPersistActionWriter extends AutomationPersistActionWriter {
+export class PeerPersistActionWriter extends AutomationPersistActionRepository {
   constructor(
     private readonly peers: Readonly<{
       datasets: Pick<DatasetApi, "batchCreateRecords">;

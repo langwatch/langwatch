@@ -9,7 +9,7 @@ export type LangyAnalyticsEventRecord = {
  * is a deployment choice: ClickHouse where the deployment has one, memory
  * otherwise. Retention days travel with each write; the tenant decides.
  */
-export abstract class LangyAnalyticsEventSink {
+export abstract class LangyAnalyticsEventRepository {
   /** One row, written on the tenant's retention. */
   abstract insert(record: LangyAnalyticsEventRecord, retentionDays: number): Promise<void>;
 

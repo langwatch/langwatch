@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { MemoryWebhookDatabase } from "../memory/memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "../memory/memory.webhook-endpoint.repository.ts";
-import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
+import type { WebhookEndpointRepository } from "../webhook-endpoint.repository.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const OTHER_ORGANIZATION_ID = "organization-2";
@@ -38,7 +38,7 @@ class PassthroughSecrets implements WebhookSecret {
 
 const at = (iso: string): Instant => Temporal.Instant.from(iso);
 
-const backends: readonly Readonly<{ name: string; create: () => WebhookEndpointRuntime }>[] = [
+const backends: readonly Readonly<{ name: string; create: () => WebhookEndpointRepository }>[] = [
   {
     name: "memory",
     create: () =>
@@ -50,7 +50,7 @@ const backends: readonly Readonly<{ name: string; create: () => WebhookEndpointR
 ];
 
 describe.each(backends)("given the $name webhook endpoint repository", ({ create }) => {
-  let repository: WebhookEndpointRuntime;
+  let repository: WebhookEndpointRepository;
 
   beforeEach(() => {
     repository = create();
@@ -178,7 +178,7 @@ describe.each(backends)("given the $name webhook endpoint repository", ({ create
   });
 
   describe("when delivery attempts keep failing past the 72h streak", () => {
-    let endpoint: Awaited<ReturnType<WebhookEndpointRuntime["create"]>>["endpoint"];
+    let endpoint: Awaited<ReturnType<WebhookEndpointRepository["create"]>>["endpoint"];
     let start: Instant;
 
     beforeEach(async () => {

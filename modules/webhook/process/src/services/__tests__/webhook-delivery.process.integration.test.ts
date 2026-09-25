@@ -40,7 +40,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
-import type { WebhookEndpointRuntime } from "../../repositories/webhook-endpoint.repository.ts";
+import type { WebhookEndpointRepository } from "../../repositories/webhook-endpoint.repository.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -90,7 +90,7 @@ let teamId: string;
 let projectId: string;
 let endpointId: string;
 
-let endpoints: WebhookEndpointRuntime;
+let endpoints: WebhookEndpointRepository;
 let store: InMemoryProcessStore;
 let service: ProcessManagerService<WebhookDeliveryState>;
 let dispatcher: OutboxDispatcherService;

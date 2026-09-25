@@ -14,7 +14,10 @@ import {
   type LangyTurnDepsOverrides,
   workerCredentials,
 } from "../../__tests__/support/langy-turn-deps.ts";
-import type { LangyWorkerProbeInput, LangyWorkerWarmInput } from "../../app/langy.members.ts";
+import type {
+  LangyWorkerProbeInput,
+  LangyWorkerWarmInput,
+} from "../../channels/langy-worker.channel.ts";
 import { LangyFinalPartsService } from "../langy-final-parts.service.ts";
 import { LangySessionKeyScopeError } from "../langy-session-key-scope.error.ts";
 import { LangyTurnWarmService } from "../langy-turn-warm.service.ts";

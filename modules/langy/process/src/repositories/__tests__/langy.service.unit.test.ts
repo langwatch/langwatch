@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangyConversationService } from "../../services/langy-conversation.service.ts";
 import type { LangyCredentialService } from "../../services/langy-credential.service.ts";
-import { LangyFeedbackPromptPolicy } from "../../services/langy-feedback-prompt.service.ts";
+import { LangyFeedbackPromptService } from "../../services/langy-feedback-prompt.service.ts";
 import type { LangyMessageService } from "../../services/langy-message.service.ts";
 import type { LangyTurnService } from "../../services/langy-turn.service.ts";
 import { LangyService } from "../../services/langy.service.ts";
@@ -16,7 +16,7 @@ import { LangyService } from "../../services/langy.service.ts";
 function feedbackPrompt() {
   const values = new Map<string, string>();
   return {
-    service: LangyFeedbackPromptPolicy.create({
+    service: LangyFeedbackPromptService.create({
       redis: {
         get: async (key: string) => values.get(key) ?? null,
         set: async (key: string, value: string) => {
@@ -30,7 +30,7 @@ function feedbackPrompt() {
 }
 
 /** Composed the way production composes it; feedback reaches no collaborator. */
-function service(prompt: LangyFeedbackPromptPolicy) {
+function service(prompt: LangyFeedbackPromptService) {
   return LangyService.create({
     conversations: createApiFixture<LangyConversationService>({}),
     turns: createApiFixture<LangyTurnService>({}),

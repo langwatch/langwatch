@@ -21,8 +21,8 @@ import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
-import type { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
-import type { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "./repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
 import {
@@ -189,7 +189,7 @@ export function createAutomationGraphActivity(input: {
  * filter is built here, not handed in, so a caller can't reclassify a query.
  */
 export function createAutomationEvaluationSubscriber(input: {
-  triggers: AutomationTraceTriggerCatalogue;
+  triggers: AutomationTraceTriggerCatalogueRepository;
   graphActivity: AutomationGraphActivity;
   /** The trace summary a match is confirmed against, and how its query is read. */
   traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
@@ -347,7 +347,7 @@ export function createAutomationCustomGraphs(database: CustomGraphDatabase): Cus
 /** The settlement ledger, over the daily ceiling this deployment enforces. */
 export function createAutomationSettlementLedger(
   options: Parameters<typeof PrismaAutomationSettlementLedgerRepository.create>[0],
-): AutomationSettlementLedger {
+): AutomationSettlementLedgerRepository {
   return PrismaAutomationSettlementLedgerRepository.create(options);
 }
 
@@ -355,6 +355,6 @@ export function createAutomationSettlementLedger(
 export function createAutomationTraceTriggerCatalogue(input: {
   prisma: AutomationTraceTriggerCatalogueDatabase;
   clock: AutomationClock;
-}): AutomationTraceTriggerCatalogue {
+}): AutomationTraceTriggerCatalogueRepository {
   return PrismaAutomationTraceTriggerCatalogueRepository.create(input);
 }

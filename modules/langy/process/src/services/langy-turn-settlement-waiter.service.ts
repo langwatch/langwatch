@@ -10,7 +10,7 @@ import {
   type LangyTurnSettlementWait,
 } from "@langwatch/langy-contract";
 
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 
 export type LangyTurnSettlementReader = {
   getEventsAfter(input: {
@@ -26,7 +26,7 @@ export type LangyTurnSettlementReader = {
 };
 
 /** One turn's live edge over a borrowed blocking connection; `release` gives it back. */
-export type LangyTurnBufferWatch = { buffer: LangyTokenBuffer; release: () => void };
+export type LangyTurnBufferWatch = { buffer: LangyTokenBufferRepository; release: () => void };
 export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;
 
 const bufferedPollMs = 5_000;
@@ -169,7 +169,7 @@ export class LangyTurnSettlementWaiterService {
   }
 
   private static async watchBufferForTerminal(
-    buffer: LangyTokenBuffer,
+    buffer: LangyTokenBufferRepository,
     input: { conversationId: string; turnId: string; signal: AbortSignal },
   ): Promise<void> {
     const { reads, lastId } = await buffer.readTail({

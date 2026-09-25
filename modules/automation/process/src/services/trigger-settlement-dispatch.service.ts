@@ -3,6 +3,7 @@ import { isDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationClock, AutomationProjectDirectory } from "../app/automation.members.ts";
+import { AutomationSettlementExecutor } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type {
   LogOverflowIntent,
@@ -10,12 +11,11 @@ import type {
   PersistMatchIntent,
 } from "../eventing/trigger-settlement.intent.ts";
 import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../eventing/trigger-settlement.intent.ts";
-import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
-import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceRepository } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
-import { AutomationSettlementExecutor } from "./automation-settlement-executor.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
@@ -25,9 +25,9 @@ import { TriggerSettlementPersistenceService } from "./trigger-settlement-persis
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 
 type SettlementComposition = {
-  automation: AutomationSettlementLedger;
+  automation: AutomationSettlementLedgerRepository;
   projects: AutomationProjectDirectory;
-  traces: AutomationSettlementTraceReader;
+  traces: AutomationSettlementTraceRepository;
   confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;
   delivery: AutomationNotificationDelivery;

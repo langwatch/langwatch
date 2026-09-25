@@ -15,7 +15,7 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 
 /** The credential behind one socket, once it resolved to a conversation. */
 export interface ControlCredential {
@@ -99,7 +99,7 @@ export type ControlSkipGate = (args: {
 }) => Promise<{ allowed: boolean }>;
 
 /** The live edge the core writes the folder's comings and goings to. */
-export type ControlBuffer = Pick<LangyTokenBuffer, "appendLocalWorkspace">;
+export type ControlBuffer = Pick<LangyTokenBufferRepository, "appendLocalWorkspace">;
 
 /** The one turn call the core makes, as a type, so a test needs no worker. */
 export interface ControlTurnStarter {

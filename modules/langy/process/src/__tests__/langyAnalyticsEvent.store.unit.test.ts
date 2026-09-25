@@ -5,7 +5,7 @@ import {
 } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyAnalyticsEventSink } from "../repositories/langy-analytics-event.repository.ts";
+import { LangyAnalyticsEventRepository } from "../repositories/langy-analytics-event.repository.ts";
 
 const record: LangyAnalyticsEventProjectionRecord = {
   eventId: "event_1",
@@ -23,7 +23,7 @@ const record: LangyAnalyticsEventProjectionRecord = {
   acceptedAtMs: 1_100,
 };
 
-class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventSink {
+class FakeLangyAnalyticsEventSink extends LangyAnalyticsEventRepository {
   readonly insert = vi.fn().mockResolvedValue(undefined);
   readonly insertBatch = vi.fn().mockResolvedValue(undefined);
 }

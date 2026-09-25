@@ -23,7 +23,7 @@ import {
   WEBHOOK_DISABLED_REASON_MANUAL,
 } from "../../services/webhook-endpoint-policy.service.ts";
 import type {
-  WebhookEndpointRuntime,
+  WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
   WebhookEndpointStatusSnapshot,
 } from "../webhook-endpoint.repository.ts";
@@ -345,7 +345,7 @@ function assertValidSqsUpdate({
  * same failure-streak bookkeeping as the Postgres twin, over a `Map` instead
  * of a table, so the app can be driven without a database.
  */
-export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
+export class MemoryWebhookEndpointRepository implements WebhookEndpointRepository {
   readonly #database: MemoryWebhookDatabase;
   readonly #options: WebhookEndpointServiceOptions;
   readonly #configuration: WebhookEndpointConfiguration;

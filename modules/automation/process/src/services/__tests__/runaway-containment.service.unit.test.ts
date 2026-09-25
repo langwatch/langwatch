@@ -6,13 +6,13 @@ import type {
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type { AutomationRunawaySignals } from "../../app/automation.members.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
-import { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
-import type { AutomationRunawaySignals } from "../automation-runaway-signals.service.ts";
+import { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
 import { RunawayContainmentService, RUNAWAY_PAUSE_REASON } from "../runaway-containment.service.ts";
 
 class TestRunawaySignals
-  extends AutomationRunaway
+  extends AutomationRunawayRepository
   implements AutomationRunawayNotice, AutomationRunawaySignals
 {
   readonly paused = vi.fn();

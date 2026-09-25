@@ -21,7 +21,7 @@ import {
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
-  LangyLocalPresence,
+  LangyLocalPresenceRepository,
   type OwedConnectTurn,
   type PresenceDeregistration,
   owedConnectTurnSchema,
@@ -37,7 +37,7 @@ export interface LocalPresenceOptions {
   presenceTtlMs?: number;
 }
 
-export class LangyLocalPresenceRedisRepository extends LangyLocalPresence {
+export class LangyLocalPresenceRedisRepository extends LangyLocalPresenceRepository {
   private readonly store: SessionStateStore;
   private readonly presenceTtlMs: number;
   readonly now: () => number;

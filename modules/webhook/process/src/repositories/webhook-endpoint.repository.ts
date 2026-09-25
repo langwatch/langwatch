@@ -31,7 +31,7 @@ export type WebhookEndpointStatusSnapshot = {
   lastFailureAt: Instant | null;
 };
 
-export interface WebhookEndpointRuntime {
+export interface WebhookEndpointRepository {
   create(
     input: CreateWebhookEndpointCommand,
   ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;

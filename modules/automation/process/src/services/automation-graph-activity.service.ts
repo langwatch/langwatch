@@ -10,6 +10,8 @@ import type {
   AutomationProjectDirectory,
   AutomationClock,
   AutomationGraphDelivery,
+  AutomationDispatchError,
+  AutomationLogger,
 } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
@@ -17,10 +19,6 @@ import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-s
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
-import {
-  type AutomationDispatchError,
-  type AutomationLogger,
-} from "./automation-graph-runtime.service.ts";
 import { type AutomationSlackBotTokenDecryptor } from "./automation-slack-secrets.service.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";

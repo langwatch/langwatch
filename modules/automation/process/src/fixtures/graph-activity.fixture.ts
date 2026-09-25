@@ -3,7 +3,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {
   AutomationDispatchError,
   AutomationLogger,
-} from "../services/automation-graph-runtime.service.ts";
+} from "../app/automation.members.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 

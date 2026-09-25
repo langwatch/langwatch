@@ -21,7 +21,7 @@ export {
 } from "@langwatch/webhook-contract";
 export type { WebhookEndpointDeps } from "./repositories/prisma/prisma.webhook-endpoint.repository.ts";
 export type {
-  WebhookEndpointRuntime,
+  WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
   WebhookEndpointStatusSnapshot,
 } from "./repositories/webhook-endpoint.repository.ts";

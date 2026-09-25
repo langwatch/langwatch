@@ -3,14 +3,14 @@ import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyDispatchOutcome,
   LangyWorkerMetrics,
   LangyWorker,
-} from "../../app/langy.members.ts";
-import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../eventing/langy-conversation-process.schemas.ts";
+} from "../langy-worker.channel.ts";
 
-export type { LangyDispatchOutcome } from "../../app/langy.members.ts";
+export type { LangyDispatchOutcome } from "../langy-worker.channel.ts";
 
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 const AGENT_PROBE_TIMEOUT_MS = 1_000;
@@ -27,7 +27,7 @@ export type LangyWorkerHttpConfig = {
   internalSecret: string;
 };
 
-export type LangyWorkerAdapterConfig = LangyWorkerHttpConfig & {
+export type LangyWorkerChannelConfig = LangyWorkerHttpConfig & {
   metrics: LangyWorkerMetrics;
 };
 
@@ -60,7 +60,7 @@ function dispatchOutcome(response: Response): LangyDispatchOutcome {
   return "unavailable";
 }
 
-function buildLangyWorker(config: LangyWorkerAdapterConfig): LangyWorker {
+function buildLangyWorker(config: LangyWorkerChannelConfig): LangyWorker {
   const { agentUrl, internalSecret, metrics } = config;
   const logger = createLogger("langwatch:langy:worker");
   const tracer = getLangWatchTracer("langwatch.langy.chat");
@@ -239,7 +239,7 @@ function buildLangyWorker(config: LangyWorkerAdapterConfig): LangyWorker {
 
 /** HTTP adapter for the process-owned Langy worker manager. */
 export class HttpLangyWorkerChannel {
-  static create(config: LangyWorkerAdapterConfig): LangyWorker {
+  static create(config: LangyWorkerChannelConfig): LangyWorker {
     return buildLangyWorker(config);
   }
 }

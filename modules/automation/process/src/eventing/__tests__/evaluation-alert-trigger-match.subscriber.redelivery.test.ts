@@ -23,7 +23,7 @@ import {
   AutomationEvaluationTriggerFilterService,
   type AutomationTriggerMatchRecorder,
 } from "../../index.ts";
-import type { AutomationTraceTriggerCatalogue } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationTraceTriggerCatalogueRepository } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 function trigger(): TriggerSummary {
   return {
@@ -168,7 +168,9 @@ class TestTraceService
  * evaluation is unreached, but the double still satisfies the port so
  * `create` type-checks against the same two narrow ports production uses.
  */
-class TestAutomationService implements AutomationTraceTriggerCatalogue, AutomationGraphActivity {
+class TestAutomationService
+  implements AutomationTraceTriggerCatalogueRepository, AutomationGraphActivity
+{
   private readonly unavailable = (): never => {
     throw new Error("not used by this subscriber");
   };

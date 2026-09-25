@@ -5,8 +5,8 @@ import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationClock, AutomationProjectDirectory } from "../app/automation.members.ts";
-import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
-import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementTraceRepository } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
@@ -16,9 +16,9 @@ const CONFIRM_CONCURRENCY = 4;
 const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
-  automation: AutomationSettlementLedger;
+  automation: AutomationSettlementLedgerRepository;
   projects: AutomationProjectDirectory;
-  traces: AutomationSettlementTraceReader;
+  traces: AutomationSettlementTraceRepository;
   confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;
   clock: AutomationClock;

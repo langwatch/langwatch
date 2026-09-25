@@ -59,9 +59,7 @@ export function ScenarioGridCard({
       </Box>
       {onCancel && isCancellableStatus(scenarioRun.status) && (
         <HStack
-          as="span"
-          role="button"
-          tabIndex={isCancelling ? -1 : 0}
+          asChild
           gap={1}
           paddingX={2}
           paddingY={0.5}
@@ -82,19 +80,14 @@ export function ScenarioGridCard({
             e.stopPropagation();
             if (!isCancelling) onCancel();
           }}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (!isCancelling && (e.key === "Enter" || e.key === " ")) {
-              e.stopPropagation();
-              e.preventDefault();
-              onCancel();
-            }
-          }}
           aria-label="Stop run"
           aria-disabled={isCancelling}
           data-testid="cancel-run-button"
         >
-          {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
-          <Text fontSize="xs">Stop</Text>
+          <button type="button">
+            {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
+            <Text fontSize="xs">Stop</Text>
+          </button>
         </HStack>
       )}
     </Box>

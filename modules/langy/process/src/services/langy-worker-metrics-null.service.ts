@@ -1,4 +1,4 @@
-import { LangyWorkerMetrics } from "../app/langy.members.ts";
+import { LangyWorkerMetrics } from "../channels/langy-worker.channel.ts";
 
 export class LangyWorkerMetricsNullService extends LangyWorkerMetrics {
   private constructor() {

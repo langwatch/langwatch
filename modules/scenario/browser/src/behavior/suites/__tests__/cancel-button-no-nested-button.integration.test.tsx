@@ -47,25 +47,10 @@ describe("<ScenarioGridCard/> per-row Cancel button structure (regression #3192)
       );
 
       const cancelButton = screen.getByTestId("cancel-run-button");
-      // The cancel control must be an ARIA button on a non-button element so
-      // it can live inside the outer card <button> without invalid HTML
-      // nesting that browsers silently flatten.
-      expect(cancelButton.tagName.toLowerCase()).not.toBe("button");
-      expect(cancelButton.getAttribute("role")).toBe("button");
-
-      // Belt-and-suspenders: assert the parent chain to the outer card button
-      // contains no other <button> in between.
       const outerCardButton = screen.getByLabelText(/View details for/);
+      expect(cancelButton.tagName.toLowerCase()).toBe("button");
       expect(outerCardButton.tagName.toLowerCase()).toBe("button");
-      let node: HTMLElement | null = cancelButton;
-      while (node && node !== outerCardButton) {
-        if (node !== cancelButton && node.tagName.toLowerCase() === "button") {
-          throw new Error(
-            `Unexpected nested <button> found between cancel control and outer card button: ${node.outerHTML.slice(0, 200)}`,
-          );
-        }
-        node = node.parentElement;
-      }
+      expect(outerCardButton.contains(cancelButton)).toBe(false);
     });
   });
 });

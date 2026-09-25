@@ -1,7 +1,7 @@
 import type { TriggerSummary } from "@langwatch/automation-contract";
 
 import type { AutomationClock } from "../app/automation.members.ts";
-import { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 
@@ -10,7 +10,7 @@ import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
  * SAME CACHE, SAME WINDOW as the wide service, so one process can't hold
  * two ideas of which automations are live; staleness is one minute.
  */
-export class AutomationTraceTriggerCatalogueService extends AutomationTraceTriggerCatalogue {
+export class AutomationTraceTriggerCatalogueService extends AutomationTraceTriggerCatalogueRepository {
   static create(input: {
     triggers: TriggerRepository;
     clock: AutomationClock;

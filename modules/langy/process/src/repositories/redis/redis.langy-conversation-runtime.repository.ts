@@ -13,7 +13,8 @@ import type {
 } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LangyTitleGenerator, LangyWorker } from "../../app/langy.members.ts";
+import type { LangyTitleGenerator } from "../../app/langy.members.ts";
+import type { LangyWorker } from "../../channels/langy-worker.channel.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
 import {
   createAgentTurnLivenessSubscriber,

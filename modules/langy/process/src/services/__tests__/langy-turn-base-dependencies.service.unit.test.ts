@@ -11,7 +11,7 @@ import {
   workerCredentials,
   conversationDetail,
 } from "../../__tests__/support/langy-turn-deps.ts";
-import type { LangyWorkerProbeInput } from "../../app/langy.members.ts";
+import type { LangyWorkerProbeInput } from "../../channels/langy-worker.channel.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 function makeFixture(over: LangyTurnDepsOverrides = {}) {

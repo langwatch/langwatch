@@ -16,10 +16,10 @@ import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract"
 
 import type { AutomationClock, AutomationProjectDirectory } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationSettlementLedgerRepository } from "../repositories/automation-settlement-ledger.repository.ts";
 import {
   AutomationTraceRecordUnavailableError,
-  type AutomationSettlementTraceReader,
+  type AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
@@ -34,9 +34,9 @@ import {
 const logger = createLogger("langwatch:automation:settlement-notification");
 
 type NotificationComposition = {
-  automation: AutomationSettlementLedger;
+  automation: AutomationSettlementLedgerRepository;
   projects: AutomationProjectDirectory;
-  traces: AutomationSettlementTraceReader;
+  traces: AutomationSettlementTraceRepository;
   confirmation: AutomationSettlementMatchConfirmation;
   delivery: AutomationNotificationDelivery;
   emailCaps: AutomationEmailCapService;

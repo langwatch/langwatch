@@ -7,10 +7,10 @@ import type {
   LangyTurnAccessRepository,
   LangyTurnHandoffRepository,
 } from "./langy-live-turn.repository.ts";
-import type { LangyLocalPresence } from "./langy-local-presence.repository.ts";
+import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
 import type {
   LangyTokenBufferConnection,
-  LangyTokenBuffer,
+  LangyTokenBufferRepository,
 } from "./langy-token-buffer.repository.ts";
 import { MemoryLangyRepositories } from "./memory/memory.langy.repositories.ts";
 import { PostgresLangyRepositories } from "./redis/redis.langy.repositories.ts";
@@ -25,14 +25,16 @@ export interface LangyRepositories {
   readonly turnHandoff: LangyTurnHandoffRepository;
   readonly frameDedup: LangyFrameDedupRepository;
   readonly resourceLinks: LangyResourceLinksRepository;
-  readonly localPresence: LangyLocalPresence;
+  readonly localPresence: LangyLocalPresenceRepository;
   readonly sessionState: SessionStateStore;
   /**
    * Opens the live edge over one turn's own borrowed connection (ADR-044 part
    * 3): a blocking tail duplicates a connection per stream, so this row is a
    * factory rather than one instance chosen at boot.
    */
-  readonly tokenBuffer: { open(connection: LangyTokenBufferConnection): LangyTokenBuffer };
+  readonly tokenBuffer: {
+    open(connection: LangyTokenBufferConnection): LangyTokenBufferRepository;
+  };
 }
 
 export const langyRepositories = defineRepositories({

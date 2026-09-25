@@ -1,16 +1,16 @@
-import type { ProcessManagerDefinition } from "@langwatch/eventing";
 import type {
   GraphTriggerEvaluationReason,
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
+import type { ProcessManagerDefinition } from "@langwatch/eventing";
+
+import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../app/automation.members.ts";
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
-import { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
-import { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
-import { AutomationSettlementExecutor } from "../services/automation-settlement-executor.service.ts";
+import { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 
 class InertSettlementExecutor extends AutomationSettlementExecutor {
   async notifyDigest(): Promise<void> {}
@@ -38,7 +38,7 @@ export class InertScheduledIntents extends AutomationScheduledIntent {
   }
 }
 
-export class InertIntentRetention extends AutomationIntentRetention {
+export class InertIntentRetention extends AutomationIntentRetentionRepository {
   async deleteDispatchedBefore(): Promise<number> {
     return 0;
   }
@@ -55,7 +55,7 @@ export function automationProcessDefinition({
 }: {
   name: "triggerSettlement" | "graphAlertSweep" | "webhookDeliveryPrune";
   scheduledIntents?: AutomationScheduledIntent;
-  retention?: AutomationIntentRetention;
+  retention?: AutomationIntentRetentionRepository;
 }): ProcessManagerDefinition {
   const dependencies: AutomationsPipelineDeps = {
     settlement: new InertSettlementExecutor(),

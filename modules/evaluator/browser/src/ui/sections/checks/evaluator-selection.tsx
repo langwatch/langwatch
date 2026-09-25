@@ -213,19 +213,10 @@ export function EvaluatorSelection({
                     borderRadius={6}
                     boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
                     cursor={isDisabled ? "default" : "pointer"}
-                    role="button"
-                    // A card is the only way to pick an evaluator, including
-                    // for someone recovering an evaluation whose evaluator is
-                    // gone, so it takes focus and answers the keys a button
-                    // answers. A disabled card stays in the tab order and says
-                    // so, rather than silently doing nothing when activated.
-                    tabIndex={0}
+                    textAlign="left"
+                    asChild
+                    // A disabled card stays in the tab order and says so.
                     aria-disabled={isDisabled ? true : undefined}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" && event.key !== " ") return;
-                      event.preventDefault();
-                      choose();
-                    }}
                     _hover={
                       isDisabled
                         ? undefined
@@ -237,62 +228,44 @@ export function EvaluatorSelection({
                     color={isDisabled ? "gray.400" : undefined}
                     background={isDisabled ? "gray.50" : "white"}
                   >
-                    <VStack align="start" gap={4} position="relative">
-                      {evaluator.isGuardrail && (
-                        <Tooltip
-                          content="This evaluator can be used as a guardrail"
-                          positioning={{ placement: "top" }}
-                        >
-                          <Box
-                            position="absolute"
-                            right="-12px"
-                            top="-12px"
-                            background="blue.100"
-                            borderRadius="100%"
-                            padding="4px"
-                          >
-                            <Shield />
-                          </Box>
-                        </Tooltip>
-                      )}
-                      <HStack>
-                        {evaluator.beta && (
-                          <Tag.Root
-                            size="sm"
-                            colorPalette="pink"
-                            paddingX={2}
-                            fontSize="14px"
-                            marginLeft="-4px"
-                          >
-                            <Tag.Label>Beta</Tag.Label>
-                          </Tag.Root>
-                        )}
-                        <Heading as="h2" size="sm">
-                          {evaluatorDisplayName(evaluator.name)}
-                        </Heading>
-                      </HStack>
-                      {evaluator.unavailable && (
-                        <Tooltip
-                          content={evaluator.unavailable.howToEnable}
-                          positioning={{ placement: "top" }}
-                        >
-                          <Tag.Root
-                            colorPalette="orange"
-                            borderRadius="8px"
-                            padding="4px 8px"
-                            lineHeight="1.5em"
-                          >
-                            <Tag.Label>Not available here</Tag.Label>
-                          </Tag.Root>
-                        </Tooltip>
-                      )}
-                      {!evaluator.unavailable &&
-                        evaluator.missingEnvVars &&
-                        evaluator.missingEnvVars.length > 0 && (
+                    <button type="button">
+                      <VStack align="start" gap={4} position="relative">
+                        {evaluator.isGuardrail && (
                           <Tooltip
-                            // The names are the actionable part for whoever
-                            // runs the install, so the tooltip keeps them.
-                            content={`Set these environment variables to enable it: ${evaluator.missingEnvVars.join(", ")}`}
+                            content="This evaluator can be used as a guardrail"
+                            positioning={{ placement: "top" }}
+                          >
+                            <Box
+                              position="absolute"
+                              right="-12px"
+                              top="-12px"
+                              background="blue.100"
+                              borderRadius="100%"
+                              padding="4px"
+                            >
+                              <Shield />
+                            </Box>
+                          </Tooltip>
+                        )}
+                        <HStack>
+                          {evaluator.beta && (
+                            <Tag.Root
+                              size="sm"
+                              colorPalette="pink"
+                              paddingX={2}
+                              fontSize="14px"
+                              marginLeft="-4px"
+                            >
+                              <Tag.Label>Beta</Tag.Label>
+                            </Tag.Root>
+                          )}
+                          <Heading as="h2" size="sm">
+                            {evaluatorDisplayName(evaluator.name)}
+                          </Heading>
+                        </HStack>
+                        {evaluator.unavailable && (
+                          <Tooltip
+                            content={evaluator.unavailable.howToEnable}
                             positioning={{ placement: "top" }}
                           >
                             <Tag.Root
@@ -301,83 +274,103 @@ export function EvaluatorSelection({
                               padding="4px 8px"
                               lineHeight="1.5em"
                             >
-                              <Tag.Label>Needs configuration</Tag.Label>
+                              <Tag.Label>Not available here</Tag.Label>
                             </Tag.Root>
                           </Tooltip>
                         )}
-                      <Text>
-                        {evaluator.description.replace("Google DLP PII detects", "Detects")}
-                      </Text>
-                      <HStack wrap="wrap">
-                        {evaluator.requiredFields.includes("contexts") && (
-                          <Link
-                            asChild
-                            href="https://docs.langwatch.ai/rags/rags-context-tracking"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <NextLink href="https://docs.langwatch.ai/rags/rags-context-tracking">
-                              <Tooltip
-                                content="Only messages with contexts can run this evaluation, click for more info"
-                                positioning={{ placement: "top" }}
+                        {!evaluator.unavailable &&
+                          evaluator.missingEnvVars &&
+                          evaluator.missingEnvVars.length > 0 && (
+                            <Tooltip
+                              // The names are the actionable part for whoever
+                              // runs the install, so the tooltip keeps them.
+                              content={`Set these environment variables to enable it: ${evaluator.missingEnvVars.join(", ")}`}
+                              positioning={{ placement: "top" }}
+                            >
+                              <Tag.Root
+                                colorPalette="orange"
+                                borderRadius="8px"
+                                padding="4px 8px"
+                                lineHeight="1.5em"
                               >
-                                <Badge colorPalette="orange" whiteSpace="nowrap">
-                                  Requires Contexts
-                                </Badge>
-                              </Tooltip>
-                            </NextLink>
-                          </Link>
-                        )}
-                        {evaluator.requiredFields.includes("expected_output") && (
-                          <Link
-                            asChild
-                            href="https://docs.langwatch.ai/docs/expected_output"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <NextLink href="https://docs.langwatch.ai/docs/expected_output">
-                              <Tooltip
-                                content="Only messages with expected outputs can run this evaluation, click for more info"
-                                positioning={{ placement: "top" }}
-                              >
-                                <Badge
-                                  colorPalette="blue"
-                                  backgroundColor="blue.50"
-                                  color="blue.700"
-                                  whiteSpace="nowrap"
+                                <Tag.Label>Needs configuration</Tag.Label>
+                              </Tag.Root>
+                            </Tooltip>
+                          )}
+                        <Text>
+                          {evaluator.description.replace("Google DLP PII detects", "Detects")}
+                        </Text>
+                        <HStack wrap="wrap">
+                          {evaluator.requiredFields.includes("contexts") && (
+                            <Link
+                              asChild
+                              href="https://docs.langwatch.ai/rags/rags-context-tracking"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <NextLink href="https://docs.langwatch.ai/rags/rags-context-tracking">
+                                <Tooltip
+                                  content="Only messages with contexts can run this evaluation, click for more info"
+                                  positioning={{ placement: "top" }}
                                 >
-                                  Requires Expected Output
-                                </Badge>
-                              </Tooltip>
-                            </NextLink>
-                          </Link>
-                        )}
-                        {evaluator.requiredFields.includes("expected_contexts") && (
-                          <Link
-                            asChild
-                            href="https://docs.langwatch.ai/docs/expected_contexts"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <NextLink href="https://docs.langwatch.ai/docs/expected_contexts">
-                              <Tooltip
-                                content="Only messages with expected contexts can run this evaluation, click for more info"
-                                positioning={{ placement: "top" }}
-                              >
-                                <Badge
-                                  colorPalette="purple"
-                                  backgroundColor="purple.50"
-                                  color="purple.700"
-                                  whiteSpace="nowrap"
+                                  <Badge colorPalette="orange" whiteSpace="nowrap">
+                                    Requires Contexts
+                                  </Badge>
+                                </Tooltip>
+                              </NextLink>
+                            </Link>
+                          )}
+                          {evaluator.requiredFields.includes("expected_output") && (
+                            <Link
+                              asChild
+                              href="https://docs.langwatch.ai/docs/expected_output"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <NextLink href="https://docs.langwatch.ai/docs/expected_output">
+                                <Tooltip
+                                  content="Only messages with expected outputs can run this evaluation, click for more info"
+                                  positioning={{ placement: "top" }}
                                 >
-                                  Requires Expected Contexts
-                                </Badge>
-                              </Tooltip>
-                            </NextLink>
-                          </Link>
-                        )}
-                      </HStack>
-                    </VStack>
+                                  <Badge
+                                    colorPalette="blue"
+                                    backgroundColor="blue.50"
+                                    color="blue.700"
+                                    whiteSpace="nowrap"
+                                  >
+                                    Requires Expected Output
+                                  </Badge>
+                                </Tooltip>
+                              </NextLink>
+                            </Link>
+                          )}
+                          {evaluator.requiredFields.includes("expected_contexts") && (
+                            <Link
+                              asChild
+                              href="https://docs.langwatch.ai/docs/expected_contexts"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <NextLink href="https://docs.langwatch.ai/docs/expected_contexts">
+                                <Tooltip
+                                  content="Only messages with expected contexts can run this evaluation, click for more info"
+                                  positioning={{ placement: "top" }}
+                                >
+                                  <Badge
+                                    colorPalette="purple"
+                                    backgroundColor="purple.50"
+                                    color="purple.700"
+                                    whiteSpace="nowrap"
+                                  >
+                                    Requires Expected Contexts
+                                  </Badge>
+                                </Tooltip>
+                              </NextLink>
+                            </Link>
+                          )}
+                        </HStack>
+                      </VStack>
+                    </button>
                   </GridItem>
                 );
               })}

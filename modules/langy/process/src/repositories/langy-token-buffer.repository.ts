@@ -18,7 +18,7 @@ export type LangyStreamBlockingRedis = Pick<Redis, "xread">;
  * and a reader replays then follows.
  * A seam because the durability split is the point (ADR-044 part 3): what is
  */
-export abstract class LangyTokenBuffer {
+export abstract class LangyTokenBufferRepository {
   /** Every entry written so far, with the id to follow from. */
   abstract readTail(input: {
     conversationId: string;

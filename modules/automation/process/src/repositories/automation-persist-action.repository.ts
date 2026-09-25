@@ -1,6 +1,6 @@
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 
-export abstract class AutomationPersistActionWriter {
+export abstract class AutomationPersistActionRepository {
   abstract addToAnnotationQueue(input: {
     traceIds: string[];
     projectId: string;

@@ -5,11 +5,8 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type LangyEffectMembers,
-  type LangyTitleGenerator,
-  type LangyWorker,
-} from "../../app/langy.members.ts";
+import { type LangyEffectMembers, type LangyTitleGenerator } from "../../app/langy.members.ts";
+import { type LangyWorker } from "../../channels/langy-worker.channel.ts";
 import type { LangyFailTurnCommand } from "../../eventing/langy-conversation.subscriber.ts";
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";

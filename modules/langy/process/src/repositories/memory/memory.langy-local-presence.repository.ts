@@ -2,7 +2,7 @@ import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
 
 import {
   type ConnectedWorkspace,
-  LangyLocalPresence,
+  LangyLocalPresenceRepository,
   type OwedConnectTurn,
   type PresenceDeregistration,
   type PresenceHeartbeat,
@@ -10,7 +10,7 @@ import {
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
 
 /** Which folder is shared with which conversation, for a process without Redis. */
-export class LangyLocalPresenceMemoryRepository extends LangyLocalPresence {
+export class LangyLocalPresenceMemoryRepository extends LangyLocalPresenceRepository {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }

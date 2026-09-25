@@ -41,8 +41,8 @@ export type {
   ServerEntry,
 } from "./services/automation-provider-registry.service.ts";
 export { AutomationPersistActionService } from "./services/persist-action.service.ts";
-export { AutomationDatasetMapper } from "./services/automation-dataset-mapper.service.ts";
-export { AutomationPersistActionWriter } from "./repositories/automation-persist-action.repository.ts";
+export { AutomationDatasetMapper } from "./app/automation.members.ts";
+export { AutomationPersistActionRepository } from "./repositories/automation-persist-action.repository.ts";
 export {
   computeScheduledFor,
   NOTIFY_TRIGGER_ACTIONS,
@@ -112,15 +112,15 @@ export {
   AutomationLogger,
   AutomationHeartbeat,
   AutomationDispatchError,
-} from "./services/automation-graph-runtime.service.ts";
+} from "./app/automation.members.ts";
 export { AutomationSlackBotTokenDecryptor } from "./services/automation-slack-secrets.service.ts";
 export type { AutomationGraphDelivery } from "./app/automation.members.ts";
 export {
-  AutomationRunaway,
+  AutomationRunawayRepository,
   type ClaimLease,
 } from "./repositories/automation-runaway.repository.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
-export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
+export { AutomationRunawaySignals } from "./app/automation.members.ts";
 export {
   AutomationRunawayService,
   type AutomationRunawayDirectories,
@@ -145,16 +145,16 @@ export {
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
 export { AutomationNotificationDeliveryService } from "./services/automation-notification-delivery.service.ts";
 export type { AutomationSettlementMatchConfirmation } from "./services/automation-settlement-match-confirmation.service.ts";
-export { AutomationSettlementExecutor } from "./services/automation-settlement-executor.service.ts";
+export { AutomationSettlementExecutor } from "./app/automation.members.ts";
 export {
   AutomationSettlementObservability,
   AUTOMATION_OVERFLOW_FLUSH_METRIC_NAME,
   AutomationSettlementObservabilityService,
 } from "./services/automation-settlement-observability.service.ts";
-export { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
+export { AutomationSettlementLedgerRepository } from "./repositories/automation-settlement-ledger.repository.ts";
 export {
-  AutomationSettlementEvaluationReader,
-  AutomationSettlementTraceReader,
+  AutomationSettlementEvaluationRepository,
+  AutomationSettlementTraceRepository,
   AutomationTraceRecordUnavailableError,
 } from "./repositories/automation-settlement-read.repository.ts";
 export {
@@ -181,7 +181,7 @@ export {
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
 } from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
-export { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
+export { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 export { type AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
 export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
@@ -190,8 +190,8 @@ export {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
 } from "./services/trigger-no-reply.service.ts";
-export { AutomationIntentRetention } from "./repositories/automation-intent-retention.repository.ts";
-export { AutomationScheduledIntent } from "./services/automation-scheduled-intent.service.ts";
+export { AutomationIntentRetentionRepository } from "./repositories/automation-intent-retention.repository.ts";
+export { AutomationScheduledIntent } from "./app/automation.members.ts";
 export {
   AutomationTestFire,
   type TestFireEmail,
@@ -256,10 +256,10 @@ export {
   AUTOMATION_AUTO_PAUSED_METRIC_NAME,
   AUTOMATION_CEILING_BREACH_METRIC_NAME,
   AUTOMATION_CONTAINMENT_FAILED_METRIC_NAME,
-  AutomationRunawayMetricsSink,
-  NoopAutomationRunawayMetrics,
-  OtelAutomationRunawayMetricsAdapter,
-} from "./services/automation-runaway-metrics.service.ts";
+  AutomationRunawayMetricsOtelService,
+} from "./services/automation-runaway-metrics-otel.service.ts";
+export { AutomationRunawayMetricsNullService } from "./services/automation-runaway-metrics-null.service.ts";
+export { AutomationRunawayMetricsSink } from "./app/automation.members.ts";
 
 /**
  * What a process composes this feature through. Each takes the substrates the

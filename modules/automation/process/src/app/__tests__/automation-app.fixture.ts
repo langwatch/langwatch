@@ -15,15 +15,17 @@ import type { AutomationGraphNotifier } from "../../channels/automation-graph-al
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
-import type { AutomationRunaway } from "../../repositories/automation-runaway.repository.ts";
+import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
-import type { AutomationLogger } from "../../services/automation-graph-runtime.service.ts";
-import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
-import type { AutomationClock } from "../automation.members.ts";
+import type {
+  AutomationLogger,
+  AutomationRunawaySignals,
+  AutomationClock,
+} from "../automation.members.ts";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationApp;
@@ -83,21 +85,22 @@ export function createCanonicalAutomationApp(): {
     info: vi.fn(),
     warn: vi.fn(),
   };
-  const runaway: AutomationRunaway & AutomationRunawayNotice & AutomationRunawaySignals = {
-    countProjectTraces24h: vi.fn(async () => 0),
-    notificationRecipients: vi.fn(async () => []),
-    sendLimitEmail: vi.fn(async () => undefined),
-    findNextStep: vi.fn(async () => undefined),
-    claimOnce: vi.fn(async () => "already-claimed" as const),
-    releaseClaim: vi.fn(async () => undefined),
-    projectName: vi.fn(async () => "Test project"),
-    automationUrl: vi.fn(async () => "https://app.test/automations"),
-    onCeilingBreach: vi.fn(),
-    onAutoPaused: vi.fn(),
-    onContainmentFailed: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  };
+  const runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals =
+    {
+      countProjectTraces24h: vi.fn(async () => 0),
+      notificationRecipients: vi.fn(async () => []),
+      sendLimitEmail: vi.fn(async () => undefined),
+      findNextStep: vi.fn(async () => undefined),
+      claimOnce: vi.fn(async () => "already-claimed" as const),
+      releaseClaim: vi.fn(async () => undefined),
+      projectName: vi.fn(async () => "Test project"),
+      automationUrl: vi.fn(async () => "https://app.test/automations"),
+      onCeilingBreach: vi.fn(),
+      onAutoPaused: vi.fn(),
+      onContainmentFailed: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    };
   const testFire: AutomationTestFire = {
     sendEmail: vi.fn(async () => undefined),
     sendSlack: vi.fn(async () => undefined),

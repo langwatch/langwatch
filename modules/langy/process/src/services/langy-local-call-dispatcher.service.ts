@@ -30,7 +30,7 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
-import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
 import {
   storedLocalCallSchema,
@@ -53,7 +53,7 @@ const logger = createLogger("langwatch:langy:local-control:dispatcher");
 export type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
 export class LocalCallDispatcherService {
   private readonly store: SessionStateStore;
-  private readonly presence: LangyLocalPresence;
+  private readonly presence: LangyLocalPresenceRepository;
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;

@@ -11,6 +11,7 @@ import {
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { Redis } from "ioredis";
 
+import { type LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
@@ -24,7 +25,7 @@ import type {
   LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
-import { LangyGithubPermit, type LangyWorker } from "./langy.members.ts";
+import { LangyGithubPermit } from "./langy.members.ts";
 
 /** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
 export type LangyGithubPrRedis = Readonly<
@@ -98,7 +99,7 @@ class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
 }
 
 /**
- * Everything `PostgresLangyAdapter.build` needs besides `commands`: the turn
+ * Everything `LangyPostgresService.build` needs besides `commands`: the turn
  * technical members, the credential stubs, and the process's own optional
  * collaborators (events reader, block metrics, the feedback-prompt store).
  */

@@ -14,7 +14,7 @@ import type {
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
 import { handleTraceAlertTriggerMatch } from "../eventing/trace-alert-trigger-match.subscriber.ts";
-import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { AutomationTraceTriggerCatalogueRepository } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { AutomationMatchRecordMetricsSink } from "./automation-match-record-metrics.service.ts";
 
 /**
@@ -23,7 +23,7 @@ import type { AutomationMatchRecordMetricsSink } from "./automation-match-record
  */
 export class AutomationEvaluationSubscriberService {
   static create(input: {
-    triggers: AutomationTraceTriggerCatalogue;
+    triggers: AutomationTraceTriggerCatalogueRepository;
     graphActivity: AutomationGraphActivity;
     traces: AutomationEvaluationTraceSummary;
     evaluationFilters: AutomationEvaluationTriggerFilter;
@@ -35,7 +35,7 @@ export class AutomationEvaluationSubscriberService {
 
   private constructor(
     private readonly deps: {
-      triggers: AutomationTraceTriggerCatalogue;
+      triggers: AutomationTraceTriggerCatalogueRepository;
       graphActivity: AutomationGraphActivity;
       traces: AutomationEvaluationTraceSummary;
       evaluationFilters: AutomationEvaluationTriggerFilter;

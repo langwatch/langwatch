@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 
 import {
-  LangyAnalyticsEventSink,
+  LangyAnalyticsEventRepository,
   type LangyAnalyticsEventRecord,
 } from "../langy-analytics-event.repository.ts";
 
@@ -95,7 +95,7 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
 /** Event-grain Langy analytics to ClickHouse. Wire format (table name, columns, async settings,
  * one-tenant guard) is literal in tests, not schema-derived. `wait_for_async_insert` differs
  * between entry points: single appends (projection writes) vs batches (bulk flushes). */
-export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEventSink {
+export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEventRepository {
   static create(
     resolveClient: LangyAnalyticsClickHouseClientResolver,
   ): LangyAnalyticsEventClickHouseRepository {

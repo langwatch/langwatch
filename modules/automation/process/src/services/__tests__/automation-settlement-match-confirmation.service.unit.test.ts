@@ -7,7 +7,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { AutomationSettlementTraceReader } from "../../repositories/automation-settlement-read.repository.ts";
+import { AutomationSettlementTraceRepository } from "../../repositories/automation-settlement-read.repository.ts";
 import {
   AutomationSettlementMatchConfirmationService,
   type AutomationSettlementEvaluationFilters,
@@ -61,7 +61,7 @@ class TestEvaluations {
   }
 }
 
-class TestTraces extends AutomationSettlementTraceReader {
+class TestTraces extends AutomationSettlementTraceRepository {
   // `TraceService` grew these and the fakes did not follow. A member left
   // off a double is a method the real service has that no test here would
   // notice going wrong.

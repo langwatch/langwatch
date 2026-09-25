@@ -9,7 +9,7 @@ import { type Instant } from "@langwatch/time";
 import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import {
-  AutomationSettlementLedger,
+  AutomationSettlementLedgerRepository,
   type AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "../repositories/automation-settlement-ledger.repository.ts";
@@ -23,7 +23,7 @@ import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
  * Settlement reads/writes must use {@link ActiveTriggerCacheService} to prevent
  * duplicate caches from giving different answers about live automations.
  */
-export class AutomationSettlementLedgerService extends AutomationSettlementLedger {
+export class AutomationSettlementLedgerService extends AutomationSettlementLedgerRepository {
   static create(input: {
     triggers: TriggerRepository;
     suppressions: EmailSuppressionRepository;

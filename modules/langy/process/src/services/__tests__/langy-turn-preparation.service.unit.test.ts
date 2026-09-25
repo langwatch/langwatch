@@ -13,7 +13,7 @@ import {
   workerCredentials,
   conversationDetail,
 } from "../../__tests__/support/langy-turn-deps.ts";
-import type { LangyWorker } from "../../app/langy.members.ts";
+import type { LangyWorker } from "../../channels/langy-worker.channel.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 /**

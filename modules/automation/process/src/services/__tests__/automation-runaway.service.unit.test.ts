@@ -1,7 +1,7 @@
 import { EmailDelivery } from "@langwatch/notification-process";
 import { describe, expect, it, vi } from "vitest";
 
-import { NoopAutomationRunawayMetrics } from "../automation-runaway-metrics.service.ts";
+import { AutomationRunawayMetricsNullService } from "../automation-runaway-metrics-null.service.ts";
 import { AutomationRunawayService } from "../automation-runaway.service.ts";
 
 class NoopMailer extends EmailDelivery {
@@ -38,7 +38,7 @@ function adapter(
     suppression: { filterSuppressed },
     mailer: new NoopMailer(),
     resolveClickHouseClient: vi.fn().mockResolvedValue(null),
-    metrics: NoopAutomationRunawayMetrics.create(),
+    metrics: AutomationRunawayMetricsNullService.create(),
     baseHost: "https://app.langwatch.test",
   });
 }
@@ -104,7 +104,7 @@ describe("given a worker holding an automation containment claim", () => {
           suppression: { filterSuppressed: vi.fn() },
           mailer: new NoopMailer(),
           resolveClickHouseClient: vi.fn(),
-          metrics: NoopAutomationRunawayMetrics.create(),
+          metrics: AutomationRunawayMetricsNullService.create(),
           baseHost: "https://app.langwatch.test",
         });
 

@@ -7,9 +7,11 @@ import {
 import { defineAggregate, definePipeline, defineCommand, EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 
-import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
-import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";
-import type { AutomationSettlementExecutor } from "../services/automation-settlement-executor.service.ts";
+import type {
+  AutomationScheduledIntent,
+  AutomationSettlementExecutor,
+} from "../app/automation.members.ts";
+import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -68,7 +70,7 @@ export type AutomationEvent = TriggerMatchRecordedEvent;
 export interface AutomationsPipelineDeps {
   scheduledIntents: AutomationScheduledIntent;
   settlement: AutomationSettlementExecutor;
-  retention: AutomationIntentRetention;
+  retention: AutomationIntentRetentionRepository;
 }
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */

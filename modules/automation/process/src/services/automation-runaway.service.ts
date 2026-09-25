@@ -9,12 +9,14 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
+import type {
+  AutomationHeartbeat,
+  AutomationRunawayMetricsSink,
+} from "../app/automation.members.ts";
 import {
-  AutomationRunaway,
+  AutomationRunawayRepository,
   type ClaimLease,
 } from "../repositories/automation-runaway.repository.ts";
-import type { AutomationHeartbeat } from "./automation-graph-runtime.service.ts";
-import type { AutomationRunawayMetricsSink } from "./automation-runaway-metrics.service.ts";
 
 const traceCountRowsSchema = z.array(z.object({ Total: z.string() }));
 
@@ -53,7 +55,7 @@ export type AutomationNextStepResolver = Readonly<{
  * Infrastructure for Automation's runaway containment, in this process. Owns the
  * substrates that policy names (trace counts, admin roll, mailer, etc.).
  */
-export class AutomationRunawayService extends AutomationRunaway {
+export class AutomationRunawayService extends AutomationRunawayRepository {
   static create(input: {
     redis: RedisConnection | null;
     directories: AutomationRunawayDirectories;

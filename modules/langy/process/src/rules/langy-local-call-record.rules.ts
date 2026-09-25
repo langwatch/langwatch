@@ -11,8 +11,8 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
  */
 import { z } from "zod";
 
-import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 
 /** What the platform keeps about one call while it is in flight. */
 export const storedLocalCallSchema = z
@@ -61,11 +61,11 @@ export type WorkspaceNudge = z.infer<typeof workspaceNudgeSchema>;
  * The live edge of the turn a call belongs to: the liveness key that says the
  * turn is still being worked on, and the activity line the panel reads.
  */
-export type LocalCallBuffer = Pick<LangyTokenBuffer, "appendStatus" | "heartbeat">;
+export type LocalCallBuffer = Pick<LangyTokenBufferRepository, "appendStatus" | "heartbeat">;
 
 export interface LocalCallDispatcherOptions {
   store: SessionStateStore;
-  presence: LangyLocalPresence;
+  presence: LangyLocalPresenceRepository;
   buffer?: LocalCallBuffer;
   now?: () => number;
   /** Test knob: how long a first call waits for the folder to appear. */
