@@ -5,7 +5,13 @@
  * The process parses the schema once and hands the result down; a secret is
  * resolved only through its handle, never read from `process.env`.
  */
-import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
+  type ConfigOf,
+} from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
 import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets";
 import { Secret } from "@langwatch/secrets/secret";
@@ -30,8 +36,12 @@ export const governanceSecrets = {
   ottlSigningSecret: gatewayInternalSecret,
 } as const;
 
-/** The deployment facts governance reads: where issued personal keys send traffic. */
-export const governanceConfig = Config.define(() => ({ gatewayPublicUrl, gatewayLegacyUrl }));
+/** Where issued personal keys send traffic, and where OTTL calls reach the gateway. */
+export const governanceConfig = Config.define(() => ({
+  gatewayPublicUrl,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+}));
 export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
 
 /** Main's precedence: the public URL, the legacy base URL, then the SaaS or local default. */

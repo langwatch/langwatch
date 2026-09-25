@@ -458,6 +458,43 @@ export interface GovernanceRestApi {
     input: { id: string; organizationId: string },
     by: EntitlementOperator,
   ): Promise<AnomalyRule>;
+
+  activitySummary(
+    input: ActivityMonitorWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<ActivityMonitorSummary>;
+  activitySpendByUser(
+    input: ActivityMonitorPagedWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByUserRow[]>;
+  activitySpendByTeam(
+    input: ActivityMonitorPagedWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByTeamRow[]>;
+  activitySpendByDepartment(
+    input: ActivityMonitorWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByDepartmentRow[]>;
+  activitySpendOverTime(
+    input: ActivityMonitorWindowQuery & { groupBy: SpendOverTimeGroupBy },
+    by: EntitlementOperator,
+  ): Promise<SpendOverTimeResult>;
+  activityRecentAnomalies(
+    input: { organizationId: string; limit: number },
+    by: EntitlementOperator,
+  ): Promise<RecentAnomalyRow[]>;
+  activityIngestionSourcesHealth(
+    input: { organizationId: string },
+    by: EntitlementOperator,
+  ): Promise<IngestionSourceHealthRow[]>;
+  activityEventsForSource(
+    input: { organizationId: string; sourceId: string; limit: number; beforeIso?: string },
+    by: EntitlementOperator,
+  ): Promise<ActivityEventDetailRow[]>;
+  activitySourceHealthMetrics(
+    input: { organizationId: string; sourceId: string },
+    by: EntitlementOperator,
+  ): Promise<SourceHealthMetrics>;
   templateListForUser(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateListForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]>;
   templateGetByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate>;

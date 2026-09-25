@@ -1,3 +1,4 @@
+export * from "./activity-monitor.trpc.ts";
 export * from "./anomaly-rule.ts";
 export * from "./anomaly-rules.trpc.ts";
 export * from "./agents-listing.ts";

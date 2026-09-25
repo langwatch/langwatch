@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type {
+  ActivityMonitorRepository,
   AnomalySpendReader,
   GovernanceKpiContributionWriter,
   GovernanceOcsfEventsReader,
@@ -49,6 +50,7 @@ import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.reposito
  * seven template operations no longer need the ~100-operation facade.
  */
 export interface GovernanceRepositories {
+  readonly activityMonitor: ActivityMonitorRepository;
   readonly anomalyRules: AnomalyRuleRepository;
   readonly departments: DepartmentRepository;
   readonly directory: GovernanceDirectoryRepository;

@@ -1,4 +1,10 @@
-import { Config, gatewayLegacyUrl, gatewayPublicUrl, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
+  type ConfigOf,
+} from "@langwatch/config";
 import { z } from "zod";
 
 import type { GatewayCacheRuleResource } from "./gateway-cache-rule.ts";
@@ -13,7 +19,7 @@ export const gatewayConfig = Config.define((c) => ({
   /** How long after a request an outcome may still arrive. */
   spendSettlementGraceMs: c.env("LW_SPEND_SETTLEMENT_GRACE_MS", z.string().optional()),
   /** Where this control plane reaches the gateway's own surface. */
-  internalUrl: c.env("LW_GATEWAY_INTERNAL_URL", z.string().optional()),
+  internalUrl: gatewayInternalUrl,
   /** Where the gateway is told to reach this control plane; the public base URL otherwise. */
   controlPlaneUrl: c.env("GATEWAY_CONTROL_PLANE_URL", z.string().optional()),
   /** Where apps reach the gateway, when no internal address is set. Legacy name, still honoured. */

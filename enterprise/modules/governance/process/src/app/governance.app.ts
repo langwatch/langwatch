@@ -111,6 +111,18 @@ import {
   type CliUserInput,
   type RevokeCliSessionInput,
   type AnomalyRule,
+  type ActivityEventDetailRow,
+  type ActivityMonitorPagedWindowQuery,
+  type ActivityMonitorSummary,
+  type ActivityMonitorWindowQuery,
+  type IngestionSourceHealthRow,
+  type RecentAnomalyRow,
+  type SourceHealthMetrics,
+  type SpendByDepartmentRow,
+  type SpendByTeamRow,
+  type SpendByUserRow,
+  type SpendOverTimeGroupBy,
+  type SpendOverTimeResult,
   type CreateAnomalyRuleInput,
   type UpdateAnomalyRuleInput,
   type ArchiveIngestionTemplateInput,
@@ -218,6 +230,7 @@ import { IngestionPullLogService } from "../services/ingestion-pull-log.service.
 import { IngestionPullMetricsService } from "../services/ingestion-pull-metrics.service.ts";
 import { IngestionPullWorkerService } from "../services/ingestion-pull-worker.service.ts";
 import { IngestionPullService } from "../services/ingestion-pull.service.ts";
+import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
 import { IngestionSourceReadService } from "../services/ingestion-source-read.service.ts";
 import {
   IngestionSecretConfiguration,
@@ -504,7 +517,10 @@ export class GovernanceApp implements GovernanceRestApi {
     );
     // Main posted OTTL to LW_GATEWAY_INTERNAL_URL, then LW_GATEWAY_BASE_URL; only the legacy leaf is shared today.
     const ottl = await secrets.into(governanceSecrets.ottlSigningSecret, (secret) =>
-      HttpOttlTransformChannel.create({ baseUrl: config?.gatewayLegacyUrl ?? null, secret }),
+      HttpOttlTransformChannel.create({
+        baseUrl: config?.gatewayInternalUrl ?? config?.gatewayLegacyUrl ?? null,
+        secret,
+      }),
     );
     return new GovernanceApp({
       ottl,
@@ -555,6 +571,7 @@ export class GovernanceApp implements GovernanceRestApi {
     this.repositories = repositories;
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
+    this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
     this.routingPolicies = DefaultGovernanceRoutingPolicyService.create({
       repository: repositories.routingPolicies,
     });
@@ -759,6 +776,7 @@ export class GovernanceApp implements GovernanceRestApi {
 
   private readonly dependencies: GovernanceAppDependencies;
   private readonly anomalyRules: AnomalyRuleService;
+  private readonly activityMonitor: ActivityMonitorService;
   private readonly routingPolicies: DefaultGovernanceRoutingPolicyService;
   private readonly personalKeys: DefaultGovernancePersonalVirtualKeyService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
@@ -1377,6 +1395,84 @@ export class GovernanceApp implements GovernanceRestApi {
     if (!isZodLikeError(error)) return error;
     const complaint = anomalyRuleConfigComplaint({ issues: error.issues, ruleType });
     return new ValidationError(complaint, { meta: { formErrors: [complaint] } });
+  }
+
+  // ── The activity monitor: Enterprise-only, refused per organization as main's gate did ──
+
+  async activitySummary(
+    input: ActivityMonitorWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<ActivityMonitorSummary> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.summary(input);
+  }
+
+  async activitySpendByUser(
+    input: ActivityMonitorPagedWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByUserRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.spendByUser(input);
+  }
+
+  async activitySpendByTeam(
+    input: ActivityMonitorPagedWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByTeamRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.spendByTeam(input);
+  }
+
+  async activitySpendByDepartment(
+    input: ActivityMonitorWindowQuery,
+    by: EntitlementOperator,
+  ): Promise<SpendByDepartmentRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.spendByDepartment(input);
+  }
+
+  async activitySpendOverTime(
+    input: ActivityMonitorWindowQuery & { groupBy: SpendOverTimeGroupBy },
+    by: EntitlementOperator,
+  ): Promise<SpendOverTimeResult> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.spendOverTime(input);
+  }
+
+  async activityRecentAnomalies(
+    input: { organizationId: string; limit: number },
+    by: EntitlementOperator,
+  ): Promise<RecentAnomalyRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.recentAnomalies(input);
+  }
+
+  async activityIngestionSourcesHealth(
+    input: { organizationId: string },
+    by: EntitlementOperator,
+  ): Promise<IngestionSourceHealthRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.ingestionSourcesHealth(input);
+  }
+
+  async activityEventsForSource(
+    input: { organizationId: string; sourceId: string; limit: number; beforeIso?: string },
+    by: EntitlementOperator,
+  ): Promise<ActivityEventDetailRow[]> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.eventsForSource(input);
+  }
+
+  async activitySourceHealthMetrics(
+    input: { organizationId: string; sourceId: string },
+    by: EntitlementOperator,
+  ): Promise<SourceHealthMetrics> {
+    await this.assertActivityMonitor(input.organizationId, by);
+    return this.activityMonitor.sourceHealthMetrics(input);
+  }
+
+  private assertActivityMonitor(organizationId: string, by: EntitlementOperator): Promise<void> {
+    return this.assertEnterprise({ organizationId, by, feature: "ACTIVITY_MONITOR" });
   }
 
   private async assertEnterprise({

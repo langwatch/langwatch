@@ -55,11 +55,13 @@ export const { langwatchDefaultModel } = Config.define((c) => ({
 }));
 
 /**
- * Where apps outside the deployment reach the AI gateway, under main's names:
- * the public URL first, then the legacy base URL. `isSaas` picks the default.
+ * Where the AI gateway is reached, under main's names: the public URL for apps
+ * outside the deployment, the internal URL for this control plane, and the
+ * legacy base URL both fall back to. `isSaas` picks the default.
  */
-export const { gatewayPublicUrl, gatewayLegacyUrl } = Config.define((c) => ({
+export const { gatewayPublicUrl, gatewayInternalUrl, gatewayLegacyUrl } = Config.define((c) => ({
   gatewayPublicUrl: c.env("LW_GATEWAY_PUBLIC_URL", z.string().optional()),
+  gatewayInternalUrl: c.env("LW_GATEWAY_INTERNAL_URL", z.string().optional()),
   gatewayLegacyUrl: c.env("LW_GATEWAY_BASE_URL", z.string().optional()),
 }));
 

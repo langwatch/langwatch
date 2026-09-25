@@ -81,6 +81,7 @@ import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecyc
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
+import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { anomalyRulesTrpcTransport } from "./transport/anomaly-rules.trpc.ts";
 import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
 import {
@@ -119,6 +120,7 @@ export const governanceServer = defineServerModule("governance")
     ingestionSourcesTrpcTransport,
     governanceTrpcTransport,
     anomalyRulesTrpcTransport,
+    activityMonitorTrpcTransport,
     personalSessionsTrpcTransport,
     ingestionKeyTrpcTransport,
     personalVirtualKeysTrpcTransport,
