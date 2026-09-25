@@ -30,6 +30,14 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     useUtils: () => ({
       user: { getLinkedAccounts: { invalidate: vi.fn() }, hasPassword: { invalidate: vi.fn() } },
     }),
+    identity: {
+      myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
+      myMethodsLastUsed: { useQuery: () => ({ data: void 0 }) },
+      addEmailIdentifier: mutation(),
+      resendIdentifierConfirmation: mutation(),
+      removeIdentifier: mutation(),
+      completeVerification: mutation(),
+    },
     license: {
       getSsoGateStatus: { useQuery: () => ({ data: state.ssoGate, isLoading: false }) },
     },

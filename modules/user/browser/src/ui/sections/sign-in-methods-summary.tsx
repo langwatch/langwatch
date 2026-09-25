@@ -37,6 +37,7 @@ export function SignInMethodsSummary() {
   }, [passkeysEnabled, host]);
 
   const accounts = api.user.getLinkedAccounts.useQuery({});
+  const identifiers = api.identity.myIdentifiers.useQuery({});
   const password = api.user.hasPassword.useQuery({});
 
   useEffect(() => {
@@ -49,6 +50,9 @@ export function SignInMethodsSummary() {
   }, [password.isError, password.error, host]);
 
   const linked = accounts.data ?? [];
+  const addresses = (identifiers.data ?? []).filter(
+    (identifier) => identifier.provider === "email" && identifier.value,
+  );
 
   return (
     <VStack align="stretch" gap={3} width="full" data-testid="sign-in-methods-summary">
@@ -63,7 +67,18 @@ export function SignInMethodsSummary() {
       </HStack>
 
       <VStack align="stretch" gap={2} width="full">
-        <MethodLine testId="method-line-address" label="Address" detail={address ?? "None yet"} />
+        {addresses.length > 0 ? (
+          addresses.map((identifier) => (
+            <MethodLine
+              key={identifier.identifierId}
+              testId="method-line-address"
+              label={identifier.value ?? ""}
+              detail={identifier.confirmed ? "Confirmed" : "Not confirmed yet"}
+            />
+          ))
+        ) : (
+          <MethodLine testId="method-line-address" label="Address" detail={address ?? "None yet"} />
+        )}
 
         {linked.map((account) => (
           <MethodLine

@@ -12,6 +12,7 @@ import type { FakePersonalHostOptions } from "../../../testing.tsx";
 import { SignInMethodsSummary } from "../sign-in-methods-summary.tsx";
 
 const linkedAccountsData: { data: unknown } = { data: [] };
+const identifiersData: { data: unknown } = { data: [] };
 const hasPasswordData: { data: unknown; isError: boolean; error: unknown } = {
   data: { hasPassword: true },
   isError: false,
@@ -21,6 +22,9 @@ const hasPasswordData: { data: unknown; isError: boolean; error: unknown } = {
 vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   personalWorkspaceApi: {},
   api: {
+    identity: {
+      myIdentifiers: { useQuery: () => identifiersData },
+    },
     user: {
       getLinkedAccounts: { useQuery: () => linkedAccountsData },
       hasPassword: { useQuery: () => hasPasswordData },
@@ -43,6 +47,7 @@ function renderSummary(options: FakePersonalHostOptions = {}) {
 afterEach(() => {
   cleanup();
   linkedAccountsData.data = [];
+  identifiersData.data = [];
   hasPasswordData.data = { hasPassword: true };
   hasPasswordData.isError = false;
   hasPasswordData.error = null;
@@ -136,6 +141,24 @@ describe("given an account with no address on it and no identifiers", () => {
       });
 
       expect(screen.getByTestId("method-line-address").textContent).toContain("None yet");
+    });
+  });
+});
+
+describe("given an account holding a confirmed and an unconfirmed address", () => {
+  describe("when the summary renders", () => {
+    it("gives each address its own line and says whether it is confirmed", () => {
+      identifiersData.data = [
+        { identifierId: "a", provider: "email", value: "ana@acme.example", confirmed: true },
+        { identifierId: "b", provider: "email", value: "ana@other.example", confirmed: false },
+      ];
+
+      renderSummary();
+
+      const lines = screen.getAllByTestId("method-line-address");
+      expect(lines).toHaveLength(2);
+      expect(lines[0]!.textContent).toContain("Confirmed");
+      expect(lines[1]!.textContent).toContain("Not confirmed yet");
     });
   });
 });

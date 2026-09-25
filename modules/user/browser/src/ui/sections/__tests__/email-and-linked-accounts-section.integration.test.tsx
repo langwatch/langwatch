@@ -8,6 +8,7 @@ import { cleanup, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { providerDisplayName } from "../../../model/sign-in-methods.ts";
 import {
   fakePersonalWorkspaceHost,
   renderWithPersonalWorkspaceHost,
@@ -38,7 +39,16 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
   const api = {
     useUtils: () => ({
       user: { getLinkedAccounts: { invalidate: calls.invalidateLinked } },
+      identity: { myIdentifiers: { invalidate: vi.fn() } },
     }),
+    identity: {
+      myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
+      myMethodsLastUsed: { useQuery: () => ({ data: undefined }) },
+      addEmailIdentifier: mutation(() => ({ identifierId: "id-new" })),
+      resendIdentifierConfirmation: mutation(() => ({ sent: true })),
+      removeIdentifier: mutation(() => ({ removed: true })),
+      completeVerification: mutation(() => ({ verified: true })),
+    },
     user: {
       getLinkedAccounts: {
         useQuery: () => ({ data: state.linkedAccounts, isLoading: state.accountsLoading }),
@@ -79,25 +89,30 @@ function renderSection(options: Parameters<typeof fakePersonalWorkspaceHost>[0] 
 
 describe("given the reader's own account", () => {
   describe("when the page renders", () => {
-    // NOT a binding of "Email addresses and linked accounts sit under one
-    // heading": that scenario also needs an "add an email address" offer,
-    // which no procedure exists for yet (see the handoff).
-    it("shows the account's address and the linked providers under one heading", () => {
+    /** @scenario "Email addresses and linked accounts sit under one heading" */
+    it("lists the address and the linked providers under one heading, with one row of offers", () => {
       const { scope } = renderSection();
 
-      expect(scope.getByTestId("email-and-linked-accounts-section")).toBeTruthy();
-      expect(scope.getByText("carol@acme.example")).toBeTruthy();
+      const section = scope.getByTestId("email-and-linked-accounts-section");
+      expect(within(section).getByText("carol@acme.example")).toBeTruthy();
+      expect(
+        within(section).getByText(providerDisplayName("auth0", "auth0|user-123")),
+      ).toBeTruthy();
+      const offers = within(scope.getByTestId("identifier-action-row"));
+      expect(offers.getByTestId("add-address")).toBeTruthy();
+      expect(offers.getByRole("button", { name: /Link another sign-in method/i })).toBeTruthy();
     });
   });
 });
 
-describe("given a deployment that reports no sign-in mode at all", () => {
+describe("given a deployment that reports no identity provider", () => {
   describe("when the page renders", () => {
-    it("says the surface is unavailable rather than offering broken controls", () => {
+    it("still manages the addresses and offers no provider link", () => {
       state.authProvider = void 0;
       const { scope } = renderSection();
 
-      expect(scope.getByText(/Sign-in management is unavailable/i)).toBeTruthy();
+      expect(scope.getByTestId("add-address")).toBeTruthy();
+      expect(scope.queryByRole("button", { name: /Link another sign-in method/i })).toBeNull();
     });
   });
 });
