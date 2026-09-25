@@ -6,7 +6,6 @@ export const LLM_MODELS = [
   { label: "GPT-5 Mini", value: "gpt-5-mini" },
   { label: "o3", value: "o3" },
   { label: "o4-mini", value: "o4-mini" },
-  { label: "Claude Opus 4", value: "claude-opus-4-20250514" },
   { label: "Claude Sonnet 4", value: "claude-sonnet-4-20250514" },
   { label: "Claude Haiku 3.5", value: "claude-3-5-haiku-20241022" },
   { label: "Gemini 2.5 Pro", value: "gemini-2.5-pro" },

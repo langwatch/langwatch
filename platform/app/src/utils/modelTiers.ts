@@ -4,17 +4,22 @@
  * every surface that pre-fills a "recommended" chat model, so the model a
  * picker shows is the model the org seed writes.
  *
- * Kept free of any catalog import: this module only knows how to read an
- * id, the catalog walk lives with the resolver.
+ * Kept free of any catalog import: this module only knows how to read
+ * ids, the catalog walk lives with the resolver.
  *
- * Each provider gets two allow-listed tiers, read from the id alone:
+ * Each provider gets two allow-listed tiers, read from the ids:
  *
  *   - "main": the newest general-purpose model of the line the provider
  *     positions for everyday serious work. Not the top tier (the premium
  *     priced one: GPT-6 Astra, GPT-5.6 Sol, Claude Fable, Gemini Pro) and
  *     not the small one.
- *   - "fast": the cost-efficient tier below it (GPT-5.6 Luna, Claude
+ *   - "fast": the cost-efficient tier below it (GPT-6 Luna, Claude
  *     Sonnet, Gemini Flash Lite, DeepSeek Flash).
+ *
+ * Most tier words keep their meaning across generations and are read from
+ * the id alone. OpenAI's named tiers do not (Sol is GPT-5.6's top tier but
+ * GPT-6's middle one), so those are read against what else the same
+ * generation ships; see `ProviderTierGrammar.ladder`.
  *
  * Everything outside the two lists never ranks: the top tier, `-pro`
  * serving modes, nano and haiku, codex, chat, image, audio and vision
@@ -53,7 +58,19 @@ interface ProviderTierGrammar {
   parse: (id: string) => ParsedModelId | null;
   main: Record<string, number>;
   fast: Record<string, number>;
+  /**
+   * Named tiers whose role depends on the generation's lineup, top first.
+   * In each generation the highest rung it ships is its top tier and never
+   * ranks; the next rung it ships is its main tier, ranked above every
+   * word in `main`. A generation shipping a single rung has no main tier
+   * yet. Words missing from the ladder never rank, so a new top-tier name
+   * only needs adding here to be skipped correctly.
+   */
+  ladder?: readonly string[];
 }
+
+/** Rank of a ladder-derived main tier: above every fixed `main` word. */
+const LADDER_MAIN_RANK = 100;
 
 const version = (major: string, minor: string | undefined): ParsedModelId => ({
   major: Number(major),
@@ -65,12 +82,15 @@ const version = (major: string, minor: string | undefined): ParsedModelId => ({
  * OpenAI: `gpt-<major>[.<minor>][-<tier>]`.
  *
  * Through GPT-5.5 a generation's general-purpose model was its unsuffixed
- * id (`gpt-5.5`) and the fast tier carried `-mini`. GPT-5.6 ships named
- * tiers and no unsuffixed id at all: Sol on top, Terra in the middle,
- * Luna as the fast tier. GPT-6 so far ships only Astra, priced as a top
- * tier, so it ranks nowhere and the main tier stays on GPT-5.6 Terra
- * until GPT-6 ships its middle tier. The number is a tiebreak used only
- * when one generation offers both spellings; the named tier wins.
+ * id (`gpt-5.5`) and the fast tier carried `-mini`. From GPT-5.6 on the
+ * tiers are named and there is no unsuffixed id: Luna is always the fast
+ * tier, and the names above it shift per generation. GPT-5.6 ships Sol on
+ * top and Terra in the middle; GPT-6 ships Astra on top and Sol in the
+ * middle. So the main tier is the second rung of the ladder that
+ * generation actually ships. While a generation ships only its top tier
+ * (GPT-6 before Sol launched), it has no main tier and the alias stays on
+ * the previous generation. The numbers are a tiebreak used only when one
+ * generation offers both spellings; the named tier wins.
  */
 const OPENAI: ProviderTierGrammar = {
   parse: (id) => {
@@ -78,8 +98,9 @@ const OPENAI: ProviderTierGrammar = {
     if (!m) return null;
     return { ...version(m[1]!, m[2]), tier: m[3] ?? "" };
   },
-  main: { "": 0, terra: 1 },
+  main: { "": 0 },
   fast: { mini: 0, luna: 1 },
+  ladder: ["astra", "sol", "terra"],
 };
 
 /**
@@ -141,25 +162,76 @@ const GRAMMARS: Record<string, ProviderTierGrammar> = {
 /** The providers whose ids the ranking knows how to read. */
 export const TIERED_PROVIDERS = Object.keys(GRAMMARS);
 
+/** A ranked candidate: the id plus its newest-first sort key. */
+export type RankedModel = ModelSortKey & { id: string };
+
+type ParsedCandidate = ParsedModelId & { id: string };
+
+const generationOf = (p: ParsedModelId) => `${p.major}.${p.minor}`;
+
 /**
- * Ranks a chat model id for the requested variant of its provider, or
- * returns null when the id is not a member of that variant's tier, or the
- * provider has no grammar.
+ * The ladder tier each generation ships as its main tier: the second
+ * rung it ships, counted from the top. Generations shipping fewer than two
+ * rungs have no entry.
  */
-export function rankChatModel({
-  id,
+function ladderMainTiers(
+  parsed: ParsedCandidate[],
+  ladder: readonly string[],
+): Map<string, string> {
+  const rungsByGeneration = new Map<string, number[]>();
+  for (const p of parsed) {
+    const rung = ladder.indexOf(p.tier);
+    if (rung < 0) continue;
+    const key = generationOf(p);
+    rungsByGeneration.set(key, [...(rungsByGeneration.get(key) ?? []), rung]);
+  }
+  const mainTiers = new Map<string, string>();
+  for (const [key, rungs] of rungsByGeneration) {
+    const second = [...new Set(rungs)].sort((a, b) => a - b)[1];
+    if (second !== undefined) mainTiers.set(key, ladder[second]!);
+  }
+  return mainTiers;
+}
+
+/**
+ * Ranks a provider's chat model ids for the requested variant, newest
+ * first. Ids that are not members of that variant's tier, and every id of
+ * a provider without a grammar, are left out. Pass the provider's whole
+ * chat lineup: ladder tiers are read against their generation's siblings.
+ */
+export function rankChatModels({
+  ids,
   provider,
   variant,
 }: {
-  id: string;
+  ids: Iterable<string>;
   provider: string;
   variant: ModelVariant;
-}): ModelSortKey | null {
+}): RankedModel[] {
   const grammar = GRAMMARS[provider];
-  if (!grammar) return null;
-  const parsed = grammar.parse(id);
-  if (!parsed) return null;
-  const rank = grammar[variant][parsed.tier];
-  if (rank === undefined) return null;
-  return { major: parsed.major, minor: parsed.minor, rank };
+  if (!grammar) return [];
+
+  const parsed: ParsedCandidate[] = [];
+  for (const id of ids) {
+    const p = grammar.parse(id);
+    if (p) parsed.push({ id, ...p });
+  }
+
+  const ladder = grammar.ladder ?? [];
+  const mainTiers = ladderMainTiers(parsed, ladder);
+  const rankOf = (p: ParsedCandidate): number | undefined => {
+    if (!ladder.includes(p.tier)) return grammar[variant][p.tier];
+    const isMain =
+      variant === "main" && mainTiers.get(generationOf(p)) === p.tier;
+    return isMain ? LADDER_MAIN_RANK : undefined;
+  };
+
+  const ranked: RankedModel[] = [];
+  for (const p of parsed) {
+    const rank = rankOf(p);
+    if (rank !== undefined) {
+      ranked.push({ id: p.id, major: p.major, minor: p.minor, rank });
+    }
+  }
+  return ranked.sort(compareModelSortKeys);
 }
