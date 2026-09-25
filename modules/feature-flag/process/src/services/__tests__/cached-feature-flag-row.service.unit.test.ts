@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { type FeatureFlagCache, type FeatureFlagCacheSlot } from "../../app/feature-flag.app.ts";
 import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
-import { CachedFeatureFlagRowAdapter } from "../cached-feature-flag-row.service.ts";
+import { CachedFeatureFlagRowService } from "../cached-feature-flag-row.service.ts";
 
 class RecordingCache implements FeatureFlagCache {
   readonly values = new Map<string, FeatureFlagCacheSlot>();
@@ -26,7 +26,7 @@ function createHarness() {
   let now = 0;
   const repository = MemoryFeatureFlagRepository.create(() => now);
   const cache = new RecordingCache();
-  const store = CachedFeatureFlagRowAdapter.create({ repository, cache, now: () => now });
+  const store = CachedFeatureFlagRowService.create({ repository, cache, now: () => now });
 
   return {
     cache,
@@ -46,7 +46,7 @@ async function writeRow(
   await repository.upsertEnabled({ key, enabled, lastEditedBy: "operator" });
 }
 
-describe("CachedFeatureFlagRowAdapter", () => {
+describe("CachedFeatureFlagRowService", () => {
   it("holds a repository row locally for five seconds, then reads it again", async () => {
     const harness = createHarness();
     await writeRow(harness.repository, "flag", false);

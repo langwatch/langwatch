@@ -18,7 +18,7 @@ export {
   type BroadcastEventType,
 } from "./repositories/redis/redis.broadcast.repository.ts";
 export {
-  BroadcastTenantRateLimiterAdapter,
+  BroadcastTenantRateLimiterService,
   type BucketConfig,
   type TierConfig,
 } from "./services/broadcast-tenant-rate-limiter.service.ts";

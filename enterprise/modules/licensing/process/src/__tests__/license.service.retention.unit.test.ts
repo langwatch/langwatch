@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   type LicenseRetention,
   type LicenseStorage,
-  NodeLicenseCryptographyAdapter,
+  NodeLicenseCryptographyService,
   type StoredLicense,
 } from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
@@ -82,7 +82,7 @@ describe("LicenseService retention provisioning", () => {
     retention = new MemoryLicenseRetention();
     service = LicenseService.create({
       repository,
-      cryptography: NodeLicenseCryptographyAdapter.create({
+      cryptography: NodeLicenseCryptographyService.create({
         publicKey: TEST_PUBLIC_KEY,
       }),
       retention,

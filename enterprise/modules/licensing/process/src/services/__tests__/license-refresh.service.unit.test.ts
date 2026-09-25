@@ -14,12 +14,12 @@ import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memo
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
 
-const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 function licenseNaming({
   services,

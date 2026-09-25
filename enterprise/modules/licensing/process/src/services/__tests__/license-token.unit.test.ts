@@ -13,9 +13,9 @@ import { describe, expect, it } from "vitest";
 
 import { TEST_PRIVATE_KEY } from "../../fixtures/license-keys.fixture.ts";
 import { LicenseGenerationService } from "../license-generation.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
-const cryptography = NodeLicenseCryptographyAdapter.create();
+const cryptography = NodeLicenseCryptographyService.create();
 const generation = LicenseGenerationService.create(cryptography);
 
 function mintLicense(organizationName = "ACME"): string {

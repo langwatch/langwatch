@@ -1,4 +1,4 @@
-export { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
+export { NodeLicenseCryptographyService } from "./services/node-license-cryptography.service.ts";
 export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
 export { licensingServer } from "./licensing.server.ts";
 export { LicensingInfrastructureService } from "./services/licensing-infrastructure.service.ts";
@@ -13,9 +13,9 @@ export {
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 /** The signed-license source an API-role process supplies to plan resolution. */
 export {
-  LicensingEntitlementSourceAdapter,
+  LicensingEntitlementSourceService,
   type LicensePlanReader,
-  type LicensingEntitlementSourceAdapterMode,
+  type LicensingEntitlementSourceMode,
 } from "./services/licensing-entitlement-source.service.ts";
 export { MemoryOrganizationLicenseRepository } from "./repositories/memory/memory.organization-license.repository.ts";
 export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";

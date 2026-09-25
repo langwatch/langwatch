@@ -59,7 +59,7 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
-import { DirectEvaluationExecutionReceiptAdapter } from "../services/direct.evaluation-execution-receipt.service.ts";
+import { DirectEvaluationExecutionReceiptService } from "../services/direct.evaluation-execution-receipt.service.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
@@ -80,7 +80,7 @@ import {
 } from "../services/evaluation-inputs-offload.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import {
-  EvaluationProcessingAdapter,
+  EvaluationProcessingService,
   type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "../services/evaluation-processing.service.ts";
@@ -94,7 +94,7 @@ import { EvaluatorModelEnvService } from "../services/evaluator-model-env.servic
 import { HttpLangevalsEvaluatorAdapter } from "../services/http.langevals-evaluator.service.ts";
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
-import { OtelEvaluationExecutionMetricsAdapter } from "../services/otel.evaluation-execution-metrics.service.ts";
+import { OtelEvaluationExecutionMetricsService } from "../services/otel.evaluation-execution-metrics.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 import type {
   EvaluationExecution,
@@ -362,7 +362,7 @@ export class EvaluationApp implements EvaluationApiContract {
         objectStorage: members.objectStorage,
       }),
     });
-    const telemetry = OtelEvaluationExecutionMetricsAdapter.create();
+    const telemetry = OtelEvaluationExecutionMetricsService.create();
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
       storage: repositories.inputs,
@@ -424,7 +424,7 @@ export class EvaluationApp implements EvaluationApiContract {
           inputs,
           flags: dependencies.featureFlags,
         }),
-        executionReceipt: DirectEvaluationExecutionReceiptAdapter.create({
+        executionReceipt: DirectEvaluationExecutionReceiptService.create({
           execution,
           costs: EvaluationCostService.create({ repository: repositories.costs }),
         }),
@@ -483,7 +483,7 @@ export class EvaluationApp implements EvaluationApiContract {
 
   /** evaluation_processing: run and analytics folds, execute intent, automation reactions. */
   eventingPipeline(): EvaluationProcessingPipeline {
-    return EvaluationProcessingAdapter.createPipeline({
+    return EvaluationProcessingService.createPipeline({
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
       automations: this.#automations,

@@ -6,7 +6,7 @@ import type { DatasetNormalize, DatasetNormalizeQueue } from "#app/dataset.app";
 import type { DatasetContentRepository } from "#repositories/dataset-content.repository";
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
 import { DatasetNormalizationService } from "#services/dataset-normalization.service";
-import { DatasetNormalizeAdapter } from "#services/dataset-normalize.service";
+import { DatasetNormalizeService } from "#services/dataset-normalize.service";
 import type { DatasetNormalizeDeps } from "#services/dataset-normalize.service";
 import { DatasetContentBackfillTask } from "#tasks/dataset-content-backfill.task";
 import { batchRecordTrpcTransport } from "#transport/batch-record.trpc";
@@ -29,7 +29,7 @@ export const datasetServer = defineServerModule("dataset")
 
 /** Normalization seams for a composing process. */
 export function createDatasetNormalize(deps: DatasetNormalizeDeps): DatasetNormalize {
-  return DatasetNormalizeAdapter.create(deps);
+  return DatasetNormalizeService.create(deps);
 }
 
 export function createDatasetNormalization(options: {

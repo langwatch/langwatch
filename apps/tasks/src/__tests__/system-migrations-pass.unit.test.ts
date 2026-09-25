@@ -46,11 +46,11 @@ vi.mock("@langwatch/group-queue", () => ({
   GroupQueueDependenciesAdapter: { create: () => ({ dependencies: () => ({}) }) },
 }));
 vi.mock("@langwatch/authz-process", () => ({
-  EventingAuthzCommandDispatcherAdapter: {
+  AuthzCommandDispatcherService: {
     create: () => ({ connect: dependencies.connectDispatcher }),
     sendersFrom: (commands: unknown) => commands,
   },
-  KsuidAuthzBindingIdAdapter: { create: () => ({ newBindingId: () => "binding" }) },
+  AuthzBindingIdService: { create: () => ({ newBindingId: () => "binding" }) },
   PostgresAuthzAdapter: {
     create: () => ({ build: () => ({ pipeline: "authz", migration: "authz-migration" }) }),
   },
@@ -62,7 +62,7 @@ vi.mock("@langwatch/identity-process", () => ({
 }));
 vi.mock("@langwatch/ops-process", () => ({
   OpsSystemMigrations: { create: dependencies.createRunner },
-  RoutingTableOrganizationDataplaneAdapter: { create: (options: unknown) => options },
+  RoutingTableOrganizationDataplaneService: { create: (options: unknown) => options },
   SystemMigrationsPassTask: {
     create: ({ pass }: { pass: () => (input: { signal: AbortSignal }) => Promise<void> }) => ({
       run: (input: { signal: AbortSignal }) => pass()(input),

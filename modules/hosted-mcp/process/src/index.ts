@@ -5,7 +5,7 @@ export {
   registerHostedMcpRoutePolicies,
   type McpHandler,
 } from "./transport/hosted-mcp.api.ts";
-export { HeaderMcpClientAddressAdapter } from "./services/header-mcp-client-address.service.ts";
+export { HeaderMcpClientAddressService } from "./services/header-mcp-client-address.service.ts";
 export {
   McpApiKeyCipher,
   McpClientAddress,

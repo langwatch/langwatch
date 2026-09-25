@@ -39,7 +39,7 @@ import {
 } from "./dataset-search.ts";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
-export class DatasetContentAdapter implements DatasetContent {
+export class DatasetContentService implements DatasetContent {
   private readonly chunks: DatasetChunkService;
 
   private constructor(
@@ -52,8 +52,8 @@ export class DatasetContentAdapter implements DatasetContent {
   static create(options: {
     datasets: DatasetContentRepository;
     storage: DatasetChunkRepository;
-  }): DatasetContentAdapter {
-    return new DatasetContentAdapter(options.datasets, options.storage);
+  }): DatasetContentService {
+    return new DatasetContentService(options.datasets, options.storage);
   }
 
   async listRecords({

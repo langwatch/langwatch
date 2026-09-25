@@ -39,18 +39,18 @@ const PEM_HEADER_LINE = /^[A-Za-z][A-Za-z0-9-]*:\s/m;
 /** RFC 7468 wraps the base64 body at 64 characters. */
 const PEM_BODY_LINE = /.{1,64}/g;
 
-export type NodeLicenseCryptographyAdapterOptions = {
+export type NodeLicenseCryptographyServiceOptions = {
   publicKey?: string;
 };
 
 /** Node RSA implementation. It owns no environment lookup or global state. */
-export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
+export class NodeLicenseCryptographyService implements LicenseCryptography {
   private constructor(private readonly publicKey: string) {}
 
   static create(
-    options: NodeLicenseCryptographyAdapterOptions = {},
-  ): NodeLicenseCryptographyAdapter {
-    return new NodeLicenseCryptographyAdapter(options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY);
+    options: NodeLicenseCryptographyServiceOptions = {},
+  ): NodeLicenseCryptographyService {
+    return new NodeLicenseCryptographyService(options.publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY);
   }
 
   /**
@@ -60,11 +60,11 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
   static normalizePemKey(raw: string): string {
     const unescaped = raw.replace(/^﻿/, "").replace(/\\r\\n|\\n/g, "\n");
     const match = PEM_PRIVATE_KEY_BLOCK.exec(unescaped) ?? PEM_BLOCK.exec(unescaped);
-    if (!match) return NodeLicenseCryptographyAdapter.dedent(unescaped);
+    if (!match) return NodeLicenseCryptographyService.dedent(unescaped);
 
     const [, label, body = ""] = match;
-    if (PEM_HEADER_LINE.test(NodeLicenseCryptographyAdapter.dedent(body))) {
-      return NodeLicenseCryptographyAdapter.dedent(unescaped);
+    if (PEM_HEADER_LINE.test(NodeLicenseCryptographyService.dedent(body))) {
+      return NodeLicenseCryptographyService.dedent(unescaped);
     }
 
     const base64 = body.replace(/\s+/g, "");
@@ -74,7 +74,7 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
 
   /** True when the key is passphrase-protected. */
   static isEncryptedPemKey(raw: string): boolean {
-    const normalized = NodeLicenseCryptographyAdapter.normalizePemKey(raw);
+    const normalized = NodeLicenseCryptographyService.normalizePemKey(raw);
     return (
       normalized.includes("-----BEGIN ENCRYPTED PRIVATE KEY-----") ||
       PEM_HEADER_LINE.test(normalized)
@@ -83,7 +83,7 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
 
   /** True when the input contains a PEM block at all. */
   static looksLikePemKey(raw: string): boolean {
-    return PEM_BLOCK.test(NodeLicenseCryptographyAdapter.normalizePemKey(raw));
+    return PEM_BLOCK.test(NodeLicenseCryptographyService.normalizePemKey(raw));
   }
 
   private static dedent(value: string): string {
@@ -117,7 +117,7 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
       verify.update(JSON.stringify(signedLicense.data));
       verify.end();
       return verify.verify(
-        NodeLicenseCryptographyAdapter.normalizePemKey(publicKey),
+        NodeLicenseCryptographyService.normalizePemKey(publicKey),
         signedLicense.signature,
         "base64",
       );
@@ -158,11 +158,11 @@ export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
   }
 
   signLicense(data: LicenseData, privateKey: string): SignedLicense {
-    const normalizedKey = NodeLicenseCryptographyAdapter.normalizePemKey(privateKey);
-    if (!NodeLicenseCryptographyAdapter.looksLikePemKey(normalizedKey)) {
+    const normalizedKey = NodeLicenseCryptographyService.normalizePemKey(privateKey);
+    if (!NodeLicenseCryptographyService.looksLikePemKey(normalizedKey)) {
       throw new LicenseSigningKeyNotPemError();
     }
-    if (NodeLicenseCryptographyAdapter.isEncryptedPemKey(normalizedKey)) {
+    if (NodeLicenseCryptographyService.isEncryptedPemKey(normalizedKey)) {
       throw new LicenseSigningKeyEncryptedError();
     }
 

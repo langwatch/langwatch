@@ -3,7 +3,7 @@ import { ENTERPRISE_TEMPLATE, GROWTH_TEMPLATE } from "@langwatch/plans";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { NodeLicenseCryptographyService } from "../index.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
 
@@ -16,7 +16,7 @@ const baseParams = {
   now: new Date("2025-06-15T12:00:00Z"),
 };
 
-const cryptography = NodeLicenseCryptographyAdapter.create();
+const cryptography = NodeLicenseCryptographyService.create();
 const generation = LicenseGenerationService.create(cryptography);
 const generateLicenseKey = generation.generate.bind(generation);
 const validateLicense = cryptography.validateLicense.bind(cryptography);

@@ -7,6 +7,7 @@ import type {
   QueueInfo,
 } from "@langwatch/ops-contract";
 
+import type { QueueAuditSink } from "../app/ops.app.ts";
 import type {
   BlockedSummary,
   DlqGroupInfo,
@@ -14,8 +15,7 @@ import type {
   JobEntry,
   QueueRepository,
 } from "../repositories/queue.repository.ts";
-import { NullQueueAuditSink } from "./null.queue-audit-sink.service.ts";
-import type { QueueAuditSink } from "./queue-audit-sink.service.ts";
+import { NullQueueAuditSinkService } from "./null.queue-audit-sink.service.ts";
 
 /** What an error with no recognizable class name is recorded as. */
 const UNTYPED_ERROR_SHAPE = "untyped_error";
@@ -42,7 +42,7 @@ export class QueueService {
 
   private constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
     this.repository = params.repo;
-    this.audit = params.audit ?? NullQueueAuditSink.create();
+    this.audit = params.audit ?? NullQueueAuditSinkService.create();
   }
 
   static create(params: { repo: QueueRepository; audit?: QueueAuditSink }): QueueService {

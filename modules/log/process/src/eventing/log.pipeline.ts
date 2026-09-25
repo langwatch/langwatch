@@ -19,7 +19,7 @@ import {
 
 import type { LogApp } from "../app/log.app.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
-import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
 import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projection.ts";
 import { RecordCanonicalLogCommand } from "./log.intent.ts";
@@ -66,7 +66,7 @@ export function createLogProcessingPipeline(
   return builder
     .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
       getGroupKey: (payload) =>
-        CanonicalLogAdapter.logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
+        CanonicalLogService.logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
       // ADR-066 pillar 2: a shard funnels many records into one group, so a
       // backed-up shard appends one tiny insert per record. Coalesce its queued
       // records into one multi-row insert instead. Safe to fold: the handler

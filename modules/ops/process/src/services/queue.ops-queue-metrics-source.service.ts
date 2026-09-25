@@ -9,9 +9,9 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { QueueService } from "./queue.service.ts";
 
 /** The writer's queue reads over the queue service alone, for a process with no Postgres. */
-export class QueueOpsMetricsSourceAdapter extends OpsQueueMetricsSourceRepository {
-  static create(queues: QueueService): QueueOpsMetricsSourceAdapter {
-    return new QueueOpsMetricsSourceAdapter(queues);
+export class QueueOpsMetricsSourceService extends OpsQueueMetricsSourceRepository {
+  static create(queues: QueueService): QueueOpsMetricsSourceService {
+    return new QueueOpsMetricsSourceService(queues);
   }
 
   private constructor(private readonly queues: QueueService) {

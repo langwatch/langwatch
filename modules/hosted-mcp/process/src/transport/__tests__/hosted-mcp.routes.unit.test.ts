@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createMcpHandler,
-  HeaderMcpClientAddressAdapter,
+  HeaderMcpClientAddressService,
   hostedMcpRoutePolicies,
   HOSTED_MCP_FAMILY,
   McpApiKeyCipher,
@@ -41,7 +41,7 @@ function handler() {
     projects: new NoProjects(),
     grants: new NoGrants(),
     cipher: new PlainCipher(),
-    address: HeaderMcpClientAddressAdapter.create(),
+    address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
   });
 }

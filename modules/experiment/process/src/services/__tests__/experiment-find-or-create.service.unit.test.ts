@@ -130,7 +130,9 @@ function experimentRow(overrides: Partial<Experiment> = {}): Experiment {
   };
 }
 
-function experimentService(overrides: Partial<ExperimentService>): ExperimentService {
+function experimentService(
+  overrides: Partial<Pick<ExperimentService, "getById" | "findBySlug" | "save">>,
+): Pick<ExperimentService, "getById" | "findBySlug" | "save"> {
   return {
     getById: async () => {
       throw new Error("getById is not part of this scenario");
@@ -140,5 +142,5 @@ function experimentService(overrides: Partial<ExperimentService>): ExperimentSer
       throw new Error("save is not part of this scenario");
     },
     ...overrides,
-  } as unknown as ExperimentService;
+  };
 }

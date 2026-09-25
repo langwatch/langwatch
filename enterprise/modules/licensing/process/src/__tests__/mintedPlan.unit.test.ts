@@ -15,7 +15,7 @@ import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { NodeLicenseCryptographyService } from "../index.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
 
 /**
@@ -44,7 +44,7 @@ const TEST_KEYS = crypto.generateKeyPairSync("rsa", {
   privateKeyEncoding: { type: "pkcs8", format: "pem" },
 });
 
-const generation = LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create());
+const generation = LicenseGenerationService.create(NodeLicenseCryptographyService.create());
 const generateLicenseKey = generation.generate.bind(generation);
 
 describe("buildMintedPlan", () => {

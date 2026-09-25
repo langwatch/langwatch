@@ -20,7 +20,7 @@ import {
 
 import {
   createMcpHandler,
-  HeaderMcpClientAddressAdapter,
+  HeaderMcpClientAddressService,
   McpApiKeyCipher,
   McpProjectLookup,
   McpSessionGrant,
@@ -342,7 +342,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       projects: new FakeProjectLookup(),
       grants: sessionGrant,
       cipher: new ReversibleTestCipher(),
-      address: HeaderMcpClientAddressAdapter.create(),
+      address: HeaderMcpClientAddressService.create(),
       baseHost: "https://app.langwatch.ai",
     });
 

@@ -565,6 +565,26 @@ export interface OpsSelfHostedInstances {
 }
 
 /** Team alert for a filed report. Best-effort: intake already succeeded. */
+/** Audit sink for GroupQueue operator actions (specs/ops/dead-letter-recovery.feature). */
+export type QueueControlAction =
+  | "queue_redrive_dlq_groups"
+  | "queue_discard_dlq_groups"
+  | "queue_drain_group"
+  | "queue_drain_tenant"
+  | "queue_move_group_to_dlq"
+  | "queue_move_all_blocked_to_dlq"
+  | "queue_unblock_group"
+  | "queue_unblock_all";
+
+export interface QueueAuditSink {
+  append(entry: {
+    actorUserId: string;
+    action: QueueControlAction;
+    queueName: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<void>;
+}
+
 export interface BugReportNotifier {
   notify(input: { report: BugReport }): Promise<void>;
 }

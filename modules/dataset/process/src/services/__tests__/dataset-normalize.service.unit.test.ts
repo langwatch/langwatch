@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toJsonlChunks } from "../../rules/dataset-chunking.rules.ts";
 import {
-  DatasetNormalizeAdapter,
+  DatasetNormalizeService,
   ImportSourceMismatchError,
 } from "../dataset-normalize.service.ts";
 import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
@@ -22,7 +22,7 @@ import type { DatasetNormalizeDeps } from "../dataset-normalize.service.ts";
 const normalizeHandler =
   (deps: DatasetNormalizeDeps) =>
   (payload: DatasetNormalizePayload): Promise<void> =>
-    DatasetNormalizeAdapter.create(deps).normalize(payload);
+    DatasetNormalizeService.create(deps).normalize(payload);
 
 /**
  * The normalize handler at its boundaries: chunk-repository spies, a stub repository and
@@ -109,7 +109,7 @@ describe("datasetNormalizePayloadSchema", () => {
   });
 });
 
-describe("DatasetNormalizeAdapter", () => {
+describe("DatasetNormalizeService", () => {
   describe("when the payload names a confirmed stored object", () => {
     /** @scenario "Datasets work on a minimal self-hosted install" */
     /** @scenario "A large file uploads on a self-hosted install with no object storage" */

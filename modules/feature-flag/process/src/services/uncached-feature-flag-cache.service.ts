@@ -5,9 +5,11 @@ import type { FeatureFlagCache, FeatureFlagCacheSlot } from "../app/feature-flag
  * per-process window goes to the repository — no deployment ever wired a
  * cross-process store here, so the App builds the same no-op instead.
  */
-export class UncachedFeatureFlagCacheAdapter implements FeatureFlagCache {
-  static create(): UncachedFeatureFlagCacheAdapter {
-    return new UncachedFeatureFlagCacheAdapter();
+export class UncachedFeatureFlagCacheService implements FeatureFlagCache {
+  private constructor() {}
+
+  static create(): UncachedFeatureFlagCacheService {
+    return new UncachedFeatureFlagCacheService();
   }
 
   findSlot(_key: string): Promise<FeatureFlagCacheSlot | undefined> {

@@ -8,10 +8,10 @@ import { latencyAllTimeKey, latencyMinuteBucketKey } from "@langwatch/ops-contra
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type { OpsSnapshotRedis } from "../app/ops.app.ts";
 import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
+import { RedisOpsSnapshotRedisRepository } from "../repositories/redis/redis.ops-snapshot-redis.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
@@ -109,7 +109,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
         const ops = OpsMetricsTestAdapter.create();
         ops.setQueueNames([name]);
         const snapshotRepository = RedisOpsSnapshotRepository.create(
-          redis as unknown as OpsSnapshotRedis,
+          RedisOpsSnapshotRedisRepository.create(redis),
         );
         const snapshots = DefaultOpsSnapshotService.create(snapshotRepository);
         const collector = OpsMetricsCollectorService.create({

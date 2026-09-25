@@ -23,7 +23,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { ExperimentRunStateStore } from "../eventing/experiment-run-state.store.ts";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
 import {
-  ExperimentEventingAdapter,
+  ClickHouseExperimentRunProcessingRepository,
   type ExperimentRunProcessingPipeline,
 } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
@@ -264,8 +264,11 @@ export function buildExperimentRunProcessing(input: {
     }).buildProcessing();
   }
 
-  const eventing = ExperimentEventingAdapter.create({ resolveClient, clickhouseEnabled: true });
-  return ExperimentEventingAdapter.pipeline({
+  const eventing = ClickHouseExperimentRunProcessingRepository.create({
+    resolveClient,
+    clickhouseEnabled: true,
+  });
+  return ClickHouseExperimentRunProcessingRepository.pipeline({
     experimentRunStateFoldStore: ExperimentRunStateStore.create({
       repository: eventing.stateRepository({ defaultRetentionDays }),
     }),
@@ -277,7 +280,7 @@ export function buildExperimentRunProcessing(input: {
 export function buildExperimentIdLookup(
   clickhouse: ClickHouseQueryClient,
 ): ExperimentIdLookupRepository {
-  return ExperimentEventingAdapter.create({
+  return ClickHouseExperimentRunProcessingRepository.create({
     resolveClient: memberSessionResolver(clickhouse),
     clickhouseEnabled: true,
   }).idLookup();

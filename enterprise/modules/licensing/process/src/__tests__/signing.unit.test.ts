@@ -8,7 +8,7 @@ import {
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { NodeLicenseCryptographyService } from "../index.ts";
 import {
   canonicalPemKey,
   mangledPemPastes,
@@ -16,7 +16,7 @@ import {
   TEST_PUBLIC_KEY,
 } from "../testing.ts";
 
-const cryptography = NodeLicenseCryptographyAdapter.create();
+const cryptography = NodeLicenseCryptographyService.create();
 const encodeLicenseKey = cryptography.encodeLicenseKey.bind(cryptography);
 const generateLicenseId = cryptography.generateLicenseId.bind(cryptography);
 const parseLicenseKey = cryptography.parseLicenseKey.bind(cryptography);

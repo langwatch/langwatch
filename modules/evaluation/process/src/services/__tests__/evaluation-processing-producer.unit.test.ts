@@ -1,12 +1,12 @@
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { EvaluationProcessingProducerAdapter } from "../evaluation-processing-producer.service.ts";
+import { EvaluationProcessingProducerService } from "../evaluation-processing-producer.service.ts";
 import { createEvaluationProcessingPipeline } from "../evaluation-processing.service.ts";
 
 /** The producer's definition, as a host receives it. */
 const producer = () =>
-  EvaluationProcessingProducerAdapter.createPipeline({
+  EvaluationProcessingProducerService.createPipeline({
     processName: "langwatch-api",
   });
 

@@ -1,13 +1,11 @@
-import { QueueAuditSink } from "./queue-audit-sink.service.ts";
+import type { QueueAuditSink } from "../app/ops.app.ts";
 
 /** For app presets that run without Postgres. */
-export class NullQueueAuditSink extends QueueAuditSink {
-  private constructor() {
-    super();
-  }
+export class NullQueueAuditSinkService implements QueueAuditSink {
+  private constructor() {}
 
-  static create(): NullQueueAuditSink {
-    return new NullQueueAuditSink();
+  static create(): NullQueueAuditSinkService {
+    return new NullQueueAuditSinkService();
   }
 
   async append(): Promise<void> {}

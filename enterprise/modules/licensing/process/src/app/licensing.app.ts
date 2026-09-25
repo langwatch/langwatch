@@ -84,9 +84,9 @@ import { LicenseRefreshService } from "../services/license-refresh.service.ts";
 import { LicenseRegistryService } from "../services/license-registry.service.ts";
 import { LicenseSyncService } from "../services/license-sync.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
-import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
+import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 import { LicensingInfrastructureService } from "../services/licensing-infrastructure.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
 import type {
@@ -209,7 +209,7 @@ export class LicensingApp implements LicensingApiContract {
   static readonly reads = [...reads("prisma", "logger"), "isSaas", "serviceVersion"] as const;
 
   readonly #service: LicenseService;
-  readonly #entitlements: LicensingEntitlementSourceAdapter;
+  readonly #entitlements: LicensingEntitlementSourceService;
   readonly #runtime: LicensingRuntime;
   readonly #registry: LicenseRegistryService;
   readonly #credentials: ConnectCredentialService;
@@ -235,7 +235,7 @@ export class LicensingApp implements LicensingApiContract {
   }: {
     service: LicenseService;
     runtime: LicensingRuntime;
-    entitlements: LicensingEntitlementSourceAdapter;
+    entitlements: LicensingEntitlementSourceService;
     registry: LicenseRegistryParts;
     install: ConnectInstallParts;
     isSaas: boolean;
@@ -270,7 +270,7 @@ export class LicensingApp implements LicensingApiContract {
     { members, config, resources, dependencies }: LicensingSetup,
     instanceLicenseKey: string | undefined,
   ): LicensingApp {
-    const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: config.publicKey });
+    const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // Derived from the closed prisma member: the licence reads are live, the seat
     // counts are entitlement's own membership classification (peer, not owned
     // here), and the mutation/enforcement ports refuse by name until a process
@@ -313,7 +313,7 @@ export class LicensingApp implements LicensingApiContract {
     const app = new LicensingApp({
       service,
       runtime,
-      entitlements: LicensingEntitlementSourceAdapter.create({
+      entitlements: LicensingEntitlementSourceService.create({
         licensing: service,
         mode: members.isSaas ? "cloud" : "self-hosted",
       }),

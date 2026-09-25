@@ -1,7 +1,7 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { z } from "zod";
 
-import { QueueAuditSink, type QueueControlAction } from "./queue-audit-sink.service.ts";
+import type { QueueAuditSink, QueueControlAction } from "../app/ops.app.ts";
 
 const auditMetadataSchema = z.record(z.string(), z.json());
 
@@ -20,14 +20,12 @@ const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
 };
 
 /** Records queue dead-letter operator actions on the shared audit log. */
-export class QueueAuditAdapter extends QueueAuditSink {
-  static create({ auditLog }: { auditLog: AuditLogApi }): QueueAuditAdapter {
-    return new QueueAuditAdapter(auditLog);
+export class AuditLogQueueAuditService implements QueueAuditSink {
+  static create({ auditLog }: { auditLog: AuditLogApi }): AuditLogQueueAuditService {
+    return new AuditLogQueueAuditService(auditLog);
   }
 
-  private constructor(private readonly auditLog: AuditLogApi) {
-    super();
-  }
+  private constructor(private readonly auditLog: AuditLogApi) {}
 
   async append(entry: {
     actorUserId: string;

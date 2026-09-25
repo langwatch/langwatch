@@ -409,9 +409,9 @@ const deriveColumnTypes = (headers: string[]): DatasetColumns =>
  * `ready` with PG-authoritative counters; on any failure it flips to `failed` (staging file
  * preserved for manual retry) and rethrows so the queue records the failure.
  */
-export class DatasetNormalizeAdapter implements DatasetNormalize {
-  static create(deps: DatasetNormalizeDeps): DatasetNormalizeAdapter {
-    return new DatasetNormalizeAdapter(deps);
+export class DatasetNormalizeService implements DatasetNormalize {
+  static create(deps: DatasetNormalizeDeps): DatasetNormalizeService {
+    return new DatasetNormalizeService(deps);
   }
 
   private constructor(private readonly deps: DatasetNormalizeDeps) {}

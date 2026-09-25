@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
 import { LicenseService } from "../services/license.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { TEST_PUBLIC_KEY, ENTERPRISE_LICENSE_KEY } from "../testing.ts";
 
 /**
@@ -43,7 +43,7 @@ describe("given an organization with 25 active members and no license yet", () =
       const storage = new InMemoryLicenseStorage(25);
       const service = LicenseService.create({
         repository: storage,
-        cryptography: NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY }),
+        cryptography: NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY }),
         retention: { provisionMissingPolicies: vi.fn() } as never,
       });
 

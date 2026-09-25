@@ -12,9 +12,9 @@ import {
 } from "@langwatch/evaluation-contract";
 import { defineCommand } from "@langwatch/eventing";
 
-export class EvaluationCommandAdapter {
-  static create(): EvaluationCommandAdapter {
-    return new EvaluationCommandAdapter();
+export class EvaluationCommandService {
+  static create(): EvaluationCommandService {
+    return new EvaluationCommandService();
   }
 
   private constructor() {}

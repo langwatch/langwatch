@@ -8,7 +8,7 @@ import type { IssuedLicenseRecord } from "../../repositories/issued-license.repo
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { ConnectCredentialService } from "../connect-credential.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const TOKEN = `lwl_${"a".repeat(64)}`;
@@ -16,7 +16,7 @@ const OTHER_TOKEN = `lwl_${"b".repeat(64)}`;
 const TOKEN_HASH = await registryHashForToken(TOKEN);
 const OTHER_TOKEN_HASH = await registryHashForToken(OTHER_TOKEN);
 
-const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseRecord {
   return {

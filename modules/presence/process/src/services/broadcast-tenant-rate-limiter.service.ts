@@ -30,9 +30,9 @@ interface Bucket {
 const CLEANUP_INTERVAL_MS = 60_000;
 const STALE_THRESHOLD_MS = 60_000;
 
-export class BroadcastTenantRateLimiterAdapter {
-  static create(): BroadcastTenantRateLimiterAdapter {
-    return new BroadcastTenantRateLimiterAdapter();
+export class BroadcastTenantRateLimiterService {
+  static create(config?: TierConfig): BroadcastTenantRateLimiterService {
+    return new BroadcastTenantRateLimiterService(config);
   }
 
   private readonly config: TierConfig;
@@ -40,7 +40,7 @@ export class BroadcastTenantRateLimiterAdapter {
   private readonly warnedTenants = new Set<string>();
   private cleanupTimer: NodeJS.Timeout | null = null;
 
-  constructor(config?: TierConfig) {
+  private constructor(config?: TierConfig) {
     this.config = config ?? DEFAULT_TIERS;
   }
 

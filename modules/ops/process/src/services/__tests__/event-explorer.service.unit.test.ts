@@ -30,10 +30,15 @@ class FakeIntrospection implements OpsEventingIntrospection {
   }
 
   projections(): OpsProjectionMetadata[] {
-    return [
-      { projectionName: "traceMetrics", aggregateType: "Trace" },
-      { projectionName: "experimentRun", aggregateType: "Experiment" },
-    ] as unknown as OpsProjectionMetadata[];
+    const projection = (projectionName: string, aggregateType: string): OpsProjectionMetadata => ({
+      projectionName,
+      pipelineName: `${aggregateType.toLowerCase()}_processing`,
+      aggregateType,
+      source: "pipeline",
+      pauseKey: `${aggregateType.toLowerCase()}_processing/handler/${projectionName}`,
+      kind: "fold",
+    });
+    return [projection("traceMetrics", "Trace"), projection("experimentRun", "Experiment")];
   }
 
   processManagers(): never[] {
@@ -47,15 +52,13 @@ class FakeIntrospection implements OpsEventingIntrospection {
 
 let introspection: FakeIntrospection;
 
-function createMockRepo(
-  overrides: Partial<Record<keyof EventExplorerRepository, unknown>> = {},
-): EventExplorerRepository {
+function createMockRepo(overrides: Partial<EventExplorerRepository> = {}): EventExplorerRepository {
   return {
     findAggregates: vi.fn().mockResolvedValue([]),
     searchAggregates: vi.fn().mockResolvedValue([]),
     findEventsByAggregate: vi.fn().mockResolvedValue([]),
     ...overrides,
-  } as unknown as EventExplorerRepository;
+  };
 }
 
 describe("EventExplorerService", () => {

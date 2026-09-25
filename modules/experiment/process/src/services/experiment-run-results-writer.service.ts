@@ -35,7 +35,7 @@ const logger = createLogger("langwatch:experiment:run-results-writer");
  * Where a completed run writes its cells so an open page can show them.
  */
 export interface RunResultsPersistence {
-  experiments: ExperimentService;
+  experiments: Pick<ExperimentService, "getWorkbenchState" | "recordWorkbenchRunResults">;
   /** Who the workbench write is attributed to in the version history. */
   actor: WorkbenchActor;
 }

@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogPreparationInput, LogRedaction } from "../../app/log.members.ts";
 import { CanonicalLogStorageMapProjection } from "../../eventing/canonical-log-storage.projection.ts";
-import { CanonicalLogAdapter } from "../canonical-log.service.ts";
+import { CanonicalLogService } from "../canonical-log.service.ts";
 
 const noRedaction: LogRedaction = {
   redactLog: async () => undefined,
@@ -21,7 +21,7 @@ function prepareCanonicalLogRecords(
   input: LogPreparationInput,
   redaction: LogRedaction = noRedaction,
 ) {
-  return CanonicalLogAdapter.create({ redaction }).prepare(input);
+  return CanonicalLogService.create({ redaction }).prepare(input);
 }
 
 function request(logRecords: unknown[], scopeName = "test.scope") {
@@ -255,15 +255,15 @@ describe("canonical log preparation", () => {
 
   describe("when reading the shard count from the environment", () => {
     it("uses the default when the variable is unset or empty", () => {
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount(void 0)).toBe(
+      expect(CanonicalLogService.resolveLogCommandShardCount(void 0)).toBe(
         DEFAULT_LOG_COMMAND_SHARDS,
       );
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("")).toBe(DEFAULT_LOG_COMMAND_SHARDS);
+      expect(CanonicalLogService.resolveLogCommandShardCount("")).toBe(DEFAULT_LOG_COMMAND_SHARDS);
     });
 
     it("uses the default when the variable is not a number", () => {
       // A typo in a deploy variable must not decide the lane count.
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("many")).toBe(
+      expect(CanonicalLogService.resolveLogCommandShardCount("many")).toBe(
         DEFAULT_LOG_COMMAND_SHARDS,
       );
     });
@@ -271,30 +271,30 @@ describe("canonical log preparation", () => {
     it("clamps to the bounds rather than trusting the value", () => {
       // Zero would make the lane modulo divide by zero; an enormous count
       // would fan one project's logs across lanes nothing consumes.
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("0")).toBe(MIN_LOG_COMMAND_SHARDS);
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("-4")).toBe(MIN_LOG_COMMAND_SHARDS);
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("100000")).toBe(
+      expect(CanonicalLogService.resolveLogCommandShardCount("0")).toBe(MIN_LOG_COMMAND_SHARDS);
+      expect(CanonicalLogService.resolveLogCommandShardCount("-4")).toBe(MIN_LOG_COMMAND_SHARDS);
+      expect(CanonicalLogService.resolveLogCommandShardCount("100000")).toBe(
         MAX_LOG_COMMAND_SHARDS,
       );
     });
 
     it("truncates a fractional count to a whole lane", () => {
-      expect(CanonicalLogAdapter.resolveLogCommandShardCount("8.9")).toBe(8);
+      expect(CanonicalLogService.resolveLogCommandShardCount("8.9")).toBe(8);
     });
   });
 
   it("keeps a lane inside the bounds even when handed a bad count directly", () => {
     // `logCommandGroupKey` clamps too, so a caller that skipped the resolver
     // still cannot divide by zero.
-    expect(CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 0)).toBe("log:0");
+    expect(CanonicalLogService.logCommandGroupKey("a".repeat(64), 0)).toBe("log:0");
   });
 
   it("assigns stable bounded command lanes", () => {
-    expect(CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 16)).toBe(
-      CanonicalLogAdapter.logCommandGroupKey("a".repeat(64), 16),
+    expect(CanonicalLogService.logCommandGroupKey("a".repeat(64), 16)).toBe(
+      CanonicalLogService.logCommandGroupKey("a".repeat(64), 16),
     );
     expect(
-      Number(CanonicalLogAdapter.logCommandGroupKey("b".repeat(64), 16).split(":")[1]),
+      Number(CanonicalLogService.logCommandGroupKey("b".repeat(64), 16).split(":")[1]),
     ).toBeLessThan(16);
   });
 
@@ -364,7 +364,7 @@ describe("canonical log preparation", () => {
     });
 
     expect(projection.options?.groupKeyFn?.(event)).toBe(
-      CanonicalLogAdapter.logCommandGroupKey(record.recordId, 16),
+      CanonicalLogService.logCommandGroupKey(record.recordId, 16),
     );
   });
 });

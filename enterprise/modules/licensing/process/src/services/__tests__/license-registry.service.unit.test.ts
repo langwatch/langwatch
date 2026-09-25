@@ -15,7 +15,7 @@ import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../../fixtures/license-keys.f
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { LicenseGenerationService } from "../license-generation.service.ts";
 import { LicenseRegistryService } from "../license-registry.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const TERM_END: Instant = Temporal.Instant.from("2027-01-01T00:00:00.000Z");
@@ -98,7 +98,7 @@ function harness({ signingKey = TEST_PRIVATE_KEY }: { signingKey?: string } = {}
   const managedKeys = new RecordingManagedKeys();
   const contractBudgets = new RecordingBudgets();
   const seatBilling = new RecordingSeatBilling();
-  const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+  const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
   const registry = LicenseRegistryService.create({
     repository,
     organizations,
@@ -357,7 +357,7 @@ describe("raising the prepaid commit", () => {
 
 describe("licenses another flow signed", () => {
   function purchased(): string {
-    return LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create()).generate({
+    return LicenseGenerationService.create(NodeLicenseCryptographyService.create()).generate({
       organizationName: "ACME",
       email: "buyer@acme.test",
       planType: "GROWTH",

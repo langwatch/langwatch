@@ -15,9 +15,9 @@ export const EVALUATION_DURATION_METRIC_NAME = "evaluation_duration_milliseconds
 export const EVALUATION_STATUS_METRIC_NAME = "evaluation_status_counter";
 
 /** Evaluation run duration and outcome over OTLP; meter resolved at declaration. */
-export class OtelEvaluationExecutionMetricsAdapter implements EvaluationExecutionTelemetry {
-  static create(): OtelEvaluationExecutionMetricsAdapter {
-    return new OtelEvaluationExecutionMetricsAdapter(
+export class OtelEvaluationExecutionMetricsService implements EvaluationExecutionTelemetry {
+  static create(): OtelEvaluationExecutionMetricsService {
+    return new OtelEvaluationExecutionMetricsService(
       histogram({
         name: EVALUATION_DURATION_METRIC_NAME,
         description: "Duration of evaluations in milliseconds",

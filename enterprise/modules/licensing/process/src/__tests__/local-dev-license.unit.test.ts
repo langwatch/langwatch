@@ -2,10 +2,10 @@ import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-cont
 import { describe, expect, it } from "vitest";
 
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY, resolveSeedLicense } from "../seeding.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
 
-const cryptography = NodeLicenseCryptographyAdapter.create();
+const cryptography = NodeLicenseCryptographyService.create();
 
 function isSignedFor({
   licenseKey,

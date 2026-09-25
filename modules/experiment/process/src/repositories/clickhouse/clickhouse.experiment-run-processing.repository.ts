@@ -183,14 +183,14 @@ export type ExperimentRunProcessingPipeline = StaticPipelineDefinition<
  * The Eventing side of experiment run processing: the storage this feature's
  * pipeline reads and writes through, and the pipeline definition itself.
  */
-export class ExperimentEventingAdapter {
+export class ClickHouseExperimentRunProcessingRepository {
   private constructor(private readonly clickhouse: ExperimentClickHouseRepository | null) {}
 
   static create(input: {
     resolveClient: ExperimentEventingClickHouseResolver;
     clickhouseEnabled: boolean;
-  }): ExperimentEventingAdapter {
-    return new ExperimentEventingAdapter(
+  }): ClickHouseExperimentRunProcessingRepository {
+    return new ClickHouseExperimentRunProcessingRepository(
       input.clickhouseEnabled
         ? ClickhouseExperimentClickHouseRepository.create(input.resolveClient)
         : null,

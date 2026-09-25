@@ -5,7 +5,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
-import { HeaderMcpClientAddressAdapter } from "../services/header-mcp-client-address.service.ts";
+import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
 import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";
@@ -63,7 +63,7 @@ export class HostedMcpApp implements HostedMcpApiContract {
       projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
       grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
       cipher: members.encryption,
-      address: HeaderMcpClientAddressAdapter.create(),
+      address: HeaderMcpClientAddressService.create(),
       baseHost: members.publicBaseUrl,
     });
   }

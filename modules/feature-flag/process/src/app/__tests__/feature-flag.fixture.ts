@@ -18,7 +18,7 @@ import type { FeatureFlagRepositories } from "../../repositories/feature-flag.re
 import { MemoryFeatureFlagExperimentRepository } from "../../repositories/memory/memory.feature-flag-experiment-setting.repository.ts";
 import { MemoryFeatureFlagRepositories } from "../../repositories/memory/memory.feature-flag.repositories.ts";
 import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
-import { CachedFeatureFlagRowAdapter } from "../../services/cached-feature-flag-row.service.ts";
+import { CachedFeatureFlagRowService } from "../../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
 import {
@@ -144,7 +144,7 @@ export function createFeatureFlagTestService(options?: {
   const organizations = TestOrganizations.create();
   const service = FeatureFlagService.create({
     repository,
-    rows: CachedFeatureFlagRowAdapter.create({ repository, cache, now }),
+    rows: CachedFeatureFlagRowService.create({ repository, cache, now }),
     experiments,
     config: options?.config ?? resolveTestFeatureFlagConfig(),
     registry: options?.registry ?? FEATURE_FLAG_REGISTRY,

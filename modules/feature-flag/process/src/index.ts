@@ -5,4 +5,4 @@ export type {
   FeatureFlagCacheSlot,
   FeatureFlagRow,
 } from "./app/feature-flag.app.ts";
-export { EventingKillSwitchAdapter } from "./services/feature-flag-kill-switch.service.ts";
+export { EventingKillSwitchService } from "./services/feature-flag-kill-switch.service.ts";

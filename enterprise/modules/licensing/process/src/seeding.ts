@@ -1,5 +1,5 @@
 // gitleaks:allow — local-dev enterprise license key, not a real secret
-import { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "./services/node-license-cryptography.service.ts";
 
 /**
  * Local-dev enterprise license key to bootstrap a fresh local install.
@@ -25,7 +25,7 @@ export function resolveSeedLicense({
   // The cryptography adapter owns parsing and verification on this branch; the
   // monolith exposed them as free functions. Built once here rather than per
   // candidate, because it canonicalises the PEM on construction.
-  const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey });
+  const cryptography = NodeLicenseCryptographyService.create({ publicKey });
   const signedForBootKey = (licenseKey: string): boolean => {
     const parsed = cryptography.parseLicenseKey(licenseKey);
     return parsed !== null && cryptography.verifySignature(parsed, publicKey);

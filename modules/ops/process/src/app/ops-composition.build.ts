@@ -27,12 +27,12 @@ import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metri
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import type { OrganizationSsoRouting } from "../services/admin-backoffice.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
-import { EventingOpsIntrospectionAdapter } from "../services/eventing.ops-introspection.service.ts";
+import { EventingOpsIntrospectionService } from "../services/eventing.ops-introspection.service.ts";
 import { AdminAuditSink } from "../services/impersonation.service.ts";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
-import { QueueOpsMetricsSourceAdapter } from "../services/queue.ops-queue-metrics-source.service.ts";
+import { QueueOpsMetricsSourceService } from "../services/queue.ops-queue-metrics-source.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 import type {
@@ -198,7 +198,7 @@ export function buildOpsInfrastructure(input: {
   rateTracker: AnomalyRateTrackerRepository;
 }): OpsAppInfrastructure {
   const { members, config, resources } = input;
-  const introspection = EventingOpsIntrospectionAdapter.create(() => members.eventing.definitions);
+  const introspection = EventingOpsIntrospectionService.create(() => members.eventing.definitions);
 
   const snapshots = DefaultOpsSnapshotService.create(
     RedisOpsSnapshotRepository.create(new MemberOpsSnapshotRedis(members.redis)),
@@ -214,7 +214,7 @@ export function buildOpsInfrastructure(input: {
   // stores close, so the lease is handed back rather than left to lapse.
   const queueMetricsWriter = OpsMetricsCollectorService.create({
     metrics: RedisOpsMetricsRepository.create({ redis: members.redis }),
-    ops: QueueOpsMetricsSourceAdapter.create(
+    ops: QueueOpsMetricsSourceService.create(
       QueueService.create({ repo: QueueRedisRepository.create({ redis: members.redis }) }),
     ),
     rateTracker: input.rateTracker,

@@ -14,12 +14,12 @@ import { MemoryConnectOrganizationRepository } from "../../repositories/memory/m
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 const NOW: Instant = Temporal.Instant.from("2026-01-01T00:00:00.000Z");
 const ORGANIZATION = "org-acme";
 
-const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 /** A license signed here, so the services it names are part of the signature. */
 function licenseNaming(services: string[]): string {

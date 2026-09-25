@@ -9,7 +9,7 @@ import {
 import type { LicenseCryptography, OrganizationLicense } from "../app/licensing.members.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
-export type LicensingEntitlementSourceAdapterMode = "cloud" | "self-hosted";
+export type LicensingEntitlementSourceMode = "cloud" | "self-hosted";
 
 /**
  * The two plan questions this source asks, and the whole of what it needs.
@@ -21,12 +21,12 @@ export type LicensePlanReader = Pick<LicensingService, "getActivePlan" | "getSel
  * port. Deployment mode is composition, while signature verification remains
  * wholly in the shared Licensing capability.
  */
-export class LicensingEntitlementSourceAdapter implements EntitlementSource {
+export class LicensingEntitlementSourceService implements EntitlementSource {
   static create(options: {
     licensing: LicensePlanReader;
-    mode: LicensingEntitlementSourceAdapterMode;
-  }): LicensingEntitlementSourceAdapter {
-    return new LicensingEntitlementSourceAdapter(options.licensing, options.mode);
+    mode: LicensingEntitlementSourceMode;
+  }): LicensingEntitlementSourceService {
+    return new LicensingEntitlementSourceService(options.licensing, options.mode);
   }
 
   /**
@@ -36,8 +36,8 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
     licenses: OrganizationLicense;
     cryptography: LicenseCryptography;
     isSaas: boolean;
-  }): LicensingEntitlementSourceAdapter {
-    return LicensingEntitlementSourceAdapter.create({
+  }): LicensingEntitlementSourceService {
+    return LicensingEntitlementSourceService.create({
       licensing: LicensePlanSourceService.create({
         licenses: options.licenses,
         cryptography: options.cryptography,
@@ -48,7 +48,7 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
 
   private constructor(
     private readonly licensing: LicensePlanReader,
-    private readonly mode: LicensingEntitlementSourceAdapterMode,
+    private readonly mode: LicensingEntitlementSourceMode,
   ) {}
 
   async resolve(input: ResolvePlanInput): Promise<PlanInfo> {

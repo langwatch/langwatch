@@ -30,11 +30,15 @@ export type ExperimentFindOrCreateInput = Readonly<{
 }>;
 
 export class ExperimentFindOrCreateService {
-  static create(experiments: ExperimentService): ExperimentFindOrCreateService {
+  static create(
+    experiments: Pick<ExperimentService, "getById" | "findBySlug" | "save">,
+  ): ExperimentFindOrCreateService {
     return new ExperimentFindOrCreateService(experiments);
   }
 
-  private constructor(private readonly experiments: ExperimentService) {}
+  private constructor(
+    private readonly experiments: Pick<ExperimentService, "getById" | "findBySlug" | "save">,
+  ) {}
 
   /**
    * The experiment the slug names, created if it is free.

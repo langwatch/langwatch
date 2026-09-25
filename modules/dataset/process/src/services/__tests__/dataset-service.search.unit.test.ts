@@ -16,7 +16,7 @@ import type { DatasetChunkRepository } from "../../repositories/dataset-chunk.re
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
-import { DatasetContentAdapter } from "../dataset-content.service.ts";
+import { DatasetContentService } from "../dataset-content.service.ts";
 import {
   DATASET_SEARCH_MAX_BYTES,
   DATASET_SEARCH_MAX_ROWS,
@@ -46,7 +46,7 @@ const makeService = (overrides: { recordRepository?: Partial<DatasetRecordReposi
     },
     "dataset chunks",
   );
-  const content = DatasetContentAdapter.create({
+  const content = DatasetContentService.create({
     datasets: createApiFixture<DatasetContentRepository>(),
     storage,
   });

@@ -7,7 +7,7 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import type { PresenceBroadcast, PresenceEmitter } from "../../app/presence.app.ts";
-import { BroadcastTenantRateLimiterAdapter } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+import { BroadcastTenantRateLimiterService } from "../../services/broadcast-tenant-rate-limiter.service.ts";
 
 export type BroadcastEventType =
   | "trace_updated"
@@ -54,8 +54,8 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> empty time
   private active = false;
-  private readonly senderRateLimiter = new BroadcastTenantRateLimiterAdapter();
-  private readonly subscriberRateLimiter = new BroadcastTenantRateLimiterAdapter();
+  private readonly senderRateLimiter = BroadcastTenantRateLimiterService.create();
+  private readonly subscriberRateLimiter = BroadcastTenantRateLimiterService.create();
   private closed = false;
 
   static create(redis: Cluster | IORedis | null): RedisBroadcastRepository {

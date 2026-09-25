@@ -7,7 +7,6 @@ import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
-import type { ExperimentService } from "../experiment.service.ts";
 
 const recordWorkbenchRunResults = vi.fn();
 const getWorkbenchState = vi.fn();
@@ -18,7 +17,7 @@ const findWriterFor = () =>
       experiments: {
         getWorkbenchState,
         recordWorkbenchRunResults,
-      } as unknown as ExperimentService,
+      },
       actor: { userId: "user_1", label: "user" },
     },
     projectId: "project_1",

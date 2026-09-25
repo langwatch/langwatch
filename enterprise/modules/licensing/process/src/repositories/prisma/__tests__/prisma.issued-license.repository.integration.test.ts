@@ -12,7 +12,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../../../fixtures/license-keys.fixture.ts";
 import { LicenseGenerationService } from "../../../services/license-generation.service.ts";
 import { LicenseRegistryService } from "../../../services/license-registry.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../../../services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../../../services/node-license-cryptography.service.ts";
 import { PrismaIssuedLicenseRepository } from "../prisma.issued-license.repository.ts";
 import {
   createLicensingTestConnection,
@@ -28,7 +28,7 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
   const repository = PrismaIssuedLicenseRepository.create(prisma);
   const organizationIds: string[] = [];
   const organizationNames = new Map<string, string>();
-  const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+  const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
   const registry = LicenseRegistryService.create({
     repository,
     organizations: {

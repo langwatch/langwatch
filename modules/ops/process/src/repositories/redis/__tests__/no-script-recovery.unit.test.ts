@@ -8,8 +8,8 @@ import { QueueRedisRepository } from "../queue.repository.ts";
  * when a node has no cached copy of the script (restart, SCRIPT FLUSH, or the
  * first call against a fresh cluster node).
  */
-function pipelineReturning(results: [Error | null, unknown][]): ChainableCommander {
-  return { exec: async () => results } as unknown as ChainableCommander;
+function pipelineReturning(results: [Error | null, unknown][]): Pick<ChainableCommander, "exec"> {
+  return { exec: async () => results };
 }
 
 const noScript = (): [Error | null, unknown] => [
@@ -111,7 +111,7 @@ describe("QueueRedisRepository.execWithNoScriptRecovery", () => {
     describe("when the batch is resolved", () => {
       it("returns an empty batch rather than null", async () => {
         const results = await QueueRedisRepository.execWithNoScriptRecovery({
-          pipeline: { exec: async () => null } as unknown as ChainableCommander,
+          pipeline: { exec: async () => null },
           rerun: async () => 1,
         });
 

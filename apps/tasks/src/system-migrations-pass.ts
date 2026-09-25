@@ -1,6 +1,6 @@
 import {
-  EventingAuthzCommandDispatcherAdapter,
-  KsuidAuthzBindingIdAdapter,
+  AuthzCommandDispatcherService,
+  AuthzBindingIdService,
   PostgresAuthzAdapter,
 } from "@langwatch/authz-process";
 import { parseRoutingTable } from "@langwatch/clickhouse-client";
@@ -20,7 +20,7 @@ import {
 } from "@langwatch/identity-process";
 import {
   OpsSystemMigrations,
-  RoutingTableOrganizationDataplaneAdapter,
+  RoutingTableOrganizationDataplaneService,
   SystemMigrationsPassTask,
 } from "@langwatch/ops-process";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -53,8 +53,8 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
     const migrations: SystemMigration[] = [];
     migrations.push(...PostgresIdentityOrganizationMigrationsAdapter.create({ database }).build());
     if (eventing) {
-      const dispatcher = EventingAuthzCommandDispatcherAdapter.create();
-      const bindingIds = KsuidAuthzBindingIdAdapter.create();
+      const dispatcher = AuthzCommandDispatcherService.create();
+      const bindingIds = AuthzBindingIdService.create();
       const authz = PostgresAuthzAdapter.create({
         database,
         redis,
@@ -62,7 +62,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
         newBindingId: () => bindingIds.newBindingId(),
       }).build();
       const registered = eventing.register(authz.pipeline);
-      dispatcher.connect(EventingAuthzCommandDispatcherAdapter.sendersFrom(registered.commands));
+      dispatcher.connect(AuthzCommandDispatcherService.sendersFrom(registered.commands));
       migrations.push(authz.migration);
     }
 
@@ -95,7 +95,7 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
       isSaaS: () => input.config.isSaaS,
       migrations: () => migrations,
       userMigrations: () => userMigrations,
-      dataplane: RoutingTableOrganizationDataplaneAdapter.create({
+      dataplane: RoutingTableOrganizationDataplaneService.create({
         routes: parseRoutingTable(input.environment).routes,
       }),
       newbornSweep: () => sweep.runPass(),

@@ -5,13 +5,13 @@ import { type OrganizationDataplane, type OrganizationDataplaneResolver } from "
  * routes rather than the whole table, needing no ClickHouse client
  * dependency; an unnamed organization falls back to the shared instance.
  */
-export class RoutingTableOrganizationDataplaneAdapter implements OrganizationDataplaneResolver {
+export class RoutingTableOrganizationDataplaneService implements OrganizationDataplaneResolver {
   static create({
     routes,
   }: {
     routes: ReadonlyMap<string, string>;
-  }): RoutingTableOrganizationDataplaneAdapter {
-    return new RoutingTableOrganizationDataplaneAdapter(routes);
+  }): RoutingTableOrganizationDataplaneService {
+    return new RoutingTableOrganizationDataplaneService(routes);
   }
 
   private constructor(private readonly routes: ReadonlyMap<string, string>) {}

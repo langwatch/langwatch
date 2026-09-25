@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
 import { LicenseService } from "../services/license.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { OFFLINE_LICENSE_FROM_MAIN as fixture } from "./support/offline-license-from-main.fixture.ts";
 
 const ORG = "org_offline";
@@ -57,7 +57,7 @@ class OfflineLicenseStorage implements LicenseStorage {
   }
 }
 
-const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: fixture.publicKey });
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: fixture.publicKey });
 
 function offlineInstall(memberCount = 0): LicenseService {
   return LicenseService.create({

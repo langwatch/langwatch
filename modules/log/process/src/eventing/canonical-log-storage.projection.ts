@@ -10,7 +10,7 @@ import {
   type CanonicalLogRecord,
 } from "@langwatch/log-contract";
 
-import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+import { CanonicalLogService } from "../services/canonical-log.service.ts";
 
 const events = [canonicalLogRecordReceivedEventSchema] as const;
 
@@ -34,7 +34,7 @@ export class CanonicalLogStorageMapProjection
     this.store = deps.store;
     this.options = {
       groupKeyFn: (event: CanonicalLogRecordReceivedEvent) =>
-        CanonicalLogAdapter.logCommandGroupKey(event.data.recordId, deps.shardCount),
+        CanonicalLogService.logCommandGroupKey(event.data.recordId, deps.shardCount),
       coalesceMaxBatch: LOG_MAP_COALESCE_MAX_BATCH,
     };
   }

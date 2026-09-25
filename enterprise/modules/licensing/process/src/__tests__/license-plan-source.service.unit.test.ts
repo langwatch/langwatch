@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import type { OrganizationLicense } from "../app/licensing.members.ts";
 import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
-import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
+import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,
@@ -32,7 +32,7 @@ class StoredLicense implements OrganizationLicense {
   }
 }
 
-const cryptography = NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY });
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
 
 function planSourceFor(licenseKey: string | null): LicensePlanSourceService {
   return LicensePlanSourceService.create({
@@ -115,7 +115,7 @@ describe("given the licence leg a deployment composes", () => {
   describe("when the deployment is the hosted one", () => {
     /** @scenario "On Cloud a lapsed license steps aside for the subscription" */
     it("reads the licence on the hosted terms, so a lapsed contract stops answering", async () => {
-      const source = LicensingEntitlementSourceAdapter.forDeployment({
+      const source = LicensingEntitlementSourceService.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
         cryptography,
         isSaas: true,
@@ -135,7 +135,7 @@ describe("given the licence leg a deployment composes", () => {
     /** @scenario "A lapsed license keeps metering the seats it sold" */
     /** @scenario "An expired license keeps the seats it sold" */
     it("reads the licence on the self-hosted terms and floors it at the open-source baseline", async () => {
-      const source = LicensingEntitlementSourceAdapter.forDeployment({
+      const source = LicensingEntitlementSourceService.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
         cryptography,
         isSaas: false,
@@ -152,7 +152,7 @@ describe("given the licence leg a deployment composes", () => {
 
     /** @scenario "A lapsed license keeps the capabilities it bought" */
     it("keeps the Enterprise identity on the self-hosted reading of a lapsed licence", async () => {
-      const source = LicensingEntitlementSourceAdapter.forDeployment({
+      const source = LicensingEntitlementSourceService.forDeployment({
         licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
         cryptography,
         isSaas: false,
@@ -164,7 +164,7 @@ describe("given the licence leg a deployment composes", () => {
     });
 
     it("answers the unlimited baseline where no licence was activated", async () => {
-      const source = LicensingEntitlementSourceAdapter.forDeployment({
+      const source = LicensingEntitlementSourceService.forDeployment({
         licenses: StoredLicense.of(null),
         cryptography,
         isSaas: false,

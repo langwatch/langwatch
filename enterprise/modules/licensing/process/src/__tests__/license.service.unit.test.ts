@@ -7,7 +7,7 @@ import {
   type LicenseStorage,
   type LicenseRetention,
   type LicenseUsage,
-  NodeLicenseCryptographyAdapter,
+  NodeLicenseCryptographyService,
   type StoredLicense,
 } from "../index.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
@@ -24,7 +24,7 @@ import {
 function mintLicenseKey(
   options: { organizationId?: string; connectServices?: string[] } = {},
 ): string {
-  return LicenseGenerationService.create(NodeLicenseCryptographyAdapter.create()).generate({
+  return LicenseGenerationService.create(NodeLicenseCryptographyService.create()).generate({
     ...(options.organizationId ? { organizationId: options.organizationId } : {}),
     ...(options.connectServices ? { connectServices: options.connectServices } : {}),
     organizationName: "Acme Corp",
@@ -126,7 +126,7 @@ describe("LicenseService", () => {
   function serviceWithInstanceKey(instanceLicenseKey: string): LicenseService {
     return LicenseService.create({
       repository,
-      cryptography: NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY }),
+      cryptography: NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY }),
       logger,
       instanceLicenseKey,
     });
@@ -138,7 +138,7 @@ describe("LicenseService", () => {
     logger = new RecordingLicenseLogger();
     service = LicenseService.create({
       repository,
-      cryptography: NodeLicenseCryptographyAdapter.create({
+      cryptography: NodeLicenseCryptographyService.create({
         publicKey: TEST_PUBLIC_KEY,
       }),
       usage: new FixedLicenseUsage(42),

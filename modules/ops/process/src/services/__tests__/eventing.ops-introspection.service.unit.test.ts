@@ -6,7 +6,7 @@
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
-import { EventingOpsIntrospectionAdapter } from "../eventing.ops-introspection.service.ts";
+import { EventingOpsIntrospectionService } from "../eventing.ops-introspection.service.ts";
 
 function definitionWith({
   stateOptions,
@@ -29,7 +29,7 @@ function definitionWith({
 }
 
 function adapterFor(definition: StaticPipelineDefinition<any, any, any>) {
-  return EventingOpsIntrospectionAdapter.create(() => [definition]);
+  return EventingOpsIntrospectionService.create(() => [definition]);
 }
 
 describe("given a pipeline registering a state projection", () => {

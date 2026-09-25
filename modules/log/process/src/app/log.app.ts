@@ -18,7 +18,7 @@ import {
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import { createLogClickHouseResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";
-import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { LogService } from "../services/log.service.ts";
 
 export type LogInfrastructure = Readonly<{
@@ -53,13 +53,13 @@ export class LogApp implements LogApiContract {
       defaultReadLimit: LOG_DEFAULT_READ_LIMIT,
     });
     const service = LogService.create({
-      preparation: CanonicalLogAdapter.create({ redaction: dependencies.dataPrivacy }),
+      preparation: CanonicalLogService.create({ redaction: dependencies.dataPrivacy }),
       repository,
     });
     const pipeline = LogProcessingAdapter.create({
       repository,
       defaultRetentionDays: LOG_DEFAULT_RETENTION_DAYS,
-      logCommandShardCount: CanonicalLogAdapter.resolveLogCommandShardCount(
+      logCommandShardCount: CanonicalLogService.resolveLogCommandShardCount(
         config.processingShards,
       ),
     }).build();

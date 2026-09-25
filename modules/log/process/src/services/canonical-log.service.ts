@@ -50,15 +50,15 @@ type StringRef = {
  * Walk decoded OTLP tree, collect stringValue leaves with array-indexed paths (for
  * uniqueness) and carry the owning attribute name so redaction NAME rules can fire.
  */
-export class CanonicalLogAdapter implements LogPreparer {
+export class CanonicalLogService implements LogPreparer {
   private constructor(private readonly redaction: LogRedaction) {}
 
-  static create(options: { redaction: LogRedaction }): CanonicalLogAdapter {
-    return new CanonicalLogAdapter(options.redaction);
+  static create(options: { redaction: LogRedaction }): CanonicalLogService {
+    return new CanonicalLogService(options.redaction);
   }
 
   prepare(input: LogPreparationInput): Promise<LogPreparation> {
-    return CanonicalLogAdapter.prepareCanonicalLogRecords(input, this.redaction);
+    return CanonicalLogService.prepareCanonicalLogRecords(input, this.redaction);
   }
 
   static async prepareCanonicalLogRecords(
@@ -75,7 +75,7 @@ export class CanonicalLogAdapter implements LogPreparer {
       const resourceLogParsed = unknownRecordSchema.safeParse(resourceLogRaw);
       if (!resourceLogParsed.success) continue;
       const resourceLog = structuredClone(resourceLogParsed.data);
-      const resourceTemplate = CanonicalLogAdapter.isRecord(resourceLog.resource)
+      const resourceTemplate = CanonicalLogService.isRecord(resourceLog.resource)
         ? resourceLog.resource
         : {};
       const scopeLogs = Array.isArray(resourceLog.scopeLogs) ? resourceLog.scopeLogs : [];
@@ -83,10 +83,10 @@ export class CanonicalLogAdapter implements LogPreparer {
         const scopeLogParsed = unknownRecordSchema.safeParse(scopeLogRaw);
         if (!scopeLogParsed.success) continue;
         const scopeLog = structuredClone(scopeLogParsed.data);
-        const scopeTemplate = CanonicalLogAdapter.isRecord(scopeLog.scope) ? scopeLog.scope : {};
+        const scopeTemplate = CanonicalLogService.isRecord(scopeLog.scope) ? scopeLog.scope : {};
         const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
         for (const logRecordRaw of logRecords) {
-          if (!CanonicalLogAdapter.isRecord(logRecordRaw)) {
+          if (!CanonicalLogService.isRecord(logRecordRaw)) {
             rejectedLogRecords++;
             errors.push("log record is malformed");
             continue;
@@ -95,7 +95,7 @@ export class CanonicalLogAdapter implements LogPreparer {
           const scope = structuredClone(scopeTemplate);
           const logRecord = structuredClone(logRecordRaw);
           try {
-            await CanonicalLogAdapter.redactTypedLog({
+            await CanonicalLogService.redactTypedLog({
               resourceAttributes: resource.attributes,
               scopeAttributes: scope.attributes,
               logAttributes: logRecord.attributes,
@@ -105,7 +105,7 @@ export class CanonicalLogAdapter implements LogPreparer {
               tenantId: args.tenantId,
             });
             accepted.push(
-              CanonicalLogAdapter.buildRecord({
+              CanonicalLogService.buildRecord({
                 tenantId: args.tenantId,
                 organizationId: args.organizationId,
                 resourceLog: { ...resourceLog, resource },
@@ -129,13 +129,13 @@ export class CanonicalLogAdapter implements LogPreparer {
     if (!value) return DEFAULT_LOG_COMMAND_SHARDS;
     const parsed = Number(value);
     return Number.isFinite(parsed)
-      ? CanonicalLogAdapter.clampLogCommandShardCount(parsed)
+      ? CanonicalLogService.clampLogCommandShardCount(parsed)
       : DEFAULT_LOG_COMMAND_SHARDS;
   }
 
   static logCommandGroupKey(recordId: string, shardCount: number): string {
-    const count = BigInt(CanonicalLogAdapter.clampLogCommandShardCount(shardCount));
-    const lane = BigInt(`0x${CanonicalLogAdapter.sha256(recordId).slice(0, 16)}`) % count;
+    const count = BigInt(CanonicalLogService.clampLogCommandShardCount(shardCount));
+    const lane = BigInt(`0x${CanonicalLogService.sha256(recordId).slice(0, 16)}`) % count;
     return `log:${lane}`;
   }
 
@@ -166,8 +166,8 @@ export class CanonicalLogAdapter implements LogPreparer {
     if (typeof value === "bigint") decimal = value.toString();
     else if (typeof value === "string") decimal = value;
     else if (typeof value === "number") decimal = String(value);
-    else if (CanonicalLogAdapter.isRecord(value) && "low" in value && "high" in value) {
-      decimal = CanonicalLogAdapter.longBitsToBigInt(value).toString();
+    else if (CanonicalLogService.isRecord(value) && "low" in value && "high" in value) {
+      decimal = CanonicalLogService.longBitsToBigInt(value).toString();
     } else {
       throw new Error(`${label} is not an integer`);
     }
@@ -179,11 +179,11 @@ export class CanonicalLogAdapter implements LogPreparer {
 
   private static optionalTimestamp(value: unknown, label: string): string {
     if (value === undefined || value === null) return "0";
-    return CanonicalLogAdapter.integerDecimal(value, label, MAX_UINT64);
+    return CanonicalLogService.integerDecimal(value, label, MAX_UINT64);
   }
 
   private static uint32Number(value: unknown, label: string): number {
-    return Number(CanonicalLogAdapter.integerDecimal(value ?? 0, label, MAX_UINT32));
+    return Number(CanonicalLogService.integerDecimal(value ?? 0, label, MAX_UINT32));
   }
 
   private static timestampMs(timestamp: string): number {
@@ -195,7 +195,7 @@ export class CanonicalLogAdapter implements LogPreparer {
   }
 
   private static canonicalAnyValue(value: unknown): unknown {
-    if (!CanonicalLogAdapter.isRecord(value)) return { type: "empty" };
+    if (!CanonicalLogService.isRecord(value)) return { type: "empty" };
     const present = [
       "stringValue",
       "boolValue",
@@ -227,7 +227,7 @@ export class CanonicalLogAdapter implements LogPreparer {
       if (typeof raw === "number" && !Number.isSafeInteger(raw)) {
         throw new Error("intValue is not safely represented");
       }
-      if (CanonicalLogAdapter.isRecord(raw) && "low" in raw && "high" in raw) {
+      if (CanonicalLogService.isRecord(raw) && "low" in raw && "high" in raw) {
         const low = BigInt(Number(raw.low ?? 0) >>> 0);
         const high = BigInt(Number(raw.high ?? 0) >>> 0);
         return {
@@ -258,7 +258,7 @@ export class CanonicalLogAdapter implements LogPreparer {
         bytes = raw;
       } else if (typeof raw === "string") {
         bytes = Buffer.from(raw, "base64");
-      } else if (CanonicalLogAdapter.isRecord(raw)) {
+      } else if (CanonicalLogService.isRecord(raw)) {
         bytes = Buffer.from(
           Object.entries(raw)
             .toSorted(([left], [right]) => Number(left) - Number(right))
@@ -272,37 +272,37 @@ export class CanonicalLogAdapter implements LogPreparer {
     }
     if (kind === "arrayValue") {
       const array = value.arrayValue;
-      if (!CanonicalLogAdapter.isRecord(array) || !Array.isArray(array.values)) {
+      if (!CanonicalLogService.isRecord(array) || !Array.isArray(array.values)) {
         throw new Error("arrayValue is malformed");
       }
       return {
         type: "array",
-        value: array.values.map((item) => CanonicalLogAdapter.canonicalAnyValue(item)),
+        value: array.values.map((item) => CanonicalLogService.canonicalAnyValue(item)),
       };
     }
     const list = value.kvlistValue;
-    if (!CanonicalLogAdapter.isRecord(list) || !Array.isArray(list.values)) {
+    if (!CanonicalLogService.isRecord(list) || !Array.isArray(list.values)) {
       throw new Error("kvlistValue is malformed");
     }
-    return { type: "kvlist", value: CanonicalLogAdapter.canonicalAttributes(list.values) };
+    return { type: "kvlist", value: CanonicalLogService.canonicalAttributes(list.values) };
   }
 
   private static canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {
     if (!Array.isArray(attributes)) return [];
     return attributes
       .map((raw) => {
-        if (!CanonicalLogAdapter.isRecord(raw) || typeof raw.key !== "string") {
+        if (!CanonicalLogService.isRecord(raw) || typeof raw.key !== "string") {
           throw new Error("attribute is malformed");
         }
-        return { key: raw.key, value: CanonicalLogAdapter.canonicalAnyValue(raw.value) };
+        return { key: raw.key, value: CanonicalLogService.canonicalAnyValue(raw.value) };
       })
       .toSorted((left, right) => {
         const byKey = compareOrdinal(left.key, right.key);
         return (
           byKey ||
           compareOrdinal(
-            CanonicalLogAdapter.stableStringify(left.value),
-            CanonicalLogAdapter.stableStringify(right.value),
+            CanonicalLogService.stableStringify(left.value),
+            CanonicalLogService.stableStringify(right.value),
           )
         );
       });
@@ -326,7 +326,7 @@ export class CanonicalLogAdapter implements LogPreparer {
   }) {
     if (Array.isArray(value)) {
       value.forEach((child, index) =>
-        CanonicalLogAdapter.collectStringRefs({
+        CanonicalLogService.collectStringRefs({
           value: child,
           prefix: `${prefix}.${index}`,
           refs,
@@ -335,14 +335,14 @@ export class CanonicalLogAdapter implements LogPreparer {
       );
       return;
     }
-    if (!CanonicalLogAdapter.isRecord(value)) return;
-    const ownName = CanonicalLogAdapter.otlpAttributeName(value) ?? attributeName;
+    if (!CanonicalLogService.isRecord(value)) return;
+    const ownName = CanonicalLogService.otlpAttributeName(value) ?? attributeName;
     for (const [key, child] of Object.entries(value)) {
       const path = prefix ? `${prefix}.${key}` : key;
       if (key === "stringValue" && typeof child === "string") {
         refs.push({ owner: value, key, path, attributeName });
       } else {
-        CanonicalLogAdapter.collectStringRefs({
+        CanonicalLogService.collectStringRefs({
           value: child,
           prefix: path,
           refs,
@@ -362,14 +362,14 @@ export class CanonicalLogAdapter implements LogPreparer {
     tenantId: string;
   }) {
     const refs: StringRef[] = [];
-    CanonicalLogAdapter.collectStringRefs({
+    CanonicalLogService.collectStringRefs({
       value: args.resourceAttributes,
       prefix: "resource",
       refs,
     });
-    CanonicalLogAdapter.collectStringRefs({ value: args.scopeAttributes, prefix: "scope", refs });
-    CanonicalLogAdapter.collectStringRefs({ value: args.logAttributes, prefix: "log", refs });
-    CanonicalLogAdapter.collectStringRefs({ value: args.body, prefix: "body", refs });
+    CanonicalLogService.collectStringRefs({ value: args.scopeAttributes, prefix: "scope", refs });
+    CanonicalLogService.collectStringRefs({ value: args.logAttributes, prefix: "log", refs });
+    CanonicalLogService.collectStringRefs({ value: args.body, prefix: "body", refs });
     const attributes = Object.fromEntries(
       refs.map((ref) => [ref.path, String(ref.owner[ref.key])]),
     );
@@ -426,8 +426,8 @@ export class CanonicalLogAdapter implements LogPreparer {
       providerKind = "generic";
     }
     if (
-      CanonicalLogAdapter.validTraceId(wireTraceId) &&
-      CanonicalLogAdapter.validSpanId(wireSpanId)
+      CanonicalLogService.validTraceId(wireTraceId) &&
+      CanonicalLogService.validSpanId(wireSpanId)
     ) {
       return {
         traceId: wireTraceId,
@@ -438,7 +438,7 @@ export class CanonicalLogAdapter implements LogPreparer {
     }
     const sessionId = attributes["session.id"] ?? "";
     if (providerKind === "claude_code" && sessionId) {
-      return CanonicalLogAdapter.claudeSynthesizedCorrelation({
+      return CanonicalLogService.claudeSynthesizedCorrelation({
         sessionId,
         wireTraceId,
         wireSpanId,
@@ -448,7 +448,7 @@ export class CanonicalLogAdapter implements LogPreparer {
     }
     const conversationId = attributes["conversation.id"] ?? "";
     if (providerKind === "codex" && conversationId) {
-      return CanonicalLogAdapter.codexSynthesizedCorrelation({
+      return CanonicalLogService.codexSynthesizedCorrelation({
         conversationId,
         wireTraceId,
         wireSpanId,
@@ -474,12 +474,12 @@ export class CanonicalLogAdapter implements LogPreparer {
     const { sessionId, wireTraceId, wireSpanId, eventName, attributes } = args;
     const promptId = attributes["prompt.id"] ?? "";
     const turnKey = promptId ? `${sessionId}:${promptId}` : sessionId;
-    const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
+    const traceId = CanonicalLogService.validTraceId(wireTraceId)
       ? wireTraceId
-      : CanonicalLogAdapter.sha256(turnKey).slice(0, 32);
-    const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
+      : CanonicalLogService.sha256(turnKey).slice(0, 32);
+    const spanId = CanonicalLogService.validSpanId(wireSpanId)
       ? wireSpanId
-      : CanonicalLogAdapter.sha256(
+      : CanonicalLogService.sha256(
           `${sessionId}:${promptId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
         ).slice(0, 16);
     return {
@@ -503,12 +503,12 @@ export class CanonicalLogAdapter implements LogPreparer {
     providerKind: LogProviderKind;
   } {
     const { conversationId, wireTraceId, wireSpanId, eventName, attributes } = args;
-    const traceId = CanonicalLogAdapter.validTraceId(wireTraceId)
+    const traceId = CanonicalLogService.validTraceId(wireTraceId)
       ? wireTraceId
-      : CanonicalLogAdapter.sha256(conversationId).slice(0, 32);
-    const spanId = CanonicalLogAdapter.validSpanId(wireSpanId)
+      : CanonicalLogService.sha256(conversationId).slice(0, 32);
+    const spanId = CanonicalLogService.validSpanId(wireSpanId)
       ? wireSpanId
-      : CanonicalLogAdapter.sha256(
+      : CanonicalLogService.sha256(
           `${conversationId}:${eventName}:${attributes["event.sequence"] ?? ""}`,
         ).slice(0, 16);
     return {
@@ -520,7 +520,7 @@ export class CanonicalLogAdapter implements LogPreparer {
   }
 
   private static bodyType(body: unknown): CanonicalLogRecord["bodyType"] {
-    if (!CanonicalLogAdapter.isRecord(body)) return "empty";
+    if (!CanonicalLogService.isRecord(body)) return "empty";
     const parsed = z
       .enum(["empty", "string", "bool", "int", "double", "bytes", "array", "kvlist"])
       .safeParse(body.type);
@@ -528,7 +528,7 @@ export class CanonicalLogAdapter implements LogPreparer {
   }
 
   private static bodyText(body: unknown): string | null {
-    if (!CanonicalLogAdapter.isRecord(body)) return null;
+    if (!CanonicalLogService.isRecord(body)) return null;
     if (body.type === "string" && typeof body.value === "string") {
       return body.value;
     }
@@ -558,51 +558,51 @@ export class CanonicalLogAdapter implements LogPreparer {
     piiRedactionLevel: PIIRedactionLevel;
     acceptedAt: number;
   }): PreparedCanonicalLogRecord {
-    const resource = CanonicalLogAdapter.isRecord(args.resourceLog.resource)
+    const resource = CanonicalLogService.isRecord(args.resourceLog.resource)
       ? args.resourceLog.resource
       : {};
-    const scope = CanonicalLogAdapter.isRecord(args.scopeLog.scope) ? args.scopeLog.scope : {};
+    const scope = CanonicalLogService.isRecord(args.scopeLog.scope) ? args.scopeLog.scope : {};
     const log = args.logRecord;
     const scopeName = typeof scope.name === "string" ? scope.name : "";
     const scopeVersion = typeof scope.version === "string" ? scope.version : "";
     const logAttributes = Array.isArray(log.attributes) ? log.attributes : [];
     log.attributes = logAttributes;
 
-    const resourceAttributes = CanonicalLogAdapter.canonicalAttributes(resource.attributes);
-    const scopeAttributes = CanonicalLogAdapter.canonicalAttributes(scope.attributes);
-    const attributes = CanonicalLogAdapter.canonicalAttributes(log.attributes);
+    const resourceAttributes = CanonicalLogService.canonicalAttributes(resource.attributes);
+    const scopeAttributes = CanonicalLogService.canonicalAttributes(scope.attributes);
+    const attributes = CanonicalLogService.canonicalAttributes(log.attributes);
     const flatAttributes = normalizeOtlpAttributeMap(log.attributes);
     const eventName =
       typeof log.eventName === "string" ? log.eventName : (flatAttributes["event.name"] ?? "");
     const flatResourceAttributes = normalizeOtlpAttributeMap(resource.attributes);
-    const wireTraceId = CanonicalLogAdapter.normalizeId(log.traceId);
-    const wireSpanId = CanonicalLogAdapter.normalizeId(log.spanId);
-    const correlation = CanonicalLogAdapter.synthesizeCorrelation({
+    const wireTraceId = CanonicalLogService.normalizeId(log.traceId);
+    const wireSpanId = CanonicalLogService.normalizeId(log.spanId);
+    const correlation = CanonicalLogService.synthesizeCorrelation({
       scopeName,
       wireTraceId,
       wireSpanId,
       eventName,
       attributes: flatAttributes,
     });
-    const timeUnixNano = CanonicalLogAdapter.optionalTimestamp(log.timeUnixNano, "timeUnixNano");
-    const observedTimeUnixNano = CanonicalLogAdapter.optionalTimestamp(
+    const timeUnixNano = CanonicalLogService.optionalTimestamp(log.timeUnixNano, "timeUnixNano");
+    const observedTimeUnixNano = CanonicalLogService.optionalTimestamp(
       log.observedTimeUnixNano,
       "observedTimeUnixNano",
     );
-    const effectiveTimestamp = CanonicalLogAdapter.effectiveTimestamp({
+    const effectiveTimestamp = CanonicalLogService.effectiveTimestamp({
       timeUnixNano,
       observedTimeUnixNano,
       acceptedAt: args.acceptedAt,
     });
-    const flags = CanonicalLogAdapter.uint32Number(log.flags, "flags");
+    const flags = CanonicalLogService.uint32Number(log.flags, "flags");
     const severityNumber = Number(
-      CanonicalLogAdapter.integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),
+      CanonicalLogService.integerDecimal(log.severityNumber ?? 0, "severityNumber", 255n),
     );
-    const canonicalBody = CanonicalLogAdapter.canonicalAnyValue(log.body);
+    const canonicalBody = CanonicalLogService.canonicalAnyValue(log.body);
     const canonicalPayloadValue = {
       resource: {
         schemaUrl: typeof args.resourceLog.schemaUrl === "string" ? args.resourceLog.schemaUrl : "",
-        droppedAttributesCount: CanonicalLogAdapter.uint32Number(
+        droppedAttributesCount: CanonicalLogService.uint32Number(
           resource.droppedAttributesCount,
           "resource.droppedAttributesCount",
         ),
@@ -612,7 +612,7 @@ export class CanonicalLogAdapter implements LogPreparer {
         schemaUrl: typeof args.scopeLog.schemaUrl === "string" ? args.scopeLog.schemaUrl : "",
         name: scopeName,
         version: scopeVersion,
-        droppedAttributesCount: CanonicalLogAdapter.uint32Number(
+        droppedAttributesCount: CanonicalLogService.uint32Number(
           scope.droppedAttributesCount,
           "scope.droppedAttributesCount",
         ),
@@ -627,7 +627,7 @@ export class CanonicalLogAdapter implements LogPreparer {
         severityText: typeof log.severityText === "string" ? log.severityText : "",
         body: canonicalBody,
         attributes,
-        droppedAttributesCount: CanonicalLogAdapter.uint32Number(
+        droppedAttributesCount: CanonicalLogService.uint32Number(
           log.droppedAttributesCount,
           "log.droppedAttributesCount",
         ),
@@ -635,30 +635,30 @@ export class CanonicalLogAdapter implements LogPreparer {
         eventName,
       },
     };
-    const canonicalPayload = CanonicalLogAdapter.stableStringify(canonicalPayloadValue);
+    const canonicalPayload = CanonicalLogService.stableStringify(canonicalPayloadValue);
     const canonicalSizeBytes = Buffer.byteLength(canonicalPayload, "utf8");
     if (canonicalSizeBytes > MAX_CANONICAL_LOG_PAYLOAD_BYTES) {
       throw new RangeError(
         `canonical log payload is ${canonicalSizeBytes} bytes (maximum ${MAX_CANONICAL_LOG_PAYLOAD_BYTES})`,
       );
     }
-    const recordId = CanonicalLogAdapter.sha256(`${args.tenantId}\0${canonicalPayload}`);
+    const recordId = CanonicalLogService.sha256(`${args.tenantId}\0${canonicalPayload}`);
     const normalizedBody =
-      CanonicalLogAdapter.bodyText(canonicalBody) ??
-      CanonicalLogAdapter.stableStringify(canonicalBody);
+      CanonicalLogService.bodyText(canonicalBody) ??
+      CanonicalLogService.stableStringify(canonicalBody);
     const record: CanonicalLogRecord = {
       tenantId: args.tenantId,
       organizationId: args.organizationId,
       recordId,
       resourceSchemaUrl: canonicalPayloadValue.resource.schemaUrl,
-      resourceAttributesJson: CanonicalLogAdapter.stableStringify(resourceAttributes),
-      resourceAttributesFlatJson: CanonicalLogAdapter.stableStringify(flatResourceAttributes),
+      resourceAttributesJson: CanonicalLogService.stableStringify(resourceAttributes),
+      resourceAttributesFlatJson: CanonicalLogService.stableStringify(flatResourceAttributes),
       resourceAttributeKeys: [...new Set(resourceAttributes.map((a) => a.key))],
       resourceDroppedAttributesCount: canonicalPayloadValue.resource.droppedAttributesCount,
       scopeSchemaUrl: canonicalPayloadValue.scope.schemaUrl,
       scopeName,
       scopeVersion,
-      scopeAttributesJson: CanonicalLogAdapter.stableStringify(scopeAttributes),
+      scopeAttributesJson: CanonicalLogService.stableStringify(scopeAttributes),
       scopeAttributeKeys: [...new Set(scopeAttributes.map((a) => a.key))],
       scopeDroppedAttributesCount: canonicalPayloadValue.scope.droppedAttributesCount,
       wireTraceId,
@@ -668,14 +668,14 @@ export class CanonicalLogAdapter implements LogPreparer {
       correlationSource: correlation.source,
       timeUnixNano,
       observedTimeUnixNano,
-      timeUnixMs: CanonicalLogAdapter.timestampMs(effectiveTimestamp),
+      timeUnixMs: CanonicalLogService.timestampMs(effectiveTimestamp),
       severityNumber,
       severityText: canonicalPayloadValue.log.severityText,
-      bodyType: CanonicalLogAdapter.bodyType(canonicalBody),
-      bodyJson: CanonicalLogAdapter.stableStringify(canonicalBody),
-      bodyText: CanonicalLogAdapter.bodyText(canonicalBody),
-      attributesJson: CanonicalLogAdapter.stableStringify(attributes),
-      attributesFlatJson: CanonicalLogAdapter.stableStringify(flatAttributes),
+      bodyType: CanonicalLogService.bodyType(canonicalBody),
+      bodyJson: CanonicalLogService.stableStringify(canonicalBody),
+      bodyText: CanonicalLogService.bodyText(canonicalBody),
+      attributesJson: CanonicalLogService.stableStringify(attributes),
+      attributesFlatJson: CanonicalLogService.stableStringify(flatAttributes),
       attributeKeys: [...new Set(attributes.map((a) => a.key))],
       droppedAttributesCount: canonicalPayloadValue.log.droppedAttributesCount,
       flags,
@@ -692,7 +692,7 @@ export class CanonicalLogAdapter implements LogPreparer {
       piiRedactionLevel: args.piiRedactionLevel,
       canonicalPayload,
       canonicalSizeBytes,
-      occurredAt: CanonicalLogAdapter.timestampMs(effectiveTimestamp),
+      occurredAt: CanonicalLogService.timestampMs(effectiveTimestamp),
       acceptedAt: args.acceptedAt,
     };
     return {
@@ -727,8 +727,8 @@ export class CanonicalLogAdapter implements LogPreparer {
         return { $bytes: Buffer.from(current).toString("base64") };
       }
       if (Array.isArray(current)) return current.map(normalize);
-      if (CanonicalLogAdapter.isSerializableRecord(current)) {
-        return CanonicalLogAdapter.normalizeRecord({ current, normalize, seen });
+      if (CanonicalLogService.isSerializableRecord(current)) {
+        return CanonicalLogService.normalizeRecord({ current, normalize, seen });
       }
       return current;
     };

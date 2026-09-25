@@ -53,9 +53,9 @@ import { ObjectStorageDatasetChunkRepository } from "../repositories/object-stor
 import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import { DatasetAttachmentReferenceService } from "../services/dataset-attachment-reference.service.ts";
 import { DatasetAttachmentUploadService } from "../services/dataset-attachment-upload.service.ts";
-import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
+import { DatasetContentService } from "../services/dataset-content.service.ts";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
-import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
+import { DatasetNormalizeService } from "../services/dataset-normalize.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import { DatasetUploadService } from "../services/dataset-upload.service.ts";
 import { DatasetService } from "../services/dataset.service.ts";
@@ -149,7 +149,7 @@ export class DatasetApp implements DatasetApi {
 
     this.#normalization = DatasetNormalizationService.create({
       datasets: repositories.content,
-      normalize: DatasetNormalizeAdapter.create({
+      normalize: DatasetNormalizeService.create({
         repository: repositories.content,
         chunks,
         storedObjects: dependencies.storedObjects,
@@ -168,7 +168,7 @@ export class DatasetApp implements DatasetApi {
       queue: members.queue ?? this.#normalization,
       content:
         members.content ??
-        DatasetContentAdapter.create({ datasets: repositories.content, storage: chunks }),
+        DatasetContentService.create({ datasets: repositories.content, storage: chunks }),
       // The identifier format a new entry is written under is this module's
       // own business, not something a composing process supplies: every real
       // composition that ever wired this feature left it unset, and the

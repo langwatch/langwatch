@@ -218,6 +218,8 @@ export class OpsMetricsWindowService {
   prevCompleted = new Map<string, number>();
   prevFailed = new Map<string, number>();
 
+  private constructor() {}
+
   static create(): OpsMetricsWindowService {
     return new OpsMetricsWindowService();
   }

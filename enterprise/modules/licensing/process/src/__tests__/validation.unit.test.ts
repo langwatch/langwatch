@@ -2,7 +2,7 @@ import { LicensePlanLimitsSchema } from "@langwatch/enterprise-licensing-contrac
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { NodeLicenseCryptographyService } from "../index.ts";
 import {
   TEST_PUBLIC_KEY,
   WRONG_PUBLIC_KEY,
@@ -17,7 +17,7 @@ import {
   VALID_LICENSE_KEY,
 } from "../testing.ts";
 
-const cryptography = NodeLicenseCryptographyAdapter.create();
+const cryptography = NodeLicenseCryptographyService.create();
 const isExpired = cryptography.isExpired.bind(cryptography);
 const parseLicenseKey = cryptography.parseLicenseKey.bind(cryptography);
 const validateLicense = cryptography.validateLicense.bind(cryptography);

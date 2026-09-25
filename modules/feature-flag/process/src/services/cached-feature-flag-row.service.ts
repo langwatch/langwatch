@@ -19,7 +19,7 @@ type LocalEntry = { row: FeatureFlagRow | null; expiresAt: number };
  * then the repository. A repository failure degrades to "no row" (logged),
  * so an unhealthy database resolves flags to registry defaults, not a caller failure.
  */
-export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
+export class CachedFeatureFlagRowService extends FeatureFlagRowStore {
   private readonly logger = createLogger("langwatch:feature-flag-store");
   private readonly local = new Map<string, LocalEntry>();
 
@@ -35,8 +35,8 @@ export class CachedFeatureFlagRowAdapter extends FeatureFlagRowStore {
     repository: FeatureFlagRepository;
     cache: FeatureFlagCache;
     now: () => number;
-  }): CachedFeatureFlagRowAdapter {
-    return new CachedFeatureFlagRowAdapter(options.repository, options.cache, options.now);
+  }): CachedFeatureFlagRowService {
+    return new CachedFeatureFlagRowService(options.repository, options.cache, options.now);
   }
 
   async findRow(key: string): Promise<FeatureFlagRow | null> {

@@ -6,13 +6,13 @@ import type { FeatureFlagApi, FeatureFlagKey } from "@langwatch/feature-flag-con
  * Targeted on `projectId`, which is what a targeting rule matches against
  * and what an event-sourcing tenant id IS here.
  */
-export class EventingKillSwitchAdapter extends KillSwitch {
+export class EventingKillSwitchService extends KillSwitch {
   private constructor(private readonly featureFlags: FeatureFlagApi) {
     super();
   }
 
-  static create(featureFlags: FeatureFlagApi): EventingKillSwitchAdapter {
-    return new EventingKillSwitchAdapter(featureFlags);
+  static create(featureFlags: FeatureFlagApi): EventingKillSwitchService {
+    return new EventingKillSwitchService(featureFlags);
   }
 
   async isKilled(query: KillSwitchQuery): Promise<boolean> {

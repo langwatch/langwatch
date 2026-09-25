@@ -9,7 +9,6 @@ import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contr
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
-import type { ExperimentService } from "../experiment.service.ts";
 
 const TARGET_ID = "target-1";
 const EVALUATOR_ID = "evaluator-1";
@@ -63,7 +62,7 @@ const persistenceFor = ({
   const experiments = {
     getWorkbenchState,
     recordWorkbenchRunResults,
-  } as unknown as ExperimentService;
+  };
   return { experiments, recordWorkbenchRunResults };
 };
 

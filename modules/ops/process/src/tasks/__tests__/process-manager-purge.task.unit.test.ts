@@ -1,38 +1,39 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  PrismaProcessManagerPurgeRepository,
-  type ProcessManagerPurgeDatabase,
-} from "../../repositories/prisma/prisma.process-manager-purge.repository.ts";
+import { PrismaProcessManagerPurgeRepository } from "../../repositories/prisma/prisma.process-manager-purge.repository.ts";
 import { purgeProcessManagerTables } from "../process-manager-purge.task.ts";
 
 /**
  * A database double that answers the two counts and hands back one full batch
  * then an empty one, so a purge that applies runs its loop to exhaustion.
  */
+function sqlText(query: unknown): string {
+  if (typeof query !== "object" || query === null || !("strings" in query)) return "";
+  return Array.isArray(query.strings) ? query.strings.join("?") : "";
+}
+
 function fakeRepository({
   eligible = 12n,
   batches = [7, 0],
 }: { eligible?: bigint; batches?: number[] } = {}) {
   const statements: string[] = [];
   const remaining = [...batches, ...batches];
-  const database = {
-    $queryRaw: vi.fn(async (query: { strings?: readonly string[] }) => {
-      statements.push(query.strings?.join("?") ?? "");
+  const database = prismaDouble({
+    $queryRaw: vi.fn(async (query: unknown) => {
+      statements.push(sqlText(query));
       return [{ n: eligible }];
     }),
-    $executeRaw: vi.fn(async (query: { strings?: readonly string[] }) => {
-      statements.push(query.strings?.join("?") ?? "");
+    $executeRaw: vi.fn(async (query: unknown) => {
+      statements.push(sqlText(query));
       return remaining.shift() ?? 0;
     }),
     $executeRawUnsafe: vi.fn(async (query: string) => {
       statements.push(query);
       return 0;
     }),
-  };
-  const repository = PrismaProcessManagerPurgeRepository.create({
-    database: database as unknown as ProcessManagerPurgeDatabase,
   });
+  const repository = PrismaProcessManagerPurgeRepository.create({ database });
   return { repository, statements };
 }
 

@@ -9,7 +9,7 @@ import {
   type ExperimentEventingClickHouseResolver,
 } from "../clickhouse/clickhouse.experiment-clickhouse.repository.ts";
 import {
-  ExperimentEventingAdapter,
+  ClickHouseExperimentRunProcessingRepository,
   type ExperimentRunProcessingPipeline,
 } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse/clickhouse.experiment-run-state.repository.ts";
@@ -50,7 +50,7 @@ export class RedisExperimentRunProcessingRepository {
   buildProcessing(): ExperimentRunProcessingPipeline {
     const clickHouse = ClickhouseExperimentClickHouseRepository.create(this.options.resolveClient);
 
-    return ExperimentEventingAdapter.pipeline({
+    return ClickHouseExperimentRunProcessingRepository.pipeline({
       experimentRunStateFoldStore: new RedisCachedFoldStore<ExperimentRunStateData>(
         ExperimentRunStateStore.create({
           repository: ClickHouseExperimentRunStateRepository.create({

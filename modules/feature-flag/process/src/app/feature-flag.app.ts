@@ -32,10 +32,10 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
-import { CachedFeatureFlagRowAdapter } from "../services/cached-feature-flag-row.service.ts";
+import { CachedFeatureFlagRowService } from "../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../services/organization-created-at-cache.service.ts";
-import { UncachedFeatureFlagCacheAdapter } from "../services/uncached-feature-flag-cache.service.ts";
+import { UncachedFeatureFlagCacheService } from "../services/uncached-feature-flag-cache.service.ts";
 
 /** The operator row as the cache carries it. */
 export type FeatureFlagRow = { enabled: boolean; rules: FeatureFlagRules };
@@ -118,9 +118,9 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     const flags = FeatureFlagService.create({
       repository: setup.repositories.flags,
       experiments: setup.repositories.experiments,
-      rows: CachedFeatureFlagRowAdapter.create({
+      rows: CachedFeatureFlagRowService.create({
         repository: setup.repositories.flags,
-        cache: UncachedFeatureFlagCacheAdapter.create(),
+        cache: UncachedFeatureFlagCacheService.create(),
         now,
       }),
       config: assembleFeatureFlagConfig(setup.config),

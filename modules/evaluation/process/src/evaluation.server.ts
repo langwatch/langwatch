@@ -18,7 +18,7 @@ import type { EvaluationClickHouseResolver } from "./repositories/clickhouse/eva
 import { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evaluation.repository.ts";
 import { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 import { PrismaEvaluationCostRepository } from "./repositories/prisma/prisma.evaluation-cost.repository.ts";
-import { DirectEvaluationExecutionReceiptAdapter } from "./services/direct.evaluation-execution-receipt.service.ts";
+import { DirectEvaluationExecutionReceiptService } from "./services/direct.evaluation-execution-receipt.service.ts";
 import { EvaluationCostService } from "./services/evaluation-cost.service.ts";
 import { EvaluationExecutionIntentService } from "./services/evaluation-execution-intent.service.ts";
 import {
@@ -115,7 +115,7 @@ export function createEvaluationExecutionIntent(input: {
     azureSafetyCredentials: input.azureSafetyCredentials,
     settingsRecovery: input.settingsRecovery,
     inputsOffload: input.inputsOffload,
-    executionReceipt: DirectEvaluationExecutionReceiptAdapter.create({
+    executionReceipt: DirectEvaluationExecutionReceiptService.create({
       execution: input.execution,
       costs: input.costs,
     }),

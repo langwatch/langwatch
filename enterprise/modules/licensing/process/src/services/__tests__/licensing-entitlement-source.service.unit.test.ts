@@ -7,8 +7,8 @@ import {
 } from "@langwatch/enterprise-licensing-process/testing";
 import { describe, expect, it } from "vitest";
 
-import { LicensingEntitlementSourceAdapter } from "../licensing-entitlement-source.service.ts";
-import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
+import { LicensingEntitlementSourceService } from "../licensing-entitlement-source.service.ts";
+import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 
 /**
  * Spec: specs/licensing/management-apis-enterprise-gate.feature. The four
@@ -21,10 +21,10 @@ function licenses(licenseKey: string | null): OrganizationLicense {
   return { getOrganizationLicense: async () => ({ licenseKey }) };
 }
 
-function cloudSource(licenseKey: string | null): LicensingEntitlementSourceAdapter {
-  return LicensingEntitlementSourceAdapter.forDeployment({
+function cloudSource(licenseKey: string | null): LicensingEntitlementSourceService {
+  return LicensingEntitlementSourceService.forDeployment({
     licenses: licenses(licenseKey),
-    cryptography: NodeLicenseCryptographyAdapter.create({ publicKey: TEST_PUBLIC_KEY }),
+    cryptography: NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY }),
     isSaas: true,
   });
 }

@@ -10,7 +10,7 @@ import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-f
 import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import {
-  EvaluationProcessingAdapter,
+  EvaluationProcessingService,
   type EvaluationAutomationReactions,
 } from "./evaluation-processing.service.ts";
 
@@ -73,17 +73,19 @@ function producerOnlyAutomations(processName: string): EvaluationAutomationReact
  * `processName` names the refusal, so a stand-in reached by accident says which process
  * reached it rather than reporting an anonymous failure.
  */
-export class EvaluationProcessingProducerAdapter {
-  static create(): EvaluationProcessingProducerAdapter {
-    return new EvaluationProcessingProducerAdapter();
+export class EvaluationProcessingProducerService {
+  private constructor() {}
+
+  static create(): EvaluationProcessingProducerService {
+    return new EvaluationProcessingProducerService();
   }
 
   static createPipeline(input: {
     processName: string;
-  }): ReturnType<EvaluationProcessingAdapter["build"]> {
+  }): ReturnType<EvaluationProcessingService["build"]> {
     const { processName } = input;
 
-    return EvaluationProcessingAdapter.createPipeline({
+    return EvaluationProcessingService.createPipeline({
       evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),
       evaluationAnalyticsStore: new ProducerOnlyFoldStore<EvaluationAnalyticsData>(
         processName,

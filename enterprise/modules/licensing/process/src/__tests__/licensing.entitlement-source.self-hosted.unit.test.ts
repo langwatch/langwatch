@@ -1,7 +1,7 @@
 import { type PlanInfo, UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
-import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
+import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 
 const ORGANIZATION_ID = "org-123";
 
@@ -22,7 +22,7 @@ const enterpriseLicensePlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
 });
 
 const providerReturning = (plan: PlanInfo) =>
-  LicensingEntitlementSourceAdapter.create({
+  LicensingEntitlementSourceService.create({
     licensing: {
       getActivePlan: async () => plan,
       getSelfHostedPlan: async () => plan,
@@ -33,7 +33,7 @@ const providerReturning = (plan: PlanInfo) =>
 const resolve = (plan: PlanInfo) =>
   providerReturning(plan).resolve({ organizationId: ORGANIZATION_ID });
 
-describe("LicensingEntitlementSourceAdapter in self-hosted mode", () => {
+describe("LicensingEntitlementSourceService in self-hosted mode", () => {
   describe("given the organization holds an Enterprise license with finite limits", () => {
     /** @scenario The seat count a license sells is enforced */
     it("keeps the seat counts the license sold, because seats are the meter", async () => {

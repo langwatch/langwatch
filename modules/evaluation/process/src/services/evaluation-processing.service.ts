@@ -32,7 +32,7 @@ import {
 } from "../eventing/evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { EvaluationCommandAdapter } from "./evaluation-command.service.ts";
+import { EvaluationCommandService } from "./evaluation-command.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 
@@ -61,21 +61,21 @@ export type EvaluationAutomationReactions = Pick<
 >;
 
 /** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
-export class EvaluationProcessingAdapter {
-  static create(deps: EvaluationProcessingPipelineDeps): EvaluationProcessingAdapter {
-    return new EvaluationProcessingAdapter(deps);
+export class EvaluationProcessingService {
+  static create(deps: EvaluationProcessingPipelineDeps): EvaluationProcessingService {
+    return new EvaluationProcessingService(deps);
   }
 
   static createPipeline(
     deps: EvaluationProcessingPipelineDeps,
-  ): ReturnType<EvaluationProcessingAdapter["build"]> {
-    return EvaluationProcessingAdapter.create(deps).build();
+  ): ReturnType<EvaluationProcessingService["build"]> {
+    return EvaluationProcessingService.create(deps).build();
   }
 
   private constructor(private readonly deps: EvaluationProcessingPipelineDeps) {}
 
   build(): EvaluationProcessingPipeline {
-    const commands = EvaluationCommandAdapter.create();
+    const commands = EvaluationCommandService.create();
 
     return definePipeline({
       name: "evaluation_processing",
@@ -116,8 +116,8 @@ export class EvaluationProcessingAdapter {
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
         delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
         dedup: {
-          makeId: EvaluationProcessingAdapter.graphTriggerActivityGroupKey.bind(
-            EvaluationProcessingAdapter,
+          makeId: EvaluationProcessingService.graphTriggerActivityGroupKey.bind(
+            EvaluationProcessingService,
           ),
           ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
           extend: false,
@@ -127,8 +127,8 @@ export class EvaluationProcessingAdapter {
         // carries no pipeline segment, so both pipelines' sweeps serialize in
         // ONE lane per tenant — a sweep evaluates all of the tenant's graph
         // triggers regardless of which event kind woke it.
-        groupKeyFn: EvaluationProcessingAdapter.graphTriggerActivityGroupKey.bind(
-          EvaluationProcessingAdapter,
+        groupKeyFn: EvaluationProcessingService.graphTriggerActivityGroupKey.bind(
+          EvaluationProcessingService,
         ),
         handler: (event, context) =>
           this.deps.automations.handleEvaluationGraphTriggerActivity({ event, context }),
@@ -163,6 +163,6 @@ export class EvaluationProcessingAdapter {
   }
 }
 
-export const createEvaluationProcessingPipeline = EvaluationProcessingAdapter.createPipeline.bind(
-  EvaluationProcessingAdapter,
+export const createEvaluationProcessingPipeline = EvaluationProcessingService.createPipeline.bind(
+  EvaluationProcessingService,
 );

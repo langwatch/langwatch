@@ -70,7 +70,7 @@ export {
 } from "./app/ops-system-migrations.ts";
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
-export { RoutingTableOrganizationDataplaneAdapter } from "./services/routing-table.organization-dataplane.service.ts";
+export { RoutingTableOrganizationDataplaneService } from "./services/routing-table.organization-dataplane.service.ts";
 export type { OrganizationDataplane, OrganizationDataplaneResolver } from "./app/ops.app.ts";
 export type { OrganizationCohortAdmission } from "./services/system-migration-cohort.service.ts";
 export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task.ts";

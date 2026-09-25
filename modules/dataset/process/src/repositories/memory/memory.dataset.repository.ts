@@ -16,7 +16,7 @@ import type {
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The same projection the Prisma twin returns rows through. */
-export function toDataset({ sourceStoredObjectId: _source, ...row }: DatasetRow): Dataset {
+function toDataset({ sourceStoredObjectId: _source, ...row }: DatasetRow): Dataset {
   return datasetSchema.parse({
     ...row,
     columnTypes: datasetColumnsSchema.parse(row.columnTypes),

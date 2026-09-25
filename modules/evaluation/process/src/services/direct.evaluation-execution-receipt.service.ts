@@ -16,12 +16,12 @@ const logger = createLogger("langwatch:evaluation:execution-receipt");
  * Runs the evaluator and writes its cost row, with the cost — and only the cost — protected
  * against a redelivery.
  */
-export class DirectEvaluationExecutionReceiptAdapter implements EvaluationExecutionReceipt {
+export class DirectEvaluationExecutionReceiptService implements EvaluationExecutionReceipt {
   static create(input: {
     execution: EvaluationExecution;
     costs: EvaluationCostRecorder;
-  }): DirectEvaluationExecutionReceiptAdapter {
-    return new DirectEvaluationExecutionReceiptAdapter(input.execution, input.costs);
+  }): DirectEvaluationExecutionReceiptService {
+    return new DirectEvaluationExecutionReceiptService(input.execution, input.costs);
   }
 
   private constructor(

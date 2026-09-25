@@ -447,7 +447,7 @@ export class QueueRedisRepository extends QueueRepository {
     pipeline,
     rerun,
   }: {
-    pipeline: ChainableCommander;
+    pipeline: Pick<ChainableCommander, "exec">;
     rerun: (index: number) => Promise<unknown>;
   }): Promise<[Error | null, unknown][]> {
     const results = (await pipeline.exec()) ?? [];

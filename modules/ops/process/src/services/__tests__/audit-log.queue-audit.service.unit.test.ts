@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { PrismaProcessAuditRepository } from "../../repositories/prisma/prisma.process-audit.repository.ts";
 import { PrismaSchedulerAuditRepository } from "../../repositories/prisma/prisma.scheduler-audit.repository.ts";
-import { QueueAuditAdapter } from "../audit-log.queue-audit.service.ts";
+import { AuditLogQueueAuditService } from "../audit-log.queue-audit.service.ts";
 
 class RecordingAuditLog implements AuditLogApi {
   readonly commands: RecordAuditLogCommand[] = [];
@@ -55,7 +55,7 @@ describe("given the operator surfaces record through the audit-log port", () => 
     it("records each act on the port with its target and metadata", async () => {
       const auditLog = new RecordingAuditLog();
 
-      await QueueAuditAdapter.create({ auditLog }).append({
+      await AuditLogQueueAuditService.create({ auditLog }).append({
         actorUserId: "user-1",
         action: "queue_drain_group",
         queueName: "trace-ingest",

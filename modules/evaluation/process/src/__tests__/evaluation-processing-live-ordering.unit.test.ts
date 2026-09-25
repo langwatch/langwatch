@@ -21,7 +21,7 @@ import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analyt
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
-import { EvaluationCommandAdapter } from "../services/evaluation-command.service.ts";
+import { EvaluationCommandService } from "../services/evaluation-command.service.ts";
 import {
   createEvaluationProcessingPipeline,
   type EvaluationAutomationReactions,
@@ -96,7 +96,7 @@ function completedEvent(params: {
 }
 
 describe("evaluation processing live FIFO", () => {
-  const commands = EvaluationCommandAdapter.create();
+  const commands = EvaluationCommandService.create();
 
   it("uses evaluationId as the aggregate identity for every lifecycle command", () => {
     expect(

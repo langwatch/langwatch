@@ -21,7 +21,7 @@ import {
   migrationRunsOnThisInstallation,
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules.ts";
-import { NullOrganizationDataplaneAdapter } from "../services/null.organization-dataplane.service.ts";
+import { NullOrganizationDataplaneService } from "../services/null.organization-dataplane.service.ts";
 import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
 import type { OrganizationDataplaneResolver } from "./ops.app.ts";
 
@@ -350,7 +350,7 @@ export class OpsSystemMigrations {
       isSaaS,
       enrolled,
       migrations,
-      dataplane: this.options.dataplane ?? NullOrganizationDataplaneAdapter.create(),
+      dataplane: this.options.dataplane ?? NullOrganizationDataplaneService.create(),
     });
     return ({ tenantId, migrationName }) => {
       const admission = cohort.admits({ organizationId: tenantId, migrationName });

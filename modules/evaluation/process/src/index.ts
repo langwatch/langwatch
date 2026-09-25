@@ -44,6 +44,6 @@ export {
   type EvaluationExecutionDeps,
 } from "./services/evaluation-execution.service.ts";
 export { HttpLangevalsEvaluatorAdapter } from "./services/http.langevals-evaluator.service.ts";
-export { OtelEvaluationExecutionMetricsAdapter } from "./services/otel.evaluation-execution-metrics.service.ts";
-export { DirectEvaluationExecutionReceiptAdapter } from "./services/direct.evaluation-execution-receipt.service.ts";
+export { OtelEvaluationExecutionMetricsService } from "./services/otel.evaluation-execution-metrics.service.ts";
+export { DirectEvaluationExecutionReceiptService } from "./services/direct.evaluation-execution-receipt.service.ts";
 export { ClickhouseMonitorPerformanceRepository as MonitorPerformanceAdapter } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";

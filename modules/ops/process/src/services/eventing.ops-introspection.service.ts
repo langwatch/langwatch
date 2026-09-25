@@ -15,13 +15,13 @@ type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
  * resolved lazily on every call because a composition registers pipelines
  * during boot and an explorer may be built before the last one lands.
  */
-export class EventingOpsIntrospectionAdapter implements OpsEventingIntrospection {
+export class EventingOpsIntrospectionService implements OpsEventingIntrospection {
   private constructor(private readonly definitions: () => readonly AnyPipelineDefinition[]) {}
 
   static create(
     definitions: () => readonly AnyPipelineDefinition[],
-  ): EventingOpsIntrospectionAdapter {
-    return new EventingOpsIntrospectionAdapter(definitions);
+  ): EventingOpsIntrospectionService {
+    return new EventingOpsIntrospectionService(definitions);
   }
 
   projections(): OpsProjectionMetadata[] {

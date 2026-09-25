@@ -32,7 +32,7 @@ const DEFAULT_BASE_HOST = "https://app.langwatch.ai";
  * configured (production); silently a no-op everywhere else so intake never
  * depends on Slack being reachable or configured.
  */
-export class SlackBugReportNotifierAdapter implements BugReportNotifier {
+export class SlackBugReportNotifierService implements BugReportNotifier {
   private constructor(
     private readonly transport: OpsSlackAlertTransport,
     private readonly config: SlackBugReportNotifierConfig,
@@ -41,8 +41,8 @@ export class SlackBugReportNotifierAdapter implements BugReportNotifier {
   static create(input: {
     transport: OpsSlackAlertTransport;
     config: SlackBugReportNotifierConfig;
-  }): SlackBugReportNotifierAdapter {
-    return new SlackBugReportNotifierAdapter(input.transport, input.config);
+  }): SlackBugReportNotifierService {
+    return new SlackBugReportNotifierService(input.transport, input.config);
   }
 
   async notify({ report }: { report: BugReport }): Promise<void> {

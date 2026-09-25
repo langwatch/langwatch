@@ -12,7 +12,7 @@ export {
   type ClickHouseExperimentRunProcessingAdapterOptions,
 } from "./repositories/redis/redis.experiment-run-processing.repository.ts";
 export {
-  ExperimentEventingAdapter,
+  ClickHouseExperimentRunProcessingRepository,
   type ExperimentRunProcessingPipeline,
   type ExperimentRunEventingIdLookup,
   type ExperimentRunEventingResultRecord,

@@ -33,7 +33,7 @@ import {
   AdminBackofficeService,
   type OrganizationSsoRouting,
 } from "../services/admin-backoffice.service.ts";
-import { QueueAuditAdapter } from "../services/audit-log.queue-audit.service.ts";
+import { AuditLogQueueAuditService } from "../services/audit-log.queue-audit.service.ts";
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { type AdminAuditSink, ImpersonationService } from "../services/impersonation.service.ts";
 import { OpsService } from "../services/ops.service.ts";
@@ -90,7 +90,7 @@ export class OpsOperations {
             redis: this.options.redis,
             payloads: this.queuePayloads(),
           }),
-          audit: QueueAuditAdapter.create({ auditLog: this.options.auditLog }),
+          audit: AuditLogQueueAuditService.create({ auditLog: this.options.auditLog }),
         })
       : QueueService.create({ repo: NullQueueRepository.create() });
 
