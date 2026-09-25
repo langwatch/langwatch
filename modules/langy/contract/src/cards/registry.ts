@@ -62,9 +62,8 @@ export function assertTotalOrder(probes: readonly CardProbe[]): void {
 }
 
 /**
- * The best card a payload's SHAPE earns, or null to keep the one its name
- * did. Null is the common, safe answer: an unrecognised shape keeps
- * today's card, so growing this list can add richness but never take any away.
+ * The best card a payload's SHAPE earns, or the nominal one when it earns none: an
+ * unrecognised shape keeps today's card, so growing this list adds richness, never removes it.
  */
 export function promoteCard({
   nominal,
@@ -75,8 +74,8 @@ export function promoteCard({
   nominal: MeasuredCardKind;
   payload: unknown;
   probes: readonly CardProbe[];
-}): MeasuredCardKind | null {
-  if (!PROMOTABLE_FROM.has(nominal)) return null;
+}): MeasuredCardKind {
+  if (!PROMOTABLE_FROM.has(nominal)) return nominal;
 
   let best: CardProbe | null = null;
   for (const probe of probes) {
@@ -86,7 +85,7 @@ export function promoteCard({
     if (!parsed.success) continue;
     best = probe;
   }
-  return best?.card ?? null;
+  return best?.card ?? nominal;
 }
 
 /**

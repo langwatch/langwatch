@@ -87,7 +87,7 @@ export function toCliToolResult({
   // card, but only from a generic one and never over a deliberate `byVerb`
   // binding. See promotion.ts and ADR-079.
   const nominal = cardKindFor({ resource, verb });
-  const card = promoteCard({ nominal, payload, probes: CARD_PROBES }) ?? nominal;
+  const card = promoteCard({ nominal, payload, probes: CARD_PROBES });
   // One map, the shared one. A second copy here drifted from the schemas the
   // rest of the contract reads by, which is how a create card could accept a
   // payload `parseCliResult` refuses.

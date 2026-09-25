@@ -214,8 +214,11 @@ export class LangyLocalWorkerService {
 
   async #ownCall(input: LangyKeyCaller & { callId: string }) {
     const caller = await this.#callers.getLocalCaller(input);
-    const call = await this.#runtime.dispatcher.read(input.callId);
-    if (!call || call.projectId !== caller.projectId) throw new LangyLocalRecordNotFoundError();
+    const lookup = await this.#runtime.dispatcher.read(input.callId);
+    if (lookup.kind === "miss" || lookup.call.projectId !== caller.projectId) {
+      throw new LangyLocalRecordNotFoundError();
+    }
+    const { call } = lookup;
     await this.#visibleOwn({ caller, conversationId: call.conversationId });
     return call;
   }

@@ -23,6 +23,7 @@ import {
   type ConnectedWorkspace,
   LangyLocalPresenceRepository,
   type OwedConnectTurn,
+  type OwedConnectTurnLookup,
   type PresenceDeregistration,
   owedConnectTurnSchema,
   type PresenceHeartbeat,
@@ -156,11 +157,10 @@ export class LangyLocalPresenceRedisRepository extends LangyLocalPresenceReposit
     );
   }
 
-  async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null> {
+  async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurnLookup> {
     const raw = await this.store.tryGet(owedConnectTurnKey(conversationId));
-    if (!raw) return null;
-    const parsed = parseOwedConnectTurn(raw);
-    return parsed;
+    if (!raw) return { kind: "miss" };
+    return parseOwedConnectTurn(raw);
   }
 
   async settleOwedConnectTurn(conversationId: string): Promise<void> {
@@ -181,11 +181,11 @@ function parseConnectedWorkspace(raw: string): ConnectedWorkspace | null {
   }
 }
 
-function parseOwedConnectTurn(raw: string): OwedConnectTurn | null {
+function parseOwedConnectTurn(raw: string): OwedConnectTurnLookup {
   try {
     const parsed = owedConnectTurnSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
+    return parsed.success ? { kind: "hit", owed: parsed.data } : { kind: "miss" };
   } catch {
-    return null;
+    return { kind: "miss" };
   }
 }

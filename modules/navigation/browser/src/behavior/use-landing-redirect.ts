@@ -120,6 +120,17 @@ function useReplaceOnce(): (destination: string | null) => void {
 }
 
 /** The / redirect: picks home per user persona; falls back to project home on error */
+/** No destination yet means no redirect yet; a resolved one keeps the conversation parameter. */
+function carryIfResolved({
+  destination,
+  search,
+}: {
+  destination: string | null;
+  search: string;
+}): string | null {
+  return destination === null ? null : carryLangyConversation({ destination, search });
+}
+
 export function useLandingRedirect(): void {
   const host = useNavigationHost();
   const project = host.project();
@@ -152,7 +163,7 @@ export function useLandingRedirect(): void {
       // the conversation and not the project the reader lands in. This redirect
       // drops the query string, so the one parameter that names a conversation
       // travels with it.
-      carryLangyConversation({
+      carryIfResolved({
         destination: landingDestination({
           resolved: toResolvedHome({ data: resolved.data, isError: resolved.isError }),
           isReachableLoading,

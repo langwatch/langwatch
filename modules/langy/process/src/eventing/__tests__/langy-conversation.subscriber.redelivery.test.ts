@@ -78,7 +78,7 @@ describe("agentTurnLiveness redelivery", () => {
           markError: vi.fn(async () => undefined),
         },
         failTurn: { failTurn },
-        handoffStore: { read: vi.fn(async () => null) },
+        handoffStore: { read: vi.fn(async () => ({ kind: "miss" as const })) },
         worker: { dispatch: vi.fn(async () => undefined) },
         clock: () => OCCURRED_AT,
       });
@@ -109,7 +109,7 @@ describe("agentTurnLiveness redelivery", () => {
           markError: vi.fn(async () => undefined),
         },
         failTurn: { failTurn },
-        handoffStore: { read: vi.fn(async () => null) },
+        handoffStore: { read: vi.fn(async () => ({ kind: "miss" as const })) },
         worker: { dispatch },
         clock: () => OCCURRED_AT,
       });

@@ -75,9 +75,12 @@ function toClickHouseRecord(
   };
 }
 
-function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
+/** `empty` is a batch with nothing to write, including one whose first row names no tenant. */
+type ValidatedBatch = { kind: "tenant"; tenantId: string } | { kind: "empty" };
+
+function validateBatch(records: LangyAnalyticsEventRecord[]): ValidatedBatch {
   const tenantId = records[0]?.tenantId;
-  if (!tenantId) return null;
+  if (!tenantId) return { kind: "empty" };
 
   for (const record of records) {
     EventUtils.validateTenantId(
@@ -89,7 +92,7 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
     }
   }
 
-  return tenantId;
+  return { kind: "tenant", tenantId };
 }
 
 /** Event-grain Langy analytics to ClickHouse. Wire format (table name, columns, async settings,
@@ -119,8 +122,9 @@ export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEvent
     retentionDays: number,
     waitForInsert: boolean,
   ): Promise<void> {
-    const tenantId = validateBatch(records);
-    if (!tenantId) return;
+    const batch = validateBatch(records);
+    if (batch.kind === "empty") return;
+    const { tenantId } = batch;
 
     try {
       const client = await this.resolveClient(tenantId);

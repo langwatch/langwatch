@@ -3,6 +3,7 @@ import type { Redis } from "ioredis";
 import {
   LANGY_HANDOFF_TTL_SECONDS,
   type LangyTurnHandoff,
+  type LangyTurnHandoffLookup,
   LangyTurnHandoffRepository,
   langyTurnHandoffSchema,
 } from "../langy-live-turn.repository.ts";
@@ -29,13 +30,13 @@ export class LangyTurnHandoffRedisRepository extends LangyTurnHandoffRepository 
     );
   }
 
-  async read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoff | null> {
+  async read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffLookup> {
     const raw = await this.redis.get(`langy:handoff:{${input.conversationId}}:${input.turnId}`);
-    if (raw == null) return null;
+    if (raw == null) return { kind: "miss" };
     try {
-      return langyTurnHandoffSchema.parse(JSON.parse(raw));
+      return { kind: "hit", handoff: langyTurnHandoffSchema.parse(JSON.parse(raw)) };
     } catch {
-      return null;
+      return { kind: "miss" };
     }
   }
 

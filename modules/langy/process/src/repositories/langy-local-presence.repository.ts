@@ -41,6 +41,8 @@ export type OwedConnectTurn = z.infer<typeof owedConnectTurnSchema>;
  * service depends on this abstract surface, never on the concrete Redis or
  * memory adapter behind it.
  */
+export type OwedConnectTurnLookup = { kind: "hit"; owed: OwedConnectTurn } | { kind: "miss" };
+
 export abstract class LangyLocalPresenceRepository {
   /** Writes the folder as connected, replacing whatever was there. */
   abstract register(workspace: ConnectedWorkspace): Promise<void>;
@@ -72,8 +74,8 @@ export abstract class LangyLocalPresenceRepository {
     input: Omit<OwedConnectTurn, "owedAt"> & { conversationId: string },
   ): Promise<void>;
 
-  /** The connect turn this folder is owed, or nothing when none is. */
-  abstract readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null>;
+  /** The connect turn this folder is owed; `miss` when none is. */
+  abstract readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurnLookup>;
 
   /**
    * Forgets the owed turn: a turn placed a call on the folder, the owed turn

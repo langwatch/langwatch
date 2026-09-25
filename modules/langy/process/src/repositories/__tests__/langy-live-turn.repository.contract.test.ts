@@ -78,7 +78,10 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
 
       await repositories.turnHandoff.stash(handoffFor("user_1"));
 
-      expect(await repositories.turnHandoff.read(turn)).toEqual(handoffFor("user_1"));
+      expect(await repositories.turnHandoff.read(turn)).toEqual({
+        kind: "hit",
+        handoff: handoffFor("user_1"),
+      });
       expect(await repositories.turnHandoff.refresh(turn)).toBe(true);
     });
 
@@ -191,10 +194,13 @@ describe.each(backends)("given the $name langy repositories", ({ create }) => {
       await repositories.turnHandoff.stash(handoffFor("user_1"));
 
       expect(await repositories.turnAccess.isTurnActor(accessFor("user_1"))).toBe(true);
-      expect(await repositories.turnHandoff.read(turn)).toEqual(handoffFor("user_1"));
+      expect(await repositories.turnHandoff.read(turn)).toEqual({
+        kind: "hit",
+        handoff: handoffFor("user_1"),
+      });
 
       expect(await other.turnAccess.isTurnActor(accessFor("user_1"))).toBe(false);
-      expect(await other.turnHandoff.read(turn)).toBeNull();
+      expect(await other.turnHandoff.read(turn)).toEqual({ kind: "miss" });
     });
   });
 });

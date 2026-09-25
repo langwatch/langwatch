@@ -91,8 +91,11 @@ export interface LangyTurnHandoffRecord {
   runToken: string;
   resumeToken?: string;
 }
+export type LangyTurnHandoffRecordLookup =
+  | { kind: "hit"; handoff: LangyTurnHandoffRecord }
+  | { kind: "miss" };
 export interface LangyTurnHandoffReader {
-  read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecord | null>;
+  read(params: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffRecordLookup>;
 }
 export interface AgentTurnLivenessSubscriberDeps {
   buffer: LangyLivenessBuffer;
@@ -189,7 +192,8 @@ export function createAgentTurnLivenessSubscriber(
         conversation.lastActivityAtMs === null
           ? MAX_STALL_MS + 1
           : now - conversation.lastActivityAtMs;
-      const candidateHandoff = await deps.handoffStore.read({ conversationId, turnId });
+      const lookup = await deps.handoffStore.read({ conversationId, turnId });
+      const candidateHandoff = lookup.kind === "hit" ? lookup.handoff : undefined;
       const handoff =
         candidateHandoff?.projectId === projectId &&
         candidateHandoff.conversationId === conversationId &&

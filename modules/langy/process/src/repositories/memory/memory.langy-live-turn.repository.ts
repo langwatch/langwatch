@@ -5,6 +5,7 @@ import {
   type LangyTurnAccess,
   LangyTurnAccessRepository,
   type LangyTurnHandoff,
+  type LangyTurnHandoffLookup,
   LangyTurnHandoffRepository,
   langyTurnAccessSchema,
   langyTurnHandoffSchema,
@@ -48,8 +49,9 @@ export class LangyTurnHandoffMemoryRepository extends LangyTurnHandoffRepository
     this.store.handoffs.set(this.store.turnKey(parsed), parsed);
   }
 
-  async read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoff | null> {
-    return this.store.handoffs.get(this.store.turnKey(input)) ?? null;
+  async read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffLookup> {
+    const handoff = this.store.handoffs.get(this.store.turnKey(input));
+    return handoff === undefined ? { kind: "miss" } : { kind: "hit", handoff };
   }
 
   async refresh(input: { conversationId: string; turnId: string }): Promise<boolean> {

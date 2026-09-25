@@ -173,8 +173,8 @@ export class LocalControlLongPollService {
   private async orphanedCalls(inFlightCallIds: readonly string[]): Promise<PlatformFrame[]> {
     const frames: PlatformFrame[] = [];
     for (const callId of inFlightCallIds) {
-      const call = await this.core.dispatcher.read(callId);
-      if (call && call.state !== "done") continue;
+      const lookup = await this.core.dispatcher.read(callId);
+      if (lookup.kind === "hit" && lookup.call.state !== "done") continue;
       frames.push({
         type: "cancel",
         protocol: LOCAL_CONTROL_PROTOCOL_VERSION,

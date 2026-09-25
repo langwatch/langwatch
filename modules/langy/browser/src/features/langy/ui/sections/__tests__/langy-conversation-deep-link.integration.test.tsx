@@ -118,7 +118,6 @@ describe("carryLangyConversation", () => {
   describe("given no such parameter", () => {
     it("leaves the destination exactly as it was", () => {
       expect(carryLangyConversation({ destination: "/acme", search: "?org=acme" })).toBe("/acme");
-      expect(carryLangyConversation({ destination: null, search: "" })).toBeNull();
     });
   });
 

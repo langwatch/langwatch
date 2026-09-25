@@ -51,6 +51,8 @@ const logger = createLogger("langwatch:langy:local-control:dispatcher");
 
 /** One poll of a call, or `gone` once its record has expired. */
 export type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
+export type LocalCallLookup = { kind: "hit"; call: StoredLocalCall } | { kind: "miss" };
+
 export class LocalCallDispatcherService {
   private readonly store: SessionStateStore;
   private readonly presence: LangyLocalPresenceRepository;
@@ -137,19 +139,26 @@ export class LocalCallDispatcherService {
   }): Promise<LocalCallPoll> {
     const until = this.now() + holdMs;
     const beat = this.beater();
-    const look = async (): Promise<StoredLocalCall | null> => {
-      const call = await this.read(callId);
-      if (call && call.state !== "done") await beat(call);
-      return call;
+    const look = async (): Promise<LocalCallLookup> => {
+      const lookup = await this.read(callId);
+      if (lookup.kind === "hit" && lookup.call.state !== "done") await beat(lookup.call);
+      return lookup;
     };
-    let call = await look();
-    while (call && call.state !== "done" && this.now() < until && !signal?.aborted) {
+    let lookup = await look();
+    while (
+      lookup.kind === "hit" &&
+      lookup.call.state !== "done" &&
+      this.now() < until &&
+      !signal?.aborted
+    ) {
       await sleep(this.pollIntervalMs, undefined, { signal }).catch((error: unknown) => {
         if (!(error instanceof Error && error.name === "AbortError")) throw error;
       });
-      call = await look();
+      lookup = await look();
     }
-    return call ? { outcome: "polled", answer: toPollResponse(call) } : { outcome: "gone" };
+    return lookup.kind === "hit"
+      ? { outcome: "polled", answer: toPollResponse(lookup.call) }
+      : { outcome: "gone" };
   }
 
   /**
@@ -220,10 +229,11 @@ export class LocalCallDispatcherService {
 
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
-    const call = await this.read(callId);
-    if (call?.state !== "pending") {
+    const lookup = await this.read(callId);
+    if (lookup.kind === "miss" || lookup.call.state !== "pending") {
       return;
     }
+    const { call } = lookup;
 
     await this.write({ ...call, state: "running" });
   }
@@ -234,10 +244,11 @@ export class LocalCallDispatcherService {
    * budget, not the command's own deadline.
    */
   async awaitPermission({ callId, waitId }: { callId: string; waitId: string }): Promise<void> {
-    const call = await this.read(callId);
-    if (!call || call.state === "done") {
+    const lookup = await this.read(callId);
+    if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
+    const { call } = lookup;
 
     const next: StoredLocalCall = {
       ...call,
@@ -258,8 +269,9 @@ export class LocalCallDispatcherService {
     callId: string;
     decision: "allow_once" | "allow_pattern" | "deny" | "expired";
   }): Promise<void> {
-    const call = await this.read(callId);
-    if (call && call.state === "awaiting_permission") {
+    const lookup = await this.read(callId);
+    if (lookup.kind === "hit" && lookup.call.state === "awaiting_permission") {
+      const { call } = lookup;
       // The command starts now, so its time limit starts now. Counting the
       // minutes the developer spent reading the card against the command left
       // a long ask with a deadline already behind it.
@@ -288,10 +300,11 @@ export class LocalCallDispatcherService {
     callId: string;
     frame: Pick<ResultFrame, "ok" | "text" | "output" | "error">;
   }): Promise<void> {
-    const call = await this.read(callId);
-    if (!call || call.state === "done") {
+    const lookup = await this.read(callId);
+    if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
+    const { call } = lookup;
 
     await this.settle({
       ...call,
@@ -316,10 +329,11 @@ export class LocalCallDispatcherService {
     code?: "cancelled" | "timeout" | "permission_expired" | "exec_failed";
     message?: string;
   }): Promise<void> {
-    const call = await this.read(callId);
-    if (!call || call.state === "done") {
+    const lookup = await this.read(callId);
+    if (lookup.kind === "miss" || lookup.call.state === "done") {
       return;
     }
+    const { call } = lookup;
 
     await this.store.publish(
       workspaceChannel(call.conversationId),
@@ -347,7 +361,8 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), 0);
     const calls: StoredLocalCall[] = [];
     for (const id of ids) {
-      const call = await this.readSkippingUnreadable(id);
+      const lookup = await this.readSkippingUnreadable(id);
+      const call = lookup.kind === "hit" ? lookup.call : undefined;
       if (call && call.state !== "done") {
         calls.push(call);
       }
@@ -366,7 +381,8 @@ export class LocalCallDispatcherService {
     const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), now);
     const envelopes: CallEnvelope[] = [];
     for (const id of ids) {
-      const call = await this.readSkippingUnreadable(id);
+      const lookup = await this.readSkippingUnreadable(id);
+      const call = lookup.kind === "hit" ? lookup.call : undefined;
       if (call && call.state !== "done") {
         envelopes.push(toEnvelope(call));
       }
@@ -376,18 +392,18 @@ export class LocalCallDispatcherService {
   }
 
   /**
-   * The stored call, or null once its key has expired. A blob we wrote that no
+   * The stored call; `miss` once its key has expired. A blob we wrote that no
    * longer decodes is corruption rather than absence, so it raises under a code
    * that tells the person at the command line to ask for the change again.
    */
-  async read(callId: string): Promise<StoredLocalCall | null> {
+  async read(callId: string): Promise<LocalCallLookup> {
     const raw = await this.store.tryGet(callKey(callId));
     if (!raw) {
-      return null;
+      return { kind: "miss" };
     }
 
     try {
-      return storedLocalCallSchema.parse(JSON.parse(raw));
+      return { kind: "hit", call: storedLocalCallSchema.parse(JSON.parse(raw)) };
     } catch (error) {
       throw new LangyLocalRecordUnreadableError({
         reasons: error instanceof Error ? [error] : [],
@@ -404,7 +420,7 @@ export class LocalCallDispatcherService {
    * A list loop's read: skips only the named unreadable error so one corrupt
    * call cannot take the whole listing down; anything else still propagates.
    */
-  private async readSkippingUnreadable(callId: string): Promise<StoredLocalCall | null> {
+  private async readSkippingUnreadable(callId: string): Promise<LocalCallLookup> {
     try {
       return await this.read(callId);
     } catch (error) {
@@ -414,7 +430,7 @@ export class LocalCallDispatcherService {
 
       logger.warn({ callId }, "skipping unreadable local call");
 
-      return null;
+      return { kind: "miss" };
     }
   }
 

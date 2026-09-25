@@ -94,7 +94,7 @@ function subscriberOver({
     },
     failTurn: { failTurn },
     worker: { dispatch: vi.fn().mockResolvedValue("accepted") },
-    handoffStore: { read: async () => null },
+    handoffStore: { read: async () => ({ kind: "miss" as const }) },
     clock: () => now,
   });
   return { subscriber, failTurn };

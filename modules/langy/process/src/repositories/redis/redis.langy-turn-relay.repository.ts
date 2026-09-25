@@ -224,6 +224,9 @@ export interface LangyRelayConversations {
   }): Promise<void>;
 }
 
+/** The run token the turn's handoff carries; `miss` when none is parked for this project. */
+export type LangyHandoffRunTokenLookup = { kind: "hit"; runToken: string } | { kind: "miss" };
+
 export interface LangyTurnRelayDeps {
   conversations: LangyRelayConversations;
   buffer: LangyRelayBuffer;
@@ -245,7 +248,7 @@ export interface LangyTurnRelayDeps {
     projectId: string;
     conversationId: string;
     turnId: string;
-  }): Promise<string | null>;
+  }): Promise<LangyHandoffRunTokenLookup>;
   /**
    * Extend the turn's handoff by another full TTL. The handoff TTL is written once when the turn is
    * dispatched, and the heartbeat below is the only ongoing proof that the worker is alive.
@@ -440,7 +443,7 @@ export class RedisLangyTurnRelayRepository {
     // worker signed with, written before dispatch — so the first frames of a
     // brand-new conversation (whose RunToken projection is still queued) are
     // authenticated instead of dropped.
-    let fromHandoff: string | null | undefined;
+    let fromHandoff: LangyHandoffRunTokenLookup | undefined;
     try {
       fromHandoff = await this.deps.readHandoffRunToken?.({
         projectId,
@@ -460,11 +463,11 @@ export class RedisLangyTurnRelayRepository {
         },
         "langy relay handoff runToken read failed; falling back to the projection",
       );
-      fromHandoff = null;
+      fromHandoff = { kind: "miss" };
     }
-    if (fromHandoff) {
-      this.runToken = fromHandoff;
-      return fromHandoff;
+    if (fromHandoff?.kind === "hit") {
+      this.runToken = fromHandoff.runToken;
+      return fromHandoff.runToken;
     }
 
     // Fallback: the durable RunToken projection. Covers a handoff that aged out
@@ -919,9 +922,10 @@ function handoffRunTokenReader(
   if (!handoff) return {};
   return {
     readHandoffRunToken: async ({ projectId, conversationId, turnId }) => {
-      const row = await handoff.read({ conversationId, turnId });
-      if (!row || row.projectId !== projectId) return null;
-      return row.runToken || null;
+      const lookup = await handoff.read({ conversationId, turnId });
+      if (lookup.kind === "miss" || lookup.handoff.projectId !== projectId) return { kind: "miss" };
+      const { runToken } = lookup.handoff;
+      return runToken ? { kind: "hit", runToken } : { kind: "miss" };
     },
   };
 }

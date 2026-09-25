@@ -75,11 +75,11 @@ export class RedisLangyEffectRepository {
         async dispatchTurn({ projectId, conversationId, turnId }): Promise<void> {
           // Peek rather than consume: an outbox failure must be able to retry the
           // same short-lived handoff until its normal TTL expires.
-          const handoff = await deps.handoffStore.read({
+          const lookup = await deps.handoffStore.read({
             conversationId,
             turnId,
           });
-          if (!handoff) {
+          if (lookup.kind === "miss") {
             // Missing/expired is not recoverable by retrying this intent. The
             // heartbeat-aware liveness subscriber owns terminalizing an
             // abandoned turn.
@@ -89,6 +89,7 @@ export class RedisLangyEffectRepository {
             );
             return;
           }
+          const { handoff } = lookup;
           assertHandoffIdentity({
             handoff,
             projectId,

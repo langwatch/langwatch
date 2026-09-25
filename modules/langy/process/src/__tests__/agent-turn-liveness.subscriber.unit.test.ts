@@ -94,7 +94,11 @@ function makeDeps(params?: {
       markError: vi.fn().mockResolvedValue(undefined),
     },
     handoffStore: {
-      read: vi.fn().mockResolvedValue(params?.handoff ?? null),
+      read: vi
+        .fn()
+        .mockResolvedValue(
+          params?.handoff ? { kind: "hit", handoff: params.handoff } : { kind: "miss" },
+        ),
     },
     worker: { dispatch: vi.fn().mockResolvedValue("accepted") },
     failTurn: { failTurn: vi.fn().mockResolvedValue(undefined) },

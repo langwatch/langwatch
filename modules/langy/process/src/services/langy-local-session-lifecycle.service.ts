@@ -178,10 +178,11 @@ export class LocalControlLifecycleService {
     }
 
     if ("call" in parsed) {
-      const call = await this.deps.dispatcher.read(parsed.call);
-      if (!call || call.conversationId !== session.conversationId) {
+      const lookup = await this.deps.dispatcher.read(parsed.call);
+      if (lookup.kind === "miss" || lookup.call.conversationId !== session.conversationId) {
         return;
       }
+      const { call } = lookup;
 
       // The channel is the conversation's, not this connection's, so a folder
       // that a newer one replaced still hears every call written for it.

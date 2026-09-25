@@ -16,6 +16,7 @@ import { createLogger } from "@langwatch/observability";
 import type {
   LangyLocalPresenceRepository,
   OwedConnectTurn,
+  OwedConnectTurnLookup,
 } from "../repositories/langy-local-presence.repository.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
 import {
@@ -63,8 +64,9 @@ export function createLocalConnectTurnSubscriber(
       const projectId = event.tenantId;
       const conversationId = String(event.aggregateId);
       const presence = deps.presence();
-      const owed = await owedTurnOf(presence, conversationId);
-      if (!owed) return;
+      const lookup = await owedTurnOf(presence, conversationId);
+      if (lookup.kind === "miss") return;
+      const { owed } = lookup;
 
       const record = await deps.conversations
         .getById({ projectId, conversationId })
@@ -93,18 +95,19 @@ export function createLocalConnectTurnSubscriber(
 async function owedTurnOf(
   presence: LocalConnectTurnPresence,
   conversationId: string,
-): Promise<OwedConnectTurn | null> {
-  const owed = await presence.readOwedConnectTurn(conversationId);
-  if (!owed) return null;
+): Promise<OwedConnectTurnLookup> {
+  const lookup = await presence.readOwedConnectTurn(conversationId);
+  if (lookup.kind === "miss") return lookup;
+  const { owed } = lookup;
   const folder = await presence.getByConversationId(conversationId).catch((error: unknown) => {
     if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
       return null;
     }
     throw error;
   });
-  if (folder && folder.requestId === owed.requestId) return owed;
+  if (folder && folder.requestId === owed.requestId) return lookup;
   await presence.settleOwedConnectTurn(conversationId);
-  return null;
+  return { kind: "miss" };
 }
 
 /** An in-flight refusal (the ended turn's admission not yet released) is rethrown to retry. */

@@ -8,6 +8,7 @@ import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
   RedisLangyTurnRelayRepository,
+  type LangyHandoffRunTokenLookup,
 } from "../redis.langy-turn-relay.repository.ts";
 
 const RUN_TOKEN = mintRunToken();
@@ -138,7 +139,7 @@ function makeRelay(
       projectId: string;
       conversationId: string;
       turnId: string;
-    }) => Promise<string | null>;
+    }) => Promise<LangyHandoffRunTokenLookup>;
     refreshHandoffTtl?: (a: { conversationId: string; turnId: string }) => Promise<void>;
   } = {},
 ) {
@@ -1096,7 +1097,10 @@ describe("LangyTurnRelayAdapter", () => {
         // (null), but the synchronous handoff carries the token the worker
         // signed with.
         const conversations = fakeConversations(null);
-        const readHandoffRunToken = vi.fn(async () => RUN_TOKEN);
+        const readHandoffRunToken = vi.fn(async () => ({
+          kind: "hit" as const,
+          runToken: RUN_TOKEN,
+        }));
         const { relay, buffer } = makeRelay({
           conversations,
           readHandoffRunToken,

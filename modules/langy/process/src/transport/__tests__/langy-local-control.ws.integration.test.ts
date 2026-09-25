@@ -31,6 +31,7 @@ import {
   type LocalControlRuntime,
 } from "../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
+import type { LocalCallLookup } from "../../services/langy-local-call-dispatcher.service.ts";
 import { LocalControlConnectionService } from "../../services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
@@ -471,6 +472,8 @@ afterAll(async () => {
   connection.disconnect();
 });
 
+const stateOf = (lookup: LocalCallLookup) => (lookup.kind === "hit" ? lookup.call.state : "gone");
+
 describe("given an approved control request", () => {
   describe("when the command line connects", () => {
     /** @scenario "A connected folder shows on the card and in the panel header" */
@@ -746,7 +749,7 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
+      expect(stateOf(await podA.runtime.dispatcher.read(call.callId))).toBe("awaiting_permission");
     });
 
     /** @scenario "The session grant button names every pattern the click covers" */
@@ -1200,7 +1203,7 @@ describe("given a command line that reconnects while a command still runs", () =
         text: "4 migrations applied",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+        .poll(async () => stateOf(await podA.runtime.dispatcher.read(call.callId)), {
           timeout: 5_000,
         })
         .toBe("done");
@@ -1277,7 +1280,7 @@ describe("given a folder replaced by a newer one", () => {
           text: "written on the machine that was replaced",
         },
       );
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).not.toBe("done");
+      expect(stateOf(await podA.runtime.dispatcher.read(call.callId))).not.toBe("done");
 
       // The folder the panel shows still answers it.
       fresh.cli.send({
@@ -1287,7 +1290,7 @@ describe("given a folder replaced by a newer one", () => {
         text: "written",
       });
       await expect
-        .poll(async () => (await podA.runtime.dispatcher.read(call.callId))?.state, {
+        .poll(async () => stateOf(await podA.runtime.dispatcher.read(call.callId)), {
           timeout: 5_000,
         })
         .toBe("done");

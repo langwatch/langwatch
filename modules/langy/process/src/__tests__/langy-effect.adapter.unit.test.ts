@@ -33,7 +33,7 @@ function handoff(overrides: Partial<LangyTurnHandoff> = {}): LangyTurnHandoff {
 function makeDeps(value: LangyTurnHandoff | null = handoff()) {
   return {
     handoffStore: {
-      read: vi.fn().mockResolvedValue(value),
+      read: vi.fn().mockResolvedValue(value ? { kind: "hit", handoff: value } : { kind: "miss" }),
       stash: vi.fn().mockResolvedValue(undefined),
       isStopped: vi.fn().mockResolvedValue(false),
     },

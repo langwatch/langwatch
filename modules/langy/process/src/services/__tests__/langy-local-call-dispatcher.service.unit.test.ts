@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import type { WorkspaceNudge } from "../../rules/langy-local-call-record.rules.ts";
 import { callKey, workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
+import type { LocalCallLookup } from "../langy-local-call-dispatcher.service.ts";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
 const projectId = "proj_1";
@@ -66,6 +67,8 @@ beforeEach(() => {
   });
 });
 
+const stateOf = (lookup: LocalCallLookup) => (lookup.kind === "hit" ? lookup.call.state : "gone");
+
 describe("given a folder connected to the conversation", () => {
   beforeEach(async () => {
     await presence.register(workspace());
@@ -87,7 +90,7 @@ describe("given a folder connected to the conversation", () => {
       expect(nudges).toContainEqual({ call: call.callId });
 
       await dispatcher.ack(call.callId);
-      expect((await dispatcher.read(call.callId))?.state).toBe("running");
+      expect(stateOf(await dispatcher.read(call.callId))).toBe("running");
 
       await dispatcher.result({
         callId: call.callId,
@@ -181,7 +184,7 @@ describe("given a folder connected to the conversation", () => {
         callId: call.callId,
         waitId: "lwait_1",
       });
-      expect((await dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
+      expect(stateOf(await dispatcher.read(call.callId))).toBe("awaiting_permission");
 
       await dispatcher.sendPermission({
         conversationId,
@@ -190,7 +193,7 @@ describe("given a folder connected to the conversation", () => {
       });
       await new Promise((resolve) => setImmediate(resolve));
 
-      expect((await dispatcher.read(call.callId))?.state).toBe("running");
+      expect(stateOf(await dispatcher.read(call.callId))).toBe("running");
       expect(nudges).toContainEqual({
         permission: { callId: call.callId, decision: "allow_once" },
       });

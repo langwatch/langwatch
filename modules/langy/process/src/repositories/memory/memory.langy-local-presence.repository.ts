@@ -4,6 +4,7 @@ import {
   type ConnectedWorkspace,
   LangyLocalPresenceRepository,
   type OwedConnectTurn,
+  type OwedConnectTurnLookup,
   type PresenceDeregistration,
   type PresenceHeartbeat,
 } from "../langy-local-presence.repository.ts";
@@ -67,8 +68,9 @@ export class LangyLocalPresenceMemoryRepository extends LangyLocalPresenceReposi
     this.store.owedConnectTurns.set(conversationId, { ...owed, owedAt: Date.now() });
   }
 
-  async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurn | null> {
-    return this.store.owedConnectTurns.get(conversationId) ?? null;
+  async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurnLookup> {
+    const owed = this.store.owedConnectTurns.get(conversationId);
+    return owed === undefined ? { kind: "miss" } : { kind: "hit", owed };
   }
 
   async settleOwedConnectTurn(conversationId: string): Promise<void> {

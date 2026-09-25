@@ -15,10 +15,9 @@ export function carryLangyConversation({
   destination,
   search,
 }: {
-  destination: string | null;
+  destination: string;
   search: string;
-}): string | null {
-  if (destination === null) return null;
+}): string {
   const conversationId = new URLSearchParams(search).get(LANGY_CONVERSATION_PARAM);
   if (!conversationId) return destination;
   // A destination that already carries the parameter is left alone, so this is

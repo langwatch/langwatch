@@ -91,7 +91,7 @@ describe("given a folder that connected while the turn before still read as in f
           idempotencyKey: "local-connect:lcr_1",
         },
       ]);
-      expect(await presence.readOwedConnectTurn(CONVERSATION_ID)).toBeNull();
+      expect((await presence.readOwedConnectTurn(CONVERSATION_ID)).kind).toBe("miss");
 
       await subscriber().handle(turnEnded(), context);
       await subscriber().handle(turnEnded("evt_3"), context);
@@ -103,12 +103,12 @@ describe("given a folder that connected while the turn before still read as in f
       await expect(subscriber().handle(turnEnded(), context)).rejects.toThrow(
         LangyTurnInProgressError,
       );
-      expect(await presence.readOwedConnectTurn(CONVERSATION_ID)).not.toBeNull();
+      expect((await presence.readOwedConnectTurn(CONVERSATION_ID)).kind).toBe("hit");
 
       turnStartOutcome = "ok";
       await subscriber().handle(turnEnded(), context);
       expect(startedTurns).toHaveLength(1);
-      expect(await presence.readOwedConnectTurn(CONVERSATION_ID)).toBeNull();
+      expect((await presence.readOwedConnectTurn(CONVERSATION_ID)).kind).toBe("miss");
     });
 
     it("pays it on a failed turn's end as well", async () => {
@@ -136,7 +136,7 @@ describe("given a folder that connected while the turn before still read as in f
       status = "running";
       await subscriber().handle(turnEnded(), context);
       expect(startedTurns).toEqual([]);
-      expect(await presence.readOwedConnectTurn(CONVERSATION_ID)).not.toBeNull();
+      expect((await presence.readOwedConnectTurn(CONVERSATION_ID)).kind).toBe("hit");
     });
   });
 
@@ -153,7 +153,7 @@ describe("given a folder that connected while the turn before still read as in f
       await presence.register(workspace("lcr_2"));
       await subscriber().handle(turnEnded(), context);
       expect(startedTurns).toEqual([]);
-      expect(await presence.readOwedConnectTurn(CONVERSATION_ID)).toBeNull();
+      expect((await presence.readOwedConnectTurn(CONVERSATION_ID)).kind).toBe("miss");
     });
   });
 });

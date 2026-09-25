@@ -61,11 +61,8 @@ export abstract class LangyTurnHandoffRepository {
   /** Parks the handoff for its TTL. */
   abstract stash(handoff: LangyTurnHandoff): Promise<void>;
 
-  /** The parked handoff, or nothing when it never landed or has lapsed. */
-  abstract read(input: {
-    conversationId: string;
-    turnId: string;
-  }): Promise<LangyTurnHandoff | null>;
+  /** The parked handoff; `miss` when it never landed, has lapsed or no longer parses. */
+  abstract read(input: { conversationId: string; turnId: string }): Promise<LangyTurnHandoffLookup>;
 
   /** Extends a live handoff's TTL. False when there was nothing to extend. */
   abstract refresh(input: { conversationId: string; turnId: string }): Promise<boolean>;
@@ -90,6 +87,8 @@ export interface LangyFrameDedupRepository {
 }
 
 /** A remembered link, or a miss the caller answers from the platform's own lookup. */
+export type LangyTurnHandoffLookup = { kind: "hit"; handoff: LangyTurnHandoff } | { kind: "miss" };
+
 export type LangyResourceLinkLookup = { kind: "hit"; href: string } | { kind: "miss" };
 
 /** Conversation-scoped links Langy's navigate command resolves an id against. */

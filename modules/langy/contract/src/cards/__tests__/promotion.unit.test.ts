@@ -4,7 +4,12 @@ import { assertTotalOrder, CARD_PROBES, promoteCard, type CardProbe } from "../r
 import { toCliToolResult } from "../tool-result.ts";
 
 const promote = (nominal: Parameters<typeof promoteCard>[0]["nominal"], payload: unknown) =>
-  promoteCard({ nominal, payload, probes: CARD_PROBES });
+  kept(nominal, promoteCard({ nominal, payload, probes: CARD_PROBES }));
+
+/** "kept" when the payload earned no richer card than its name did. */
+function kept(nominal: string, card: string): string {
+  return card === nominal ? "kept" : card;
+}
 
 describe("promoteCard", () => {
   describe("given a generic read whose payload carries cost", () => {
@@ -64,7 +69,7 @@ describe("promoteCard", () => {
         promote("resourceRead", {
           series: [{ name: "Total cost", points: [{ t: "2026-07-15", v: 0.11 }] }],
         }),
-      ).toBeNull();
+      ).toBe("kept");
     });
 
     it("refuses an unnamed series — half the product emits arrays of pairs", () => {
@@ -79,14 +84,14 @@ describe("promoteCard", () => {
             },
           ],
         }),
-      ).toBeNull();
+      ).toBe("kept");
     });
   });
 
   describe("given a payload that merely has numbers in it", () => {
     it("is left alone — 'has numbers' is not evidence of spend", () => {
-      expect(promote("resourceRead", { count: 9, latency: 120 })).toBeNull();
-      expect(promote("resourceRead", { data: [1, 2, 3] })).toBeNull();
+      expect(promote("resourceRead", { count: 9, latency: 120 })).toBe("kept");
+      expect(promote("resourceRead", { data: [1, 2, 3] })).toBe("kept");
     });
   });
 
@@ -94,13 +99,13 @@ describe("promoteCard", () => {
     it("never overrides it, however tempting the payload", () => {
       // A trace page carries cost, but `trace search` means traces.
       const payload = { traces: [{ metrics: { total_cost: 1 } }] };
-      expect(promote("traces", payload)).toBeNull();
-      expect(promote("evalRun", payload)).toBeNull();
+      expect(promote("traces", payload)).toBe("kept");
+      expect(promote("evalRun", payload)).toBe("kept");
     });
 
     it("never demotes a write card", () => {
-      expect(promote("resourceCreated", { totalCost: 3 })).toBeNull();
-      expect(promote("resourceRemoved", { totalCost: 3 })).toBeNull();
+      expect(promote("resourceCreated", { totalCost: 3 })).toBe("kept");
+      expect(promote("resourceRemoved", { totalCost: 3 })).toBe("kept");
     });
   });
 
@@ -126,7 +131,7 @@ describe("promoteCard", () => {
     });
 
     it("still keeps it when the payload earns nothing richer", () => {
-      expect(promote("metrics", { currentPeriod: [{ date: 1 }], previousPeriod: [] })).toBeNull();
+      expect(promote("metrics", { currentPeriod: [{ date: 1 }], previousPeriod: [] })).toBe("kept");
     });
   });
 
@@ -141,9 +146,9 @@ describe("promoteCard", () => {
 
   describe("given nothing recognisable", () => {
     it("keeps the card the command's name earned", () => {
-      expect(promote("resourceRead", { name: "anything" })).toBeNull();
-      expect(promote("resourceRead", "a string")).toBeNull();
-      expect(promote("resourceRead", null)).toBeNull();
+      expect(promote("resourceRead", { name: "anything" })).toBe("kept");
+      expect(promote("resourceRead", "a string")).toBe("kept");
+      expect(promote("resourceRead", null)).toBe("kept");
     });
   });
 });

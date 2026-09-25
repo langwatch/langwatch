@@ -34,7 +34,7 @@ describe("LangyTurnHandoffRedisRepository", () => {
 
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
-    ).resolves.toEqual(handoff);
+    ).resolves.toEqual({ kind: "hit", handoff });
   });
 
   it("returns null for a missing or corrupt handoff", async () => {
@@ -43,12 +43,12 @@ describe("LangyTurnHandoffRedisRepository", () => {
 
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ kind: "miss" });
 
     await redis.set("langy:handoff:{conversation-1}:turn-1", "not-json");
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ kind: "miss" });
 
     await redis.set(
       "langy:handoff:{conversation-1}:turn-1",
@@ -56,7 +56,7 @@ describe("LangyTurnHandoffRedisRepository", () => {
     );
     await expect(
       store.read({ conversationId: handoff.conversationId, turnId: handoff.turnId }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ kind: "miss" });
   });
 
   it("refreshes a live handoff without rewriting it", async () => {
