@@ -352,7 +352,7 @@ describe("cacheRule.form", () => {
         priority: 0,
         enabled: true,
         matchers: { vk_id: "vk_01" },
-        action: { mode: "legacy-unknown" as unknown as "force" },
+        action: { mode: "legacy-unknown" },
       });
       expect(state.actionMode).toBe("respect");
     });

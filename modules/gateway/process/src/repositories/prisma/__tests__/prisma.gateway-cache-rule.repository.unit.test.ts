@@ -3,13 +3,11 @@
  * the App's own copy was removed: bundle filter/order (first-match-wins), the mode column
  * recomputed from the write, and the audit row sharing the write's transaction.
  */
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { GatewayAudit, GatewayChangeEvents } from "../../../app/gateway.members.ts";
-import {
-  PrismaGatewayCacheRuleRepository,
-  type GatewayCacheRuleDatabase,
-} from "../prisma.gateway-cache-rule.repository.ts";
+import { PrismaGatewayCacheRuleRepository } from "../prisma.gateway-cache-rule.repository.ts";
 
 const storedRow = {
   id: "rule_01",
@@ -60,10 +58,11 @@ function recordingDatabase(row: typeof storedRow | null = storedRow) {
       });
     },
   };
-  const database = {
+  const transactionClient = prismaDouble({ gatewayCacheRule: delegate });
+  const database = prismaDouble({
     gatewayCacheRule: delegate,
-    $transaction: (run: (client: unknown) => unknown) => run({ gatewayCacheRule: delegate }),
-  } as unknown as GatewayCacheRuleDatabase;
+    $transaction: (run) => run(transactionClient),
+  });
   return { database, calls, delegate };
 }
 

@@ -9,7 +9,7 @@ const gatewayAuditJsonSchema = z.json();
 
 export type GatewayAuditJson = z.infer<typeof gatewayAuditJsonSchema>;
 
-export function serializeRowForAudit<T extends Record<string, unknown>>(row: T): GatewayAuditJson {
+export function serializeRowForAudit(row: object): GatewayAuditJson {
   const serialised = JSON.stringify(row, (_key, value) =>
     typeof value === "bigint" ? value.toString() : value,
   );

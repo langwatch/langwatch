@@ -1,6 +1,6 @@
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AnnotationQueueItemDatabase } from "../prisma.annotation-queue-item.repository.ts";
 import { PrismaAnnotationQueueItemRepository } from "../prisma.annotation-queue-item.repository.ts";
 
 const createdAt = new Date("2026-01-01T00:00:00.000Z");
@@ -51,10 +51,10 @@ function delegates() {
   };
 
   return {
-    prisma: {
+    prisma: prismaDouble({
       annotationQueue: queue,
       annotationQueueItem: queueItem,
-    } as unknown as AnnotationQueueItemDatabase,
+    }),
     queue,
     queueItem,
   };

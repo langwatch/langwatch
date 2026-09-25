@@ -17,12 +17,7 @@ type FakeCrisp = {
   trigger: (event: string) => void;
 };
 
-type CrispGlobals = {
-  $crisp?: unknown;
-  CRISP_READY_TRIGGER?: () => void;
-};
-
-const crispGlobals = () => window as unknown as CrispGlobals;
+const crispGlobals = () => window;
 
 function installFakeCrisp(): FakeCrisp {
   const handlers = new Map<string, () => void>();

@@ -1,6 +1,7 @@
 /**
  * See specs/traces-v2/anchored-comments.feature.
  */
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AnnotationDatabase } from "../prisma.annotation.repository.ts";
@@ -28,8 +29,8 @@ function baseRow(overrides: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function fakeDatabase(create: ReturnType<typeof vi.fn>): AnnotationDatabase {
-  return { annotation: { create } } as unknown as AnnotationDatabase;
+function fakeDatabase(create: (...args: unknown[]) => unknown): AnnotationDatabase {
+  return prismaDouble({ annotation: { create } });
 }
 
 describe("PrismaAnnotationRepository.create anchoring", () => {
@@ -164,7 +165,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
         }),
       );
 
-      const database = { annotation: { update } } as unknown as AnnotationDatabase;
+      const database = prismaDouble({ annotation: { update } });
       const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const updated = await repository.update({
@@ -198,7 +199,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
       ];
 
       const findMany = vi.fn().mockResolvedValue(rows);
-      const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
+      const database = prismaDouble({ annotation: { findMany } });
       const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const all = await repository.findAll({
@@ -219,7 +220,7 @@ describe("PrismaAnnotationRepository.create anchoring", () => {
           baseRow({ id: "a-trace", anchorKind: null, anchorId: null, anchorPath: null }),
         ]);
 
-      const database = { annotation: { findMany } } as unknown as AnnotationDatabase;
+      const database = prismaDouble({ annotation: { findMany } });
       const repository = PrismaAnnotationRepository.create({ prisma: database });
 
       const traceOnly = await repository.findAll({

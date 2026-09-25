@@ -4,6 +4,7 @@
  *
  * @see specs/analytics/posthog-guided-onboarding.feature
  */
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,7 +14,9 @@ type ProjectDatabase = Parameters<typeof PrismaProjectRepository.create>[0]["pri
 
 function repositoryWith(project: unknown) {
   const findUnique = vi.fn().mockResolvedValue(project);
-  const database = { project: { findUnique }, team: {} } as unknown as ProjectDatabase;
+  const database: ProjectDatabase = prismaDouble({
+    project: { findUnique: (args) => findUnique(args) },
+  });
   return {
     repository: PrismaProjectRepository.create({ prisma: database }),
     findUnique,

@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RedisGatewayBudgetChangeDedupeRepository } from "../repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";
@@ -16,8 +16,8 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function redisStub(set: ReturnType<typeof vi.fn>) {
-  return { set } as unknown as IORedis;
+function redisStub(set: (...args: unknown[]) => Promise<string | null>) {
+  return redisDouble({ set: (...args) => set(...args) });
 }
 
 describe("budget change-event dedupe", () => {

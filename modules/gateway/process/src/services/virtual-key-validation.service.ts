@@ -258,7 +258,7 @@ export class VirtualKeyValidationService {
       ...safe
     } = vk;
 
-    return serializeRowForAudit(safe as unknown as Record<string, unknown>);
+    return serializeRowForAudit(safe);
   }
 
   private constructor(

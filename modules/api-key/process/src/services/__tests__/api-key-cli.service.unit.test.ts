@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { fromDate } from "@langwatch/time";
 /**
  * Unit coverage for the CLI login key mint mechanics: re-login and racing logins never
@@ -39,13 +40,17 @@ function loginKey(overrides: Pick<StoredApiKey, "id" | "createdAt">): StoredApiK
 
 const OLD_KEY = loginKey({ id: "apikey-old", createdAt: new Date("2026-01-01T00:00:00Z") });
 
+function revokedKey(id: string): StoredApiKey {
+  return loginKey({ id, createdAt: new Date("2026-01-01T00:00:00Z") });
+}
+
 function serviceWith(options: {
   findForUser?: () => Promise<StoredApiKey[]>;
   createdKey?: { id: string; createdAt: Date };
-  revoke?: (input: { id: string }) => Promise<unknown>;
+  revoke?: ApiKeyLifecycleService["revoke"];
   extendLoginKeyExpiry?: (input: unknown) => Promise<void>;
 }) {
-  const revoke = vi.fn(options.revoke ?? (() => Promise.resolve()));
+  const revoke = vi.fn(options.revoke ?? ((input) => Promise.resolve(revokedKey(input.id))));
   const create = vi.fn();
   const extendLoginKeyExpiry = vi.fn(options.extendLoginKeyExpiry ?? (() => Promise.resolve()));
   const created = options.createdKey ?? {
@@ -62,12 +67,9 @@ function serviceWith(options: {
     },
   );
 
-  const lifecycle = {
-    create,
-    revoke,
-  } as unknown as ApiKeyLifecycleService;
+  const lifecycle = createApiFixture<ApiKeyLifecycleService>({ create, revoke });
 
-  const policy = {} as unknown as ApiKeyGrantPolicyService;
+  const policy = createApiFixture<ApiKeyGrantPolicyService>();
 
   const service = ApiKeyCliService.create(
     {
@@ -172,9 +174,9 @@ describe("given a CLI login key mint", () => {
       const deviceRevokeError = new Error("revoke failed");
       const { service, revoke, created } = serviceWith({
         findForUser: () => Promise.resolve([OLD_KEY]),
-        revoke: (input: { id: string }) => {
+        revoke: (input) => {
           if (input.id === OLD_KEY.id) return Promise.reject(deviceRevokeError);
-          return Promise.resolve();
+          return Promise.resolve(revokedKey(input.id));
         },
       });
 

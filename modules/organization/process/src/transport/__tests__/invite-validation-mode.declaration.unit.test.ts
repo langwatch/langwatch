@@ -69,12 +69,7 @@ function trpcProcedure(dottedName: string): TrpcProcedureRequest<object> {
     router: (record) => record,
   };
 
-  (
-    organizationTrpcTransport.router as unknown as (
-      runtime: TrpcProcedureFactory<object>,
-      app: unknown,
-    ) => void
-  )(factory, () => {
+  organizationTrpcTransport.router(factory, () => {
     throw new Error("the wire table never resolves an application");
   });
 

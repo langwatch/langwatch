@@ -1,7 +1,6 @@
 import { api as workflowApi } from "@langwatch/browser-trpc/workflow-api";
 import { hasDSLChanged, type Project, studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { useEffect, useMemo } from "react";
-import type { UseFormReturn } from "react-hook-form";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
@@ -17,7 +16,7 @@ export const useVersionState = ({
   allowSaveIfAutoSaveIsCurrentButNotLatest = true,
 }: {
   project?: Project;
-  form?: UseFormReturn<{ version: string; commitMessage: string }>;
+  form?: { setValue(name: "version", value: string): void };
   allowSaveIfAutoSaveIsCurrentButNotLatest?: boolean;
 }) => {
   const { workflowId, getWorkflow, autosavedWorkflow } = useWorkflowStore(

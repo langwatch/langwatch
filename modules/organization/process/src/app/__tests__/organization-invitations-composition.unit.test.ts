@@ -262,8 +262,8 @@ describe("given a deployment that composed no invitation service", () => {
     it("refuses with the named capability error rather than crashing", async () => {
       const app = ServerOrganizationApp.createForTesting({
         dependencies: {
-          organizations: {} as unknown as ServerOrganizationAppDependencies["organizations"],
-          membership: {} as unknown as ServerOrganizationAppDependencies["membership"],
+          organizations: createApiFixture<ServerOrganizationAppDependencies["organizations"]>(),
+          membership: createApiFixture<ServerOrganizationAppDependencies["membership"]>(),
           projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
           permissions: createApiFixture<AuthzApi>({}),
         },

@@ -4,17 +4,19 @@
  * invitation — and no email can go out for a record that was rolled back.
  * @see specs/members/update-pending-invitation.feature
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationInviteRepository } from "../../repositories/organization-invite.repository.ts";
 import { InviteCreationService } from "../invite-creation.service.ts";
+import { makeInvite, makeOrganization } from "./support/invite-fakes.ts";
 
-const ORGANIZATION = { id: "organization-1", name: "Acme", members: [] };
+const ORGANIZATION = { ...makeOrganization({ id: "organization-1", name: "Acme" }), members: [] };
 
 function serviceWithRecordingOrder() {
   const order: string[] = [];
 
-  const invites = {
+  const invites: OrganizationInviteRepository = createApiFixture<OrganizationInviteRepository>({
     getOrganizationWithMembers: async () => ORGANIZATION,
     findMemberEmails: async () => [],
     hasOpenInviteForEmail: async () => false,
@@ -23,16 +25,15 @@ function serviceWithRecordingOrder() {
     findPersonalTeamsInScopes: async () => [],
     createPendingInvite: async (input: { email: string }) => {
       order.push(`record:${input.email}`);
-      return {
+      return makeInvite({
         id: `invite-${input.email}`,
         email: input.email,
         inviteCode: `code-${input.email}`,
         organizationId: ORGANIZATION.id,
-      };
+      });
     },
-    withTransaction: async <T>(write: (tx: OrganizationInviteRepository) => Promise<T>) =>
-      write(invites as unknown as OrganizationInviteRepository),
-  } as unknown as OrganizationInviteRepository;
+    withTransaction: async (write) => write(invites),
+  });
 
   const sendInvite = vi.fn(async ({ email }: { email: string }) => {
     order.push(`email:${email}`);

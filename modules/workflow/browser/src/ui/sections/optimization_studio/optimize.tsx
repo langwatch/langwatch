@@ -225,10 +225,7 @@ export function OptimizeModalContent({
 
   const { versions } = useVersionState({
     project,
-    form: form as unknown as UseFormReturn<{
-      version: string;
-      commitMessage: string;
-    }>,
+    form,
     allowSaveIfAutoSaveIsCurrentButNotLatest: false,
   });
   const canSave = checkCanCommitNewVersion();

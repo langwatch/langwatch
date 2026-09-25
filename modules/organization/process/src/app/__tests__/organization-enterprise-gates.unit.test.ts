@@ -22,6 +22,11 @@ const TEAM = {
   name: "Engineering",
   slug: "engineering",
   organizationId: ORGANIZATION_ID,
+  isPersonal: false,
+  ownerUserId: null,
+  archivedAt: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
 };
 const CALLER: OrganizationCaller = { id: "user-1", name: "Sam", email: "sam@acme.test" };
 
@@ -62,13 +67,14 @@ function application(options: { enterprise: boolean }) {
   const membership = {
     updateTeamMemberRole: writes.updateTeamMemberRole,
     getAuditLogs: writes.getAuditLogs,
-    findUserOrgRoleByTeamId: vi.fn(async () => "MEMBER"),
+    findUserOrgRoleByTeamId: vi.fn(async () => "MEMBER" as const),
   };
 
   const app = ServerOrganizationApp.createForTesting({
     dependencies: {
-      organizations: organizations as unknown as ServerOrganizationAppDependencies["organizations"],
-      membership: membership as unknown as ServerOrganizationAppDependencies["membership"],
+      organizations:
+        createApiFixture<ServerOrganizationAppDependencies["organizations"]>(organizations),
+      membership: createApiFixture<ServerOrganizationAppDependencies["membership"]>(membership),
       projects: createApiFixture<ServerOrganizationAppDependencies["projects"]>(),
       permissions: createApiFixture<AuthzApi>({ hasPermission: vi.fn(async () => true) }),
     },

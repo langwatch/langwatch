@@ -1,4 +1,4 @@
-import type { FoldProjectionStore } from "@langwatch/eventing";
+import type { Event, FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
@@ -29,22 +29,17 @@ const FAILED_COST_NANO_USD = 1_086_250;
 const stubStore = {} as FoldProjectionStore<GatewaySpendState>;
 const projection = new GatewaySpendFoldProjection({ store: stubStore });
 
-function makeEvent<E extends { type: string; data: unknown }>(
-  type: E["type"],
-  data: E["data"],
-  occurredAt: number,
-): E {
-  return EventUtils.createEvent({
+function makeEvent<E extends Event>(type: E["type"], data: E["data"], occurredAt: number): E {
+  return EventUtils.createEvent<E>({
     aggregateType: GATEWAY_SPEND_AGGREGATE_TYPE,
     aggregateId: REQUEST,
     tenantId: createTenantId(TENANT),
-    type: type as Parameters<typeof EventUtils.createEvent>[0]["type"],
+    type,
     version: GATEWAY_SPEND_EVENT_VERSION_LATEST,
     data,
-    metadata: {},
     occurredAt,
     idempotencyKey: `${TENANT}:${REQUEST}:${type}:${occurredAt}`,
-  }) as unknown as E;
+  });
 }
 
 /**

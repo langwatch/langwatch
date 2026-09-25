@@ -5,25 +5,22 @@
  * these cases pin both listings to the contract's list, not to today's names.
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaApiKeyRepository, type PrismaApiKeyDatabase } from "../prisma.api-key.repository.ts";
+import { PrismaApiKeyRepository } from "../prisma.api-key.repository.ts";
 
 function repositoryWithSpy() {
   const findMany = vi.fn(async () => []);
-  const database = { apiKey: { findMany } } as unknown as PrismaApiKeyDatabase;
+  const database = prismaDouble({ apiKey: { findMany } });
   return { repository: PrismaApiKeyRepository.create({ prisma: database }), findMany };
 }
 
-type SweepUpdate = {
-  where: { name: string; revokedAt: Date | null; expiresAt: { not: null; lte: Date } };
-  data: { revokedAt: Date };
-};
-
 function repositoryWithUpdateSpy(count = 0) {
-  const updateMany = vi.fn(async (_update: SweepUpdate) => ({ count }));
-  const database = { apiKey: { updateMany } } as unknown as PrismaApiKeyDatabase;
+  const updateMany = vi.fn(async (_update: Prisma.ApiKeyUpdateManyArgs) => ({ count }));
+  const database = prismaDouble({ apiKey: { updateMany } });
   return { repository: PrismaApiKeyRepository.create({ prisma: database }), updateMany };
 }
 
@@ -84,7 +81,8 @@ describe("PrismaApiKeyRepository", () => {
       await repository.revokeExpiredByName({ name: "Agent sandbox run", now: nowInstant() });
 
       const where = updateMany.mock.calls[0]![0].where;
-      expect(where.expiresAt).toMatchObject({ not: null });
+      expect(where).toBeDefined();
+      expect(where?.expiresAt).toMatchObject({ not: null });
     });
 
     /** @scenario "The sandbox sweep leaves live and already-revoked keys alone" */
@@ -93,7 +91,7 @@ describe("PrismaApiKeyRepository", () => {
 
       await repository.revokeExpiredByName({ name: "Agent sandbox run", now: nowInstant() });
 
-      expect(updateMany.mock.calls[0]![0].where.revokedAt).toBeNull();
+      expect(updateMany.mock.calls[0]![0].where?.revokedAt).toBeNull();
     });
 
     /** @scenario "The sandbox sweep reports how many keys it retired" */
@@ -114,7 +112,7 @@ describe("PrismaApiKeyRepository", () => {
   describe("when looking up an organization's ingestion key", () => {
     it("scopes the lookup to the caller's organization", async () => {
       const findFirst = vi.fn(async (_args: unknown) => null);
-      const database = { apiKey: { findFirst } } as unknown as PrismaApiKeyDatabase;
+      const database = prismaDouble({ apiKey: { findFirst } });
       const repository = PrismaApiKeyRepository.create({ prisma: database });
 
       await repository.findIngestKey({
@@ -140,10 +138,13 @@ describe("when a key is revoked", () => {
       return 1;
     });
     const findUniqueOrThrow = vi.fn(async () => row);
-    const database = {
+    const database = prismaDouble({
       apiKey: { findUniqueOrThrow },
-      $executeRaw,
-    } as unknown as PrismaApiKeyDatabase;
+      $executeRaw: (query, ...values) => {
+        if ("sql" in query) throw new Error("the revoke writes through a tagged template");
+        return $executeRaw(query, ...values);
+      },
+    });
     return { repository: PrismaApiKeyRepository.create({ prisma: database }), $executeRaw, row };
   }
 

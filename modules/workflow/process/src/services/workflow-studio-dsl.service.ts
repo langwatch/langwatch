@@ -61,7 +61,7 @@ export class ModelProviderWorkflowStudioDslService implements WorkflowStudioDsl 
     projectId: string;
     dsl: StudioWorkflow;
   }): Promise<void> {
-    const dsl = input.dsl as unknown as GraphLike;
+    const dsl: GraphLike = input.dsl;
     const legacyDefault =
       dsl.default_llm && hasModel(dsl.default_llm) ? dsl.default_llm : undefined;
     delete dsl.default_llm;

@@ -5,6 +5,7 @@
  */
 
 /** Spec: specs/server/declarative-process-composition.feature */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
@@ -18,14 +19,14 @@ import { apiKeyEventing } from "../api-key.pipeline.ts";
 import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
 
 /** The sandbox sweep never calls into the app, so a stand-in proves nothing there. */
-const unusedApp = undefined as unknown as ApiKeyApp;
+const unusedApp = createApiFixture<ApiKeyApp>();
 
 function installed(participation: "produce" | "consume" = "consume") {
   const repositories = MemoryApiKeyRepositories.create();
   const revokeExpiredByName = vi.spyOn(repositories.apiKeys, "revokeExpiredByName");
   const findElapsedLoginKeys = vi.spyOn(repositories.apiKeys, "findElapsedLoginKeys");
   const revoke = vi.fn(async (input: { id: string }) => ({ id: input.id }) as never);
-  const app = { revoke } as unknown as ApiKeyApp;
+  const app = createApiFixture<ApiKeyApp>({ revoke });
   const processStore = InMemoryProcessStore.createForTesting();
   const deleteDispatchedBefore = vi.spyOn(processStore, "deleteDispatchedBefore");
   const definition = apiKeyEventing.build({

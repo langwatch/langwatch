@@ -6,14 +6,17 @@ const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 const CRISP_CONTAINER_SELECTOR = "#crisp-chatbox, .crisp-client";
 
 type CrispQueue = { push: (args: unknown[]) => unknown };
-type CrispWindow = {
-  $crisp?: CrispQueue;
-  CRISP_READY_TRIGGER?: () => void;
-};
 
-function crispWindow(): CrispWindow | undefined {
+declare global {
+  interface Window {
+    $crisp?: CrispQueue;
+    CRISP_READY_TRIGGER?: () => void;
+  }
+}
+
+function crispWindow(): Window | undefined {
   if (typeof window === "undefined") return undefined;
-  return window as unknown as CrispWindow;
+  return window;
 }
 
 function getCrisp(): CrispQueue | undefined {
@@ -84,7 +87,8 @@ export function installCrispBubblePolicy(): () => void {
   // script preserves an existing queue (window.$crisp = window.$crisp || []),
   // so these pushes work whether Crisp is already live or not loaded yet.
   if (!w.$crisp) {
-    w.$crisp = [] as unknown as CrispQueue;
+    const pending: unknown[][] = [];
+    w.$crisp = pending;
   }
   const queue = w.$crisp;
 

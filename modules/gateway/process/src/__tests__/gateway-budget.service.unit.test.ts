@@ -1,15 +1,15 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { type LedgerEventRow } from "../app/gateway.members.ts";
+import { type GatewayBudgetSpend, type LedgerEventRow } from "../app/gateway.members.ts";
 import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
-import type { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 function mockChRepoWithEvents(
   events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],
-): GatewayBudgetClickHouseRepository {
+): GatewayBudgetSpend {
   const fullEvents: LedgerEventRow[] = events.map((e) => ({
     id: e.id,
     budgetId: e.budgetId ?? "b_01",
@@ -23,10 +23,10 @@ function mockChRepoWithEvents(
     status: e.status ?? "SUCCESS",
     occurredAt: e.occurredAt ?? nowInstant(),
   }));
-  return {
+  return createApiFixture<GatewayBudgetSpend>({
     recentEventsForBudget: async () => fullEvents,
     getSpendForBudgetsAcrossTenants: async () => [],
-  } as unknown as GatewayBudgetClickHouseRepository;
+  });
 }
 
 function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
@@ -74,7 +74,7 @@ function mockPrismaWithBudgets(budgets: GatewayBudget[]): PrismaClient {
  * Composed the way `PrismaGatewayAdapter` composes it — see
  * dev/docs/best_practices/service-repository-adapter-port.md.
  */
-function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetClickHouseRepository) {
+function serviceOver(prisma: PrismaClient, spend?: GatewayBudgetSpend) {
   return PrismaGatewayAdapter.create({
     database: prisma,
     projects: {
@@ -209,17 +209,17 @@ describe("GatewayService.check", () => {
         limitUsd: new Prisma.Decimal("100.00"),
         spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
       });
-      const chRepoStub = {
+      const chRepoStub = createApiFixture<GatewayBudgetSpend>({
         getSpendForBudgetsAcrossTenants: async () => [
-          // Both units, as a real read returns them. The cast below means the
-          // compiler would not notice this drifting from the shape.
           {
             budgetId: "b_ch_sourced",
+            scope: "PROJECT",
+            scopeId: "project_01",
             spentNanoUsd: 95_000_000_000,
             spentUsd: "95",
           },
         ],
-      } as unknown as GatewayBudgetClickHouseRepository;
+      });
 
       const sut = serviceOver(mockPrismaWithBudgets([budget]), chRepoStub);
 

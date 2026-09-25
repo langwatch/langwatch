@@ -4,14 +4,14 @@
  * comparator is invisible on screen and wrong exactly where it matters.
  */
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { nanoUsdToDecimalString, usdToNanoUsd } from "@langwatch/gateway-contract";
 import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { type BucketSpend } from "../app/gateway.members.ts";
+import { type BucketSpend, type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
-import type { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -72,7 +72,7 @@ function mockPrisma(budgets: GatewayBudget[], boundaries: unknown[] = []) {
  * Composed the way `PrismaGatewayAdapter` composes it — see
  * dev/docs/best_practices/service-repository-adapter-port.md.
  */
-function serviceOver(prisma: PrismaClient, spend: GatewayBudgetClickHouseRepository) {
+function serviceOver(prisma: PrismaClient, spend: GatewayBudgetSpend) {
   return PrismaGatewayAdapter.create({
     database: prisma,
     projects: {
@@ -89,10 +89,10 @@ function serviceOver(prisma: PrismaClient, spend: GatewayBudgetClickHouseReposit
 
 function mockChRepo(args: {
   breakdown?: BucketSpend[];
-  breakdownSpy?: ReturnType<typeof vi.fn>;
+  breakdownSpy?: GatewayBudgetSpend["getBucketSpendBreakdownForBudget"];
   throwOnBreakdown?: boolean;
-}): GatewayBudgetClickHouseRepository {
-  return {
+}): GatewayBudgetSpend {
+  return createApiFixture<GatewayBudgetSpend>({
     getSpendForBudgetsAcrossTenants: async () => [],
     getBucketSpendBreakdownForBudget:
       args.breakdownSpy ??
@@ -100,7 +100,7 @@ function mockChRepo(args: {
         if (args.throwOnBreakdown) throw new Error("clickhouse unavailable");
         return args.breakdown ?? [];
       }),
-  } as unknown as GatewayBudgetClickHouseRepository;
+  });
 }
 
 describe("GatewayService per-person standing", () => {
