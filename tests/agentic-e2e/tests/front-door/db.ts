@@ -1,14 +1,11 @@
 /**
  * Direct Postgres access for the front-door e2e suite.
  *
- * CONFIRMATION AND RESET LINKS ARE EMAILED, AND CI HAS NO MAIL PROVIDER
- * (`e2e-ci.yml` sets no SendGrid/SES key, so `HAS_EMAIL_PROVIDER_KEY` is
- * false and `/auth/forgot-password` renders the "cannot send email" card
- * instead of its form). Sign-up's own `requestSignUpVerification` still
- * writes its single-use token row before it ever tries to send mail
- * (`SignUpVerificationService.issueLink` writes the row, then calls the
- * mailer), so reading the token straight out of Postgres reproduces exactly
- * what a person would do by clicking the email, without needing an inbox.
+ * CI HAS NO MAIL PROVIDER (`e2e-ci.yml` sets none), so `/auth/forgot-password`
+ * renders the "cannot send email" card and sign-up answers with an
+ * unconfirmed address proof instead of mailing a link. The token read below
+ * applies only to an installation that sends email; `confirmAddressOf` stands
+ * in for the link where a test needs a confirmed address.
  *
  * The sign-up token lives in `VerificationToken`, under the identifier
  * `identity-signup-verification:{"email":"...","passwordHash":...}` with the
