@@ -61,6 +61,21 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
   return { personalWorkspaceApi: api, api };
 });
 
+vi.mock("../../../../features/two-step-verification/behavior/two-step-verification-api.ts", () => ({
+  twoStepVerificationApi: {
+    useUtils: () => ({ twoStepVerification: { account: { invalidate: vi.fn() } } }),
+    twoStepVerification: {
+      account: {
+        useQuery: () => ({
+          data: { offered: true, enabled: false, holdsPasskey: false, requiringOrganizations: [] },
+          isPending: false,
+        }),
+      },
+      disable: { useMutation: () => ({ isPending: false, mutate: vi.fn() }) },
+    },
+  },
+}));
+
 beforeEach(() => {
   state.linkedAccounts = [{ id: "acc-1", provider: "auth0", providerAccountId: "auth0|user-123" }];
   state.hasPassword = true;

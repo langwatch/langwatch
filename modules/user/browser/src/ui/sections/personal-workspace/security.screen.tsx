@@ -6,12 +6,12 @@
 
 import { Heading, Text, VStack } from "@chakra-ui/react";
 
+import { TwoStepVerificationSection } from "../../../features/two-step-verification/ui/sections/two-step-verification-section.tsx";
 import { usePersonalWorkspaceHost } from "../../../model/personal-workspace-host.ts";
 import { EmailAndLinkedAccountsSection } from "../email-and-linked-accounts-section.tsx";
 import { EnterpriseCapabilitiesSection } from "../enterprise-capabilities-section.tsx";
 import { PasskeysSection } from "../passkeys-section.tsx";
 import { PasswordSection } from "../password-section.tsx";
-import { TwoFactorSection } from "../two-factor-section.tsx";
 
 export default function SecurityScreen() {
   const host = usePersonalWorkspaceHost();
@@ -32,7 +32,7 @@ export default function SecurityScreen() {
           they stopped using makes the opposite one. */}
       <PasskeysSection />
 
-      <TwoFactorSection />
+      <TwoStepVerificationSection />
 
       <PasswordSection />
 

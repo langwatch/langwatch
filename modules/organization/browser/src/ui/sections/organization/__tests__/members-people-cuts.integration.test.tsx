@@ -87,6 +87,10 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
   }),
 }));
 
+vi.mock("../../../../behavior/use-two-step-requirement.ts", () => ({
+  useTwoStepRequirement: () => ({ show: false, mfaRequired: false, byUser: new Map() }),
+}));
+
 vi.mock("../../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: { HAS_EMAIL_PROVIDER_KEY: true } }),
 }));

@@ -22,7 +22,7 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 
 import type { RouterOutputs } from "../../../behavior/organization-api.ts";
 import { api } from "../../../behavior/organization-api.ts";
@@ -36,6 +36,7 @@ import { useMemberDisableAction } from "../../../behavior/use-member-disable-act
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePublicEnv } from "../../../behavior/use-public-env.ts";
 import { useRequiredSession } from "../../../behavior/use-required-session.ts";
+import { useTwoStepRequirement } from "../../../behavior/use-two-step-requirement.ts";
 import {
   useOrganizationHost,
   type OrganizationTeamReading,
@@ -55,6 +56,7 @@ import { CopyInput } from "../../../ui/elements/copy-input.tsx";
 import { ProvenanceChip } from "../../../ui/elements/member-provenance.tsx";
 import { OverflownTextWithTooltip } from "../../../ui/elements/overflown-text.tsx";
 import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
+import { SecondFactorCell } from "../../../ui/elements/second-factor-cell.tsx";
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
 import { InvitesTable } from "../../../ui/sections/invites-table.tsx";
 import { MemberDetailDialog } from "../../../ui/sections/member-detail-dialog.tsx";
@@ -127,6 +129,10 @@ function MembersList({
   );
   const department = useDepartmentColumn(organization.id, governanceEnabled);
   const showDepartment = department.show && hasOrganizationManagePermission;
+  const twoStep = useTwoStepRequirement({
+    organizationId: organization.id,
+    canManage: hasOrganizationManagePermission,
+  });
 
   const queryClient = api.useUtils();
 
@@ -251,20 +257,7 @@ function MembersList({
     { enabled: !!organization.id && hasOrganizationManagePermission },
   );
 
-  const bindingsByUser = useMemo(() => {
-    const map = new Map<string, Binding[]>();
-    for (const b of allBindings ?? []) {
-      if (b.userId) {
-        if (!map.has(b.userId)) map.set(b.userId, []);
-        map.get(b.userId)!.push(b);
-      }
-      for (const uid of b.memberUserIds) {
-        if (!map.has(uid)) map.set(uid, []);
-        map.get(uid)!.push(b);
-      }
-    }
-    return map;
-  }, [allBindings]);
+  const bindingsByUser = useMemo(() => bindingsByUserOf(allBindings ?? []), [allBindings]);
 
   const sortedMembers = useMemo(
     () =>
@@ -355,99 +348,30 @@ function MembersList({
                       <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                     )}
                     {showDepartment && <Table.ColumnHeader>Department</Table.ColumnHeader>}
+                    {twoStep.show && <Table.ColumnHeader>Two-step verification</Table.ColumnHeader>}
                     <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {sortedMembers.map((member) => {
-                    return (
-                      <Table.Row key={member.userId}>
-                        <Table.Cell>
-                          <RandomColorAvatar
-                            size="2xs"
-                            name={member.user.name ?? ""}
-                            image={member.user.image}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <HStack>
-                            <Button
-                              variant="plain"
-                              size="sm"
-                              padding={0}
-                              height="auto"
-                              fontWeight="normal"
-                              color="colorPalette.fg"
-                              colorPalette="blue"
-                              onClick={() => {
-                                setSelectedMember({
-                                  userId: member.userId,
-                                  role: member.role,
-                                  user: {
-                                    name: member.user.name ?? null,
-                                    email: member.user.email ?? null,
-                                  },
-                                });
-                              }}
-                            >
-                              {member.user.name}
-                            </Button>
-                            {member.role === "EXTERNAL" && (
-                              <Badge colorPalette="gray" size="sm">
-                                Lite Member
-                              </Badge>
-                            )}
-                            {member.user.deactivatedAt && (
-                              <Badge colorPalette="red" size="sm">
-                                Deactivated
-                              </Badge>
-                            )}
-                            {member.disabledAt && (
-                              <Badge colorPalette="orange" size="sm">
-                                Disabled
-                              </Badge>
-                            )}
-                            <ProvenanceChip provenance={provenance.data?.[member.userId]} />
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell maxWidth="280px">
-                          <OverflownTextWithTooltip>{member.user.email}</OverflownTextWithTooltip>
-                        </Table.Cell>
-                        {hasOrganizationManagePermission && (
-                          <Table.Cell>
-                            <MemberAccessDisplay
-                              bindings={bindingsByUser.get(member.userId) ?? []}
-                              isLoading={isBindingsLoading || isBindingsError}
-                            />
-                          </Table.Cell>
-                        )}
-                        {showDepartment && (
-                          <Table.Cell>
-                            <DepartmentPicker
-                              organizationId={organization.id}
-                              kind="user"
-                              entityId={member.userId}
-                              value={department.byUser.get(member.userId) ?? null}
-                              departments={department.departments}
-                              onAssigned={department.refetch}
-                            />
-                          </Table.Cell>
-                        )}
-                        <Table.Cell>
-                          <Box width="full" height="full" display="flex" justifyContent="end">
-                            <MemberRowActions
-                              member={member}
-                              canDisable={canDisableMember(member.userId)}
-                              canDelete={canDeleteMember(member.userId)}
-                              onEdit={setSelectedMember}
-                              onSetDisabled={setMemberDisabled}
-                              onDelete={deleteMember}
-                            />
-                          </Box>
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
+                  {sortedMembers.map((member) => (
+                    <MemberRow
+                      key={member.userId}
+                      member={member}
+                      organizationId={organization.id}
+                      provenance={provenance.data?.[member.userId]}
+                      showAccess={hasOrganizationManagePermission}
+                      bindings={bindingsByUser.get(member.userId) ?? []}
+                      bindingsLoading={isBindingsLoading || isBindingsError}
+                      showDepartment={showDepartment}
+                      department={department}
+                      twoStep={twoStep}
+                      canDisable={canDisableMember(member.userId)}
+                      canDelete={canDeleteMember(member.userId)}
+                      onSelect={setSelectedMember}
+                      onSetDisabled={setMemberDisabled}
+                      onDelete={deleteMember}
+                    />
+                  ))}
                 </Table.Body>
               </Table.Root>
             </Card.Body>
@@ -532,6 +456,140 @@ function MembersList({
  * within its licensed seats; delete removes the membership outright. See
  * seat-reconciliation.feature.
  */
+function bindingsByUserOf(bindings: readonly Binding[]): Map<string, Binding[]> {
+  const map = new Map<string, Binding[]>();
+  const add = (userId: string, binding: Binding) =>
+    map.set(userId, [...(map.get(userId) ?? []), binding]);
+  for (const binding of bindings) {
+    if (binding.userId) add(binding.userId, binding);
+    for (const userId of binding.memberUserIds) add(userId, binding);
+  }
+  return map;
+}
+
+type Member = OrganizationWithMembersAndTheirTeams["members"][number];
+
+function MemberRow({
+  member,
+  organizationId,
+  provenance,
+  showAccess,
+  bindings,
+  bindingsLoading,
+  showDepartment,
+  department,
+  twoStep,
+  canDisable,
+  canDelete,
+  onSelect,
+  onSetDisabled,
+  onDelete,
+}: {
+  member: Member;
+  organizationId: string;
+  provenance: ComponentProps<typeof ProvenanceChip>["provenance"];
+  showAccess: boolean;
+  bindings: Binding[];
+  bindingsLoading: boolean;
+  showDepartment: boolean;
+  department: ReturnType<typeof useDepartmentColumn>;
+  twoStep: ReturnType<typeof useTwoStepRequirement>;
+  canDisable: boolean;
+  canDelete: boolean;
+  onSelect: ComponentProps<typeof MemberRowActions>["onEdit"];
+  onSetDisabled: ComponentProps<typeof MemberRowActions>["onSetDisabled"];
+  onDelete: ComponentProps<typeof MemberRowActions>["onDelete"];
+}) {
+  return (
+    <Table.Row key={member.userId}>
+      <Table.Cell>
+        <RandomColorAvatar size="2xs" name={member.user.name ?? ""} image={member.user.image} />
+      </Table.Cell>
+      <Table.Cell>
+        <HStack>
+          <Button
+            variant="plain"
+            size="sm"
+            padding={0}
+            height="auto"
+            fontWeight="normal"
+            color="colorPalette.fg"
+            colorPalette="blue"
+            onClick={() => {
+              onSelect({
+                userId: member.userId,
+                role: member.role,
+                user: {
+                  name: member.user.name ?? null,
+                  email: member.user.email ?? null,
+                },
+              });
+            }}
+          >
+            {member.user.name}
+          </Button>
+          {member.role === "EXTERNAL" && (
+            <Badge colorPalette="gray" size="sm">
+              Lite Member
+            </Badge>
+          )}
+          {member.user.deactivatedAt && (
+            <Badge colorPalette="red" size="sm">
+              Deactivated
+            </Badge>
+          )}
+          {member.disabledAt && (
+            <Badge colorPalette="orange" size="sm">
+              Disabled
+            </Badge>
+          )}
+          <ProvenanceChip provenance={provenance} />
+        </HStack>
+      </Table.Cell>
+      <Table.Cell maxWidth="280px">
+        <OverflownTextWithTooltip>{member.user.email}</OverflownTextWithTooltip>
+      </Table.Cell>
+      {showAccess && (
+        <Table.Cell>
+          <MemberAccessDisplay bindings={bindings} isLoading={bindingsLoading} />
+        </Table.Cell>
+      )}
+      {showDepartment && (
+        <Table.Cell>
+          <DepartmentPicker
+            organizationId={organizationId}
+            kind="user"
+            entityId={member.userId}
+            value={department.byUser.get(member.userId) ?? null}
+            departments={department.departments}
+            onAssigned={department.refetch}
+          />
+        </Table.Cell>
+      )}
+      {twoStep.show && (
+        <Table.Cell>
+          <SecondFactorCell
+            member={twoStep.byUser.get(member.userId)}
+            mfaRequired={twoStep.mfaRequired}
+          />
+        </Table.Cell>
+      )}
+      <Table.Cell>
+        <Box width="full" height="full" display="flex" justifyContent="end">
+          <MemberRowActions
+            member={member}
+            canDisable={canDisable}
+            canDelete={canDelete}
+            onEdit={onSelect}
+            onSetDisabled={onSetDisabled}
+            onDelete={onDelete}
+          />
+        </Box>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
 function MemberRowActions({
   member,
   canDisable,

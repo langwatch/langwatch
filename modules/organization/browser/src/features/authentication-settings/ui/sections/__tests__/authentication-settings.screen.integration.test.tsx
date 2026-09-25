@@ -23,6 +23,22 @@ vi.mock("../../../../../behavior/use-join-requests.ts", () => ({
   }),
 }));
 
+vi.mock("../../../../../behavior/use-two-step-requirement.ts", () => ({
+  useTwoStepRequirement: () => ({
+    show: true,
+    mfaRequired: false,
+    connection: { connected: false, assertedFactors: [], assertsSecondFactor: false },
+    members: [],
+    byUser: new Map(),
+    heldCount: 0,
+    canTurnOn: true,
+    planLocked: false,
+    planLink: { href: "/settings/subscription", label: "See plans" },
+    saving: false,
+    setRequirement: vi.fn(),
+  }),
+}));
+
 vi.mock("../../../behavior/use-sign-in-security.ts", () => ({
   useSignInSecurity: () => ({
     show: true,
@@ -72,6 +88,7 @@ describe("given an administrator on the Authentication page", () => {
 
       expect(screen.getByTestId("organization-policy")).toBeInTheDocument();
       expect(screen.getByTestId("domain-join-card")).toBeInTheDocument();
+      expect(screen.getByTestId("two-step-requirement-card")).toBeInTheDocument();
       expect(
         screen.getByText(/also apply when your organization uses password sign-in/),
       ).toBeInTheDocument();
