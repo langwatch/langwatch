@@ -68,6 +68,16 @@ export type ListSsoConnectionsInput = z.infer<typeof listSsoConnectionsInputSche
 export const ssoConnectionByIdSchema = z.object({ connectionId: z.string().min(1) });
 export type SsoConnectionByIdInput = z.infer<typeof ssoConnectionByIdSchema>;
 
+/** One page of a cutover's members, found by connection alone: the operator is cross-tenant. */
+export const operatorSsoMigrationProgressInputSchema = z.object({
+  ...ssoConnectionByIdSchema.shape,
+  cursor: z.string().nullable().default(null),
+  limit: z.number().int().min(1).max(100).default(50),
+});
+export type OperatorSsoMigrationProgressInput = z.infer<
+  typeof operatorSsoMigrationProgressInputSchema
+>;
+
 /**
  * The organization is routing, not reach: it says whose connection history the
  * command is appended to. Who may issue it is the staff list, and nothing else.

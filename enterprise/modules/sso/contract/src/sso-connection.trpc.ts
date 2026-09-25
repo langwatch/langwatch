@@ -8,11 +8,18 @@ import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
 import {
+  ssoConnectionHistoryEntrySchema,
+  ssoSetupMigrationSchema,
+  ssoSetupRegisteredSchema,
+  ssoSetupStartMigrationSchema,
+} from "./sso-setup.contract.ts";
+import {
   activateSsoConnectionInputSchema,
   attestSsoDomainInputSchema,
   backofficeSsoConnectionPageSchema,
   backofficeSsoConnectionSchema,
   listSsoConnectionsInputSchema,
+  operatorSsoMigrationProgressInputSchema,
   registerSsoConnectionInputSchema,
   rejectSsoDomainClaimInputSchema,
   ssoConnectionByIdSchema,
@@ -29,6 +36,20 @@ export const ssoConnectionTrpc = defineTrpcContract("ssoConnections")
   .query("getById")
   .withInput(ssoConnectionByIdSchema)
   .withOutput(backofficeSsoConnectionSchema.nullable())
+
+  /** The connection's history in the organization's own words; null for an unknown id. */
+  .query("getHistory")
+  .withInput(ssoConnectionByIdSchema)
+  .withOutput(ssoConnectionHistoryEntrySchema.array().nullable())
+
+  /** Null where the connection is missing or runs no cutover. */
+  .query("getMigrationProgress")
+  .withInput(operatorSsoMigrationProgressInputSchema)
+  .withOutput(ssoSetupMigrationSchema.nullable())
+
+  .mutation("startLegacyMigration")
+  .withInput(ssoSetupStartMigrationSchema)
+  .withOutput(ssoSetupRegisteredSchema)
 
   /**
    * Answers the ledger's own command result, which is the identity aggregate's

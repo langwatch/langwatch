@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Who reaches the back office's single sign-on surface, what it refuses by name,
@@ -5,14 +6,21 @@
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type {
+  SsoConnectionBackofficeApi,
+  SsoConnectionHistoryApi,
+  SsoSetupApi,
+} from "@langwatch/identity-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
+  createSsoTestIdentity,
   createSsoTestUsers,
   RecordingSsoConnectionLedger,
+  RecordingSsoSetupCommands,
   SSO_TEST_STAFF_EMAIL,
 } from "../../app/__tests__/sso.fixture.ts";
 import { ssoConnectionTrpcTransport } from "../sso-connection.trpc.ts";
@@ -67,9 +75,22 @@ function runtimePorts(): TrpcRuntimeMembers<TestContext> {
 async function harness() {
   const connections = RecordingSsoConnectionLedger.create();
   const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+  const getHistory = vi.fn<SsoConnectionHistoryApi["getHistory"]>(async () => [
+    { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+  ]);
+  const getMigrationProgress = vi.fn<SsoSetupApi["getMigrationProgress"]>(async () => ({
+    migration: null,
+  }));
+  const commands = RecordingSsoSetupCommands.create();
   const app = await createSsoTestApp({
     connections,
     dependencies: {
+      identity: createSsoTestIdentity({
+        connections,
+        history: createApiFixture<SsoConnectionHistoryApi>({ getHistory }),
+        setup: createApiFixture<SsoSetupApi>({ getMigrationProgress }),
+        commands,
+      }),
       users: createSsoTestUsers({
         [STAFF_ID]: SSO_TEST_STAFF_EMAIL,
         [CUSTOMER_ID]: "ana@acme.com",
@@ -87,11 +108,46 @@ async function harness() {
 
   const callerFor = (actor: TestContext["actor"]) => router.createCaller({ actor });
 
-  return { connections, record, router, callerFor };
+  return { connections, record, router, callerFor, getHistory, getMigrationProgress, commands };
 }
 
 const TARGET = { organizationId: "org_acme", connectionId: "ssoc_1" };
 const EVIDENCE = { evidenceRef: "ticket:SEC-123", note: "Signed contract names acme.com" };
+const IDP = {
+  protocol: "oidc",
+  issuer: "https://acme.okta.com",
+  clientId: "client",
+  clientSecret: "shhh",
+} as const;
+
+type BackofficeConnection = NonNullable<
+  Awaited<ReturnType<SsoConnectionBackofficeApi["findById"]>>
+>;
+
+function legacyConnection(organizationId: string): BackofficeConnection {
+  return {
+    connectionId: "ssoc_1",
+    organizationId,
+    organizationName: "Acme",
+    type: "oidc",
+    state: "ACTIVE",
+    claimedDomains: [],
+    approvedDomains: [],
+    verifiedDomains: ["acme.com"],
+    domainVerifications: [],
+    providerId: "okta",
+    issuer: null,
+    allowsJit: false,
+    arrivalPolicy: "refuse",
+    source: "legacy-grandfathered",
+    testLoginAccountId: null,
+    rejection: null,
+    pendingVerificationDomain: null,
+    pendingVerificationExpiresAtMs: null,
+    createdAtMs: 0,
+    updatedAtMs: 0,
+  };
+}
 
 describe("the back-office single sign-on surface", () => {
   let context: Awaited<ReturnType<typeof harness>>;
@@ -127,6 +183,15 @@ describe("the back-office single sign-on surface", () => {
       const attempts = [
         () => caller.getAll({ page: 0, pageSize: 25 }),
         () => caller.getById({ connectionId: "ssoc_1" }),
+        () => caller.getHistory({ connectionId: "ssoc_1" }),
+        () => caller.getMigrationProgress({ connectionId: "ssoc_1" }),
+        () =>
+          caller.startLegacyMigration({
+            organizationId: "org_acme",
+            legacyConnectionId: "ssoc_1",
+            providerId: "okta-direct",
+            idp: IDP,
+          }),
         () => caller.claimDomain({ ...TARGET, domain: "acme.com" }),
         () => caller.approveDomainClaim({ ...TARGET, domain: "acme.com" }),
         () => caller.attestDomain({ ...TARGET, ...EVIDENCE, domain: "acme.com" }),
@@ -144,6 +209,8 @@ describe("the back-office single sign-on surface", () => {
       expect(context.connections.claimDomain).not.toHaveBeenCalled();
       expect(context.connections.requestTeardown).not.toHaveBeenCalled();
       expect(context.connections.list).not.toHaveBeenCalled();
+      expect(context.connections.findById).not.toHaveBeenCalled();
+      expect(context.commands.startLegacyMigration).not.toHaveBeenCalled();
     });
   });
 
@@ -183,10 +250,13 @@ describe("the back-office single sign-on surface", () => {
         "claimDomain",
         "getAll",
         "getById",
+        "getHistory",
+        "getMigrationProgress",
         "register",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",
+        "startLegacyMigration",
         "suspend",
       ]);
     });
@@ -306,6 +376,89 @@ describe("the back-office single sign-on surface", () => {
       expect(context.connections.requestTeardown).toHaveBeenCalledWith(
         expect.objectContaining({ graceMs: 7 * 24 * 60 * 60 * 1000 }),
       );
+    });
+  });
+  describe("given an operator reading and moving a customer's connection", () => {
+    it("answers null history for a connection that does not exist", async () => {
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      await expect(caller.getHistory({ connectionId: "ssoc_missing" })).resolves.toBeNull();
+      expect(context.getHistory).not.toHaveBeenCalled();
+    });
+
+    it("reads the history under the connection's own organization and audits it", async () => {
+      context.connections.findById.mockResolvedValue(legacyConnection("org_acme"));
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      const history = await caller.getHistory({ connectionId: "ssoc_1" });
+
+      expect(history).toEqual([
+        { eventId: "evt_1", occurredAtMs: 1, summary: "Registered", carriedOver: false },
+      ]);
+      expect(context.getHistory).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        connectionId: "ssoc_1",
+      });
+      expect(context.record).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: STAFF_ID, action: "ssoConnections.getHistory" }),
+      );
+    });
+
+    it("pages a cutover with main's defaults, and answers null for a missing connection", async () => {
+      const caller = context.callerFor({ id: STAFF_ID });
+      await expect(
+        caller.getMigrationProgress({ connectionId: "ssoc_missing" }),
+      ).resolves.toBeNull();
+      expect(context.getMigrationProgress).not.toHaveBeenCalled();
+
+      context.connections.findById.mockResolvedValue(legacyConnection("org_acme"));
+      await caller.getMigrationProgress({ connectionId: "ssoc_1" });
+
+      expect(context.getMigrationProgress).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        connectionId: "ssoc_1",
+        cursor: null,
+        limit: 50,
+      });
+    });
+
+    it("registers the replacement with the operator as the actor", async () => {
+      context.connections.findById.mockResolvedValue(legacyConnection("org_acme"));
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_1",
+          providerId: "okta-direct",
+          idp: IDP,
+        }),
+      ).resolves.toEqual({ connectionId: "conn-replacement" });
+
+      expect(context.commands.startLegacyMigration).toHaveBeenCalledWith({
+        organizationId: "org_acme",
+        legacyConnectionId: "ssoc_1",
+        providerId: "okta-direct",
+        registration: IDP,
+        actor: { userId: STAFF_ID },
+      });
+      const audited = context.record.mock.calls[0]?.[0];
+      expect(audited?.args).not.toHaveProperty("idp");
+    });
+
+    it("refuses a legacy connection that belongs to another organization as not found", async () => {
+      context.connections.findById.mockResolvedValue(legacyConnection("org_other"));
+      const caller = context.callerFor({ id: STAFF_ID });
+
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: "org_acme",
+          legacyConnectionId: "ssoc_1",
+          providerId: "okta-direct",
+          idp: IDP,
+        }),
+      ).rejects.toMatchObject({ code: "NOT_FOUND" });
+      expect(context.commands.startLegacyMigration).not.toHaveBeenCalled();
     });
   });
 });

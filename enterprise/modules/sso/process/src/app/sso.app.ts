@@ -20,6 +20,7 @@ import {
   type BackofficeSsoConnection,
   type BackofficeSsoConnectionPage,
   type ListSsoConnectionsInput,
+  type OperatorSsoMigrationProgressInput,
   type RegisterSsoConnectionInput,
   type AttestSsoDomainInput,
   type RejectSsoDomainClaimInput,
@@ -68,7 +69,7 @@ import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
-import { IdentityApi } from "@langwatch/identity-contract";
+import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { signInProviderSecrets } from "@langwatch/secrets";
@@ -500,6 +501,82 @@ export class SsoApp implements SsoApiContract {
       args: { ...input },
       command: (operator) =>
         this.#connections.requestTeardown({ ...input, operator, graceMs: TEARDOWN_GRACE_MS }),
+    });
+  }
+
+  async findConnectionHistoryForOperator(
+    input: SsoConnectionByIdInput,
+    by: SsoOperator,
+  ): Promise<SsoConnectionHistoryEntry[] | undefined> {
+    return this.#audited({
+      by,
+      action: "getHistory",
+      args: { connectionId: input.connectionId },
+      command: async () => {
+        const connection = await this.#connections.findById(input);
+        if (!connection) return undefined;
+        return this.findConnectionHistory({
+          organizationId: connection.organizationId,
+          connectionId: connection.connectionId,
+        });
+      },
+    });
+  }
+
+  async getMigrationProgressForOperator(
+    input: OperatorSsoMigrationProgressInput,
+    by: SsoOperator,
+  ): Promise<{ migration: SsoSetupMigration | null }> {
+    return this.#audited({
+      by,
+      action: "getMigrationProgress",
+      args: { connectionId: input.connectionId },
+      command: async () => {
+        const connection = await this.#connections.findById({ connectionId: input.connectionId });
+        if (!connection) return { migration: null };
+        return this.#setup.getMigrationProgress({
+          organizationId: connection.organizationId,
+          connectionId: connection.connectionId,
+          cursor: input.cursor,
+          limit: input.limit,
+        });
+      },
+    });
+  }
+
+  /** Not plan-gated: the operator acts for the organization, as main's back office did. */
+  async startLegacyMigrationForOperator(
+    input: SsoSetupStartMigrationInput,
+    by: SsoOperator,
+  ): Promise<SsoSetupRegistered> {
+    return this.#audited({
+      by,
+      action: "startLegacyMigration",
+      args: {
+        organizationId: input.organizationId,
+        connectionId: input.legacyConnectionId,
+        providerId: input.providerId,
+        protocol: input.idp.protocol,
+      },
+      command: async (operator) => {
+        const connection = await this.#connections.findById({
+          connectionId: input.legacyConnectionId,
+        });
+        if (connection?.organizationId !== input.organizationId) {
+          throw new SsoConnectionNotFoundError(
+            `connection ${input.legacyConnectionId} is not in organization ${input.organizationId}`,
+          );
+        }
+        return this.#selfServe.startLegacyMigration(
+          {
+            organizationId: connection.organizationId,
+            legacyConnectionId: connection.connectionId,
+            providerId: input.providerId,
+            registration: input.idp,
+          },
+          operator,
+        );
+      },
     });
   }
 

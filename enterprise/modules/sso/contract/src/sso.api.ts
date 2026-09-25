@@ -35,6 +35,7 @@ import type {
   BackofficeSsoConnection,
   BackofficeSsoConnectionPage,
   ListSsoConnectionsInput,
+  OperatorSsoMigrationProgressInput,
   RegisterSsoConnectionInput,
   AttestSsoDomainInput,
   RejectSsoDomainClaimInput,
@@ -99,6 +100,21 @@ export interface SsoApi {
   suspendConnection(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
   resumeConnection(input: SsoConnectionTarget, by: SsoOperator): Promise<void>;
   requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
+  /** The administrator's history read, across tenants; `undefined` for an unknown id. */
+  findConnectionHistoryForOperator(
+    input: SsoConnectionByIdInput,
+    by: SsoOperator,
+  ): Promise<SsoConnectionHistoryEntry[] | undefined>;
+  /** One cutover's members, paged; no migration where the connection is missing. */
+  getMigrationProgressForOperator(
+    input: OperatorSsoMigrationProgressInput,
+    by: SsoOperator,
+  ): Promise<{ migration: SsoSetupMigration | null }>;
+  /** The replacement for a grandfathered connection, registered by an operator. */
+  startLegacyMigrationForOperator(
+    input: SsoSetupStartMigrationInput,
+    by: SsoOperator,
+  ): Promise<SsoSetupRegistered>;
 
   /**
    * What happened to one of the caller's own connections, newest first. The

@@ -53,6 +53,24 @@ export const ssoConnectionTrpcTransport = defineTrpcRouter(SsoApi, ssoConnection
     async ({ app, input, actor }) => (await app.findConnection(input, operatorOf(actor))) ?? null,
   )
 
+  .procedure("getHistory")
+  .noPermission({ reason: STAFF_LIST_REASON })
+  .handle(
+    async ({ app, input, actor }) =>
+      (await app.findConnectionHistoryForOperator(input, operatorOf(actor))) ?? null,
+  )
+
+  .procedure("getMigrationProgress")
+  .noPermission({ reason: STAFF_LIST_REASON })
+  .handle(
+    async ({ app, input, actor }) =>
+      (await app.getMigrationProgressForOperator(input, operatorOf(actor))).migration,
+  )
+
+  .procedure("startLegacyMigration")
+  .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
+  .handle(({ app, input, actor }) => app.startLegacyMigrationForOperator(input, operatorOf(actor)))
+
   .procedure("register")
   .noPermission({ reason: STAFF_LIST_REASON, allow: ORGANIZATION_IS_ROUTING })
   .handle(({ app, input, actor }) => app.registerConnection(input, operatorOf(actor)))
