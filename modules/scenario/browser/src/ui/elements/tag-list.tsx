@@ -3,7 +3,7 @@
  */
 
 import { Button, HStack, Input } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { TagPill, type TagPillTone } from "./tag-pill.tsx";
 
@@ -19,6 +19,11 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const submittedRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isAdding) inputRef.current?.focus();
+  }, [isAdding]);
 
   if (labels.length === 0 && !onAdd) {
     return null;
@@ -85,6 +90,7 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
+          ref={inputRef}
           width="100px"
           borderRadius="full"
         />

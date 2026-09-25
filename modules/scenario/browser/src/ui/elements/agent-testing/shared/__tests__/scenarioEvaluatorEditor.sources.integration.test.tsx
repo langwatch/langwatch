@@ -7,22 +7,17 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
-  store: vi.fn(() => ({})),
-  initialState: {},
-  useWorkflowStore: vi.fn(() => ({})),
-}));
-
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "p1" } }),
 }));
-vi.mock("~/hooks/useProjectSpanNames", () => ({
+vi.mock("@langwatch/trace-browser/surfaces/project-span-names", () => ({
   useProjectSpanNames: () => ({ spanNames: [], metadataKeys: [] }),
 }));
 
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
-vi.mock("~/hooks/useDrawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   useDrawer: () => ({ openDrawer: mockOpenDrawer }),
   setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
     flowCallbacksStore[drawer] = callbacks;

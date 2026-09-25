@@ -21,7 +21,7 @@ const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockToast = vi.hoisted(() => vi.fn());
 
-vi.mock("~/utils/compat/next-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     asPath: "/test-project/agent-testing",
@@ -30,11 +30,11 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useDrawer", () => ({
+vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: mockOpenDrawer }),
 }));
 
-vi.mock("~/components/ui/toaster", () => ({
+vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: mockToast },
 }));
 

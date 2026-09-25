@@ -103,7 +103,7 @@ describe("ScenarioTable", () => {
       </ChakraProvider>,
     );
 
-    expect(screen.getByText("formatted:2026-08-25T12:00:00.000Z")).toBeInTheDocument();
+    expect(screen.getByText("formatted:2026-08-25T12:00:00Z")).toBeInTheDocument();
     expect(screen.getByText("support")).toBeInTheDocument();
     expect(renderRow).toHaveBeenCalledWith(
       expect.objectContaining({ id: "scenario-1" }),

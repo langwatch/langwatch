@@ -206,7 +206,7 @@ function versionEntry(overrides: Record<string, unknown> = {}) {
     authorName: "Lena Fischer",
     changeDescription: null,
     changedFields: ["name", "criteria"],
-    createdAt: new Date("2026-08-20T10:00:00.000Z"),
+    createdAt: "2026-08-20T10:00:00.000Z",
     isSynthesized: false,
     ...overrides,
   };

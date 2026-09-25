@@ -18,11 +18,12 @@ vi.mock("../caller-voice-model-select", () => ({
 // The group is flag-gated (release_voice_agents_enabled). Default on, so its
 // own behavior tests are unaffected by the gate.
 let mockVoiceAgentsEnabled = true;
-vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+vi.mock("../../../../behavior/use-voice-agents-enabled.ts", () => ({
   useVoiceAgentsEnabled: () => mockVoiceAgentsEnabled,
 }));
 
 import { ScenarioForm } from "../../../elements/scenario-form.tsx";
+import { CallerVoiceGroup } from "../caller-voice-group.tsx";
 
 afterEach(() => {
   cleanup();
@@ -35,6 +36,7 @@ function renderForm() {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ScenarioForm
+        callerVoiceGroup={(control) => <CallerVoiceGroup control={control} />}
         defaultValues={{
           name: "Angry cancellation",
           callerVoice: {

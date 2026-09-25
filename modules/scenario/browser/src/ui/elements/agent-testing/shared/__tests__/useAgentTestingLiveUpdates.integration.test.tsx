@@ -16,20 +16,20 @@ const invalidations = vi.hoisted(() => ({
   resultAtoms: vi.fn(),
 }));
 
-vi.mock("~/hooks/useSimulationUpdateListener", () => ({
+vi.mock("../../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: (options: { refetch: () => void; enabled: boolean }) => {
     listenerOptions.refetch = options.refetch;
     listenerOptions.enabled = options.enabled;
     return { isConnected: true };
   },
 }));
-vi.mock("~/hooks/useScenarioTabFollow", () => ({
+vi.mock("../../../../../behavior/use-scenario-tab-follow.ts", () => ({
   useScenarioTabFollow: () => ({ tabKey: "tab", tabId: "tab_1" }),
 }));
-vi.mock("~/utils/compat/next-router", () => ({
+vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       suites: { getSummaries: { invalidate: invalidations.suiteSummaries } },

@@ -32,7 +32,7 @@ import {
 import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import { History, Lock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { type FieldErrors, useFormState, useWatch } from "react-hook-form";
+import { type Control, type FieldErrors, useFormState, useWatch } from "react-hook-form";
 
 import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
 import { api } from "../../../behavior/scenario-api.ts";
@@ -51,6 +51,7 @@ import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-ma
 import { TagList } from "../../elements/tag-list.tsx";
 import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";
+import { CallerVoiceGroup } from "./caller-voice-group.tsx";
 import { SaveAndRunMenu } from "./save-and-run-menu.tsx";
 import { ScenarioEditorSidebar } from "./scenario-editor-sidebar.tsx";
 import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
@@ -654,6 +655,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                       key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       onControllerChange={setFormController}
+                      callerVoiceGroup={renderCallerVoiceGroup}
                     />
                   )}
                 </>
@@ -780,6 +782,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   );
 }
 
+function renderCallerVoiceGroup(control: Control<ScenarioFormData>) {
+  return <CallerVoiceGroup control={control} />;
+}
+
 /**
  * The form with the test suite field filled from the project.
  */
@@ -809,6 +815,7 @@ function ScenarioFormWithSuites({
       defaultValues={defaultValues}
       onControllerChange={onControllerChange}
       testSuiteOptions={testSuiteOptions}
+      callerVoiceGroup={renderCallerVoiceGroup}
     />
   );
 }

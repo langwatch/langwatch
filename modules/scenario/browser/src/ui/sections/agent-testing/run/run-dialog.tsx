@@ -12,6 +12,7 @@ import { OpenListContext } from "../../../elements/agent-testing/shared/open-lis
 import { RunDialogFields } from "./run-dialog-fields.tsx";
 import { RunDialogFooter } from "./run-dialog-footer.tsx";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types.ts";
+import { RUN_MISSING_MAPPINGS_TOOLTIP } from "./run-evaluators.ts";
 import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form.ts";
 import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit.ts";
 
@@ -160,6 +161,9 @@ function useRunDialogState({
   // An evaluator whose required input reads nothing holds the run: Run opens
   // its editor instead, so the fix is one click away and nothing is queued
   // that the server would refuse.
+  const offender = form.offender;
+  const onRun = offender ? form.openOffender : () => void controller.run();
+
   return {
     isNameListOpen,
     setIsNameListOpen,
@@ -167,6 +171,8 @@ function useRunDialogState({
     reportOpenList,
     form,
     controller,
+    offender,
+    onRun,
   };
 }
 
@@ -179,6 +185,8 @@ function RunDialogContent({
   reportOpenList,
   form,
   controller,
+  offender,
+  onRun,
 }: {
   subject: RunDialogSubject;
   onClose: () => void;
@@ -215,6 +223,8 @@ function RunDialogContent({
           controller={controller}
           isRunBlocked={isRunBlocked({ form, controller })}
           blockedReason={runBlockedReason({ subject, form, controller })}
+          warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
+          onRun={onRun}
           caseCount={form.caseCount}
           targetCount={form.runTargets.length}
           onClose={onClose}

@@ -42,6 +42,7 @@ import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
+import { EFFECT_LABELS } from "../../scenarios/caller-voice-group.tsx";
 import { CallerVoiceModelSelect } from "../../scenarios/caller-voice-model-select.tsx";
 import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
 import { ParameterLineField } from "../run/parameter-line-field.tsx";
@@ -63,13 +64,6 @@ const SITUATION_HEIGHT = { min: "52px", max: "156px" } as const;
 
 /** The same pair for the criteria, which opens two lines taller. */
 const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
-
-/** What each caller voice effect reads as in the picker. */
-const EFFECT_LABELS: Record<CallerVoiceConfig["effects"], string> = {
-  none: "None",
-  phone_line: "Phone line",
-  background_noise: "Background noise",
-};
 
 /** Narrows a native select's raw string to a declared caller voice effect. */
 function isCallerVoiceEffect(value: string): value is CallerVoiceConfig["effects"] {
@@ -693,7 +687,12 @@ function CallerVoiceBlock({
 function CustomizeBlocks({ editor }: { editor: CaseEditorState }) {
   const { draft, setDraft, customize } = editor;
 
-  if (!customize.showParameters && !customize.showTurns && !customize.showModels) {
+  if (
+    !customize.showParameters &&
+    !customize.showTurns &&
+    !customize.showModels &&
+    !customize.showCallerVoice
+  ) {
     return null;
   }
 

@@ -15,7 +15,7 @@ import {
   scenarioParameterDefinitionsSchema,
 } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   type Control,
   Controller,
@@ -72,6 +72,8 @@ type ScenarioFormProps = {
    * is what every surface outside Agent Testing does.
    */
   testSuiteOptions?: ScenarioTestSuiteOption[];
+  /** The Caller voice group nested under Customize scenario, supplied by the section. */
+  callerVoiceGroup?: (control: Control<ScenarioFormData>) => ReactNode;
 };
 
 /** Narrow composition port for the app-owned drawer, transport and AI actions. */
@@ -94,6 +96,7 @@ export function ScenarioForm({
   defaultValues,
   onControllerChange,
   testSuiteOptions,
+  callerVoiceGroup,
 }: ScenarioFormProps) {
   const form = useForm<ScenarioFormData>({
     defaultValues: {
@@ -204,7 +207,12 @@ export function ScenarioForm({
         />
       </VStack>
 
-      <AdvancedSection register={register} errors={errors} control={control} />
+      <CustomizeSection
+        register={register}
+        errors={errors}
+        control={control}
+        callerVoiceGroup={callerVoiceGroup}
+      />
     </VStack>
   );
 }
@@ -250,13 +258,16 @@ function useResetOnDefaultsChange({
   }, [defaultValues, reset]);
 }
 
-function AdvancedSection({
+function CustomizeSection({
   register,
   errors,
+  control,
+  callerVoiceGroup,
 }: {
   register: UseFormRegister<ScenarioFormData>;
   errors: FieldErrors<ScenarioFormData>;
   control: Control<ScenarioFormData>;
+  callerVoiceGroup?: (control: Control<ScenarioFormData>) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ChevronIcon = open ? ChevronDown : ChevronRight;
@@ -266,7 +277,7 @@ function AdvancedSection({
       <Collapsible.Trigger asChild>
         <HStack cursor="pointer" userSelect="none" _hover={{ color: "fg.emphasized" }}>
           <ChevronIcon size={14} />
-          <ScenarioSectionHeader>Advanced</ScenarioSectionHeader>
+          <ScenarioSectionHeader>Customize scenario</ScenarioSectionHeader>
         </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
@@ -303,6 +314,7 @@ function AdvancedSection({
             Max Turns caps the conversation length. Min Turns prevents the judge from ending the
             test early.
           </Text>
+          {callerVoiceGroup?.(control)}
         </VStack>
       </Collapsible.Content>
     </Collapsible.Root>
