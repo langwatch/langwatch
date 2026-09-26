@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -17,6 +18,7 @@ class RegisterLangyControlSessionBodyWorkspace:
         root (str):
         name (str):
         os (str):
+        git_repository (bool | Unset):
         git_branch (str | Unset):
         git_remote (str | Unset):
         git_dirty (bool | Unset):
@@ -29,6 +31,7 @@ class RegisterLangyControlSessionBodyWorkspace:
     root: str
     name: str
     os: str
+    git_repository: bool | Unset = UNSET
     git_branch: str | Unset = UNSET
     git_remote: str | Unset = UNSET
     git_dirty: bool | Unset = UNSET
@@ -36,6 +39,7 @@ class RegisterLangyControlSessionBodyWorkspace:
     python_version: str | Unset = UNSET
     gh_authenticated: bool | Unset = UNSET
     package_manager: str | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         root = self.root
@@ -43,6 +47,8 @@ class RegisterLangyControlSessionBodyWorkspace:
         name = self.name
 
         os = self.os
+
+        git_repository = self.git_repository
 
         git_branch = self.git_branch
 
@@ -59,7 +65,7 @@ class RegisterLangyControlSessionBodyWorkspace:
         package_manager = self.package_manager
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "root": root,
@@ -67,6 +73,8 @@ class RegisterLangyControlSessionBodyWorkspace:
                 "os": os,
             }
         )
+        if git_repository is not UNSET:
+            field_dict["gitRepository"] = git_repository
         if git_branch is not UNSET:
             field_dict["gitBranch"] = git_branch
         if git_remote is not UNSET:
@@ -93,6 +101,8 @@ class RegisterLangyControlSessionBodyWorkspace:
 
         os = d.pop("os")
 
+        git_repository = d.pop("gitRepository", UNSET)
+
         git_branch = d.pop("gitBranch", UNSET)
 
         git_remote = d.pop("gitRemote", UNSET)
@@ -111,6 +121,7 @@ class RegisterLangyControlSessionBodyWorkspace:
             root=root,
             name=name,
             os=os,
+            git_repository=git_repository,
             git_branch=git_branch,
             git_remote=git_remote,
             git_dirty=git_dirty,
@@ -120,4 +131,21 @@ class RegisterLangyControlSessionBodyWorkspace:
             package_manager=package_manager,
         )
 
+        register_langy_control_session_body_workspace.additional_properties = d
         return register_langy_control_session_body_workspace
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

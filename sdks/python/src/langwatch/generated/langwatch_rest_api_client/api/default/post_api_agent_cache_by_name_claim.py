@@ -109,12 +109,9 @@ def sync_detailed(
     | PostApiAgentCacheByNameClaimResponse403
     | PostApiAgentCacheByNameClaimResponse500
 ]:
-    """Store a value under a name only if the project does not hold that name yet. The answer says whether
-    this caller is the one that took it: `claimed` is true when the value was written, and false when
-    the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a
-    refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run
-    uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is
-    encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.
+    """Claim an agent cache entry
+
+     Store the value only while the name is free. The claimed field reports whether this caller took it.
 
     Args:
         name (str):
@@ -153,12 +150,9 @@ def sync(
     | PostApiAgentCacheByNameClaimResponse500
     | None
 ):
-    """Store a value under a name only if the project does not hold that name yet. The answer says whether
-    this caller is the one that took it: `claimed` is true when the value was written, and false when
-    the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a
-    refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run
-    uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is
-    encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.
+    """Claim an agent cache entry
+
+     Store the value only while the name is free. The claimed field reports whether this caller took it.
 
     Args:
         name (str):
@@ -191,12 +185,9 @@ async def asyncio_detailed(
     | PostApiAgentCacheByNameClaimResponse403
     | PostApiAgentCacheByNameClaimResponse500
 ]:
-    """Store a value under a name only if the project does not hold that name yet. The answer says whether
-    this caller is the one that took it: `claimed` is true when the value was written, and false when
-    the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a
-    refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run
-    uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is
-    encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.
+    """Claim an agent cache entry
+
+     Store the value only while the name is free. The claimed field reports whether this caller took it.
 
     Args:
         name (str):
@@ -233,12 +224,9 @@ async def asyncio(
     | PostApiAgentCacheByNameClaimResponse500
     | None
 ):
-    """Store a value under a name only if the project does not hold that name yet. The answer says whether
-    this caller is the one that took it: `claimed` is true when the value was written, and false when
-    the name was already held, which leaves the held value alone. Losing is an ordinary answer and not a
-    refusal, so a caller branches on `claimed` rather than on an error. This is what one row of a run
-    uses to do work the rows beside it then reuse, instead of every row doing it at once. The value is
-    encrypted at rest and expires by itself after ttl_seconds, which defaults to 900 seconds.
+    """Claim an agent cache entry
+
+     Store the value only while the name is free. The claimed field reports whether this caller took it.
 
     Args:
         name (str):

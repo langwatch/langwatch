@@ -99,8 +99,9 @@ def sync_detailed(
     | DeleteApiAgentCacheByNameResponse403
     | DeleteApiAgentCacheByNameResponse500
 ]:
-    """Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller
-    can clear an entry without reading it first.
+    """Delete an agent cache entry
+
+     Delete by name. Removing a name the project does not hold still succeeds.
 
     Args:
         name (str):
@@ -136,8 +137,9 @@ def sync(
     | DeleteApiAgentCacheByNameResponse500
     | None
 ):
-    """Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller
-    can clear an entry without reading it first.
+    """Delete an agent cache entry
+
+     Delete by name. Removing a name the project does not hold still succeeds.
 
     Args:
         name (str):
@@ -167,8 +169,9 @@ async def asyncio_detailed(
     | DeleteApiAgentCacheByNameResponse403
     | DeleteApiAgentCacheByNameResponse500
 ]:
-    """Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller
-    can clear an entry without reading it first.
+    """Delete an agent cache entry
+
+     Delete by name. Removing a name the project does not hold still succeeds.
 
     Args:
         name (str):
@@ -202,8 +205,9 @@ async def asyncio(
     | DeleteApiAgentCacheByNameResponse500
     | None
 ):
-    """Remove a cache entry. A name the project does not hold answers the same as one it does, so a caller
-    can clear an entry without reading it first.
+    """Delete an agent cache entry
+
+     Delete by name. Removing a name the project does not hold still succeeds.
 
     Args:
         name (str):

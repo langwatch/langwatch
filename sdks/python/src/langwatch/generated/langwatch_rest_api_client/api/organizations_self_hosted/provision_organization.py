@@ -6,10 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.provision_organization_body import ProvisionOrganizationBody
 from ...models.provision_organization_response_201 import ProvisionOrganizationResponse201
-from ...models.provision_organization_response_401 import ProvisionOrganizationResponse401
-from ...models.provision_organization_response_404 import ProvisionOrganizationResponse404
-from ...models.provision_organization_response_409 import ProvisionOrganizationResponse409
-from ...models.provision_organization_response_422 import ProvisionOrganizationResponse422
 from ...types import Response, safe_http_status
 
 
@@ -34,38 +30,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-    | None
-):
+) -> ProvisionOrganizationResponse201 | None:
     if response.status_code == 201:
         response_201 = ProvisionOrganizationResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 401:
-        response_401 = ProvisionOrganizationResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 404:
-        response_404 = ProvisionOrganizationResponse404.from_dict(response.json())
-
-        return response_404
-
-    if response.status_code == 409:
-        response_409 = ProvisionOrganizationResponse409.from_dict(response.json())
-
-        return response_409
-
-    if response.status_code == 422:
-        response_422 = ProvisionOrganizationResponse422.from_dict(response.json())
-
-        return response_422
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -75,13 +44,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-]:
+) -> Response[ProvisionOrganizationResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -97,19 +60,9 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: ProvisionOrganizationBody,
-) -> Response[
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-]:
-    """Create an organization
-
-     Self-hosted only. Creates an organization with a default team and returns an organization-scoped
-    admin API key, so provisioning can continue through the management APIs without a browser step: the
-    instance key creates the organization, the returned key does everything else. The slug is the
-    natural key; a taken slug answers 409 organization_slug_taken.
+) -> Response[ProvisionOrganizationResponse201]:
+    """Provision a new organization with its first team and a bootstrap admin service key, self-hosted
+    instance administrators only.
 
     Args:
         body (ProvisionOrganizationBody):
@@ -119,7 +72,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ProvisionOrganizationResponse201 | ProvisionOrganizationResponse401 | ProvisionOrganizationResponse404 | ProvisionOrganizationResponse409 | ProvisionOrganizationResponse422]
+        Response[ProvisionOrganizationResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -137,20 +90,9 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: ProvisionOrganizationBody,
-) -> (
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-    | None
-):
-    """Create an organization
-
-     Self-hosted only. Creates an organization with a default team and returns an organization-scoped
-    admin API key, so provisioning can continue through the management APIs without a browser step: the
-    instance key creates the organization, the returned key does everything else. The slug is the
-    natural key; a taken slug answers 409 organization_slug_taken.
+) -> ProvisionOrganizationResponse201 | None:
+    """Provision a new organization with its first team and a bootstrap admin service key, self-hosted
+    instance administrators only.
 
     Args:
         body (ProvisionOrganizationBody):
@@ -160,7 +102,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ProvisionOrganizationResponse201 | ProvisionOrganizationResponse401 | ProvisionOrganizationResponse404 | ProvisionOrganizationResponse409 | ProvisionOrganizationResponse422
+        ProvisionOrganizationResponse201
     """
 
     return sync_detailed(
@@ -173,19 +115,9 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: ProvisionOrganizationBody,
-) -> Response[
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-]:
-    """Create an organization
-
-     Self-hosted only. Creates an organization with a default team and returns an organization-scoped
-    admin API key, so provisioning can continue through the management APIs without a browser step: the
-    instance key creates the organization, the returned key does everything else. The slug is the
-    natural key; a taken slug answers 409 organization_slug_taken.
+) -> Response[ProvisionOrganizationResponse201]:
+    """Provision a new organization with its first team and a bootstrap admin service key, self-hosted
+    instance administrators only.
 
     Args:
         body (ProvisionOrganizationBody):
@@ -195,7 +127,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ProvisionOrganizationResponse201 | ProvisionOrganizationResponse401 | ProvisionOrganizationResponse404 | ProvisionOrganizationResponse409 | ProvisionOrganizationResponse422]
+        Response[ProvisionOrganizationResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -211,20 +143,9 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: ProvisionOrganizationBody,
-) -> (
-    ProvisionOrganizationResponse201
-    | ProvisionOrganizationResponse401
-    | ProvisionOrganizationResponse404
-    | ProvisionOrganizationResponse409
-    | ProvisionOrganizationResponse422
-    | None
-):
-    """Create an organization
-
-     Self-hosted only. Creates an organization with a default team and returns an organization-scoped
-    admin API key, so provisioning can continue through the management APIs without a browser step: the
-    instance key creates the organization, the returned key does everything else. The slug is the
-    natural key; a taken slug answers 409 organization_slug_taken.
+) -> ProvisionOrganizationResponse201 | None:
+    """Provision a new organization with its first team and a bootstrap admin service key, self-hosted
+    instance administrators only.
 
     Args:
         body (ProvisionOrganizationBody):
@@ -234,7 +155,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ProvisionOrganizationResponse201 | ProvisionOrganizationResponse401 | ProvisionOrganizationResponse404 | ProvisionOrganizationResponse409 | ProvisionOrganizationResponse422
+        ProvisionOrganizationResponse201
     """
 
     return (

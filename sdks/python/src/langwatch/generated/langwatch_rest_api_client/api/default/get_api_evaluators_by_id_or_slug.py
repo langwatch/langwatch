@@ -6,11 +6,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_evaluators_by_id_or_slug_response_200 import GetApiEvaluatorsByIdOrSlugResponse200
-from ...models.get_api_evaluators_by_id_or_slug_response_400 import GetApiEvaluatorsByIdOrSlugResponse400
-from ...models.get_api_evaluators_by_id_or_slug_response_401 import GetApiEvaluatorsByIdOrSlugResponse401
 from ...models.get_api_evaluators_by_id_or_slug_response_404 import GetApiEvaluatorsByIdOrSlugResponse404
-from ...models.get_api_evaluators_by_id_or_slug_response_422 import GetApiEvaluatorsByIdOrSlugResponse422
-from ...models.get_api_evaluators_by_id_or_slug_response_500 import GetApiEvaluatorsByIdOrSlugResponse500
 from ...types import Response, safe_http_status
 
 
@@ -30,44 +26,16 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-    | None
-):
+) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
     if response.status_code == 200:
         response_200 = GetApiEvaluatorsByIdOrSlugResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = GetApiEvaluatorsByIdOrSlugResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiEvaluatorsByIdOrSlugResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
         response_404 = GetApiEvaluatorsByIdOrSlugResponse404.from_dict(response.json())
 
         return response_404
-
-    if response.status_code == 422:
-        response_422 = GetApiEvaluatorsByIdOrSlugResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = GetApiEvaluatorsByIdOrSlugResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -77,14 +45,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-]:
+) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -100,14 +61,7 @@ def sync_detailed(
     id_or_slug: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-]:
+) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
     """Get a specific evaluator by ID or slug
 
     Args:
@@ -118,7 +72,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse401 | GetApiEvaluatorsByIdOrSlugResponse404 | GetApiEvaluatorsByIdOrSlugResponse422 | GetApiEvaluatorsByIdOrSlugResponse500]
+        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -136,15 +90,7 @@ def sync(
     id_or_slug: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-    | None
-):
+) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
     """Get a specific evaluator by ID or slug
 
     Args:
@@ -155,7 +101,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse401 | GetApiEvaluatorsByIdOrSlugResponse404 | GetApiEvaluatorsByIdOrSlugResponse422 | GetApiEvaluatorsByIdOrSlugResponse500
+        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404
     """
 
     return sync_detailed(
@@ -168,14 +114,7 @@ async def asyncio_detailed(
     id_or_slug: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-]:
+) -> Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]:
     """Get a specific evaluator by ID or slug
 
     Args:
@@ -186,7 +125,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse401 | GetApiEvaluatorsByIdOrSlugResponse404 | GetApiEvaluatorsByIdOrSlugResponse422 | GetApiEvaluatorsByIdOrSlugResponse500]
+        Response[GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404]
     """
 
     kwargs = _get_kwargs(
@@ -202,15 +141,7 @@ async def asyncio(
     id_or_slug: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiEvaluatorsByIdOrSlugResponse200
-    | GetApiEvaluatorsByIdOrSlugResponse400
-    | GetApiEvaluatorsByIdOrSlugResponse401
-    | GetApiEvaluatorsByIdOrSlugResponse404
-    | GetApiEvaluatorsByIdOrSlugResponse422
-    | GetApiEvaluatorsByIdOrSlugResponse500
-    | None
-):
+) -> GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404 | None:
     """Get a specific evaluator by ID or slug
 
     Args:
@@ -221,7 +152,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse400 | GetApiEvaluatorsByIdOrSlugResponse401 | GetApiEvaluatorsByIdOrSlugResponse404 | GetApiEvaluatorsByIdOrSlugResponse422 | GetApiEvaluatorsByIdOrSlugResponse500
+        GetApiEvaluatorsByIdOrSlugResponse200 | GetApiEvaluatorsByIdOrSlugResponse404
     """
 
     return (

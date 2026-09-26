@@ -14,12 +14,6 @@ from ...models.delete_api_governance_ingestion_templates_by_id_response_400 impo
 from ...models.delete_api_governance_ingestion_templates_by_id_response_401 import (
     DeleteApiGovernanceIngestionTemplatesByIdResponse401,
 )
-from ...models.delete_api_governance_ingestion_templates_by_id_response_403 import (
-    DeleteApiGovernanceIngestionTemplatesByIdResponse403,
-)
-from ...models.delete_api_governance_ingestion_templates_by_id_response_404 import (
-    DeleteApiGovernanceIngestionTemplatesByIdResponse404,
-)
 from ...models.delete_api_governance_ingestion_templates_by_id_response_422 import (
     DeleteApiGovernanceIngestionTemplatesByIdResponse422,
 )
@@ -49,8 +43,6 @@ def _parse_response(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -69,16 +61,6 @@ def _parse_response(
         response_401 = DeleteApiGovernanceIngestionTemplatesByIdResponse401.from_dict(response.json())
 
         return response_401
-
-    if response.status_code == 403:
-        response_403 = DeleteApiGovernanceIngestionTemplatesByIdResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 404:
-        response_404 = DeleteApiGovernanceIngestionTemplatesByIdResponse404.from_dict(response.json())
-
-        return response_404
 
     if response.status_code == 422:
         response_422 = DeleteApiGovernanceIngestionTemplatesByIdResponse422.from_dict(response.json())
@@ -102,8 +84,6 @@ def _build_response(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -126,8 +106,6 @@ def sync_detailed(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -144,7 +122,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -166,8 +144,6 @@ def sync(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -185,7 +161,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
+        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return sync_detailed(
@@ -202,8 +178,6 @@ async def asyncio_detailed(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -220,7 +194,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -240,8 +214,6 @@ async def asyncio(
     DeleteApiGovernanceIngestionTemplatesByIdResponse200
     | DeleteApiGovernanceIngestionTemplatesByIdResponse400
     | DeleteApiGovernanceIngestionTemplatesByIdResponse401
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse403
-    | DeleteApiGovernanceIngestionTemplatesByIdResponse404
     | DeleteApiGovernanceIngestionTemplatesByIdResponse422
     | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -259,7 +231,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse403 | DeleteApiGovernanceIngestionTemplatesByIdResponse404 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
+        DeleteApiGovernanceIngestionTemplatesByIdResponse200 | DeleteApiGovernanceIngestionTemplatesByIdResponse400 | DeleteApiGovernanceIngestionTemplatesByIdResponse401 | DeleteApiGovernanceIngestionTemplatesByIdResponse422 | DeleteApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return (

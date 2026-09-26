@@ -1,21 +1,21 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_patch_group_body import ScimPatchGroupBody
 from ...models.scim_patch_group_response_200 import ScimPatchGroupResponse200
-from ...models.scim_patch_group_response_400 import ScimPatchGroupResponse400
-from ...models.scim_patch_group_response_401 import ScimPatchGroupResponse401
-from ...models.scim_patch_group_response_403 import ScimPatchGroupResponse403
-from ...models.scim_patch_group_response_404 import ScimPatchGroupResponse404
 from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
+    *,
+    body: ScimPatchGroupBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
@@ -24,42 +24,36 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-    | None
-):
+) -> Any | ScimPatchGroupResponse200 | None:
     if response.status_code == 200:
         response_200 = ScimPatchGroupResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = ScimPatchGroupResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = ScimPatchGroupResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = ScimPatchGroupResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
     if response.status_code == 404:
-        response_404 = ScimPatchGroupResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -70,13 +64,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-]:
+) -> Response[Any | ScimPatchGroupResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -92,13 +80,8 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-]:
+    body: ScimPatchGroupBody,
+) -> Response[Any | ScimPatchGroupResponse200]:
     """Update a provisioned group
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of
@@ -112,17 +95,19 @@ def sync_detailed(
 
     Args:
         id (str):
+        body (ScimPatchGroupBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimPatchGroupResponse200 | ScimPatchGroupResponse400 | ScimPatchGroupResponse401 | ScimPatchGroupResponse403 | ScimPatchGroupResponse404]
+        Response[Any | ScimPatchGroupResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -136,14 +121,8 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-    | None
-):
+    body: ScimPatchGroupBody,
+) -> Any | ScimPatchGroupResponse200 | None:
     """Update a provisioned group
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of
@@ -157,18 +136,20 @@ def sync(
 
     Args:
         id (str):
+        body (ScimPatchGroupBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimPatchGroupResponse200 | ScimPatchGroupResponse400 | ScimPatchGroupResponse401 | ScimPatchGroupResponse403 | ScimPatchGroupResponse404
+        Any | ScimPatchGroupResponse200
     """
 
     return sync_detailed(
         id=id,
         client=client,
+        body=body,
     ).parsed
 
 
@@ -176,13 +157,8 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-]:
+    body: ScimPatchGroupBody,
+) -> Response[Any | ScimPatchGroupResponse200]:
     """Update a provisioned group
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of
@@ -196,17 +172,19 @@ async def asyncio_detailed(
 
     Args:
         id (str):
+        body (ScimPatchGroupBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimPatchGroupResponse200 | ScimPatchGroupResponse400 | ScimPatchGroupResponse401 | ScimPatchGroupResponse403 | ScimPatchGroupResponse404]
+        Response[Any | ScimPatchGroupResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -218,14 +196,8 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimPatchGroupResponse200
-    | ScimPatchGroupResponse400
-    | ScimPatchGroupResponse401
-    | ScimPatchGroupResponse403
-    | ScimPatchGroupResponse404
-    | None
-):
+    body: ScimPatchGroupBody,
+) -> Any | ScimPatchGroupResponse200 | None:
     """Update a provisioned group
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of
@@ -239,18 +211,20 @@ async def asyncio(
 
     Args:
         id (str):
+        body (ScimPatchGroupBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimPatchGroupResponse200 | ScimPatchGroupResponse400 | ScimPatchGroupResponse401 | ScimPatchGroupResponse403 | ScimPatchGroupResponse404
+        Any | ScimPatchGroupResponse200
     """
 
     return (
         await asyncio_detailed(
             id=id,
             client=client,
+            body=body,
         )
     ).parsed

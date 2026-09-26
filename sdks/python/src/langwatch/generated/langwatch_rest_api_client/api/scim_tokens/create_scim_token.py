@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_scim_token_body import CreateScimTokenBody
 from ...models.create_scim_token_response_201 import CreateScimTokenResponse201
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: CreateScimTokenBody,
+    body: CreateScimTokenBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,7 +20,8 @@ def _get_kwargs(
         "url": "/api/v1/scim-tokens",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -59,14 +60,13 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateScimTokenBody,
+    body: CreateScimTokenBody | Unset = UNSET,
 ) -> Response[CreateScimTokenResponse201]:
-    """Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against
-    /api/scim/v2. The token only manages the people that connection provisioned. The token value is
-    returned once, here, and never again; store it in the identity provider immediately.
+    """Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned
+    once, here, and never again; store it in the identity provider immediately.
 
     Args:
-        body (CreateScimTokenBody):
+        body (CreateScimTokenBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -90,14 +90,13 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: CreateScimTokenBody,
+    body: CreateScimTokenBody | Unset = UNSET,
 ) -> CreateScimTokenResponse201 | None:
-    """Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against
-    /api/scim/v2. The token only manages the people that connection provisioned. The token value is
-    returned once, here, and never again; store it in the identity provider immediately.
+    """Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned
+    once, here, and never again; store it in the identity provider immediately.
 
     Args:
-        body (CreateScimTokenBody):
+        body (CreateScimTokenBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -116,14 +115,13 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateScimTokenBody,
+    body: CreateScimTokenBody | Unset = UNSET,
 ) -> Response[CreateScimTokenResponse201]:
-    """Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against
-    /api/scim/v2. The token only manages the people that connection provisioned. The token value is
-    returned once, here, and never again; store it in the identity provider immediately.
+    """Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned
+    once, here, and never again; store it in the identity provider immediately.
 
     Args:
-        body (CreateScimTokenBody):
+        body (CreateScimTokenBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -145,14 +143,13 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: CreateScimTokenBody,
+    body: CreateScimTokenBody | Unset = UNSET,
 ) -> CreateScimTokenResponse201 | None:
-    """Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against
-    /api/scim/v2. The token only manages the people that connection provisioned. The token value is
-    returned once, here, and never again; store it in the identity provider immediately.
+    """Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned
+    once, here, and never again; store it in the identity provider immediately.
 
     Args:
-        body (CreateScimTokenBody):
+        body (CreateScimTokenBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

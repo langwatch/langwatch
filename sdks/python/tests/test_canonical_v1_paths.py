@@ -28,7 +28,10 @@ VERSION_SEGMENT = re.compile(r"^v\d+$")
 BARE_PATH = re.compile(r"/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_{}-]+)*)")
 
 # Routes the document keeps bare because they have no `/api/v1` twin.
-BARE_ONLY = (re.compile(r"^/api/traces/[^/]+/transcript$"),)
+BARE_ONLY = (
+    re.compile(r"^/api/traces/[^/]+/transcript$"),
+    re.compile(r"^/api/trace/(search|[^/]+(/share|/unshare)?)$"),
+)
 
 
 def bare_family_paths(files: List[Path]) -> List[str]:

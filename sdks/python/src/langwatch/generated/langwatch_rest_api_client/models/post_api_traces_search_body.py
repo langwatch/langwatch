@@ -54,6 +54,12 @@ class PostApiTracesSearchBody:
             'events.*'/'annotations.*'/'evaluations.*' return as nested arrays (one row per trace). When present, the
             response gains a top-level 'schema' field describing the resolved columns. When omitted, the response is
             unchanged from the legacy shape.
+        filter_ (str | Unset): A trace filter string in the same language the Trace Explorer's search bar speaks —
+            `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted
+            phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them,
+            so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET
+            /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the
+            language does not have, is a 422 that names the field.
     """
 
     start_date: float | str
@@ -75,6 +81,7 @@ class PostApiTracesSearchBody:
     date_field: PostApiTracesSearchBodyDateField | Unset = PostApiTracesSearchBodyDateField.OCCURRED
     from_: PostApiTracesSearchBodyFrom | Unset = PostApiTracesSearchBodyFrom.TRACES
     select: list[str] | Unset = UNSET
+    filter_: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -134,6 +141,8 @@ class PostApiTracesSearchBody:
         if not isinstance(self.select, Unset):
             select = self.select
 
+        filter_ = self.filter_
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -176,6 +185,8 @@ class PostApiTracesSearchBody:
             field_dict["from"] = from_
         if select is not UNSET:
             field_dict["select"] = select
+        if filter_ is not UNSET:
+            field_dict["filter"] = filter_
 
         return field_dict
 
@@ -256,6 +267,8 @@ class PostApiTracesSearchBody:
 
         select = cast(list[str], d.pop("select", UNSET))
 
+        filter_ = d.pop("filter", UNSET)
+
         post_api_traces_search_body = cls(
             start_date=start_date,
             end_date=end_date,
@@ -276,6 +289,7 @@ class PostApiTracesSearchBody:
             date_field=date_field,
             from_=from_,
             select=select,
+            filter_=filter_,
         )
 
         post_api_traces_search_body.additional_properties = d

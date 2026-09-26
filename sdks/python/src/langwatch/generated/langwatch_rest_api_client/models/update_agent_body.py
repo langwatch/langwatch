@@ -21,8 +21,7 @@ class UpdateAgentBody:
     """
     Attributes:
         name (str | Unset):
-        type_ (UpdateAgentBodyType | Unset): The kind of agent to write. A connected agent is registered from code by
-            the SDK, so "connected" is refused with agent_register_only.
+        type_ (UpdateAgentBodyType | Unset):
         config (UpdateAgentBodyConfig | Unset):
         workflow_id (None | str | Unset):
     """

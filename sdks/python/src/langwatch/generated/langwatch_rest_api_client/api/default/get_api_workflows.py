@@ -5,10 +5,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_workflows_response_200_item import GetApiWorkflowsResponse200Item
-from ...models.get_api_workflows_response_400 import GetApiWorkflowsResponse400
-from ...models.get_api_workflows_response_401 import GetApiWorkflowsResponse401
-from ...models.get_api_workflows_response_422 import GetApiWorkflowsResponse422
-from ...models.get_api_workflows_response_500 import GetApiWorkflowsResponse500
 from ...types import Response, safe_http_status
 
 
@@ -24,14 +20,7 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-    | None
-):
+) -> list[GetApiWorkflowsResponse200Item] | None:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.json()
@@ -42,26 +31,6 @@ def _parse_response(
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = GetApiWorkflowsResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiWorkflowsResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 422:
-        response_422 = GetApiWorkflowsResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = GetApiWorkflowsResponse500.from_dict(response.json())
-
-        return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -70,13 +39,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-]:
+) -> Response[list[GetApiWorkflowsResponse200Item]]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -91,13 +54,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-]:
+) -> Response[list[GetApiWorkflowsResponse200Item]]:
     """List all non-archived workflows for the project
 
     Raises:
@@ -105,7 +62,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWorkflowsResponse400 | GetApiWorkflowsResponse401 | GetApiWorkflowsResponse422 | GetApiWorkflowsResponse500 | list[GetApiWorkflowsResponse200Item]]
+        Response[list[GetApiWorkflowsResponse200Item]]
     """
 
     kwargs = _get_kwargs()
@@ -120,14 +77,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-    | None
-):
+) -> list[GetApiWorkflowsResponse200Item] | None:
     """List all non-archived workflows for the project
 
     Raises:
@@ -135,7 +85,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWorkflowsResponse400 | GetApiWorkflowsResponse401 | GetApiWorkflowsResponse422 | GetApiWorkflowsResponse500 | list[GetApiWorkflowsResponse200Item]
+        list[GetApiWorkflowsResponse200Item]
     """
 
     return sync_detailed(
@@ -146,13 +96,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-]:
+) -> Response[list[GetApiWorkflowsResponse200Item]]:
     """List all non-archived workflows for the project
 
     Raises:
@@ -160,7 +104,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWorkflowsResponse400 | GetApiWorkflowsResponse401 | GetApiWorkflowsResponse422 | GetApiWorkflowsResponse500 | list[GetApiWorkflowsResponse200Item]]
+        Response[list[GetApiWorkflowsResponse200Item]]
     """
 
     kwargs = _get_kwargs()
@@ -173,14 +117,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiWorkflowsResponse400
-    | GetApiWorkflowsResponse401
-    | GetApiWorkflowsResponse422
-    | GetApiWorkflowsResponse500
-    | list[GetApiWorkflowsResponse200Item]
-    | None
-):
+) -> list[GetApiWorkflowsResponse200Item] | None:
     """List all non-archived workflows for the project
 
     Raises:
@@ -188,7 +125,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWorkflowsResponse400 | GetApiWorkflowsResponse401 | GetApiWorkflowsResponse422 | GetApiWorkflowsResponse500 | list[GetApiWorkflowsResponse200Item]
+        list[GetApiWorkflowsResponse200Item]
     """
 
     return (

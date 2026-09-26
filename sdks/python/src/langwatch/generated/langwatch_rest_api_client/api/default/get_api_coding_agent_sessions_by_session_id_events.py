@@ -26,24 +26,24 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     session_id: str,
     *,
-    kinds: str | Unset = UNSET,
-    cursor: str | Unset = UNSET,
     limit: int | Unset = 500,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    kinds: str | Unset = UNSET,
+    from_: float | Unset = UNSET,
+    to: float | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
 
-    params["kinds"] = kinds
-
-    params["cursor"] = cursor
-
     params["limit"] = limit
+
+    params["kinds"] = kinds
 
     params["from"] = from_
 
     params["to"] = to
+
+    params["cursor"] = cursor
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -123,11 +123,11 @@ def sync_detailed(
     session_id: str,
     *,
     client: AuthenticatedClient,
-    kinds: str | Unset = UNSET,
-    cursor: str | Unset = UNSET,
     limit: int | Unset = 500,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    kinds: str | Unset = UNSET,
+    from_: float | Unset = UNSET,
+    to: float | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> Response[
     GetApiCodingAgentSessionsBySessionIdEventsResponse200
     | GetApiCodingAgentSessionsBySessionIdEventsResponse400
@@ -143,11 +143,11 @@ def sync_detailed(
 
     Args:
         session_id (str):
-        kinds (str | Unset):
-        cursor (str | Unset):
         limit (int | Unset):  Default: 500.
-        from_ (int | Unset):
-        to (int | Unset):
+        kinds (str | Unset):
+        from_ (float | Unset):
+        to (float | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,11 +159,11 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         session_id=session_id,
-        kinds=kinds,
-        cursor=cursor,
         limit=limit,
+        kinds=kinds,
         from_=from_,
         to=to,
+        cursor=cursor,
     )
 
     response = client.get_httpx_client().request(
@@ -177,11 +177,11 @@ def sync(
     session_id: str,
     *,
     client: AuthenticatedClient,
-    kinds: str | Unset = UNSET,
-    cursor: str | Unset = UNSET,
     limit: int | Unset = 500,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    kinds: str | Unset = UNSET,
+    from_: float | Unset = UNSET,
+    to: float | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> (
     GetApiCodingAgentSessionsBySessionIdEventsResponse200
     | GetApiCodingAgentSessionsBySessionIdEventsResponse400
@@ -198,11 +198,11 @@ def sync(
 
     Args:
         session_id (str):
-        kinds (str | Unset):
-        cursor (str | Unset):
         limit (int | Unset):  Default: 500.
-        from_ (int | Unset):
-        to (int | Unset):
+        kinds (str | Unset):
+        from_ (float | Unset):
+        to (float | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -215,11 +215,11 @@ def sync(
     return sync_detailed(
         session_id=session_id,
         client=client,
-        kinds=kinds,
-        cursor=cursor,
         limit=limit,
+        kinds=kinds,
         from_=from_,
         to=to,
+        cursor=cursor,
     ).parsed
 
 
@@ -227,11 +227,11 @@ async def asyncio_detailed(
     session_id: str,
     *,
     client: AuthenticatedClient,
-    kinds: str | Unset = UNSET,
-    cursor: str | Unset = UNSET,
     limit: int | Unset = 500,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    kinds: str | Unset = UNSET,
+    from_: float | Unset = UNSET,
+    to: float | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> Response[
     GetApiCodingAgentSessionsBySessionIdEventsResponse200
     | GetApiCodingAgentSessionsBySessionIdEventsResponse400
@@ -247,11 +247,11 @@ async def asyncio_detailed(
 
     Args:
         session_id (str):
-        kinds (str | Unset):
-        cursor (str | Unset):
         limit (int | Unset):  Default: 500.
-        from_ (int | Unset):
-        to (int | Unset):
+        kinds (str | Unset):
+        from_ (float | Unset):
+        to (float | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -263,11 +263,11 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         session_id=session_id,
-        kinds=kinds,
-        cursor=cursor,
         limit=limit,
+        kinds=kinds,
         from_=from_,
         to=to,
+        cursor=cursor,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -279,11 +279,11 @@ async def asyncio(
     session_id: str,
     *,
     client: AuthenticatedClient,
-    kinds: str | Unset = UNSET,
-    cursor: str | Unset = UNSET,
     limit: int | Unset = 500,
-    from_: int | Unset = UNSET,
-    to: int | Unset = UNSET,
+    kinds: str | Unset = UNSET,
+    from_: float | Unset = UNSET,
+    to: float | Unset = UNSET,
+    cursor: str | Unset = UNSET,
 ) -> (
     GetApiCodingAgentSessionsBySessionIdEventsResponse200
     | GetApiCodingAgentSessionsBySessionIdEventsResponse400
@@ -300,11 +300,11 @@ async def asyncio(
 
     Args:
         session_id (str):
-        kinds (str | Unset):
-        cursor (str | Unset):
         limit (int | Unset):  Default: 500.
-        from_ (int | Unset):
-        to (int | Unset):
+        kinds (str | Unset):
+        from_ (float | Unset):
+        to (float | Unset):
+        cursor (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -318,10 +318,10 @@ async def asyncio(
         await asyncio_detailed(
             session_id=session_id,
             client=client,
-            kinds=kinds,
-            cursor=cursor,
             limit=limit,
+            kinds=kinds,
             from_=from_,
             to=to,
+            cursor=cursor,
         )
     ).parsed

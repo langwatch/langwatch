@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.post_api_gateway_v1_virtual_keys_body_routing_mode import PostApiGatewayV1VirtualKeysBodyRoutingMode
 from ..types import UNSET, Unset
@@ -30,8 +32,7 @@ class PostApiGatewayV1VirtualKeysBody:
         trace_project_id (None | str | Unset):
         routing_policy_id (None | str | Unset):
         routing_mode (PostApiGatewayV1VirtualKeysBodyRoutingMode | Unset):
-        expires_at (str | Unset): When the key stops serving. Omit it and the key never expires. A date that has already
-            passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival.
+        expires_at (datetime.datetime | Unset):
         budget (None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset):
         config (PostApiGatewayV1VirtualKeysBodyConfig | Unset):
         external_id (None | str | Unset):
@@ -46,7 +47,7 @@ class PostApiGatewayV1VirtualKeysBody:
     trace_project_id: None | str | Unset = UNSET
     routing_policy_id: None | str | Unset = UNSET
     routing_mode: PostApiGatewayV1VirtualKeysBodyRoutingMode | Unset = UNSET
-    expires_at: str | Unset = UNSET
+    expires_at: datetime.datetime | Unset = UNSET
     budget: None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset = UNSET
     config: PostApiGatewayV1VirtualKeysBodyConfig | Unset = UNSET
     external_id: None | str | Unset = UNSET
@@ -92,7 +93,9 @@ class PostApiGatewayV1VirtualKeysBody:
         if not isinstance(self.routing_mode, Unset):
             routing_mode = self.routing_mode.value
 
-        expires_at = self.expires_at
+        expires_at: str | Unset = UNSET
+        if not isinstance(self.expires_at, Unset):
+            expires_at = self.expires_at.isoformat()
 
         budget: dict[str, Any] | None | Unset
         if isinstance(self.budget, Unset):
@@ -209,7 +212,12 @@ class PostApiGatewayV1VirtualKeysBody:
         else:
             routing_mode = PostApiGatewayV1VirtualKeysBodyRoutingMode(_routing_mode)
 
-        expires_at = d.pop("expires_at", UNSET)
+        _expires_at = d.pop("expires_at", UNSET)
+        expires_at: datetime.datetime | Unset
+        if isinstance(_expires_at, Unset):
+            expires_at = UNSET
+        else:
+            expires_at = isoparse(_expires_at)
 
         def _parse_budget(data: object) -> None | PostApiGatewayV1VirtualKeysBodyBudgetType0 | Unset:
             if data is None:

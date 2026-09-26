@@ -29,7 +29,7 @@ class GetApiSimulationRunsBatchesListResponse200BatchesItem:
             update time of a batch where no run is running.
         is_complete (bool): True when every run of the batch reached a terminal status.
         note (None | str | Unset): One short line saying why the batch was run, as given when it was queued. Null on a
-            batch run without one. Absent on servers that predate run notes.
+            batch run without one.
     """
 
     batch_run_id: str

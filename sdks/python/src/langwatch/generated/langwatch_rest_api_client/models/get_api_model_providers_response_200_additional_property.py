@@ -33,8 +33,8 @@ class GetApiModelProvidersResponse200AdditionalProperty:
         provider (str):
         enabled (bool):
         custom_keys (GetApiModelProvidersResponse200AdditionalPropertyCustomKeysType0 | None):
+        deployment_mapping (Any | None):
         id (str | Unset):
-        deployment_mapping (None | Unset):
         models (list[str] | None | Unset):
         embeddings_models (list[str] | None | Unset):
         custom_models (list[GetApiModelProvidersResponse200AdditionalPropertyCustomModelsType0Item] | None | Unset):
@@ -47,8 +47,8 @@ class GetApiModelProvidersResponse200AdditionalProperty:
     provider: str
     enabled: bool
     custom_keys: GetApiModelProvidersResponse200AdditionalPropertyCustomKeysType0 | None
+    deployment_mapping: Any | None
     id: str | Unset = UNSET
-    deployment_mapping: None | Unset = UNSET
     models: list[str] | None | Unset = UNSET
     embeddings_models: list[str] | None | Unset = UNSET
     custom_models: list[GetApiModelProvidersResponse200AdditionalPropertyCustomModelsType0Item] | None | Unset = UNSET
@@ -74,9 +74,10 @@ class GetApiModelProvidersResponse200AdditionalProperty:
         else:
             custom_keys = self.custom_keys
 
-        id = self.id
-
+        deployment_mapping: Any | None
         deployment_mapping = self.deployment_mapping
+
+        id = self.id
 
         models: list[str] | None | Unset
         if isinstance(self.models, Unset):
@@ -141,12 +142,11 @@ class GetApiModelProvidersResponse200AdditionalProperty:
                 "provider": provider,
                 "enabled": enabled,
                 "customKeys": custom_keys,
+                "deploymentMapping": deployment_mapping,
             }
         )
         if id is not UNSET:
             field_dict["id"] = id
-        if deployment_mapping is not UNSET:
-            field_dict["deploymentMapping"] = deployment_mapping
         if models is not UNSET:
             field_dict["models"] = models
         if embeddings_models is not UNSET:
@@ -197,9 +197,14 @@ class GetApiModelProvidersResponse200AdditionalProperty:
 
         custom_keys = _parse_custom_keys(d.pop("customKeys"))
 
-        id = d.pop("id", UNSET)
+        def _parse_deployment_mapping(data: object) -> Any | None:
+            if data is None:
+                return data
+            return cast(Any | None, data)
 
-        deployment_mapping = d.pop("deploymentMapping", UNSET)
+        deployment_mapping = _parse_deployment_mapping(d.pop("deploymentMapping"))
+
+        id = d.pop("id", UNSET)
 
         def _parse_models(data: object) -> list[str] | None | Unset:
             if data is None:
@@ -332,8 +337,8 @@ class GetApiModelProvidersResponse200AdditionalProperty:
             provider=provider,
             enabled=enabled,
             custom_keys=custom_keys,
-            id=id,
             deployment_mapping=deployment_mapping,
+            id=id,
             models=models,
             embeddings_models=embeddings_models,
             custom_models=custom_models,

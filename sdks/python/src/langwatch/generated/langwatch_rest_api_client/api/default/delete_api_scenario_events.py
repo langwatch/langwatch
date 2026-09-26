@@ -4,8 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.delete_api_scenario_events_response_200_type_0 import DeleteApiScenarioEventsResponse200Type0
-from ...models.delete_api_scenario_events_response_200_type_1 import DeleteApiScenarioEventsResponse200Type1
+from ...models.delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
 from ...models.delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
 from ...models.delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
 from ...models.delete_api_scenario_events_response_404 import DeleteApiScenarioEventsResponse404
@@ -40,8 +39,7 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
@@ -50,25 +48,7 @@ def _parse_response(
     | None
 ):
     if response.status_code == 200:
-
-        def _parse_response_200(
-            data: object,
-        ) -> DeleteApiScenarioEventsResponse200Type0 | DeleteApiScenarioEventsResponse200Type1:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_200_type_0 = DeleteApiScenarioEventsResponse200Type0.from_dict(data)
-
-                return response_200_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            response_200_type_1 = DeleteApiScenarioEventsResponse200Type1.from_dict(data)
-
-            return response_200_type_1
-
-        response_200 = _parse_response_200(response.json())
+        response_200 = DeleteApiScenarioEventsResponse200.from_dict(response.json())
 
         return response_200
 
@@ -106,8 +86,7 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
@@ -131,17 +110,15 @@ def sync_detailed(
     scenario_set_id: str | Unset = UNSET,
     scenario_run_id: str | Unset = UNSET,
 ) -> Response[
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
     | DeleteApiScenarioEventsResponse422
     | DeleteApiScenarioEventsResponse500
 ]:
-    """Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set;
-    `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one
-    run).
+    """Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set;
+    scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
     Args:
         scenario_set_id (str | Unset):
@@ -152,7 +129,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiScenarioEventsResponse200Type0 | DeleteApiScenarioEventsResponse200Type1 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
+        Response[DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -173,8 +150,7 @@ def sync(
     scenario_set_id: str | Unset = UNSET,
     scenario_run_id: str | Unset = UNSET,
 ) -> (
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
@@ -182,9 +158,8 @@ def sync(
     | DeleteApiScenarioEventsResponse500
     | None
 ):
-    """Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set;
-    `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one
-    run).
+    """Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set;
+    scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
     Args:
         scenario_set_id (str | Unset):
@@ -195,7 +170,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiScenarioEventsResponse200Type0 | DeleteApiScenarioEventsResponse200Type1 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
+        DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
     """
 
     return sync_detailed(
@@ -211,17 +186,15 @@ async def asyncio_detailed(
     scenario_set_id: str | Unset = UNSET,
     scenario_run_id: str | Unset = UNSET,
 ) -> Response[
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
     | DeleteApiScenarioEventsResponse422
     | DeleteApiScenarioEventsResponse500
 ]:
-    """Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set;
-    `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one
-    run).
+    """Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set;
+    scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
     Args:
         scenario_set_id (str | Unset):
@@ -232,7 +205,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiScenarioEventsResponse200Type0 | DeleteApiScenarioEventsResponse200Type1 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
+        Response[DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -251,8 +224,7 @@ async def asyncio(
     scenario_set_id: str | Unset = UNSET,
     scenario_run_id: str | Unset = UNSET,
 ) -> (
-    DeleteApiScenarioEventsResponse200Type0
-    | DeleteApiScenarioEventsResponse200Type1
+    DeleteApiScenarioEventsResponse200
     | DeleteApiScenarioEventsResponse400
     | DeleteApiScenarioEventsResponse401
     | DeleteApiScenarioEventsResponse404
@@ -260,9 +232,8 @@ async def asyncio(
     | DeleteApiScenarioEventsResponse500
     | None
 ):
-    """Archive simulation runs. Pass exactly one of `scenarioSetId` (archives every run in the set;
-    `scenarioSetId=default` targets the implicit default set) or `scenarioRunId` (archives that one
-    run).
+    """Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set;
+    scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
     Args:
         scenario_set_id (str | Unset):
@@ -273,7 +244,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiScenarioEventsResponse200Type0 | DeleteApiScenarioEventsResponse200Type1 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
+        DeleteApiScenarioEventsResponse200 | DeleteApiScenarioEventsResponse400 | DeleteApiScenarioEventsResponse401 | DeleteApiScenarioEventsResponse404 | DeleteApiScenarioEventsResponse422 | DeleteApiScenarioEventsResponse500
     """
 
     return (

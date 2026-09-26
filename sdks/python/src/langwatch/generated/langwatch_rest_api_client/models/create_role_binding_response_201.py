@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.create_role_binding_response_201_role import CreateRoleBindingResponse201Role
 from ..models.create_role_binding_response_201_scope_type import CreateRoleBindingResponse201ScopeType
@@ -29,7 +31,7 @@ class CreateRoleBindingResponse201:
         scope_type (CreateRoleBindingResponse201ScopeType):
         scope_id (str):
         scope_name (None | str):
-        created_at (str):
+        created_at (datetime.datetime):
         has_legacy_access_notice (bool | Unset):
     """
 
@@ -41,7 +43,7 @@ class CreateRoleBindingResponse201:
     scope_type: CreateRoleBindingResponse201ScopeType
     scope_id: str
     scope_name: None | str
-    created_at: str
+    created_at: datetime.datetime
     has_legacy_access_notice: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -65,7 +67,7 @@ class CreateRoleBindingResponse201:
         scope_name: None | str
         scope_name = self.scope_name
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
         has_legacy_access_notice = self.has_legacy_access_notice
 
@@ -125,7 +127,7 @@ class CreateRoleBindingResponse201:
 
         scope_name = _parse_scope_name(d.pop("scopeName"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
         has_legacy_access_notice = d.pop("hasLegacyAccessNotice", UNSET)
 

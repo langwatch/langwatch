@@ -31,7 +31,7 @@ var (
 	barePathPattern = regexp.MustCompile(`/api/([a-zA-Z0-9_-]+)((?:/[a-zA-Z0-9_%-]+)*)`)
 	versionSegment  = regexp.MustCompile(`^v\d+$`)
 	// Routes the document keeps bare because they have no /api/v1 twin.
-	bareOnly = regexp.MustCompile(`^/api/traces/[^/]+/transcript$`)
+	bareOnly = regexp.MustCompile(`^/api/traces/[^/]+/transcript$|^/api/trace/(search|[^/]+(/share|/unshare)?)$`)
 )
 
 // @scenario "The track-event path is v1-form"
@@ -64,7 +64,12 @@ func TestGeneratedClientRequestPathsAreCanonical(t *testing.T) {
 		families[family] = struct{}{}
 	}
 
-	var offenders []string
+	type candidate struct {
+		line int
+		path string
+	}
+	var candidates []candidate
+	published := map[string]struct{}{}
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 	line := 0
@@ -77,6 +82,7 @@ func TestGeneratedClientRequestPathsAreCanonical(t *testing.T) {
 		}
 		for _, match := range barePathPattern.FindAllStringSubmatch(text, -1) {
 			paths++
+			published[match[0]] = struct{}{}
 			if _, ok := families[match[1]]; !ok {
 				continue
 			}
@@ -89,10 +95,20 @@ func TestGeneratedClientRequestPathsAreCanonical(t *testing.T) {
 			if versioned || bareOnly.MatchString(match[0]) {
 				continue
 			}
-			offenders = append(offenders, fmt.Sprintf("line %d: %s", line, match[0]))
+			candidates = append(candidates, candidate{line: line, path: match[0]})
 		}
 	}
 	require.NoError(t, scanner.Err())
+
+	// A bare path the document also publishes under /api/v1 has its twin; the
+	// offence is a family route with no /api/v1 address at all.
+	var offenders []string
+	for _, c := range candidates {
+		if _, twin := published["/api/v1"+strings.TrimPrefix(c.path, "/api")]; twin {
+			continue
+		}
+		offenders = append(offenders, fmt.Sprintf("line %d: %s", c.line, c.path))
+	}
 
 	// A guard that read no paths would pass while proving nothing.
 	assert.Greater(t, paths, 100)

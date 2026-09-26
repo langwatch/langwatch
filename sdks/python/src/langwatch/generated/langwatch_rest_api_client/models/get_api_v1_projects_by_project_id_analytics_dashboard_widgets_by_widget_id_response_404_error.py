@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404_error_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorFault,
+)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -24,17 +27,27 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
         type_ (str):
         code (str):
         message (str):
+        retryable (bool):
         meta (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorMeta | Unset):
         trace_id (str | Unset):
         span_id (str | Unset):
+        tips (list[str] | Unset):
+        docs_url (str | Unset):
+        fault (GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorFault | Unset):
+        reasons (list[Any] | Unset):
     """
 
     type_: str
     code: str
     message: str
+    retryable: bool
     meta: GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorMeta | Unset = UNSET
     trace_id: str | Unset = UNSET
     span_id: str | Unset = UNSET
+    tips: list[str] | Unset = UNSET
+    docs_url: str | Unset = UNSET
+    fault: GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorFault | Unset = UNSET
+    reasons: list[Any] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,6 +57,8 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
 
         message = self.message
 
+        retryable = self.retryable
+
         meta: dict[str, Any] | Unset = UNSET
         if not isinstance(self.meta, Unset):
             meta = self.meta.to_dict()
@@ -52,6 +67,20 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
 
         span_id = self.span_id
 
+        tips: list[str] | Unset = UNSET
+        if not isinstance(self.tips, Unset):
+            tips = self.tips
+
+        docs_url = self.docs_url
+
+        fault: str | Unset = UNSET
+        if not isinstance(self.fault, Unset):
+            fault = self.fault.value
+
+        reasons: list[Any] | Unset = UNSET
+        if not isinstance(self.reasons, Unset):
+            reasons = self.reasons
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -59,6 +88,7 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
                 "type": type_,
                 "code": code,
                 "message": message,
+                "retryable": retryable,
             }
         )
         if meta is not UNSET:
@@ -67,6 +97,14 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
             field_dict["trace_id"] = trace_id
         if span_id is not UNSET:
             field_dict["span_id"] = span_id
+        if tips is not UNSET:
+            field_dict["tips"] = tips
+        if docs_url is not UNSET:
+            field_dict["docs_url"] = docs_url
+        if fault is not UNSET:
+            field_dict["fault"] = fault
+        if reasons is not UNSET:
+            field_dict["reasons"] = reasons
 
         return field_dict
 
@@ -83,6 +121,8 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
 
         message = d.pop("message")
 
+        retryable = d.pop("retryable")
+
         _meta = d.pop("meta", UNSET)
         meta: GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorMeta | Unset
         if isinstance(_meta, Unset):
@@ -94,13 +134,31 @@ class GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404E
 
         span_id = d.pop("span_id", UNSET)
 
+        tips = cast(list[str], d.pop("tips", UNSET))
+
+        docs_url = d.pop("docs_url", UNSET)
+
+        _fault = d.pop("fault", UNSET)
+        fault: GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorFault | Unset
+        if isinstance(_fault, Unset):
+            fault = UNSET
+        else:
+            fault = GetApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdResponse404ErrorFault(_fault)
+
+        reasons = cast(list[Any], d.pop("reasons", UNSET))
+
         get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404_error = cls(
             type_=type_,
             code=code,
             message=message,
+            retryable=retryable,
             meta=meta,
             trace_id=trace_id,
             span_id=span_id,
+            tips=tips,
+            docs_url=docs_url,
+            fault=fault,
+            reasons=reasons,
         )
 
         get_api_v1_projects_by_project_id_analytics_dashboard_widgets_by_widget_id_response_404_error.additional_properties = d

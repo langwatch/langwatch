@@ -7,14 +7,8 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.patch_api_triggers_by_id_response_200_action import PatchApiTriggersByIdResponse200Action
-from ..models.patch_api_triggers_by_id_response_200_alert_type_type_1 import (
-    PatchApiTriggersByIdResponse200AlertTypeType1,
-)
-from ..models.patch_api_triggers_by_id_response_200_alert_type_type_2_type_1 import (
-    PatchApiTriggersByIdResponse200AlertTypeType2Type1,
-)
-from ..models.patch_api_triggers_by_id_response_200_alert_type_type_3_type_1 import (
-    PatchApiTriggersByIdResponse200AlertTypeType3Type1,
+from ..models.patch_api_triggers_by_id_response_200_alert_type_type_0 import (
+    PatchApiTriggersByIdResponse200AlertTypeType0,
 )
 
 if TYPE_CHECKING:
@@ -36,8 +30,7 @@ class PatchApiTriggersByIdResponse200:
         filters (PatchApiTriggersByIdResponse200Filters):
         active (bool):
         message (None | str):
-        alert_type (None | PatchApiTriggersByIdResponse200AlertTypeType1 |
-            PatchApiTriggersByIdResponse200AlertTypeType2Type1 | PatchApiTriggersByIdResponse200AlertTypeType3Type1):
+        alert_type (None | PatchApiTriggersByIdResponse200AlertTypeType0):
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -50,12 +43,7 @@ class PatchApiTriggersByIdResponse200:
     filters: PatchApiTriggersByIdResponse200Filters
     active: bool
     message: None | str
-    alert_type: (
-        None
-        | PatchApiTriggersByIdResponse200AlertTypeType1
-        | PatchApiTriggersByIdResponse200AlertTypeType2Type1
-        | PatchApiTriggersByIdResponse200AlertTypeType3Type1
-    )
+    alert_type: None | PatchApiTriggersByIdResponse200AlertTypeType0
     created_at: str
     updated_at: str
     platform_url: str
@@ -78,11 +66,7 @@ class PatchApiTriggersByIdResponse200:
         message = self.message
 
         alert_type: None | str
-        if isinstance(self.alert_type, PatchApiTriggersByIdResponse200AlertTypeType1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PatchApiTriggersByIdResponse200AlertTypeType2Type1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, PatchApiTriggersByIdResponse200AlertTypeType3Type1):
+        if isinstance(self.alert_type, PatchApiTriggersByIdResponse200AlertTypeType0):
             alert_type = self.alert_type.value
         else:
             alert_type = self.alert_type
@@ -140,47 +124,18 @@ class PatchApiTriggersByIdResponse200:
 
         message = _parse_message(d.pop("message"))
 
-        def _parse_alert_type(
-            data: object,
-        ) -> (
-            None
-            | PatchApiTriggersByIdResponse200AlertTypeType1
-            | PatchApiTriggersByIdResponse200AlertTypeType2Type1
-            | PatchApiTriggersByIdResponse200AlertTypeType3Type1
-        ):
+        def _parse_alert_type(data: object) -> None | PatchApiTriggersByIdResponse200AlertTypeType0:
             if data is None:
                 return data
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                alert_type_type_1 = PatchApiTriggersByIdResponse200AlertTypeType1(data)
+                alert_type_type_0 = PatchApiTriggersByIdResponse200AlertTypeType0(data)
 
-                return alert_type_type_1
+                return alert_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_2_type_1 = PatchApiTriggersByIdResponse200AlertTypeType2Type1(data)
-
-                return alert_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_3_type_1 = PatchApiTriggersByIdResponse200AlertTypeType3Type1(data)
-
-                return alert_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | PatchApiTriggersByIdResponse200AlertTypeType1
-                | PatchApiTriggersByIdResponse200AlertTypeType2Type1
-                | PatchApiTriggersByIdResponse200AlertTypeType3Type1,
-                data,
-            )
+            return cast(None | PatchApiTriggersByIdResponse200AlertTypeType0, data)
 
         alert_type = _parse_alert_type(d.pop("alertType"))
 

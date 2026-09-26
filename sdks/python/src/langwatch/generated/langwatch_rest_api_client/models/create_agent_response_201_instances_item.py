@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 if TYPE_CHECKING:
     from ..models.create_agent_response_201_instances_item_sdk import CreateAgentResponse201InstancesItemSdk
@@ -23,7 +25,7 @@ class CreateAgentResponse201InstancesItem:
         pid (float):
         label (None | str):
         sdk (CreateAgentResponse201InstancesItemSdk):
-        connected_at (str):
+        connected_at (datetime.datetime):
         inflight (float):
         max_concurrency (float):
     """
@@ -34,7 +36,7 @@ class CreateAgentResponse201InstancesItem:
     pid: float
     label: None | str
     sdk: CreateAgentResponse201InstancesItemSdk
-    connected_at: str
+    connected_at: datetime.datetime
     inflight: float
     max_concurrency: float
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -53,7 +55,7 @@ class CreateAgentResponse201InstancesItem:
 
         sdk = self.sdk.to_dict()
 
-        connected_at = self.connected_at
+        connected_at = self.connected_at.isoformat()
 
         inflight = self.inflight
 
@@ -99,7 +101,7 @@ class CreateAgentResponse201InstancesItem:
 
         sdk = CreateAgentResponse201InstancesItemSdk.from_dict(d.pop("sdk"))
 
-        connected_at = d.pop("connectedAt")
+        connected_at = isoparse(d.pop("connectedAt"))
 
         inflight = d.pop("inflight")
 

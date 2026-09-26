@@ -35,8 +35,8 @@ class CreateInstantEvalRunBody:
             to seven days ago.
         end (datetime.datetime | Unset): With target: the newest instant to judge. Defaults to now.
         questions (list[CreateInstantEvalRunBodyQuestionsItem] | Unset): With target: what to ask of each row. One
-            classification asks them all per row, and the question text is part of what that classification is priced
-            on; the estimate endpoint prices the exact set.
+            classification asks them all per row, and the question text is part of what that classification is priced on;
+            the estimate endpoint prices the exact set.
         name (str | Unset): What to call the run. Yours to choose.
         limit (int | Unset): Rows the run may judge. Ten thousand by default on every plan, up to one hundred thousand
             on a plan that lifts the cap.

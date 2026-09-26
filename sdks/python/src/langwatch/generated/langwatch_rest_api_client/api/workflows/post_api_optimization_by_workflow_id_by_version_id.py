@@ -14,15 +14,6 @@ from ...models.post_api_optimization_by_workflow_id_by_version_id_response_200 i
 from ...models.post_api_optimization_by_workflow_id_by_version_id_response_400 import (
     PostApiOptimizationByWorkflowIdByVersionIdResponse400,
 )
-from ...models.post_api_optimization_by_workflow_id_by_version_id_response_401 import (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse401,
-)
-from ...models.post_api_optimization_by_workflow_id_by_version_id_response_403 import (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse403,
-)
-from ...models.post_api_optimization_by_workflow_id_by_version_id_response_404 import (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse404,
-)
 from ...types import Response, safe_http_status
 
 
@@ -53,12 +44,7 @@ def _get_kwargs(
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
-    | None
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | None
 ):
     if response.status_code == 200:
         response_200 = PostApiOptimizationByWorkflowIdByVersionIdResponse200.from_dict(response.json())
@@ -70,21 +56,6 @@ def _parse_response(
 
         return response_400
 
-    if response.status_code == 401:
-        response_401 = PostApiOptimizationByWorkflowIdByVersionIdResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 403:
-        response_403 = PostApiOptimizationByWorkflowIdByVersionIdResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 404:
-        response_404 = PostApiOptimizationByWorkflowIdByVersionIdResponse404.from_dict(response.json())
-
-        return response_404
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -94,11 +65,7 @@ def _parse_response(
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
 ) -> Response[
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
@@ -118,17 +85,14 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiOptimizationByWorkflowIdByVersionIdBody,
 ) -> Response[
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400
 ]:
     """Run a workflow version (legacy path)
 
      Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST
     /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one
-    stays for callers written against it.
+    stays for callers written against it. The body is the workflow's own input fields, named as its
+    entry node names them.
 
     Args:
         workflow_id (str):
@@ -141,7 +105,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | PostApiOptimizationByWorkflowIdByVersionIdResponse401 | PostApiOptimizationByWorkflowIdByVersionIdResponse403 | PostApiOptimizationByWorkflowIdByVersionIdResponse404]
+        Response[PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -164,18 +128,14 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiOptimizationByWorkflowIdByVersionIdBody,
 ) -> (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
-    | None
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | None
 ):
     """Run a workflow version (legacy path)
 
      Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST
     /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one
-    stays for callers written against it.
+    stays for callers written against it. The body is the workflow's own input fields, named as its
+    entry node names them.
 
     Args:
         workflow_id (str):
@@ -188,7 +148,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | PostApiOptimizationByWorkflowIdByVersionIdResponse401 | PostApiOptimizationByWorkflowIdByVersionIdResponse403 | PostApiOptimizationByWorkflowIdByVersionIdResponse404
+        PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400
     """
 
     return sync_detailed(
@@ -206,17 +166,14 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiOptimizationByWorkflowIdByVersionIdBody,
 ) -> Response[
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400
 ]:
     """Run a workflow version (legacy path)
 
      Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST
     /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one
-    stays for callers written against it.
+    stays for callers written against it. The body is the workflow's own input fields, named as its
+    entry node names them.
 
     Args:
         workflow_id (str):
@@ -229,7 +186,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | PostApiOptimizationByWorkflowIdByVersionIdResponse401 | PostApiOptimizationByWorkflowIdByVersionIdResponse403 | PostApiOptimizationByWorkflowIdByVersionIdResponse404]
+        Response[PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -250,18 +207,14 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiOptimizationByWorkflowIdByVersionIdBody,
 ) -> (
-    PostApiOptimizationByWorkflowIdByVersionIdResponse200
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse400
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse401
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse403
-    | PostApiOptimizationByWorkflowIdByVersionIdResponse404
-    | None
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | None
 ):
     """Run a workflow version (legacy path)
 
      Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST
     /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one
-    stays for callers written against it.
+    stays for callers written against it. The body is the workflow's own input fields, named as its
+    entry node names them.
 
     Args:
         workflow_id (str):
@@ -274,7 +227,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400 | PostApiOptimizationByWorkflowIdByVersionIdResponse401 | PostApiOptimizationByWorkflowIdByVersionIdResponse403 | PostApiOptimizationByWorkflowIdByVersionIdResponse404
+        PostApiOptimizationByWorkflowIdByVersionIdResponse200 | PostApiOptimizationByWorkflowIdByVersionIdResponse400
     """
 
     return (

@@ -1,20 +1,18 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.scim_list_users_response_200 import ScimListUsersResponse200
-from ...models.scim_list_users_response_401 import ScimListUsersResponse401
-from ...models.scim_list_users_response_403 import ScimListUsersResponse403
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -38,20 +36,18 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+) -> Any | ScimListUsersResponse200 | None:
     if response.status_code == 200:
         response_200 = ScimListUsersResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 401:
-        response_401 = ScimListUsersResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = ScimListUsersResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
     if client.raise_on_unexpected_status:
@@ -62,7 +58,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+) -> Response[Any | ScimListUsersResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -78,26 +74,27 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
+) -> Response[Any | ScimListUsersResponse200]:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]
+        Response[Any | ScimListUsersResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -117,26 +114,27 @@ def sync(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
+) -> Any | ScimListUsersResponse200 | None:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403
+        Any | ScimListUsersResponse200
     """
 
     return sync_detailed(
@@ -151,26 +149,27 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
-) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
+) -> Response[Any | ScimListUsersResponse200]:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]
+        Response[Any | ScimListUsersResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -188,26 +187,27 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
-) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
+) -> Any | ScimListUsersResponse200 | None:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403
+        Any | ScimListUsersResponse200
     """
 
     return (

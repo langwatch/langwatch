@@ -4,6 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.post_api_governance_ingestion_templates_body import PostApiGovernanceIngestionTemplatesBody
 from ...models.post_api_governance_ingestion_templates_response_201 import (
     PostApiGovernanceIngestionTemplatesResponse201,
 )
@@ -22,13 +23,22 @@ from ...models.post_api_governance_ingestion_templates_response_500 import (
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: PostApiGovernanceIngestionTemplatesBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/v1/governance/ingestion-templates",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -96,6 +106,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesBody,
 ) -> Response[
     PostApiGovernanceIngestionTemplatesResponse201
     | PostApiGovernanceIngestionTemplatesResponse400
@@ -109,6 +120,9 @@ def sync_detailed(
     rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform
     defaults via POST /ingestion-templates/clone instead.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -117,7 +131,9 @@ def sync_detailed(
         Response[PostApiGovernanceIngestionTemplatesResponse201 | PostApiGovernanceIngestionTemplatesResponse400 | PostApiGovernanceIngestionTemplatesResponse401 | PostApiGovernanceIngestionTemplatesResponse422 | PostApiGovernanceIngestionTemplatesResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -129,6 +145,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesBody,
 ) -> (
     PostApiGovernanceIngestionTemplatesResponse201
     | PostApiGovernanceIngestionTemplatesResponse400
@@ -143,6 +160,9 @@ def sync(
     rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform
     defaults via POST /ingestion-templates/clone instead.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -153,12 +173,14 @@ def sync(
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesBody,
 ) -> Response[
     PostApiGovernanceIngestionTemplatesResponse201
     | PostApiGovernanceIngestionTemplatesResponse400
@@ -172,6 +194,9 @@ async def asyncio_detailed(
     rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform
     defaults via POST /ingestion-templates/clone instead.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -180,7 +205,9 @@ async def asyncio_detailed(
         Response[PostApiGovernanceIngestionTemplatesResponse201 | PostApiGovernanceIngestionTemplatesResponse400 | PostApiGovernanceIngestionTemplatesResponse401 | PostApiGovernanceIngestionTemplatesResponse422 | PostApiGovernanceIngestionTemplatesResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -190,6 +217,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesBody,
 ) -> (
     PostApiGovernanceIngestionTemplatesResponse201
     | PostApiGovernanceIngestionTemplatesResponse400
@@ -203,6 +231,9 @@ async def asyncio(
      Creates a brand-new template scoped to the caller's organization. Slug is auto-generated. Platform
     rows (organizationId IS NULL) are NEVER created via this endpoint — admins customize platform
     defaults via POST /ingestion-templates/clone instead.
+
+    Args:
+        body (PostApiGovernanceIngestionTemplatesBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -215,5 +246,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

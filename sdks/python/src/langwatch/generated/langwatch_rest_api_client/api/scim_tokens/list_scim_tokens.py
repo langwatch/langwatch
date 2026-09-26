@@ -50,9 +50,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListScimTokensResponse200]:
-    """List the organization's SCIM bearer tokens: id, description, the connection each one manages,
-    creation time and last use. Token values and hashes are never returned; the value exists only in the
-    create response, once.
+    """List the organization's SCIM bearer tokens: id, description, creation time and last use. Token
+    values and hashes are never returned; the value exists only in the create response, once.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -75,9 +74,8 @@ def sync(
     *,
     client: AuthenticatedClient,
 ) -> ListScimTokensResponse200 | None:
-    """List the organization's SCIM bearer tokens: id, description, the connection each one manages,
-    creation time and last use. Token values and hashes are never returned; the value exists only in the
-    create response, once.
+    """List the organization's SCIM bearer tokens: id, description, creation time and last use. Token
+    values and hashes are never returned; the value exists only in the create response, once.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -96,9 +94,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
 ) -> Response[ListScimTokensResponse200]:
-    """List the organization's SCIM bearer tokens: id, description, the connection each one manages,
-    creation time and last use. Token values and hashes are never returned; the value exists only in the
-    create response, once.
+    """List the organization's SCIM bearer tokens: id, description, creation time and last use. Token
+    values and hashes are never returned; the value exists only in the create response, once.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -119,9 +116,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
 ) -> ListScimTokensResponse200 | None:
-    """List the organization's SCIM bearer tokens: id, description, the connection each one manages,
-    creation time and last use. Token values and hashes are never returned; the value exists only in the
-    create response, once.
+    """List the organization's SCIM bearer tokens: id, description, creation time and last use. Token
+    values and hashes are never returned; the value exists only in the create response, once.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

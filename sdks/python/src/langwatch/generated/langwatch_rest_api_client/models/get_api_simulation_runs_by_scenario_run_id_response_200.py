@@ -29,22 +29,18 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
         scenario_run_id (str):
         name (None | str):
         description (None | str):
-        status (str): Where the run stands. PENDING_EVALUATION means the conversation is over and the judge has decided,
-            but the evaluators the run's suite and plan attach have not been recorded yet, so a required one may still fail
-            the run. Wait for another status before reading the verdict as final.
+        status (str):
         results (GetApiSimulationRunsByScenarioRunIdResponse200ResultsType0 | None):
         messages (list[GetApiSimulationRunsByScenarioRunIdResponse200MessagesItem]):
         timestamp (float):
         updated_at (float):
         duration_in_ms (float):
         platform_url (str):
-        messages_truncated (bool | Unset): True when `messages` holds only the first few messages of a longer
-            conversation. Pass `include=messages` to read them all.
         total_cost (float | Unset):
         note (None | str | Unset): One short line saying why the run was started, as given when it was queued. Null on a
-            run started without one. Absent on servers that predate run notes.
+            run started without one.
         scenario_version (int | None | Unset): The version of the scenario at the moment the run was queued. Null on
-            runs recorded before versions existed. Absent on servers that predate scenario versions.
+            runs recorded before versions existed.
     """
 
     scenario_id: str
@@ -59,7 +55,6 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
     updated_at: float
     duration_in_ms: float
     platform_url: str
-    messages_truncated: bool | Unset = UNSET
     total_cost: float | Unset = UNSET
     note: None | str | Unset = UNSET
     scenario_version: int | None | Unset = UNSET
@@ -103,8 +98,6 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         platform_url = self.platform_url
 
-        messages_truncated = self.messages_truncated
-
         total_cost = self.total_cost
 
         note: None | str | Unset
@@ -137,8 +130,6 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
                 "platformUrl": platform_url,
             }
         )
-        if messages_truncated is not UNSET:
-            field_dict["messagesTruncated"] = messages_truncated
         if total_cost is not UNSET:
             field_dict["totalCost"] = total_cost
         if note is not UNSET:
@@ -210,8 +201,6 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
-        messages_truncated = d.pop("messagesTruncated", UNSET)
-
         total_cost = d.pop("totalCost", UNSET)
 
         def _parse_note(data: object) -> None | str | Unset:
@@ -245,7 +234,6 @@ class GetApiSimulationRunsByScenarioRunIdResponse200:
             updated_at=updated_at,
             duration_in_ms=duration_in_ms,
             platform_url=platform_url,
-            messages_truncated=messages_truncated,
             total_cost=total_cost,
             note=note,
             scenario_version=scenario_version,

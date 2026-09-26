@@ -109,8 +109,9 @@ def sync_detailed(
     | PutApiAgentCacheByNameResponse403
     | PutApiAgentCacheByNameResponse500
 ]:
-    """Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and
-    expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins.
+    """Store an agent cache entry
+
+     Store or replace an encrypted value. It expires after ttl_seconds, which defaults to 900.
 
     Args:
         name (str):
@@ -149,8 +150,9 @@ def sync(
     | PutApiAgentCacheByNameResponse500
     | None
 ):
-    """Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and
-    expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins.
+    """Store an agent cache entry
+
+     Store or replace an encrypted value. It expires after ttl_seconds, which defaults to 900.
 
     Args:
         name (str):
@@ -183,8 +185,9 @@ async def asyncio_detailed(
     | PutApiAgentCacheByNameResponse403
     | PutApiAgentCacheByNameResponse500
 ]:
-    """Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and
-    expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins.
+    """Store an agent cache entry
+
+     Store or replace an encrypted value. It expires after ttl_seconds, which defaults to 900.
 
     Args:
         name (str):
@@ -221,8 +224,9 @@ async def asyncio(
     | PutApiAgentCacheByNameResponse500
     | None
 ):
-    """Store a value under a name, whether or not the name is held yet. The value is encrypted at rest and
-    expires by itself after ttl_seconds, which defaults to 900 seconds. The last write wins.
+    """Store an agent cache entry
+
+     Store or replace an encrypted value. It expires after ttl_seconds, which defaults to 900.
 
     Args:
         name (str):

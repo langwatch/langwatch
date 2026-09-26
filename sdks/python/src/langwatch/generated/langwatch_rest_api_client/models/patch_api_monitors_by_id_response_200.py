@@ -7,7 +7,6 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.patch_api_monitors_by_id_response_200_execution_mode import PatchApiMonitorsByIdResponse200ExecutionMode
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PatchApiMonitorsByIdResponse200")
 
@@ -25,13 +24,13 @@ class PatchApiMonitorsByIdResponse200:
         sample (float):
         level (str):
         evaluator_id (None | str):
+        preconditions (Any):
+        parameters (Any):
+        mappings (Any | None):
         thread_idle_timeout (float | None):
         created_at (str):
         updated_at (str):
         platform_url (str):
-        preconditions (Any | Unset):
-        parameters (Any | Unset):
-        mappings (None | Unset):
     """
 
     id: str
@@ -43,13 +42,13 @@ class PatchApiMonitorsByIdResponse200:
     sample: float
     level: str
     evaluator_id: None | str
+    preconditions: Any
+    parameters: Any
+    mappings: Any | None
     thread_idle_timeout: float | None
     created_at: str
     updated_at: str
     platform_url: str
-    preconditions: Any | Unset = UNSET
-    parameters: Any | Unset = UNSET
-    mappings: None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,6 +71,13 @@ class PatchApiMonitorsByIdResponse200:
         evaluator_id: None | str
         evaluator_id = self.evaluator_id
 
+        preconditions = self.preconditions
+
+        parameters = self.parameters
+
+        mappings: Any | None
+        mappings = self.mappings
+
         thread_idle_timeout: float | None
         thread_idle_timeout = self.thread_idle_timeout
 
@@ -80,12 +86,6 @@ class PatchApiMonitorsByIdResponse200:
         updated_at = self.updated_at
 
         platform_url = self.platform_url
-
-        preconditions = self.preconditions
-
-        parameters = self.parameters
-
-        mappings = self.mappings
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -100,18 +100,15 @@ class PatchApiMonitorsByIdResponse200:
                 "sample": sample,
                 "level": level,
                 "evaluatorId": evaluator_id,
+                "preconditions": preconditions,
+                "parameters": parameters,
+                "mappings": mappings,
                 "threadIdleTimeout": thread_idle_timeout,
                 "createdAt": created_at,
                 "updatedAt": updated_at,
                 "platformUrl": platform_url,
             }
         )
-        if preconditions is not UNSET:
-            field_dict["preconditions"] = preconditions
-        if parameters is not UNSET:
-            field_dict["parameters"] = parameters
-        if mappings is not UNSET:
-            field_dict["mappings"] = mappings
 
         return field_dict
 
@@ -141,6 +138,17 @@ class PatchApiMonitorsByIdResponse200:
 
         evaluator_id = _parse_evaluator_id(d.pop("evaluatorId"))
 
+        preconditions = d.pop("preconditions")
+
+        parameters = d.pop("parameters")
+
+        def _parse_mappings(data: object) -> Any | None:
+            if data is None:
+                return data
+            return cast(Any | None, data)
+
+        mappings = _parse_mappings(d.pop("mappings"))
+
         def _parse_thread_idle_timeout(data: object) -> float | None:
             if data is None:
                 return data
@@ -154,12 +162,6 @@ class PatchApiMonitorsByIdResponse200:
 
         platform_url = d.pop("platformUrl")
 
-        preconditions = d.pop("preconditions", UNSET)
-
-        parameters = d.pop("parameters", UNSET)
-
-        mappings = d.pop("mappings", UNSET)
-
         patch_api_monitors_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -170,13 +172,13 @@ class PatchApiMonitorsByIdResponse200:
             sample=sample,
             level=level,
             evaluator_id=evaluator_id,
+            preconditions=preconditions,
+            parameters=parameters,
+            mappings=mappings,
             thread_idle_timeout=thread_idle_timeout,
             created_at=created_at,
             updated_at=updated_at,
             platform_url=platform_url,
-            preconditions=preconditions,
-            parameters=parameters,
-            mappings=mappings,
         )
 
         patch_api_monitors_by_id_response_200.additional_properties = d

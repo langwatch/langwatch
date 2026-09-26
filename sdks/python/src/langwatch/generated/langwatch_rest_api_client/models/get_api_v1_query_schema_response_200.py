@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
-    from ..models.get_api_v1_query_schema_response_200_datasets_item import GetApiV1QuerySchemaResponse200DatasetsItem
-    from ..models.get_api_v1_query_schema_response_200_functions_item import GetApiV1QuerySchemaResponse200FunctionsItem
+    from ..models.get_api_v1_query_schema_response_200_app_functions_item import (
+        GetApiV1QuerySchemaResponse200AppFunctionsItem,
+    )
+    from ..models.get_api_v1_query_schema_response_200_views_item import GetApiV1QuerySchemaResponse200ViewsItem
 
 
 T = TypeVar("T", bound="GetApiV1QuerySchemaResponse200")
@@ -19,35 +21,40 @@ class GetApiV1QuerySchemaResponse200:
     """
     Attributes:
         database (str):
-        datasets (list[GetApiV1QuerySchemaResponse200DatasetsItem]):
-        functions (list[GetApiV1QuerySchemaResponse200FunctionsItem]):
+        views (list[GetApiV1QuerySchemaResponse200ViewsItem]):
+        functions (list[str]):
+        app_functions (list[GetApiV1QuerySchemaResponse200AppFunctionsItem]):
     """
 
     database: str
-    datasets: list[GetApiV1QuerySchemaResponse200DatasetsItem]
-    functions: list[GetApiV1QuerySchemaResponse200FunctionsItem]
+    views: list[GetApiV1QuerySchemaResponse200ViewsItem]
+    functions: list[str]
+    app_functions: list[GetApiV1QuerySchemaResponse200AppFunctionsItem]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         database = self.database
 
-        datasets = []
-        for datasets_item_data in self.datasets:
-            datasets_item = datasets_item_data.to_dict()
-            datasets.append(datasets_item)
+        views = []
+        for views_item_data in self.views:
+            views_item = views_item_data.to_dict()
+            views.append(views_item)
 
-        functions = []
-        for functions_item_data in self.functions:
-            functions_item = functions_item_data.to_dict()
-            functions.append(functions_item)
+        functions = self.functions
+
+        app_functions = []
+        for app_functions_item_data in self.app_functions:
+            app_functions_item = app_functions_item_data.to_dict()
+            app_functions.append(app_functions_item)
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "database": database,
-                "datasets": datasets,
+                "views": views,
                 "functions": functions,
+                "appFunctions": app_functions,
             }
         )
 
@@ -55,34 +62,35 @@ class GetApiV1QuerySchemaResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_v1_query_schema_response_200_datasets_item import (
-            GetApiV1QuerySchemaResponse200DatasetsItem,
+        from ..models.get_api_v1_query_schema_response_200_app_functions_item import (
+            GetApiV1QuerySchemaResponse200AppFunctionsItem,
         )
-        from ..models.get_api_v1_query_schema_response_200_functions_item import (
-            GetApiV1QuerySchemaResponse200FunctionsItem,
-        )
+        from ..models.get_api_v1_query_schema_response_200_views_item import GetApiV1QuerySchemaResponse200ViewsItem
 
         d = dict(src_dict)
         database = d.pop("database")
 
-        datasets = []
-        _datasets = d.pop("datasets")
-        for datasets_item_data in _datasets:
-            datasets_item = GetApiV1QuerySchemaResponse200DatasetsItem.from_dict(datasets_item_data)
+        views = []
+        _views = d.pop("views")
+        for views_item_data in _views:
+            views_item = GetApiV1QuerySchemaResponse200ViewsItem.from_dict(views_item_data)
 
-            datasets.append(datasets_item)
+            views.append(views_item)
 
-        functions = []
-        _functions = d.pop("functions")
-        for functions_item_data in _functions:
-            functions_item = GetApiV1QuerySchemaResponse200FunctionsItem.from_dict(functions_item_data)
+        functions = cast(list[str], d.pop("functions"))
 
-            functions.append(functions_item)
+        app_functions = []
+        _app_functions = d.pop("appFunctions")
+        for app_functions_item_data in _app_functions:
+            app_functions_item = GetApiV1QuerySchemaResponse200AppFunctionsItem.from_dict(app_functions_item_data)
+
+            app_functions.append(app_functions_item)
 
         get_api_v1_query_schema_response_200 = cls(
             database=database,
-            datasets=datasets,
+            views=views,
             functions=functions,
+            app_functions=app_functions,
         )
 
         get_api_v1_query_schema_response_200.additional_properties = d

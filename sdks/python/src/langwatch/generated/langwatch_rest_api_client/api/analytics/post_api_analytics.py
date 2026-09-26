@@ -8,7 +8,6 @@ from ...models.post_api_analytics_body import PostApiAnalyticsBody
 from ...models.post_api_analytics_response_200 import PostApiAnalyticsResponse200
 from ...models.post_api_analytics_response_400 import PostApiAnalyticsResponse400
 from ...models.post_api_analytics_response_401 import PostApiAnalyticsResponse401
-from ...models.post_api_analytics_response_403 import PostApiAnalyticsResponse403
 from ...types import Response, safe_http_status
 
 
@@ -33,13 +32,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-    | None
-):
+) -> PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | None:
     if response.status_code == 200:
         response_200 = PostApiAnalyticsResponse200.from_dict(response.json())
 
@@ -55,11 +48,6 @@ def _parse_response(
 
         return response_401
 
-    if response.status_code == 403:
-        response_403 = PostApiAnalyticsResponse403.from_dict(response.json())
-
-        return response_403
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -68,12 +56,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-]:
+) -> Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -89,12 +72,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiAnalyticsBody,
-) -> Response[
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-]:
+) -> Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401]:
     """Query analytics timeseries (legacy path)
 
      Query analytics timeseries with metrics, aggregations and filters. Identical to `POST
@@ -109,7 +87,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | PostApiAnalyticsResponse403]
+        Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401]
     """
 
     kwargs = _get_kwargs(
@@ -127,13 +105,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiAnalyticsBody,
-) -> (
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-    | None
-):
+) -> PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | None:
     """Query analytics timeseries (legacy path)
 
      Query analytics timeseries with metrics, aggregations and filters. Identical to `POST
@@ -148,7 +120,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | PostApiAnalyticsResponse403
+        PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401
     """
 
     return sync_detailed(
@@ -161,12 +133,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiAnalyticsBody,
-) -> Response[
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-]:
+) -> Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401]:
     """Query analytics timeseries (legacy path)
 
      Query analytics timeseries with metrics, aggregations and filters. Identical to `POST
@@ -181,7 +148,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | PostApiAnalyticsResponse403]
+        Response[PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401]
     """
 
     kwargs = _get_kwargs(
@@ -197,13 +164,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiAnalyticsBody,
-) -> (
-    PostApiAnalyticsResponse200
-    | PostApiAnalyticsResponse400
-    | PostApiAnalyticsResponse401
-    | PostApiAnalyticsResponse403
-    | None
-):
+) -> PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | None:
     """Query analytics timeseries (legacy path)
 
      Query analytics timeseries with metrics, aggregations and filters. Identical to `POST
@@ -218,7 +179,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401 | PostApiAnalyticsResponse403
+        PostApiAnalyticsResponse200 | PostApiAnalyticsResponse400 | PostApiAnalyticsResponse401
     """
 
     return (

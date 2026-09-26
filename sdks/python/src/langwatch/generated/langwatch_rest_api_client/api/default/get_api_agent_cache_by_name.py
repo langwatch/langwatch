@@ -9,7 +9,6 @@ from ...models.get_api_agent_cache_by_name_response_200 import GetApiAgentCacheB
 from ...models.get_api_agent_cache_by_name_response_400 import GetApiAgentCacheByNameResponse400
 from ...models.get_api_agent_cache_by_name_response_401 import GetApiAgentCacheByNameResponse401
 from ...models.get_api_agent_cache_by_name_response_403 import GetApiAgentCacheByNameResponse403
-from ...models.get_api_agent_cache_by_name_response_404 import GetApiAgentCacheByNameResponse404
 from ...models.get_api_agent_cache_by_name_response_500 import GetApiAgentCacheByNameResponse500
 from ...types import Response, safe_http_status
 
@@ -35,7 +34,6 @@ def _parse_response(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
     | None
 ):
@@ -59,11 +57,6 @@ def _parse_response(
 
         return response_403
 
-    if response.status_code == 404:
-        response_404 = GetApiAgentCacheByNameResponse404.from_dict(response.json())
-
-        return response_404
-
     if response.status_code == 500:
         response_500 = GetApiAgentCacheByNameResponse500.from_dict(response.json())
 
@@ -82,7 +75,6 @@ def _build_response(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
 ]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
@@ -105,13 +97,12 @@ def sync_detailed(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
 ]:
-    """Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers
-    404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already
-    choose what the next read answers. A legacy project API key reaches this route, the same as it
-    reaches the rest of the project surface.
+    """Read an agent cache entry
+
+     Read a cache entry by name. An absent or expired entry answers 404. The value is returned only to a
+    caller that can manage the project's agent cache.
 
     Args:
         name (str):
@@ -121,7 +112,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse404 | GetApiAgentCacheByNameResponse500]
+        Response[GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -144,14 +135,13 @@ def sync(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
     | None
 ):
-    """Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers
-    404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already
-    choose what the next read answers. A legacy project API key reaches this route, the same as it
-    reaches the rest of the project surface.
+    """Read an agent cache entry
+
+     Read a cache entry by name. An absent or expired entry answers 404. The value is returned only to a
+    caller that can manage the project's agent cache.
 
     Args:
         name (str):
@@ -161,7 +151,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse404 | GetApiAgentCacheByNameResponse500
+        GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse500
     """
 
     return sync_detailed(
@@ -179,13 +169,12 @@ async def asyncio_detailed(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
 ]:
-    """Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers
-    404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already
-    choose what the next read answers. A legacy project API key reaches this route, the same as it
-    reaches the rest of the project surface.
+    """Read an agent cache entry
+
+     Read a cache entry by name. An absent or expired entry answers 404. The value is returned only to a
+    caller that can manage the project's agent cache.
 
     Args:
         name (str):
@@ -195,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse404 | GetApiAgentCacheByNameResponse500]
+        Response[GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -216,14 +205,13 @@ async def asyncio(
     | GetApiAgentCacheByNameResponse400
     | GetApiAgentCacheByNameResponse401
     | GetApiAgentCacheByNameResponse403
-    | GetApiAgentCacheByNameResponse404
     | GetApiAgentCacheByNameResponse500
     | None
 ):
-    """Read a cache entry by name. An entry that was never stored, or whose lifetime has passed, answers
-    404. Requires the agentCache:manage grain, because a caller that can overwrite an entry can already
-    choose what the next read answers. A legacy project API key reaches this route, the same as it
-    reaches the rest of the project surface.
+    """Read an agent cache entry
+
+     Read a cache entry by name. An absent or expired entry answers 404. The value is returned only to a
+    caller that can manage the project's agent cache.
 
     Args:
         name (str):
@@ -233,7 +221,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse404 | GetApiAgentCacheByNameResponse500
+        GetApiAgentCacheByNameResponse200 | GetApiAgentCacheByNameResponse400 | GetApiAgentCacheByNameResponse401 | GetApiAgentCacheByNameResponse403 | GetApiAgentCacheByNameResponse500
     """
 
     return (

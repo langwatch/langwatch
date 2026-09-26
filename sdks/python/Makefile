@@ -119,7 +119,7 @@ generate/api-client: ensure-openapi-python-client
 	@python3 scripts/spec-for-python-generator.py \
 		$(API_SPEC) \
 		.tmp/openapiLangWatch.python.json
-	uv run openapi-python-client generate \
+	uv run --with "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)" openapi-python-client generate \
 		--path .tmp/openapiLangWatch.python.json \
 		--output-path .tmp/api-client \
 		--custom-template-path openapi-templates \

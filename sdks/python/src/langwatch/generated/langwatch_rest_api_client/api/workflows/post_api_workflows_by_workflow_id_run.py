@@ -8,9 +8,6 @@ from ...client import AuthenticatedClient, Client
 from ...models.post_api_workflows_by_workflow_id_run_body import PostApiWorkflowsByWorkflowIdRunBody
 from ...models.post_api_workflows_by_workflow_id_run_response_200 import PostApiWorkflowsByWorkflowIdRunResponse200
 from ...models.post_api_workflows_by_workflow_id_run_response_400 import PostApiWorkflowsByWorkflowIdRunResponse400
-from ...models.post_api_workflows_by_workflow_id_run_response_401 import PostApiWorkflowsByWorkflowIdRunResponse401
-from ...models.post_api_workflows_by_workflow_id_run_response_403 import PostApiWorkflowsByWorkflowIdRunResponse403
-from ...models.post_api_workflows_by_workflow_id_run_response_404 import PostApiWorkflowsByWorkflowIdRunResponse404
 from ...types import Response, safe_http_status
 
 
@@ -38,14 +35,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-    | None
-):
+) -> PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | None:
     if response.status_code == 200:
         response_200 = PostApiWorkflowsByWorkflowIdRunResponse200.from_dict(response.json())
 
@@ -56,21 +46,6 @@ def _parse_response(
 
         return response_400
 
-    if response.status_code == 401:
-        response_401 = PostApiWorkflowsByWorkflowIdRunResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 403:
-        response_403 = PostApiWorkflowsByWorkflowIdRunResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 404:
-        response_404 = PostApiWorkflowsByWorkflowIdRunResponse404.from_dict(response.json())
-
-        return response_404
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -79,13 +54,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-]:
+) -> Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -102,17 +71,12 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiWorkflowsByWorkflowIdRunBody,
-) -> Response[
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-]:
+) -> Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400]:
     """Run a workflow
 
      Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
-    published version; address a specific version with the `{versionId}` form of this path.
+    published version; address a specific version with the `{versionId}` form of this path. The body is
+    the workflow's own input fields, named as its entry node names them.
 
     Args:
         workflow_id (str):
@@ -124,7 +88,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404]
+        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -144,18 +108,12 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiWorkflowsByWorkflowIdRunBody,
-) -> (
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-    | None
-):
+) -> PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | None:
     """Run a workflow
 
      Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
-    published version; address a specific version with the `{versionId}` form of this path.
+    published version; address a specific version with the `{versionId}` form of this path. The body is
+    the workflow's own input fields, named as its entry node names them.
 
     Args:
         workflow_id (str):
@@ -167,7 +125,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404
+        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400
     """
 
     return sync_detailed(
@@ -182,17 +140,12 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiWorkflowsByWorkflowIdRunBody,
-) -> Response[
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-]:
+) -> Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400]:
     """Run a workflow
 
      Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
-    published version; address a specific version with the `{versionId}` form of this path.
+    published version; address a specific version with the `{versionId}` form of this path. The body is
+    the workflow's own input fields, named as its entry node names them.
 
     Args:
         workflow_id (str):
@@ -204,7 +157,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404]
+        Response[PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400]
     """
 
     kwargs = _get_kwargs(
@@ -222,18 +175,12 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiWorkflowsByWorkflowIdRunBody,
-) -> (
-    PostApiWorkflowsByWorkflowIdRunResponse200
-    | PostApiWorkflowsByWorkflowIdRunResponse400
-    | PostApiWorkflowsByWorkflowIdRunResponse401
-    | PostApiWorkflowsByWorkflowIdRunResponse403
-    | PostApiWorkflowsByWorkflowIdRunResponse404
-    | None
-):
+) -> PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | None:
     """Run a workflow
 
      Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's
-    published version; address a specific version with the `{versionId}` form of this path.
+    published version; address a specific version with the `{versionId}` form of this path. The body is
+    the workflow's own input fields, named as its entry node names them.
 
     Args:
         workflow_id (str):
@@ -245,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400 | PostApiWorkflowsByWorkflowIdRunResponse401 | PostApiWorkflowsByWorkflowIdRunResponse403 | PostApiWorkflowsByWorkflowIdRunResponse404
+        PostApiWorkflowsByWorkflowIdRunResponse200 | PostApiWorkflowsByWorkflowIdRunResponse400
     """
 
     return (

@@ -17,7 +17,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/v1/trace/search",
+        "url": "/api/trace/search",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -54,7 +54,7 @@ def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Res
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: SearchRequest,
 ) -> Response[SearchResponse]:
     """Search traces
@@ -85,7 +85,7 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: SearchRequest,
 ) -> SearchResponse | None:
     """Search traces
@@ -111,7 +111,7 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: SearchRequest,
 ) -> Response[SearchResponse]:
     """Search traces
@@ -140,7 +140,7 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
+    client: AuthenticatedClient,
     body: SearchRequest,
 ) -> SearchResponse | None:
     """Search traces

@@ -83,24 +83,24 @@ type TraceSearchParams struct {
 //		for _, t := range res.Traces { fmt.Println(*t.TraceId) }
 //	}
 func (s *TracesService) Search(ctx context.Context, params TraceSearchParams) (*TraceSearchResponse, error) {
-	body := openapi.SearchRequest{}
+	body := map[string]any{}
 	if params.Query != "" {
-		body.Query = &params.Query
+		body["query"] = params.Query
 	}
 	if params.StartDate != nil {
-		body.StartDate = params.StartDate
+		body["startDate"] = params.StartDate
 	}
 	if params.EndDate != nil {
-		body.EndDate = params.EndDate
+		body["endDate"] = params.EndDate
 	}
 	if params.Filters != nil {
-		body.Filters = &params.Filters
+		body["filters"] = params.Filters
 	}
 	if params.PageSize > 0 {
-		body.PageSize = &params.PageSize
+		body["pageSize"] = params.PageSize
 	}
 	if params.ScrollID != "" {
-		body.ScrollId = &params.ScrollID
+		body["scrollId"] = params.ScrollID
 	}
 	reader, err := jsonReader(body)
 	if err != nil {
@@ -120,7 +120,7 @@ func (s *TracesService) Search(ctx context.Context, params TraceSearchParams) (*
 //
 //	t, err := lw.Traces.Get(ctx, "trace_abc123")
 func (s *TracesService) Get(ctx context.Context, traceID string) (*Trace, error) {
-	jsonFormat := openapi.GetApiTracesByTraceIdParamsFormatJson
+	jsonFormat := "json"
 	params := &openapi.GetApiTracesByTraceIdParams{Format: &jsonFormat}
 	resp, err := s.client.gen.GetApiTracesByTraceId(ctx, traceID, params)
 	var out Trace

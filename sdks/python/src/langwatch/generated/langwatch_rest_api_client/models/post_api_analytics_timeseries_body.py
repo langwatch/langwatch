@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_analytics_timeseries_body_group_by import PostApiAnalyticsTimeseriesBodyGroupBy
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -29,7 +28,7 @@ class PostApiAnalyticsTimeseriesBody:
         filters (PostApiAnalyticsTimeseriesBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
-        group_by (PostApiAnalyticsTimeseriesBodyGroupBy | Unset):
+        group_by (str | Unset):
         group_by_key (str | Unset):
         time_scale (int | Literal['full'] | Unset):
     """
@@ -42,7 +41,7 @@ class PostApiAnalyticsTimeseriesBody:
     filters: PostApiAnalyticsTimeseriesBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
-    group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset = UNSET
+    group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | Literal["full"] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -73,9 +72,7 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = self.negate_filters
 
-        group_by: str | Unset = UNSET
-        if not isinstance(self.group_by, Unset):
-            group_by = self.group_by.value
+        group_by = self.group_by
 
         group_by_key = self.group_by_key
 
@@ -151,12 +148,7 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
-        _group_by = d.pop("groupBy", UNSET)
-        group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset
-        if isinstance(_group_by, Unset):
-            group_by = UNSET
-        else:
-            group_by = PostApiAnalyticsTimeseriesBodyGroupBy(_group_by)
+        group_by = d.pop("groupBy", UNSET)
 
         group_by_key = d.pop("groupByKey", UNSET)
 

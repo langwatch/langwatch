@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -6,11 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_experiments_by_slug_response_200 import GetApiExperimentsBySlugResponse200
-from ...models.get_api_experiments_by_slug_response_400 import GetApiExperimentsBySlugResponse400
-from ...models.get_api_experiments_by_slug_response_401 import GetApiExperimentsBySlugResponse401
-from ...models.get_api_experiments_by_slug_response_404 import GetApiExperimentsBySlugResponse404
-from ...models.get_api_experiments_by_slug_response_422 import GetApiExperimentsBySlugResponse422
-from ...models.get_api_experiments_by_slug_response_500 import GetApiExperimentsBySlugResponse500
 from ...types import Response, safe_http_status
 
 
@@ -30,44 +25,15 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-    | None
-):
+) -> Any | GetApiExperimentsBySlugResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiExperimentsBySlugResponse200.from_dict(response.json())
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = GetApiExperimentsBySlugResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiExperimentsBySlugResponse401.from_dict(response.json())
-
-        return response_401
-
     if response.status_code == 404:
-        response_404 = GetApiExperimentsBySlugResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
-
-    if response.status_code == 422:
-        response_422 = GetApiExperimentsBySlugResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = GetApiExperimentsBySlugResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -77,14 +43,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-]:
+) -> Response[Any | GetApiExperimentsBySlugResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -100,14 +59,7 @@ def sync_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-]:
+) -> Response[Any | GetApiExperimentsBySlugResponse200]:
     """Read one experiment
 
      Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id
@@ -121,7 +73,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugResponse200 | GetApiExperimentsBySlugResponse400 | GetApiExperimentsBySlugResponse401 | GetApiExperimentsBySlugResponse404 | GetApiExperimentsBySlugResponse422 | GetApiExperimentsBySlugResponse500]
+        Response[Any | GetApiExperimentsBySlugResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -139,15 +91,7 @@ def sync(
     slug: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-    | None
-):
+) -> Any | GetApiExperimentsBySlugResponse200 | None:
     """Read one experiment
 
      Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id
@@ -161,7 +105,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugResponse200 | GetApiExperimentsBySlugResponse400 | GetApiExperimentsBySlugResponse401 | GetApiExperimentsBySlugResponse404 | GetApiExperimentsBySlugResponse422 | GetApiExperimentsBySlugResponse500
+        Any | GetApiExperimentsBySlugResponse200
     """
 
     return sync_detailed(
@@ -174,14 +118,7 @@ async def asyncio_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-]:
+) -> Response[Any | GetApiExperimentsBySlugResponse200]:
     """Read one experiment
 
      Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id
@@ -195,7 +132,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugResponse200 | GetApiExperimentsBySlugResponse400 | GetApiExperimentsBySlugResponse401 | GetApiExperimentsBySlugResponse404 | GetApiExperimentsBySlugResponse422 | GetApiExperimentsBySlugResponse500]
+        Response[Any | GetApiExperimentsBySlugResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -211,15 +148,7 @@ async def asyncio(
     slug: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiExperimentsBySlugResponse200
-    | GetApiExperimentsBySlugResponse400
-    | GetApiExperimentsBySlugResponse401
-    | GetApiExperimentsBySlugResponse404
-    | GetApiExperimentsBySlugResponse422
-    | GetApiExperimentsBySlugResponse500
-    | None
-):
+) -> Any | GetApiExperimentsBySlugResponse200 | None:
     """Read one experiment
 
      Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id
@@ -233,7 +162,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugResponse200 | GetApiExperimentsBySlugResponse400 | GetApiExperimentsBySlugResponse401 | GetApiExperimentsBySlugResponse404 | GetApiExperimentsBySlugResponse422 | GetApiExperimentsBySlugResponse500
+        Any | GetApiExperimentsBySlugResponse200
     """
 
     return (

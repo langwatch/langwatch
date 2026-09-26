@@ -11,7 +11,7 @@ T = TypeVar("T", bound="PutApiExperimentsBySlugWorkbenchStateBodyState")
 
 @_attrs_define
 class PutApiExperimentsBySlugWorkbenchStateBodyState:
-    """The full setup to save"""
+    """ """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

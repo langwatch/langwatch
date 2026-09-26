@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 if TYPE_CHECKING:
     from ..models.list_organizations_response_200_organizations_item import (
         ListOrganizationsResponse200OrganizationsItem,
@@ -21,25 +19,25 @@ T = TypeVar("T", bound="ListOrganizationsResponse200")
 class ListOrganizationsResponse200:
     """
     Attributes:
-        organizations (list[ListOrganizationsResponse200OrganizationsItem] | Unset):
+        organizations (list[ListOrganizationsResponse200OrganizationsItem]):
     """
 
-    organizations: list[ListOrganizationsResponse200OrganizationsItem] | Unset = UNSET
+    organizations: list[ListOrganizationsResponse200OrganizationsItem]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        organizations: list[dict[str, Any]] | Unset = UNSET
-        if not isinstance(self.organizations, Unset):
-            organizations = []
-            for organizations_item_data in self.organizations:
-                organizations_item = organizations_item_data.to_dict()
-                organizations.append(organizations_item)
+        organizations = []
+        for organizations_item_data in self.organizations:
+            organizations_item = organizations_item_data.to_dict()
+            organizations.append(organizations_item)
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if organizations is not UNSET:
-            field_dict["organizations"] = organizations
+        field_dict.update(
+            {
+                "organizations": organizations,
+            }
+        )
 
         return field_dict
 
@@ -50,14 +48,12 @@ class ListOrganizationsResponse200:
         )
 
         d = dict(src_dict)
-        _organizations = d.pop("organizations", UNSET)
-        organizations: list[ListOrganizationsResponse200OrganizationsItem] | Unset = UNSET
-        if _organizations is not UNSET:
-            organizations = []
-            for organizations_item_data in _organizations:
-                organizations_item = ListOrganizationsResponse200OrganizationsItem.from_dict(organizations_item_data)
+        organizations = []
+        _organizations = d.pop("organizations")
+        for organizations_item_data in _organizations:
+            organizations_item = ListOrganizationsResponse200OrganizationsItem.from_dict(organizations_item_data)
 
-                organizations.append(organizations_item)
+            organizations.append(organizations_item)
 
         list_organizations_response_200 = cls(
             organizations=organizations,

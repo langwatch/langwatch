@@ -17,19 +17,39 @@ T = TypeVar("T", bound="GetApiWebhooksV1EventsByIdResponse200")
 class GetApiWebhooksV1EventsByIdResponse200:
     """
     Attributes:
+        id (str):
+        type_ (str):
+        created (str):
+        schema_version (str):
         data (GetApiWebhooksV1EventsByIdResponse200Data):
     """
 
+    id: str
+    type_: str
+    created: str
+    schema_version: str
     data: GetApiWebhooksV1EventsByIdResponse200Data
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        id = self.id
+
+        type_ = self.type_
+
+        created = self.created
+
+        schema_version = self.schema_version
+
         data = self.data.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
+                "id": id,
+                "type": type_,
+                "created": created,
+                "schema_version": schema_version,
                 "data": data,
             }
         )
@@ -43,9 +63,21 @@ class GetApiWebhooksV1EventsByIdResponse200:
         )
 
         d = dict(src_dict)
+        id = d.pop("id")
+
+        type_ = d.pop("type")
+
+        created = d.pop("created")
+
+        schema_version = d.pop("schema_version")
+
         data = GetApiWebhooksV1EventsByIdResponse200Data.from_dict(d.pop("data"))
 
         get_api_webhooks_v1_events_by_id_response_200 = cls(
+            id=id,
+            type_=type_,
+            created=created,
+            schema_version=schema_version,
             data=data,
         )
 

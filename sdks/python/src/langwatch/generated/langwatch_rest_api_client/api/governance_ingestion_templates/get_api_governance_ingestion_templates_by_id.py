@@ -14,9 +14,6 @@ from ...models.get_api_governance_ingestion_templates_by_id_response_400 import 
 from ...models.get_api_governance_ingestion_templates_by_id_response_401 import (
     GetApiGovernanceIngestionTemplatesByIdResponse401,
 )
-from ...models.get_api_governance_ingestion_templates_by_id_response_404 import (
-    GetApiGovernanceIngestionTemplatesByIdResponse404,
-)
 from ...models.get_api_governance_ingestion_templates_by_id_response_422 import (
     GetApiGovernanceIngestionTemplatesByIdResponse422,
 )
@@ -46,7 +43,6 @@ def _parse_response(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
     | None
@@ -65,11 +61,6 @@ def _parse_response(
         response_401 = GetApiGovernanceIngestionTemplatesByIdResponse401.from_dict(response.json())
 
         return response_401
-
-    if response.status_code == 404:
-        response_404 = GetApiGovernanceIngestionTemplatesByIdResponse404.from_dict(response.json())
-
-        return response_404
 
     if response.status_code == 422:
         response_422 = GetApiGovernanceIngestionTemplatesByIdResponse422.from_dict(response.json())
@@ -93,7 +84,6 @@ def _build_response(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
 ]:
@@ -116,14 +106,14 @@ def sync_detailed(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
 ]:
     """Get ingestion template
 
-     Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404
-    (no enumeration vector).
+     Single-template lookup by id, scoped to the caller's organization, including the canonical
+    `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row
+    without `ottl_rules` from GET /ingestion-templates.
 
     Args:
         id (str):
@@ -133,7 +123,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse404 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -155,15 +145,15 @@ def sync(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
     | None
 ):
     """Get ingestion template
 
-     Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404
-    (no enumeration vector).
+     Single-template lookup by id, scoped to the caller's organization, including the canonical
+    `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row
+    without `ottl_rules` from GET /ingestion-templates.
 
     Args:
         id (str):
@@ -173,7 +163,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse404 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500
+        GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return sync_detailed(
@@ -190,14 +180,14 @@ async def asyncio_detailed(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
 ]:
     """Get ingestion template
 
-     Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404
-    (no enumeration vector).
+     Single-template lookup by id, scoped to the caller's organization, including the canonical
+    `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row
+    without `ottl_rules` from GET /ingestion-templates.
 
     Args:
         id (str):
@@ -207,7 +197,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse404 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500]
+        Response[GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500]
     """
 
     kwargs = _get_kwargs(
@@ -227,15 +217,15 @@ async def asyncio(
     GetApiGovernanceIngestionTemplatesByIdResponse200
     | GetApiGovernanceIngestionTemplatesByIdResponse400
     | GetApiGovernanceIngestionTemplatesByIdResponse401
-    | GetApiGovernanceIngestionTemplatesByIdResponse404
     | GetApiGovernanceIngestionTemplatesByIdResponse422
     | GetApiGovernanceIngestionTemplatesByIdResponse500
     | None
 ):
     """Get ingestion template
 
-     Single-template lookup by id, scoped to the caller's organization. Cross-org probes collapse to 404
-    (no enumeration vector).
+     Single-template lookup by id, scoped to the caller's organization, including the canonical
+    `ottl_rules`. Cross-org probes collapse to 404 (no enumeration vector). Members read the same row
+    without `ottl_rules` from GET /ingestion-templates.
 
     Args:
         id (str):
@@ -245,7 +235,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse404 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500
+        GetApiGovernanceIngestionTemplatesByIdResponse200 | GetApiGovernanceIngestionTemplatesByIdResponse400 | GetApiGovernanceIngestionTemplatesByIdResponse401 | GetApiGovernanceIngestionTemplatesByIdResponse422 | GetApiGovernanceIngestionTemplatesByIdResponse500
     """
 
     return (

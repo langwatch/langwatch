@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
 
@@ -35,8 +37,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         config (GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None):
         workflow_id (None | str):
         copied_from_evaluator_id (None | str):
-        created_at (str):
-        updated_at (str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
         fields (list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]):
         output_fields (list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]):
         platform_url (str):
@@ -52,8 +54,8 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
     config: GetApiEvaluatorsByIdOrSlugResponse200ConfigType0 | None
     workflow_id: None | str
     copied_from_evaluator_id: None | str
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     fields: list[GetApiEvaluatorsByIdOrSlugResponse200FieldsItem]
     output_fields: list[GetApiEvaluatorsByIdOrSlugResponse200OutputFieldsItem]
     platform_url: str
@@ -89,9 +91,9 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
         copied_from_evaluator_id: None | str
         copied_from_evaluator_id = self.copied_from_evaluator_id
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         fields = []
         for fields_item_data in self.fields:
@@ -192,9 +194,9 @@ class GetApiEvaluatorsByIdOrSlugResponse200:
 
         copied_from_evaluator_id = _parse_copied_from_evaluator_id(d.pop("copiedFromEvaluatorId"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         fields = []
         _fields = d.pop("fields")

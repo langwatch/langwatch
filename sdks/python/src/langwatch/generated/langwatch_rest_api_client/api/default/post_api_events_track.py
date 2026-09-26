@@ -4,6 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.post_api_events_track_body import PostApiEventsTrackBody
 from ...models.post_api_events_track_response_200 import PostApiEventsTrackResponse200
 from ...models.post_api_events_track_response_400 import PostApiEventsTrackResponse400
 from ...models.post_api_events_track_response_401 import PostApiEventsTrackResponse401
@@ -12,13 +13,22 @@ from ...models.post_api_events_track_response_500 import PostApiEventsTrackRespo
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: PostApiEventsTrackBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/v1/events/track",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -86,6 +96,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiEventsTrackBody,
 ) -> Response[
     PostApiEventsTrackResponse200
     | PostApiEventsTrackResponse400
@@ -93,9 +104,14 @@ def sync_detailed(
     | PostApiEventsTrackResponse422
     | PostApiEventsTrackResponse500
 ]:
-    """Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
+    """Record a user event
+
+     Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
     validate against their schemas; custom event types pass through
     `trackEventRESTParamsValidatorSchema`.
+
+    Args:
+        body (PostApiEventsTrackBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -105,7 +121,9 @@ def sync_detailed(
         Response[PostApiEventsTrackResponse200 | PostApiEventsTrackResponse400 | PostApiEventsTrackResponse401 | PostApiEventsTrackResponse422 | PostApiEventsTrackResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -117,6 +135,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    body: PostApiEventsTrackBody,
 ) -> (
     PostApiEventsTrackResponse200
     | PostApiEventsTrackResponse400
@@ -125,9 +144,14 @@ def sync(
     | PostApiEventsTrackResponse500
     | None
 ):
-    """Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
+    """Record a user event
+
+     Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
     validate against their schemas; custom event types pass through
     `trackEventRESTParamsValidatorSchema`.
+
+    Args:
+        body (PostApiEventsTrackBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -139,12 +163,14 @@ def sync(
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiEventsTrackBody,
 ) -> Response[
     PostApiEventsTrackResponse200
     | PostApiEventsTrackResponse400
@@ -152,9 +178,14 @@ async def asyncio_detailed(
     | PostApiEventsTrackResponse422
     | PostApiEventsTrackResponse500
 ]:
-    """Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
+    """Record a user event
+
+     Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
     validate against their schemas; custom event types pass through
     `trackEventRESTParamsValidatorSchema`.
+
+    Args:
+        body (PostApiEventsTrackBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -164,7 +195,9 @@ async def asyncio_detailed(
         Response[PostApiEventsTrackResponse200 | PostApiEventsTrackResponse400 | PostApiEventsTrackResponse401 | PostApiEventsTrackResponse422 | PostApiEventsTrackResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -174,6 +207,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    body: PostApiEventsTrackBody,
 ) -> (
     PostApiEventsTrackResponse200
     | PostApiEventsTrackResponse400
@@ -182,9 +216,14 @@ async def asyncio(
     | PostApiEventsTrackResponse500
     | None
 ):
-    """Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
+    """Record a user event
+
+     Record a user event (e.g. thumbs up/down, selected text) attached to a trace. Predefined event types
     validate against their schemas; custom event types pass through
     `trackEventRESTParamsValidatorSchema`.
+
+    Args:
+        body (PostApiEventsTrackBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -197,5 +236,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

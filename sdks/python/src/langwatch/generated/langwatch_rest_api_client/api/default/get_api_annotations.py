@@ -4,7 +4,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.error import Error
 from ...models.get_api_annotations_anchor import GetApiAnnotationsAnchor
 from ...models.get_api_annotations_response_200 import GetApiAnnotationsResponse200
 from ...types import UNSET, Response, Unset, safe_http_status
@@ -12,7 +11,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 
 def _get_kwargs(
     *,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
+    anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -36,16 +35,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Error | GetApiAnnotationsResponse200 | None:
+) -> GetApiAnnotationsResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiAnnotationsResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = Error.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -55,7 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Error | GetApiAnnotationsResponse200]:
+) -> Response[GetApiAnnotationsResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -69,20 +63,20 @@ def _build_response(
 
 def sync_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
-) -> Response[Error | GetApiAnnotationsResponse200]:
-    """Returns all annotations for project
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
+) -> Response[GetApiAnnotationsResponse200]:
+    """List annotations in the caller’s project
 
     Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
+        anchor (GetApiAnnotationsAnchor | Unset):  Default: GetApiAnnotationsAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | GetApiAnnotationsResponse200]
+        Response[GetApiAnnotationsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -98,20 +92,20 @@ def sync_detailed(
 
 def sync(
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
-) -> Error | GetApiAnnotationsResponse200 | None:
-    """Returns all annotations for project
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
+) -> GetApiAnnotationsResponse200 | None:
+    """List annotations in the caller’s project
 
     Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
+        anchor (GetApiAnnotationsAnchor | Unset):  Default: GetApiAnnotationsAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | GetApiAnnotationsResponse200
+        GetApiAnnotationsResponse200
     """
 
     return sync_detailed(
@@ -122,20 +116,20 @@ def sync(
 
 async def asyncio_detailed(
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
-) -> Response[Error | GetApiAnnotationsResponse200]:
-    """Returns all annotations for project
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
+) -> Response[GetApiAnnotationsResponse200]:
+    """List annotations in the caller’s project
 
     Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
+        anchor (GetApiAnnotationsAnchor | Unset):  Default: GetApiAnnotationsAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | GetApiAnnotationsResponse200]
+        Response[GetApiAnnotationsResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -149,20 +143,20 @@ async def asyncio_detailed(
 
 async def asyncio(
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsAnchor | Unset = UNSET,
-) -> Error | GetApiAnnotationsResponse200 | None:
-    """Returns all annotations for project
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsAnchor | Unset = GetApiAnnotationsAnchor.ALL,
+) -> GetApiAnnotationsResponse200 | None:
+    """List annotations in the caller’s project
 
     Args:
-        anchor (GetApiAnnotationsAnchor | Unset):
+        anchor (GetApiAnnotationsAnchor | Unset):  Default: GetApiAnnotationsAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | GetApiAnnotationsResponse200
+        GetApiAnnotationsResponse200
     """
 
     return (

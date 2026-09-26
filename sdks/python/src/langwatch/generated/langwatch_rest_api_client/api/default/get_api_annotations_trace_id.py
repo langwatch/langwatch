@@ -5,7 +5,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.error import Error
 from ...models.get_api_annotations_trace_id_anchor import GetApiAnnotationsTraceIdAnchor
 from ...models.get_api_annotations_trace_id_response_200 import GetApiAnnotationsTraceIdResponse200
 from ...types import UNSET, Response, Unset, safe_http_status
@@ -14,7 +13,7 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     id: str,
     *,
-    anchor: GetApiAnnotationsTraceIdAnchor | Unset = UNSET,
+    anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -40,16 +39,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Error | GetApiAnnotationsTraceIdResponse200 | None:
+) -> GetApiAnnotationsTraceIdResponse200 | None:
     if response.status_code == 200:
         response_200 = GetApiAnnotationsTraceIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = Error.from_dict(response.json())
-
-        return response_400
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -59,7 +53,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Error | GetApiAnnotationsTraceIdResponse200]:
+) -> Response[GetApiAnnotationsTraceIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -74,21 +68,22 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsTraceIdAnchor | Unset = UNSET,
-) -> Response[Error | GetApiAnnotationsTraceIdResponse200]:
-    """Returns all annotations for single trace
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
+) -> Response[GetApiAnnotationsTraceIdResponse200]:
+    """List annotations on a trace in the caller’s project
 
     Args:
         id (str):
-        anchor (GetApiAnnotationsTraceIdAnchor | Unset):
+        anchor (GetApiAnnotationsTraceIdAnchor | Unset):  Default:
+            GetApiAnnotationsTraceIdAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | GetApiAnnotationsTraceIdResponse200]
+        Response[GetApiAnnotationsTraceIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -106,21 +101,22 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsTraceIdAnchor | Unset = UNSET,
-) -> Error | GetApiAnnotationsTraceIdResponse200 | None:
-    """Returns all annotations for single trace
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
+) -> GetApiAnnotationsTraceIdResponse200 | None:
+    """List annotations on a trace in the caller’s project
 
     Args:
         id (str):
-        anchor (GetApiAnnotationsTraceIdAnchor | Unset):
+        anchor (GetApiAnnotationsTraceIdAnchor | Unset):  Default:
+            GetApiAnnotationsTraceIdAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | GetApiAnnotationsTraceIdResponse200
+        GetApiAnnotationsTraceIdResponse200
     """
 
     return sync_detailed(
@@ -133,21 +129,22 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsTraceIdAnchor | Unset = UNSET,
-) -> Response[Error | GetApiAnnotationsTraceIdResponse200]:
-    """Returns all annotations for single trace
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
+) -> Response[GetApiAnnotationsTraceIdResponse200]:
+    """List annotations on a trace in the caller’s project
 
     Args:
         id (str):
-        anchor (GetApiAnnotationsTraceIdAnchor | Unset):
+        anchor (GetApiAnnotationsTraceIdAnchor | Unset):  Default:
+            GetApiAnnotationsTraceIdAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Error | GetApiAnnotationsTraceIdResponse200]
+        Response[GetApiAnnotationsTraceIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -163,21 +160,22 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-    anchor: GetApiAnnotationsTraceIdAnchor | Unset = UNSET,
-) -> Error | GetApiAnnotationsTraceIdResponse200 | None:
-    """Returns all annotations for single trace
+    client: AuthenticatedClient,
+    anchor: GetApiAnnotationsTraceIdAnchor | Unset = GetApiAnnotationsTraceIdAnchor.ALL,
+) -> GetApiAnnotationsTraceIdResponse200 | None:
+    """List annotations on a trace in the caller’s project
 
     Args:
         id (str):
-        anchor (GetApiAnnotationsTraceIdAnchor | Unset):
+        anchor (GetApiAnnotationsTraceIdAnchor | Unset):  Default:
+            GetApiAnnotationsTraceIdAnchor.ALL.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Error | GetApiAnnotationsTraceIdResponse200
+        GetApiAnnotationsTraceIdResponse200
     """
 
     return (

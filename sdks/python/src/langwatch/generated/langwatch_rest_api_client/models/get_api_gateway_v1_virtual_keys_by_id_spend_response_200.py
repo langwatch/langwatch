@@ -20,8 +20,7 @@ class GetApiGatewayV1VirtualKeysByIdSpendResponse200:
     """
     Attributes:
         virtual_key_id (str):
-        spent_usd (str): Spend over the window, summed from the cost path. Decimal string, up to 9 fractional digits,
-            trailing zeros trimmed, never exponent notation.
+        spent_usd (str):
         requests (int):
         window (GetApiGatewayV1VirtualKeysByIdSpendResponse200Window):
     """

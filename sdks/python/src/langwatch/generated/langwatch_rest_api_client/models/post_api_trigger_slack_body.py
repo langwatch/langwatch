@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..models.post_api_trigger_slack_body_alert_type import PostApiTriggerSlackBodyAlertType
 from ..types import UNSET, Unset
@@ -32,6 +33,7 @@ class PostApiTriggerSlackBody:
     alert_type: PostApiTriggerSlackBodyAlertType
     message: str | Unset = UNSET
     filters: PostApiTriggerSlackBodyFilters | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         slack_webhook = self.slack_webhook
@@ -47,7 +49,7 @@ class PostApiTriggerSlackBody:
             filters = self.filters.to_dict()
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "slack_webhook": slack_webhook,
@@ -90,4 +92,21 @@ class PostApiTriggerSlackBody:
             filters=filters,
         )
 
+        post_api_trigger_slack_body.additional_properties = d
         return post_api_trigger_slack_body
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

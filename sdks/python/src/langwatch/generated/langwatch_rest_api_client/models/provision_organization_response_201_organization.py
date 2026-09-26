@@ -6,8 +6,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="ProvisionOrganizationResponse201Organization")
 
 
@@ -15,14 +13,14 @@ T = TypeVar("T", bound="ProvisionOrganizationResponse201Organization")
 class ProvisionOrganizationResponse201Organization:
     """
     Attributes:
-        id (str | Unset):
-        name (str | Unset):
-        slug (str | Unset):
+        id (str):
+        name (str):
+        slug (str):
     """
 
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    slug: str | Unset = UNSET
+    id: str
+    name: str
+    slug: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -34,24 +32,24 @@ class ProvisionOrganizationResponse201Organization:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if id is not UNSET:
-            field_dict["id"] = id
-        if name is not UNSET:
-            field_dict["name"] = name
-        if slug is not UNSET:
-            field_dict["slug"] = slug
+        field_dict.update(
+            {
+                "id": id,
+                "name": name,
+                "slug": slug,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        id = d.pop("id", UNSET)
+        id = d.pop("id")
 
-        name = d.pop("name", UNSET)
+        name = d.pop("name")
 
-        slug = d.pop("slug", UNSET)
+        slug = d.pop("slug")
 
         provision_organization_response_201_organization = cls(
             id=id,

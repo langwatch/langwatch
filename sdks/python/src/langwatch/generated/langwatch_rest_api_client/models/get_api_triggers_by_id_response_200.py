@@ -7,13 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.get_api_triggers_by_id_response_200_action import GetApiTriggersByIdResponse200Action
-from ..models.get_api_triggers_by_id_response_200_alert_type_type_1 import GetApiTriggersByIdResponse200AlertTypeType1
-from ..models.get_api_triggers_by_id_response_200_alert_type_type_2_type_1 import (
-    GetApiTriggersByIdResponse200AlertTypeType2Type1,
-)
-from ..models.get_api_triggers_by_id_response_200_alert_type_type_3_type_1 import (
-    GetApiTriggersByIdResponse200AlertTypeType3Type1,
-)
+from ..models.get_api_triggers_by_id_response_200_alert_type_type_0 import GetApiTriggersByIdResponse200AlertTypeType0
 
 if TYPE_CHECKING:
     from ..models.get_api_triggers_by_id_response_200_action_params import GetApiTriggersByIdResponse200ActionParams
@@ -34,8 +28,7 @@ class GetApiTriggersByIdResponse200:
         filters (GetApiTriggersByIdResponse200Filters):
         active (bool):
         message (None | str):
-        alert_type (GetApiTriggersByIdResponse200AlertTypeType1 | GetApiTriggersByIdResponse200AlertTypeType2Type1 |
-            GetApiTriggersByIdResponse200AlertTypeType3Type1 | None):
+        alert_type (GetApiTriggersByIdResponse200AlertTypeType0 | None):
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -48,12 +41,7 @@ class GetApiTriggersByIdResponse200:
     filters: GetApiTriggersByIdResponse200Filters
     active: bool
     message: None | str
-    alert_type: (
-        GetApiTriggersByIdResponse200AlertTypeType1
-        | GetApiTriggersByIdResponse200AlertTypeType2Type1
-        | GetApiTriggersByIdResponse200AlertTypeType3Type1
-        | None
-    )
+    alert_type: GetApiTriggersByIdResponse200AlertTypeType0 | None
     created_at: str
     updated_at: str
     platform_url: str
@@ -76,11 +64,7 @@ class GetApiTriggersByIdResponse200:
         message = self.message
 
         alert_type: None | str
-        if isinstance(self.alert_type, GetApiTriggersByIdResponse200AlertTypeType1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, GetApiTriggersByIdResponse200AlertTypeType2Type1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, GetApiTriggersByIdResponse200AlertTypeType3Type1):
+        if isinstance(self.alert_type, GetApiTriggersByIdResponse200AlertTypeType0):
             alert_type = self.alert_type.value
         else:
             alert_type = self.alert_type
@@ -136,47 +120,18 @@ class GetApiTriggersByIdResponse200:
 
         message = _parse_message(d.pop("message"))
 
-        def _parse_alert_type(
-            data: object,
-        ) -> (
-            GetApiTriggersByIdResponse200AlertTypeType1
-            | GetApiTriggersByIdResponse200AlertTypeType2Type1
-            | GetApiTriggersByIdResponse200AlertTypeType3Type1
-            | None
-        ):
+        def _parse_alert_type(data: object) -> GetApiTriggersByIdResponse200AlertTypeType0 | None:
             if data is None:
                 return data
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                alert_type_type_1 = GetApiTriggersByIdResponse200AlertTypeType1(data)
+                alert_type_type_0 = GetApiTriggersByIdResponse200AlertTypeType0(data)
 
-                return alert_type_type_1
+                return alert_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_2_type_1 = GetApiTriggersByIdResponse200AlertTypeType2Type1(data)
-
-                return alert_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_3_type_1 = GetApiTriggersByIdResponse200AlertTypeType3Type1(data)
-
-                return alert_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                GetApiTriggersByIdResponse200AlertTypeType1
-                | GetApiTriggersByIdResponse200AlertTypeType2Type1
-                | GetApiTriggersByIdResponse200AlertTypeType3Type1
-                | None,
-                data,
-            )
+            return cast(GetApiTriggersByIdResponse200AlertTypeType0 | None, data)
 
         alert_type = _parse_alert_type(d.pop("alertType"))
 

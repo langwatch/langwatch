@@ -21,10 +21,9 @@ T = TypeVar("T", bound="PutApiExperimentsBySlugWorkbenchStateBody")
 class PutApiExperimentsBySlugWorkbenchStateBody:
     """
     Attributes:
-        state (PutApiExperimentsBySlugWorkbenchStateBodyState): The full setup to save
-        expected_version (int | Unset): The version you read. Sending it refuses the save when someone else already
-            wrote on top of it.
-        commit_message (str | Unset): Names this version in the history list
+        state (PutApiExperimentsBySlugWorkbenchStateBodyState):
+        expected_version (int | Unset):
+        commit_message (str | Unset):
     """
 
     state: PutApiExperimentsBySlugWorkbenchStateBodyState

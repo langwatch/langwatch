@@ -16,7 +16,7 @@ def _get_kwargs(
     *,
     repository: str,
     pull_request: int,
-    host: str | Unset = "github.com",
+    host: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -31,7 +31,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/v1/coding-agent/pull-request-usage",
+        "url": "/api/coding-agent/pull-request-usage",
         "params": params,
     }
 
@@ -104,7 +104,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     repository: str,
     pull_request: int,
-    host: str | Unset = "github.com",
+    host: str | Unset = UNSET,
 ) -> Response[
     GetApiCodingAgentPullRequestUsageResponse200
     | GetApiCodingAgentPullRequestUsageResponse400
@@ -120,14 +120,12 @@ def sync_detailed(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price. Prefer `GET
-    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
-    key alone and needs no X-Project-Id header.
+    projects the calling user may view, and cost only for those they may price.
 
     Args:
         repository (str):
         pull_request (int):
-        host (str | Unset):  Default: 'github.com'.
+        host (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -155,7 +153,7 @@ def sync(
     client: AuthenticatedClient,
     repository: str,
     pull_request: int,
-    host: str | Unset = "github.com",
+    host: str | Unset = UNSET,
 ) -> (
     GetApiCodingAgentPullRequestUsageResponse200
     | GetApiCodingAgentPullRequestUsageResponse400
@@ -172,14 +170,12 @@ def sync(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price. Prefer `GET
-    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
-    key alone and needs no X-Project-Id header.
+    projects the calling user may view, and cost only for those they may price.
 
     Args:
         repository (str):
         pull_request (int):
-        host (str | Unset):  Default: 'github.com'.
+        host (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -202,7 +198,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     repository: str,
     pull_request: int,
-    host: str | Unset = "github.com",
+    host: str | Unset = UNSET,
 ) -> Response[
     GetApiCodingAgentPullRequestUsageResponse200
     | GetApiCodingAgentPullRequestUsageResponse400
@@ -218,14 +214,12 @@ async def asyncio_detailed(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price. Prefer `GET
-    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
-    key alone and needs no X-Project-Id header.
+    projects the calling user may view, and cost only for those they may price.
 
     Args:
         repository (str):
         pull_request (int):
-        host (str | Unset):  Default: 'github.com'.
+        host (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -251,7 +245,7 @@ async def asyncio(
     client: AuthenticatedClient,
     repository: str,
     pull_request: int,
-    host: str | Unset = "github.com",
+    host: str | Unset = UNSET,
 ) -> (
     GetApiCodingAgentPullRequestUsageResponse200
     | GetApiCodingAgentPullRequestUsageResponse400
@@ -268,14 +262,12 @@ async def asyncio(
     already covers, and the list-price total of both. Per-model totals carry the list price only. Cost
     is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend
     rather than restating a provider invoice. Requires a personal-project API key; rows appear only for
-    projects the calling user may view, and cost only for those they may price. Prefer `GET
-    /api/v1/coding-agent/pull-request-usage`, which answers the same question with an organization API
-    key alone and needs no X-Project-Id header.
+    projects the calling user may view, and cost only for those they may price.
 
     Args:
         repository (str):
         pull_request (int):
-        host (str | Unset):  Default: 'github.com'.
+        host (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

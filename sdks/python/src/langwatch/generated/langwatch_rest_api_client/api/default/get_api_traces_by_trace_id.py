@@ -5,8 +5,6 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_traces_by_trace_id_format import GetApiTracesByTraceIdFormat
-from ...models.get_api_traces_by_trace_id_llm_mode import GetApiTracesByTraceIdLlmMode
 from ...models.get_api_traces_by_trace_id_response_200 import GetApiTracesByTraceIdResponse200
 from ...models.get_api_traces_by_trace_id_response_400 import GetApiTracesByTraceIdResponse400
 from ...models.get_api_traces_by_trace_id_response_401 import GetApiTracesByTraceIdResponse401
@@ -20,23 +18,15 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     trace_id: str,
     *,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: str | Unset = UNSET,
+    llm_mode: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
 
-    json_format_: str | Unset = UNSET
-    if not isinstance(format_, Unset):
-        json_format_ = format_.value
+    params["format"] = format_
 
-    params["format"] = json_format_
-
-    json_llm_mode: str | Unset = UNSET
-    if not isinstance(llm_mode, Unset):
-        json_llm_mode = llm_mode.value
-
-    params["llmMode"] = json_llm_mode
+    params["llmMode"] = llm_mode
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -130,8 +120,8 @@ def sync_detailed(
     trace_id: str,
     *,
     client: AuthenticatedClient,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: str | Unset = UNSET,
+    llm_mode: str | Unset = UNSET,
 ) -> Response[
     GetApiTracesByTraceIdResponse200
     | GetApiTracesByTraceIdResponse400
@@ -145,8 +135,8 @@ def sync_detailed(
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (str | Unset):
+        llm_mode (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,8 +163,8 @@ def sync(
     trace_id: str,
     *,
     client: AuthenticatedClient,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: str | Unset = UNSET,
+    llm_mode: str | Unset = UNSET,
 ) -> (
     GetApiTracesByTraceIdResponse200
     | GetApiTracesByTraceIdResponse400
@@ -189,8 +179,8 @@ def sync(
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (str | Unset):
+        llm_mode (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -212,8 +202,8 @@ async def asyncio_detailed(
     trace_id: str,
     *,
     client: AuthenticatedClient,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: str | Unset = UNSET,
+    llm_mode: str | Unset = UNSET,
 ) -> Response[
     GetApiTracesByTraceIdResponse200
     | GetApiTracesByTraceIdResponse400
@@ -227,8 +217,8 @@ async def asyncio_detailed(
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (str | Unset):
+        llm_mode (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -253,8 +243,8 @@ async def asyncio(
     trace_id: str,
     *,
     client: AuthenticatedClient,
-    format_: GetApiTracesByTraceIdFormat | Unset = UNSET,
-    llm_mode: GetApiTracesByTraceIdLlmMode | Unset = UNSET,
+    format_: str | Unset = UNSET,
+    llm_mode: str | Unset = UNSET,
 ) -> (
     GetApiTracesByTraceIdResponse200
     | GetApiTracesByTraceIdResponse400
@@ -269,8 +259,8 @@ async def asyncio(
 
     Args:
         trace_id (str):
-        format_ (GetApiTracesByTraceIdFormat | Unset):
-        llm_mode (GetApiTracesByTraceIdLlmMode | Unset):
+        format_ (str | Unset):
+        llm_mode (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -11,8 +11,7 @@ T = TypeVar("T", bound="GetAgentResponse200OwnerType0")
 
 @_attrs_define
 class GetAgentResponse200OwnerType0:
-    """The person a personal development agent belongs to. Null when the agent is shared or host-scoped.
-
+    """
     Attributes:
         user_id (str):
         name (None | str):

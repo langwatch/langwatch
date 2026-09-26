@@ -1,18 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
 from ..models.post_langy_control_frames_body_frames_item_type_4_decision import (
     PostLangyControlFramesBodyFramesItemType4Decision,
-)
-from ..models.post_langy_control_frames_body_frames_item_type_4_protocol import (
-    PostLangyControlFramesBodyFramesItemType4Protocol,
-)
-from ..models.post_langy_control_frames_body_frames_item_type_4_type import (
-    PostLangyControlFramesBodyFramesItemType4Type,
 )
 from ..types import UNSET, Unset
 
@@ -23,23 +18,24 @@ T = TypeVar("T", bound="PostLangyControlFramesBodyFramesItemType4")
 class PostLangyControlFramesBodyFramesItemType4:
     """
     Attributes:
-        protocol (PostLangyControlFramesBodyFramesItemType4Protocol):
-        type_ (PostLangyControlFramesBodyFramesItemType4Type):
+        protocol (Literal[1]):
+        type_ (Literal['permission_answered']):
         call_id (str):
         decision (PostLangyControlFramesBodyFramesItemType4Decision):
         patterns (list[str] | Unset):
     """
 
-    protocol: PostLangyControlFramesBodyFramesItemType4Protocol
-    type_: PostLangyControlFramesBodyFramesItemType4Type
+    protocol: Literal[1]
+    type_: Literal["permission_answered"]
     call_id: str
     decision: PostLangyControlFramesBodyFramesItemType4Decision
     patterns: list[str] | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        protocol = self.protocol.value
+        protocol = self.protocol
 
-        type_ = self.type_.value
+        type_ = self.type_
 
         call_id = self.call_id
 
@@ -50,7 +46,7 @@ class PostLangyControlFramesBodyFramesItemType4:
             patterns = self.patterns
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "protocol": protocol,
@@ -67,9 +63,13 @@ class PostLangyControlFramesBodyFramesItemType4:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        protocol = PostLangyControlFramesBodyFramesItemType4Protocol(d.pop("protocol"))
+        protocol = cast(Literal[1], d.pop("protocol"))
+        if protocol != 1:
+            raise ValueError(f"protocol must match const 1, got '{protocol}'")
 
-        type_ = PostLangyControlFramesBodyFramesItemType4Type(d.pop("type"))
+        type_ = cast(Literal["permission_answered"], d.pop("type"))
+        if type_ != "permission_answered":
+            raise ValueError(f"type must match const 'permission_answered', got '{type_}'")
 
         call_id = d.pop("callId")
 
@@ -85,4 +85,21 @@ class PostLangyControlFramesBodyFramesItemType4:
             patterns=patterns,
         )
 
+        post_langy_control_frames_body_frames_item_type_4.additional_properties = d
         return post_langy_control_frames_body_frames_item_type_4
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

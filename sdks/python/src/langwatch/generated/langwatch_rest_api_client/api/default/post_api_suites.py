@@ -6,10 +6,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_suites_body import PostApiSuitesBody
 from ...models.post_api_suites_response_201 import PostApiSuitesResponse201
-from ...models.post_api_suites_response_400 import PostApiSuitesResponse400
-from ...models.post_api_suites_response_401 import PostApiSuitesResponse401
-from ...models.post_api_suites_response_422 import PostApiSuitesResponse422
-from ...models.post_api_suites_response_500 import PostApiSuitesResponse500
 from ...types import Response, safe_http_status
 
 
@@ -34,38 +30,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-    | None
-):
+) -> PostApiSuitesResponse201 | None:
     if response.status_code == 201:
         response_201 = PostApiSuitesResponse201.from_dict(response.json())
 
         return response_201
-
-    if response.status_code == 400:
-        response_400 = PostApiSuitesResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = PostApiSuitesResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 422:
-        response_422 = PostApiSuitesResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = PostApiSuitesResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -75,13 +44,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-]:
+) -> Response[PostApiSuitesResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -97,14 +60,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiSuitesBody,
-) -> Response[
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+) -> Response[PostApiSuitesResponse201]:
+    """Create a new suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         body (PostApiSuitesBody):
@@ -114,7 +71,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesResponse201 | PostApiSuitesResponse400 | PostApiSuitesResponse401 | PostApiSuitesResponse422 | PostApiSuitesResponse500]
+        Response[PostApiSuitesResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -132,15 +89,8 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiSuitesBody,
-) -> (
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-    | None
-):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+) -> PostApiSuitesResponse201 | None:
+    """Create a new suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         body (PostApiSuitesBody):
@@ -150,7 +100,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesResponse201 | PostApiSuitesResponse400 | PostApiSuitesResponse401 | PostApiSuitesResponse422 | PostApiSuitesResponse500
+        PostApiSuitesResponse201
     """
 
     return sync_detailed(
@@ -163,14 +113,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiSuitesBody,
-) -> Response[
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-]:
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+) -> Response[PostApiSuitesResponse201]:
+    """Create a new suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         body (PostApiSuitesBody):
@@ -180,7 +124,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiSuitesResponse201 | PostApiSuitesResponse400 | PostApiSuitesResponse401 | PostApiSuitesResponse422 | PostApiSuitesResponse500]
+        Response[PostApiSuitesResponse201]
     """
 
     kwargs = _get_kwargs(
@@ -196,15 +140,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiSuitesBody,
-) -> (
-    PostApiSuitesResponse201
-    | PostApiSuitesResponse400
-    | PostApiSuitesResponse401
-    | PostApiSuitesResponse422
-    | PostApiSuitesResponse500
-    | None
-):
-    """Deprecated: use /api/v1/run-plans and /api/v1/test-suites. Create a new suite (run plan).
+) -> PostApiSuitesResponse201 | None:
+    """Create a new suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
 
     Args:
         body (PostApiSuitesBody):
@@ -214,7 +151,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiSuitesResponse201 | PostApiSuitesResponse400 | PostApiSuitesResponse401 | PostApiSuitesResponse422 | PostApiSuitesResponse500
+        PostApiSuitesResponse201
     """
 
     return (

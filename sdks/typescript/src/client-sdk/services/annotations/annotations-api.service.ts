@@ -5,15 +5,9 @@ import {
 import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { type InternalConfig } from "@/client-sdk/types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-import type { paths } from "@/internal/generated/openapi/api-client";
+import type { components, paths } from "@/internal/generated/openapi/api-client";
 
-// The generator no longer names this shape as a standalone component (every
-// annotation operation now inlines it), so the type comes from a real
-// operation's response rather than a `components["schemas"]` entry that
-// nothing in the spec defines any more.
-export type AnnotationResponse = NonNullable<
-  paths["/api/v1/annotations/{id}"]["get"]["responses"][200]["content"]
->["application/json"]["data"];
+export type AnnotationResponse = components["schemas"]["Annotation"];
 
 export type CreateAnnotationBody = NonNullable<
   paths["/api/v1/annotations/trace/{id}"]["post"]["requestBody"]

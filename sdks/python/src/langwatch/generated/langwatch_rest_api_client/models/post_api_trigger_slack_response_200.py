@@ -13,7 +13,7 @@ T = TypeVar("T", bound="PostApiTriggerSlackResponse200")
 class PostApiTriggerSlackResponse200:
     """
     Attributes:
-        message (str): Human-readable confirmation
+        message (str):
     """
 
     message: str

@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-if TYPE_CHECKING:
-    from ..models.delete_api_webhooks_v1_endpoints_by_id_response_200_data import (
-        DeleteApiWebhooksV1EndpointsByIdResponse200Data,
-    )
-
 
 T = TypeVar("T", bound="DeleteApiWebhooksV1EndpointsByIdResponse200")
 
@@ -19,20 +13,20 @@ T = TypeVar("T", bound="DeleteApiWebhooksV1EndpointsByIdResponse200")
 class DeleteApiWebhooksV1EndpointsByIdResponse200:
     """
     Attributes:
-        data (DeleteApiWebhooksV1EndpointsByIdResponse200Data):
+        archived (bool):
     """
 
-    data: DeleteApiWebhooksV1EndpointsByIdResponse200Data
+    archived: bool
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data = self.data.to_dict()
+        archived = self.archived
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "data": data,
+                "archived": archived,
             }
         )
 
@@ -40,15 +34,11 @@ class DeleteApiWebhooksV1EndpointsByIdResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.delete_api_webhooks_v1_endpoints_by_id_response_200_data import (
-            DeleteApiWebhooksV1EndpointsByIdResponse200Data,
-        )
-
         d = dict(src_dict)
-        data = DeleteApiWebhooksV1EndpointsByIdResponse200Data.from_dict(d.pop("data"))
+        archived = d.pop("archived")
 
         delete_api_webhooks_v1_endpoints_by_id_response_200 = cls(
-            data=data,
+            archived=archived,
         )
 
         delete_api_webhooks_v1_endpoints_by_id_response_200.additional_properties = d

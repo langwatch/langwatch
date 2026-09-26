@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.create_api_key_body_key_type import CreateApiKeyBodyKeyType
 from ..models.create_api_key_body_permission_mode import CreateApiKeyBodyPermissionMode
@@ -25,7 +27,7 @@ class CreateApiKeyBody:
         key_type (CreateApiKeyBodyKeyType | Unset): A personal key acts as the user who created it and needs explicit
             bindings. A service key is not tied to a user. Default: CreateApiKeyBodyKeyType.PERSONAL.
         description (str | Unset):
-        expires_at (str | Unset): ISO 8601 timestamp after which the key stops working
+        expires_at (datetime.datetime | Unset): ISO 8601 timestamp after which the key stops working
         assigned_to_user_id (str | Unset): Organization admins only: the member who owns the key and whose access caps
             it. Defaults to the caller.
         permission_mode (CreateApiKeyBodyPermissionMode | Unset): 'all' and 'readonly' take their meaning from the
@@ -41,7 +43,7 @@ class CreateApiKeyBody:
     name: str
     key_type: CreateApiKeyBodyKeyType | Unset = CreateApiKeyBodyKeyType.PERSONAL
     description: str | Unset = UNSET
-    expires_at: str | Unset = UNSET
+    expires_at: datetime.datetime | Unset = UNSET
     assigned_to_user_id: str | Unset = UNSET
     permission_mode: CreateApiKeyBodyPermissionMode | Unset = CreateApiKeyBodyPermissionMode.ALL
     permissions: list[str] | Unset = UNSET
@@ -58,7 +60,9 @@ class CreateApiKeyBody:
 
         description = self.description
 
-        expires_at = self.expires_at
+        expires_at: str | Unset = UNSET
+        if not isinstance(self.expires_at, Unset):
+            expires_at = self.expires_at.isoformat()
 
         assigned_to_user_id = self.assigned_to_user_id
 
@@ -123,7 +127,12 @@ class CreateApiKeyBody:
 
         description = d.pop("description", UNSET)
 
-        expires_at = d.pop("expiresAt", UNSET)
+        _expires_at = d.pop("expiresAt", UNSET)
+        expires_at: datetime.datetime | Unset
+        if isinstance(_expires_at, Unset):
+            expires_at = UNSET
+        else:
+            expires_at = isoparse(_expires_at)
 
         assigned_to_user_id = d.pop("assignedToUserId", UNSET)
 

@@ -6,9 +6,7 @@ from typing import Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.update_organization_body_primary_intent_type_1 import UpdateOrganizationBodyPrimaryIntentType1
-from ..models.update_organization_body_primary_intent_type_2_type_1 import UpdateOrganizationBodyPrimaryIntentType2Type1
-from ..models.update_organization_body_primary_intent_type_3_type_1 import UpdateOrganizationBodyPrimaryIntentType3Type1
+from ..models.update_organization_body_primary_intent_type_0 import UpdateOrganizationBodyPrimaryIntentType0
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="UpdateOrganizationBody")
@@ -22,8 +20,7 @@ class UpdateOrganizationBody:
         support_contact (None | str | Unset):
         presence_enabled (bool | Unset):
         trace_sharing_enabled (bool | Unset):
-        primary_intent (None | Unset | UpdateOrganizationBodyPrimaryIntentType1 |
-            UpdateOrganizationBodyPrimaryIntentType2Type1 | UpdateOrganizationBodyPrimaryIntentType3Type1):
+        primary_intent (None | Unset | UpdateOrganizationBodyPrimaryIntentType0):
         s_3_endpoint (None | str | Unset):
         s_3_access_key_id (None | str | Unset):
         s_3_secret_access_key (None | str | Unset):
@@ -34,13 +31,7 @@ class UpdateOrganizationBody:
     support_contact: None | str | Unset = UNSET
     presence_enabled: bool | Unset = UNSET
     trace_sharing_enabled: bool | Unset = UNSET
-    primary_intent: (
-        None
-        | Unset
-        | UpdateOrganizationBodyPrimaryIntentType1
-        | UpdateOrganizationBodyPrimaryIntentType2Type1
-        | UpdateOrganizationBodyPrimaryIntentType3Type1
-    ) = UNSET
+    primary_intent: None | Unset | UpdateOrganizationBodyPrimaryIntentType0 = UNSET
     s_3_endpoint: None | str | Unset = UNSET
     s_3_access_key_id: None | str | Unset = UNSET
     s_3_secret_access_key: None | str | Unset = UNSET
@@ -63,11 +54,7 @@ class UpdateOrganizationBody:
         primary_intent: None | str | Unset
         if isinstance(self.primary_intent, Unset):
             primary_intent = UNSET
-        elif isinstance(self.primary_intent, UpdateOrganizationBodyPrimaryIntentType1):
-            primary_intent = self.primary_intent.value
-        elif isinstance(self.primary_intent, UpdateOrganizationBodyPrimaryIntentType2Type1):
-            primary_intent = self.primary_intent.value
-        elif isinstance(self.primary_intent, UpdateOrganizationBodyPrimaryIntentType3Type1):
+        elif isinstance(self.primary_intent, UpdateOrganizationBodyPrimaryIntentType0):
             primary_intent = self.primary_intent.value
         else:
             primary_intent = self.primary_intent
@@ -138,15 +125,7 @@ class UpdateOrganizationBody:
 
         trace_sharing_enabled = d.pop("traceSharingEnabled", UNSET)
 
-        def _parse_primary_intent(
-            data: object,
-        ) -> (
-            None
-            | Unset
-            | UpdateOrganizationBodyPrimaryIntentType1
-            | UpdateOrganizationBodyPrimaryIntentType2Type1
-            | UpdateOrganizationBodyPrimaryIntentType3Type1
-        ):
+        def _parse_primary_intent(data: object) -> None | Unset | UpdateOrganizationBodyPrimaryIntentType0:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -154,35 +133,12 @@ class UpdateOrganizationBody:
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                primary_intent_type_1 = UpdateOrganizationBodyPrimaryIntentType1(data)
+                primary_intent_type_0 = UpdateOrganizationBodyPrimaryIntentType0(data)
 
-                return primary_intent_type_1
+                return primary_intent_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                primary_intent_type_2_type_1 = UpdateOrganizationBodyPrimaryIntentType2Type1(data)
-
-                return primary_intent_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                primary_intent_type_3_type_1 = UpdateOrganizationBodyPrimaryIntentType3Type1(data)
-
-                return primary_intent_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | Unset
-                | UpdateOrganizationBodyPrimaryIntentType1
-                | UpdateOrganizationBodyPrimaryIntentType2Type1
-                | UpdateOrganizationBodyPrimaryIntentType3Type1,
-                data,
-            )
+            return cast(None | Unset | UpdateOrganizationBodyPrimaryIntentType0, data)
 
         primary_intent = _parse_primary_intent(d.pop("primaryIntent", UNSET))
 

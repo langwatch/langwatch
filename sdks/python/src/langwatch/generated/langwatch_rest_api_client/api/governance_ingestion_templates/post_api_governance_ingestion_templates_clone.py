@@ -4,6 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.post_api_governance_ingestion_templates_clone_body import PostApiGovernanceIngestionTemplatesCloneBody
 from ...models.post_api_governance_ingestion_templates_clone_response_201 import (
     PostApiGovernanceIngestionTemplatesCloneResponse201,
 )
@@ -12,9 +13,6 @@ from ...models.post_api_governance_ingestion_templates_clone_response_400 import
 )
 from ...models.post_api_governance_ingestion_templates_clone_response_401 import (
     PostApiGovernanceIngestionTemplatesCloneResponse401,
-)
-from ...models.post_api_governance_ingestion_templates_clone_response_404 import (
-    PostApiGovernanceIngestionTemplatesCloneResponse404,
 )
 from ...models.post_api_governance_ingestion_templates_clone_response_422 import (
     PostApiGovernanceIngestionTemplatesCloneResponse422,
@@ -25,13 +23,22 @@ from ...models.post_api_governance_ingestion_templates_clone_response_500 import
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: PostApiGovernanceIngestionTemplatesCloneBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/v1/governance/ingestion-templates/clone",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -41,7 +48,6 @@ def _parse_response(
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
     | None
@@ -60,11 +66,6 @@ def _parse_response(
         response_401 = PostApiGovernanceIngestionTemplatesCloneResponse401.from_dict(response.json())
 
         return response_401
-
-    if response.status_code == 404:
-        response_404 = PostApiGovernanceIngestionTemplatesCloneResponse404.from_dict(response.json())
-
-        return response_404
 
     if response.status_code == 422:
         response_422 = PostApiGovernanceIngestionTemplatesCloneResponse422.from_dict(response.json())
@@ -88,7 +89,6 @@ def _build_response(
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
 ]:
@@ -106,11 +106,11 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesCloneBody,
 ) -> Response[
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
 ]:
@@ -119,15 +119,20 @@ def sync_detailed(
      Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the
     admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesCloneBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse404 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500]
+        Response[PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -139,11 +144,11 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesCloneBody,
 ) -> (
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
     | None
@@ -153,27 +158,31 @@ def sync(
      Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the
     admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesCloneBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse404 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500
+        PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500
     """
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesCloneBody,
 ) -> Response[
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
 ]:
@@ -182,15 +191,20 @@ async def asyncio_detailed(
      Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the
     admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesCloneBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse404 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500]
+        Response[PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -200,11 +214,11 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
+    body: PostApiGovernanceIngestionTemplatesCloneBody,
 ) -> (
     PostApiGovernanceIngestionTemplatesCloneResponse201
     | PostApiGovernanceIngestionTemplatesCloneResponse400
     | PostApiGovernanceIngestionTemplatesCloneResponse401
-    | PostApiGovernanceIngestionTemplatesCloneResponse404
     | PostApiGovernanceIngestionTemplatesCloneResponse422
     | PostApiGovernanceIngestionTemplatesCloneResponse500
     | None
@@ -214,16 +228,20 @@ async def asyncio(
      Forks the source row's source_type / display_name / OTTL into a fresh org-authored row that the
     admin can then edit via PATCH /ingestion-templates/:id/ottl-rules.
 
+    Args:
+        body (PostApiGovernanceIngestionTemplatesCloneBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse404 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500
+        PostApiGovernanceIngestionTemplatesCloneResponse201 | PostApiGovernanceIngestionTemplatesCloneResponse400 | PostApiGovernanceIngestionTemplatesCloneResponse401 | PostApiGovernanceIngestionTemplatesCloneResponse422 | PostApiGovernanceIngestionTemplatesCloneResponse500
     """
 
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

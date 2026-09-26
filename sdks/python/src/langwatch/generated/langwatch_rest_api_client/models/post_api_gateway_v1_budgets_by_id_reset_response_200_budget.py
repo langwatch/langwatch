@@ -43,32 +43,23 @@ class PostApiGatewayV1BudgetsByIdResetResponse200Budget:
         on_breach (PostApiGatewayV1BudgetsByIdResetResponse200BudgetOnBreach):
         limit_usd (str): Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never
             exponent notation. Use limit_nano_usd for arithmetic.
-        limit_nano_usd (int | None): Canonical integer amount, nano-USD. Null past the safe integer range, where
-            limit_usd still reads.
-        spent_usd (None | str): Display value, null when spend_available is false. Decimal string, up to 9 fractional
-            digits, trailing zeros trimmed, never exponent notation. Use spent_nano_usd for arithmetic.
-        spent_nano_usd (int | None): Canonical integer spend, nano-USD. Null when spend is unavailable. Derived from the
-            same integer as spent_usd, so the pair always agrees.
+        limit_nano_usd (int | None):
+        spent_usd (None | str):
+        spent_nano_usd (int | None):
         timezone (None | str):
         provider_key (None | str):
         external_id (None | str):
         metadata (PostApiGatewayV1BudgetsByIdResetResponse200BudgetMetadata):
-        current_period_started_at (str): Start of the period `spent_usd` covers, computed at read time. For an anchored
-            budget this is its own cycle's start, not the calendar period's.
-        resets_at (str): When the current period gives way to the next. Far-future for total and manual windows, which
-            do not roll on their own.
-        cycle_anchor_at (None | str): The instant this budget's cycle is phased to. Null means no anchor: a calendar-
-            aligned cyclic window, or one of the two windows that do not cycle (total, manual).
+        current_period_started_at (str):
+        resets_at (str):
+        cycle_anchor_at (None | str):
         last_reset_at (None | str):
         archived_at (None | str):
         created_at (str):
         member_count (int | Unset):
         end_users_seen (int | Unset):
         end_users_over (int | Unset):
-        scope_reach (PostApiGatewayV1BudgetsByIdResetResponse200BudgetScopeReach | Unset): Whether any active key in the
-            organization can produce traffic this budget matches. `unreachable` means it will never accrue and never block
-            as configured: scope a key to its target, or move the budget where the keys already run. This is the only field
-            that tells a budget nothing can reach apart from one that simply has not been breached.
+        scope_reach (PostApiGatewayV1BudgetsByIdResetResponse200BudgetScopeReach | Unset):
     """
 
     id: str

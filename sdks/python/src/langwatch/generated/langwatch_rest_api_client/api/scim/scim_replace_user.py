@@ -1,21 +1,21 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_replace_user_body import ScimReplaceUserBody
 from ...models.scim_replace_user_response_200 import ScimReplaceUserResponse200
-from ...models.scim_replace_user_response_400 import ScimReplaceUserResponse400
-from ...models.scim_replace_user_response_401 import ScimReplaceUserResponse401
-from ...models.scim_replace_user_response_403 import ScimReplaceUserResponse403
-from ...models.scim_replace_user_response_404 import ScimReplaceUserResponse404
 from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
+    *,
+    body: ScimReplaceUserBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -24,42 +24,36 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-    | None
-):
+) -> Any | ScimReplaceUserResponse200 | None:
     if response.status_code == 200:
         response_200 = ScimReplaceUserResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = ScimReplaceUserResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = ScimReplaceUserResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = ScimReplaceUserResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
     if response.status_code == 404:
-        response_404 = ScimReplaceUserResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -70,13 +64,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-]:
+) -> Response[Any | ScimReplaceUserResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -92,13 +80,8 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-]:
+    body: ScimReplaceUserBody,
+) -> Response[Any | ScimReplaceUserResponse200]:
     """Replace a provisioned user
 
      Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the
@@ -107,17 +90,19 @@ def sync_detailed(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimReplaceUserResponse200 | ScimReplaceUserResponse400 | ScimReplaceUserResponse401 | ScimReplaceUserResponse403 | ScimReplaceUserResponse404]
+        Response[Any | ScimReplaceUserResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -131,14 +116,8 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-    | None
-):
+    body: ScimReplaceUserBody,
+) -> Any | ScimReplaceUserResponse200 | None:
     """Replace a provisioned user
 
      Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the
@@ -147,18 +126,20 @@ def sync(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimReplaceUserResponse200 | ScimReplaceUserResponse400 | ScimReplaceUserResponse401 | ScimReplaceUserResponse403 | ScimReplaceUserResponse404
+        Any | ScimReplaceUserResponse200
     """
 
     return sync_detailed(
         id=id,
         client=client,
+        body=body,
     ).parsed
 
 
@@ -166,13 +147,8 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-]:
+    body: ScimReplaceUserBody,
+) -> Response[Any | ScimReplaceUserResponse200]:
     """Replace a provisioned user
 
      Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the
@@ -181,17 +157,19 @@ async def asyncio_detailed(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimReplaceUserResponse200 | ScimReplaceUserResponse400 | ScimReplaceUserResponse401 | ScimReplaceUserResponse403 | ScimReplaceUserResponse404]
+        Response[Any | ScimReplaceUserResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -203,14 +181,8 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimReplaceUserResponse200
-    | ScimReplaceUserResponse400
-    | ScimReplaceUserResponse401
-    | ScimReplaceUserResponse403
-    | ScimReplaceUserResponse404
-    | None
-):
+    body: ScimReplaceUserBody,
+) -> Any | ScimReplaceUserResponse200 | None:
     """Replace a provisioned user
 
      Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the
@@ -219,18 +191,20 @@ async def asyncio(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimReplaceUserResponse200 | ScimReplaceUserResponse400 | ScimReplaceUserResponse401 | ScimReplaceUserResponse403 | ScimReplaceUserResponse404
+        Any | ScimReplaceUserResponse200
     """
 
     return (
         await asyncio_detailed(
             id=id,
             client=client,
+            body=body,
         )
     ).parsed

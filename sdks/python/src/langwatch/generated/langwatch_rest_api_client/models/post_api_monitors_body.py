@@ -11,8 +11,9 @@ from ..models.post_api_monitors_body_level import PostApiMonitorsBodyLevel
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.post_api_monitors_body_mappings_type_0 import PostApiMonitorsBodyMappingsType0
+    from ..models.post_api_monitors_body_mappings import PostApiMonitorsBodyMappings
     from ..models.post_api_monitors_body_parameters import PostApiMonitorsBodyParameters
+    from ..models.post_api_monitors_body_preconditions_item import PostApiMonitorsBodyPreconditionsItem
 
 
 T = TypeVar("T", bound="PostApiMonitorsBody")
@@ -24,11 +25,11 @@ class PostApiMonitorsBody:
     Attributes:
         name (str):
         check_type (str):
+        mappings (PostApiMonitorsBodyMappings):
         execution_mode (PostApiMonitorsBodyExecutionMode | Unset):  Default:
             PostApiMonitorsBodyExecutionMode.ON_MESSAGE.
-        preconditions (list[Any] | Unset):
+        preconditions (list[PostApiMonitorsBodyPreconditionsItem] | Unset):
         parameters (PostApiMonitorsBodyParameters | Unset):
-        mappings (None | PostApiMonitorsBodyMappingsType0 | Unset):
         sample (float | Unset):  Default: 1.0.
         evaluator_id (str | Unset):
         level (PostApiMonitorsBodyLevel | Unset):  Default: PostApiMonitorsBodyLevel.TRACE.
@@ -37,10 +38,10 @@ class PostApiMonitorsBody:
 
     name: str
     check_type: str
+    mappings: PostApiMonitorsBodyMappings
     execution_mode: PostApiMonitorsBodyExecutionMode | Unset = PostApiMonitorsBodyExecutionMode.ON_MESSAGE
-    preconditions: list[Any] | Unset = UNSET
+    preconditions: list[PostApiMonitorsBodyPreconditionsItem] | Unset = UNSET
     parameters: PostApiMonitorsBodyParameters | Unset = UNSET
-    mappings: None | PostApiMonitorsBodyMappingsType0 | Unset = UNSET
     sample: float | Unset = 1.0
     evaluator_id: str | Unset = UNSET
     level: PostApiMonitorsBodyLevel | Unset = PostApiMonitorsBodyLevel.TRACE
@@ -48,31 +49,26 @@ class PostApiMonitorsBody:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.post_api_monitors_body_mappings_type_0 import PostApiMonitorsBodyMappingsType0
-
         name = self.name
 
         check_type = self.check_type
+
+        mappings = self.mappings.to_dict()
 
         execution_mode: str | Unset = UNSET
         if not isinstance(self.execution_mode, Unset):
             execution_mode = self.execution_mode.value
 
-        preconditions: list[Any] | Unset = UNSET
+        preconditions: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.preconditions, Unset):
-            preconditions = self.preconditions
+            preconditions = []
+            for preconditions_item_data in self.preconditions:
+                preconditions_item = preconditions_item_data.to_dict()
+                preconditions.append(preconditions_item)
 
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
             parameters = self.parameters.to_dict()
-
-        mappings: dict[str, Any] | None | Unset
-        if isinstance(self.mappings, Unset):
-            mappings = UNSET
-        elif isinstance(self.mappings, PostApiMonitorsBodyMappingsType0):
-            mappings = self.mappings.to_dict()
-        else:
-            mappings = self.mappings
 
         sample = self.sample
 
@@ -94,6 +90,7 @@ class PostApiMonitorsBody:
             {
                 "name": name,
                 "checkType": check_type,
+                "mappings": mappings,
             }
         )
         if execution_mode is not UNSET:
@@ -102,8 +99,6 @@ class PostApiMonitorsBody:
             field_dict["preconditions"] = preconditions
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
-        if mappings is not UNSET:
-            field_dict["mappings"] = mappings
         if sample is not UNSET:
             field_dict["sample"] = sample
         if evaluator_id is not UNSET:
@@ -117,13 +112,16 @@ class PostApiMonitorsBody:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_monitors_body_mappings_type_0 import PostApiMonitorsBodyMappingsType0
+        from ..models.post_api_monitors_body_mappings import PostApiMonitorsBodyMappings
         from ..models.post_api_monitors_body_parameters import PostApiMonitorsBodyParameters
+        from ..models.post_api_monitors_body_preconditions_item import PostApiMonitorsBodyPreconditionsItem
 
         d = dict(src_dict)
         name = d.pop("name")
 
         check_type = d.pop("checkType")
+
+        mappings = PostApiMonitorsBodyMappings.from_dict(d.pop("mappings"))
 
         _execution_mode = d.pop("executionMode", UNSET)
         execution_mode: PostApiMonitorsBodyExecutionMode | Unset
@@ -132,7 +130,14 @@ class PostApiMonitorsBody:
         else:
             execution_mode = PostApiMonitorsBodyExecutionMode(_execution_mode)
 
-        preconditions = cast(list[Any], d.pop("preconditions", UNSET))
+        _preconditions = d.pop("preconditions", UNSET)
+        preconditions: list[PostApiMonitorsBodyPreconditionsItem] | Unset = UNSET
+        if _preconditions is not UNSET:
+            preconditions = []
+            for preconditions_item_data in _preconditions:
+                preconditions_item = PostApiMonitorsBodyPreconditionsItem.from_dict(preconditions_item_data)
+
+                preconditions.append(preconditions_item)
 
         _parameters = d.pop("parameters", UNSET)
         parameters: PostApiMonitorsBodyParameters | Unset
@@ -140,23 +145,6 @@ class PostApiMonitorsBody:
             parameters = UNSET
         else:
             parameters = PostApiMonitorsBodyParameters.from_dict(_parameters)
-
-        def _parse_mappings(data: object) -> None | PostApiMonitorsBodyMappingsType0 | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                mappings_type_0 = PostApiMonitorsBodyMappingsType0.from_dict(data)
-
-                return mappings_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | PostApiMonitorsBodyMappingsType0 | Unset, data)
-
-        mappings = _parse_mappings(d.pop("mappings", UNSET))
 
         sample = d.pop("sample", UNSET)
 
@@ -181,10 +169,10 @@ class PostApiMonitorsBody:
         post_api_monitors_body = cls(
             name=name,
             check_type=check_type,
+            mappings=mappings,
             execution_mode=execution_mode,
             preconditions=preconditions,
             parameters=parameters,
-            mappings=mappings,
             sample=sample,
             evaluator_id=evaluator_id,
             level=level,

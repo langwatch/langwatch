@@ -19,8 +19,7 @@ class GetApiGatewayV1BudgetsResponse200:
     Attributes:
         data (list[GetApiGatewayV1BudgetsResponse200DataItem]):
         spend_available (bool):
-        next_cursor (None | str): Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page
-            does NOT mean there is more.
+        next_cursor (None | str): Pass back as cursor for the next page. Null means the walk is exhausted.
     """
 
     data: list[GetApiGatewayV1BudgetsResponse200DataItem]

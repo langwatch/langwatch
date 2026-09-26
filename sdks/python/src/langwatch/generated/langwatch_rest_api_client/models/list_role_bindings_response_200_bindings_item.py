@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 from ..models.list_role_bindings_response_200_bindings_item_role import ListRoleBindingsResponse200BindingsItemRole
 from ..models.list_role_bindings_response_200_bindings_item_scope_type import (
@@ -32,7 +34,7 @@ class ListRoleBindingsResponse200BindingsItem:
         scope_type (ListRoleBindingsResponse200BindingsItemScopeType):
         scope_id (str):
         scope_name (None | str):
-        created_at (str):
+        created_at (datetime.datetime):
     """
 
     id: str
@@ -43,7 +45,7 @@ class ListRoleBindingsResponse200BindingsItem:
     scope_type: ListRoleBindingsResponse200BindingsItemScopeType
     scope_id: str
     scope_name: None | str
-    created_at: str
+    created_at: datetime.datetime
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,7 +68,7 @@ class ListRoleBindingsResponse200BindingsItem:
         scope_name: None | str
         scope_name = self.scope_name
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -124,7 +126,7 @@ class ListRoleBindingsResponse200BindingsItem:
 
         scope_name = _parse_scope_name(d.pop("scopeName"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
         list_role_bindings_response_200_bindings_item = cls(
             id=id,

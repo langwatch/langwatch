@@ -56,19 +56,20 @@ class GetApiPromptsByIdVersionsResponse200Item:
         version (float):
         created_at (str):
         prompt (str):
-        messages (list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem]):
-        inputs (list[GetApiPromptsByIdVersionsResponse200ItemInputsItem]):
         outputs (list[GetApiPromptsByIdVersionsResponse200ItemOutputsItem]):
         model (str):
-        tags (list[GetApiPromptsByIdVersionsResponse200ItemTagsItem]):
-        parameters (GetApiPromptsByIdVersionsResponse200ItemParameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
+        messages (list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem] | Unset):
+        inputs (list[GetApiPromptsByIdVersionsResponse200ItemInputsItem] | Unset):
         temperature (float | Unset):
         max_tokens (float | Unset):
         demonstrations (GetApiPromptsByIdVersionsResponse200ItemDemonstrations | Unset):
         prompting_technique (GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique | Unset):
         response_format (GetApiPromptsByIdVersionsResponse200ItemResponseFormat | Unset):
+        tags (list[GetApiPromptsByIdVersionsResponse200ItemTagsItem] | Unset):
+        parameters (GetApiPromptsByIdVersionsResponse200ItemParameters | Unset):
+        platform_url (str | Unset):
     """
 
     id: str
@@ -82,19 +83,20 @@ class GetApiPromptsByIdVersionsResponse200Item:
     version: float
     created_at: str
     prompt: str
-    messages: list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem]
-    inputs: list[GetApiPromptsByIdVersionsResponse200ItemInputsItem]
     outputs: list[GetApiPromptsByIdVersionsResponse200ItemOutputsItem]
     model: str
-    tags: list[GetApiPromptsByIdVersionsResponse200ItemTagsItem]
-    parameters: GetApiPromptsByIdVersionsResponse200ItemParameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
+    messages: list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem] | Unset = UNSET
+    inputs: list[GetApiPromptsByIdVersionsResponse200ItemInputsItem] | Unset = UNSET
     temperature: float | Unset = UNSET
     max_tokens: float | Unset = UNSET
     demonstrations: GetApiPromptsByIdVersionsResponse200ItemDemonstrations | Unset = UNSET
     prompting_technique: GetApiPromptsByIdVersionsResponse200ItemPromptingTechnique | Unset = UNSET
     response_format: GetApiPromptsByIdVersionsResponse200ItemResponseFormat | Unset = UNSET
+    tags: list[GetApiPromptsByIdVersionsResponse200ItemTagsItem] | Unset = UNSET
+    parameters: GetApiPromptsByIdVersionsResponse200ItemParameters | Unset = UNSET
+    platform_url: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -121,29 +123,12 @@ class GetApiPromptsByIdVersionsResponse200Item:
 
         prompt = self.prompt
 
-        messages = []
-        for messages_item_data in self.messages:
-            messages_item = messages_item_data.to_dict()
-            messages.append(messages_item)
-
-        inputs = []
-        for inputs_item_data in self.inputs:
-            inputs_item = inputs_item_data.to_dict()
-            inputs.append(inputs_item)
-
         outputs = []
         for outputs_item_data in self.outputs:
             outputs_item = outputs_item_data.to_dict()
             outputs.append(outputs_item)
 
         model = self.model
-
-        tags = []
-        for tags_item_data in self.tags:
-            tags_item = tags_item_data.to_dict()
-            tags.append(tags_item)
-
-        parameters = self.parameters.to_dict()
 
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
@@ -156,6 +141,20 @@ class GetApiPromptsByIdVersionsResponse200Item:
             commit_message = UNSET
         else:
             commit_message = self.commit_message
+
+        messages: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.messages, Unset):
+            messages = []
+            for messages_item_data in self.messages:
+                messages_item = messages_item_data.to_dict()
+                messages.append(messages_item)
+
+        inputs: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.inputs, Unset):
+            inputs = []
+            for inputs_item_data in self.inputs:
+                inputs_item = inputs_item_data.to_dict()
+                inputs.append(inputs_item)
 
         temperature = self.temperature
 
@@ -173,6 +172,19 @@ class GetApiPromptsByIdVersionsResponse200Item:
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
+        tags: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = []
+            for tags_item_data in self.tags:
+                tags_item = tags_item_data.to_dict()
+                tags.append(tags_item)
+
+        parameters: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.parameters, Unset):
+            parameters = self.parameters.to_dict()
+
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -188,18 +200,18 @@ class GetApiPromptsByIdVersionsResponse200Item:
                 "version": version,
                 "createdAt": created_at,
                 "prompt": prompt,
-                "messages": messages,
-                "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
-                "tags": tags,
-                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
             field_dict["authorId"] = author_id
         if commit_message is not UNSET:
             field_dict["commitMessage"] = commit_message
+        if messages is not UNSET:
+            field_dict["messages"] = messages
+        if inputs is not UNSET:
+            field_dict["inputs"] = inputs
         if temperature is not UNSET:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
@@ -210,6 +222,12 @@ class GetApiPromptsByIdVersionsResponse200Item:
             field_dict["promptingTechnique"] = prompting_technique
         if response_format is not UNSET:
             field_dict["responseFormat"] = response_format
+        if tags is not UNSET:
+            field_dict["tags"] = tags
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
+        if platform_url is not UNSET:
+            field_dict["platformUrl"] = platform_url
 
         return field_dict
 
@@ -268,20 +286,6 @@ class GetApiPromptsByIdVersionsResponse200Item:
 
         prompt = d.pop("prompt")
 
-        messages = []
-        _messages = d.pop("messages")
-        for messages_item_data in _messages:
-            messages_item = GetApiPromptsByIdVersionsResponse200ItemMessagesItem.from_dict(messages_item_data)
-
-            messages.append(messages_item)
-
-        inputs = []
-        _inputs = d.pop("inputs")
-        for inputs_item_data in _inputs:
-            inputs_item = GetApiPromptsByIdVersionsResponse200ItemInputsItem.from_dict(inputs_item_data)
-
-            inputs.append(inputs_item)
-
         outputs = []
         _outputs = d.pop("outputs")
         for outputs_item_data in _outputs:
@@ -290,15 +294,6 @@ class GetApiPromptsByIdVersionsResponse200Item:
             outputs.append(outputs_item)
 
         model = d.pop("model")
-
-        tags = []
-        _tags = d.pop("tags")
-        for tags_item_data in _tags:
-            tags_item = GetApiPromptsByIdVersionsResponse200ItemTagsItem.from_dict(tags_item_data)
-
-            tags.append(tags_item)
-
-        parameters = GetApiPromptsByIdVersionsResponse200ItemParameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -317,6 +312,24 @@ class GetApiPromptsByIdVersionsResponse200Item:
             return cast(None | str | Unset, data)
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
+
+        _messages = d.pop("messages", UNSET)
+        messages: list[GetApiPromptsByIdVersionsResponse200ItemMessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = GetApiPromptsByIdVersionsResponse200ItemMessagesItem.from_dict(messages_item_data)
+
+                messages.append(messages_item)
+
+        _inputs = d.pop("inputs", UNSET)
+        inputs: list[GetApiPromptsByIdVersionsResponse200ItemInputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = GetApiPromptsByIdVersionsResponse200ItemInputsItem.from_dict(inputs_item_data)
+
+                inputs.append(inputs_item)
 
         temperature = d.pop("temperature", UNSET)
 
@@ -345,6 +358,24 @@ class GetApiPromptsByIdVersionsResponse200Item:
         else:
             response_format = GetApiPromptsByIdVersionsResponse200ItemResponseFormat.from_dict(_response_format)
 
+        _tags = d.pop("tags", UNSET)
+        tags: list[GetApiPromptsByIdVersionsResponse200ItemTagsItem] | Unset = UNSET
+        if _tags is not UNSET:
+            tags = []
+            for tags_item_data in _tags:
+                tags_item = GetApiPromptsByIdVersionsResponse200ItemTagsItem.from_dict(tags_item_data)
+
+                tags.append(tags_item)
+
+        _parameters = d.pop("parameters", UNSET)
+        parameters: GetApiPromptsByIdVersionsResponse200ItemParameters | Unset
+        if isinstance(_parameters, Unset):
+            parameters = UNSET
+        else:
+            parameters = GetApiPromptsByIdVersionsResponse200ItemParameters.from_dict(_parameters)
+
+        platform_url = d.pop("platformUrl", UNSET)
+
         get_api_prompts_by_id_versions_response_200_item = cls(
             id=id,
             handle=handle,
@@ -357,19 +388,20 @@ class GetApiPromptsByIdVersionsResponse200Item:
             version=version,
             created_at=created_at,
             prompt=prompt,
-            messages=messages,
-            inputs=inputs,
             outputs=outputs,
             model=model,
-            tags=tags,
-            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
+            messages=messages,
+            inputs=inputs,
             temperature=temperature,
             max_tokens=max_tokens,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
             response_format=response_format,
+            tags=tags,
+            parameters=parameters,
+            platform_url=platform_url,
         )
 
         get_api_prompts_by_id_versions_response_200_item.additional_properties = d

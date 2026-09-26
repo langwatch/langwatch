@@ -33,7 +33,10 @@ const BARE_PATH = /\/api\/([a-zA-Z0-9_-]+)((?:\/(?:\$\{[^}]*\}|[a-zA-Z0-9_{}.-]+
 const VERSION_SEGMENT = /^v\d+$/;
 
 /** Routes the document keeps bare because they have no `/api/v1` twin. */
-const BARE_ONLY = [/^\/api\/traces\/[^/]+\/transcript$/];
+const BARE_ONLY = [
+  /^\/api\/traces\/[^/]+\/transcript$/,
+  /^\/api\/trace\/(search|[^/]+(\/share|\/unshare)?)$/,
+];
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((entry) => {

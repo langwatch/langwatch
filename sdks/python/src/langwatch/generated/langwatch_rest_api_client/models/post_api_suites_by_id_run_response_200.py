@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.post_api_suites_by_id_run_response_200_items_item import PostApiSuitesByIdRunResponse200ItemsItem
     from ..models.post_api_suites_by_id_run_response_200_skipped_archived import (
@@ -26,6 +28,8 @@ class PostApiSuitesByIdRunResponse200:
         job_count (float):
         skipped_archived (PostApiSuitesByIdRunResponse200SkippedArchived):
         items (list[PostApiSuitesByIdRunResponse200ItemsItem]):
+        plan_name (str | Unset):
+        created (bool | Unset):
     """
 
     scheduled: bool
@@ -34,6 +38,8 @@ class PostApiSuitesByIdRunResponse200:
     job_count: float
     skipped_archived: PostApiSuitesByIdRunResponse200SkippedArchived
     items: list[PostApiSuitesByIdRunResponse200ItemsItem]
+    plan_name: str | Unset = UNSET
+    created: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,6 +58,10 @@ class PostApiSuitesByIdRunResponse200:
             items_item = items_item_data.to_dict()
             items.append(items_item)
 
+        plan_name = self.plan_name
+
+        created = self.created
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -64,6 +74,10 @@ class PostApiSuitesByIdRunResponse200:
                 "items": items,
             }
         )
+        if plan_name is not UNSET:
+            field_dict["planName"] = plan_name
+        if created is not UNSET:
+            field_dict["created"] = created
 
         return field_dict
 
@@ -92,6 +106,10 @@ class PostApiSuitesByIdRunResponse200:
 
             items.append(items_item)
 
+        plan_name = d.pop("planName", UNSET)
+
+        created = d.pop("created", UNSET)
+
         post_api_suites_by_id_run_response_200 = cls(
             scheduled=scheduled,
             batch_run_id=batch_run_id,
@@ -99,6 +117,8 @@ class PostApiSuitesByIdRunResponse200:
             job_count=job_count,
             skipped_archived=skipped_archived,
             items=items,
+            plan_name=plan_name,
+            created=created,
         )
 
         post_api_suites_by_id_run_response_200.additional_properties = d
