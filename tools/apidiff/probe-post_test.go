@@ -308,6 +308,31 @@ func TestPermissionLeakFindingNamesTheMatchedID(t *testing.T) {
 	}
 }
 
+// Organization-level definitions are shared with a sibling project by
+// design; the foreign-organization key reading them is still a leak.
+func TestOrganizationLevelReadIsNotASiblingLeak(t *testing.T) {
+	engine := &probeEngine{
+		options:  ProbeOptions{Keys: Keys{ProjectKeyB: ProjectKeyB, ProjectKeyC: ProjectKeyC}},
+		ownerIDs: map[string]*sideIDs{},
+	}
+	operation := Operation{Method: "GET", Path: "/api/prompts/tags"}
+	owner := newSideIDs()
+	owner.a["tag-a"] = true
+	owner.b["tag-b"] = true
+	engine.ownerIDs[operationKeyOf(operation)] = owner
+	transcript := Transcript{
+		A: SideResult{Status: 200, Body: `[{"id": "tag-a"}]`},
+		B: SideResult{Status: 200, Body: `[{"id": "tag-b"}]`},
+	}
+	keys := engine.foreignKeys()
+	if findings := engine.classifyPermission(operation, keys[0], transcript); len(findings) != 0 {
+		t.Fatalf("sibling key reading organization tags = %+v, want none", findings)
+	}
+	if findings := engine.classifyPermission(operation, keys[1], transcript); len(findings) != 1 || findings[0].Kind != FindingPermissionLeak {
+		t.Fatalf("foreign-organization key = %+v, want one permission_leak", findings)
+	}
+}
+
 // The settle is event-driven: a list that only shows the entity on a later
 // read is a wait, not a mutation_not_visible finding.
 func TestSettleWaitsForACollectionToCatchUp(t *testing.T) {

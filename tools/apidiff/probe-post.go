@@ -238,16 +238,24 @@ func (engine *probeEngine) permissionProbes(operations []Operation) []Finding {
 // legitimately owns — its own project, and the organization and team it sits
 // in. Seeing one of those is that key reading its own scope, not a leak.
 type foreignKey struct {
-	label string
-	key   string
-	scope map[string]bool
+	label            string
+	key              string
+	scope            map[string]bool
+	sameOrganization bool
+}
+
+// organizationLevelReads list organization-owned definitions: a sibling
+// project in the same organization reads them by design, so key-b seeing
+// the owner's IDs there is not a leak.
+var organizationLevelReads = map[string]bool{
+	"GET /api/prompts/tags": true,
 }
 
 func (engine *probeEngine) foreignKeys() []foreignKey {
 	return []foreignKey{
 		{label: "key-b", key: engine.options.Keys.ProjectKeyB, scope: map[string]bool{
 			fixtureProjectBID: true, seededOrganizationID: true, seededTeamID: true,
-		}},
+		}, sameOrganization: true},
 		{label: "key-c", key: engine.options.Keys.ProjectKeyC, scope: map[string]bool{
 			fixtureProjectCID: true, fixtureOrg2ID: true, fixtureTeam2ID: true,
 		}},
@@ -298,7 +306,8 @@ func (engine *probeEngine) classifyPermission(operation Operation, foreign forei
 	owner := engine.ownerIDs[operationKeyOf(operation)]
 	leakedA, okA := leakedID(ownerSet(owner, true), transcript.A, foreign.scope)
 	leakedB, okB := leakedID(ownerSet(owner, false), transcript.B, foreign.scope)
-	if okA || okB {
+	shared := foreign.sameOrganization && organizationLevelReads[strings.ToUpper(operation.Method)+" "+operation.Path]
+	if (okA || okB) && !shared {
 		return []Finding{{
 			Kind:        FindingPermissionLeak,
 			Method:      operation.Method,

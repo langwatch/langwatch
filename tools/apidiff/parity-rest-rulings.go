@@ -4,7 +4,6 @@ const (
 	rulingConnectRedesign = "deliberate: the connect protocol was redesigned on the branch (r39 triage)"
 	rulingFlattening      = "artifact: the branch documents a union main flattened; the wire shape matches (r39 triage)"
 	rulingPhantomField    = "phantom: main documents a field its handler never answers or accepts (r39 triage)"
-	rulingShareSecurity   = "deliberate: sharing is tightened on the branch, safer auth wins (ruling C, 2026-09-25)"
 )
 
 // ruledBreakingRest names the operations whose breaking rows were triaged
@@ -26,8 +25,4 @@ var ruledBreakingRest = map[string]string{
 	"GET /api/query/reference":                 rulingPhantomField,
 	"GET /api/query/schema":                    rulingPhantomField,
 	"POST /api/evaluations/batch/log_results":  rulingPhantomField,
-	"POST /api/trace/search":                   rulingPhantomField,
-	"GET /api/trace/{id}":                      rulingPhantomField,
-	"POST /api/trace/{id}/share":               rulingShareSecurity,
-	"POST /api/trace/{id}/unshare":             rulingShareSecurity,
 }
