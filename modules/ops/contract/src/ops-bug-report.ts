@@ -100,6 +100,11 @@ export type ListBugReportsInput = z.infer<typeof listBugReportsInputSchema>;
 export const bugReportIdInputSchema = z.object({ id: z.string() });
 export type BugReportIdInput = z.infer<typeof bugReportIdInputSchema>;
 
+/** The one header the intake reads: the proxy chain its rate-limit bucket comes from. */
+export const bugReportIntakeHeadersSchema = z.object({
+  "x-forwarded-for": z.string().optional(),
+});
+
 /**
  * The report a customer's coding agent posts, parsed by the intake route
  * so a rejection answers the bespoke body released CLI/MCP builds read.

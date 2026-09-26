@@ -2,6 +2,7 @@ import { type EventSourcing, killSwitchDescriptorsFor } from "@langwatch/eventin
 
 import {
   type OpsEventingIntrospection,
+  type OpsDejaViewFold,
   type OpsDejaViewProjection,
   type OpsProcessManagerMetadata,
   type OpsKillSwitchDescriptor,
@@ -83,9 +84,10 @@ export class EventingIntrospectionService implements OpsEventingIntrospection {
       Array.from(def.foldProjections.values()).map(({ definition: d, open }) => ({
         projectionName: d.name,
         eventTypes: d.eventTypes,
-        init: () => d.init(),
-        apply: (state: unknown, event: { type: string }) =>
-          open((fold) => fold.apply(state as any, event)),
+        replay: <R>(use: <State>(fold: OpsDejaViewFold<State>) => R): R =>
+          open((fold) =>
+            use({ init: () => fold.init(), apply: (state, event) => fold.apply(state, event) }),
+          ),
       })),
     );
   }

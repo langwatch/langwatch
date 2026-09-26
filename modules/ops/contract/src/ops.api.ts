@@ -89,6 +89,7 @@ import type {
 } from "./ops-system-migration.ts";
 import type { ProductAnalyticsTarget } from "./ops.config.ts";
 import type {
+  OpsDoorAnswer,
   OpsEventLogSearchWindow,
   OpsExplainAnswer,
   OpsExplainRequest,
@@ -486,6 +487,11 @@ export interface OpsApi {
   authorizeOperatorSecret(input: { presented: string | null }): void;
   /** One operator EXPLAIN, guardrails and fail-closed rule included. */
   explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
+  /** One EXPLAIN as the operator door received it, answered in the bodies the tool parses. */
+  explainClickHouseRequest(input: {
+    body: string;
+    authorization: string | null;
+  }): Promise<OpsDoorAnswer>;
   listPipelineRegistrations(): OpsPipelineRegistrations;
   getEventLogSearchWindow(): OpsEventLogSearchWindow;
   /** Null when no Grafana is configured: callers render no link, not a dead one. */
@@ -553,6 +559,12 @@ export interface OpsApi {
     apiToken?: string | undefined;
     projectIdHint?: string | null;
   }): Promise<{ id: string }>;
+  /** One report as the intake door received it, answered in the bodies released builds read. */
+  receiveBugReport(input: {
+    body: string;
+    forwardedFor: string | null;
+    credential: Readonly<{ token: string; projectId: string | null }> | null;
+  }): Promise<OpsDoorAnswer>;
   findDashboardData(): DashboardData | null;
   badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
   streamDashboard(input: StreamDashboardInput): AsyncIterable<DashboardData>;

@@ -3,32 +3,53 @@
  * this walk stopped at fold and map.
  * @see specs/ops/state-projection-visibility.feature
  */
-import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  defineAggregate,
+  definePipeline,
+  EventSchema,
+  type FoldProjectionStore,
+  type StateProjectionOptions,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { EventingIntrospectionService } from "../eventing-introspection.service.ts";
 
-function definitionWith({
-  stateOptions,
-}: {
-  stateOptions?: { killSwitch?: { customKey?: string } };
-} = {}): StaticPipelineDefinition<any, any, any> {
-  return {
-    metadata: { name: "authz_grants", aggregateType: "authz_grants" },
-    foldProjections: new Map([["grantsFold", { definition: { name: "grantsFold" } }]]),
-    mapProjections: new Map(),
-    stateProjections: new Map([
-      ["authzGrantsState", { definition: { name: "authzGrantsState", options: stateOptions } }],
-    ]),
-    commands: [],
-    foldSubscribers: new Map(),
-    mapSubscribers: new Map(),
-    eventSubscribers: new Map(),
-    processManagers: new Map(),
-  } as unknown as StaticPipelineDefinition<any, any, any>;
+const GRANTED = "lw.authz.authz_grants.granted";
+const grantedSchema = z.object({ ...EventSchema.shape, type: z.literal(GRANTED) });
+
+type GrantsState = { granted: number };
+
+function definitionWith({ stateOptions }: { stateOptions?: StateProjectionOptions } = {}) {
+  return definePipeline({
+    name: "authz_grants",
+    aggregate: defineAggregate({ type: "authz_grants" }),
+  })
+    .withEvents([grantedSchema])
+    .withClickHouseFoldProjection({
+      name: "grantsFold",
+      version: "2026-01-01",
+      eventTypes: [GRANTED],
+      init: (): GrantsState => ({ granted: 0 }),
+      apply: (state) => state,
+      store: createApiFixture<FoldProjectionStore<GrantsState>>(),
+      LastEventOccurredAtKey: "lastEventOccurredAt",
+    })
+    .withPostgresProjection({
+      name: "authzGrantsState",
+      version: "2026-01-01",
+      eventTypes: [GRANTED],
+      init: (): GrantsState => ({ granted: 0 }),
+      apply: (state) => state,
+      store: createApiFixture<StateProjectionStore<GrantsState>>(),
+      options: stateOptions,
+    })
+    .build();
 }
 
-function adapterFor(definition: StaticPipelineDefinition<any, any, any>) {
+function adapterFor(definition: ReturnType<typeof definitionWith>) {
   return EventingIntrospectionService.create(() => [definition]);
 }
 

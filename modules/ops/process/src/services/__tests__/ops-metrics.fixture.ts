@@ -12,6 +12,7 @@ export class OpsMetricsTestAdapter {
   private pendingReconciliations: OpsQueueReconcileOutcome[] = [];
   private pendingDrift = 0;
   private scanCalls = 0;
+  private driftReads = 0;
 
   private constructor() {}
 
@@ -37,6 +38,10 @@ export class OpsMetricsTestAdapter {
 
   getScanCalls(): number {
     return this.scanCalls;
+  }
+
+  getDriftReads(): number {
+    return this.driftReads;
   }
 
   private unavailable(): never {
@@ -241,6 +246,7 @@ export class OpsMetricsTestAdapter {
   }
 
   async readQueuePendingDrift(): Promise<number> {
+    this.driftReads++;
     return this.pendingDrift;
   }
 

@@ -7,12 +7,13 @@ import { publicRoute } from "@langwatch/api/access";
 import {
   defineRestMiddleware,
   defineRestRouter,
-  jsonResponse,
   MANAGEMENT_API_VERSION,
-  type RestRawResult,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
-import { OpsApi, submitBugReportSchema } from "@langwatch/ops-contract";
+import {
+  bugReportIntakeHeadersSchema,
+  OpsApi,
+  submitBugReportSchema,
+} from "@langwatch/ops-contract";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
@@ -71,56 +72,20 @@ export const opsBugReportRest = defineRestRouter(OpsApi)
     }),
   )
   .withMiddleware(bugReportCredential)
+  .withHeaders(bugReportIntakeHeadersSchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: payloadTooLarge })
-  .withRawResponse({ produces: "application/json" })
-  .handle(async ({ app, raw, request }, credential): Promise<RestRawResult> => {
-    const posted = parsedJson(raw);
+  .withResponse("protocol", { produces: "application/json", because: INTAKE_ANSWERS })
+  .handle(async ({ app, raw, response }, credential, headers) => {
+    const answer = await app.receiveBugReport({
+      body: raw,
+      forwardedFor: headers["x-forwarded-for"] ?? null,
+      credential,
+    });
 
-    if (posted === null) return jsonResponse({ error: "Invalid body, expecting JSON" }, 400);
-
-    const parsed = submitBugReportSchema.safeParse(posted);
-
-    if (!parsed.success) {
-      return jsonResponse({ error: "Invalid report", details: parsed.error.flatten() }, 400);
-    }
-
-    try {
-      const { id } = await app.submitBugReport({
-        report: parsed.data,
-        callerKey: callerKeyOf(request),
-        apiToken: credential?.token,
-        projectIdHint: credential?.projectId ?? null,
-      });
-
-      return jsonResponse({ id }, 201);
-    } catch (error) {
-      if (!HandledError.isHandled(error)) throw error;
-
-      return jsonResponse(
-        { error: error.message, code: error.code },
-        error.httpStatus as 400 | 429 | 500,
-      );
-    }
+    return response.write({
+      status: answer.status,
+      mediaType: "application/json",
+      body: JSON.stringify(answer.body),
+    });
   })
   .build();
-
-/** The posted document, or null where the body was not JSON. */
-function parsedJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Rate-limit bucket for the caller. `x-forwarded-for` is only trustworthy from
- * the hop nearest us, which is why this reads the LAST entry: earlier ones are
- * client-supplied.
- */
-function callerKeyOf(request: Request): string {
-  const hops = request.headers.get("x-forwarded-for")?.split(",") ?? [];
-  const nearest = hops[hops.length - 1]?.trim();
-
-  return `ip:${nearest ?? "unknown"}`;
-}
