@@ -123,6 +123,7 @@ function seed(over: Partial<SsoConnectionState> = {}): void {
 
 describe("given an administrator registering their identity provider", () => {
   describe("when it speaks openid connect", () => {
+    /** @scenario "Registering an OpenID Connect provider takes the credentials it will dial with" */
     it("keeps both credentials in the vault and names only their references in the fact", async () => {
       const { connectionId } = await commands.register({
         organizationId: ORG,

@@ -270,6 +270,7 @@ describe("the organization's directory sync panel", () => {
       ]);
     });
 
+    /** @scenario "A directory-caused change and the audit page tell the same story" */
     it("names the same recorded fact the grants ledger names for that change", async () => {
       const panel = await service.getAll({ organizationId: ACME });
 
@@ -318,6 +319,7 @@ describe("the organization's directory sync panel", () => {
   });
 
   describe("given a connection that belongs to another organization", () => {
+    /** @scenario "Another organization's connection is not there to read" */
     it("lists nothing of theirs, because the read was built from this organization", async () => {
       const panel = await service.getAll({ organizationId: ACME });
 
@@ -331,6 +333,7 @@ describe("the organization's directory sync panel", () => {
   });
 
   describe("when the panel reads recent directory changes", () => {
+    /** @scenario "Recent directory removals survive a full page of live grants" */
     it("asks the grants ledger for the whole recent window rather than a page of live rows", async () => {
       await service.getAll({ organizationId: ACME });
 

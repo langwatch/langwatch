@@ -3,6 +3,7 @@ import { configuredAuthProvider } from "@langwatch/enterprise-sso-contract/sign-
 import { describe, expect, it } from "vitest";
 
 describe("configuredAuthProvider", () => {
+  /** @scenario "The provider setting answers to its modern name" */
   it("reads AUTH_PROVIDER without a word of complaint", () => {
     expect(configuredAuthProvider({ authProvider: "auth0", legacyProvider: undefined })).toEqual({
       provider: "auth0",

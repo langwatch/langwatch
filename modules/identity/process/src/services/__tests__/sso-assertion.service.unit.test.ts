@@ -169,6 +169,7 @@ describe("given a live connection", () => {
     ).resolves.toEqual({ action: "continue" });
   });
 
+  /** @scenario "Every exact domain on one connection is qualified independently" */
   it("accepts each exact proved domain and no subdomain of either", async () => {
     const beta = { ...DOMAIN_PROOF, domain: "beta.example" };
     const { service } = serviceOver({
@@ -234,6 +235,7 @@ describe("given a live connection", () => {
   });
 
   describe("when it asserts an address on a domain it never proved", () => {
+    /** @scenario "A provider may only assert addresses on the domains it proved" */
     it("refuses, whoever the address belongs to", async () => {
       const { service } = serviceOver({ row: connection() });
 
@@ -348,6 +350,7 @@ describe("given an assertion that names no connection we hold", () => {
     ).resolves.toMatchObject({ action: "reject" });
   });
 
+  /** @scenario "The named provider is not a connection at all" */
   it("refuses an id that is not a connection id at all, without a read", async () => {
     const { service, getConnection } = serviceOver({ row: connection() });
 
@@ -361,6 +364,7 @@ describe("given an assertion that names no connection we hold", () => {
 describe("given a connection that no longer accepts sign-in", () => {
   const closed = ["REJECTED", "SUSPENDED", "TEARDOWN_PENDING", "TORN_DOWN"] as const;
 
+  /** @scenario "A callback for a suspended or removed connection is refused" */
   it.each(closed)("refuses a registrant callback while the connection is %s", async (state) => {
     const { service, findRegistrantAtAddress } = serviceOver({
       row: connection({ state }),
@@ -383,6 +387,7 @@ describe("given a connection that no longer accepts sign-in", () => {
   // The fold keeps the proof, the arrival answer and the break-glass grant
   // through suspension and teardown, so a closed connection still satisfies
   // every readiness question. Readiness must not be what carries it.
+  /** @scenario "Go-live readiness does not survive suspension or teardown" */
   it.each(closed)("refuses a %s connection that is otherwise ready", async (state) => {
     const hasLiveBinding = vi.fn().mockResolvedValue(true);
     const service = SsoAssertionService.create({
@@ -426,6 +431,7 @@ describe("given an address the gate cannot read a domain from", () => {
 });
 
 describe("given several different reasons to refuse", () => {
+  /** @scenario "No such connection is held" */
   it("answers identically every cause that would say what exists here", async () => {
     const causes = await Promise.all([
       serviceOver({ row: null }).service.decide({
@@ -444,6 +450,7 @@ describe("given several different reasons to refuse", () => {
     expect(new Set(causes.map(codeOf))).toEqual(new Set(["sso_sign_in_refused"]));
   });
 
+  /** @scenario "The identity provider released no email address" */
   it("says the provider sent no address", async () => {
     const decision = await serviceOver({ row: connection() }).service.decide({
       providerId: CONNECTION_ID,
@@ -453,6 +460,7 @@ describe("given several different reasons to refuse", () => {
     expect(codeOf(decision)).toBe("sso_assertion_without_address");
   });
 
+  /** @scenario "The asserted domain is not one the connection has proved" */
   it("says the domain is not verified for this connection", async () => {
     const decision = await serviceOver({ row: connection() }).service.decide({
       providerId: CONNECTION_ID,
@@ -462,6 +470,7 @@ describe("given several different reasons to refuse", () => {
     expect(codeOf(decision)).toBe("sso_domain_not_verified");
   });
 
+  /** @scenario "The provider asserted an address the connection cannot carry yet" */
   it("says the address was not the registrant's, naming nobody", async () => {
     const decision = await serviceOver({
       row: connection({ state: "DRAFT", verifiedDomains: [], domainVerifications: [] }),
@@ -471,6 +480,7 @@ describe("given several different reasons to refuse", () => {
     expect(JSON.stringify(decision)).not.toContain(REGISTRAR_ID);
   });
 
+  /** @scenario "The domain's proof has lapsed and this account is new" */
   it("says the domain's verification has lapsed", async () => {
     const decision = await serviceOver({
       row: connection({ domainVerifications: [lapsedProof] }),
@@ -483,6 +493,7 @@ describe("given several different reasons to refuse", () => {
     expect(codeOf(decision)).toBe("sso_domain_proof_lapsed");
   });
 
+  /** @scenario "The opaque refusal is not the credential refusal" */
   it("never borrows the credential refusal's code", async () => {
     // `identity_sign_in_refused` means "that email or password is wrong", and
     // every one of these reached the gate without a password existing.
@@ -510,6 +521,7 @@ describe("given several different reasons to refuse", () => {
 });
 
 describe("given any refusal at all", () => {
+  /** @scenario "Every refusal logs its reason" */
   it("writes down the reason, the connection and the domain", async () => {
     const { service } = serviceOver({
       row: connection({ state: "DRAFT", verifiedDomains: [], domainVerifications: [] }),
@@ -538,6 +550,7 @@ describe("given any refusal at all", () => {
     expect(JSON.stringify(loggerStub.info.mock.calls)).not.toContain("someone@acme.com");
   });
 
+  /** @scenario "A connection with no registrant recorded is logged as our fault" */
   it("logs a connection with no registrant at error, not as routine", async () => {
     const { service } = serviceOver({
       row: connection({ state: "DRAFT", verifiedDomains: [], createdBy: null }),
@@ -556,6 +569,7 @@ describe("given any refusal at all", () => {
 describe("given a domain whose published record has lapsed", () => {
   const lapsed = () => connection({ domainVerifications: [lapsedProof] });
 
+  /** @scenario "The gate asks for a re-read when it refuses somebody new" */
   it("asks for that domain's record to be read again when it refuses somebody new", async () => {
     const { service, requestReproof } = serviceOver({ row: lapsed() });
 
@@ -584,6 +598,7 @@ describe("given a domain whose published record has lapsed", () => {
     expect(codeOf(decision)).toBe("sso_domain_proof_lapsed");
   });
 
+  /** @scenario "Somebody already bound to the connection asks for nothing" */
   it("carries somebody already bound through, and asks for nothing", async () => {
     const { service, requestReproof } = serviceOver({
       row: lapsed(),
@@ -635,6 +650,7 @@ describe("given a connection that has done everything but the sign-in", () => {
     };
   }
 
+  /** @scenario "A proved domain carries the sign-in that would activate it" */
   it("carries the sign-in that would activate it", async () => {
     const { service } = serviceWithBreakGlass({ row: readyRow() });
 
@@ -643,6 +659,7 @@ describe("given a connection that has done everything but the sign-in", () => {
     ).resolves.toEqual({ action: "continue" });
   });
 
+  /** @scenario "Missing any other precondition keeps the setup rule" */
   it("holds the door when nobody can get in without the identity provider", async () => {
     const { service } = serviceWithBreakGlass({ row: readyRow(), live: false });
 
@@ -667,6 +684,7 @@ describe("given a connection that has done everything but the sign-in", () => {
     expect(codeOf(decision)).toBe("sso_setup_address_mismatch");
   });
 
+  /** @scenario "An unproved domain is never carried by readiness" */
   it("refuses an unproved domain however ready everything else is", async () => {
     const { service, hasLiveBinding } = serviceWithBreakGlass({
       row: readyRow({ verifiedDomains: [], domainVerifications: [] }),
@@ -684,6 +702,7 @@ describe("given a connection that has done everything but the sign-in", () => {
 });
 
 describe("given a connection that is already live", () => {
+  /** @scenario "A live connection asks nothing extra" */
   it("asks the database no readiness question", async () => {
     // This runs on every single sign-on request, so an extra read here would
     // tax all of them for a rule that only matters before activation.

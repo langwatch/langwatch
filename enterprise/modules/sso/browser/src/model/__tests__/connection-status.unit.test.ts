@@ -44,6 +44,7 @@ describe("the connection status chip", () => {
   });
 
   describe("when the domain is proved but the journey is not finished", () => {
+    /** @scenario "A proved domain does not claim to be ready while steps are outstanding" */
     it("says the domain is proved rather than that it is ready to turn on", () => {
       const blocked = connectionStatusChipFor({
         state: "VERIFIED",

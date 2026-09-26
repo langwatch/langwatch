@@ -200,6 +200,7 @@ describe("ScimDirectoryIdentityService", () => {
   });
 
   describe("given a token that predates connection scoping", () => {
+    /** @scenario "Tokens issued before connections existed keep exactly the reach they had" */
     it("checks nothing, keeping the organization-wide authority it was sold with", async () => {
       await service.remember({
         connectionId: ENTRA,

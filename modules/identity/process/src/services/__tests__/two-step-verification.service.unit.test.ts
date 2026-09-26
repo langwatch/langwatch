@@ -239,6 +239,7 @@ describe("two-step verification", () => {
   });
 
   describe("given an administrator changes the requirement", () => {
+    /** @scenario "Turning the requirement on is recorded with who did it" */
     it("turns it on and tells every active member who did it", async () => {
       const { service, mail } = organizationService(accounts);
 

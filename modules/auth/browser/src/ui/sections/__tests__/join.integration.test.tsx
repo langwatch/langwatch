@@ -80,6 +80,7 @@ afterEach(() => cleanup());
 describe("given a verified address an organization is open to", () => {
   describe("when sign-up reaches the join step", () => {
     /** @scenario "Sign-up offers the team before offering a workspace" */
+    /** @scenario "Sign-up offers my team before offering a new workspace" */
     it("leads with joining and keeps creating as the explicit secondary", async () => {
       renderScreen();
 

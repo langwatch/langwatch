@@ -60,6 +60,7 @@ describe("ScimService.generateToken", () => {
   describe("when generating a token", () => {
     describe("given no connection", () => {
       /** @scenario A token cannot exist without a connection to belong to */
+      /** @scenario "Issuing a token without naming a connection is refused" */
       it("refuses with scim_connection_required and writes nothing", async () => {
         const repo = scimRepositoryFixture();
         const scim = service(repo);

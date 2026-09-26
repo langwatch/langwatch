@@ -183,6 +183,7 @@ describe("EventingAuthzAuditAdapter", () => {
    *  is filtered by actor — a directory sync's de-enroll is a change the
    *  customer's own directory made, and it belongs on their audit page.
    *  @scenario "A revocation names the surface that made it without a source of its own" */
+  /** @scenario "Directory-sourced membership changes stay on the customer's audit page" */
   it("records the row, with the reason and no invented person", async () => {
     const store = new RecordingAuditTrailStore();
     const adapter = EventingAuthzAuditAdapter.create({ store });

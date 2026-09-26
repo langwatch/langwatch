@@ -131,6 +131,7 @@ describe("given a sign-up address to confirm", () => {
       await harness.service.completeVerification({ token: "token-1" });
     });
 
+    /** @scenario "Opening a confirmation link a second time confirms, rather than refusing" */
     it("answers as the first opening did, without a fresh proof", async () => {
       await expect(harness.service.completeVerification({ token: "token-1" })).resolves.toEqual({
         email: "sam@acme.com",
@@ -140,6 +141,7 @@ describe("given a sign-up address to confirm", () => {
       });
     });
 
+    /** @scenario "A spent link stops working once its grace window closes" */
     it("refuses once the spent link's grace has run out", async () => {
       harness.advance(SPENT_LINK_GRACE_MS + 1);
 
@@ -150,6 +152,7 @@ describe("given a sign-up address to confirm", () => {
   });
 
   describe("when the address gained an account before the link came back", () => {
+    /** @scenario "A confirmation link never opens an account it did not create" */
     it("refuses rather than adopting the account", async () => {
       const harness = makeService();
       await harness.service.requestVerification({ email: "sam@acme.com" });
@@ -162,6 +165,7 @@ describe("given a sign-up address to confirm", () => {
   });
 
   describe("when the link never existed or belongs to another feature", () => {
+    /** @scenario "A link nobody ever issued is refused the way an expired one is" */
     it("refuses both the same way", async () => {
       const harness = makeService();
       harness.memory.verificationTokens.set("borrowed", {

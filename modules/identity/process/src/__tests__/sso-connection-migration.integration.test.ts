@@ -315,6 +315,7 @@ describe("given a grandfathered connection an organization is moving off", () =>
   });
 
   describe("when the connection is renamed", () => {
+    /** @scenario "Renaming a connection changes the name and nothing else" */
     it("says the new name on the card and nothing else", async () => {
       await liveReplacement();
 

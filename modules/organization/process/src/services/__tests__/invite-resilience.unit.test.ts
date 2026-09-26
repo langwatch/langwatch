@@ -275,6 +275,8 @@ describe("InviteService resilience", () => {
     });
 
     describe("when the extend runs", () => {
+      /** @scenario "Extending is not how a leaked link is dealt with" */
+      /** @scenario "Extending an invitation moves the deadline and leaves the link alone" */
       it("keeps the code and mails nothing, only pushing the expiry out", async () => {
         mockPrisma.organizationInvite.updateMany.mockResolvedValue({
           count: 1,
@@ -311,6 +313,7 @@ describe("InviteService resilience", () => {
         ).rejects.toBeInstanceOf(InviteNotFoundError);
       });
 
+      /** @scenario "Only an invitation still waiting can be extended" */
       it("refuses to extend a revoked invitation", async () => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue({
           ...makePendingInvite(),

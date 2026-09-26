@@ -109,6 +109,8 @@ function scimService(repository = scimRepositoryFixture(), users = userService()
 describe("ScimService.listUsers", () => {
   describe("when the filter names an attribute the listing cannot match", () => {
     /** @scenario "A user listing filtered by an unsupported attribute is refused" */
+    /** @scenario "An unsupported filter never widens into the whole organization" */
+    /** @scenario "A filter on something we do not support is refused" */
     it("refuses with invalidFilter rather than listing the organization", async () => {
       const { service, repository } = scimService();
 
@@ -127,6 +129,7 @@ describe("ScimService.listUsers", () => {
 
   describe("when the filter names userName", () => {
     /** @scenario "A user listing filtered by userName matches without regard to case" */
+    /** @scenario "Looking somebody up by their sign-in address still works" */
     it("narrows the read to that address", async () => {
       const { service, repository } = scimService();
 
@@ -145,6 +148,7 @@ describe("ScimService.listUsers", () => {
 describe("ScimDirectoryService.listGroups", () => {
   describe("when the expression is richer than equality", () => {
     /** @scenario "A group listing filtered by an unsupported expression is refused" */
+    /** @scenario "A group filter follows the same rule as a person filter" */
     it("refuses with invalidFilter rather than listing every group", async () => {
       const repository = directoryRepository();
       const service = ScimDirectoryService.create({
@@ -174,6 +178,7 @@ describe("ScimService.updateUser", () => {
 
   describe("when the directory patches only the family name", () => {
     /** @scenario "A patch naming only the surname keeps the forename" */
+    /** @scenario "A directory patches one half of a name with a dotted path" */
     it("keeps the given name it did not mention", async () => {
       const repository = scimRepositoryFixture({
         findMembership: vi.fn(async () => ({
@@ -198,6 +203,7 @@ describe("ScimService.updateUser", () => {
 
   describe("when the parts arrive unwrapped under a name path", () => {
     /** @scenario "A patch sending the family name as a dotted path is applied" */
+    /** @scenario "A directory replaces both halves of a name at once" */
     it("writes both halves", async () => {
       const repository = scimRepositoryFixture({
         findMembership: vi.fn(async () => ({

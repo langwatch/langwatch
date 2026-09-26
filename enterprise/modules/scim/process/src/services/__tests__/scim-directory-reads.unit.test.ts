@@ -202,6 +202,7 @@ describe("reading the directory back", () => {
     const people = Array.from({ length: 250 }, (_, index) => person(index));
 
     /** @scenario "A page reports how many resources it actually carries" */
+    /** @scenario "The last page reports how many people it actually carries" */
     it("reports the short last page at its real size", async () => {
       const page = await serviceOver(directory({ people })).listUsers({
         organizationId: ORGANIZATION,
@@ -214,6 +215,7 @@ describe("reading the directory back", () => {
     });
 
     /** @scenario "A page reports how many resources it actually carries" */
+    /** @scenario "A full page reports the whole page" */
     it("reports a full page as full", async () => {
       const page = await serviceOver(directory({ people })).listUsers({
         organizationId: ORGANIZATION,
