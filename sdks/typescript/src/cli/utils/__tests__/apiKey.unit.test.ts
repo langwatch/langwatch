@@ -60,7 +60,11 @@ vi.mock("../projectScope", async () => {
 
 import { config } from "dotenv";
 
-import { scopedProjectId } from "../../../internal/credentialContext";
+import {
+  runWithCredentialHolder,
+  scopedProjectId,
+  setRunsOutsideProject,
+} from "../../../internal/credentialContext";
 import {
   loginElsewhereMessage,
   loginMadeElsewhere,
@@ -232,6 +236,36 @@ describe("resolveCredentials()", () => {
       // The key reaches further, but the request still names the project the
       // command pointed at before this feature.
       expect(resolved.projectId).toBe("proj_1");
+    });
+
+    it("tells which project a project command reads", async () => {
+      mockedLoadConfig.mockReturnValue(
+        loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+      );
+
+      await runWithCredentialHolder(async () => {
+        setRunsOutsideProject(false);
+        await resolveCredentials();
+      });
+
+      expect(mockedNotice).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "device-login-key" }),
+      );
+    });
+
+    describe("when the command answers for the organization, not a project", () => {
+      it("says nothing about which project it reads", async () => {
+        mockedLoadConfig.mockReturnValue(
+          loggedInConfig({ ...freshPersonal(), cli_api_key: "sk-lw-lookup01_secret01" }) as never,
+        );
+
+        await runWithCredentialHolder(async () => {
+          setRunsOutsideProject(true);
+          await resolveCredentials();
+        });
+
+        expect(mockedNotice).not.toHaveBeenCalled();
+      });
     });
 
     it("keeps LANGWATCH_API_KEY ahead of the login key", async () => {

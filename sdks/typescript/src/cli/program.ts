@@ -4,7 +4,7 @@
 
 import { Command, Option } from "commander";
 
-import { setRequestedProject } from "../internal/credentialContext";
+import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -21,7 +21,13 @@ import {
   rendersOwnResult,
   type RawOutputFlags,
 } from "./utils/output";
-import { applyProjectOption, PROJECT_FLAG_HELP, projectSelectorOf } from "./utils/projectOption";
+import {
+  applyProjectOption,
+  COMMANDS_WITHOUT_PROJECT,
+  commandPath,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
 
 declare const __CLI_VERSION__: string;
 
@@ -307,6 +313,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     // the action runs so `resolveCredentials` reads it without the action
     // having to accept the value and pass it on.
     setRequestedProject(projectSelectorOf(actionCommand));
+    setRunsOutsideProject(commandPath(actionCommand) in COMMANDS_WITHOUT_PROJECT);
   });
 
   registerLoginCommands(program);

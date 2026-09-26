@@ -5,6 +5,7 @@ import { isUserScopedApiKey } from "@/internal/api/auth";
 import {
   claimProjectEnvIgnoredWarning,
   requestedProject,
+  runsOutsideProject,
   setResolvedApiKey,
   setResolvedProjectId,
 } from "@/internal/credentialContext";
@@ -267,8 +268,13 @@ async function resolveFromSession({
   // warn about. `LANGWATCH_PROJECT_ID` does not: it is ambient, and this path does not even read it
   // (the personal project answers), so suppressing the notice for it would leave nothing on screen
   // saying which project replied. A command that acts as the person reads no project either way, so
-  // the notice about which project it reads would be wrong; that command names its own login.
-  if (currentProjectSelector(project)?.source !== "named" && !isLoginKeyRequired) {
+  // the notice about which project it reads would be wrong; that command names its own login. So
+  // would it for an organization-scoped or machine-local command, which reads no project.
+  if (
+    currentProjectSelector(project)?.source !== "named" &&
+    !isLoginKeyRequired &&
+    !runsOutsideProject()
+  ) {
     await maybePrintIdentityNotice({
       mode: session.isLoginKey ? "device-login-key" : "device",
       apiKey: session.apiKey,

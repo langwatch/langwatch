@@ -277,6 +277,7 @@ describe("given the CLI asked for management access", () => {
 
       expect(await screen.findByText("You have no management access here")).toBeInTheDocument();
       expect(screen.queryByTestId("cli-auth-management-request")).toBeNull();
+      expect(screen.queryByText(/plus the management access below/)).toBeNull();
       expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
       expect(host.approvals).toEqual([]);
     });

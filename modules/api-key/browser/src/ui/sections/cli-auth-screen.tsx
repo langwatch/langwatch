@@ -704,7 +704,7 @@ export default function CliAuthScreen() {
                         </Text>
                       )}
                     </VStack>
-                  ) : requestsManagement ? (
+                  ) : requestsManagement && !cannotGrantManagement && managementHeld.length > 0 ? (
                     <Text textStyle="xs" color="fg.muted" lineHeight="tall">
                       The key gets your access for everyday work: traces, datasets, prompts,
                       evaluations, the AI Gateway, and project settings, plus the management access

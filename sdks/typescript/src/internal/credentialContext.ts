@@ -10,6 +10,7 @@ interface CredentialHolder {
   apiKey?: string;
   projectId?: string;
   requestedProject?: string;
+  runsOutsideProject?: boolean;
   warnedProjectEnvIgnored?: boolean;
 }
 
@@ -85,6 +86,19 @@ export function setRequestedProject(selector: string | undefined): void {
  */
 export function requestedProject(): string | undefined {
   return currentHolder().requestedProject;
+}
+
+/**
+ * Publish whether the command about to run answers outside any project (machine-local or
+ * organization-scoped), so nothing tells its user which project it reads.
+ */
+export function setRunsOutsideProject(outsideProject: boolean): void {
+  currentHolder().runsOutsideProject = outsideProject;
+}
+
+/** Whether the current request's command answers outside any project; false when nothing said. */
+export function runsOutsideProject(): boolean {
+  return currentHolder().runsOutsideProject === true;
 }
 
 /**
