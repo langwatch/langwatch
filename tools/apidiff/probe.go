@@ -370,7 +370,7 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		engine.captureFrom(operation, probeCase, transcript)
 
 		if !operation.InA || !operation.InB {
-			if !missingReported && !RetiredRestOperation(operation.Path) {
+			if reportsMissing(operation, missingReported) {
 				missingReported = true
 				findings = append(findings, missingOperationFinding(operation, probeCase.name, transcript))
 			}
@@ -565,6 +565,12 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	request.query = target.queryB
 	transcript.B = engine.execute(request)
 	return transcript
+}
+
+// reportsMissing is whether a one-sided operation still owes its finding:
+// once per operation, and never for a ruled-retired one.
+func reportsMissing(operation Operation, alreadyReported bool) bool {
+	return !alreadyReported && !RetiredRestOperation(operation.Path)
 }
 
 // missingOperationFinding records an operation present on only one side,
