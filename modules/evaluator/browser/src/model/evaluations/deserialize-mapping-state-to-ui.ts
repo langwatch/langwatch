@@ -13,27 +13,28 @@ export function deserializeMappingStateToUI(
   const uiMappings: Record<string, UIFieldMapping> = {};
 
   for (const [field, mapping] of Object.entries(existingMappings.mapping)) {
-    if (mapping.source) {
-      const pathParts: string[] = [mapping.source as string];
-      if ("type" in mapping && mapping.type === "thread") {
-        if ("selectedFields" in mapping && mapping.selectedFields?.length) {
-          pathParts.push(...mapping.selectedFields);
-        }
-      } else {
-        if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
-        if ("subkey" in mapping && mapping.subkey) pathParts.push(mapping.subkey);
-      }
-
-      const isThreadMapping = "type" in mapping && mapping.type === "thread";
-      const sourceId = monitorLevel === "thread" || isThreadMapping ? "thread" : "trace";
-
-      uiMappings[field] = {
-        type: "source",
-        sourceId,
-        path: pathParts,
-      };
-    }
+    if (!mapping.source) continue;
+    const isThreadMapping = "type" in mapping && mapping.type === "thread";
+    uiMappings[field] = {
+      type: "source",
+      sourceId: monitorLevel === "thread" || isThreadMapping ? "thread" : "trace",
+      path: [mapping.source as string, ...mappingPathTail(mapping)],
+    };
   }
 
   return uiMappings;
+}
+
+type PersistedFieldMapping = MappingState["mapping"][string];
+
+function mappingPathTail(mapping: PersistedFieldMapping): string[] {
+  if ("type" in mapping && mapping.type === "thread") {
+    return "selectedFields" in mapping && mapping.selectedFields?.length
+      ? [...mapping.selectedFields]
+      : [];
+  }
+  const tail: string[] = [];
+  if ("key" in mapping && mapping.key) tail.push(mapping.key);
+  if ("subkey" in mapping && mapping.subkey) tail.push(mapping.subkey);
+  return tail;
 }

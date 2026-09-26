@@ -11,6 +11,7 @@ import {
   WorkflowCardActions,
   WorkflowCardDisplay,
 } from "@langwatch/workflow-browser-kit";
+import type { WorkflowCascadeArchive } from "@langwatch/workflow-contract";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 
 import { WorkflowCascadeArchiveDialog } from "../blocks/workflow-cascade-archive-dialog.tsx";
@@ -54,12 +55,7 @@ export function WorkflowListCard({
   const workflow = workflowId
     ? workflows?.find((candidate) => candidate.id === workflowId)
     : undefined;
-  const isCopiedWorkflow = !!workflow?.copiedFromWorkflowId;
-  const hasCopies = (workflow?._count?.copiedWorkflows ?? 0) > 0;
-
-  const sourceProjectPath = workflow?.copiedFrom
-    ? `${workflow.copiedFrom.project.team.organization.name} / ${workflow.copiedFrom.project.team.name} / ${workflow.copiedFrom.project.name}`
-    : undefined;
+  const { isCopiedWorkflow, hasCopies, sourceProjectPath } = readLineage(workflow);
 
   const onSyncFromSource = useCallback(() => {
     if (!workflowId || !projectId) return;
@@ -94,24 +90,7 @@ export function WorkflowListCard({
           onSuccess: (result) => {
             setIsDeleteDialogOpen(false);
             void utils.workflow.getAll.invalidate();
-
-            const parts: string[] = [];
-            if (result.archivedEvaluatorsCount > 0) {
-              parts.push(
-                `${result.archivedEvaluatorsCount} evaluator${result.archivedEvaluatorsCount > 1 ? "s" : ""}`,
-              );
-            }
-            if (result.archivedAgentsCount > 0) {
-              parts.push(
-                `${result.archivedAgentsCount} agent${result.archivedAgentsCount > 1 ? "s" : ""}`,
-              );
-            }
-            if (result.deletedMonitorsCount > 0) {
-              parts.push(
-                `${result.deletedMonitorsCount} online evaluation${result.deletedMonitorsCount > 1 ? "s" : ""}`,
-              );
-            }
-
+            const parts = describeCascadeArchive(result);
             host.succeeded({
               title: `Workflow "${name}" deleted`,
               ...(parts.length > 0 ? { description: `Also deleted: ${parts.join(", ")}` } : {}),
@@ -178,17 +157,7 @@ export function WorkflowListCard({
         isLoadingRelated={relatedEntitiesQuery.isLoading}
         entityType="workflow"
         entityName={name}
-        relatedEntities={{
-          ...(relatedEntitiesQuery.data?.evaluators
-            ? { evaluators: relatedEntitiesQuery.data.evaluators }
-            : {}),
-          ...(relatedEntitiesQuery.data?.agents
-            ? { agents: relatedEntitiesQuery.data.agents }
-            : {}),
-          ...(relatedEntitiesQuery.data?.monitors
-            ? { monitors: relatedEntitiesQuery.data.monitors }
-            : {}),
-        }}
+        relatedEntities={relatedEntitiesQuery.data ?? {}}
       />
 
       {workflowId && (
@@ -209,4 +178,32 @@ export function WorkflowListCard({
       )}
     </>
   );
+}
+
+function readLineage(workflow: WorkflowListRow | undefined) {
+  const source = workflow?.copiedFrom?.project;
+  return {
+    isCopiedWorkflow: !!workflow?.copiedFromWorkflowId,
+    hasCopies: (workflow?._count?.copiedWorkflows ?? 0) > 0,
+    sourceProjectPath: source
+      ? `${source.team.organization.name} / ${source.team.name} / ${source.name}`
+      : undefined,
+  };
+}
+
+function countLabel(count: number, noun: string): string[] {
+  return count > 0 ? [`${count} ${noun}${count > 1 ? "s" : ""}`] : [];
+}
+
+function describeCascadeArchive(
+  result: Pick<
+    WorkflowCascadeArchive,
+    "archivedEvaluatorsCount" | "archivedAgentsCount" | "deletedMonitorsCount"
+  >,
+): string[] {
+  return [
+    ...countLabel(result.archivedEvaluatorsCount, "evaluator"),
+    ...countLabel(result.archivedAgentsCount, "agent"),
+    ...countLabel(result.deletedMonitorsCount, "online evaluation"),
+  ];
 }

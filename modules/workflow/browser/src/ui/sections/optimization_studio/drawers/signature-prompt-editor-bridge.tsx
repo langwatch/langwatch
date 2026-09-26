@@ -113,6 +113,68 @@ function remapEdges({
   return changed ? updated : null;
 }
 
+type PromptIOField = { identifier: string; type: string };
+type PromptIO = { inputs?: PromptIOField[]; outputs?: PromptIOField[] };
+
+/** Maps prompt I/O arrays to DSL Field format, preserving field.value from existing inputs. */
+function mapIOToFields(items: PromptIOField[], currentInputs: Field[]): Field[] {
+  return items.map((item) => {
+    const existing = currentInputs.find((e) => e.identifier === item.identifier);
+    return {
+      identifier: item.identifier,
+      type: item.type as Field["type"],
+      ...(existing?.value != null ? { value: existing.value } : {}),
+    };
+  });
+}
+
+function promptIONodeData(prompt: PromptIO, currentInputs: Field[]): Partial<Signature> {
+  return {
+    ...(prompt.inputs ? { inputs: mapIOToFields(prompt.inputs, currentInputs) } : {}),
+    ...(prompt.outputs ? { outputs: mapIOToFields(prompt.outputs, currentInputs) } : {}),
+  };
+}
+
+/** The canvas reads the model from the "llm" parameter, so the LLM config is mirrored there. */
+function mirroredLlmParameters(
+  oldParameters: NonNullable<Signature["parameters"]>,
+  llm: LocalPromptConfig["llm"],
+): Signature["parameters"] {
+  if (!oldParameters.some((p) => p.identifier === "llm")) return undefined;
+  return oldParameters.map((p) => (p.identifier === "llm" ? { ...p, value: llm } : p));
+}
+
+function syncedInputs({
+  nodeId,
+  oldInputs,
+  newInputs,
+  edges,
+}: {
+  nodeId: string;
+  oldInputs: Field[];
+  newInputs: PromptIOField[];
+  edges: Edge[];
+}): { inputs: Field[]; remapped: Edge[] | null } {
+  const incomingEdges = edges.filter(
+    (e) => e.target === nodeId && e.targetHandle?.startsWith("inputs."),
+  );
+  return {
+    inputs: mergeFields({
+      oldFields: oldInputs,
+      newFields: newInputs,
+      connectedEdges: incomingEdges,
+      handlePrefix: "inputs",
+    }),
+    remapped: remapEdges({
+      nodeId,
+      oldFields: oldInputs,
+      newFields: newInputs,
+      edges,
+      connectedEdges: incomingEdges,
+    }),
+  };
+}
+
 /**
  * Bridges the headless PromptEditorDrawer to the studio's workflow store,
  * as a panel inside StudioDrawerWrapper. Builds sources/mappings from
@@ -193,15 +255,8 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
         localPromptConfig: config,
       };
 
-      // Mirror LLM config into parameters so the canvas node display stays in sync.
-      // The canvas reads model from parameters[identifier="llm"].value (Nodes.tsx:384).
-      const oldParameters = signatureNode.data.parameters ?? [];
-      const updatedParameters = oldParameters.map((p) =>
-        p.identifier === "llm" ? { ...p, value: config.llm } : p,
-      );
-      if (updatedParameters.some((p) => p.identifier === "llm")) {
-        data.parameters = updatedParameters;
-      }
+      const parameters = mirroredLlmParameters(signatureNode.data.parameters ?? [], config.llm);
+      if (parameters) data.parameters = parameters;
 
       const oldInputs = signatureNode.data.inputs ?? [];
       const oldOutputs = signatureNode.data.outputs ?? [];
@@ -209,38 +264,23 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
       // Only update inputs when the set of identifiers actually changed.
       // Skipping avoids triggering removeInvalidEdges on drawer open.
       if (config.inputs && !fieldsMatch(oldInputs, config.inputs)) {
-        const currentEdges = getWorkflow().edges;
-        const incomingEdges = currentEdges.filter(
-          (e) => e.target === node.id && e.targetHandle?.startsWith("inputs."),
-        );
-
-        data.inputs = mergeFields({
-          oldFields: oldInputs,
-          newFields: config.inputs,
-          connectedEdges: incomingEdges,
-          handlePrefix: "inputs",
-        });
-
-        const remapped = remapEdges({
+        const synced = syncedInputs({
           nodeId: node.id,
-          oldFields: oldInputs,
-          newFields: config.inputs,
-          edges: currentEdges,
-          connectedEdges: incomingEdges,
+          oldInputs,
+          newInputs: config.inputs,
+          edges: getWorkflow().edges,
         });
-        if (remapped) setEdges(remapped);
+        data.inputs = synced.inputs;
+        if (synced.remapped) setEdges(synced.remapped);
       }
 
       if (config.outputs && !fieldsMatch(oldOutputs, config.outputs)) {
-        const currentEdges = getWorkflow().edges;
-        const outgoingEdges = currentEdges.filter(
-          (e) => e.source === node.id && e.sourceHandle?.startsWith("outputs."),
-        );
-
         data.outputs = mergeFields({
           oldFields: oldOutputs,
           newFields: config.outputs,
-          connectedEdges: outgoingEdges,
+          connectedEdges: getWorkflow().edges.filter(
+            (e) => e.source === node.id && e.sourceHandle?.startsWith("outputs."),
+          ),
           handlePrefix: "outputs",
         });
       }
@@ -260,20 +300,8 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
     ],
   );
 
-  /** Maps prompt I/O arrays to DSL Field format, preserving field.value from existing inputs. */
-  const mapIOToFields = useCallback(
-    (items?: { identifier: string; type: string }[]): Field[] | undefined => {
-      if (!items) return undefined;
-      const currentInputs = signatureNode.data.inputs ?? [];
-      return items.map((item) => {
-        const existing = currentInputs.find((e) => e.identifier === item.identifier);
-        return {
-          identifier: item.identifier,
-          type: item.type as Field["type"],
-          ...(existing?.value != null ? { value: existing.value } : {}),
-        };
-      });
-    },
+  const promptIOData = useCallback(
+    (prompt: PromptIO) => promptIONodeData(prompt, signatureNode.data.inputs ?? []),
     [signatureNode.data.inputs],
   );
 
@@ -291,18 +319,12 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
         promptVersionId: prompt.versionId,
         localPromptConfig: undefined,
         name: prompt.name,
+        ...promptIOData(prompt),
       };
-
-      const inputs = mapIOToFields(prompt.inputs);
-      if (inputs) data.inputs = inputs;
-
-      const outputs = mapIOToFields(prompt.outputs);
-      if (outputs) data.outputs = outputs;
-
       setNode({ id: node.id, data });
       updateNodeInternals(node.id);
     },
-    [node.id, setNode, updateNodeInternals, mapIOToFields],
+    [node.id, setNode, updateNodeInternals, promptIOData],
   );
 
   const handleVersionChange = useCallback(
@@ -314,18 +336,12 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
     }) => {
       const data: Partial<Signature> & Record<string, unknown> = {
         promptVersionId: prompt.versionId,
+        ...promptIOData(prompt),
       };
-
-      const inputs = mapIOToFields(prompt.inputs);
-      if (inputs) data.inputs = inputs;
-
-      const outputs = mapIOToFields(prompt.outputs);
-      if (outputs) data.outputs = outputs;
-
       setNode({ id: node.id, data });
       updateNodeInternals(node.id);
     },
-    [node.id, setNode, updateNodeInternals, mapIOToFields],
+    [node.id, setNode, updateNodeInternals, promptIOData],
   );
 
   return (

@@ -1,6 +1,6 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { hasDSLChanged, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Check, X } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 
@@ -8,6 +8,28 @@ import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../behavior/workflow-store.ts";
 
 type WorkflowAutosaveResult = { version: string; id: string };
+type TimerRef = RefObject<ReturnType<typeof setTimeout> | undefined>;
+
+function clearTimer(ref: TimerRef) {
+  if (ref.current) clearTimeout(ref.current);
+  ref.current = undefined;
+}
+
+/** The write succeeded; the baseline moves only once the version list refreshed. */
+async function refreshThenMoveBaseline({
+  onRefreshVersions,
+  moveBaseline,
+}: {
+  onRefreshVersions: () => Promise<void>;
+  moveBaseline: () => void;
+}) {
+  try {
+    await onRefreshVersions();
+    moveBaseline();
+  } catch (error) {
+    void error;
+  }
+}
 
 /**
  * Browser-side Workflow autosave. The application provides the two transport
@@ -59,14 +81,8 @@ export function WorkflowAutosave({
   const stateWorkflow = useWorkflowStore(useShallow((state) => state.getWorkflow()));
 
   const clearScheduledSave = useCallback(() => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = undefined;
-    }
-    if (maxWaitTimeoutRef.current) {
-      clearTimeout(maxWaitTimeoutRef.current);
-      maxWaitTimeoutRef.current = undefined;
-    }
+    clearTimer(saveTimeoutRef);
+    clearTimer(maxWaitTimeoutRef);
   }, []);
 
   const saveIfChanged = useCallback(async () => {
@@ -100,19 +116,12 @@ export function WorkflowAutosave({
       }
       setCurrentVersionId(saved.id);
       setRecentlySaved(true);
-      if (savedIndicatorTimeoutRef.current) {
-        clearTimeout(savedIndicatorTimeoutRef.current);
-      }
+      clearTimer(savedIndicatorTimeoutRef);
       savedIndicatorTimeoutRef.current = setTimeout(() => setRecentlySaved(false), 5000);
-
-      try {
-        await onRefreshVersions();
-        setAutosavedWorkflow(currentWorkflow);
-      } catch (error) {
-        // The write succeeded. Keep the pending-change baseline unchanged until
-        // the version list can be refreshed, matching the previous transport flow.
-        void error;
-      }
+      await refreshThenMoveBaseline({
+        onRefreshVersions,
+        moveBaseline: () => setAutosavedWorkflow(currentWorkflow),
+      });
     } catch {
       setHasSaveError(true);
     } finally {
@@ -137,33 +146,38 @@ export function WorkflowAutosave({
       return;
     }
 
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    clearTimer(saveTimeoutRef);
     saveTimeoutRef.current = setTimeout(() => void saveIfChanged(), 1000);
 
     if (!maxWaitTimeoutRef.current) {
       maxWaitTimeoutRef.current = setTimeout(() => void saveIfChanged(), 30_000);
     }
 
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-        saveTimeoutRef.current = undefined;
-      }
-    };
+    return () => clearTimer(saveTimeoutRef);
   }, [clearScheduledSave, isWorkflowReady, saveIfChanged, stateWorkflow]);
 
   useEffect(
     () => () => {
       clearScheduledSave();
-      if (savedIndicatorTimeoutRef.current) {
-        clearTimeout(savedIndicatorTimeoutRef.current);
-      }
+      clearTimer(savedIndicatorTimeoutRef);
     },
     [clearScheduledSave],
   );
 
+  return (
+    <AutosaveStatus isSaving={isSaving} hasSaveError={hasSaveError} recentlySaved={recentlySaved} />
+  );
+}
+
+function AutosaveStatus({
+  isSaving,
+  hasSaveError,
+  recentlySaved,
+}: {
+  isSaving: boolean;
+  hasSaveError: boolean;
+  recentlySaved: boolean;
+}) {
   const showSaveError = !isSaving && hasSaveError;
   const showSaved = !isSaving && !hasSaveError && recentlySaved;
 

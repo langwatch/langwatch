@@ -3,6 +3,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,7 @@ const evaluator: WireOf<Evaluator> = {
 afterEach(cleanup);
 
 describe("EvaluatorListItem", () => {
-  it("renders evaluator details and selects on keyboard activation", () => {
+  it("renders evaluator details and selects on keyboard activation", async () => {
     const onClick = vi.fn();
     render(
       <EvaluatorListItem
@@ -44,12 +45,13 @@ describe("EvaluatorListItem", () => {
       { wrapper: Wrapper },
     );
 
-    const card = screen.getByTestId("evaluator-card-evaluator-1");
+    expect(screen.getByTestId("evaluator-card-evaluator-1")).toBeInTheDocument();
     expect(screen.getByText("Exact Match")).toBeInTheDocument();
     expect(screen.getByText("Exact Match Evaluator")).toBeInTheDocument();
     expect(screen.getByText("Updated 2 days ago")).toBeInTheDocument();
 
-    fireEvent.keyDown(card, { key: "Enter" });
+    screen.getByRole("button", { name: "Exact Match" }).focus();
+    await userEvent.keyboard("{Enter}");
     expect(onClick).toHaveBeenCalledOnce();
   });
 

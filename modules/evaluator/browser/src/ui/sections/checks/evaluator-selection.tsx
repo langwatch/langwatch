@@ -17,6 +17,7 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { CustomEvaluator } from "@langwatch/evaluation-contract";
 import {
   evaluatorDisplayName,
   AVAILABLE_EVALUATORS,
@@ -95,7 +96,7 @@ export function EvaluatorSelection({
         if (index2 === -1) return -999;
         return index - index2;
       }),
-    ...(availableCustomEvaluators.data ?? []).map((evaluator: any) => [
+    ...(availableCustomEvaluators.data ?? []).map((evaluator: CustomEvaluator) => [
       `custom/${evaluator.id}`,
       {
         name: evaluator.name,
@@ -108,17 +109,7 @@ export function EvaluatorSelection({
 
   const categories: Category[] = ["safety", "policy", "rag", "quality", "custom"];
 
-  const availableEvaluatorsPerCategory: Record<
-    string,
-    [
-      string,
-      EvaluatorDefinition & {
-        beta?: boolean;
-        missingEnvVars?: string[];
-        unavailable?: { reason: string; howToEnable: string };
-      },
-    ][]
-  > = {};
+  const availableEvaluatorsPerCategory: Record<string, [string, CatalogueEntry][]> = {};
 
   for (const category of categories) {
     availableEvaluatorsPerCategory[category] = availableEvaluators.filter(
@@ -187,193 +178,19 @@ export function EvaluatorSelection({
         {Object.entries(availableEvaluatorsPerCategory).map(([category, evaluators]) => (
           <Tabs.Content key={category} value={category} paddingX={0}>
             <Grid templateColumns="repeat(3, 1fr)" gap={6}>
-              {evaluators.map(([key, evaluator]) => {
-                // Two different reasons a card cannot be picked: the
-                // evaluator is not installed on this server at all, or it is
-                // installed but not configured. They read differently and are
-                // fixed differently, so they are shown differently.
-                const isDisabled =
-                  !!evaluator.unavailable ||
-                  (evaluator.missingEnvVars && evaluator.missingEnvVars.length > 0);
-
-                const choose = () => {
-                  if (isDisabled) return;
-                  form.setValue("checkType", key as EvaluatorTypes);
-                  void router.push({
-                    pathname: router.pathname.replace("/choose", ""),
-                    query: router.query,
-                  });
-                };
-
-                return (
-                  <GridItem
-                    key={key}
-                    width="full"
-                    padding={6}
-                    borderRadius={6}
-                    boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
-                    cursor={isDisabled ? "default" : "pointer"}
-                    textAlign="left"
-                    asChild
-                    // A disabled card stays in the tab order and says so.
-                    aria-disabled={isDisabled ? true : undefined}
-                    _hover={
-                      isDisabled
-                        ? undefined
-                        : {
-                            background: "gray.200",
-                          }
-                    }
-                    onClick={choose}
-                    color={isDisabled ? "gray.400" : undefined}
-                    background={isDisabled ? "gray.50" : "white"}
-                  >
-                    <button type="button">
-                      <VStack align="start" gap={4} position="relative">
-                        {evaluator.isGuardrail && (
-                          <Tooltip
-                            content="This evaluator can be used as a guardrail"
-                            positioning={{ placement: "top" }}
-                          >
-                            <Box
-                              position="absolute"
-                              right="-12px"
-                              top="-12px"
-                              background="blue.100"
-                              borderRadius="100%"
-                              padding="4px"
-                            >
-                              <Shield />
-                            </Box>
-                          </Tooltip>
-                        )}
-                        <HStack>
-                          {evaluator.beta && (
-                            <Tag.Root
-                              size="sm"
-                              colorPalette="pink"
-                              paddingX={2}
-                              fontSize="14px"
-                              marginLeft="-4px"
-                            >
-                              <Tag.Label>Beta</Tag.Label>
-                            </Tag.Root>
-                          )}
-                          <Heading as="h2" size="sm">
-                            {evaluatorDisplayName(evaluator.name)}
-                          </Heading>
-                        </HStack>
-                        {evaluator.unavailable && (
-                          <Tooltip
-                            content={evaluator.unavailable.howToEnable}
-                            positioning={{ placement: "top" }}
-                          >
-                            <Tag.Root
-                              colorPalette="orange"
-                              borderRadius="8px"
-                              padding="4px 8px"
-                              lineHeight="1.5em"
-                            >
-                              <Tag.Label>Not available here</Tag.Label>
-                            </Tag.Root>
-                          </Tooltip>
-                        )}
-                        {!evaluator.unavailable &&
-                          evaluator.missingEnvVars &&
-                          evaluator.missingEnvVars.length > 0 && (
-                            <Tooltip
-                              // The names are the actionable part for whoever
-                              // runs the install, so the tooltip keeps them.
-                              content={`Set these environment variables to enable it: ${evaluator.missingEnvVars.join(", ")}`}
-                              positioning={{ placement: "top" }}
-                            >
-                              <Tag.Root
-                                colorPalette="orange"
-                                borderRadius="8px"
-                                padding="4px 8px"
-                                lineHeight="1.5em"
-                              >
-                                <Tag.Label>Needs configuration</Tag.Label>
-                              </Tag.Root>
-                            </Tooltip>
-                          )}
-                        <Text>
-                          {evaluator.description.replace("Google DLP PII detects", "Detects")}
-                        </Text>
-                        <HStack wrap="wrap">
-                          {evaluator.requiredFields.includes("contexts") && (
-                            <Link
-                              asChild
-                              href="https://docs.langwatch.ai/rags/rags-context-tracking"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <NextLink href="https://docs.langwatch.ai/rags/rags-context-tracking">
-                                <Tooltip
-                                  content="Only messages with contexts can run this evaluation, click for more info"
-                                  positioning={{ placement: "top" }}
-                                >
-                                  <Badge colorPalette="orange" whiteSpace="nowrap">
-                                    Requires Contexts
-                                  </Badge>
-                                </Tooltip>
-                              </NextLink>
-                            </Link>
-                          )}
-                          {evaluator.requiredFields.includes("expected_output") && (
-                            <Link
-                              asChild
-                              href="https://docs.langwatch.ai/docs/expected_output"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <NextLink href="https://docs.langwatch.ai/docs/expected_output">
-                                <Tooltip
-                                  content="Only messages with expected outputs can run this evaluation, click for more info"
-                                  positioning={{ placement: "top" }}
-                                >
-                                  <Badge
-                                    colorPalette="blue"
-                                    backgroundColor="blue.50"
-                                    color="blue.700"
-                                    whiteSpace="nowrap"
-                                  >
-                                    Requires Expected Output
-                                  </Badge>
-                                </Tooltip>
-                              </NextLink>
-                            </Link>
-                          )}
-                          {evaluator.requiredFields.includes("expected_contexts") && (
-                            <Link
-                              asChild
-                              href="https://docs.langwatch.ai/docs/expected_contexts"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <NextLink href="https://docs.langwatch.ai/docs/expected_contexts">
-                                <Tooltip
-                                  content="Only messages with expected contexts can run this evaluation, click for more info"
-                                  positioning={{ placement: "top" }}
-                                >
-                                  <Badge
-                                    colorPalette="purple"
-                                    backgroundColor="purple.50"
-                                    color="purple.700"
-                                    whiteSpace="nowrap"
-                                  >
-                                    Requires Expected Contexts
-                                  </Badge>
-                                </Tooltip>
-                              </NextLink>
-                            </Link>
-                          )}
-                        </HStack>
-                      </VStack>
-                    </button>
-                  </GridItem>
-                );
-              })}
+              {evaluators.map(([key, evaluator]) => (
+                <EvaluatorChoiceCard
+                  key={key}
+                  evaluator={evaluator}
+                  onChoose={() => {
+                    form.setValue("checkType", key as EvaluatorTypes);
+                    void router.push({
+                      pathname: router.pathname.replace("/choose", ""),
+                      query: router.query,
+                    });
+                  }}
+                />
+              ))}
 
               {category === "custom" && (
                 <GridItem
@@ -407,5 +224,188 @@ export function EvaluatorSelection({
         ))}
       </Tabs.Root>
     </VStack>
+  );
+}
+
+type CatalogueEntry = EvaluatorDefinition & {
+  beta?: boolean;
+  missingEnvVars?: string[];
+  unavailable?: { reason: string; howToEnable: string };
+};
+
+function EvaluatorChoiceCard({
+  evaluator,
+  onChoose,
+}: {
+  evaluator: CatalogueEntry;
+  onChoose: () => void;
+}) {
+  // Not installed on this server, or installed but not configured: both block picking.
+  const isDisabled = !!evaluator.unavailable || (evaluator.missingEnvVars?.length ?? 0) > 0;
+  const choose = () => {
+    if (!isDisabled) onChoose();
+  };
+
+  return (
+    <GridItem
+      width="full"
+      padding={6}
+      borderRadius={6}
+      boxShadow="0px 4px 10px 0px rgba(0, 0, 0, 0.06)"
+      cursor={isDisabled ? "default" : "pointer"}
+      textAlign="left"
+      asChild
+      // A disabled card stays in the tab order and says so.
+      aria-disabled={isDisabled ? true : undefined}
+      _hover={
+        isDisabled
+          ? undefined
+          : {
+              background: "gray.200",
+            }
+      }
+      onClick={choose}
+      color={isDisabled ? "gray.400" : undefined}
+      background={isDisabled ? "gray.50" : "white"}
+    >
+      <button type="button">
+        <VStack align="start" gap={4} position="relative">
+          {evaluator.isGuardrail && (
+            <Tooltip
+              content="This evaluator can be used as a guardrail"
+              positioning={{ placement: "top" }}
+            >
+              <Box
+                position="absolute"
+                right="-12px"
+                top="-12px"
+                background="blue.100"
+                borderRadius="100%"
+                padding="4px"
+              >
+                <Shield />
+              </Box>
+            </Tooltip>
+          )}
+          <HStack>
+            {evaluator.beta && (
+              <Tag.Root
+                size="sm"
+                colorPalette="pink"
+                paddingX={2}
+                fontSize="14px"
+                marginLeft="-4px"
+              >
+                <Tag.Label>Beta</Tag.Label>
+              </Tag.Root>
+            )}
+            <Heading as="h2" size="sm">
+              {evaluatorDisplayName(evaluator.name)}
+            </Heading>
+          </HStack>
+          {evaluator.unavailable && (
+            <Tooltip content={evaluator.unavailable.howToEnable} positioning={{ placement: "top" }}>
+              <Tag.Root
+                colorPalette="orange"
+                borderRadius="8px"
+                padding="4px 8px"
+                lineHeight="1.5em"
+              >
+                <Tag.Label>Not available here</Tag.Label>
+              </Tag.Root>
+            </Tooltip>
+          )}
+          {!evaluator.unavailable &&
+            evaluator.missingEnvVars &&
+            evaluator.missingEnvVars.length > 0 && (
+              <Tooltip
+                // The names are the actionable part for whoever
+                // runs the install, so the tooltip keeps them.
+                content={`Set these environment variables to enable it: ${evaluator.missingEnvVars.join(", ")}`}
+                positioning={{ placement: "top" }}
+              >
+                <Tag.Root
+                  colorPalette="orange"
+                  borderRadius="8px"
+                  padding="4px 8px"
+                  lineHeight="1.5em"
+                >
+                  <Tag.Label>Needs configuration</Tag.Label>
+                </Tag.Root>
+              </Tooltip>
+            )}
+          <Text>{evaluator.description.replace("Google DLP PII detects", "Detects")}</Text>
+          <HStack wrap="wrap">
+            {evaluator.requiredFields.includes("contexts") && (
+              <Link
+                asChild
+                href="https://docs.langwatch.ai/rags/rags-context-tracking"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <NextLink href="https://docs.langwatch.ai/rags/rags-context-tracking">
+                  <Tooltip
+                    content="Only messages with contexts can run this evaluation, click for more info"
+                    positioning={{ placement: "top" }}
+                  >
+                    <Badge colorPalette="orange" whiteSpace="nowrap">
+                      Requires Contexts
+                    </Badge>
+                  </Tooltip>
+                </NextLink>
+              </Link>
+            )}
+            {evaluator.requiredFields.includes("expected_output") && (
+              <Link
+                asChild
+                href="https://docs.langwatch.ai/docs/expected_output"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <NextLink href="https://docs.langwatch.ai/docs/expected_output">
+                  <Tooltip
+                    content="Only messages with expected outputs can run this evaluation, click for more info"
+                    positioning={{ placement: "top" }}
+                  >
+                    <Badge
+                      colorPalette="blue"
+                      backgroundColor="blue.50"
+                      color="blue.700"
+                      whiteSpace="nowrap"
+                    >
+                      Requires Expected Output
+                    </Badge>
+                  </Tooltip>
+                </NextLink>
+              </Link>
+            )}
+            {evaluator.requiredFields.includes("expected_contexts") && (
+              <Link
+                asChild
+                href="https://docs.langwatch.ai/docs/expected_contexts"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <NextLink href="https://docs.langwatch.ai/docs/expected_contexts">
+                  <Tooltip
+                    content="Only messages with expected contexts can run this evaluation, click for more info"
+                    positioning={{ placement: "top" }}
+                  >
+                    <Badge
+                      colorPalette="purple"
+                      backgroundColor="purple.50"
+                      color="purple.700"
+                      whiteSpace="nowrap"
+                    >
+                      Requires Expected Contexts
+                    </Badge>
+                  </Tooltip>
+                </NextLink>
+              </Link>
+            )}
+          </HStack>
+        </VStack>
+      </button>
+    </GridItem>
   );
 }

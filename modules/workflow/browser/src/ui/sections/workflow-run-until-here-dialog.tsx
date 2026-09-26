@@ -47,6 +47,9 @@ const stringifyValue = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
+const keepIfSame = (currentValues: Record<string, string>, nextValues: Record<string, string>) =>
+  hasSameValues(currentValues, nextValues) ? currentValues : nextValues;
+
 const hasSameValues = (
   currentValues: Record<string, string>,
   nextValues: Record<string, string>,
@@ -112,30 +115,19 @@ export function WorkflowRunUntilHereDialog({
     }
     if (userEditedValues.current) return;
 
-    const manualValues = entryNode?.data.manual_run_values;
-    const firstRow = datasetRows[0];
-    const nextValues = Object.fromEntries(
-      fields.map((field) => {
-        const fromRow = firstRow?.[field.identifier];
-        const value =
-          manualValues?.[field.identifier] ??
-          (fromRow !== void 0 && fromRow !== null
-            ? stringifyValue(fromRow)
-            : stringifyValue(field.value));
-        return [field.identifier, value];
-      }),
-    );
+    const nextValues = initialRunValues({
+      fields,
+      manualValues: entryNode?.data.manual_run_values,
+      firstRow: datasetRows[0],
+    });
 
-    setValues((currentValues) =>
-      hasSameValues(currentValues, nextValues) ? currentValues : nextValues,
-    );
+    setValues((currentValues) => keepIfSame(currentValues, nextValues));
   }, [datasetRows, entryNode?.data.manual_run_values, fields, untilNodeId]);
 
   useEffect(() => {
-    if (untilNodeId) {
-      deselectAllNodes();
-      setPropertiesExpanded(false);
-    }
+    if (!untilNodeId) return;
+    deselectAllNodes();
+    setPropertiesExpanded(false);
   }, [untilNodeId, deselectAllNodes, setPropertiesExpanded]);
 
   const runWithValues = (runValues: Record<string, string>) => {
@@ -156,26 +148,9 @@ export function WorkflowRunUntilHereDialog({
   };
 
   const runWithSelectedRow = () => {
-    if (selectedRowIndex === void 0) return;
-
-    const row = datasetRows[selectedRowIndex];
-    if (!row) return;
-
-    runWithValues(
-      Object.fromEntries(
-        fields.map((field) => [field.identifier, stringifyValue(row[field.identifier])]),
-      ),
-    );
+    const row = selectedRowIndex === void 0 ? undefined : datasetRows[selectedRowIndex];
+    if (row) runWithValues(rowRunValues(fields, row));
   };
-
-  const previewRows = datasetRows.map((row, index) => ({
-    ...row,
-    id: stringifyValue(row.id),
-    isSelected: index === selectedRowIndex,
-  }));
-
-  const showFields = view !== "table" && fields.length > 0;
-  const showNoInputs = view !== "table" && fields.length === 0;
 
   return (
     <Dialog.Root
@@ -196,100 +171,186 @@ export function WorkflowRunUntilHereDialog({
           </VStack>
         </Dialog.Header>
         <Dialog.Body>
-          {view === "table" &&
+          {view === "table" ? (
             renderDatasetPreview({
-              rows: previewRows,
+              rows: previewRowsOf(datasetRows, selectedRowIndex),
               columns: datasetColumns,
               onRowClick: setSelectedRowIndex,
-            })}
-          {showFields && (
-            <VStack width="full" align="start" gap={3}>
-              {fields.map((field) => (
-                <Field.Root key={field.identifier} width="full">
-                  <Field.Label fontSize="12px" fontFamily="mono" color="fg.muted">
-                    {field.identifier}
-                  </Field.Label>
-                  <Input
-                    size="sm"
-                    data-testid={`run-until-here-input-${field.identifier}`}
-                    value={values[field.identifier] ?? ""}
-                    onChange={(event) => {
-                      userEditedValues.current = true;
-                      setValues((current) => ({
-                        ...current,
-                        [field.identifier]: event.target.value,
-                      }));
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        runWithValues(values);
-                      }
-                    }}
-                  />
-                </Field.Root>
-              ))}
-            </VStack>
-          )}
-          {showNoInputs && (
-            <Text fontSize="13px" color="fg.muted">
-              The entry point has no inputs, the run starts with an empty entry.
-            </Text>
+            })
+          ) : (
+            <RunUntilHereFields
+              fields={fields}
+              values={values}
+              onEdit={(identifier, value) => {
+                userEditedValues.current = true;
+                setValues((current) => ({ ...current, [identifier]: value }));
+              }}
+              onSubmit={() => runWithValues(values)}
+            />
           )}
         </Dialog.Body>
         <Dialog.Footer>
           {view === "table" ? (
-            <HStack width="full">
-              <Spacer />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setView("fields");
-                  setSelectedRowIndex(void 0);
-                }}
-              >
-                Cancel
-              </Button>
-              {selectedRowIndex !== void 0 && (
-                <Button
-                  colorPalette="orange"
-                  size="sm"
-                  data-testid="run-with-selected-row"
-                  onClick={runWithSelectedRow}
-                >
-                  Run with selected row
-                </Button>
-              )}
-            </HStack>
+            <TableViewFooter
+              hasSelection={selectedRowIndex !== void 0}
+              onCancel={() => {
+                setView("fields");
+                setSelectedRowIndex(void 0);
+              }}
+              onRunWithSelectedRow={runWithSelectedRow}
+            />
           ) : (
-            <HStack width="full">
-              {dataset && datasetRows.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="select-dataset-value"
-                  onClick={() => setView("table")}
-                >
-                  Select dataset value
-                </Button>
-              )}
-              <Spacer />
-              <Button variant="ghost" size="sm" onClick={close}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                size="sm"
-                data-testid="run-until-here-run"
-                onClick={() => runWithValues(values)}
-              >
-                Run
-              </Button>
-            </HStack>
+            <FieldsViewFooter
+              canPickDatasetValue={!!dataset && datasetRows.length > 0}
+              onPickDatasetValue={() => setView("table")}
+              onCancel={close}
+              onRun={() => runWithValues(values)}
+            />
           )}
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+type EntryField = NonNullable<Entry["outputs"]>[number];
+
+function initialRunValues({
+  fields,
+  manualValues,
+  firstRow,
+}: {
+  fields: EntryField[];
+  manualValues: Entry["manual_run_values"];
+  firstRow: DatasetRecordEntry | undefined;
+}): Record<string, string> {
+  return Object.fromEntries(
+    fields.map((field) => {
+      const fromRow = firstRow?.[field.identifier];
+      const fallback = fromRow ?? field.value;
+      return [field.identifier, manualValues?.[field.identifier] ?? stringifyValue(fallback)];
+    }),
+  );
+}
+
+function RunUntilHereFields({
+  fields,
+  values,
+  onEdit,
+  onSubmit,
+}: {
+  fields: EntryField[];
+  values: Record<string, string>;
+  onEdit: (identifier: string, value: string) => void;
+  onSubmit: () => void;
+}) {
+  if (fields.length === 0) {
+    return (
+      <Text fontSize="13px" color="fg.muted">
+        The entry point has no inputs, the run starts with an empty entry.
+      </Text>
+    );
+  }
+  return (
+    <VStack width="full" align="start" gap={3}>
+      {fields.map((field) => (
+        <Field.Root key={field.identifier} width="full">
+          <Field.Label fontSize="12px" fontFamily="mono" color="fg.muted">
+            {field.identifier}
+          </Field.Label>
+          <Input
+            size="sm"
+            data-testid={`run-until-here-input-${field.identifier}`}
+            value={values[field.identifier] ?? ""}
+            onChange={(event) => onEdit(field.identifier, event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              onSubmit();
+            }}
+          />
+        </Field.Root>
+      ))}
+    </VStack>
+  );
+}
+
+function TableViewFooter({
+  hasSelection,
+  onCancel,
+  onRunWithSelectedRow,
+}: {
+  hasSelection: boolean;
+  onCancel: () => void;
+  onRunWithSelectedRow: () => void;
+}) {
+  return (
+    <HStack width="full">
+      <Spacer />
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+      {hasSelection && (
+        <Button
+          colorPalette="orange"
+          size="sm"
+          data-testid="run-with-selected-row"
+          onClick={onRunWithSelectedRow}
+        >
+          Run with selected row
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+function FieldsViewFooter({
+  canPickDatasetValue,
+  onPickDatasetValue,
+  onCancel,
+  onRun,
+}: {
+  canPickDatasetValue: boolean;
+  onPickDatasetValue: () => void;
+  onCancel: () => void;
+  onRun: () => void;
+}) {
+  return (
+    <HStack width="full">
+      {canPickDatasetValue && (
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="select-dataset-value"
+          onClick={onPickDatasetValue}
+        >
+          Select dataset value
+        </Button>
+      )}
+      <Spacer />
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button colorPalette="orange" size="sm" data-testid="run-until-here-run" onClick={onRun}>
+        Run
+      </Button>
+    </HStack>
+  );
+}
+
+function rowRunValues(fields: EntryField[], row: DatasetRecordEntry): Record<string, string> {
+  return Object.fromEntries(
+    fields.map((field) => [field.identifier, stringifyValue(row[field.identifier])]),
+  );
+}
+
+function previewRowsOf(
+  datasetRows: DatasetRecordEntry[],
+  selectedRowIndex: number | undefined,
+): WorkflowDatasetPreviewRow[] {
+  return datasetRows.map((row, index) => ({
+    ...row,
+    id: stringifyValue(row.id),
+    isSelected: index === selectedRowIndex,
+  }));
 }

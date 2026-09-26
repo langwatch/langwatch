@@ -2,7 +2,7 @@ import { toaster } from "@langwatch/browser-host/toaster";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import type { StudioClientEvent, StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   generateWorkflowRunId,
   hasDSLChanged,
@@ -14,7 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
-import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
+import { serializeWorkflow, type WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useVersionState } from "./use-version-state.ts";
 
@@ -68,40 +68,15 @@ export const useRunEvalution = () => {
 
   const trpc = api.useUtils();
 
-  const [triggerTimeout, setTriggerTimeout] = useState<{
-    run_id: string;
-    timeout_on_status: "waiting" | "running";
-  } | null>(null);
+  const [triggerTimeout, setTriggerTimeout] = useState<EvaluationTimeoutTrigger | null>(null);
 
   useEffect(() => {
     if (!triggerTimeout) return;
-
-    const workflow = getWorkflow();
-    const evaluation = workflow.state.evaluation;
-    const timedOutOnThisRun =
-      evaluation?.run_id === triggerTimeout.run_id &&
-      evaluation?.status === triggerTimeout.timeout_on_status;
-    if (timedOutOnThisRun) {
-      logger.warn(
-        {
-          run_id: triggerTimeout.run_id,
-          timeout_on_status: triggerTimeout.timeout_on_status,
-        },
-        "evaluation timeout triggered",
-      );
-      setEvaluationState({
-        status: "error",
-        error: "Timeout",
-        timestamps: { finished_at: nowInstant().epochMilliseconds },
-      });
-      toaster.create({
-        title: `Timeout ${
-          triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
-        } evaluation execution`,
-        type: "error",
-        duration: 5000,
-      });
-    }
+    reportEvaluationTimeout({
+      triggerTimeout,
+      evaluation: getWorkflow().state.evaluation,
+      setEvaluationState,
+    });
   }, [triggerTimeout, setEvaluationState, getWorkflow]);
 
   const runEvaluation = useCallback(
@@ -135,60 +110,38 @@ export const useRunEvalution = () => {
         "evaluation starting",
       );
 
-      const hasChanges =
-        latestVersion?.autoSaved &&
-        (previousVersionDsl ? hasDSLChanged(workflow, previousVersionDsl, false) : true);
-
-      let versionId =
-        workflow_version_id ?? (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id);
-      // Generate new version if changes but no version ID provided
-      if (hasChanges && !workflow_version_id) {
-        let commitMessage = previousVersion ? "autosaved" : "first version";
-        if (previousVersionDsl && resolvedCommitMessageModel.data != null) {
-          try {
-            const commitMessageResponse = await generateCommitMessage.mutateAsync({
-              projectId: project?.id ?? "",
-              prevDsl: previousVersionDsl,
+      const plan = planEvaluationVersion({
+        workflow,
+        latestVersion,
+        previousVersion,
+        previousVersionDsl,
+        requestedVersionId: workflow_version_id,
+      });
+      let versionId = plan.versionId;
+      if (plan.mustCommit) {
+        const outcome = await commitForEvaluation({
+          isFirstVersion: !previousVersion,
+          previousVersionDsl,
+          canGenerateMessage: resolvedCommitMessageModel.data != null,
+          generateMessage: (prevDsl) =>
+            generateCommitMessage.mutateAsync({
+              projectId: project.id,
+              prevDsl,
               newDsl: getWorkflow(),
-            });
-            commitMessage = commitMessageResponse;
-          } catch (err) {
-            // Autogen is cosmetic sugar over the "autosaved" fallback;
-            // surfacing it as an error toast mid-evaluate reads like the
-            // run itself failed.
-            logger.error({ error: err }, "evaluation: error auto-generating version description");
-          }
-        }
-
-        try {
-          const versionResponse = await commitVersion.mutateAsync({
-            projectId: project.id,
-            workflowId,
-            commitMessage,
-            dsl: serializeWorkflow({
-              ...workflow,
-              version: nextVersion,
             }),
-          });
-          versionId = versionResponse.id;
-          logger.info(
-            { version: nextVersion, versionId },
-            "evaluation: auto-committed new version",
-          );
-
-          setWorkflow({ version: nextVersion });
-
-          void trpc.workflow.getVersions.invalidate();
-        } catch (err) {
-          logger.error({ error: err }, "evaluation: error saving version");
-          toaster.create({
-            error: err,
-            title: "Couldn't save the version",
-            type: "error",
-            duration: 5000,
-          });
-          return;
-        }
+          commit: (commitMessage) =>
+            commitVersion.mutateAsync({
+              projectId: project.id,
+              workflowId,
+              commitMessage,
+              dsl: serializeWorkflow({ ...workflow, version: nextVersion }),
+            }),
+        });
+        if (!outcome.ok) return;
+        versionId = outcome.versionId;
+        logger.info({ version: nextVersion, versionId }, "evaluation: auto-committed new version");
+        setWorkflow({ version: nextVersion });
+        void trpc.workflow.getVersions.invalidate();
       }
 
       onStart?.();
@@ -274,3 +227,119 @@ export const useRunEvalution = () => {
     isLoading: isLoading || generateCommitMessage.isPending || commitVersion.isPending,
   };
 };
+
+/** Autogen is cosmetic sugar over the fallback; a failure never reads as the run failing. */
+async function resolveCommitMessage({
+  fallback,
+  generate,
+}: {
+  fallback: string;
+  generate: (() => Promise<string>) | undefined;
+}): Promise<string> {
+  if (!generate) return fallback;
+  try {
+    return await generate();
+  } catch (err) {
+    logger.error({ error: err }, "evaluation: error auto-generating version description");
+    return fallback;
+  }
+}
+
+async function commitForEvaluation(
+  input: Parameters<typeof commitChangedWorkflow>[0],
+): Promise<{ ok: true; versionId: string } | { ok: false }> {
+  try {
+    return { ok: true, versionId: await commitChangedWorkflow(input) };
+  } catch (err) {
+    logger.error({ error: err }, "evaluation: error saving version");
+    toaster.create({
+      error: err,
+      title: "Couldn't save the version",
+      type: "error",
+      duration: 5000,
+    });
+    return { ok: false };
+  }
+}
+
+type VersionState = ReturnType<typeof useVersionState>;
+
+/** An autosaved, changed DSL is committed first, unless the caller named a version. */
+function planEvaluationVersion({
+  workflow,
+  latestVersion,
+  previousVersion,
+  previousVersionDsl,
+  requestedVersionId,
+}: Pick<VersionState, "latestVersion" | "previousVersion" | "previousVersionDsl"> & {
+  workflow: StudioWorkflow;
+  requestedVersionId: string | undefined;
+}): { versionId: string | undefined; mustCommit: boolean } {
+  const hasChanges =
+    !!latestVersion?.autoSaved &&
+    (previousVersionDsl ? hasDSLChanged(workflow, previousVersionDsl, false) : true);
+  return {
+    versionId:
+      requestedVersionId ?? (latestVersion?.autoSaved ? previousVersion?.id : latestVersion?.id),
+    mustCommit: hasChanges && !requestedVersionId,
+  };
+}
+
+async function commitChangedWorkflow({
+  isFirstVersion,
+  previousVersionDsl,
+  canGenerateMessage,
+  generateMessage,
+  commit,
+}: {
+  isFirstVersion: boolean;
+  previousVersionDsl: StudioWorkflow | undefined;
+  canGenerateMessage: boolean;
+  generateMessage: (prevDsl: StudioWorkflow) => Promise<string>;
+  commit: (commitMessage: string) => Promise<{ id: string }>;
+}): Promise<string> {
+  const commitMessage = await resolveCommitMessage({
+    fallback: isFirstVersion ? "first version" : "autosaved",
+    generate:
+      previousVersionDsl && canGenerateMessage
+        ? () => generateMessage(previousVersionDsl)
+        : undefined,
+  });
+  return (await commit(commitMessage)).id;
+}
+
+type EvaluationTimeoutTrigger = {
+  run_id: string;
+  timeout_on_status: "waiting" | "running";
+};
+
+function reportEvaluationTimeout({
+  triggerTimeout,
+  evaluation,
+  setEvaluationState,
+}: {
+  triggerTimeout: EvaluationTimeoutTrigger;
+  evaluation: ReturnType<WorkflowStore["getWorkflow"]>["state"]["evaluation"];
+  setEvaluationState: WorkflowStore["setEvaluationState"];
+}) {
+  const timedOutOnThisRun =
+    evaluation?.run_id === triggerTimeout.run_id &&
+    evaluation?.status === triggerTimeout.timeout_on_status;
+  if (!timedOutOnThisRun) return;
+  logger.warn(
+    { run_id: triggerTimeout.run_id, timeout_on_status: triggerTimeout.timeout_on_status },
+    "evaluation timeout triggered",
+  );
+  setEvaluationState({
+    status: "error",
+    error: "Timeout",
+    timestamps: { finished_at: nowInstant().epochMilliseconds },
+  });
+  toaster.create({
+    title: `Timeout ${
+      triggerTimeout.timeout_on_status === "waiting" ? "starting" : "stopping"
+    } evaluation execution`,
+    type: "error",
+    duration: 5000,
+  });
+}

@@ -72,7 +72,7 @@ export function LiquidConditionEditor({
 }) {
   const { colorMode } = useColorMode();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<Monaco | null>(null);
+  const monacoRef = useRef<Monaco>(null);
 
   const validation = useMemo(
     () => validateLiquidCondition(value, availableVariables),
