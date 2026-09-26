@@ -26,8 +26,6 @@ const INSTALL_WIDE_KEYS = [
   "install_method",
   "environment",
   "hostname",
-  "user_email_domains",
-  "active_users_28d",
   "auth_method",
   "connected",
 ];
@@ -122,6 +120,13 @@ beforeEach(() => {
   world.projectsByOrganization.set("org-1", ["project-1"]);
   world.projectsByOrganization.set("org-2", ["project-2", "project-3"]);
   world.emailDomains = { "acme.test": 2, "other.test": 1 };
+  world.membersByOrganization.set("org-1", ["user_member", "user_colleague"]);
+  world.membersByOrganization.set("org-2", ["user_elsewhere"]);
+  world.emailsByUser.set("user_member", "member@acme.test");
+  world.emailsByUser.set("user_colleague", "colleague@acme.test");
+  world.emailsByUser.set("user_elsewhere", "someone@other.test");
+  world.signedInUserIds.add("user_member");
+  world.signedInUserIds.add("user_elsewhere");
 });
 
 describe("given the caller is on the ops back-office list", () => {
@@ -149,6 +154,24 @@ describe("given the caller is on the ops back-office list", () => {
         switches: { optional: true, hostname: true },
         disabled: false,
         payload: { organizations: 2, projects: 3, version: "3.17.0" },
+      });
+    });
+  });
+
+  describe("when the usage report switches are changed", () => {
+    /** @scenario "An install admin changes what the install reports" */
+    it("writes the switches and answers the whole install's report", async () => {
+      const report = await app().setUsageReportSwitches({
+        organizationId: "org-1",
+        operator: STAFF,
+        hostnameOptOut: true,
+      });
+
+      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
+      expect(report).toMatchObject({
+        deployment: "self-hosted",
+        switches: { optional: true, hostname: true },
+        payload: { organizations: 2, projects: 3 },
       });
     });
   });
@@ -199,17 +222,32 @@ describe("given the caller is signed in and not on the ops back-office list", ()
       expect(report).not.toHaveProperty("switches");
     });
 
-    it("answers a switch change with the organization's figures, not the install's", async () => {
-      const report = await app().setUsageReportSwitches({
-        organizationId: "org-1",
-        operator: MEMBER,
-        hostnameOptOut: true,
-      });
+    /** @scenario "An organization's report counts its own members' sign-ins and email domains" */
+    it("counts signed-in users and email domains among the organization's members only", async () => {
+      const report = await app().getUsageReport({ organizationId: "org-1", operator: MEMBER });
 
       if (report.deployment !== "self-hosted") throw new Error("answered saas");
-      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
-      expect(report.payload).toMatchObject({ organizations: 1, projects: 1 });
-      expect(report).not.toHaveProperty("switches");
+      expect(report.payload).toMatchObject({
+        active_users_28d: 1,
+        user_email_domains: { "acme.test": 2 },
+      });
+    });
+  });
+
+  describe("when the usage report switches are changed", () => {
+    /** @scenario "Only an install admin changes what the install reports" */
+    it("refuses as operator-only and writes nothing", async () => {
+      await expect(
+        app().setUsageReportSwitches({
+          organizationId: "org-1",
+          operator: MEMBER,
+          hostnameOptOut: true,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+      await expect(
+        app().setUsageReportSwitches({ organizationId: "org-1", operator: null }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
+      expect(switchWrites).toEqual([]);
     });
   });
 });

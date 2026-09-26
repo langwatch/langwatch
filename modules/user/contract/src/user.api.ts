@@ -205,6 +205,8 @@ export interface UserApi {
   readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(): Promise<UserUsageCount>;
+  /** The same figures for one organization, counted over the members the caller names. */
+  countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount>;
   /** Whether anybody with an address on this domain has an account; no address leaves. */
   hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
 }

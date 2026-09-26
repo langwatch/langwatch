@@ -37,6 +37,7 @@ const NOW = fromDate(new Date(42));
 
 class StubRepository implements UserRepository {
   countUsage = vi.fn(async () => ({ emailDomains: {} }));
+  countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
   hasAccountOnDomain = vi.fn(async () => false);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);

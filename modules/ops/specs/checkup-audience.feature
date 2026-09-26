@@ -39,7 +39,29 @@ Feature: Who reads what of the checkup
     Given the caller is signed in and not on the ops back-office list
     When the usage report is read
     Then its figures count the caller's organization only
-    And it carries no install identity, release, hostname, email domains or signed-in users
+    And it carries no install identity, release, hostname or sign-in method
+
+  @unit
+  Scenario: An organization's report counts its own members' sign-ins and email domains
+    Given the caller is signed in and not on the ops back-office list
+    And members of another organization are signed in with other email domains
+    When the usage report is read
+    Then its signed-in users count the caller's organization's members only
+    And its email domains count the caller's organization's members only
+
+  @unit
+  Scenario: An install admin changes what the install reports
+    Given the caller is on the ops back-office list
+    When the usage report switches are changed
+    Then the switches are written
+    And the whole install's report comes back with its switches
+
+  @unit
+  Scenario: Only an install admin changes what the install reports
+    Given the caller is not on the ops back-office list
+    When the usage report switches are changed
+    Then the change is refused as operator-only
+    And nothing is written
 
   @integration
   Scenario: The checkup page tells an organization member who can see the details

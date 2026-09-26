@@ -769,6 +769,18 @@ export class AuthApp implements AuthApiContract {
     return { signedInUsers: await this.#sessions.countSignedInUsers(input) };
   }
 
+  async countUsageForMembers({
+    memberUserIds,
+    at,
+  }: {
+    memberUserIds: readonly string[];
+    at: number;
+  }): Promise<AuthUsageCount> {
+    return {
+      signedInUsers: await this.#sessions.countSignedInUsersAmong({ userIds: memberUserIds, at }),
+    };
+  }
+
   listBrowserSessions(input: {
     userId: string;
     currentSessionId?: string | undefined;

@@ -134,6 +134,21 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when the email domains are counted among some people", () => {
+    /** @scenario "An organization's email domains count its own members only" */
+    it("counts only those people's domains and returns no address", async () => {
+      const { users } = create();
+      const ada = await users.create({ name: "Ada", email: "ada@acme.test" });
+      const grace = await users.create({ name: "Grace", email: "Grace@ACME.test" });
+      await users.create({ name: "Kay", email: "kay@other.test" });
+
+      const { emailDomains } = await users.countUsageAmong({ userIds: [ada.id, grace.id] });
+
+      expect(emailDomains).toEqual({ "acme.test": 2 });
+      await expect(users.countUsageAmong({ userIds: [] })).resolves.toEqual({ emailDomains: {} });
+    });
+  });
+
   describe("when an account was stored with capitals in its address", () => {
     /** Rows written before sign-in lowercased addresses may carry capitals. */
     it("finds it from the lowercased address", async () => {

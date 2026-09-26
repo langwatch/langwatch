@@ -1008,6 +1008,10 @@ export class UserApp implements UserApi {
     return this.#users.countUsage();
   }
 
+  countUsageForMembers(input: { memberUserIds: readonly string[] }): Promise<UserUsageCount> {
+    return this.#users.countUsageForMembers(input);
+  }
+
   hasAccountOnDomain(input: { domain: string }): Promise<boolean> {
     return this.#users.hasAccountOnDomain(input);
   }

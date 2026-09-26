@@ -50,6 +50,8 @@ export interface AuthSessionRepository {
   touch(input: { sessionId: string; at: Instant }): Promise<void>;
   /** Distinct people holding an unexpired session at `at` (epoch ms), install-wide. */
   countSignedInUsers(input: { at: number }): Promise<number>;
+  /** The same count, among these people only. */
+  countSignedInUsersAmong(input: { userIds: readonly string[]; at: number }): Promise<number>;
   /** The session a token names, expired or not; empty when no row holds it. */
   findExpiryByToken(input: { token: string }): Promise<SessionExpiry[]>;
   /** The amr the session recorded; empty when the session is gone. */

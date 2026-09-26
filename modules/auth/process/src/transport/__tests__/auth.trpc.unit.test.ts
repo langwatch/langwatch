@@ -32,6 +32,7 @@ const getPriorSession = vi.fn<AuthApi["getPriorSession"]>();
 /** The seven operations this surface calls; the rest of the module refuses. */
 const door: AuthApi = {
   countUsage: vi.fn(),
+  countUsageForMembers: vi.fn(),
   offersPasskeys: () => false,
   offersTwoStepVerification: () => false,
   getSignedInWith: () => unreached("getSignedInWith"),

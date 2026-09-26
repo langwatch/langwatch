@@ -65,6 +65,8 @@ export interface UserRepository {
   setAvatar(input: { id: string; image: string | null }): Promise<void>;
   /** The usage report's count, install-wide: the part after the `@`, never an address. */
   countUsage(): Promise<UserUsageCount>;
+  /** The same count, among these people only. */
+  countUsageAmong(input: { userIds: readonly string[] }): Promise<UserUsageCount>;
   /** Whether any account's address is on this domain, install-wide, case aside. */
   hasAccountOnDomain(domain: string): Promise<boolean>;
 }

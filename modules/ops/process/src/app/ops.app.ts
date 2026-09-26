@@ -1633,7 +1633,7 @@ export class OpsApp implements OpsApi {
   }
 
   async setUsageReportSwitches({
-    organizationId,
+    organizationId: _organizationId,
     operator,
     ...switches
   }: {
@@ -1644,11 +1644,8 @@ export class OpsApp implements OpsApi {
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    const report = await checkup.setUsageReportSwitches({
-      ...switches,
-      organizationId,
-      installAdmin: this.#isInstallAdmin(operator),
-    });
+    this.admitOperator(operator, "ops:manage");
+    const report = await checkup.setUsageReportSwitches(switches);
     return { deployment: "self-hosted", ...report };
   }
 

@@ -8,6 +8,7 @@ import { MemoryCliDeviceSessionRepository } from "../memory.cli-device-session.r
 import { MemorySignUpVerificationTokenRepository } from "../memory.signup-verification-token.repository.ts";
 
 const NOW = Temporal.Instant.from("2026-08-28T00:00:00.000Z");
+const SESSION = { sessionToken: "token", impersonating: null };
 
 function sessions() {
   const memory = MemoryAuthDatabase.create();
@@ -46,6 +47,34 @@ describe("MemoryAuthSessionRepository", () => {
         ).resolves.toBe(1);
         await expect(repository.findById({ id: "s1" })).resolves.not.toBeNull();
         await expect(repository.findById({ id: "s2" })).resolves.toBeNull();
+      });
+    });
+
+    describe("when the signed-in users are counted among some people", () => {
+      /** @scenario "An organization's signed-in count holds its own members only" */
+      it("counts each of those people with a live session once, and nobody else", async () => {
+        const memory = MemoryAuthDatabase.create();
+        const live = NOW.add({ hours: 1 });
+        memory.sessions.set("s1", { ...SESSION, id: "s1", userId: "u1", expires: live });
+        memory.sessions.set("s2", { ...SESSION, id: "s2", userId: "u1", expires: live });
+        memory.sessions.set("s3", {
+          ...SESSION,
+          id: "s3",
+          userId: "u2",
+          expires: NOW.subtract({ hours: 1 }),
+        });
+        memory.sessions.set("s4", { ...SESSION, id: "s4", userId: "outsider", expires: live });
+        const repository = MemoryAuthSessionRepository.create({ memory });
+
+        await expect(
+          repository.countSignedInUsersAmong({
+            userIds: ["u1", "u2"],
+            at: NOW.epochMilliseconds,
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          repository.countSignedInUsersAmong({ userIds: [], at: NOW.epochMilliseconds }),
+        ).resolves.toBe(0);
       });
     });
 

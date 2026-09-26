@@ -59,4 +59,20 @@ describe.skipIf(!databaseUrl)("given users on two company domains", () => {
       expect(JSON.stringify(emailDomains)).not.toContain("ada@");
     });
   });
+
+  describe("when the domains are counted among some of them", () => {
+    it("counts only those people's domains in Postgres", async () => {
+      const repository = PrismaUserRepository.create({ prisma: connection.client });
+      const members = await connection.client.user.findMany({
+        where: { email: { contains: DOMAIN, mode: "insensitive" } },
+        select: { id: true },
+      });
+
+      const { emailDomains } = await repository.countUsageAmong({
+        userIds: members.map((member) => member.id),
+      });
+
+      expect(emailDomains).toEqual({ [DOMAIN]: 2 });
+    });
+  });
 });

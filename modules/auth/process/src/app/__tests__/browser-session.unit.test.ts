@@ -57,6 +57,7 @@ const LIVE_SESSION: StoredBrowserSession = {
 
 class Sessions implements AuthSessionRepository {
   countSignedInUsers = vi.fn().mockResolvedValue(0);
+  countSignedInUsersAmong = vi.fn().mockResolvedValue(0);
   stored: StoredBrowserSession | null = LIVE_SESSION;
   records: readonly BrowserSessionRecord[] = [];
   readonly deletedAll = vi.fn().mockResolvedValue(2);

@@ -60,6 +60,10 @@ export class BrowserSessionService {
     return this.deps.sessions.countSignedInUsers(input);
   }
 
+  countSignedInUsersAmong(input: { userIds: readonly string[]; at: number }): Promise<number> {
+    return this.deps.sessions.countSignedInUsersAmong(input);
+  }
+
   async tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
   }): Promise<BrowserSession | null> {

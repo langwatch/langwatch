@@ -38,6 +38,22 @@ export class PrismaAuthSessionRepository
     return rows.length;
   }
 
+  async countSignedInUsersAmong({
+    userIds,
+    at,
+  }: {
+    userIds: readonly string[];
+    at: number;
+  }): Promise<number> {
+    if (userIds.length === 0) return 0;
+    const rows = await this.prisma.session.findMany({
+      where: { userId: { in: [...userIds] }, expires: { gte: new Date(at) } },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return rows.length;
+  }
+
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     const row = await this.prisma.session.findUnique({ where: { id }, select: sessionSelect });
     if (!row) return null;

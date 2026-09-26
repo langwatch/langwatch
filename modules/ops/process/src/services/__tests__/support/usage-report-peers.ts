@@ -1,5 +1,7 @@
 import { AuthUnavailableError } from "@langwatch/auth-contract";
+import type { User } from "@langwatch/organization-contract";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
+import { Temporal } from "@langwatch/time";
 
 import type { UsageReportPeers } from "../../usage-report-collection.service.ts";
 
@@ -25,6 +27,9 @@ export class UsageReportWorld {
   readonly projectsByOrganization = new Map<string, string[]>();
   readonly rows: IngestedRow[] = [];
   emailDomains: Record<string, number> = {};
+  readonly membersByOrganization = new Map<string, string[]>();
+  readonly emailsByUser = new Map<string, string>();
+  readonly signedInUserIds = new Set<string>();
   /** The sign-in mode auth names; absent reads as a process that composes none. */
   authProvider: string | undefined = "email";
   mailProvider: string | undefined = undefined;
@@ -46,15 +51,30 @@ export class UsageReportWorld {
     return {
       organizations: {
         countUsage: async () => ({ members: 1, teams: 1, ssoProviders: [] }),
+        getAllMembers: async ({ organizationId }) =>
+          (this.membersByOrganization.get(organizationId) ?? []).map(member),
       },
       projects: {
         listIdsByOrganization: async ({ organizationId }) =>
           this.projectsByOrganization.get(organizationId) ?? [],
         countUsage: async () => ({ projects: 0, updatedProjects: 0 }),
       },
-      users: { countUsage: async () => ({ emailDomains: this.emailDomains }) },
+      users: {
+        countUsage: async () => ({ emailDomains: this.emailDomains }),
+        countUsageForMembers: async ({ memberUserIds }) => {
+          const emailDomains: Record<string, number> = {};
+          for (const userId of memberUserIds) {
+            const domain = this.emailsByUser.get(userId)?.split("@")[1];
+            if (domain) emailDomains[domain] = (emailDomains[domain] ?? 0) + 1;
+          }
+          return { emailDomains };
+        },
+      },
       auth: {
         countUsage: async () => ({ signedInUsers: 0 }),
+        countUsageForMembers: async ({ memberUserIds }) => ({
+          signedInUsers: memberUserIds.filter((userId) => this.signedInUserIds.has(userId)).length,
+        }),
         resolveAuthProvider: async () => {
           if (this.authProvider === undefined) {
             throw new AuthUnavailableError({ capability: "sign-in mode", processName: "test" });
@@ -142,4 +162,25 @@ export class UsageReportWorld {
         (since === undefined || row.at >= since),
     );
   }
+}
+
+/** An active member row, as the organization module answers one. */
+function member(id: string): User {
+  return {
+    id,
+    name: null,
+    email: null,
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    userHashKey: null,
+    twoFactorEnabled: false,
+    createdAt: Temporal.Instant.fromEpochMilliseconds(0),
+    updatedAt: Temporal.Instant.fromEpochMilliseconds(0),
+    lastLoginAt: null,
+    deactivatedAt: null,
+    lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
+    passkeyNudgeDismissedAt: null,
+  };
 }

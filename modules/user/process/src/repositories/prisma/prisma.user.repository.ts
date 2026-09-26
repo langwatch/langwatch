@@ -80,6 +80,15 @@ export class PrismaUserRepository
     return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
   }
 
+  async countUsageAmong({ userIds }: { userIds: readonly string[] }): Promise<UserUsageCount> {
+    if (userIds.length === 0) return { emailDomains: {} };
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] }, email: { not: null } },
+      select: { email: true },
+    });
+    return { emailDomains: domainCounts(rows.map((row) => row.email ?? "")) };
+  }
+
   /** Install-wide on purpose, like the report: one row at most, and only a yes or no leaves. */
   async hasAccountOnDomain(domain: string): Promise<boolean> {
     const row = await this.prisma.user.findFirst({

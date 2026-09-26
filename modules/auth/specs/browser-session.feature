@@ -36,3 +36,11 @@ Feature: Browser session lifecycle
     Then that session is ended and the others remain
     And ending the session they are reading from reports session_is_current
     And naming a session that is not theirs ends nothing
+
+  @unit
+  Scenario: An organization's signed-in count holds its own members only
+    Given members of an organization and people outside it hold live browser sessions
+    And one member holds several sessions and another's has expired
+    When the signed-in users are counted for that organization's members
+    Then each member with a live session counts once
+    And nobody outside the organization is counted

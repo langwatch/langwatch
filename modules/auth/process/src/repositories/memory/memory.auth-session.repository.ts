@@ -25,6 +25,23 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
     return new Set(signedIn.map((session) => session.userId)).size;
   }
 
+  async countSignedInUsersAmong({
+    userIds,
+    at,
+  }: {
+    userIds: readonly string[];
+    at: number;
+  }): Promise<number> {
+    const among = new Set(userIds);
+    const signedIn = [...this.memory.sessions.values()].filter(
+      (session) =>
+        among.has(session.userId) &&
+        session.expires !== undefined &&
+        session.expires.epochMilliseconds >= at,
+    );
+    return new Set(signedIn.map((session) => session.userId)).size;
+  }
+
   async findById({ id }: { id: string }): Promise<StoredBrowserSession | null> {
     const session = this.memory.sessions.get(id);
     if (!session) return null;

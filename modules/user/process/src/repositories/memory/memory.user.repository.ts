@@ -51,12 +51,12 @@ export class MemoryUserRepository implements UserRepository {
   }
 
   async countUsage(): Promise<UserUsageCount> {
-    const emailDomains: Record<string, number> = {};
-    for (const row of this.#database.rows()) {
-      const domain = row.email?.trim().toLowerCase().split("@")[1];
-      if (domain) emailDomains[domain] = (emailDomains[domain] ?? 0) + 1;
-    }
-    return { emailDomains };
+    return { emailDomains: domainCounts(this.#database.rows()) };
+  }
+
+  async countUsageAmong({ userIds }: { userIds: readonly string[] }): Promise<UserUsageCount> {
+    const among = new Set(userIds);
+    return { emailDomains: domainCounts(this.#database.rows().filter((row) => among.has(row.id))) };
   }
 
   async hasAccountOnDomain(domain: string): Promise<boolean> {
@@ -339,4 +339,13 @@ function fullOf(row: MemoryUserRow): UserFullProfile {
       ? toDate(row.tracesExplorerTourDismissedAt)
       : null,
   };
+}
+
+function domainCounts(rows: readonly MemoryUserRow[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const domain = row.email?.trim().toLowerCase().split("@")[1];
+    if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
+  }
+  return counts;
 }

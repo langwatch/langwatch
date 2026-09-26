@@ -34,6 +34,13 @@ Feature: Canonical user lifecycle
       When the same reads and writes run against every backend
       Then each refuses to unlink the last method, lists the method without its password, and stores a rotated hash on the same row
 
+    @unit
+    Scenario: An organization's email domains count its own members only
+      Given accounts on two company domains, only some of them members of the organization
+      When the email domains are counted for that organization's members
+      Then each domain counts only the members on it, case aside
+      And no address leaves the module
+
   # The stored password hash is the one column in this feature that must not
   # travel. It used to: the API process read it on its own connection and the
   # comparison happened in a transport, which meant the rule about that column

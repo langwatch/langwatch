@@ -10,6 +10,9 @@ export class TestUserApi implements UserApi {
     return Promise.resolve({ emailDomains: {} });
   }
 
+  countUsageForMembers: UserApi["countUsageForMembers"] = (input) =>
+    this.overrides.countUsageForMembers?.(input) ?? this.unimplemented("countUsageForMembers");
+
   constructor(private readonly overrides: Partial<UserApi> = {}) {}
 
   hasAccountOnDomain: UserApi["hasAccountOnDomain"] = (input) =>

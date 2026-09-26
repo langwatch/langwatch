@@ -260,9 +260,16 @@ describe("given an install carrying no organization", () => {
 
 describe("given an install with two organizations", () => {
   describe("when one organization's figures are taken", () => {
-    it("counts that organization's projects only, and nothing install-wide", async () => {
+    it("counts that organization's projects and members only, and nothing install-wide", async () => {
       seedTwoOrganizations();
-      state.emailDomains = { "acme.test": 2 };
+      state.emailDomains = { "acme.test": 2, "other.test": 1 };
+      state.membersByOrganization.set("org-1", ["ada", "grace"]);
+      state.membersByOrganization.set("org-2", ["kay"]);
+      state.emailsByUser.set("ada", "ada@acme.test");
+      state.emailsByUser.set("grace", "grace@acme.test");
+      state.emailsByUser.set("kay", "kay@other.test");
+      state.signedInUserIds.add("ada");
+      state.signedInUserIds.add("kay");
 
       const payload = await collector().collectForOrganization({
         organizationId: "org-1",
@@ -275,14 +282,10 @@ describe("given an install with two organizations", () => {
         totalTraces: 1,
         gateway_requests: 1,
         gateway_spend_usd: 1.25,
+        active_users_28d: 1,
+        user_email_domains: { "acme.test": 2 },
       });
-      for (const key of [
-        "instance_id",
-        "version",
-        "hostname",
-        "user_email_domains",
-        "active_users_28d",
-      ]) {
+      for (const key of ["instance_id", "version", "hostname", "auth_method", "storage_backend"]) {
         expect(payload).not.toHaveProperty(key);
       }
     });

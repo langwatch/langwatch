@@ -303,15 +303,9 @@ export class OpsCheckupService {
       : this.usageReports.previewForOrganization({ organizationId });
   }
 
-  /** Changes what the install reports, and answers the report as this reader may see it. */
-  async setUsageReportSwitches({
-    organizationId,
-    installAdmin,
-    ...switches
-  }: CheckupReader & UsageReportSwitchChange): Promise<UsageReportPreview> {
-    if (installAdmin) return this.usageReports.setSwitches(switches);
-    await this.usageReports.writeSwitches(switches);
-    return this.usageReports.previewForOrganization({ organizationId });
+  /** Changes what the install reports; only an install admin reaches it. */
+  setUsageReportSwitches(switches: UsageReportSwitchChange): Promise<UsageReportPreview> {
+    return this.usageReports.setSwitches(switches);
   }
 }
 

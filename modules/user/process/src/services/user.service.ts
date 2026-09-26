@@ -97,6 +97,14 @@ export class UserService {
     return this.repository.countUsage();
   }
 
+  countUsageForMembers({
+    memberUserIds,
+  }: {
+    memberUserIds: readonly string[];
+  }): Promise<UserUsageCount> {
+    return this.repository.countUsageAmong({ userIds: memberUserIds });
+  }
+
   /** A domain with a wildcard in it is no domain, so it matches nobody. */
   hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
     const normalised = domain.trim().toLowerCase();

@@ -273,6 +273,11 @@ export interface AuthApi {
   }): Promise<ReleaseHeldAccountResult>;
   /** The usage report's figure (ADR-156, section 10), install-wide. */
   countUsage(input: { at: number }): Promise<AuthUsageCount>;
+  /** The same figure for one organization, counted over the members the caller names. */
+  countUsageForMembers(input: {
+    memberUserIds: readonly string[];
+    at: number;
+  }): Promise<AuthUsageCount>;
 }
 
 /** Which accounts a legacy-access question is about: the connection being

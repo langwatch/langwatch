@@ -52,10 +52,10 @@ export interface UsageReportDeployment {
 
 /** Every module that owns a figure, asked through its own `countUsage`. */
 export interface UsageReportPeers {
-  readonly organizations: Pick<OrganizationApi, "countUsage">;
+  readonly organizations: Pick<OrganizationApi, "countUsage" | "getAllMembers">;
   readonly projects: Pick<ProjectApi, "listIdsByOrganization" | "countUsage">;
-  readonly users: Pick<UserApi, "countUsage">;
-  readonly auth: Pick<AuthApi, "countUsage" | "resolveAuthProvider">;
+  readonly users: Pick<UserApi, "countUsage" | "countUsageForMembers">;
+  readonly auth: Pick<AuthApi, "countUsage" | "countUsageForMembers" | "resolveAuthProvider">;
   readonly datasets: Pick<DatasetApi, "countUsage">;
   readonly annotations: Pick<AnnotationApi, "countUsage">;
   readonly monitors: Pick<MonitorApi, "countUsage">;
@@ -151,8 +151,8 @@ export class UsageReportCollectionService {
 
   /**
    * One organization's own figures, for a caller who is not an install admin. What only
-   * the whole install can answer (its identity, release, hostname, sign-in, mail, storage,
-   * email domains and signed-in users) is left out rather than shown install-wide.
+   * the whole install can answer (its identity, release, hostname, sign-in, mail and
+   * storage) is left out rather than shown install-wide.
    */
   async collectForOrganization({
     organizationId,
@@ -162,12 +162,18 @@ export class UsageReportCollectionService {
     now: Instant;
   }): Promise<Record<string, unknown>> {
     const { peers } = this.deps;
-    const scope = await this.scopeOf({ organizationIds: [organizationId], now });
-    const [organizations, stored, ingested, providers] = await Promise.all([
+    const [scope, members] = await Promise.all([
+      this.scopeOf({ organizationIds: [organizationId], now }),
+      peers.organizations.getAllMembers({ organizationId }),
+    ]);
+    const memberUserIds = members.map((member) => member.id);
+    const [organizations, stored, ingested, providers, signedIn, domains] = await Promise.all([
       peers.organizations.countUsage({ organizationIds: scope.organizationIds }),
       scope.projectIds.length > 0 ? this.stored(scope) : Promise.resolve({}),
       this.ingested(scope),
       peers.modelProviders.countUsage({ organizationIds: scope.organizationIds }),
+      peers.auth.countUsageForMembers({ memberUserIds, at: now.epochMilliseconds }),
+      peers.users.countUsageForMembers({ memberUserIds }),
     ]);
 
     return {
@@ -179,7 +185,9 @@ export class UsageReportCollectionService {
       users: organizations.members,
       sso_provider: organizations.ssoProviders[0] ?? null,
       ...stored,
+      active_users_28d: signedIn.signedInUsers,
       ...ingested,
+      user_email_domains: domains.emailDomains,
       model_providers: providers.providers.toSorted(),
     };
   }
