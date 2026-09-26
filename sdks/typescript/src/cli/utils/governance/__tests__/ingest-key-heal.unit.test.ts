@@ -331,6 +331,68 @@ describe("healRevokedIngestKey", () => {
     });
   });
 
+  describe("given a key read out of the agent's wiring that has drifted from the cache", () => {
+    const WIRED = "ik-lw-wiredlookupid0_wired-secret";
+
+    /** @scenario "A drifted wired key the platform recognises is re-minted" */
+    it("re-mints once the platform confirms the key is this account's, cache identity notwithstanding", async () => {
+      const d = deps({
+        describeIngestionKey: vi
+          .fn()
+          .mockResolvedValue({ status: "revoked", revocationCause: "cap" }),
+      });
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: WIRED,
+        rejectedTokenSource: "wiring",
+        deps: d,
+      });
+
+      expect(d.describeIngestionKey).toHaveBeenCalledWith(
+        expect.anything(),
+        "wiredlookupid0",
+        expect.anything(),
+      );
+      expect(healed).toMatchObject({ status: "healed" });
+      expect(d.installTelemetryWiring).toHaveBeenCalledOnce();
+    });
+
+    /** @scenario "A wired key the platform does not know is not re-minted" */
+    it("declines when the platform has no such key of this account's, where a cached key would mint", async () => {
+      const d = deps();
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: WIRED,
+        rejectedTokenSource: "wiring",
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "declined" });
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.installTelemetryWiring).not.toHaveBeenCalled();
+      expect(d.saveConfig).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A wired bearer that is not a personal ingest key is not re-minted" */
+    it("declines a foreign bearer before asking the platform anything", async () => {
+      const d = deps();
+
+      const healed = await healRevokedIngestKey({
+        agent: "claude_code",
+        rejectedToken: "some-other-collectors-token",
+        rejectedTokenSource: "wiring",
+        deps: d,
+      });
+
+      expect(healed).toEqual({ status: "declined" });
+      expect(d.describeIngestionKey).not.toHaveBeenCalled();
+      expect(d.resolveLiveIngestionKey).not.toHaveBeenCalled();
+      expect(d.installTelemetryWiring).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a platform that still lists the cached key as live", () => {
     /** @scenario "A key the platform still lists as live is not re-minted" */
     it("returns nothing, because the 401 means something else", async () => {

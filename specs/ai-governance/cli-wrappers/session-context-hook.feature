@@ -9,6 +9,7 @@
 #   sdks/typescript/src/cli/utils/governance/session-context-hooks.ts  (the Claude Code and Codex hook files)
 #   sdks/typescript/src/cli/utils/governance/opencode-plugin.ts        (the opencode plugin file)
 #   sdks/typescript/src/cli/utils/governance/telemetry-targets.ts      (logout removal)
+#   sdks/typescript/src/cli/utils/governance/wired-target.ts           (the target the agent's own exporter is wired to)
 #
 # Related specs:
 #   specs/coding-agent/session-git-context.feature , what the pipeline does with the event
@@ -560,3 +561,76 @@ Rule: A revoked ingest key heals itself
     Given an opencode plugin whose hook command cannot be spawned
     When a session event reaches it
     Then the event handler resolves and nothing is thrown
+
+Rule: The hook probes the target the agent itself exports with
+
+  # The hook posts with the CLI's cached key; the agent's exporter posts with
+  # whatever its settings file holds. The two can drift — a live cache over a
+  # revoked wiring — and then the hook succeeds on every session while every
+  # span the agent emits is refused in silence (#7958). One empty batch per
+  # session, posted to the wired target read out of the agent's own settings
+  # file, is the question nobody was asking.
+
+  @unit
+  Scenario: A drifted wired key is probed and healed
+    Given an agent whose settings file holds a key the collector refuses
+    And a CLI whose own cached key is live
+    When the hook runs
+    Then one empty batch is posted to the agent's wired endpoint with the wired key
+    And the healer is asked about the wired credential
+    And the user is told to restart the agent
+
+  @unit
+  Scenario: A refused wiring nobody can re-mint is reported plainly
+    Given an agent whose settings file holds a key the collector refuses
+    And a platform that withholds the repair
+    When the hook runs
+    Then the user is told which endpoint is refusing the agent's telemetry
+    And told to run the instrument command
+
+  @unit
+  Scenario: A wiring that matches the hook's own target is not probed
+    Given an agent whose settings file names the same endpoint and key the hook posts with
+    When the hook runs
+    Then no probe is sent
+
+  @unit
+  Scenario: A wiring whose authorization is not a bearer token is not probed
+    Given an agent whose settings file carries an authorization of another scheme
+    When the wired target is read
+    Then it reports no wiring, so no bearer the agent never sends is probed
+
+  # The settings file proves nothing about who wrote what is in it: a person
+  # can wire it to any collector by hand. Ownership of a wired key is read
+  # from the key itself — a personal ingest key the platform recognises as
+  # this account's — and nothing short of that mints or rewrites anything.
+  @unit
+  Scenario: A wiring to another collector is not probed
+    Given an agent whose settings file a person wired to another collector with its own bearer
+    When the wired target is read
+    Then it reports no wiring
+
+  @unit
+  Scenario: A drifted wired key the platform recognises is re-minted
+    Given a wired personal key that differs from the cached one
+    And a platform that says the key was retired by its own doing
+    When the healer is asked about the wired credential
+    Then it re-mints and rewires the tool
+
+  @unit
+  Scenario: A wired key the platform does not know is not re-minted
+    Given a wired personal key the platform has no record of for this account
+    When the healer is asked about the wired credential
+    Then it declines, minting nothing and writing nothing
+
+  @unit
+  Scenario: A wired bearer that is not a personal ingest key is not re-minted
+    Given a wired bearer that is not a personal ingest key
+    When the healer is asked about the wired credential
+    Then it declines without asking the platform anything
+
+  @unit
+  Scenario: An offline probe does not spend the session's one ask
+    Given an agent whose wired endpoint the network never answers
+    When the hook runs twice
+    Then the second hook probes again
