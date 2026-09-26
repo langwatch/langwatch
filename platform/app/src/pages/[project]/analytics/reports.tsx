@@ -20,19 +20,14 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
-import {
-  buildWidgetRenderResult,
-  useWidgetRenderReceiptStore,
-} from "~/features/custom-chart-playground/renderReceipt/widgetRenderReceiptStore";
+import { useDashboardLangyActions } from "~/features/custom-chart-playground/renderReceipt/useDashboardLangyActions";
 import {
   useRegisterLangyActions,
   useRegisterLangyPageContext,
 } from "~/features/langy/LangyContext";
 import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
-import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
-import { getWidgetRenderPayloadSchema } from "~/server/analytics/dashboardWidgetRenderActions";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { ReportGrid } from "../../../components/analytics/reports";
@@ -111,26 +106,11 @@ function ReportsContent() {
   );
   useRegisterLangyPageContext(dashboardPageContext);
 
-  // The one live UI action this page answers: read the render receipts the
+  // The one live UI action this page answers — read the render receipts the
   // mounted widgets published (see `DashboardWidgetFrame`) so an off-screen
-  // agent can "see" what each card painted. The receipts→result mapping is
-  // pure and lives in the store module; this is only the store read + filter.
-  const langyActions = useMemo<LangyUiActionHandlers>(
-    () => ({
-      "dashboard.getWidgetRender": {
-        payloadSchema: getWidgetRenderPayloadSchema,
-        run: (payload: { widgetId?: string; shouldIncludeMarkup?: boolean }) =>
-          buildWidgetRenderResult({
-            receipts: useWidgetRenderReceiptStore.getState().receipts,
-            dashboardId: activeDashboardId ?? null,
-            widgetId: payload.widgetId,
-            shouldIncludeMarkup: payload.shouldIncludeMarkup,
-          }),
-      },
-    }),
-    [activeDashboardId],
-  );
-  useRegisterLangyActions(langyActions);
+  // agent can "see" what each card painted — extracted to its own unit and
+  // scoped to the open dashboard (see `useDashboardLangyActions`).
+  useRegisterLangyActions(useDashboardLangyActions(activeDashboardId ?? null));
 
   // Graphs for the active dashboard
   const graphsQuery = api.graphs.getAll.useQuery(

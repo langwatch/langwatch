@@ -207,7 +207,8 @@ export interface LwRenderReceiptMessage {
   readonly type: "lw:render-receipt";
   /**
    * "ok" once author code mounted and painted; "error" for a compile error,
-   * a render throw, a missing default export, or an `LW.error()` call.
+   * a render throw, or a missing default export. An `LW.error()` call posts a
+   * separate `lw:error` log message and does NOT set this status.
    */
   readonly status: "ok" | "error";
   readonly errorText?: string;

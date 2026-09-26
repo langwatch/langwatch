@@ -365,7 +365,8 @@ function sanitizeReceiptHeight(raw: unknown): number {
  * frame is sandboxed but author code can post on the transferred port
  * directly, skipping the shim that normally enforces the markup cap — so the
  * parent re-checks every field itself rather than trusting the shape.
- * Returns `null` for anything that isn't a well-formed receipt.
+ * Returns `null` for non-object values, unsupported statuses, or non-string
+ * `markup`. Normalizes invalid heights to `0` and omits non-string `errorText`.
  */
 export function sanitizeRenderReceipt(
   raw: unknown,

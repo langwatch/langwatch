@@ -64,6 +64,15 @@ export interface SandboxedChartFrameProps {
    */
   onRenderReceipt?: (receipt: ChartFrameRenderReceipt) => void;
   /**
+   * Fires whenever the frame's running state flips: `false` once the watchdog
+   * has torn the frame down and the "stopped responding"/"Restarted N times"
+   * panel is showing instead of the live iframe, `true` again once it is
+   * running. A receipt reader (the dashboard render-receipt publisher) uses
+   * this to drop a now-stale `status: "ok"` receipt for a frame that is no
+   * longer painting.
+   */
+  onFrameRunningChange?: (isRunning: boolean) => void;
+  /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller
    * card gives the chart more room without lifting the bridge's own clamp.
@@ -80,6 +89,7 @@ export function SandboxedChartFrame({
   onLog,
   onNavigate,
   onRenderReceipt,
+  onFrameRunningChange,
   maxHeight = CHART_FRAME_MAX_HEIGHT_PX,
 }: SandboxedChartFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -88,6 +98,14 @@ export function SandboxedChartFrame({
   // A torn-down frame comes back on its own, with backoff; see the hook.
   const restart = useFrameAutoRestart({ onRestart: remount });
   const { noteTornDown, noteFrameMounted } = restart;
+
+  // Surface running-state transitions so a receipt reader can drop the last
+  // "ok" receipt once the watchdog has torn the frame down (below we render
+  // the panel instead of the iframe whenever status !== "running").
+  const isFrameRunning = restart.status === "running";
+  useEffect(() => {
+    onFrameRunningChange?.(isFrameRunning);
+  }, [isFrameRunning, onFrameRunningChange]);
 
   // The frame document is the same static route for every widget, so a change
   // to `code` cannot reload the iframe on its own. Bump a generation counter

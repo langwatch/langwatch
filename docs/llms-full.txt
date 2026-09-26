@@ -56586,7 +56586,7 @@ When the user has that dashboard open in the app and the dashboard chip is attac
 langwatch ui call dashboard.getWidgetRender --payload '{"widgetId":"<id>"}'
 ```
 
-It returns the widget's render status, any compile/runtime error text, and the rendered markup (inline SVG for a recharts chart) — so you can check for an empty chart, NaN/undefined labels, overflow, or an error panel before calling the work done. Omit `widgetId` to list every widget on the open dashboard without markup. Receipts exist only while that tab is open; there is no away fallback.
+It returns the widget's render status, any compile/runtime error text, and the rendered markup (inline SVG for a recharts chart) — so you can check for an empty chart, NaN/undefined labels, overflow, or an error panel before calling the work done. Omit `widgetId` to list the dashboard's sandboxed widget cards (the code-defined ones this recipe creates) without markup; classic chart cards do not run in a frame, publish no receipt, and are not listed. Receipts exist only while that tab is open; there is no away fallback.
 
 ## Managing saved widgets
 

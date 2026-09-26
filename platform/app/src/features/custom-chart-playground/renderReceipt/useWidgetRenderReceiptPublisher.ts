@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type { ChartFrameRenderReceipt } from "../bridge/frameBridge";
 import { useWidgetRenderReceiptStore } from "./widgetRenderReceiptStore";
@@ -10,6 +10,14 @@ import { useWidgetRenderReceiptStore } from "./widgetRenderReceiptStore";
  * off-screen agent (Langy) can read this card through `dashboard.getWidgetRender`.
  * It exists only while this card is mounted, so it is dropped when the card leaves
  * the grid.
+ *
+ * The receipt is also dropped whenever the frame is NOT painting — either the
+ * definition failed to parse (`isRendered: false`) or the frame's watchdog tore
+ * it down (`onFrameRunningChange(false)`, wired from `SandboxedChartFrame`). A
+ * `status: "ok"` receipt from before a teardown is stale, and an off-screen
+ * agent must not be told a widget rendered fine when the "stopped responding"
+ * panel is on screen instead. Returns that frame-running setter alongside the
+ * receipt handler so the caller only forwards two callbacks.
  */
 export function useWidgetRenderReceiptPublisher({
   id,
@@ -25,9 +33,13 @@ export function useWidgetRenderReceiptPublisher({
   readonly theme: "light" | "dark";
   readonly timeWindow: { start: number; end: number };
   readonly isRendered?: boolean;
-}) {
+}): {
+  onRenderReceipt: (receipt: ChartFrameRenderReceipt) => void;
+  onFrameRunningChange: (isRunning: boolean) => void;
+} {
   const publishReceipt = useWidgetRenderReceiptStore((state) => state.publish);
   const removeReceipt = useWidgetRenderReceiptStore((state) => state.remove);
+  const [isFrameRunning, setIsFrameRunning] = useState(true);
 
   const onRenderReceipt = useCallback(
     (receipt: ChartFrameRenderReceipt) => {
@@ -46,11 +58,12 @@ export function useWidgetRenderReceiptPublisher({
 
   useEffect(() => () => removeReceipt(id), [id, removeReceipt]);
 
+  const shouldKeepReceipt = isRendered && isFrameRunning;
   useEffect(() => {
-    if (!isRendered) {
+    if (!shouldKeepReceipt) {
       removeReceipt(id);
     }
-  }, [isRendered, id, removeReceipt]);
+  }, [shouldKeepReceipt, id, removeReceipt]);
 
-  return onRenderReceipt;
+  return { onRenderReceipt, onFrameRunningChange: setIsFrameRunning };
 }

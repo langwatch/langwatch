@@ -106,6 +106,24 @@ export interface WidgetRenderResult {
 }
 
 /**
+ * Total markup, in characters, that one `dashboard.getWidgetRender` result may
+ * carry across ALL of its widget rows.
+ *
+ * The UI-action channel replaces any completion whose serialized payload is
+ * over 64 KB (`MAX_RESULT_BYTES` in `ui-action.service.ts`) with a
+ * `result_too_large` error, so the agent gets nothing back. A single widget's
+ * markup is already capped at `CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS` (60,000)
+ * at capture, but nothing bounded the SUM across a multi-widget dashboard, so
+ * `{"shouldIncludeMarkup":true}` on more than one card blew straight past the
+ * ceiling. This budget is a shared allowance across rows, deliberately well
+ * below 64 KB to leave headroom for JSON escaping (SVG quotes serialize to two
+ * bytes each) and the non-markup fields of every row. Rows are filled in the
+ * sorted order the agent reads; the row that would cross the budget is
+ * truncated and every row from there on is flagged `isMarkupTruncated`.
+ */
+export const DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS = 45_000;
+
+/**
  * The pure `receipts → dashboard.getWidgetRender result` mapping, kept out of
  * the page handler so it can be unit-tested without a React tree (the handler
  * is only the store read + this call).
@@ -113,7 +131,9 @@ export interface WidgetRenderResult {
  * `shouldIncludeMarkup` defaults to true for a single widget and false for the whole
  * list — the markup of every card at once is a lot to hand an agent that only
  * wanted to know which ones errored. `capturedAt` becomes an ISO string, the
- * shape the result schema (and the agent) reads.
+ * shape the result schema (and the agent) reads. Included markup is held to a
+ * shared budget ({@link DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS}) so the
+ * whole result stays under the UI-action channel's 64 KB ceiling.
  */
 export function buildWidgetRenderResult({
   receipts,
@@ -134,19 +154,31 @@ export function buildWidgetRenderResult({
       ...(widgetId === undefined ? {} : { widgetId }),
     },
   });
+  let markupBudgetLeft = DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS;
   return {
     dashboardId,
-    widgets: list.map((receipt) => ({
-      widgetId: receipt.widgetId,
-      widgetName: receipt.widgetName ?? null,
-      status: receipt.status,
-      errorText: receipt.errorText ?? null,
-      height: receipt.height,
-      theme: receipt.theme,
-      timeWindow: receipt.timeWindow,
-      capturedAt: new Date(receipt.capturedAt).toISOString(),
-      ...(isMarkupIncluded ? { markup: receipt.markup } : {}),
-      isMarkupTruncated: receipt.isMarkupTruncated,
-    })),
+    widgets: list.map((receipt) => {
+      const row = {
+        widgetId: receipt.widgetId,
+        widgetName: receipt.widgetName ?? null,
+        status: receipt.status,
+        errorText: receipt.errorText ?? null,
+        height: receipt.height,
+        theme: receipt.theme,
+        timeWindow: receipt.timeWindow,
+        capturedAt: new Date(receipt.capturedAt).toISOString(),
+        isMarkupTruncated: receipt.isMarkupTruncated,
+      };
+      if (!isMarkupIncluded) return row;
+      const full = receipt.markup ?? "";
+      const markup = full.slice(0, markupBudgetLeft);
+      markupBudgetLeft -= markup.length;
+      return {
+        ...row,
+        markup,
+        isMarkupTruncated:
+          receipt.isMarkupTruncated || markup.length < full.length,
+      };
+    }),
   };
 }

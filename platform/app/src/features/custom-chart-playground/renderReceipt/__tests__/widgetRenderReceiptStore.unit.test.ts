@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildWidgetRenderResult,
+  DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS,
   listWidgetRenderReceipts,
   useWidgetRenderReceiptStore,
   type WidgetRenderReceipt,
@@ -156,6 +157,51 @@ describe("buildWidgetRenderResult", () => {
       });
 
       expect(result.widgets[0]?.markup).toBe("<svg/>");
+    });
+  });
+
+  describe("when the markup across widgets would exceed the result budget", () => {
+    it("truncates rows past the shared budget and flags them, so the whole result stays under the channel ceiling", () => {
+      // Three widgets each carrying markup a third of the budget plus a bit,
+      // so the third must be cut. Big enough that unbounded aggregation would
+      // sail past the UI-action channel's 64 KB result ceiling.
+      const chunk = "x".repeat(20_000);
+      const receipts = {
+        a: makeReceipt({ widgetId: "a", widgetName: "a", markup: chunk }),
+        b: makeReceipt({ widgetId: "b", widgetName: "b", markup: chunk }),
+        c: makeReceipt({ widgetId: "c", widgetName: "c", markup: chunk }),
+      };
+
+      const result = buildWidgetRenderResult({
+        receipts,
+        dashboardId: "dash_1",
+        shouldIncludeMarkup: true,
+      });
+
+      const totalMarkup = result.widgets.reduce(
+        (sum, w) => sum + (w.markup?.length ?? 0),
+        0,
+      );
+      expect(totalMarkup).toBeLessThanOrEqual(
+        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS,
+      );
+      // Something was cut, so at least one row must say so.
+      expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
+    });
+
+    it("does not flag a receipt whose full markup fit within the budget", () => {
+      const receipts = {
+        w1: makeReceipt({ widgetId: "w1", markup: "<svg/>" }),
+      };
+
+      const result = buildWidgetRenderResult({
+        receipts,
+        dashboardId: "dash_1",
+        shouldIncludeMarkup: true,
+      });
+
+      expect(result.widgets[0]?.markup).toBe("<svg/>");
+      expect(result.widgets[0]?.isMarkupTruncated).toBe(false);
     });
   });
 });

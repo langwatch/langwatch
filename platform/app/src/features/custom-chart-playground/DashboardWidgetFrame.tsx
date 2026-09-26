@@ -123,8 +123,7 @@ export function DashboardWidgetFrame({
     resetKey: definition.code,
   });
 
-  // Publish render receipts and clean up on unmount.
-  const onRenderReceipt = useWidgetRenderReceiptPublisher({
+  const receipt = useWidgetRenderReceiptPublisher({
     id,
     widgetName,
     dashboardId,
@@ -147,7 +146,8 @@ export function DashboardWidgetFrame({
         params={paramsSnapshot}
         onLog={onLog}
         onNavigate={onNavigate}
-        onRenderReceipt={onRenderReceipt}
+        onRenderReceipt={receipt.onRenderReceipt}
+        onFrameRunningChange={receipt.onFrameRunningChange}
         maxHeight={maxHeight}
       />
       <FrameDiagnosticBadge diagnostic={diagnostic} />
