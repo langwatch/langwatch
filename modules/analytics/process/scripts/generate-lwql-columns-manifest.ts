@@ -139,7 +139,11 @@ async function main(): Promise<void> {
     // Dropped first, so a reused server dumps this run's migrations rather than
     // whatever a previous run left in the scratch database.
     await client.command({ query: `DROP DATABASE IF EXISTS ${MANIFEST_DATABASE}` });
-    await migrateUp({ connectionUrl: server.connectionUrl, database: MANIFEST_DATABASE });
+    await migrateUp({
+      connectionUrl: server.connectionUrl,
+      database: MANIFEST_DATABASE,
+      childEnvironment: process.env,
+    });
     const manifest = await buildColumnsManifest({ client, database: MANIFEST_DATABASE });
     writeFileSync(OUTPUT_PATH, `${JSON.stringify(manifest, null, 2)}\n`);
     console.log(`wrote ${manifest.tables.length} tables to ${OUTPUT_PATH}`);

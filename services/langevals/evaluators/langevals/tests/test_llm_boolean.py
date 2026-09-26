@@ -73,3 +73,46 @@ def test_llm_as_judge_atla_ai():
     assert result.status == "processed"
     assert result.score == 1
     assert result.passed == True
+
+
+# Real calls, one per outcome, on the fail-condition wording most customer
+# prompts use. Skipped without keys; LANGEVALS_POLARITY_MODELS widens the list.
+POLARITY_MODELS = os.environ.get(
+    "LANGEVALS_POLARITY_MODELS", "openai/gpt-5-mini"
+).split(",")
+
+COMPETITOR_PROMPT = (
+    "You are checking a support agent for Acme. Return false if the answer "
+    "mentions a competitor of Acme (Globex or Initech)."
+)
+
+
+def _key_for(model: str) -> bool:
+    provider = model.split("/")[0]
+    if provider == "bedrock":
+        return bool(os.environ.get("AWS_ACCESS_KEY_ID"))
+    return bool(os.environ.get(f"{provider.upper()}_API_KEY"))
+
+
+# @scenario "A fail-condition prompt yields false when its condition holds and true when it does not"
+@pytest.mark.parametrize("model", POLARITY_MODELS)
+@pytest.mark.parametrize(
+    "output, expected",
+    [
+        ("You could also try Globex, their plan is cheaper.", False),
+        ("Acme's Pro plan includes priority support and SSO.", True),
+    ],
+)
+def test_fail_condition_prompt_keeps_its_polarity(model, output, expected):
+    if not _key_for(model):
+        pytest.skip(f"no API key for {model}")
+
+    evaluator = CustomLLMBooleanEvaluator(
+        settings=CustomLLMBooleanSettings(model=model, prompt=COMPETITOR_PROMPT)
+    )
+    result = evaluator.evaluate(
+        CustomLLMBooleanEntry(input="Which plan should I pick?", output=output)
+    )
+
+    assert result.status == "processed", result.details
+    assert result.passed is expected

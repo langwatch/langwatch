@@ -156,10 +156,10 @@ func TestConcurrentChangesSurviveRestart(t *testing.T) {
 	var pending sync.WaitGroup
 	for i := range 10 {
 		pending.Go(func() {
-			req := httptest.NewRequest("POST", testBase+"/control/t/1/users",
+			req := httptest.NewRequest(http.MethodPost, testBase+"/control/t/1/users",
 				strings.NewReader(fmt.Sprintf(`{"email":"person%d@acme1.test"}`, i)))
 			assert.Equal(t, http.StatusCreated, do(s, req).Code)
-			patch := httptest.NewRequest("PATCH", testBase+"/t/1/scim/v2/Users/t1-user-member",
+			patch := httptest.NewRequest(http.MethodPatch, testBase+"/t/1/scim/v2/Users/t1-user-member",
 				strings.NewReader(`{"Operations":[{"op":"replace","path":"active","value":false}]}`))
 			patch.Header.Set("Authorization", "Bearer idpsim-scim-token-1")
 			assert.Equal(t, http.StatusOK, do(s, patch).Code)

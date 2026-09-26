@@ -705,6 +705,60 @@ describe("simulationRunStateFoldProjection", () => {
       expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
     });
 
+    /** @scenario "A finished event with per-criterion verdicts is folded into the run" */
+    it("keeps each criterion with its status, requirement and reasoning in declared order", () => {
+      const criteria = [
+        {
+          criterion: "stays polite",
+          requirement: "The agent stays polite",
+          status: "passed" as const,
+          reasoning: "Every reply was courteous.",
+        },
+        {
+          criterion: "names the refund window",
+          requirement: "The agent names the refund window",
+          status: "failed" as const,
+          reasoning: "The agent never mentioned a time limit.",
+        },
+      ];
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: ["stays polite"],
+            unmetCriteria: ["names the refund window"],
+            criteria,
+          },
+        }),
+      ]);
+
+      expect(state.Criteria).toEqual(criteria);
+    });
+
+    /** @scenario "Inconclusive criteria are taken from the per-criterion verdicts when the list is absent" */
+    it("lists a criterion its verdicts mark inconclusive when the event names no list", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createRunFinishedEvent({
+          results: {
+            verdict: "failure",
+            metCriteria: [],
+            unmetCriteria: ["opens a ticket"],
+            criteria: [
+              {
+                criterion: "opens a ticket",
+                status: "inconclusive",
+                reasoning: "No tool spans arrived.",
+              },
+            ],
+          },
+        }),
+      ]);
+
+      expect(state.InconclusiveCriteria).toEqual(["opens a ticket"]);
+    });
+
     it("stores no inconclusive criteria when the event names none", () => {
       const state = foldEvents([
         createRunStartedEvent(),

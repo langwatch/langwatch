@@ -6,6 +6,7 @@ import { EventType } from "@ag-ui/core";
 import { z } from "zod";
 
 import { runActorLabelSchema } from "../run-actor.ts";
+import { scenarioCriterionResultSchema } from "../scenario-criterion-result.ts";
 import {
   SCENARIO_EVALUATION_STATUSES,
   scenarioEvaluationResultSchema,
@@ -192,6 +193,11 @@ export const scenarioResultsSchema = z.object({
    * an undecided criterion never passes. Absent on results recorded before.
    */
   inconclusiveCriteria: z.array(z.string()).optional(),
+  /**
+   * Each criterion with its own status and reasoning, in declared order.
+   * Absent on SDKs before per-criterion verdicts.
+   */
+  criteria: z.array(scenarioCriterionResultSchema).optional(),
   error: z.string().optional(),
   /**
    * One result per evaluator that ran on the scenario. Absent on a run with

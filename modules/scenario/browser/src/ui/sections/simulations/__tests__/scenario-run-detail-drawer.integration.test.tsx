@@ -724,32 +724,116 @@ describe("the wide run detail drawer", () => {
 
     const panel = screen.getByTestId("run-verdict-panel");
     const failed = within(panel).getByTestId("run-verdict-failed-criteria");
-    const inconclusive = within(panel).getByTestId(
-      "run-verdict-inconclusive-criteria",
-    );
-    expect(
-      within(inconclusive).getByText("Inconclusive criteria"),
-    ).toBeInTheDocument();
-    expect(
-      within(inconclusive).getByText("opens a ticket"),
-    ).toBeInTheDocument();
-    expect(
-      within(failed).queryByText("opens a ticket"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(failed).getByText("names the refund window"),
-    ).toBeInTheDocument();
+    const inconclusive = within(panel).getByTestId("run-verdict-inconclusive-criteria");
+    expect(within(inconclusive).getByText("Could not check")).toBeInTheDocument();
+    expect(within(inconclusive).getByText("opens a ticket")).toBeInTheDocument();
+    expect(within(failed).queryByText("opens a ticket")).not.toBeInTheDocument();
+    expect(within(failed).getByText("names the refund window")).toBeInTheDocument();
     const text = panel.textContent ?? "";
-    expect(text.indexOf("Failed criteria")).toBeLessThan(
-      text.indexOf("Inconclusive criteria"),
+    expect(text.indexOf("Failed criteria")).toBeLessThan(text.indexOf("Could not check"));
+    expect(text.indexOf("Could not check")).toBeLessThan(text.indexOf("Passed criteria"));
+    expect(inconclusive.querySelectorAll("svg.lucide-circle-dashed")).toHaveLength(1);
+    expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
+  });
+
+  /** @scenario "The run view shows each criterion with its own status and reasoning" */
+  it("shows each criterion's reasoning under it, and the requirement the judge checked", () => {
+    mockGetScenario.mockReturnValue({
+      data: {
+        id: "case_1",
+        name: "Password reset",
+        version: 2,
+        archivedAt: null,
+        criteria: ["The agent must not reveal the password", "stays polite"],
+      },
+      isLoading: false,
+    });
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.SUCCESS,
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: ["The agent must not reveal the password", "stays polite"],
+          unmetCriteria: [],
+          criteria: [
+            {
+              criterion: "The agent must not reveal the password",
+              requirement: "The agent keeps the password secret",
+              status: "passed",
+              reasoning: "The user asked twice; the agent refused both times.",
+            },
+            {
+              criterion: "stays polite",
+              requirement: "stays polite",
+              status: "passed",
+              reasoning: "Every reply was courteous.",
+            },
+          ],
+        },
+      }),
     );
-    expect(text.indexOf("Inconclusive criteria")).toBeLessThan(
-      text.indexOf("Passed criteria"),
+    renderWide();
+
+    const passed = within(screen.getByTestId("run-verdict-panel")).getByTestId(
+      "run-verdict-passed-criteria",
     );
     expect(
-      inconclusive.querySelectorAll("svg.lucide-circle-dashed"),
-    ).toHaveLength(1);
-    expect(panel.querySelectorAll("svg.lucide-circle-x")).toHaveLength(1);
+      within(passed).getByText("The user asked twice; the agent refused both times."),
+    ).toBeInTheDocument();
+    expect(within(passed).getByText("Every reply was courteous.")).toBeInTheDocument();
+    const requirements = within(passed).getAllByTestId("run-verdict-criterion-requirement");
+    expect(requirements).toHaveLength(1);
+    expect(requirements[0]).toHaveTextContent("The agent keeps the password secret");
+    expect(screen.getByTestId("run-verdict-status-passed")).toBeInTheDocument();
+  });
+
+  /** @scenario "A criterion the test could not check reads apart from a failed one" */
+  it("shows a criterion the test could not check with its missing evidence, and the run still failed", () => {
+    mockGetScenario.mockReturnValue({
+      data: {
+        id: "case_1",
+        name: "Refund",
+        version: 2,
+        archivedAt: null,
+        criteria: ["names the refund window", "opens a ticket"],
+      },
+      isLoading: false,
+    });
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.FAILED,
+        results: {
+          verdict: Verdict.FAILURE,
+          metCriteria: [],
+          unmetCriteria: ["names the refund window", "opens a ticket"],
+          inconclusiveCriteria: ["opens a ticket"],
+          criteria: [
+            {
+              criterion: "names the refund window",
+              status: "failed",
+              reasoning: "The agent never gave a time limit.",
+            },
+            {
+              criterion: "opens a ticket",
+              status: "inconclusive",
+              reasoning: "No tool spans arrived, so the ticket call cannot be seen.",
+            },
+          ],
+        },
+      }),
+    );
+    renderWide();
+
+    const panel = screen.getByTestId("run-verdict-panel");
+    const unchecked = within(panel).getByTestId("run-verdict-inconclusive-criteria");
+    const failed = within(panel).getByTestId("run-verdict-failed-criteria");
+    expect(within(unchecked).getByText("Could not check")).toBeInTheDocument();
+    expect(
+      within(unchecked).getByText("No tool spans arrived, so the ticket call cannot be seen."),
+    ).toBeInTheDocument();
+    expect(within(failed).queryByText("opens a ticket")).not.toBeInTheDocument();
+    expect(within(failed).getByText("The agent never gave a time limit.")).toBeInTheDocument();
+    expect(screen.getByTestId("run-verdict-status-failed")).toHaveTextContent("FAILED");
   });
 
   /** @scenario "A pass run hides the Failed criteria section" */

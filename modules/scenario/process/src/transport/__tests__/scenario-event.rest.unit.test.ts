@@ -398,6 +398,56 @@ describe("the scenario-events REST declaration", () => {
     });
   });
 
+  describe("when a run finished event carries per-criterion verdicts", () => {
+    /** @scenario "The events endpoint keeps inconclusive criteria and per-criterion verdicts" */
+    it("hands the inconclusive criteria and every criterion verdict to the finished run", async () => {
+      const finishRun = vi.fn(async () => {});
+      const family = await buildEventFamily({ simulations: { finishRun } });
+      const criteria = [
+        {
+          criterion: "The agent must not reveal the account password",
+          requirement: "The agent keeps the account password secret",
+          status: "passed",
+          reasoning: "The agent refused both times and offered a reset link.",
+        },
+        {
+          criterion: "The agent opens a support ticket",
+          requirement: "The agent opens a support ticket",
+          status: "inconclusive",
+          reasoning: "No tool spans arrived, so the ticket call cannot be seen.",
+        },
+      ];
+
+      const response = await postJson(family, "/api/scenario-events", {
+        type: "SCENARIO_RUN_FINISHED",
+        timestamp: 1,
+        batchRunId: "batch-a",
+        scenarioId: "scenario-a",
+        scenarioRunId: "run-a",
+        scenarioSetId: "default",
+        status: "FAILED",
+        results: {
+          verdict: "failure",
+          reasoning: "One criterion could not be checked.",
+          metCriteria: [criteria[0]!.criterion],
+          unmetCriteria: [criteria[1]!.criterion],
+          inconclusiveCriteria: [criteria[1]!.criterion],
+          criteria,
+        },
+      });
+
+      expect(response.status).toBe(201);
+      expect(finishRun).toHaveBeenCalledWith(
+        expect.objectContaining({
+          results: expect.objectContaining({
+            inconclusiveCriteria: [criteria[1]!.criterion],
+            criteria,
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when ingesting inline media", () => {
     /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("dispatches no event after extraction fails", async () => {

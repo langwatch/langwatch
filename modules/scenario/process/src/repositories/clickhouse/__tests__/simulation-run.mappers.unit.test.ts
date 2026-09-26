@@ -5,6 +5,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
+import { criteriaToColumns } from "../simulation-criteria.mapper.ts";
 import { columnsToEvaluations, evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 import {
   type ClickHouseSimulationRunRow,
@@ -112,6 +113,7 @@ describe("mapClickHouseRowToScenarioRunData", () => {
         reasoning: "The SQL check failed.",
         metCriteria: ["Answers politely"],
         unmetCriteria: [],
+        criteria: [{ criterion: "Answers politely", status: "passed", reasoning: "" }],
         error: undefined,
         evaluations: [FULL, MINIMAL],
       });
@@ -131,6 +133,53 @@ describe("mapClickHouseRowToScenarioRunData", () => {
         unmetCriteria: ["opens a ticket"],
         inconclusiveCriteria: ["opens a ticket"],
       });
+    });
+  });
+
+  describe("when the row was written by an SDK without per-criterion verdicts", () => {
+    /** @scenario "A run from an older SDK reads back with derived per-criterion results" */
+    it("derives each criterion's status from the lists, with an empty reasoning", () => {
+      const run = mapClickHouseRowToScenarioRunData(
+        makeRow({
+          MetCriteria: ["stays polite"],
+          UnmetCriteria: ["names the refund window", "opens a ticket"],
+          InconclusiveCriteria: ["opens a ticket"],
+        }),
+      );
+
+      expect(run.results?.criteria).toEqual([
+        { criterion: "stays polite", status: "passed", reasoning: "" },
+        { criterion: "names the refund window", status: "failed", reasoning: "" },
+        { criterion: "opens a ticket", status: "inconclusive", reasoning: "" },
+      ]);
+    });
+  });
+
+  describe("when the row carries per-criterion verdicts", () => {
+    it("reads each criterion back with its requirement and reasoning", () => {
+      const criteria = [
+        {
+          criterion: "The agent must not reveal the password",
+          requirement: "The agent keeps the password secret",
+          status: "passed" as const,
+          reasoning: "The agent refused twice.",
+        },
+        {
+          criterion: "opens a ticket",
+          status: "inconclusive" as const,
+          reasoning: "No tool spans arrived.",
+        },
+      ];
+      const run = mapClickHouseRowToScenarioRunData(
+        makeRow({
+          MetCriteria: [criteria[0]!.criterion],
+          UnmetCriteria: ["opens a ticket"],
+          InconclusiveCriteria: ["opens a ticket"],
+          ...criteriaToColumns(criteria),
+        }),
+      );
+
+      expect(run.results?.criteria).toEqual(criteria);
     });
   });
 

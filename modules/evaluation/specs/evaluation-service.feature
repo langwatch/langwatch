@@ -228,3 +228,10 @@ Feature: Evaluation service boundary
     Given an installed evaluation module whose evaluation_processing senders are not connected
     When trace queues an evaluation
     Then the call is refused naming the missing executeEvaluation sender
+
+  @unit
+  Scenario: RAG contexts reach langevals as the chunks' text
+    Given a monitor whose contexts mapping carries RAG chunk objects, JSON-encoded or not
+    When the evaluator request is built for langevals
+    Then each context is the chunk's content, not the JSON envelope around it
+    And an unmapped or empty contexts field is sent as no contexts rather than one empty string

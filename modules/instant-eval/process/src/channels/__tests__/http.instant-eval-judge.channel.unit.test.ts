@@ -215,28 +215,31 @@ describe("given a limiter that records what each permit asks for", () => {
 describe("given a text the judge refuses as too large", () => {
   describe("when it is refused once", () => {
     /** @scenario "A text the classifier refuses as too large is cut once and retried" */
-    it("sends it again at three quarters of its length", async () => {
-      const lengths: number[] = [];
+    it("sends it again at three quarters of its length, keeping both ends", async () => {
+      const sent: string[] = [];
       endpoint()
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(400, (options) => {
-          lengths.push(JSON.parse(sentText(options.body)).state.length);
+          sent.push(JSON.parse(sentText(options.body)).state);
           return TOO_LARGE;
         });
       endpoint()
         .intercept({ path: "/v1/systemone", method: "POST" })
         .reply(200, (options) => {
-          lengths.push(JSON.parse(sentText(options.body)).state.length);
+          sent.push(JSON.parse(sentText(options.body)).state);
           return ANSWER;
         });
 
       const judgement = await judge().classify({
         projectId: "project-1",
-        text: "x".repeat(400),
+        text: `OPENING ${"x".repeat(385)} ENDING`,
         questions: [QUESTION],
       });
 
-      expect(lengths).toEqual([400, 300]);
+      expect(sent.map((text) => text.length)).toEqual([400, expect.any(Number)]);
+      expect(sent[1]!.length).toBeLessThanOrEqual(300);
+      expect(sent[1]!.startsWith("OPENING")).toBe(true);
+      expect(sent[1]!.endsWith("ENDING")).toBe(true);
       expect(judgement.verdicts).toHaveLength(1);
       expect(judgement.isTextTruncated).toBe(true);
     });

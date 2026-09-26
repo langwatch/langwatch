@@ -55,6 +55,7 @@ Feature: Reading a trace the way the drawer reads it
     Given a parsed conversation whose every turn is larger than the budget
     When it is rendered with that budget
     Then the result is cut to the budget
+    And the final turn keeps its opening and its ending, so the last reply is still read
     And a visible marker says the text was truncated
 
   @unit
@@ -138,6 +139,15 @@ Feature: Reading a trace the way the drawer reads it
     Then the cut moves back to the last whole line
     And a first line already over the budget is cut where the budget ends
 
+  @unit
+  Scenario: A text cut for a judge keeps its opening and its ending
+    Given a text larger than the budget a judge can read
+    When it is cut keeping both ends
+    Then the result fits the budget
+    And it starts with the text's opening and ends with the text's ending
+    And a marker between them says how many tokens were left out
+    And neither end is cut inside a multi-byte character
+
   # =========================================================================
   # Bounding the LLM-readable trace digest
   # =========================================================================
@@ -164,4 +174,39 @@ Feature: Reading a trace the way the drawer reads it
     Given a trace whose span tree alone is larger than the budget
     When the bounded digest is built
     Then the returned text fits the budget
+    And it keeps the first and the last spans of the tree, on whole lines, with a marker between them
     And it is reported as truncated
+
+  @unit
+  Scenario: A bounded digest spends the caller's budget, not the judge tool's
+    Given a long agent loop whose full digest is larger than an 8,000-token budget
+    When the bounded digest is built for that budget
+    Then spans are expanded past the 4,096-token limit of the scenario judge's expand tool
+    And the text never tells the reader to call grep_trace or expand_trace
+    And a span too large to expand whole is expanded keeping its opening and its ending
+
+  # =========================================================================
+  # What the judge renderings carry
+  # =========================================================================
+
+  @unit
+  Scenario: An LLM span's messages include its system prompt
+    Given an LLM span whose system prompt canonicalisation moved to gen_ai.system_instructions
+    When the span's messages are read
+    Then the input side starts with that system prompt as a system message
+    And a span whose input already carries a system message is not given a second one
+
+  @unit
+  Scenario: An LLM span recorded in the OTel GenAI parts format reads as chat messages
+    Given an LLM span whose messages carry parts instead of content
+    When the span's messages are read
+    Then each text part becomes the message content
+    And tool call parts become tool calls and tool call responses become tool messages
+    And the span can stand for its trace
+
+  @unit
+  Scenario: A conversation transcript renders the same on every day
+    Given a thread rendered as a conversation transcript
+    When it is rendered at two different times
+    Then both renderings are identical
+    And each turn heading carries the turn's absolute start time

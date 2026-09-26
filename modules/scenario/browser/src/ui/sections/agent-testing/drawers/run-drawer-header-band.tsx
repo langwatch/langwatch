@@ -136,6 +136,7 @@ function ChipStrip({ detail, scenarioState }: SectionProps) {
         <RunCriteriaChip
           metCriteria={scenarioState.results.metCriteria ?? []}
           unmetCriteria={scenarioState.results.unmetCriteria ?? []}
+          inconclusiveCriteria={scenarioState.results.inconclusiveCriteria ?? []}
         />
       )}
       {scenarioState.durationInMs > 0 && (

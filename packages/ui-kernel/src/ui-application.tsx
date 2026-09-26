@@ -77,12 +77,12 @@ export function createUiApplication({
         shellLayouts: pages.shellLayouts,
       }),
       rootComponent: createUiRootLayout({
-        moduleHosts: createUiModuleHostStack(features.hosts ?? []),
         innerProvider: createUiInnerProvider(providers),
         featureShell: createUiFeatureShell({
           apis: features.apis ?? [],
           capabilities: features.capabilities ?? {},
           drawers,
+          moduleHosts: createUiModuleHostStack(features.hosts ?? []),
           failures: features.failures ?? [],
           isDevelopment: providers.isDevelopment,
           sessionQueryKey,

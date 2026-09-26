@@ -5,6 +5,14 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { extractErrorInfo, inferSpanTypeIfAbsent } from "../rules/canonical-extraction.rules.ts";
 import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 
+/** OTel GenAI `gen_ai.operation.name` values that are not a model call. */
+const OPERATION_TO_SPAN_TYPE: Record<string, "agent" | "tool"> = {
+  invoke_agent: "agent",
+  create_agent: "agent",
+  execute_tool: "tool",
+  tool: "tool",
+};
+
 export class FallbackCanonicaliserService implements AttributeCanonicaliser {
   static create(): FallbackCanonicaliserService {
     return new FallbackCanonicaliserService();
@@ -15,19 +23,30 @@ export class FallbackCanonicaliserService implements AttributeCanonicaliser {
   readonly id = "fallback";
 
   apply(ctx: ExtractorContext): void {
+    // Skip type inference if already set (in bag or by a previous extractor)
+    const isTyped =
+      ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE) || ctx.out[ATTR_KEYS.SPAN_TYPE] !== void 0;
+    if (!isTyped) this.inferSpanType(ctx);
+    extractErrorInfo(ctx);
+  }
+
+  private inferSpanType(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    // Skip type inference if already set (in bag or by a previous extractor)
-    if (attrs.has(ATTR_KEYS.SPAN_TYPE) || ctx.out[ATTR_KEYS.SPAN_TYPE] !== void 0) {
-      extractErrorInfo(ctx);
+    const genAiOperation =
+      ctx.out[ATTR_KEYS.GEN_AI_OPERATION_NAME] ?? attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME);
+    const operationType =
+      typeof genAiOperation === "string" ? OPERATION_TO_SPAN_TYPE[genAiOperation] : void 0;
+    if (operationType !== void 0) {
+      ctx.setAttr(ATTR_KEYS.SPAN_TYPE, operationType);
+      ctx.recordRule(`${this.id}:${operationType}.from_operation`);
 
       return;
     }
 
     const isToolSpan =
       attrs.get(ATTR_KEYS.OPERATION_NAME) === "ai.toolCall" ||
-      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME) ||
-      attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME) === "tool";
+      attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME);
     if (isToolSpan) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, "tool");
       ctx.recordRule(`${this.id}:tool`);
@@ -70,7 +89,5 @@ export class FallbackCanonicaliserService implements AttributeCanonicaliser {
     if (hasGenAiSignals || hasVercelSignals || hasLegacyLlmSignals) {
       inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm`);
     }
-
-    extractErrorInfo(ctx);
   }
 }

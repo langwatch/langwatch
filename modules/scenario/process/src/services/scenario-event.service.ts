@@ -273,6 +273,8 @@ export class ScenarioEventService {
               reasoning: event.results.reasoning,
               metCriteria: event.results.metCriteria,
               unmetCriteria: event.results.unmetCriteria,
+              inconclusiveCriteria: event.results.inconclusiveCriteria,
+              criteria: event.results.criteria,
               error: event.results.error,
             }
           : undefined,

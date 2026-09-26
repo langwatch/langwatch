@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { runActorLabelSchema } from "./run-actor.ts";
+import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 import { runParameterValuesSchema } from "./scenario.parameters.ts";
 
@@ -48,6 +49,11 @@ export const simulationRunResultSchema = z.object({
   unmetCriteria: z.array(z.string()),
   /** Criteria the judge could not decide; each is also in `unmetCriteria`. */
   inconclusiveCriteria: z.array(z.string()).optional(),
+  /**
+   * Each criterion with its own status and reasoning. Always present on a
+   * read: runs from older SDKs derive it from the criteria lists.
+   */
+  criteria: z.array(scenarioCriterionResultSchema).optional(),
   error: z.string().optional(),
   /**
    * One result per evaluator that ran on the scenario. Absent on a run with

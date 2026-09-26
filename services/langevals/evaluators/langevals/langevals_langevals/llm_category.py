@@ -1,5 +1,5 @@
-import json
 from typing import Optional, Union, cast
+from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     MAX_TOKENS_HARD_LIMIT,
@@ -14,7 +14,6 @@ from langevals_core.base_evaluator import (
 from langevals_core.image_support import build_content_parts, ContentPart
 from pydantic import BaseModel, Field
 import litellm
-from litellm import Choices, Message
 from litellm.types.utils import ModelResponse
 from litellm.cost_calculator import completion_cost
 from litellm.utils import encode
@@ -131,7 +130,7 @@ class CustomLLMCategoryEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
+                                    "description": "a short reasoning for the decision, written before the label",
                                 },
                                 "label": {
                                     "type": "string",
@@ -144,7 +143,7 @@ class CustomLLMCategoryEvaluator(
                             },
                             "required": ["reasoning", "label"],
                         },
-                        "description": "use this function to write your thoughts on the reasoning, then decide if it passed or not with this json structure",
+                        "description": "Record the category of the message: a short reasoning first, then the label.",
                     },
                 },
             ],
@@ -152,9 +151,11 @@ class CustomLLMCategoryEvaluator(
         )
 
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+        arguments = read_tool_call_arguments(
+            response,
+            "evaluation",
+            required=["reasoning", "label"],
+            model=self.settings.model,
         )
         cost = completion_cost(completion_response=response)
 

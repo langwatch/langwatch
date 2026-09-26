@@ -1,11 +1,10 @@
 import {
   DEFAULT_TOKEN_THRESHOLD,
   estimateTokens,
-  expandTrace,
   judgeSpanDigestFormatter,
 } from "@langwatch/scenario";
 import {
-  cutToEstimatedTokensAtLineBreak,
+  cutToEstimatedTokensKeepingEnds,
   type Span,
   type SpanTypes,
 } from "@langwatch/trace-contract";
@@ -236,7 +235,11 @@ export function formatSpansDigestBounded({
   if (estimateTokens(structure) > budget) {
     // One span per line, so the cut lands on a line break: half a tree line
     // names a span that does not exist.
-    const text = cutToEstimatedTokensAtLineBreak({ text: structure, maxTokens: budget });
+    const text = cutToEstimatedTokensKeepingEnds({
+      text: structure,
+      maxTokens: budget,
+      atLineBreak: true,
+    });
     return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
   }
 
@@ -295,8 +298,8 @@ export interface BoundedSpansDigest {
 
 /**
  * The skeleton with as many fully expanded spans as the budget takes. A span
- * that does not fit is skipped rather than ending the walk: a cheaper one
- * further down the ranking still earns its place.
+ * that does not fit is skipped, since a cheaper one further down still earns
+ * its place; the best-ranked one left out then gets what remains, ends kept.
  */
 function expandedWithinBudget({
   spans,
@@ -309,13 +312,57 @@ function expandedWithinBudget({
   structure: string;
   budget: number;
 }): BoundedSpansDigest {
-  let text = structure;
-  const expanded: string[] = [];
+  const budgetBytes = budget * 4;
+  let usedBytes = byteLength(structure);
+  const readableOf = new Map(spans.map((span, index) => [span, readableSpans[index]!]));
+  const blocks = new Map<string, string>();
+  let firstSkipped: Span | undefined;
   for (const span of rankSpansForExpansion(spans)) {
-    const candidate = `${structure}\n\n${expandTrace(readableSpans, [...expanded, span.span_id])}`;
-    if (estimateTokens(candidate) > budget) continue;
-    expanded.push(span.span_id);
-    text = candidate;
+    const block = renderSpanBlock(readableOf.get(span)!);
+    const cost = byteLength(`${BLOCK_SEPARATOR}${block}`);
+    if (usedBytes + cost > budgetBytes) {
+      firstSkipped ??= span;
+      continue;
+    }
+    blocks.set(span.span_id, block);
+    usedBytes += cost;
   }
+
+  const remainingTokens =
+    Math.floor((budgetBytes - usedBytes) / 4) - estimateTokens(BLOCK_SEPARATOR);
+  if (firstSkipped && remainingTokens >= MIN_PARTIAL_SPAN_TOKENS) {
+    blocks.set(
+      firstSkipped.span_id,
+      cutToEstimatedTokensKeepingEnds({
+        text: renderSpanBlock(readableOf.get(firstSkipped)!),
+        maxTokens: remainingTokens,
+        atLineBreak: true,
+      }),
+    );
+  }
+
+  const ordered = spans.flatMap((span) => blocks.get(span.span_id) ?? []);
+  const text = [structure, ...ordered].join(BLOCK_SEPARATOR);
   return { text, isTruncated: true, estimatedTokens: estimateTokens(text) };
+}
+
+const BLOCK_SEPARATOR = "\n\n";
+
+/** Below this, a partly expanded span says too little to be worth its tokens. */
+const MIN_PARTIAL_SPAN_TOKENS = 128;
+
+function byteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+/**
+ * One span in full, as the digest writes it, with no size cap: the scenario
+ * judge's own expand tool stops at its tool-result budget and then tells the
+ * reader to call tools a classifier does not have.
+ */
+function renderSpanBlock(span: ReadableSpan): string {
+  const digest = judgeSpanDigestFormatter.format([{ ...span, parentSpanContext: undefined }]);
+  const body = digest.split("\n").slice(2).join("\n");
+  const errorsAt = body.indexOf("\n=== ERRORS ===");
+  return (errorsAt >= 0 ? body.slice(0, errorsAt) : body).trimEnd();
 }

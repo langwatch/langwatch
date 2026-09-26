@@ -20,13 +20,16 @@ describe("given the ClickHouse member in front of a server", () => {
   let peak: number;
   let serverCap: number | undefined;
   let refused: number;
+  let requestUrls: string[];
 
   beforeEach(async () => {
     inFlight = 0;
     peak = 0;
     serverCap = undefined;
     refused = 0;
+    requestUrls = [];
     server = createServer((request, response) => {
+      requestUrls.push(request.url ?? "");
       request.resume();
       request.on("end", () => {
         if (serverCap !== undefined && inFlight >= serverCap) {
@@ -96,6 +99,15 @@ describe("given the ClickHouse member in front of a server", () => {
       });
 
       expect(peak).toBeLessThanOrEqual(3);
+    });
+  });
+
+  describe("when a statement is sent", () => {
+    /** @scenario "Statements parse ISO timestamps" */
+    it("asks the server to parse timestamps with best_effort", async () => {
+      await burst({ config: { url }, count: 1 });
+
+      expect(requestUrls[0]).toContain("date_time_input_format=best_effort");
     });
   });
 

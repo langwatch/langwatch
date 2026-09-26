@@ -1,4 +1,9 @@
-import type { Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
+import {
+  extractSystemInstructions,
+  type Span,
+  type SpanInputOutput,
+  type Trace,
+} from "@langwatch/trace-contract";
 import {
   type ChatMessage,
   coerceToChatMessages,
@@ -40,7 +45,10 @@ export function pickLlmSpanForTrace({ spans }: { spans: Span[] }): Span | null {
  * because the caller asked about *this* span.
  */
 export function extractLlmMessagesForSpan({ span }: { span: Span }): LlmTraceMessages {
-  const input = coerceSpanIOToChatMessages(span.input) ?? [];
+  const input = withSystemInstructions({
+    messages: coerceSpanIOToChatMessages(span.input) ?? [],
+    params: span.params,
+  });
   const output =
     coerceSpanIOToChatMessages(span.output) ??
     wrapAsMessage({ text: spanIOToText(span.output), role: "assistant" });
@@ -84,10 +92,82 @@ export function extractLlmMessagesForTrace({
  */
 function coerceSpanIOToChatMessages(io: SpanInputOutput | null | undefined): ChatMessage[] | null {
   if (!io) return null;
-  const value: unknown = io.value;
-  if (value === undefined || value === null) return null;
-  if (typeof value === "string") return coerceToChatMessages(parseJSON(value));
-  return coerceToChatMessages(value);
+  const raw: unknown = io.value;
+  if (raw === undefined || raw === null) return null;
+  const value = typeof raw === "string" ? parseJSON(raw) : raw;
+  return coerceToChatMessages(fromGenAiPartsMessages(value));
+}
+
+/**
+ * OTel GenAI messages carry `parts` instead of `content`
+ * (`{ role, parts: [{ type: "text", content }] }`); read them as chat
+ * messages with their text, tool calls and tool results.
+ */
+function fromGenAiPartsMessages(value: unknown): unknown {
+  if (!Array.isArray(value) || value.length === 0) return value;
+  if (!value.every(isGenAiPartsMessage)) return value;
+  return value.flatMap(genAiPartsToMessages);
+}
+
+interface GenAiPartsMessage {
+  role: string;
+  parts: Record<string, unknown>[];
+}
+
+function isGenAiPartsMessage(item: unknown): item is GenAiPartsMessage {
+  if (!item || typeof item !== "object") return false;
+  const { role, parts, content } = item as Record<string, unknown>;
+  return typeof role === "string" && Array.isArray(parts) && content === undefined;
+}
+
+function genAiPartsToMessages({ role, parts }: GenAiPartsMessage): ChatMessage[] {
+  const text = parts
+    .filter((part) => part.type === "text" && typeof part.content === "string")
+    .map((part) => part.content as string)
+    .join("\n");
+  const toolCalls = parts
+    .filter((part) => part.type === "tool_call")
+    .map((part) => ({
+      id: typeof part.id === "string" ? part.id : "",
+      type: "function",
+      function: {
+        name: typeof part.name === "string" ? part.name : "",
+        arguments: jsonText(part.arguments),
+      },
+    }));
+  const results: ChatMessage[] = parts
+    .filter((part) => part.type === "tool_call_response")
+    .map((part) => ({
+      role: "tool",
+      content: jsonText(part.response ?? part.result),
+      ...(typeof part.id === "string" ? { tool_call_id: part.id } : {}),
+    }));
+  const hasOwnMessage = text.length > 0 || toolCalls.length > 0 || results.length === 0;
+  const own: ChatMessage[] = hasOwnMessage
+    ? [{ role, content: text, ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}) }]
+    : [];
+  return [...own, ...results];
+}
+
+function jsonText(value: unknown): string {
+  if (typeof value === "string") return value;
+  return value === undefined ? "" : JSON.stringify(value);
+}
+
+/**
+ * Canonicalisation moves a system prompt out of the input messages into
+ * `gen_ai.system_instructions`; a reader of the messages still needs it.
+ */
+function withSystemInstructions({
+  messages,
+  params,
+}: {
+  messages: ChatMessage[];
+  params: Span["params"];
+}): ChatMessage[] {
+  const system = extractSystemInstructions(params ?? null);
+  if (!system || messages.some((message) => message.role === "system")) return messages;
+  return [{ role: "system", content: system }, ...messages];
 }
 
 /** A typed span payload as plain text, for the non-chat fallback. */

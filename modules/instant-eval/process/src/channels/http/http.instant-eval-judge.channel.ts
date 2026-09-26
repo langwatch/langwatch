@@ -11,6 +11,7 @@ import {
 } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
 import {
@@ -21,6 +22,7 @@ import {
 import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import {
   estimateJudgedTextTokens,
+  estimateTokensFromBytes,
   instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
@@ -302,7 +304,10 @@ function cutForRetry(state: AttemptState): Settlement {
   if (state.isCutForSize) return settled(instantEvalSkipped("classifier_input_too_large"));
   state.isCutForSize = true;
   state.isTruncated = true;
-  state.text = state.text.slice(0, Math.floor(state.text.length * TOO_LARGE_RETRY_FRACTION));
+  state.text = cutToEstimatedTokensKeepingEnds({
+    text: state.text,
+    maxTokens: Math.floor(estimateTokensFromBytes(state.text) * TOO_LARGE_RETRY_FRACTION),
+  });
   return { kind: "retry" };
 }
 

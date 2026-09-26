@@ -9,6 +9,7 @@ import {
   type InstantEvalClassifierLimits,
   type InstantEvalQuestion,
 } from "@langwatch/instant-eval-contract";
+import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 
 import { instantEvalScoreLevels, toClassifierQuestions } from "./instant-eval-judge-wire.rules.ts";
 
@@ -19,37 +20,6 @@ import { instantEvalScoreLevels, toClassifierQuestions } from "./instant-eval-ju
  */
 export function estimateTokensFromBytes(text: string): number {
   return Math.ceil(new TextEncoder().encode(text).length / 4);
-}
-
-/**
- * Cut a string down to an estimated token count, on a character boundary: a
- * byte cut can land inside a multi-byte character, so the cut moves back to
- * the last complete one rather than shipping a half-decoded character.
- */
-export function cutToEstimatedTokens({
-  text,
-  maxTokens,
-}: {
-  text: string;
-  maxTokens: number;
-}): string {
-  const bytes = new TextEncoder().encode(text);
-  const limit = Math.max(0, maxTokens) * 4;
-  if (bytes.length <= limit) return text;
-  return new TextDecoder().decode(bytes.subarray(0, characterBoundaryAtOrBefore({ bytes, limit })));
-}
-
-/** The largest index at or before `limit` that ends a whole UTF-8 character. */
-function characterBoundaryAtOrBefore({
-  bytes,
-  limit,
-}: {
-  bytes: Uint8Array;
-  limit: number;
-}): number {
-  let end = limit;
-  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
-  return end;
 }
 
 /**
@@ -95,9 +65,9 @@ export interface PreparedInstantEvalText {
 }
 
 /**
- * Cuts a text to a budget. Measured with the generic rule rather than the
- * denser one, because the extraction functions cut their `max_tokens`
- * argument by it: a conversation rendered to fit must not be cut twice.
+ * Cuts a text to a budget, keeping both ends. Measured with the generic rule
+ * rather than the denser one, because the extraction functions cut their
+ * `max_tokens` argument by it: a conversation rendered to fit must not be cut twice.
  */
 export function prepareInstantEvalText({
   text,
@@ -107,7 +77,10 @@ export function prepareInstantEvalText({
   budgetTokens: number;
 }): PreparedInstantEvalText {
   if (estimateTokensFromBytes(text) <= budgetTokens) return { text, isTruncated: false };
-  return { text: cutToEstimatedTokens({ text, maxTokens: budgetTokens }), isTruncated: true };
+  return {
+    text: cutToEstimatedTokensKeepingEnds({ text, maxTokens: budgetTokens }),
+    isTruncated: true,
+  };
 }
 
 /**

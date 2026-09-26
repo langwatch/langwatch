@@ -24,3 +24,9 @@ Feature: The ClickHouse member bounds what it sends to the server
     When a module sends 40 statements at once
     Then the refused statements are retried with backoff, as main's resilient client did
     And every statement is answered
+
+  @integration
+  Scenario: Statements parse ISO timestamps
+    Given a module writing a row whose DateTime64 columns hold ISO timestamps
+    When the statement reaches the server
+    Then it carries date_time_input_format best_effort, as main's managed client did

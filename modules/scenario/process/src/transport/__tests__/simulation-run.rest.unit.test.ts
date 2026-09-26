@@ -176,6 +176,48 @@ describe("the simulation-runs REST declaration", () => {
     });
   });
 
+  describe("when a listed run carries per-criterion verdicts", () => {
+    /** @scenario "The simulation runs API returns per-criterion results" */
+    it("returns the inconclusive criteria and each criterion with its status and reasoning", async () => {
+      const criteria = [
+        {
+          criterion: "works",
+          requirement: "The agent completes the checkout",
+          status: "passed" as const,
+          reasoning: "The order was placed.",
+        },
+        {
+          criterion: "emails a receipt",
+          status: "inconclusive" as const,
+          reasoning: "No email tool span arrived.",
+        },
+      ];
+      const failedRun = run("run-a", "batch-a");
+      failedRun.results = {
+        verdict: SimulationVerdict.FAILURE,
+        reasoning: "One criterion could not be checked.",
+        metCriteria: ["works"],
+        unmetCriteria: ["emails a receipt"],
+        inconclusiveCriteria: ["emails a receipt"],
+        criteria,
+      };
+      const getRunDataForBatchRun = vi.fn<SimulationService["getRunDataForBatchRun"]>(async () => ({
+        changed: true as const,
+        lastUpdatedAt: 2,
+        runs: [failedRun],
+      }));
+      const family = await buildSimulationRunsFamily({ getRunDataForBatchRun });
+
+      const response = await family.request("/api/simulation-runs?batchRunId=batch-a");
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { runs: { results: unknown }[] };
+      expect(body.runs[0]?.results).toMatchObject({
+        inconclusiveCriteria: ["emails a receipt"],
+        criteria,
+      });
+    });
+  });
+
   describe("when the project reads Agent Testing", () => {
     /** @scenario "A simulation run links to its run drawer in the interface the project reads" */
     it("links every listed run under /agent-testing, reading the flag once", async () => {
