@@ -53,7 +53,7 @@ import type {
   AutomationSettlementTraceRepository,
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
-import { RedisAutomationEmailCapRepository } from "../repositories/redis/redis.automation-email-cap.repository.ts";
+import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -124,6 +124,7 @@ type AutomationInfrastructureInput = Readonly<{
     | "persistCaps"
     | "callCounter"
     | "webhookRateLimits"
+    | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
@@ -141,7 +142,8 @@ export function buildAutomationInfrastructure(
   const clock = new ApiAutomationClock();
   const delivery = buildNotificationDelivery(input);
   const emailCaps = AutomationEmailCapService.create({
-    store: RedisAutomationEmailCapRepository.create({ connection: members.redis }),
+    store: input.repositories.emailCaps,
+    fallback: MemoryAutomationEmailCapRepository.create(),
   });
 
   return {

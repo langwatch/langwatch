@@ -10,7 +10,12 @@ import type {
 import { AutomationSlackSecretsService } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
-import { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
+import {
+  AutomationEmailCapRepository,
+  type EmailCapClaim,
+  type EmailCapSend,
+} from "../repositories/automation-email-cap.repository.ts";
+import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import { AutomationDatasetMapper } from "../app/automation.members.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
@@ -339,32 +344,15 @@ class SettlementDelivery extends AutomationNotificationDelivery {
 
 class SettlementEmailCapStore extends AutomationEmailCapRepository {
   readonly claimKeys: string[] = [];
-  private readonly counts = new Map<string, number>();
+  private readonly counts = MemoryAutomationEmailCapRepository.create();
 
-  async claim(key: string): Promise<"claimed" | "already-claimed"> {
-    this.claimKeys.push(key);
-    return "claimed";
+  claimSend(send: EmailCapSend): Promise<EmailCapClaim> {
+    this.claimKeys.push(send.claim);
+    return this.counts.claimSend(send);
   }
 
-  async findValue(key: string): Promise<string | null> {
-    const count = this.counts.get(key);
-    return count === void 0 ? null : String(count);
-  }
-
-  async incr(key: string): Promise<number> {
-    return this.increment(key, 1);
-  }
-
-  async incrby(key: string, increment: number): Promise<number> {
-    return this.increment(key, increment);
-  }
-
-  async eval(): Promise<void> {}
-
-  private increment(key: string, increment: number): number {
-    const count = (this.counts.get(key) ?? 0) + increment;
-    this.counts.set(key, count);
-    return count;
+  countSends(input: Readonly<{ window: string; now: Instant }>): Promise<number> {
+    return this.counts.countSends(input);
   }
 }
 
@@ -443,7 +431,10 @@ export function createSettlementFixture(trigger: TriggerSummary): {
     confirmation,
     persistActions,
     delivery,
-    emailCaps: AutomationEmailCapService.create({ store: emailCapStore }),
+    emailCaps: AutomationEmailCapService.create({
+      store: emailCapStore,
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    }),
     slack: AutomationSlackSecretsService.create(crypto),
     webhooks: AutomationWebhookSecretsService.create(crypto),
     clock,

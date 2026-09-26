@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
 import { settlementTrigger } from "../../fixtures/settlement.fixtures.ts";
+import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
 import { AutomationNotificationDeliveryService } from "../../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../../services/automation-provider-registry.service.ts";
@@ -32,7 +33,10 @@ function composeNotifier(publicBaseUrl: string | undefined) {
       baseHost: BASE_HOST,
       unsubscribeSigningSecret: "0f".repeat(32),
     }),
-    emailCaps: AutomationEmailCapService.create({ store: null }),
+    emailCaps: AutomationEmailCapService.create({
+      store: MemoryAutomationEmailCapRepository.create(),
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    }),
   });
   return { mail, notifier };
 }

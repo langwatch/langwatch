@@ -1,6 +1,7 @@
 import type { AutomationRepositories } from "../automation.repositories.ts";
 import { MemoryAutomationCallCounterRepository } from "./memory.automation-call-counter.repository.ts";
 import { MemoryAutomationContainmentClaimRepository } from "./memory.automation-containment-claim.repository.ts";
+import { MemoryAutomationEmailCapRepository } from "./memory.automation-email-cap.repository.ts";
 import { MemoryAutomationPersistCapRepository } from "./memory.automation-persist-cap.repository.ts";
 import { MemoryAutomationWebhookRateLimitRepository } from "./memory.automation-webhook-rate-limit.repository.ts";
 import { MemoryAutomationStore } from "./memory.automation.store.ts";
@@ -34,6 +35,7 @@ export class MemoryAutomationRepositories {
       callCounter: MemoryAutomationCallCounterRepository.create(),
       webhookRateLimits: MemoryAutomationWebhookRateLimitRepository.create(),
       containmentClaims: MemoryAutomationContainmentClaimRepository.create(),
+      emailCaps: MemoryAutomationEmailCapRepository.create(),
     };
   }
 }

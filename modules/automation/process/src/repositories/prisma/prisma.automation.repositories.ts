@@ -9,6 +9,7 @@ import type { AutomationRepositories } from "../automation.repositories.ts";
 export type AutomationDatabase = PrismaClient;
 import { RedisAutomationCallCounterRepository } from "../redis/redis.automation-call-counter.repository.ts";
 import { RedisAutomationContainmentClaimRepository } from "../redis/redis.automation-containment-claim.repository.ts";
+import { RedisAutomationEmailCapRepository } from "../redis/redis.automation-email-cap.repository.ts";
 import { RedisAutomationPersistCapRepository } from "../redis/redis.automation-persist-cap.repository.ts";
 import { RedisAutomationWebhookRateLimitRepository } from "../redis/redis.automation-webhook-rate-limit.repository.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
@@ -49,6 +50,7 @@ export class PostgresAutomationRepositories {
       containmentClaims: RedisAutomationContainmentClaimRepository.create({
         connection: members.redis,
       }),
+      emailCaps: RedisAutomationEmailCapRepository.create({ connection: members.redis }),
     };
   }
 }

@@ -30,6 +30,7 @@ export {
   SilentLogger,
   TestDispatchErrors,
 } from "./fixtures/graph-activity.fixture.ts";
+import { MemoryAutomationEmailCapRepository } from "./repositories/memory/memory.automation-email-cap.repository.ts";
 
 class TestNotifier implements AutomationGraphNotifier {
   async dispatch() {
@@ -125,7 +126,10 @@ export function createAutomationTestRuntime(): {
   testFire: TestFireDelivery;
 } {
   return {
-    emailCaps: AutomationEmailCapService.create({ store: null }),
+    emailCaps: AutomationEmailCapService.create({
+      store: MemoryAutomationEmailCapRepository.create(),
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    }),
     projects: {} as never,
     analytics: {} as never,
     notifier: new TestNotifier(),

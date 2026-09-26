@@ -146,10 +146,11 @@ class ReportedNoReplyWarning extends TriggerNoReplyWarning {
 /**
  * The email ceilings both halves of this feature spend against. Composed
  * once per process, since two services counting the same budget separately
- * would let one fleet send double; with no shared store, it counts per pod.
+ * would let one fleet send double; a failing store degrades to the per-pod fallback.
  */
 export function createAutomationEmailCaps(input: {
-  store: AutomationEmailCapRepository | null;
+  store: AutomationEmailCapRepository;
+  fallback: AutomationEmailCapRepository;
 }): AutomationEmailCapService {
   return AutomationEmailCapService.create(input);
 }

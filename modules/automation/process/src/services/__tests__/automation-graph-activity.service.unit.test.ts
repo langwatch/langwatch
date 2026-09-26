@@ -12,6 +12,7 @@ import {
   SilentLogger,
   TestDispatchErrors,
 } from "../../fixtures/graph-activity.fixture.ts";
+import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
@@ -79,7 +80,10 @@ function compose(
     slackTokens: AutomationSlackBotTokenDecryptorService.create(
       AutomationSlackSecretsService.create(secrets),
     ),
-    emailCaps: AutomationEmailCapService.create({ store: null }),
+    emailCaps: AutomationEmailCapService.create({
+      store: MemoryAutomationEmailCapRepository.create(),
+      fallback: MemoryAutomationEmailCapRepository.create(),
+    }),
     logger,
     dispatchErrors: new TestDispatchErrors(),
     baseHost: "https://app.langwatch.test",
