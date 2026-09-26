@@ -1,3 +1,4 @@
+import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
@@ -5,7 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * all required members are read and refusals answer correctly.
  */
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -22,6 +23,7 @@ import { TraceLegacyCredentialService } from "../../services/trace-legacy-creden
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
+import { tracesRestCredential } from "../../transport/traces.rest.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -121,19 +123,26 @@ function bootTraceApp(options: {
     legacyCredential: TraceLegacyCredentialService.create({ apiKeys, authz }),
   });
 
+  // The project door as the process opens it: absent and unresolvable keys are its refusals.
   const runtime = createRestRuntime({
     identity: {
-      authenticate: () => {
-        throw new Error("The deprecated trace family resolves its own credential.");
+      authenticate: ({ request }) => {
+        const token = request.headers.get("x-auth-token");
+        if (!token) throw new ProjectMissingCredentialsError();
+        if (!options.resolveToken(token)) throw new ProjectInvalidCredentialsError();
+
+        return {
+          actor: { type: "user" as const, id: "user-1" },
+          scope: { tier: "project" as const, id: PROJECT.id },
+        };
       },
     },
   });
 
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => app,
-    credential: "public",
-    onError: (_error, context) =>
-      context.json({ error: "Internal Server Error", message: "An unknown error occurred" }, 500),
+    onError: canonicalErrorResponse,
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
   });
 
   return { family, findById, apiKeys };
@@ -142,22 +151,20 @@ function bootTraceApp(options: {
 describe("given the deprecated trace family installed on the trace application", () => {
   describe("when a caller presents no credential", () => {
     /** @scenario "An anonymous legacy trace read is refused rather than failing" */
-    it("answers 401 with the sentence the family publishes", async () => {
-      const { family } = bootTraceApp({ resolveToken: () => null });
+    it("answers the project door's missing-credentials refusal", async () => {
+      const { family, findById } = bootTraceApp({ resolveToken: () => null });
 
       const response = await family.request("/api/trace/trace-1");
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        message:
-          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      });
+      expect(await response.json()).toMatchObject({ code: "missing_credentials" });
+      expect(findById).not.toHaveBeenCalled();
     });
   });
 
   describe("when a caller presents a token nothing resolves", () => {
     /** @scenario "An anonymous legacy trace read is refused rather than failing" */
-    it("answers 401 and says nothing about why", async () => {
+    it("answers the project door's invalid-credentials refusal", async () => {
       const { family } = bootTraceApp({ resolveToken: () => null });
 
       const response = await family.request("/api/trace/trace-1", {
@@ -165,7 +172,7 @@ describe("given the deprecated trace family installed on the trace application",
       });
 
       expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({ message: "Invalid auth token." });
+      expect(await response.json()).toMatchObject({ code: "invalid_credentials" });
     });
   });
 

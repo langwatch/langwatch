@@ -23,7 +23,7 @@ Feature: A legacy trace read failure degrades to the generic unknown
   Scenario: An anonymous legacy trace read is refused rather than failing
     Given the deprecated trace family installed on the trace application
     When a caller asks for a trace with no credential, or one nothing resolves
-    Then the answer is the refusal that family publishes, not an unknown failure
+    Then the answer is the project door's handled refusal code, not an unknown failure
 
   @integration
   Scenario: A credentialled legacy trace read reaches the read

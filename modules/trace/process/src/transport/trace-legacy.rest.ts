@@ -38,10 +38,12 @@ import {
   toLLMModeTrace,
 } from "#rules/trace-formatting.rules";
 import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rules";
+
+import { tracesRestCredential } from "./traces.rest.ts";
 /**
  * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
- * Declared public, resolves own credential, checks permissions in handler. Literal
- * paths (no versioning) that released SDKs dial.
+ * The first four answer behind the project door; the hidden thread read still
+ * resolves its own credential. Literal paths (no versioning) that released SDKs dial.
  */
 
 const PRODUCES_JSON = "application/json";
@@ -122,6 +124,10 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
    */
   getProtections(
     input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
+  ): Promise<unknown>;
+  /** The same redactions, for the key the project door resolved. */
+  resolveApiKeyProtections(
+    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
   ): Promise<unknown>;
   /**
    * Search body schema: strict parsing (method, not field).
@@ -224,22 +230,33 @@ function legacySearchTraces(
 const READ_REASON =
   "Trace API key resolved in-handler, so the refusal carries this family's own sentence; " +
   "the route itself is gated on traces:view";
-const SHARE_REASON =
-  "Trace API key resolved in-handler, so the refusal carries this family's own sentence; " +
-  "the route itself is gated on traces:share, which mints a PUBLIC link";
+
+/** The project the door resolved, and the key it resolved it from. */
+type LegacyDoor = Readonly<{
+  projectId: string;
+  caller: Readonly<{ apiKeyId: string | null; userId: string | null }>;
+}>;
+
+function protectionsFor({ app, door }: { app: LegacyApp; door: LegacyDoor }): Promise<unknown> {
+  return app.resolveApiKeyProtections({
+    projectId: door.projectId,
+    apiKeyId: door.caller.apiKeyId,
+    userId: door.caller.userId,
+  });
+}
 
 const LEGACY_PROTOCOL_REASON =
   "Released SDKs parse this deprecated family's own statuses and bodies, credential refusals included";
 
-/** `readLegacyTrace`: one legacy route's read, for a resolved credential. */
+/** `readLegacyTrace`: one legacy route's read, behind the project door. */
 async function readLegacyTrace({
   app,
   input,
-  auth: { project, credential, markUsed },
+  door,
 }: {
   app: LegacyApp;
   input: z.infer<typeof traceLegacyIdParamsSchema> & z.infer<typeof traceFormatQuerySchema>;
-  auth: TraceLegacyCredential;
+  door: LegacyDoor;
 }): Promise<LegacyAnswer> {
   // No catch-all here: an unanticipated failure is the shared error
   // renderer's to answer, which degrades it to the generic unknown plus the
@@ -252,24 +269,22 @@ async function readLegacyTrace({
   // Prepared before the read, so the 404 below carries them too.
   const headers = supersededBy(`/api/traces/${traceId}?format=${format}`);
 
-  const protections = await app.getProtections({ projectId: project.id, credential });
+  const protections = await protectionsFor({ app, door });
   // `findTrace` resolves offloaded values in full (#4991) — the same
   // `{ full: true }` this handler used to pass for itself.
   const trace = await app.traces().findTrace({
-    projectId: project.id,
+    projectId: door.projectId,
     traceId,
     protections,
   });
   if (!trace) return answer({ message: "Trace not found." }, 404, headers);
 
   const evaluationsMap = await app.traces().readEvaluations({
-    projectId: project.id,
+    projectId: door.projectId,
     traceIds: [traceId],
     protections,
   });
   const evaluations = evaluationsMap[traceId] ?? [];
-
-  markUsed();
 
   if (format === "digest") {
     return answer(
@@ -296,57 +311,53 @@ async function readLegacyTrace({
   );
 }
 
-/** `shareLegacyTrace`: one legacy route's read, for a resolved credential. */
+/** `shareLegacyTrace`: mints the trace's public link, behind the project door. */
 async function shareLegacyTrace({
   app,
   input,
-  auth: { project, markUsed },
+  projectId,
 }: {
   app: LegacyApp;
   input: z.infer<typeof traceLegacyIdParamsSchema>;
-  auth: TraceLegacyCredential;
+  projectId: string;
 }): Promise<LegacyAnswer> {
   const share = await app.shares().createShare({
-    projectId: project.id,
+    projectId,
     resourceType: "TRACE",
     resourceId: input.id,
   });
-
-  markUsed();
 
   return answer({ status: "success", path: `/share/${share.id}` }, 200);
 }
 
-/** `unshareLegacyTrace`: one legacy route's read, for a resolved credential. */
+/** `unshareLegacyTrace`: removes the trace's public link, behind the project door. */
 async function unshareLegacyTrace({
   app,
   input,
-  auth: { project, markUsed },
+  projectId,
 }: {
   app: LegacyApp;
   input: z.infer<typeof traceLegacyIdParamsSchema>;
-  auth: TraceLegacyCredential;
+  projectId: string;
 }): Promise<LegacyAnswer> {
   await app.shares().unshare({
-    projectId: project.id,
+    projectId,
     resourceType: "TRACE",
     resourceId: input.id,
   });
 
-  markUsed();
-
   return answer({ status: "success" }, 200);
 }
 
-/** `searchLegacyTraces`: one legacy route's read, for a resolved credential. */
+/** `searchLegacyTraces`: the deprecated search, behind the project door. */
 async function searchLegacyTraces({
   app,
   raw,
-  auth: { project, credential, markUsed },
+  door,
 }: {
   app: LegacyApp;
   raw: string;
-  auth: TraceLegacyCredential;
+  door: LegacyDoor;
 }): Promise<LegacyAnswer> {
   let body: unknown;
   try {
@@ -366,10 +377,10 @@ async function searchLegacyTraces({
   const headers = supersededBy("/api/traces/search");
 
   const pageSize = params.pageSize ?? DEFAULT_TRACES_PAGE_SIZE;
-  const protections = await app.getProtections({ projectId: project.id, credential });
+  const protections = await protectionsFor({ app, door });
   const query: TraceLegacyListInput = {
     ...params,
-    projectId: project.id,
+    projectId: door.projectId,
     startDate:
       typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
     endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
@@ -394,8 +405,6 @@ async function searchLegacyTraces({
     format,
     llmMode: params.llmMode ?? false,
   });
-
-  markUsed();
 
   return answer(
     {
@@ -444,7 +453,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .get("/api/trace/:id", "getLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
   .withQuery(traceFormatQuerySchema)
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .withPermission("traces:view")
+  .withMiddleware(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     description: "Returns single trace details based on the ID supplied",
@@ -456,12 +466,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       },
     },
   })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      await authorised({ app, request, permission: "traces:view" }, (auth) =>
-        readLegacyTrace({ app, input, auth }),
-      ),
-    ),
+  .handle(async ({ app, input, scope, response }, caller) =>
+    response.write(await readLegacyTrace({ app, input, door: { projectId: scope.id, caller } })),
   )
 
   // ── the public-link pair ──────────────────────────────────────────────────
@@ -470,7 +476,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // read and the search do.
   .post("/api/trace/:id/share", "shareLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
-  .withAccess(publicRoute({ reason: SHARE_REASON }))
+  .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     description: "Returns a public path for a trace",
@@ -482,17 +488,13 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       },
     },
   })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      await authorised({ app, request, permission: "traces:share" }, (auth) =>
-        shareLegacyTrace({ app, input, auth }),
-      ),
-    ),
+  .handle(async ({ app, input, scope, response }) =>
+    response.write(await shareLegacyTrace({ app, input, projectId: scope.id })),
   )
 
   .post("/api/trace/:id/unshare", "unshareLegacyTrace")
   .withParams(traceLegacyIdParamsSchema)
-  .withAccess(publicRoute({ reason: SHARE_REASON }))
+  .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     description: "Deletes a public path for a trace",
@@ -504,12 +506,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       },
     },
   })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      await authorised({ app, request, permission: "traces:share" }, (auth) =>
-        unshareLegacyTrace({ app, input, auth }),
-      ),
-    ),
+  .handle(async ({ app, input, scope, response }) =>
+    response.write(await unshareLegacyTrace({ app, input, projectId: scope.id })),
   )
 
   // ── the deprecated trace search ───────────────────────────────────────────
@@ -519,7 +517,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   .post("/api/trace/search", "searchLegacyTraces")
   .withRawBody("text", { mediaType: PRODUCES_JSON })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES, onExceeded: payloadTooLarge })
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .withPermission("traces:view")
+  .withMiddleware(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Search traces",
@@ -533,12 +532,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       },
     },
   })
-  .handle(async ({ app, raw, request, response }) =>
-    response.write(
-      await authorised({ app, request, permission: "traces:view" }, (auth) =>
-        searchLegacyTraces({ app, raw, auth }),
-      ),
-    ),
+  .handle(async ({ app, raw, scope, response }, caller) =>
+    response.write(await searchLegacyTraces({ app, raw, door: { projectId: scope.id, caller } })),
   )
 
   // ── the deprecated thread read ────────────────────────────────────────────

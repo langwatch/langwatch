@@ -2,7 +2,7 @@
  * @vitest-environment node
  * Verifies error handling consistency for GET /api/trace/:id (F4 of e2e-walk).
  */
-import { createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ import {
   type TraceLegacyRestMembers,
   type TraceLegacySearchFields,
 } from "../trace-legacy.rest.ts";
+import { tracesRestCredential } from "../traces.rest.ts";
 
 const project = { id: "project-123" };
 
@@ -18,9 +19,10 @@ const INTERNAL_MESSAGE = "TraceService requires EvaluationService for evaluation
 
 const runtime = createRestRuntime({
   identity: {
-    authenticate: () => {
-      throw new Error("The deprecated trace family resolves its own credential.");
-    },
+    authenticate: () => ({
+      actor: { type: "user" as const, id: "user-1" },
+      scope: { tier: "project" as const, id: project.id },
+    }),
   },
 });
 
@@ -39,6 +41,7 @@ function buildApi(findTrace: () => Promise<never>) {
     }),
     shares: () => ({ createShare: vi.fn(), unshare: vi.fn() }),
     getProtections: async () => ({}),
+    resolveApiKeyProtections: async () => ({}),
     searchBodySchema: {} as TraceLegacyRestMembers<
       TraceLegacySearchFields,
       unknown
@@ -49,7 +52,7 @@ function buildApi(findTrace: () => Promise<never>) {
 
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    credential: "public",
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
     // The boundary the process installs, restated: a handled refusal answers
     // with its code, and anything else degrades to the generic unknown.
     onError: (error, context) => {
