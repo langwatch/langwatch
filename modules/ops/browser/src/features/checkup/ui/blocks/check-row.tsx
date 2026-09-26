@@ -23,9 +23,16 @@ export function CheckRow({ row }: { row: CheckRowData }) {
           <Text fontWeight="medium">{row.name}</Text>
           <VerdictBadge outcome={verdict.outcome} />
         </HStack>
-        <Text fontSize="sm" color="fg.muted">
-          {verdict.detail}
-        </Text>
+        {verdict.detail ? (
+          <Text fontSize="sm" color="fg.muted">
+            {verdict.detail}
+          </Text>
+        ) : null}
+        {!verdict.detail && verdict.outcome !== "verified" ? (
+          <Text fontSize="sm" color="fg.muted" data-testid={`checkup-details-withheld-${row.id}`}>
+            Your install administrator can see what this check found and how to fix it.
+          </Text>
+        ) : null}
         {fix ? (
           <Text fontSize="sm" data-testid={`checkup-fix-${row.id}`}>
             {fix}
@@ -77,10 +84,10 @@ export function VerdictBadge({ outcome }: { outcome: CheckRowData["verdict"]["ou
  */
 function fixOf(verdict: CheckRowData["verdict"]): string | undefined {
   if (verdict.outcome === "verified") return void 0;
-  if (verdict.outcome === "unchecked") return verdict.fix;
+  if (verdict.outcome === "unchecked" || verdict.code === undefined) return verdict.fix;
   const copy = resolveUiFailureCopy({
     error: { code: verdict.code, httpStatus: 0, meta: verdict.meta ?? {} },
-    fallbackTitle: verdict.detail,
+    fallbackTitle: verdict.detail ?? "",
     description: verdict.fix,
   });
   return copy.description || verdict.fix;

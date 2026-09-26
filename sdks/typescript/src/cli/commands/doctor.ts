@@ -26,7 +26,8 @@ export interface DoctorRow {
   cost: "free" | "egress" | "paid";
   verdict: {
     outcome: CheckOutcome;
-    detail: string;
+    /** Absent for a project key: only an install admin reads what a check found. */
+    detail?: string;
     fix?: string;
     code?: string;
     docsPath?: string;
@@ -36,13 +37,14 @@ export interface DoctorRow {
 export interface DoctorReport {
   ranAt: string;
   rows: DoctorRow[];
+  /** A project key reads its own organization's figures, without the install-wide fields. */
   usageReport: {
     payload: Record<string, unknown>;
-    switches: { optional: boolean; hostname: boolean };
-    endpoint: string;
-    disabled: boolean;
+    switches?: { optional: boolean; hostname: boolean };
+    endpoint?: string;
+    disabled?: boolean;
     schemaVersion: number;
-    nextReportAt: string | null;
+    nextReportAt?: string | null;
   };
 }
 
@@ -149,7 +151,7 @@ export function printReport(report: DoctorReport): void {
       console.log(chalk.bold(GROUP_TITLES[group] ?? group));
     }
     console.log(`  ${verdictLabel(row.verdict.outcome).padEnd(22)} ${row.name}`);
-    console.log(chalk.gray(`      ${row.verdict.detail}`));
+    if (row.verdict.detail) console.log(chalk.gray(`      ${row.verdict.detail}`));
     if (row.verdict.outcome !== "verified" && row.verdict.fix) {
       console.log(chalk.yellow(`      Fix: ${row.verdict.fix}`));
     }
@@ -159,6 +161,21 @@ export function printReport(report: DoctorReport): void {
   }
   console.log();
   const usage = report.usageReport;
+  printUsageHeader(usage);
+  console.log(JSON.stringify(usage.payload, null, 2));
+  console.log();
+  console.log(
+    chalk.gray(
+      "Every field is explained at https://docs.langwatch.ai/self-hosting/data-and-telemetry",
+    ),
+  );
+}
+
+function printUsageHeader(usage: DoctorReport["usageReport"]): void {
+  if (usage.endpoint === undefined || usage.switches === undefined) {
+    printOrganizationUsage(usage);
+    return;
+  }
   console.log(chalk.bold("What this install sends to LangWatch"));
   console.log(
     chalk.gray(
@@ -172,11 +189,13 @@ export function printReport(report: DoctorReport): void {
       `  Schema version ${usage.schemaVersion}. Usage counts: ${usage.switches.optional ? "on" : "off"}. Hostname: ${usage.switches.hostname ? "on" : "off"}.`,
     ),
   );
-  console.log(JSON.stringify(usage.payload, null, 2));
-  console.log();
+}
+
+function printOrganizationUsage(usage: DoctorReport["usageReport"]): void {
+  console.log(chalk.bold("What this organization adds to the install's usage report"));
   console.log(
     chalk.gray(
-      "Every field is explained at https://docs.langwatch.ai/self-hosting/data-and-telemetry",
+      `  Schema version ${usage.schemaVersion}. An install administrator sees the whole report on the Settings > Checkup page.`,
     ),
   );
 }

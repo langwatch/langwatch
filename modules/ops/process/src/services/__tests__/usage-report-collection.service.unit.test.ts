@@ -257,3 +257,34 @@ describe("given an install carrying no organization", () => {
     });
   });
 });
+
+describe("given an install with two organizations", () => {
+  describe("when one organization's figures are taken", () => {
+    it("counts that organization's projects only, and nothing install-wide", async () => {
+      seedTwoOrganizations();
+      state.emailDomains = { "acme.test": 2 };
+
+      const payload = await collector().collectForOrganization({
+        organizationId: "org-1",
+        now: NOW,
+      });
+
+      expect(payload).toMatchObject({
+        organizations: 1,
+        projects: 1,
+        totalTraces: 1,
+        gateway_requests: 1,
+        gateway_spend_usd: 1.25,
+      });
+      for (const key of [
+        "instance_id",
+        "version",
+        "hostname",
+        "user_email_domains",
+        "active_users_28d",
+      ]) {
+        expect(payload).not.toHaveProperty(key);
+      }
+    });
+  });
+});

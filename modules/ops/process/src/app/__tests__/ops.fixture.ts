@@ -14,6 +14,7 @@ import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
   OpsApp,
   type OpsAppInfrastructure,
@@ -48,6 +49,7 @@ export type OpsTestAppOptions = Readonly<{
   projects?: ProjectApi;
   featureFlags?: FeatureFlagApi;
   repositories?: OpsRepositories;
+  checkup?: OpsCheckupService;
 }>;
 
 export type OpsTestApp = Readonly<{ app: OpsApp; repositories: OpsRepositories }>;
@@ -104,6 +106,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
       featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
     },
     repositories,
+    ...(options.checkup === undefined ? {} : { checkup: options.checkup }),
   });
 
   return { app, repositories };

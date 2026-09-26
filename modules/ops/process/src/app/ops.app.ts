@@ -1295,6 +1295,11 @@ export class OpsApp implements OpsApi {
     return this.isAdmin(actingIdentityOf(operator)) ? operator : null;
   }
 
+  /** An install admin is an operator on the same list; a caller with no person never is. */
+  #isInstallAdmin(operator: OpsOperator | null): boolean {
+    return this.#operatorOf(operator) !== null;
+  }
+
   // -- the operator-only ClickHouse EXPLAIN ----------------------------------
 
   /**
@@ -1573,56 +1578,89 @@ export class OpsApp implements OpsApi {
   // -- Settings, Checkup and the usage report (specs/self-hosting/checkup) --
 
   /** The free checks, or "not a self-hosted install" on LangWatch Cloud. */
-  async getCheckup({ organizationId }: { organizationId: string }): Promise<CheckupAnswer> {
+  async getCheckup({
+    organizationId,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<CheckupAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    const result = await checkup.checkupFor({ organizationId, requestedBy: "checkup" }).cheap();
+    const result = await checkup.cheapFor({
+      organizationId,
+      installAdmin: this.#isInstallAdmin(operator),
+      requestedBy: "checkup",
+    });
     return { deployment: "self-hosted", ...result };
   }
 
   async runCheckup({
     organizationId,
+    operator,
     requestedBy,
     ...input
   }: {
     organizationId: string;
+    operator: OpsOperator | null;
     requestedBy?: string;
   } & ExplicitCheckInput): Promise<CheckupAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    const result = await checkup
-      .checkupFor({ organizationId, requestedBy: requestedBy ?? "checkup" })
-      .explicit(input);
+    const result = await checkup.explicitFor({
+      ...input,
+      organizationId,
+      installAdmin: this.#isInstallAdmin(operator),
+      requestedBy: requestedBy ?? "checkup",
+    });
     return { deployment: "self-hosted", ...result };
   }
 
-  async getUsageReport(_input: { organizationId: string }): Promise<UsageReportAnswer> {
+  async getUsageReport({
+    organizationId,
+    operator,
+  }: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    return { deployment: "self-hosted", ...(await checkup.usageReports.preview()) };
+    const report = await checkup.usageReportFor({
+      organizationId,
+      installAdmin: this.#isInstallAdmin(operator),
+    });
+    return { deployment: "self-hosted", ...report };
   }
 
   async setUsageReportSwitches({
-    organizationId: _organizationId,
+    organizationId,
+    operator,
     ...switches
   }: {
     organizationId: string;
+    operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    return { deployment: "self-hosted", ...(await checkup.usageReports.setSwitches(switches)) };
+    const report = await checkup.setUsageReportSwitches({
+      ...switches,
+      organizationId,
+      installAdmin: this.#isInstallAdmin(operator),
+    });
+    return { deployment: "self-hosted", ...report };
   }
 
-  /** The key names a project, the project names the organization, and the checkup runs for it. */
+  /** A project key has no person behind it, so it reads its organization's verdicts only. */
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
     const checkup = this.#checkup;
     if (checkup.isSaas) throw new CheckupNotSelfHostedError();
     const organizationId = await this.#dependencies.projects.getOrganizationId(projectId);
+    const reader = { organizationId, installAdmin: false };
     const [result, usageReport] = await Promise.all([
-      checkup.checkupFor({ organizationId, requestedBy: "checkup" }).cheap(),
-      checkup.usageReports.preview(),
+      checkup.cheapFor({ ...reader, requestedBy: "checkup" }),
+      checkup.usageReportFor(reader),
     ]);
     return { ...result, usageReport };
   }
@@ -1634,7 +1672,12 @@ export class OpsApp implements OpsApi {
     const checkup = this.#checkup;
     if (checkup.isSaas) throw new CheckupNotSelfHostedError();
     const organizationId = await this.#dependencies.projects.getOrganizationId(projectId);
-    return checkup.checkupFor({ organizationId, requestedBy: "checkup" }).explicit(input);
+    return checkup.explicitFor({
+      ...input,
+      organizationId,
+      installAdmin: false,
+      requestedBy: "checkup",
+    });
   }
 
   getStartupNotice(_input: { organizationId: string }): Promise<StartupNoticeState> {

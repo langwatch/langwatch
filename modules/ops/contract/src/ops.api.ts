@@ -623,21 +623,32 @@ export interface OpsApi {
   // -- Settings, Checkup of a self-hosted install; LangWatch Cloud answers
   // `{ deployment: "saas" }` (specs/self-hosting/checkup/checkup.feature) ---
 
-  /** The free checks, which are what the page opens with. */
-  getCheckup(input: { organizationId: string }): Promise<CheckupAnswer>;
+  /** The free checks; details only where `operator` is an install admin. */
+  getCheckup(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<CheckupAnswer>;
   /** The checks that cost egress or money, run because someone asked. */
   runCheckup(
-    input: { organizationId: string; requestedBy?: string } & ExplicitCheckInput,
+    input: {
+      organizationId: string;
+      operator: OpsOperator | null;
+      requestedBy?: string;
+    } & ExplicitCheckInput,
   ): Promise<CheckupAnswer>;
-  /** The exact report the install would send right now. */
-  getUsageReport(input: { organizationId: string }): Promise<UsageReportAnswer>;
+  /** The install's report for an install admin; the organization's own figures otherwise. */
+  getUsageReport(input: {
+    organizationId: string;
+    operator: OpsOperator | null;
+  }): Promise<UsageReportAnswer>;
   setUsageReportSwitches(input: {
     organizationId: string;
+    operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
   }): Promise<UsageReportAnswer>;
   getStartupNotice(input: { organizationId: string }): Promise<StartupNoticeState>;
-  /** What `langwatch doctor` reads over a project key: the free checks and the report. */
+  /** What `langwatch doctor` reads over a project key, which is never an install admin. */
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
   /** The paid checks over a project key; refused on LangWatch Cloud. */
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;

@@ -10,7 +10,12 @@ import type {
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import type { OpsServerConfig } from "@langwatch/ops-contract";
+import type {
+  CheckupResult,
+  ExplicitCheckInput,
+  OpsServerConfig,
+  UsageReportPreview,
+} from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type {
@@ -27,6 +32,7 @@ import type {
   PostgresHealthRepository,
   RedisHealthRepository,
 } from "../repositories/datastore-health.repository.ts";
+import { checkupVerdictsOnly } from "../rules/checkup-audience.rules.ts";
 import {
   type CheckupConnectView,
   type CheckupFacts,
@@ -39,7 +45,11 @@ import {
   UsageReportCollectionService,
   type UsageReportPeers,
 } from "./usage-report-collection.service.ts";
-import { type UsageReportInstall, UsageReportService } from "./usage-report.service.ts";
+import {
+  type UsageReportInstall,
+  UsageReportService,
+  type UsageReportSwitchChange,
+} from "./usage-report.service.ts";
 
 const CANARY_TIMEOUT_MS = 150_000;
 const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
@@ -77,6 +87,9 @@ export interface OpsCheckupDependencies {
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
 }
+
+/** Who asks: an install admin reads every detail, anyone else their organization's verdicts. */
+export type CheckupReader = Readonly<{ organizationId: string; installAdmin: boolean }>;
 
 /**
  * The checkup of one organization and the install's usage report, each fact
@@ -260,6 +273,45 @@ export class OpsCheckupService {
 
   checkupFor(input: { organizationId: string; requestedBy: string }): CheckupService {
     return CheckupService.create(this.factsFor(input));
+  }
+
+  /** The free checks, as this reader may see them (modules/ops/specs/checkup-audience.feature). */
+  async cheapFor({
+    organizationId,
+    installAdmin,
+    requestedBy,
+  }: CheckupReader & { requestedBy: string }): Promise<CheckupResult> {
+    const result = await this.checkupFor({ organizationId, requestedBy }).cheap();
+    return installAdmin ? result : checkupVerdictsOnly(result);
+  }
+
+  /** The checks that cost egress or money, as this reader may see them. */
+  async explicitFor({
+    organizationId,
+    installAdmin,
+    requestedBy,
+    ...input
+  }: CheckupReader & { requestedBy: string } & ExplicitCheckInput): Promise<CheckupResult> {
+    const result = await this.checkupFor({ organizationId, requestedBy }).explicit(input);
+    return installAdmin ? result : checkupVerdictsOnly(result);
+  }
+
+  /** The whole install's report for an install admin; the organization's own otherwise. */
+  usageReportFor({ organizationId, installAdmin }: CheckupReader): Promise<UsageReportPreview> {
+    return installAdmin
+      ? this.usageReports.preview()
+      : this.usageReports.previewForOrganization({ organizationId });
+  }
+
+  /** Changes what the install reports, and answers the report as this reader may see it. */
+  async setUsageReportSwitches({
+    organizationId,
+    installAdmin,
+    ...switches
+  }: CheckupReader & UsageReportSwitchChange): Promise<UsageReportPreview> {
+    if (installAdmin) return this.usageReports.setSwitches(switches);
+    await this.usageReports.writeSwitches(switches);
+    return this.usageReports.previewForOrganization({ organizationId });
   }
 }
 

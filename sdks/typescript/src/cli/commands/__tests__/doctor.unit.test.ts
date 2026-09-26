@@ -119,6 +119,30 @@ describe("langwatch doctor", () => {
       expect(output).toContain("https://docs.langwatch.ai/self-hosting/troubleshooting");
     });
 
+    /** @scenario "A project key reads the verdicts and its organization's figures" */
+    it("prints each verdict without a detail line and the organization's figures", async () => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse({
+          ranAt: "2026-09-21T10:00:00.000Z",
+          rows: report().rows.map(({ verdict, ...row }) => ({
+            ...row,
+            verdict: { outcome: verdict.outcome },
+          })),
+          usageReport: { payload: { event: "daily_usage_stats", projects: 1 }, schemaVersion: 3 },
+        }),
+      );
+
+      const result = await doctorCommand({});
+      result?.table();
+
+      const output = logs.join("\n");
+      expect(output).toMatch(/FAIL.*Redis/);
+      expect(output).not.toContain("undefined");
+      expect(output).not.toContain("Fix:");
+      expect(output).toContain("What this organization adds to the install's usage report");
+      expect(output).toContain('"projects": 1');
+    });
+
     /** @scenario "The explicit checks run only when asked for" */
     it("posts to /api/checkup/run only with --run", async () => {
       fetchMock.mockResolvedValueOnce(jsonResponse(report()));

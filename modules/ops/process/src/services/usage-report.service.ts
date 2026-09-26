@@ -36,6 +36,12 @@ export type UsageReportInstall = Pick<
   | "acknowledgeStartupNotice"
 >;
 
+/** Each switch a change names is an opt-out. */
+export type UsageReportSwitchChange = Readonly<{
+  optionalMetricsOptOut?: boolean;
+  hostnameOptOut?: boolean;
+}>;
+
 export type UsageReportSendOutcome =
   | "sent"
   | "refused"
@@ -153,13 +159,34 @@ export class UsageReportService {
     };
   }
 
-  /** Changes what the install reports, and answers the report as it now stands. */
-  async setSwitches(input: {
-    optionalMetricsOptOut?: boolean;
-    hostnameOptOut?: boolean;
+  /**
+   * One organization's own figures, for a caller who is not an install admin: no
+   * install identity, destination, switches or schedule.
+   */
+  async previewForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
   }): Promise<UsageReportPreview> {
-    await this.deps.install.setUsageReportSwitches(input);
+    const payload = await this.deps.collection.collectForOrganization({
+      organizationId,
+      now: this.deps.now(),
+    });
+    return {
+      payload: { event: USAGE_REPORT_EVENT, ...payload },
+      schemaVersion: USAGE_REPORT_SCHEMA_VERSION,
+    };
+  }
+
+  /** Changes what the install reports, and answers the report as it now stands. */
+  async setSwitches(input: UsageReportSwitchChange): Promise<UsageReportPreview> {
+    await this.writeSwitches(input);
     return this.preview();
+  }
+
+  /** Changes what the install reports, answering nothing. */
+  async writeSwitches(input: UsageReportSwitchChange): Promise<void> {
+    await this.deps.install.setUsageReportSwitches(input);
   }
 
   /** Whether the notice is due. Reads the identity row and never mints it. */

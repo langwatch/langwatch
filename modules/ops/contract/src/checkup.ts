@@ -129,21 +129,26 @@ export const CHECKUP_DOCS = {
   lwql: "/self-hosting/troubleshooting",
 } as const;
 
+/**
+ * A verdict. Detail, fix, code and docs name hosts, ports, env vars and versions, so only
+ * an install admin reads them; an organization caller reads the outcome alone
+ * (modules/ops/specs/checkup-audience.feature).
+ */
 export const checkVerdictSchema = z.discriminatedUnion("outcome", [
-  z.object({ outcome: z.literal("verified"), detail: z.string() }),
+  z.object({ outcome: z.literal("verified"), detail: z.string().optional() }),
   z.object({
     outcome: z.literal("refused"),
     /** Stable, so a runbook matches on it: a `HandledError` code or a `checkup_*` one. */
-    code: z.string(),
-    detail: z.string(),
-    fix: z.string(),
-    docsPath: z.string(),
+    code: z.string().optional(),
+    detail: z.string().optional(),
+    fix: z.string().optional(),
+    docsPath: z.string().optional(),
     /** What the presentation registry reads for this code, if anything. */
     meta: z.record(z.string(), z.unknown()).optional(),
   }),
   z.object({
     outcome: z.literal("unchecked"),
-    detail: z.string(),
+    detail: z.string().optional(),
     fix: z.string().optional(),
     docsPath: z.string().optional(),
   }),

@@ -20,17 +20,21 @@ export const USAGE_REPORT_SWITCHES_ON: UsageReportSwitches = { optional: true, h
 /** Where an install that has never reported shows its identity: the page reads and never mints. */
 export const INSTANCE_ID_NOT_MINTED = "(minted on the first report)";
 
+/**
+ * An install admin reads the whole install's report and where it goes; an organization
+ * caller reads its own organization's figures, and the install-wide fields are absent.
+ */
 export const usageReportPreviewSchema = z.object({
-  /** The payload, exactly as it would be posted. */
+  /** The payload, exactly as it would be posted; one organization's figures for its members. */
   payload: z.record(z.string(), z.unknown()),
-  switches: usageReportSwitchesSchema,
+  switches: usageReportSwitchesSchema.optional(),
   /** Where it goes. */
-  endpoint: z.string(),
+  endpoint: z.string().optional(),
   /** DISABLE_USAGE_STATS is set: the payload is what would go, and it does not. */
-  disabled: z.boolean(),
+  disabled: z.boolean().optional(),
   schemaVersion: z.number().int(),
   /** When the sender next posts, or null while reporting is off. */
-  nextReportAt: z.string().nullable(),
+  nextReportAt: z.string().nullable().optional(),
 });
 export type UsageReportPreview = z.infer<typeof usageReportPreviewSchema>;
 

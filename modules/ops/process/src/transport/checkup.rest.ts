@@ -1,6 +1,7 @@
 /**
  * The checkup over REST for `langwatch doctor` (sdks/typescript/specs/cli/doctor.feature),
- * answered to a project API key whose project names the organization it runs for.
+ * answered to a project API key whose project names the organization it runs for. A key is
+ * never an install admin, so it reads verdicts only (modules/ops/specs/checkup-audience.feature).
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
@@ -21,7 +22,7 @@ export const checkupRest = defineRestRouter(OpsApi)
   .withDocs({
     summary: "Run the free checks of a self-hosted install",
     description:
-      "The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage report this install would send next. Answers 404 on LangWatch Cloud.",
+      "The checkup `langwatch doctor` and the Settings > Checkup page show: one row per check with a pass, fail or not checked verdict. A project API key reads the verdicts only; what each check found and how to fix it is shown to install administrators on the Settings > Checkup page. Checks that open a connection or spend money are reported as not checked here and run through `POST /api/checkup/run`. The response also carries the usage figures of the key's own organization. Answers 404 on LangWatch Cloud.",
   })
   .handle(({ app, scope }) => app.getProjectCheckup({ projectId: scope.id }))
 
@@ -32,7 +33,7 @@ export const checkupRest = defineRestRouter(OpsApi)
   .withDocs({
     summary: "Run the checks that open a connection or spend money",
     description:
-      "Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.",
+      "Runs the egress and paid checks of a self-hosted install: reaching the connect and gateway hosts, the storage write, the SMTP connection, one model provider call and the pipeline canaries. Name the checks to run, or leave the list out to run them all. A project API key reads the verdicts only. The scenario canary launches a real run and needs a run plan id. Answers 404 on LangWatch Cloud.",
   })
   .handle(({ app, input, scope }) => app.runProjectCheckup({ ...input, projectId: scope.id }))
   .build();

@@ -165,3 +165,39 @@ describe("UsageReportSection", () => {
     });
   });
 });
+
+describe("given the checkup answered verdicts only", () => {
+  describe("when the page renders a failing row and the usage report", () => {
+    /** @scenario "The checkup page tells an organization member who can see the details" */
+    it("says the install administrator can see the details, and shows the organization's figures without switches", () => {
+      renderRows(
+        CHECK_DEFINITIONS.map((definition) => ({
+          ...definition,
+          verdict: { outcome: definition.id === "email" ? "refused" : "verified" },
+        })),
+      );
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <UsageReportSection
+            report={{ payload: { event: "daily_usage_stats", projects: 1 }, schemaVersion: 3 }}
+            canManage
+            isSaving={false}
+            onSwitch={() => undefined}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(screen.getByTestId("checkup-details-withheld-email")).toHaveTextContent(
+        "Your install administrator can see what this check found",
+      );
+      expect(screen.queryByTestId("checkup-details-withheld-app")).not.toBeInTheDocument();
+      expect(screen.getByTestId("checkup-row-email").querySelector("a")).toBeNull();
+
+      expect(screen.getByTestId("checkup-usage-report")).toHaveTextContent(
+        "What your organization adds to this install's usage report",
+      );
+      expect(screen.getByTestId("checkup-usage-report-payload")).toHaveTextContent('"projects": 1');
+      expect(screen.queryByTestId("checkup-switch-optional-input")).not.toBeInTheDocument();
+    });
+  });
+});

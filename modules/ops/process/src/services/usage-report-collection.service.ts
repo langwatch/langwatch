@@ -128,19 +128,7 @@ export class UsageReportCollectionService {
     if (organizationIds.length === 0) {
       throw new Error("an install with no organization has nothing to report");
     }
-    const projectIds = (
-      await Promise.all(
-        organizationIds.map((organizationId) =>
-          this.deps.peers.projects.listIdsByOrganization({ organizationId }),
-        ),
-      )
-    ).flat();
-    const scope: Scope = {
-      organizationIds,
-      projectIds,
-      sevenDays: now.epochMilliseconds - 7 * DAY_MS,
-      twentyEightDays: now.epochMilliseconds - 28 * DAY_MS,
-    };
+    const scope = await this.scopeOf({ organizationIds, now });
     const [operational, optional] = await Promise.all([
       this.operational({ scope, connected }),
       switches.optional ? this.optional({ scope, switches, now }) : Promise.resolve({}),
@@ -158,6 +146,63 @@ export class UsageReportCollectionService {
       timestamp: iso(now.epochMilliseconds),
       ...operational,
       ...optional,
+    };
+  }
+
+  /**
+   * One organization's own figures, for a caller who is not an install admin. What only
+   * the whole install can answer (its identity, release, hostname, sign-in, mail, storage,
+   * email domains and signed-in users) is left out rather than shown install-wide.
+   */
+  async collectForOrganization({
+    organizationId,
+    now,
+  }: {
+    organizationId: string;
+    now: Instant;
+  }): Promise<Record<string, unknown>> {
+    const { peers } = this.deps;
+    const scope = await this.scopeOf({ organizationIds: [organizationId], now });
+    const [organizations, stored, ingested, providers] = await Promise.all([
+      peers.organizations.countUsage({ organizationIds: scope.organizationIds }),
+      scope.projectIds.length > 0 ? this.stored(scope) : Promise.resolve({}),
+      this.ingested(scope),
+      peers.modelProviders.countUsage({ organizationIds: scope.organizationIds }),
+    ]);
+
+    return {
+      report_schema_version: USAGE_REPORT_SCHEMA_VERSION,
+      timestamp: iso(now.epochMilliseconds),
+      organizations: scope.organizationIds.length,
+      teams: organizations.teams,
+      projects: scope.projectIds.length,
+      users: organizations.members,
+      sso_provider: organizations.ssoProviders[0] ?? null,
+      ...stored,
+      ...ingested,
+      model_providers: providers.providers.toSorted(),
+    };
+  }
+
+  private async scopeOf({
+    organizationIds,
+    now,
+  }: {
+    organizationIds: readonly string[];
+    now: Instant;
+  }): Promise<Scope> {
+    const projectIds = (
+      await Promise.all(
+        organizationIds.map((organizationId) =>
+          this.deps.peers.projects.listIdsByOrganization({ organizationId }),
+        ),
+      )
+    ).flat();
+    return {
+      organizationIds,
+      projectIds,
+      sevenDays: now.epochMilliseconds - 7 * DAY_MS,
+      twentyEightDays: now.epochMilliseconds - 28 * DAY_MS,
     };
   }
 
@@ -200,18 +245,24 @@ export class UsageReportCollectionService {
     now: Instant;
   }): Promise<Record<string, unknown>> {
     const { peers } = this.deps;
-    const [stored, domains, providers, ingested, mail, [storageBackend]] = await Promise.all([
-      scope.projectIds.length > 0 ? this.stored({ scope, now }) : Promise.resolve({}),
-      peers.users.countUsage(),
-      peers.modelProviders.countUsage({ organizationIds: scope.organizationIds }),
-      this.ingested(scope),
-      peers.mail.getMailDelivery(),
-      this.findStorageBackends(scope),
-    ]);
+    const [stored, signedIn, domains, providers, ingested, mail, [storageBackend]] =
+      await Promise.all([
+        scope.projectIds.length > 0 ? this.stored(scope) : Promise.resolve({}),
+        // An unexpired session is a recent sign-in; one person on four devices is one.
+        scope.projectIds.length > 0
+          ? peers.auth.countUsage({ at: now.epochMilliseconds })
+          : Promise.resolve(undefined),
+        peers.users.countUsage(),
+        peers.modelProviders.countUsage({ organizationIds: scope.organizationIds }),
+        this.ingested(scope),
+        peers.mail.getMailDelivery(),
+        this.findStorageBackends(scope),
+      ]);
     const deployment = this.deps.deployment();
 
     return {
       ...stored,
+      ...(signedIn === undefined ? {} : { active_users_28d: signedIn.signedInUsers }),
       ...ingested,
       user_email_domains: domains.emailDomains,
       ...(switches.hostname ? { hostname: deployment.hostname ?? null } : {}),
@@ -244,7 +295,7 @@ export class UsageReportCollectionService {
   }
 
   /** What the relational owners hold: windowed figures, lifetime totals and the ladder. */
-  private async stored({ scope, now }: { scope: Scope; now: Instant }) {
+  private async stored(scope: Scope) {
     const { peers } = this.deps;
     const { projectIds, organizationIds } = scope;
     const byProject = <T>(
@@ -265,7 +316,6 @@ export class UsageReportCollectionService {
       organizations,
       dashboards,
       modelProviders,
-      signedIn,
     ] = await Promise.all([
       byProject((input) => peers.datasets.countUsage(input)),
       byProject((input) => peers.annotations.countUsage(input)),
@@ -284,8 +334,6 @@ export class UsageReportCollectionService {
       peers.organizations.countUsage({ organizationIds }),
       peers.dashboards.countUsage({ projectIds }),
       peers.modelProviders.countUsage({ organizationIds }),
-      // An unexpired session is somebody who signed in recently; one person on four devices is one.
-      peers.auth.countUsage({ at: now.epochMilliseconds }),
     ]);
     const [projectsLifetime, projectsRecent] = projects;
 
@@ -318,7 +366,6 @@ export class UsageReportCollectionService {
       ...rung("first_trigger_at", automations.lifetime.firstTriggerAt),
       ...rung("first_experiment_at", experiments.lifetime.firstExperimentAt),
       ...rung("first_langy_turn_at", langy.lifetime.firstTurnAt),
-      active_users_28d: signedIn.signedInUsers,
       active_projects_28d: projectsRecent.updatedProjects,
     };
   }
