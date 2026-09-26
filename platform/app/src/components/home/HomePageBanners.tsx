@@ -605,9 +605,12 @@ export function HomePageBanners({
 
             It bleeds past its own box on purpose. The hero is not an object on
             the home, it is where the home is lit from. */}
+        {/* Both bleed layers sit at zIndex -1: they light the page from
+            behind, so neighbours the bleed reaches never paint under them. */}
         <Box
           aria-hidden
           position="absolute"
+          zIndex={-1}
           insetInline={{ base: "-8%", md: "-14%" }}
           insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
@@ -659,13 +662,11 @@ export function HomePageBanners({
             past its left and right edges, so the ground reads as light the
             content stands in front of rather than a curtain dropped over
             it. Dark keeps the full field: the same colours read as depth
-            there. Covers the ground's own bleed box so it tracks exactly.
-            Anything of the page's own chrome the bleed reaches (the demo
-            row above the hero) stacks itself above this — the order is
-            colour, then bloom, then every element. */}
+            there. Covers the ground's own bleed box so it tracks exactly. */}
         <Box
           aria-hidden
           position="absolute"
+          zIndex={-1}
           insetInline={{ base: "-8%", md: "-14%" }}
           insetBlock={{ base: "-30%", md: "-45%" }}
           pointerEvents="none"
