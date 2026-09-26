@@ -19,7 +19,10 @@ import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 
-/** The vendor client, built once per physical endpoint this process reaches. */
+/**
+ * The vendor client, built once per physical endpoint this process reaches. ISO
+ * timestamps parse as main's managed client parsed them (best_effort).
+ */
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
   constructor(private readonly config: ClickHouseConfig) {
     super();
@@ -32,9 +35,10 @@ class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseCl
       ...(this.config.requestTimeoutMs === undefined
         ? {}
         : { request_timeout: this.config.requestTimeoutMs }),
-      ...(this.config.settings === undefined
-        ? {}
-        : { clickhouse_settings: this.config.settings as Record<string, never> }),
+      clickhouse_settings: {
+        date_time_input_format: "best_effort",
+        ...(this.config.settings as Record<string, never> | undefined),
+      },
     });
   }
 }

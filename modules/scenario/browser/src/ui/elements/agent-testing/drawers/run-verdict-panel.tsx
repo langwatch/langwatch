@@ -220,7 +220,12 @@ function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
           {result.criterion}
         </Text>
         {showsRequirement ? (
-          <Text fontSize="11px" color="fg.subtle" data-testid="run-verdict-criterion-requirement">
+          <Text
+            fontSize="11px"
+            color="fg.subtle"
+            lineHeight="short"
+            data-testid="run-verdict-criterion-requirement"
+          >
             Checked as: {requirement}
           </Text>
         ) : null}
@@ -263,7 +268,7 @@ function CriteriaSection({
     <VStack align="stretch" gap={2} data-testid={testId}>
       <PanelHeading color={headingColor}>{heading}</PanelHeading>
       {description ? (
-        <Text fontSize="11.5px" color={FG_MUTED} marginTop={-1}>
+        <Text fontSize="11.5px" color={FG_MUTED} lineHeight="short" marginTop={-1}>
           {description}
         </Text>
       ) : null}

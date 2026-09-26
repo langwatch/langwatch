@@ -28,7 +28,7 @@ import {
 } from "@langwatch/browser-host/transport";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
 import { QueryClientContext, QueryClientProvider } from "@tanstack/react-query";
-import { useContext, useMemo, useState, type ReactNode } from "react";
+import { useContext, useMemo, useState, type ComponentType, type ReactNode } from "react";
 
 import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
 import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature-install.ts";
@@ -44,6 +44,11 @@ export type UiFeatureShellInstall = {
   capabilities: UiCapabilityInstall;
   /** Every installed module's drawers, as one registry. */
   drawers?: UiDrawerRegistry;
+  /**
+   * Every installed module's host mounts, composed. They wrap the routed page
+   * and the open drawer alike: a drawer reads the same `*HostApi` its screens do.
+   */
+  moduleHosts?: ComponentType<{ children?: ReactNode }>;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
   /**
@@ -67,6 +72,11 @@ export type UiFeatureShellInstall = {
   sessionQueryKey: readonly unknown[];
 };
 
+/** A composition that installed no module host mounts. */
+function UiNoModuleHosts({ children }: { children?: ReactNode }) {
+  return <>{children}</>;
+}
+
 /** The session and scope of a composition that declared neither. Refuse by name. */
 const useUnavailableUiSession: UiSessionSource = () => ({
   session: UNAVAILABLE_UI_SESSION,
@@ -77,6 +87,7 @@ export function createUiFeatureShell({
   apis,
   capabilities,
   drawers = {},
+  moduleHosts: ModuleHosts = UiNoModuleHosts,
   transport,
   failures = [],
   session,
@@ -134,12 +145,14 @@ export function createUiFeatureShell({
           {/* Nothing is answering on the API's address, so the reader waits
               here rather than being signed out of a stack that is booting. */}
           <UiApiWaitingGate isDevelopment={isDevelopment} sessionQueryKey={sessionQueryKey}>
-            {children}
+            <ModuleHosts>
+              {children}
+              <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
+            </ModuleHosts>
           </UiApiWaitingGate>
           {/* Always mounted, one gate for every routed page — a surface
               without this reach opened a limit dialog nobody ever saw. */}
           <UiSlot name="globalUpgradeModal" props={{}} />
-          <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
         </UiScopeHostProvider>
       </UiCapabilityContextProvider>
     );

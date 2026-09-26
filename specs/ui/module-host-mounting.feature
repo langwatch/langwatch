@@ -36,6 +36,14 @@ Feature: A module mounts the host its screens read
     # router root rather than around the declaring module's own loaders.
 
   @integration
+  Scenario: A module's host is mounted above an open drawer too
+    Given a module that mounts a host and a drawer that reads it
+    When the address bar opens that drawer
+    Then the drawer reads the host rather than throwing
+    # Drawers render beside the routed page, so a stack around the page alone
+    # left every scenario drawer throwing on its missing ScenarioHostProvider.
+
+  @integration
   Scenario: A mounted host answers the reading its screen renders from
     Given a module whose host mount resolves its organization from its own read
     When a customer opens the screen that renders from that organization
