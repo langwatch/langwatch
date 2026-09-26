@@ -12993,9 +12993,6 @@
                         "rowsReturned"
                       ]
                     },
-                    "truncated": {
-                      "type": "boolean"
-                    },
                     "followsTimeWindow": {
                       "type": "boolean"
                     },
