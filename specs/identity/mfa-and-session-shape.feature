@@ -681,3 +681,10 @@ Feature: Two-step verification - one setup per person, and organizations that re
     When the flag is turned off
     Then their sessions keep working
     And nothing they set up is erased
+
+  @unit @regression
+  Scenario: Selected session revocation deletes rows before invalidating cached sessions
+    Given a user revokes selected sessions or all sessions from one identifier
+    When the session records are deleted
+    Then cache invalidation follows the completed deletion
+    And unrelated session rows remain live

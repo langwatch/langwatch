@@ -197,10 +197,25 @@ export function usePasskeyAutofill({
       if (interacted && isWebauthnField(event.target)) offerOnce();
     };
 
-    const onGesture = (event: Event) => {
+    const onPointerDown = (event: Event) => {
       interacted = true;
-      // A click straight into the field, or a keystroke while already in it
-      // (the entrance autofocuses, so typing is often the FIRST gesture).
+      // A pointer lands where it is aimed, and only that counts as reaching
+      // for the field. Where the focus happens to be is the wrong question
+      // here: focus has not moved yet when `pointerdown` fires, so it still
+      // names whatever the person is clicking AWAY from — the address field,
+      // on every screen that autofocuses it. That armed the offer from a
+      // click on any control on the card, "Continue" included, and Continue
+      // starts a passkey ceremony of its own. Two ceremonies share one
+      // server-side challenge: the second overwrites the first, and both
+      // assertions are then turned down.
+      if (isWebauthnField(event.target)) offerOnce();
+    };
+
+    const onKeyDown = (event: Event) => {
+      interacted = true;
+      // Typing has no aim of its own — it goes wherever the focus is, and the
+      // entrance autofocuses the address field, so the first keystroke is
+      // often the FIRST gesture somebody makes.
       if (
         isWebauthnField(event.target) ||
         isWebauthnField(document.activeElement)
@@ -223,13 +238,13 @@ export function usePasskeyAutofill({
 
     const remove = () => {
       document.removeEventListener("focusin", onFocusIn);
-      document.removeEventListener("pointerdown", onGesture);
-      document.removeEventListener("keydown", onGesture);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
 
     document.addEventListener("focusin", onFocusIn);
-    document.addEventListener("pointerdown", onGesture);
-    document.addEventListener("keydown", onGesture);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     // NOT removed by `remove()`: the gesture listeners have done their job once
     // the offer is out, and this one only starts mattering at that point.
     window.addEventListener("pagehide", onPageHide);

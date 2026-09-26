@@ -7,7 +7,7 @@
  * and every way it can go wrong has a state of its own that names the cause.
  * There is no path through this component that renders an empty chart.
  *
- * @see specs/analytics/lwql-workbench.feature
+ * @see specs/lwql/workbench.feature
  */
 
 import { Box, Stack, Text, VStack } from "@chakra-ui/react";

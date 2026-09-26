@@ -17,6 +17,7 @@ from langevals.utils import (
     get_cpu_count,
     get_evaluator_classes,
     get_evaluator_definitions,
+    gunicorn_options,
     load_evaluator_packages,
     positive_float_or_none,
     positive_int_or_none,
@@ -500,17 +501,7 @@ def main():
 
         print(f"Starting server with {workers} workers")
 
-        options = {
-            "bind": f"{host}:{port}",
-            "workers": workers,
-            "worker_class": "uvicorn.workers.UvicornWorker",
-            "preload_app": True,
-            "forwarded_allow_ips": "*",
-            "loglevel": "warning",
-            "timeout": 900,
-        }
-
-        StandaloneApplication(app, options).run()
+        StandaloneApplication(app, gunicorn_options(host, port, workers)).run()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import { SimpleGrid } from "@chakra-ui/react";
+import { SimpleGrid, VStack } from "@chakra-ui/react";
 
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../server/license-enforcement/constants";
@@ -33,22 +33,19 @@ export function MemberSeatUsage({
   if (!usage.data) return null;
 
   return (
-    <SimpleGrid
-      columns={{ base: 1, md: 2 }}
-      gap={3}
-      width="full"
-      maxWidth="2xl"
-    >
-      <ResourceLimitRow
-        label={LIMIT_TYPE_DISPLAY_LABELS.members}
-        current={usage.data.membersCount}
-        max={activePlan.maxMembers}
-      />
-      <ResourceLimitRow
-        label={LIMIT_TYPE_DISPLAY_LABELS.membersLite}
-        current={usage.data.membersLiteCount}
-        max={activePlan.maxMembersLite}
-      />
-    </SimpleGrid>
+    <VStack width="full" maxWidth="2xl" align="stretch" gap={2}>
+      <SimpleGrid columns={{ base: 1, md: 2 }} gap={3} width="full">
+        <ResourceLimitRow
+          label={LIMIT_TYPE_DISPLAY_LABELS.members}
+          current={usage.data.membersCount}
+          max={activePlan.maxMembers}
+        />
+        <ResourceLimitRow
+          label={LIMIT_TYPE_DISPLAY_LABELS.membersLite}
+          current={usage.data.membersLiteCount}
+          max={activePlan.maxMembersLite}
+        />
+      </SimpleGrid>
+    </VStack>
   );
 }

@@ -120,6 +120,15 @@ export const FRONTEND_FEATURE_FLAGS = [
   // keeps a project on the Simulations pages, which are untouched while it
   // is off. The backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
+  // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
+  // bar shows a contact-us popover instead of starting a run. See
+  // specs/traces-v2/instant-eval-search.feature.
+  "release_instant_evals",
+  // The guided onboarding variant (spec:
+  // specs/features/onboarding/guided-onboarding-variant.feature). Read on the
+  // welcome flow with the user's id, which is what the percentage rollout
+  // rule buckets on, so the same user lands in the same variant every time.
+  "experiment_onboarding_langy_guided",
 ] as const;
 
 /**

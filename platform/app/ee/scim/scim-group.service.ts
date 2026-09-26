@@ -3,6 +3,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+
 import type { Group, PrismaClient } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
@@ -10,6 +11,8 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
+
+import { ScimWriteOutsideConnectionError } from "./errors";
 import type {
   ScimCreateGroupRequest,
   ScimError,
@@ -19,7 +22,14 @@ import type {
   ScimPatchRequest,
   ScimReplaceGroupRequest,
 } from "./scim.types";
-import { reconcileScimGrants } from "./scim-grants.reconciler";
+import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
+import { parseScimFilter } from "./scim-filter";
+import {
+  reconcileScimGrants,
+  retireScimMembershipGrants,
+} from "./scim-grants.reconciler";
+import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
+import { assertScimOrganizationId } from "./scim-organization-scope";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -41,6 +51,7 @@ type MemberInstruction =
 export class ScimGroupService {
   private readonly prisma: PrismaClient;
   private readonly writer: GrantsLedgerWriter;
+  readonly #directoryIdentity: ScimDirectoryIdentityService;
 
   constructor({
     prisma,
@@ -51,6 +62,7 @@ export class ScimGroupService {
   }) {
     this.prisma = prisma;
     this.writer = writer;
+    this.#directoryIdentity = ScimDirectoryIdentityService.create(prisma);
   }
 
   static create(options: {
@@ -62,25 +74,54 @@ export class ScimGroupService {
 
   async listGroups({
     organizationId,
+    connectionId = null,
     filter,
     startIndex = 1,
     count = 100,
     excludeMembers = false,
   }: {
     organizationId: string;
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
     excludeMembers?: boolean;
-  }): Promise<ScimListResponse<ScimGroup>> {
-    const displayNameFilter = this.parseDisplayNameFilter(filter);
+  }): Promise<ScimListResponse<ScimGroup> | ScimError> {
+    assertScimOrganizationId(organizationId);
+    const parsed = parseScimFilter({
+      filter,
+      supported: ["displayName", "externalId"],
+    });
+    if (!parsed.ok) {
+      return {
+        schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+        status: "400",
+        scimType: "invalidFilter",
+        detail: parsed.detail,
+      };
+    }
+    const term = parsed.term;
 
     const where = {
       organizationId,
+      // Legacy tokens retain organization-wide reach; scoped tokens also see legacy groups.
+      ...(connectionId === null
+        ? {}
+        : {
+            OR: [
+              { scimConnectionId: connectionId },
+              { scimConnectionId: null },
+            ],
+          }),
       scimSource: { not: null as string | null },
-      ...(displayNameFilter
-        ? { name: { equals: displayNameFilter, mode: "insensitive" as const } }
+      ...(term?.attribute === "displayName"
+        ? { name: { equals: term.value, mode: "insensitive" as const } }
         : {}),
+      // An `externalId` term narrows to the group the directory means. A
+      // value this organization has never pushed narrows to nobody rather
+      // than widening back to every group — the same rule the people
+      // listing follows.
+      ...(term?.attribute === "externalId" ? { externalId: term.value } : {}),
     };
 
     const [groups, totalCount] = await Promise.all([
@@ -95,32 +136,44 @@ export class ScimGroupService {
         },
         skip: startIndex - 1,
         take: count,
-        orderBy: { createdAt: "asc" },
+        // `createdAt` alone leaves groups made in the same instant in an
+        // order the store picks, and two pages cut from two different such
+        // orders overlap. The id settles the tie.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       }),
       this.prisma.group.count({ where }),
     ]);
 
+    const resources = groups.map((g) =>
+      this.toScimGroup(g, g.members, excludeMembers),
+    );
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
       startIndex,
-      itemsPerPage: count,
-      Resources: groups.map((g) =>
-        this.toScimGroup(g, g.members, excludeMembers),
-      ),
+      // What this page holds, not what was asked for (RFC 7644 §3.4.2.4).
+      itemsPerPage: resources.length,
+      Resources: resources,
     };
   }
 
   async getGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     excludeMembers = false,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     excludeMembers?: boolean;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    assertScimOrganizationId(organizationId);
+    const group = await this.findGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
@@ -141,6 +194,7 @@ export class ScimGroupService {
     organizationId: string;
     connectionId?: string | null;
   }): Promise<ScimGroup | ScimError> {
+    assertScimOrganizationId(organizationId);
     // The directory's own identifier first, and the display name second: a
     // group renamed in the directory is the same group, and matching on the
     // name would make it a second one.
@@ -157,6 +211,11 @@ export class ScimGroupService {
       });
     }
 
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: (request.members ?? []).map((member) => member.value),
+    });
     const slug = await this.uniqueSlug(organizationId, request.displayName);
     const group = await this.prisma.group.create({
       data: {
@@ -189,15 +248,35 @@ export class ScimGroupService {
   async replaceGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     request,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     request: ScimReplaceGroupRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    assertScimOrganizationId(organizationId);
+    const group = await this.findWritableGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    const currentMembers = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      select: { userId: true },
+    });
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: [
+        ...currentMembers.map((member) => member.userId),
+        ...(request.members ?? []).map((member) => member.value),
+      ],
+    });
 
     // A PUT restates the whole resource, so it restates the directory's own
     // identifier too. It used to be accepted on create only, which meant a
@@ -216,22 +295,25 @@ export class ScimGroupService {
     }
 
     const requestedIds = new Set((request.members ?? []).map((m) => m.value));
-    const current = await this.prisma.groupMembership.findMany({
-      where: { groupId: group.id },
-    });
-    const currentIds = new Set(current.map((m) => m.userId));
+    const currentIds = new Set(currentMembers.map((member) => member.userId));
 
     const toAdd = [...requestedIds].filter((id) => !currentIds.has(id));
     const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
 
-    if (toAdd.length)
+    if (toAdd.length) {
       await this.addMembers({
         groupId: group.id,
         organizationId,
         memberIds: toAdd,
       });
-    if (toRemove.length)
-      await this.removeMembers({ groupId: group.id, userIds: toRemove });
+    }
+    if (toRemove.length) {
+      await this.removeMembers({
+        organizationId,
+        groupId: group.id,
+        userIds: toRemove,
+      });
+    }
 
     const updatedGroup = await this.prisma.group.findUniqueOrThrow({
       where: { id: group.id },
@@ -247,15 +329,31 @@ export class ScimGroupService {
   async updateGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
     patchRequest,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
     patchRequest: ScimPatchRequest;
   }): Promise<ScimGroup | ScimError> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    assertScimOrganizationId(organizationId);
+    const group = await this.findWritableGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: await this.membersTouchedByPatch({
+        groupId: group.id,
+        operations: patchRequest.Operations,
+      }),
+    });
 
     for (const operation of patchRequest.Operations) {
       await this.applyPatch({ group, operation, organizationId });
@@ -275,13 +373,40 @@ export class ScimGroupService {
   async deleteGroup({
     scimResourceId,
     organizationId,
+    connectionId = null,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId?: string | null;
   }): Promise<ScimError | null> {
-    const group = await this.findGroup({ scimResourceId, organizationId });
+    assertScimOrganizationId(organizationId);
+    const group = await this.findWritableGroup({
+      scimResourceId,
+      organizationId,
+      connectionId,
+    });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    const affectedMembers = await this.prisma.groupMembership.findMany({
+      where: { groupId: group.id },
+      select: { userId: true },
+    });
+    await this.authorizeMembers({
+      organizationId,
+      connectionId,
+      memberIds: affectedMembers.map((member) => member.userId),
+    });
+
+    if (scimGrantsWritePathEnabled()) {
+      await retireScimMembershipGrants({
+        prisma: this.prisma,
+        writer: this.writer,
+        organizationId,
+        userIds: affectedMembers.map(({ userId }) => userId),
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      });
+    }
 
     // The grants the group carried go first and carry instant enforcement:
     // an IdP that deletes a group has taken that access away. Reconciled to
@@ -290,7 +415,7 @@ export class ScimGroupService {
       prisma: this.prisma,
       writer: this.writer,
       organizationId,
-      where: { groupId: group.id },
+      where: { principal: { type: "group", id: group.id } },
       desired: [],
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
       mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
@@ -302,8 +427,6 @@ export class ScimGroupService {
 
     return null;
   }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   /**
    * The group this push is about, before one exists.
@@ -326,42 +449,107 @@ export class ScimGroupService {
     externalId: string | null;
     displayName: string;
   }): Promise<Group | null> {
-    if (connectionId && externalId) {
+    if (externalId) {
       const byIdentifier = await this.prisma.group.findFirst({
         where: { organizationId, scimConnectionId: connectionId, externalId },
       });
       if (byIdentifier) return byIdentifier;
     }
+    // Name matching has the same reach as reads, including legacy token authority.
     return this.prisma.group.findFirst({
       where: {
         organizationId,
         name: displayName,
         scimSource: { not: null },
+        ...(connectionId === null
+          ? {}
+          : {
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
+            }),
       },
     });
   }
 
   /**
-   * The group a `/Groups/:id` request names.
-   *
-   * `:id` is the SERVICE PROVIDER's identifier (RFC 7643 §3.1) — ours, minted
-   * by us and stored by the directory — so resolving it against `Group.id` is
-   * correct. What was wrong was the name: the parameter was called
-   * `externalScimId`, which says it is the DIRECTORY's identifier, and
-   * `externalId` is a different column that this never read. Renamed rather
-   * than re-pointed, because re-pointing it would break every identity
-   * provider that has already stored the ids we handed out.
+   * Resource ids are our Group.id, not the directory's externalId. Concrete
+   * tokens cannot read sibling groups; null tokens retain organization-wide
+   * authority. Legacy groups remain visible to every token in the organization.
    */
   private async findGroup({
     scimResourceId,
     organizationId,
+    connectionId,
   }: {
     scimResourceId: string;
     organizationId: string;
+    connectionId: string | null;
   }): Promise<Group | null> {
     return this.prisma.group.findFirst({
+      where: {
+        id: scimResourceId,
+        organizationId,
+        ...(connectionId === null
+          ? {}
+          : {
+              OR: [
+                { scimConnectionId: connectionId },
+                { scimConnectionId: null },
+              ],
+            }),
+      },
+    });
+  }
+
+  /**
+   * Resolve a mutation target without turning a sibling connection's resource
+   * into a misleading retryable not-found. Reads keep hiding sibling groups,
+   * while writes acknowledge that the submitted service-provider id exists
+   * and refuse the token's authority with the same stable 403 used for users.
+   */
+  private async findWritableGroup({
+    scimResourceId,
+    organizationId,
+    connectionId,
+  }: {
+    scimResourceId: string;
+    organizationId: string;
+    connectionId: string | null;
+  }): Promise<Group | null> {
+    const group = await this.prisma.group.findFirst({
       where: { id: scimResourceId, organizationId },
     });
+    if (!group) return null;
+    if (
+      connectionId === null ||
+      group.scimConnectionId === null ||
+      group.scimConnectionId === connectionId
+    ) {
+      return group;
+    }
+
+    throw new ScimWriteOutsideConnectionError();
+  }
+
+  private async authorizeMembers({
+    organizationId,
+    connectionId,
+    memberIds,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    memberIds: string[];
+  }): Promise<void> {
+    if (connectionId === null) return;
+    for (const userId of new Set(memberIds)) {
+      await this.#directoryIdentity.assertWritable({
+        organizationId,
+        connectionId,
+        userId,
+      });
+    }
   }
 
   private async addMembers({
@@ -390,15 +578,71 @@ export class ScimGroupService {
   }
 
   private async removeMembers({
+    organizationId,
     groupId,
     userIds,
   }: {
     groupId: string;
     userIds: string[];
+    organizationId: string;
   }): Promise<void> {
+    if (scimGrantsWritePathEnabled()) {
+      const members = await this.prisma.groupMembership.findMany({
+        where: { groupId, userId: { in: userIds } },
+        select: { userId: true },
+      });
+      await retireScimMembershipGrants({
+        prisma: this.prisma,
+        writer: this.writer,
+        organizationId,
+        userIds: members.map(({ userId }) => userId),
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      });
+    }
     await this.prisma.groupMembership.deleteMany({
       where: { groupId, userId: { in: userIds } },
     });
+  }
+
+  private async membersTouchedByPatch({
+    groupId,
+    operations,
+  }: {
+    groupId: string;
+    operations: ScimPatchOperation[];
+  }): Promise<string[]> {
+    const memberIds = new Set<string>();
+    let replacesMembers = false;
+
+    for (const operation of operations) {
+      if (operation.op === "add" && operation.path === "members") {
+        this.extractMemberIds(operation.value).forEach((id) =>
+          memberIds.add(id),
+        );
+      }
+      if (operation.op === "remove" && operation.path?.startsWith("members")) {
+        this.extractMemberIdsFromPath(operation.path, operation.value).forEach(
+          (id) => memberIds.add(id),
+        );
+      }
+      if (operation.op === "replace") {
+        const instruction = this.extractRequestedMemberIds(operation);
+        if (instruction.kind === "list") {
+          instruction.ids.forEach((id) => memberIds.add(id));
+          replacesMembers = true;
+        }
+      }
+    }
+
+    if (replacesMembers) {
+      const current = await this.prisma.groupMembership.findMany({
+        where: { groupId },
+        select: { userId: true },
+      });
+      current.forEach(({ userId }) => memberIds.add(userId));
+    }
+
+    return [...memberIds];
   }
 
   private async applyPatch({
@@ -412,12 +656,13 @@ export class ScimGroupService {
   }): Promise<void> {
     if (operation.op === "add" && operation.path === "members") {
       const ids = this.extractMemberIds(operation.value);
-      if (ids.length)
+      if (ids.length) {
         await this.addMembers({
           groupId: group.id,
           organizationId,
           memberIds: ids,
         });
+      }
       return;
     }
 
@@ -426,86 +671,132 @@ export class ScimGroupService {
         operation.path,
         operation.value,
       );
-      if (ids.length)
-        await this.removeMembers({ groupId: group.id, userIds: ids });
+      if (ids.length) {
+        await this.removeMembers({
+          organizationId,
+          groupId: group.id,
+          userIds: ids,
+        });
+      }
       return;
     }
 
-    if (operation.op === "replace") {
-      if (
-        operation.path === "displayName" &&
-        typeof operation.value === "string"
-      ) {
-        await this.prisma.group.update({
-          where: { id: group.id },
-          data: { name: operation.value },
-        });
-        return;
-      }
+    if (operation.op !== "replace") return;
+    await this.applyReplacePatch({ group, operation, organizationId });
+  }
 
-      // Handle value object containing "displayName" (no path variant)
-      let renamed = false;
-      if (
-        !operation.path &&
-        typeof operation.value === "object" &&
-        operation.value !== null
-      ) {
-        const valueObj = operation.value as Record<string, unknown>;
-        if (
-          "displayName" in valueObj &&
-          typeof valueObj.displayName === "string"
-        ) {
-          await this.prisma.group.update({
-            where: { id: group.id },
-            data: { name: valueObj.displayName },
-          });
-          renamed = true;
-        }
-      }
+  private async applyReplacePatch({
+    group,
+    operation,
+    organizationId,
+  }: {
+    group: Group;
+    operation: ScimPatchOperation;
+    organizationId: string;
+  }): Promise<void> {
+    if (
+      operation.path === "displayName" &&
+      typeof operation.value === "string"
+    ) {
+      await this.renameGroup(group.id, operation.value);
+      return;
+    }
 
-      // Full member replace (path="members" or no path with members in value).
-      // Only when the operation actually carries a member list: an operation
-      // that never mentions members carries no membership instruction at all.
-      const instruction = this.extractRequestedMemberIds(operation);
-      if (instruction.kind !== "list") {
-        // Doing nothing is the safe answer, but it is also a silent one: an IdP
-        // sending a shape we do not parse would otherwise look like a success
-        // forever. Logged so a misconfigured sync is findable without an
-        // access-loss incident pointing at it.
-        if (instruction.kind === "malformed") {
-          logger.warn(
-            { groupId: group.id, path: operation.path },
-            "SCIM group replace named members but did not give a list; membership left unchanged",
-          );
-        } else if (!renamed) {
-          // Nothing recognised at all. A rename that mentions no members is a
-          // complete, supported operation, so it must not warn.
-          logger.warn(
-            { groupId: group.id, path: operation.path },
-            "SCIM group replace matched no known attribute; leaving the group unchanged",
-          );
-        }
-        return;
-      }
-      const members = instruction.ids;
-
-      const current = await this.prisma.groupMembership.findMany({
-        where: { groupId: group.id },
+    const renamed = await this.renameFromValue(group.id, operation);
+    const instruction = this.extractRequestedMemberIds(operation);
+    if (instruction.kind !== "list") {
+      this.warnIgnoredReplace({
+        groupId: group.id,
+        path: operation.path,
+        instruction,
+        renamed,
       });
-      const requestedIds = new Set(members);
-      const currentIds = new Set(current.map((m) => m.userId));
+      return;
+    }
 
-      const toAdd = members.filter((id) => !currentIds.has(id));
-      const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
+    await this.replaceMembers({
+      groupId: group.id,
+      organizationId,
+      memberIds: instruction.ids,
+    });
+  }
 
-      if (toAdd.length)
-        await this.addMembers({
-          groupId: group.id,
-          organizationId,
-          memberIds: toAdd,
-        });
-      if (toRemove.length)
-        await this.removeMembers({ groupId: group.id, userIds: toRemove });
+  private async renameFromValue(
+    groupId: string,
+    operation: ScimPatchOperation,
+  ): Promise<boolean> {
+    if (
+      operation.path ||
+      operation.value === null ||
+      typeof operation.value !== "object"
+    ) {
+      return false;
+    }
+
+    const displayName = (operation.value as Record<string, unknown>)
+      .displayName;
+    if (typeof displayName !== "string") return false;
+
+    await this.renameGroup(groupId, displayName);
+    return true;
+  }
+
+  private async renameGroup(
+    groupId: string,
+    displayName: string,
+  ): Promise<void> {
+    await this.prisma.group.update({
+      where: { id: groupId },
+      data: { name: displayName },
+    });
+  }
+
+  private warnIgnoredReplace({
+    groupId,
+    path,
+    instruction,
+    renamed,
+  }: {
+    groupId: string;
+    path: string | undefined;
+    instruction: Exclude<MemberInstruction, { kind: "list" }>;
+    renamed: boolean;
+  }): void {
+    if (instruction.kind === "malformed") {
+      logger.warn(
+        { groupId, path },
+        "SCIM group replace named members but did not give a list; membership left unchanged",
+      );
+    } else if (!renamed) {
+      logger.warn(
+        { groupId, path },
+        "SCIM group replace matched no known attribute; leaving the group unchanged",
+      );
+    }
+  }
+
+  private async replaceMembers({
+    groupId,
+    organizationId,
+    memberIds,
+  }: {
+    groupId: string;
+    organizationId: string;
+    memberIds: string[];
+  }): Promise<void> {
+    const current = await this.prisma.groupMembership.findMany({
+      where: { groupId },
+    });
+    const requestedIds = new Set(memberIds);
+    const currentIds = new Set(current.map(({ userId }) => userId));
+    const toAdd = memberIds.filter((id) => !currentIds.has(id));
+    const toRemove = [...currentIds].filter((id) => !requestedIds.has(id));
+
+    if (toAdd.length) {
+      await this.addMembers({ groupId, organizationId, memberIds: toAdd });
+    }
+    if (toRemove.length) {
+      await this.removeMembers({ organizationId, groupId, userIds: toRemove });
     }
   }
 
@@ -526,10 +817,10 @@ export class ScimGroupService {
 
   private toScimGroup(
     group: Group,
-    members: Array<{
+    members: {
       userId: string;
       user: { id: string; email: string | null; name: string | null };
-    }>,
+    }[],
     excludeMembers = false,
   ): ScimGroup {
     return {
@@ -554,12 +845,6 @@ export class ScimGroupService {
         lastModified: group.updatedAt.toISOString(),
       },
     };
-  }
-
-  private parseDisplayNameFilter(filter?: string): string | null {
-    if (!filter) return null;
-    const match = filter.match(/^displayName\s+eq\s+"([^"]+)"$/);
-    return match?.[1] ?? null;
   }
 
   private extractMemberIds(value: unknown): string[] {

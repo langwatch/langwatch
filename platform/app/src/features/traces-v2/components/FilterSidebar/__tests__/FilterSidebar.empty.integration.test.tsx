@@ -38,6 +38,23 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   }),
 }));
 
+vi.mock("../../../hooks/useFilteredTraceFacets", () => ({
+  useFilteredTraceFacets: () => ({
+    data: undefined,
+    isPlaceholderData: false,
+    isFetching: false,
+    isError: false,
+  }),
+}));
+
+vi.mock("../../../onboarding/hooks/usePreviewTracesActive", () => ({
+  usePreviewTracesActive: () => false,
+}));
+
+vi.mock("../ExplorerTotal", () => ({
+  ExplorerTotal: () => null,
+}));
+
 vi.mock("../../../stores/uiStore", () => ({
   useUIStore: (selector: (s: unknown) => unknown) =>
     selector({
@@ -48,18 +65,12 @@ vi.mock("../../../stores/uiStore", () => ({
     }),
 }));
 
-vi.mock("../../../stores/filterStore", () => ({
-  useFilterStore: (selector: (s: unknown) => unknown) =>
+vi.mock("../../../stores/explorerStore", () => ({
+  useExplorerStore: (selector: (s: unknown) => unknown) =>
     selector({
       ast: { type: "group", combinator: "and", filters: [] },
       queryText: "",
       clearAll: vi.fn(),
-    }),
-}));
-
-vi.mock("../../../stores/viewStore", () => ({
-  useViewStore: (selector: (s: unknown) => unknown) =>
-    selector({
       activeLensId: "all-traces",
       isDraft: () => false,
       revertLens: vi.fn(),

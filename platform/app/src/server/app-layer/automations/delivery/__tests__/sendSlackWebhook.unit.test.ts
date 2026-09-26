@@ -150,6 +150,7 @@ describe("sendSlackWebhook", () => {
   });
 
   describe("when the trigger matches a trace with events", () => {
+    /** @scenario "Notification links carry the timestamp" */
     it("interpolates the trace link, input/output, and event details into the mrkdwn text", async () => {
       sendMock.mockResolvedValue(undefined);
       await sendSlackWebhook({
@@ -161,6 +162,7 @@ describe("sendSlackWebhook", () => {
             output: "assistant answer",
             fullTrace: {
               trace_id: "trace-1",
+              timestamps: { started_at: 1714476000000 },
               events: [
                 {
                   event_type: "thumbs_up",
@@ -180,7 +182,7 @@ describe("sendSlackWebhook", () => {
       expect(sendMock).toHaveBeenCalledTimes(1);
       const text = sendMock.mock.calls[0]?.[0]?.text as string;
       expect(text).toContain("⚠️ LangWatch Trigger - *Quality Alert*");
-      expect(text).toContain("/demo/traces/trace-1|trace-1>");
+      expect(text).toContain("/demo/traces/trace-1?t=1714476000000|trace-1>");
       expect(text).toContain("*Input:* user question");
       expect(text).toContain("*Output:* assistant answer");
       expect(text).toContain("*Event Type:* thumbs_up");

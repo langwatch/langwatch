@@ -6,7 +6,7 @@
  * the datastore lane).
  *
  * @see ../selfProvisionLock.ts
- * @see ../../../../tasks/provisionLwql.ts
+ * @see ../selfProvisionEntry.ts
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";

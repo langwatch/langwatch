@@ -210,6 +210,7 @@ describe("GET /:traceId", () => {
   describe("when the caller passes a unique prefix", () => {
     /** @scenario Unique prefix resolves to the full trace */
     /** @scenario CLI `trace get` with truncated ID from `trace search` succeeds */
+    /** @scenario "The REST trace endpoints link with the timestamp" */
     it("returns the trace using the resolved full trace ID", async () => {
       // Service resolves the prefix and hands back the full trace
       const fullId = "63dc535cea6335c506bc81ef3543a07d";
@@ -225,7 +226,7 @@ describe("GET /:traceId", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.trace_id).toBe(fullId);
-      expect(body.platformUrl).toContain(fullId);
+      expect(body.platformUrl).toContain(`/traces/${fullId}?t=1000`);
       // Evaluations lookup keys on the FULL trace ID, not the prefix
       expect(mockGetEvaluationsMultiple).toHaveBeenCalledWith(
         "project-123",

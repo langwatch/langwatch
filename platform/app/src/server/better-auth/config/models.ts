@@ -114,6 +114,10 @@ export function models(): Pick<
     },
     verification: {
       modelName: "VerificationToken",
+      // SAML replay reservations are deterministic primary-key inserts. They
+      // must reach Prisma even when Redis is configured as secondary storage,
+      // both so valid assertions work and so the database rejects a replay.
+      storeInDatabase: true,
       fields: {
         identifier: "identifier",
         value: "token",

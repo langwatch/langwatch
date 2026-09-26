@@ -1,8 +1,7 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Permission } from "~/server/api/rbac";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
+import { resolveApiKeyPermission } from "~/server/app-layer/authz/credential-permissions";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
@@ -20,7 +19,7 @@ import type { ResolvedToken } from "../token-resolver";
  * @see specs/api-keys/scope-based-permissions.feature
  */
 
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
   resolveApiKeyPermission: vi.fn(),
 }));
 

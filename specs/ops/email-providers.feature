@@ -186,3 +186,17 @@ Feature: Email gateway providers
     Given a deployment configured with the enable toggle that email used to need
     When the deployment is rendered
     Then rendering fails explaining that naming a gateway is what turns email on
+
+  @unit @regression
+  Scenario: Resend retries reuse the same provider idempotency key
+    Given an event notification has a stable recipient delivery identity
+    When the same delivery is attempted again
+    Then Resend receives the same opaque idempotency key and message payload
+    And a different recipient delivery receives a different key
+
+  @unit @regression
+  Scenario: SMTP retries preserve the notification message identity
+    Given an event notification has a stable recipient delivery identity
+    When the same SMTP delivery is attempted again
+    Then its MIME message identifier remains the same
+    And a different recipient delivery has a different identifier

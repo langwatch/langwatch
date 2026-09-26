@@ -42,6 +42,25 @@ Feature: Langy works in a folder shared from the developer's machine
       Then my request is not among them
       And approving it with their session is refused
 
+    # A device login signs the command line in as the person's personal
+    # project, and the conversation that asked lives on a team project. The
+    # request is addressed to the person, so the login's project is not what
+    # finds it.
+    @integration
+    Scenario: A login on my personal project lists a request raised on a team project
+      Given a control request I created on a team project
+      When the CLI signed in as my personal project lists the open requests
+      Then my request is among them
+      And approving it mints the session key for the team project
+      And the conversation's address is on the team project
+
+    @integration
+    Scenario: A project key holds no requests
+      Given a control request I created
+      When the team project's own key lists the open requests
+      Then the list is refused, since no person is behind the key
+      And approving the request with that key is refused the same way
+
     @integration
     Scenario: Approving a request mints a session key for the conversation
       Given an open control request
@@ -99,11 +118,35 @@ Feature: Langy works in a folder shared from the developer's machine
       And no second turn is started
       And the running turn can use the folder from its next tool call
 
+    # On film the terminal connected nine seconds after a turn ended, while
+    # that turn's end was still being folded. The connect turn was refused as
+    # a second turn, no turn was left to pick the folder up, and the
+    # conversation sat with the folder connected and no answer.
+    @integration @unit
+    Scenario: A folder connected as a turn ends is answered once the turn's end is folded
+      Given an approved control request
+      And the turn before still reads as in flight when the CLI connects
+      When that turn's end is folded
+      Then one turn reads that the local folder is connected, under the key the direct start would have used
+      And the same end folded again starts no second turn
+      And a turn that placed a call on the folder before ending is followed by no connect turn
+      And a folder that stopped sharing before the turn ended is owed nothing
+
     @integration
     Scenario: The connection carries what Langy would otherwise probe
       When the CLI connects
       Then Langy learns the folder root, the git branch and remote, whether the tree is dirty, the operating system, the node and python versions, whether the GitHub CLI is signed in and the package manager
       And Langy does not spend a turn asking the folder for those
+
+    # The facts read the manager off a lock file, and a uv project with its
+    # lock file ignored, or not written yet, read as unknown: the venv uv made
+    # is the signal, and that venv has no pip in it.
+    @unit
+    Scenario: A folder uv manages names uv as its package manager
+      Given a folder with a uv.lock, or a pyproject.toml with a tool.uv table, or a .venv whose pyvenv.cfg names uv
+      When the CLI describes the folder
+      Then the facts name uv as the package manager, before any lock file of another language
+      And a plain venv beside a requirements.txt still names pip
 
     @integration
     Scenario: The connection survives a network blip
@@ -209,6 +252,49 @@ Feature: Langy works in a folder shared from the developer's machine
       And each takes the same parameters as the built-in it mirrors
       And each says in its description that it runs on the developer's machine
 
+    # A model offered both sets picks the sandbox one often enough: in one
+    # run it read the folder through local_read and then edited with the
+    # sandbox edit, got ENOENT twice, read that as the share being broken and
+    # stopped the whole path before the branch. While a folder is connected
+    # the sandbox file tools are not a wrong choice because they are not
+    # offered; bash stays for the langwatch CLI.
+    @unit
+    Scenario: The sandbox file tools are withdrawn while a folder is connected
+      Given a folder is connected to the conversation
+      When a turn starts
+      Then the worker's tool set has no sandbox read, edit, write, grep, find or ls
+      And it keeps bash, the local tools and every other tool
+      And a turn that starts with no folder connected has the sandbox file tools back
+      And a turn that starts while the app cannot say keeps them
+
+    # With the file tools gone, a run explored the worker's empty sandbox
+    # through bash instead ("not a git repository"), so the shell the model
+    # reaches for by its standard name lands in the folder while one is
+    # connected. The langwatch CLI is the exception: its cards, navigate opens
+    # and login belong to this conversation, so it runs in the sandbox either
+    # way.
+    @unit
+    Scenario: The shell runs in the folder while it is connected, and the CLI still runs here
+      Given a folder is connected to the conversation
+      When Langy runs a command through bash
+      Then the command runs on the developer's machine through the local_bash path, permission card and all
+      And a langwatch command runs in the sandbox, where the CLI has this conversation's login
+      And with no folder connected bash is the sandbox shell
+
+    # The manager's GitHub gate and the panel's install card once stood down
+    # by the tool name starting with local_. The shell that delegates to the
+    # folder is named bash, so a git push there raised the install card, killed
+    # the turn and disconnected the folder. The settled call now carries where
+    # it ran, and both read that instead of the name.
+    @unit
+    Scenario: A push or gh command in the shared folder never raises the GitHub install card
+      Given a folder is connected to the conversation
+      When Langy runs a git push or a gh command through bash
+      Then the settled call is marked as run in the developer's folder
+      And the manager's GitHub gate stands down on that marker, as it does on a local tool
+      And the same command with no marker still trips the gate as a sandbox push
+      And the panel's install card stands down on the same marker
+
     @integration
     Scenario: A local call travels to the CLI and its result comes back
       Given a connected folder
@@ -252,6 +338,23 @@ Feature: Langy works in a folder shared from the developer's machine
       When Langy makes a local call
       Then the tool result says no folder is connected and names the code access step
       And Langy asks for code access instead of retrying
+
+    # The worker's own conversation was accepted before the worker existed,
+    # but the app reads it from a projection folded afterwards; the first
+    # code access check of a conversation can land before that fold.
+    @unit
+    Scenario: A code access check that beats the conversation projection waits for it
+      Given a worker on a conversation whose projection row has not been folded yet
+      When Langy asks for code access and the app answers not found
+      Then the worker reads the folder state again until the app answers
+      And the code access card is raised as usual
+
+    @unit
+    Scenario: A code access check whose conversation never appears says the app did not answer
+      Given a worker whose conversation the app keeps answering not found for
+      When Langy asks for code access and the wait runs out
+      Then the tool result says the app did not answer the code access check
+      And no control request is created
 
     @unit
     Scenario: A command stopped at its time limit says the limit and how to raise it
@@ -298,6 +401,46 @@ Feature: Langy works in a folder shared from the developer's machine
       And the folder is still connected
       Then Langy reads that the call was lost and to run the command one more time
       And Langy does not read that the shared folder is gone
+
+    @unit
+    Scenario: A validation refusal reaches Langy as the issues, not as a lost call
+      Given the app refuses a local call with the parameters it found invalid
+      When the worker reads the refusal
+      Then Langy reads each issue with the parameter it names and that it can call the tool again
+      And Langy does not read that the call was lost or that the folder is gone
+      And the call is posted once
+
+    @unit
+    Scenario: An edit can append to the end of a file
+      Given an edit whose entry carries text to append instead of old text
+      When the command line applies it
+      Then the text is added as the last line of the file, which is created when absent
+      And a replacement in a file that is not there is still refused
+
+  Rule: The app gets its LangWatch key from the developer's login, never from Langy
+
+    @unit
+    Scenario: The app gets the project's key through the developer's own login
+      Given a folder shared by a developer whose login may update the project
+      When Langy asks for the project's credentials in the app's env file
+      Then the command line fetches the project's key with the developer's own login
+      And writes LANGWATCH_API_KEY and LANGWATCH_ENDPOINT into the file, keeping every other line
+      And the key appears in no frame, no result and no terminal line
+
+    @unit
+    Scenario: The key is refused when the login lacks the permission
+      Given a folder shared by a developer whose login may not update the project
+      When Langy asks for the project's credentials
+      Then the answer is the refusal code, naming the permission, the project and the file
+      And the env file is left as it was
+
+    @unit
+    Scenario: The credentials are not written when the terminal has no endpoint
+      Given a shared folder whose command line was started without an endpoint
+      When Langy asks for the project's credentials
+      Then the call fails the way the missing project does, naming the file
+      And the key is never requested and the env file is left as it was
+      And the app is never pointed at the cloud
 
   Rule: The session key is the only credential and it ends with the conversation
 

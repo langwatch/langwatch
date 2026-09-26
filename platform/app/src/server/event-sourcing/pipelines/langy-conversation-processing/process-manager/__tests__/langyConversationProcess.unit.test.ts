@@ -394,6 +394,24 @@ describe("LangyConversationProcess", () => {
       );
       expect(titles).toHaveLength(0);
     });
+
+    /** @scenario "A title chosen at creation is never replaced by a generated one" */
+    it("records no automatic title for a conversation created with a title", async () => {
+      await deliver([
+        conversationStartedEvent({
+          id: "evt_conv",
+          occurredAt: T0,
+          title: "Getting started",
+        }),
+        ...turnCycle(1, T0 + 1_000),
+      ]);
+
+      expect((await state()).titleSource).toBe("user");
+      const titles = (await store.findMessagesByRef({ ref })).filter(
+        (m) => m.intentType === LANGY_PROCESS_INTENT_TYPES.GENERATE_TITLE,
+      );
+      expect(titles).toHaveLength(0);
+    });
   });
 
   describe("given a shutdown handoff (ADR-048)", () => {

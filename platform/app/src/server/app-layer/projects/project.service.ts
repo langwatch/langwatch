@@ -11,6 +11,7 @@ import {
   productionLangWatchQLNames,
 } from "~/server/analytics/lwql/provisioning";
 import { parseConnectionUrl } from "~/server/clickhouse/goose";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -37,12 +38,21 @@ export interface OrgAdminResolution {
   userId: string | null;
   organizationId: string | null;
   firstMessage: boolean;
+  /**
+   * Which onboarding the organization went through, so a milestone tracked
+   * against the admin can be split by variant. Null before the experiment.
+   */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 const NULL_RESOLUTION: OrgAdminResolution = {
   userId: null,
   organizationId: null,
   firstMessage: false,
+  onboardingVariant: null,
+  organizationCreatedAt: null,
 };
 
 export class ProjectNotFoundError extends Error {
@@ -590,6 +600,8 @@ export class ProjectService {
         userId: result.adminUserId,
         organizationId: result.organizationId,
         firstMessage: result.firstMessage,
+        onboardingVariant: result.onboardingVariant,
+        organizationCreatedAt: result.organizationCreatedAt,
       };
     } catch (error) {
       logger.error(

@@ -26,6 +26,17 @@ Feature: Analytics CLI Commands
     When I run "langwatch analytics query"
     Then the output mentions available presets including trace-count, total-cost, avg-latency
 
+  @unit
+  Scenario: Query with the traces.count alias
+    When I run "langwatch analytics query --metric traces.count"
+    Then the query counts distinct traces, the way the trace-count preset does
+
+  @unit
+  Scenario: An unknown metric is refused with the known list
+    When I run "langwatch analytics query --metric spans.count"
+    Then no request is sent
+    And I see an error naming the value, the presets and the metric paths the platform accepts
+
   Scenario: Run analytics command without API key
     Given LANGWATCH_API_KEY is not set
     When I run "langwatch analytics query"

@@ -269,6 +269,13 @@ Feature: Scenario infrastructure error surfacing and empty-response state
     Then the handled error code is "scenario_model_empty_response"
     And the message names the judge model
 
+  @unit
+  Scenario: The empty-response error is raised only after the simulator retried
+    Given a scenario run failed because the model that plays the simulated user returned no text
+    When the failure is classified
+    Then the hint says the simulation asked the model again twice before giving up
+    And a judge failure carries no such line, since the judge is never asked again
+
   # The message says what happened; the detail says where. A reader who opens
   # the details gets the stack the runner recorded, so the raw text is kept
   # rather than lost, but it is never what the panel opens with.

@@ -10,6 +10,7 @@
  * Requires: PostgreSQL database (Prisma)
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -17,10 +18,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
@@ -126,22 +127,18 @@ describe("Langy session key (caller-scoped)", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    const customRole = await prisma.customRole.create({
-      data: {
-        name: `limited-${ns}`,
-        organizationId,
-        permissions: LIMITED_ROLE_PERMISSIONS,
-      },
+    const customRole = await seedCustomRole(prisma, {
+      name: `limited-${ns}`,
+      organizationId,
+      permissions: LIMITED_ROLE_PERMISSIONS,
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: editorUserId,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: customRole.id,
-        scopeType: RoleBindingScopeType.PROJECT,
-        scopeId: projectId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: editorUserId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: customRole.id,
+      scopeType: RoleBindingScopeType.PROJECT,
+      scopeId: projectId,
     });
 
     // Experimenter: holds the experiment surface the ordinary way, so the
@@ -158,22 +155,18 @@ describe("Langy session key (caller-scoped)", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    const experimenterRole = await prisma.customRole.create({
-      data: {
-        name: `experimenter-${ns}`,
-        organizationId,
-        permissions: EXPERIMENTER_ROLE_PERMISSIONS,
-      },
+    const experimenterRole = await seedCustomRole(prisma, {
+      name: `experimenter-${ns}`,
+      organizationId,
+      permissions: EXPERIMENTER_ROLE_PERMISSIONS,
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId,
-        userId: experimenterUserId,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: experimenterRole.id,
-        scopeType: RoleBindingScopeType.PROJECT,
-        scopeId: projectId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId,
+      userId: experimenterUserId,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: experimenterRole.id,
+      scopeType: RoleBindingScopeType.PROJECT,
+      scopeId: projectId,
     });
 
     // No-access: an org member with NO project/team binding at all.
@@ -193,8 +186,10 @@ describe("Langy session key (caller-scoped)", () => {
   afterAll(async () => {
     // RoleBinding → ApiKey is onDelete: Restrict, so bindings must go first.
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["apiKey", { organizationId }],
+      ["role", { organizationId }],
       ["customRole", { organizationId }],
       ["project", { teamId }],
       ["organizationUser", { organizationId }],

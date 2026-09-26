@@ -48,6 +48,7 @@ export type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccountsPort,
+  IdentityConnectionIssuersPort,
   IdentityIssuerResolution,
   IdentityResolution,
   IdentityResolutionPort,

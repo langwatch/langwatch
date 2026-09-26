@@ -1,28 +1,8 @@
-/**
- * ADR-092 decision 25 — the ONE data seam behind every permission check,
- * imperative and declared alike. Only this repository touches the client;
- * the service above it takes the repository, and the boundaries take the
- * service.
- *
- * The implementation delegates to the fork-aware resolvers in `rbac.ts`:
- * a not-yet-migrated organization is decided by the legacy walk and a
- * migrated one by the engine, chosen by the organization's migration status
- * alone — no shadow or reverse-shadow comparison at request time. The contract
- * PR rewires ONLY this class onto the engine — nothing above it learns.
- */
+/** Adapts the grants engine to the permission service contract. */
 import type { AuthzDenialReason, AuthzPermission } from "@langwatch/authz";
-import type {
-  OrganizationUserRole,
-  PrismaClient,
-} from "~/generated/prisma/client";
-import {
-  hasOrganizationPermission,
-  organizationDenialReason,
-  resolveProjectPermission,
-  resolveProjectPermissionAny,
-  resolveTeamPermission,
-} from "~/server/api/rbac";
-import type { Session } from "~/server/auth";
+import type { AuthzService } from "@langwatch/authz-server";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
+import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
 
 export type PermissionDecision = {
   permitted: boolean;
@@ -30,7 +10,7 @@ export type PermissionDecision = {
   /**
    * Why the check failed, when it did — the boundary needs it to pick the
    * error a caller can act on. Absent on a permitted decision, and on the
-   * legacy walk, which never produced one.
+   * checks with no resolved scope.
    */
   denialReason?: AuthzDenialReason;
 };
@@ -58,25 +38,28 @@ export interface PermissionDecisionRepository {
   }): Promise<PermissionDecision>;
 }
 
-export class ForkAwarePermissionDecisionRepository
+export class EnginePermissionDecisionRepository
   implements PermissionDecisionRepository
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  readonly #authz: AuthzService;
 
-  async findProjectDecision({
-    userId,
-    projectId,
-    permission,
-  }: {
+  private constructor(authz: AuthzService) {
+    this.#authz = authz;
+  }
+
+  static create(authz: AuthzService): EnginePermissionDecisionRepository {
+    return new EnginePermissionDecisionRepository(authz);
+  }
+
+  async findProjectDecision(input: {
     userId: string;
     projectId: string;
     permission: AuthzPermission;
   }): Promise<PermissionDecision> {
-    return await resolveProjectPermission(
-      this.resolverContextFor(userId),
-      projectId,
-      permission,
-    );
+    if (isDemoProject(input.projectId, input.permission)) {
+      return { permitted: true, organizationRole: null };
+    }
+    return this.#check(input);
   }
 
   async findProjectAnyDecision({
@@ -88,74 +71,58 @@ export class ForkAwarePermissionDecisionRepository
     projectId: string;
     permissions: readonly AuthzPermission[];
   }): Promise<PermissionDecision> {
-    return await resolveProjectPermissionAny(
-      this.resolverContextFor(userId),
+    if (
+      permissions.some((permission) => isDemoProject(projectId, permission))
+    ) {
+      return { permitted: true, organizationRole: null };
+    }
+    const decision = await this.#authz.canAnyByIds({
+      principal: { type: "user", id: userId },
       projectId,
       permissions,
-    );
+    });
+    return {
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
+    };
   }
 
-  async findTeamDecision({
-    userId,
-    teamId,
-    permission,
-  }: {
+  findTeamDecision(input: {
     userId: string;
     teamId: string;
     permission: AuthzPermission;
   }): Promise<PermissionDecision> {
-    return await resolveTeamPermission(
-      this.resolverContextFor(userId),
-      teamId,
-      permission,
-    );
+    return this.#check(input);
   }
 
-  async findOrganizationDecision({
-    userId,
-    organizationId,
-    permission,
-  }: {
+  async findOrganizationDecision(input: {
     userId: string;
     organizationId: string;
     permission: AuthzPermission;
   }): Promise<PermissionDecision> {
-    const ctx = this.resolverContextFor(userId);
-    const permitted = await hasOrganizationPermission(
-      ctx,
-      organizationId,
-      permission,
-    );
-    return {
-      permitted,
-      // The organization walk carries no membership role in its answer, and
-      // legacy never put one on the context either.
-      organizationRole: null,
-      // Asked for only on a refusal, so the permitted path pays nothing.
-      ...(permitted
-        ? {}
-        : {
-            denialReason: await organizationDenialReason({
-              ctx,
-              organizationId,
-            }),
-          }),
-    };
+    const decision = await this.#check(input);
+    return { ...decision, organizationRole: null };
   }
 
-  /**
-   * The resolvers grew up inside tRPC middleware, so they take a request
-   * context — of which they read only `prisma` and `session.user.id`. This
-   * shim is the single place that legacy shape is manufactured; it goes with
-   * the resolvers when the contract PR lands.
-   */
-  private resolverContextFor(userId: string): {
-    prisma: PrismaClient;
-    session: Session;
-  } {
+  async #check({
+    userId,
+    ...scope
+  }: {
+    userId: string;
+    permission: AuthzPermission;
+    projectId?: string;
+    teamId?: string;
+    organizationId?: string;
+  }): Promise<PermissionDecision> {
+    const decision = await this.#authz.checkByIds({
+      principal: { type: "user", id: userId },
+      ...scope,
+    });
     return {
-      prisma: this.prisma,
-      session: { user: { id: userId }, expires: "" } satisfies Session,
+      permitted: decision.allowed,
+      organizationRole: decision.organizationRole,
+      denialReason: decision.denialReason,
     };
   }
 }

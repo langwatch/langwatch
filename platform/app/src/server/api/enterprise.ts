@@ -14,6 +14,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   RBAC: "Custom roles require an Enterprise plan",
   AUDIT_LOGS: "Audit logs require an Enterprise plan",
   SCIM: "SCIM provisioning requires an Enterprise plan",
+  SSO: "Single sign-on requires an Enterprise plan",
   ANOMALY_RULES: "Anomaly rules require an Enterprise plan",
   ACTIVITY_MONITOR: "The activity monitor requires an Enterprise plan",
   GOVERNANCE_COST: "Governance cost views require an Enterprise plan",
@@ -21,6 +22,7 @@ export const ENTERPRISE_FEATURE_ERRORS = {
   OCSF_EXPORT: "OCSF compliance export requires an Enterprise plan",
   MANAGEMENT_API: "The management API requires an Enterprise plan",
   GROUPS: "Groups require an Enterprise plan",
+  SIGN_IN_SECURITY: "Sign-in security controls require an Enterprise plan",
 } as const;
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
@@ -35,8 +37,10 @@ export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
  * upgrade guidance without a UI. `fault` stays `customer`: the refusal is an
  * account state the customer resolves, not a platform failure.
  *
- * REST-only by design: the tRPC surface keeps `requireEnterprisePlan` below,
- * which answers FORBIDDEN with the same sentences.
+ * Thrown from REST routes and from the tRPC procedures whose refusal the
+ * client presents by code (the single sign-on setup router); the older tRPC
+ * procedures keep `requireEnterprisePlan` below, which answers FORBIDDEN with
+ * the same sentences.
  */
 export class EnterprisePlanRequiredError extends HandledError {
   declare readonly code: "enterprise_plan_required";

@@ -26,14 +26,18 @@
                 "trace get",
                 "trace export",
                 "trace transcript",
-                "session events"
+                "session events",
+                "trace facets",
+                "trace fields"
               ],
               "hints": {
                 "trace search": "langwatch trace search -q \"timeout\" --limit 10 -o json",
                 "trace get": "langwatch trace get <traceId> -o json",
                 "trace export": "langwatch trace export --start-date 2026-01-01 -f jsonl -o traces.jsonl",
                 "trace transcript": "langwatch trace transcript <traceId> -o json",
-                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json"
+                "session events": "langwatch session events <sessionId> --kinds model_call,compaction -o json",
+                "trace facets": "langwatch trace facets model --prefix gpt -o json",
+                "trace fields": "langwatch trace fields -o json"
               },
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
@@ -93,6 +97,48 @@
           "produces": [
             "metrics"
           ],
+          "consumes": [
+            "traces"
+          ]
+        },
+        {
+          "id": "observability.custom-query",
+          "name": "Custom Query",
+          "description": "Query traces two ways: LangWatchQL analytics SQL for counts, rates and joins, and the trace filter language for finding traces",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "typescript": "langwatch.query"
+              },
+              "cli": [
+                "query run",
+                "query schema",
+                "query reference",
+                "query examples"
+              ],
+              "hints": {
+                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
+                "query schema": "langwatch query schema -f json",
+                "query reference": "langwatch query reference -f json",
+                "query examples": "langwatch query examples --tag cost"
+              },
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/experiments/workbench",
+              "mcp": [
+                "run_query",
+                "discover_schema"
+              ],
+              "skill": null,
+              "docs": null
+            },
+            "api": "/api/v1/query",
+            "docs": null
+          },
+          "sync": "code-to-platform",
+          "produces": [],
           "consumes": [
             "traces"
           ]
@@ -287,6 +333,56 @@
             "evaluators"
           ],
           "notes": "Platform side uses Monitors. Code side includes guardrails (as_guardrail=True for sync blocking)."
+        },
+        {
+          "id": "evaluations.instant-evals",
+          "name": "Instant Evals",
+          "description": "Search your entire production history with on-demand evals: ask one question of every trace, conversation or model call and get the matches back",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": "client.instantEvals",
+                "go": null
+              },
+              "cli": [
+                "instant-eval run",
+                "instant-eval estimate",
+                "instant-eval status",
+                "instant-eval list",
+                "instant-eval results",
+                "instant-eval sample",
+                "instant-eval cancel"
+              ],
+              "hints": {
+                "instant-eval run": "langwatch instant-eval run \"the customer sounds annoyed\" --target threads --last 7d --limit 100 --wait",
+                "instant-eval estimate": "langwatch instant-eval estimate \"the customer sounds annoyed\" --target threads --last 30d --limit 10000",
+                "instant-eval status": "langwatch instant-eval status <id> --wait -o json",
+                "instant-eval list": "langwatch instant-eval list -o json",
+                "instant-eval results": "langwatch instant-eval results <id> --matched -o json",
+                "instant-eval sample": "langwatch instant-eval sample <id> -n 5",
+                "instant-eval cancel": "langwatch instant-eval cancel <id>"
+              },
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/features/instant-evals/cli.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": [],
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/features/instant-evals/overview.md"
+            },
+            "api": "/api/v1/instant-evals",
+            "docs": "https://langwatch.ai/docs/features/instant-evals/overview.md"
+          },
+          "sync": null,
+          "produces": [
+            "judgments"
+          ],
+          "consumes": [
+            "traces"
+          ],
+          "notes": "Behind the release_instant_evals flag. The input is one LangWatchQL statement; a target and questions have the statement written for them and it is handed back on the run."
         }
       ]
     },
@@ -1824,7 +1920,8 @@
       "agent-best-practices": "Expert AI engineering consultant for your LangWatch setup",
       "evaluate-multimodal": "Evaluate multimodal agents (images, audio, PDFs)",
       "generate-rag-dataset": "Generate synthetic evaluation dataset from your RAG knowledge base",
-      "test-compliance": "Test that your agent stays observational in regulated domains"
+      "test-compliance": "Test that your agent stays observational in regulated domains",
+      "find-traces": "Find the traces a description names: drive the Trace Explorer or answer with cards, trying every form a concept can take"
     }
   }
 }

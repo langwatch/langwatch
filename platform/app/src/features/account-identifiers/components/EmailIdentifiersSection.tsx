@@ -86,8 +86,8 @@ export function EmailIdentifiersSection({
   const sentTo = resentTo;
 
   const rows = identifiers.data ?? [];
-  const emailRows = rows.filter((row) => row.provider === "email");
   const ownAddress = confirmation.data?.email ?? null;
+  const emailRows = emailRowsOf({ rows, confirmation: confirmation.data });
 
   const refresh = useRefreshEmailIdentifiers();
 
@@ -140,7 +140,7 @@ export function EmailIdentifiersSection({
       emailRows={emailRows}
       ownAddress={ownAddress}
       ownAddressConfirmed={confirmation.data?.confirmed === true}
-      ownAddressResendable={confirmation.data?.confirmed === false}
+      ownAddressResendable={canResendOwnAddress(confirmation.data)}
       ownAddressSending={ownResend.isPending}
       sentTo={sentTo}
       lastUsedByIdentifier={lastUsed.data?.byIdentifier}
@@ -162,6 +162,41 @@ export function EmailIdentifiersSection({
       trailingActions={trailingActions}
     />
   );
+}
+
+type OwnAddressConfirmation = {
+  email: string | null;
+  confirmed: boolean;
+  canSendConfirmation: boolean;
+};
+
+function canResendOwnAddress(
+  confirmation: OwnAddressConfirmation | undefined,
+): boolean {
+  return (
+    confirmation?.confirmed === false &&
+    confirmation.canSendConfirmation !== false
+  );
+}
+
+/**
+ * The email rows, with every resend taken away where the installation has no
+ * email provider and so could never send a link.
+ */
+function emailRowsOf({
+  rows,
+  confirmation,
+}: {
+  rows: AccountIdentifier[];
+  confirmation: OwnAddressConfirmation | undefined;
+}): AccountIdentifier[] {
+  return rows
+    .filter((row) => row.provider === "email")
+    .map((row) =>
+      confirmation?.canSendConfirmation === false
+        ? { ...row, resendable: false }
+        : row,
+    );
 }
 
 function useRefreshEmailIdentifiers() {

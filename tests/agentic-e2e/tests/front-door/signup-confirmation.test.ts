@@ -1,61 +1,41 @@
 /**
  * Feature: The first-party sign-in and sign-up screens
  * Source: specs/identity/signin-signup-screens.feature
- * Also binds: specs/identity/passkeys.feature
  *
- * Bug-bash findings covered:
- *   #1  Sign up, open the confirmation link: land in the app signed in, with
- *       no passkey error and no second password prompt.
- *   #6  An account created without a display name is called by its email
- *       address, never "null".
- *   #11 Passkey sign-up from the verify link moves forward.
+ * CI is an installation with no email provider, so sign-up there asks for a
+ * password straight away and leaves the address unconfirmed. The mailed-link
+ * flow is covered by the component and integration suites.
  *
- * Named `.test.ts` rather than this package's usual `.spec.ts` so
- * `check-feature-parity.ts`'s `TEST_FILE_RE` (`/\.test\.tsx?$/`) picks up the
- * `@scenario` annotations below — Playwright's default `testMatch` already
- * covers both suffixes, so this costs nothing at collection time. See the
- * added `tests/agentic-e2e/tests` root in `check-feature-parity.ts`.
+ * Named `.test.ts` so `check-feature-parity.ts` picks up the `@scenario`
+ * annotations below; Playwright's default `testMatch` covers both suffixes.
  */
 import { type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import {
-  addVirtualAuthenticator,
-  removeVirtualAuthenticator,
-} from "./webauthn";
+import { closeDb, isAddressConfirmed } from "./db";
 import {
   FRONT_DOOR_PASSWORD,
-  findSignUpTokenFor,
   generateFrontDoorEmail,
   givenIAmOnTheSignUpScreen,
   givenMyAccountHasAWorkspace,
-  signUpVerificationTokenAfterResponse,
   thenIAmCalledByMyEmailNeverNull,
-  thenTheLinkSignsMeInWithNoSecondPrompt,
-  whenIOpenTheConfirmationLinkFor,
+  thenIAmSignedInWithNoSecondPrompt,
 } from "./steps";
 
-// Reached signed out — never inherit the shared browser-test@langwatch.ai
+// Reached signed out: never inherit the shared browser-test@langwatch.ai
 // session this package's other suites reuse.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test.describe("Sign-up confirmation", () => {
-  async function whenIRequestSignUpVerification(
-    page: Page,
-    email: string,
-  ): Promise<void> {
+test.afterAll(async () => {
+  await closeDb();
+});
+
+test.describe("Sign-up without email", () => {
+  async function whenIStartSignUpWith(page: Page, email: string) {
     await page.getByLabel("Email", { exact: true }).fill(email);
-    const requestFinished = page.waitForResponse((response) =>
-      response.url().includes("/api/trpc/auth.requestSignUpVerification"),
-    );
     await page.getByRole("button", { name: "Continue", exact: true }).click();
-    const response = await requestFinished;
-    await signUpVerificationTokenAfterResponse(response, email);
-    if (response.ok()) {
-      await expect(page.getByTestId("verification-sent")).toBeVisible();
-    }
   }
 
-  async function whenIChooseAPasswordAfterProof(page: Page): Promise<void> {
+  async function whenIChooseAPassword(page: Page): Promise<void> {
     await page
       .getByLabel("Password", { exact: true })
       .fill(FRONT_DOOR_PASSWORD);
@@ -67,34 +47,24 @@ test.describe("Sign-up confirmation", () => {
       .click();
   }
 
-  /**
-   * Scenario: Opening the link unlocks credential choice
-   * Source: signin-signup-screens.feature lines 243-249
-   */
-  // @scenario "Opening the link unlocks credential choice"
-  test("opening the confirmation link unlocks password choice before a session", async ({
+  // @scenario "An installation that cannot send email signs up with a password and leaves the address unconfirmed"
+  test("asks for a password straight away and leaves the address unconfirmed", async ({
     page,
   }) => {
-    const email = generateFrontDoorEmail("confirm");
+    const email = generateFrontDoorEmail("no-email");
 
     await givenIAmOnTheSignUpScreen(page);
-    await whenIRequestSignUpVerification(page, email);
-    await whenIOpenTheConfirmationLinkFor(page, email);
-    await expect(page.getByTestId("verified-address")).toContainText(email);
-    await whenIChooseAPasswordAfterProof(page);
-    await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
+    await whenIStartSignUpWith(page, email);
+    await expect(page.getByTestId("unconfirmed-address")).toContainText(email);
+    await expect(page.getByTestId("passkey-sign-up")).toHaveCount(0);
+    await whenIChooseAPassword(page);
+    await thenIAmSignedInWithNoSecondPrompt(page, email);
+    expect(await isAddressConfirmed(email)).toBe(false);
   });
 
   /**
-   * Bug-bash finding #6, folded onto the same fresh account: sign-up never
-   * asks for a name (`SignUpCredentialForm`'s own comment: "Onboarding asks
-   * for it... putting it here charges a field at the one moment somebody has
-   * least patience for one"), so the account this test just confirmed is
+   * Bug-bash finding #6: sign-up never asks for a name, so a fresh account is
    * exactly the shape `displayNameFor` exists to handle.
-   *
-   * No standalone scenario names this in the four bound specs; recorded here
-   * as a new one on the account-menu behaviour `displayName.ts`'s own doc
-   * comment already describes as the bug ("null (sam@acme.com)").
    */
   // @scenario "An account with no display name is called by its email, never null"
   test("an account with no display name is called by its email, never 'null'", async ({
@@ -103,44 +73,12 @@ test.describe("Sign-up confirmation", () => {
     const email = generateFrontDoorEmail("noname");
 
     await givenIAmOnTheSignUpScreen(page);
-    await whenIRequestSignUpVerification(page, email);
-    await whenIOpenTheConfirmationLinkFor(page, email);
-    await expect(page.getByTestId("verified-address")).toContainText(email);
-    await whenIChooseAPasswordAfterProof(page);
-    await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
+    await whenIStartSignUpWith(page, email);
+    await expect(page.getByTestId("unconfirmed-address")).toContainText(email);
+    await whenIChooseAPassword(page);
+    await thenIAmSignedInWithNoSecondPrompt(page, email);
 
     await givenMyAccountHasAWorkspace(page);
     await thenIAmCalledByMyEmailNeverNull(page, email);
-  });
-
-  /**
-   * Scenario: Signing up with a passkey consumes the verified address proof
-   * Source: signin-signup-screens.feature lines 274-279
-   *
-   * The proof is obtained before the passkey ceremony. The confirmed branch
-   * passes that proof to the real WebAuthn registration and opens the session
-   * only after the account and credential are created.
-   */
-  // @scenario "Signing up with a passkey consumes the verified address proof"
-  test("a verified address can be finished with a passkey and signs in", async ({
-    page,
-  }) => {
-    const email = generateFrontDoorEmail("passkey-signup");
-    const authenticator = await addVirtualAuthenticator(page);
-
-    try {
-      await givenIAmOnTheSignUpScreen(page);
-      await whenIRequestSignUpVerification(page, email);
-      await whenIOpenTheConfirmationLinkFor(page, email);
-      await expect(page.getByTestId("verified-address")).toContainText(email);
-      await expect(page.getByTestId("passkey-sign-up")).toBeVisible();
-      await page.getByTestId("passkey-sign-up").click();
-      await expect(
-        page.getByText("Could not create a passkey", { exact: false }),
-      ).toHaveCount(0);
-      await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
-    } finally {
-      await removeVirtualAuthenticator(authenticator);
-    }
   });
 });

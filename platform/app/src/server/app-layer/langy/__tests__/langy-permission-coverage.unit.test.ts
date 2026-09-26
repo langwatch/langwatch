@@ -24,9 +24,12 @@
  * Runs in the UNIT lane: this reads the in-memory route registry and needs no
  * database. A drift guard is worth most when it runs often.
  */
+
+import { permissionSatisfiedBy } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 
-import { hasPermissionWithHierarchy } from "~/server/api/rbac";
+const hasPermissionWithHierarchy = (permissions: string[], requested: string) =>
+  permissionSatisfiedBy({ granted: new Set(permissions), requested });
 
 import { LANGY_CANDIDATE_PERMISSIONS } from "../langyApiKey";
 import {

@@ -6,40 +6,32 @@
  * the runtime `LWQL_*` connection. No I/O happens here — every function
  * takes its inputs as parameters and returns SQL statements, a name, or a
  * plan, so the composition itself is unit-testable without a database.
- * `src/tasks/provisionLwql.ts` is the only caller and the only place that
+ * `selfProvisionEntry.ts` is the only caller and the only place that
  * touches a client, an env var beyond what it hands in here, or Postgres.
  *
- * ## What this deploy provisions, and what it does not
+ * ## What this module composes
  *
- * The ClickHouse access model — restricted user, settings profile, grants,
- * row policies — and the PostgreSQL-mapped views are infra's job: terraform
- * provisions both out of band, against a server-managed identity a
- * `CREATE USER`/`GRANT` issued here would be rejected against. This module
- * therefore composes only three things: the ClickHouse-native views
- * ({@link productionClickHouseObjectStatements}), the PostgreSQL-side
- * approved views ({@link productionPostgresApprovedViewStatements}), and the
- * key-map backfill plan ({@link planLwqlKeyMapBackfill}).
+ * The application owns the LangWatchQL access model on every deployment and
+ * converges the ClickHouse side — restricted user, settings profile, grants,
+ * row policies, views — through `selfProvisioning.ts` at boot (ADR-142). What
+ * remains here is the PostgreSQL half and the key map: this module composes
+ * the PostgreSQL-side approved views
+ * ({@link productionPostgresApprovedViewStatements}) and the key-map backfill
+ * plan ({@link planLwqlKeyMapBackfill}) that `selfProvisionEntry.ts` runs.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import type { LangWatchQLViewDefinition } from "../catalog/types";
-import { isPostgresResident } from "../catalog/types";
 import type { LangWatchQLConnection } from "../connection";
-import { postgresLiteral, postgresQuoted } from "../sqlText";
 import {
   KEY_MAP_COLUMNS,
   type LangWatchQLNames,
   qualified,
 } from "./accessModel";
-import {
-  lwqlApprovedPostgresViewNames,
-  lwqlPostgresApprovedViewStatements,
-  lwqlViewStatement,
-  SHIPPED_LWQL_DEDUP,
-} from "./catalogStatements";
+import { lwqlPostgresApprovedViewStatements } from "./catalogStatements";
 
 /**
  * Literal, hard-coded match for the table name the SaaS row-filter subqueries
@@ -109,9 +101,8 @@ export function productionLangWatchQLNames({
  *
  * Always migration 00084's table, created under the app's own ClickHouse
  * database (`sourceDatabase`, matching goose's `${CLICKHOUSE_DATABASE}`) —
- * the same database infra's row filters already reference. Never
- * `names.database`: this deploy provisions no key-map table of its own (see
- * {@link productionClickHouseObjectStatements}'s doc comment).
+ * the same database the row filters already reference. Never `names.database`:
+ * this deploy provisions no key-map table of its own; migration 00084 owns it.
  */
 export function lwqlKeyMapTableQualifiedName({
   names,
@@ -124,112 +115,38 @@ export function lwqlKeyMapTableQualifiedName({
 }
 
 /**
- * ClickHouse-native views only. Never grants, policies, a user, a profile, or
- * the key-map table (migration 00084 already created it) — the ClickHouse
- * access model and the PostgreSQL-mapped views are infra's job, provisioned
- * out of band (see the module doc comment).
- */
-export function productionClickHouseObjectStatements({
-  names,
-  sourceDatabase,
-  views = LWQL_VIEW_CATALOG,
-}: {
-  names: LangWatchQLNames;
-  sourceDatabase: string;
-  views?: readonly LangWatchQLViewDefinition[];
-}): string[] {
-  return [
-    `CREATE DATABASE IF NOT EXISTS ${names.database}`,
-    ...views
-      .filter((view) => !isPostgresResident(view))
-      .map((view) =>
-        lwqlViewStatement({
-          names,
-          sourceDatabase,
-          view,
-          dedup: SHIPPED_LWQL_DEDUP,
-        }),
-      ),
-  ];
-}
-
-/**
  * The PostgreSQL-side approved views. Independent of ClickHouse credentials —
  * always runs.
  */
 export function productionPostgresApprovedViewStatements({
   schema = LWQL_POSTGRES_SCHEMA,
   views = LWQL_VIEW_CATALOG,
+  readerRole,
 }: {
   /** From {@link lwqlPostgresSchemaFromDatabaseUrl} in a real deploy. */
   schema?: string;
   views?: readonly LangWatchQLViewDefinition[];
+  /**
+   * Forwarded to {@link lwqlPostgresApprovedViewStatements} — the reader role
+   * whichever mode this boot converges the role under (see
+   * `LWQL_POSTGRES_READER_ROLE` and `src/tasks/provisionLwql.ts`).
+   */
+  readerRole?: string;
 } = {}): string[] {
   return lwqlPostgresApprovedViewStatements({
     schema,
     views,
+    readerRole,
   });
 }
 
 /**
- * The PostgreSQL role the ClickHouse named collection dials as. Provisioned
- * out of band (terraform in the cloud, self-provisioning elsewhere); this
- * module only ever grants it read access to views it just created.
+ * The PostgreSQL role the ClickHouse named collection dials as. The app
+ * converges it as part of the self-provisioned model (see
+ * `selfHostedPostgresReaderStatements`) and grants it read access to the
+ * approved views.
  */
 export const LWQL_POSTGRES_READER_ROLE = "lwql_ro";
-
-/**
- * Grants the reader role SELECT on every approved view, to be run straight
- * after {@link productionPostgresApprovedViewStatements} creates them.
- *
- * This exists because the two halves are provisioned by different systems on
- * different schedules. Out-of-band provisioning grants the role whatever
- * views exist *at the moment it runs*, and re-runs only when its own inputs
- * change — so a view this task adds later (a new catalog dataset, a first
- * deploy that lands before the grant job) is created with no grant on it, and
- * every query touching it fails `ACCESS_DENIED` until someone re-runs the
- * grant job by hand. Re-granting here on every boot makes the app converge
- * its own views and removes the ordering dependency entirely.
- *
- * Grants only — never `CREATE ROLE`, never a password. This code path holds
- * no reader credential and must not invent one: if the role is absent the
- * whole block is a no-op, so a deployment that has not provisioned the reader
- * yet is unaffected rather than broken.
- */
-export function productionPostgresReaderGrantStatements({
-  schema = LWQL_POSTGRES_SCHEMA,
-  role = LWQL_POSTGRES_READER_ROLE,
-  views = LWQL_VIEW_CATALOG,
-}: {
-  schema?: string;
-  role?: string;
-  views?: readonly LangWatchQLViewDefinition[];
-} = {}): string[] {
-  const approvedViews = lwqlApprovedPostgresViewNames(views);
-  if (approvedViews.length === 0) return [];
-
-  const quotedSchema = postgresQuoted(schema);
-  const quotedRole = postgresQuoted(role);
-  const grants = [
-    `GRANT USAGE ON SCHEMA ${quotedSchema} TO ${quotedRole}`,
-    ...approvedViews.map(
-      (view) =>
-        `GRANT SELECT ON ${quotedSchema}.${postgresQuoted(view)} TO ${quotedRole}`,
-    ),
-  ];
-
-  // One guarded block rather than a probe followed by grants: the check and
-  // the grants have to be the same statement, or a role dropped between them
-  // turns a no-op into a failed deploy.
-  return [
-    `DO $$\nBEGIN\n` +
-      `  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${postgresLiteral(role)}) THEN\n` +
-      grants
-        .map((grant) => `    EXECUTE ${postgresLiteral(grant)};\n`)
-        .join("") +
-      `  END IF;\nEND\n$$`,
-  ];
-}
 
 /** One project's key-map row candidate. */
 export interface LwqlKeyMapRow {

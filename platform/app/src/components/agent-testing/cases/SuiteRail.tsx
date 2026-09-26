@@ -10,14 +10,13 @@
  * @see specs/suites/test-suites.feature
  */
 
-import { Box, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type {
   Period,
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { NewSimulationsCallout } from "~/components/suites/NewSimulationsCallout";
 import { SuiteArchiveDialog } from "~/components/suites/SuiteArchiveDialog";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { SuiteRailFooter } from "./SuiteRailFooter";
@@ -90,12 +89,6 @@ export function SuiteRail(props: SuiteRailProps) {
       data-testid="agent-testing-suite-rail"
     >
       <SuiteRailSections {...props} onRequestArchive={setSuiteToArchive} />
-
-      {!collapsed && (
-        <Box paddingX={3}>
-          <NewSimulationsCallout target="scenarios" />
-        </Box>
-      )}
 
       <SuiteRailFooter {...props} />
 

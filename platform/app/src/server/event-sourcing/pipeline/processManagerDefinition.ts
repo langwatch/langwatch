@@ -87,6 +87,11 @@ export interface IntentContext {
   tenantId: string;
   messageKey: string;
   attempt: number;
+  /**
+   * When the delivery's outbox lease lapses, for a handler that must finish
+   * its effect inside it. Absent where no dispatcher leased the message.
+   */
+  leaseExpiresAt?: number;
 }
 
 export type IntentExecutor<Payload> = (

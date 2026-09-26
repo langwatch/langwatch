@@ -24,6 +24,7 @@ vi.mock("../stripe/stripePriceCatalog", () => ({
 import {
   createCheckoutLineItems,
   isGrowthEventsPrice,
+  isGrowthInstantEvalPriceProvisioned,
   isGrowthSeatPrice,
   resolveGrowthEventsPriceId,
   resolveGrowthSeatPriceId,
@@ -204,6 +205,25 @@ describe("growthSeatEvent", () => {
           { price: "price_seat_usd_annual", quantity: 3 },
           { price: "price_events_usd_annual" },
         ]);
+      });
+    });
+
+    describe("when the Instant Evals price is not provisioned in this mode", () => {
+      it("builds the checkout without an Instant Evals item", () => {
+        const items = createCheckoutLineItems({
+          coreMembers: 2,
+          currency: "USD",
+          interval: "monthly",
+        });
+
+        // The catalog mock above maps no GROWTH_INSTANT_EVAL_USD, which is
+        // every mode until the meter and price are created there by hand. A
+        // Growth checkout has to keep working through that window.
+        expect(items).toEqual([
+          { price: "price_seat_usd_monthly", quantity: 2 },
+          { price: "price_events_usd_monthly" },
+        ]);
+        expect(isGrowthInstantEvalPriceProvisioned()).toBe(false);
       });
     });
 

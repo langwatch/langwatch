@@ -18,7 +18,7 @@
  *    than trusted, so a migration that changes a column turns this red instead
  *    of turning the schema endpoint into a liar.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  * @see ../catalogStatements.ts — the statements under proof
  */
 
@@ -37,6 +37,7 @@ import {
   expectOnlyTenantA,
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
+  LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
   MOVED_PARTITION_FIXTURE,
   mapPostgresIntoClickHouse,
   measureQuery,
@@ -60,21 +61,28 @@ import {
   lwqlAllowedTables,
   lwqlGatedColumns,
   lwqlGrainColumns,
+  lwqlPhysicalColumn,
 } from "../../catalog/types";
 import { validateLangWatchQL } from "../../validation/validate";
 import {
   definerViewAuditQuery,
   dropLangWatchQLRowPolicyStatement,
   lwqlPolicyCoverageQuery,
-  lwqlRowPolicyStatement,
 } from "../accessModel";
 import {
+  lwqlApprovedPostgresViewNames,
   lwqlGrantedSourceColumns,
+  lwqlPostgresApprovedViewStatements,
   lwqlSourceTables,
   lwqlViewSetupStatements,
   lwqlViewStatement,
   SHIPPED_LWQL_DEDUP,
 } from "../catalogStatements";
+import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  postgresReaderRoleStatements,
+} from "../postgresMapping";
+import { LWQL_POSTGRES_SCHEMA } from "../productionProvisioning";
 
 /** A column no view exposes, so the grant must make it unreachable. */
 const OFF_CATALOG_COLUMN = "ProjectionId";
@@ -109,6 +117,47 @@ const GATED_COLUMN_POSITIONS = (database: string) =>
     ],
   ] as const;
 
+/** The reported query, run directly to show the database is not the gate. */
+const REPORTED_LEAK_QUERY = (database: string) =>
+  `SELECT TraceId, toString(COLUMNS('^CapturedInput$')) AS leaked FROM ${database}.traces LIMIT 10`;
+
+/**
+ * Column-set shapes that resolve to captured content without naming it — a
+ * wildcard or a regexp `COLUMNS()` matcher, wrapped in a function or buried in a
+ * clause. The reported query (langwatch-saas#1244) leads; the rest cover the
+ * positions a caller could otherwise smuggle one through. Each is refused by the
+ * validator, not by the database — the direct-read assertion below shows the
+ * database returns the content.
+ */
+const COLUMN_SET_POSITIONS = (database: string) =>
+  [
+    ["the reported query", REPORTED_LEAK_QUERY(database)],
+    ["a wildcard inside tuple", `SELECT tuple(*) FROM ${database}.traces`],
+    [
+      "a matcher inside concat",
+      `SELECT concat('', COLUMNS('^Captured')) FROM ${database}.traces`,
+    ],
+    [
+      "a matcher in HAVING",
+      `SELECT TraceId, count() AS n FROM ${database}.traces ` +
+        `GROUP BY TraceId HAVING max(COLUMNS('^Captured')) != ''`,
+    ],
+    [
+      "a matcher in a CTE body",
+      `WITH c AS (SELECT COLUMNS('^Captured') FROM ${database}.traces) ` +
+        `SELECT TraceId FROM c`,
+    ],
+    [
+      "a matcher in a UNION ALL branch",
+      `SELECT TraceId FROM ${database}.traces LIMIT 10 ` +
+        `UNION ALL SELECT COLUMNS('^Captured') FROM ${database}.spans LIMIT 10`,
+    ],
+    [
+      "the spans equivalent for CapturedOutput",
+      `SELECT toString(COLUMNS('^CapturedOutput$')) AS leaked FROM ${database}.spans LIMIT 10`,
+    ],
+  ] as const;
+
 describe("given the LangWatchQL views provisioned over the shipped fact tables", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -125,6 +174,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         dedup: SHIPPED_LWQL_DEDUP,
       }),
     );
+    // Grants and source-table policies for the whole shipped catalog, from the
+    // single access-model emitter (#8258) — the view statements are structural.
+    await harness.applyAccessModel({
+      views: LWQL_VIEW_CATALOG,
+      sourceDatabase: harness.factDatabase,
+    });
   };
 
   beforeAll(async () => {
@@ -160,6 +215,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * matters.
      */
     /** @scenario "The catalog's declared columns match the tables the views read" */
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("declares only columns the source tables have", async () => {
       // The source of a PostgreSQL-resident dataset is its engine table in the
       // LangWatchQL database, not a migrated fact table, so where to look is
@@ -194,6 +250,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
     });
 
     /** @scenario "The catalog's declared columns match the tables the views read" */
+    /** @scenario "The catalog ground truth lists every derived view" */
     it("declares the types the views actually return", async () => {
       for (const view of LWQL_VIEW_CATALOG) {
         const actual = await selectRows<{ name: string; type: string }>(
@@ -258,8 +315,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).toBeDefined();
 
         const sortingKey = source!.sorting_key.split(", ");
+        // Key and grain columns are exposed names; the engine sorts by the
+        // physical column an alias renames, so compare against the physical.
         expect(
-          [...view.dedup.keyColumns],
+          view.dedup.keyColumns.map((key) => lwqlPhysicalColumn(view, key)),
           `${view.name} declares a key its source does not sort by`,
         ).toEqual(sortingKey);
 
@@ -270,7 +329,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           expect(
             sortingKey,
             `${view.name} calls ${column} part of its grain, but ${view.sourceTable} does not sort by it`,
-          ).toContain(column);
+          ).toContain(lwqlPhysicalColumn(view, column));
         }
 
         // The engine family, both ways round: an entry says its rows are summed
@@ -316,12 +375,14 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           `SELECT partition_key AS value FROM system.tables ` +
             `WHERE database = '${facts}' AND name = '${view.sourceTable}'`,
         );
+        // A source with no partition key (a small index table like
+        // governance_cost_rollup_restatement_index) has no partition to prune,
+        // so a time column carries no pruning claim to check — the shape guard
+        // still requires it to be a real, filterable column.
+        if (partitionKey === "") continue;
+        expect(view.timeColumn).toBeDefined();
         expect(
-          partitionKey,
-          `${view.sourceTable} is not partitioned — pruning advice would be nonsense`,
-        ).not.toBe("");
-        expect(
-          partitionKey.includes(view.timeColumn),
+          partitionKey.includes(view.timeColumn!),
           `${view.name} advertises ${view.timeColumn} but ${view.sourceTable} partitions by ${partitionKey}`,
         ).toBe(true);
       }
@@ -339,7 +400,16 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           // A PostgreSQL-engine table sits in the LangWatchQL database, which is
           // `recordSeedControl`'s default; only the fact tables live elsewhere.
           ...(isPostgresResident(view) ? {} : { database: facts }),
-          tenantColumn: "TenantId",
+          // The physical tenant column: almost always TenantId, but
+          // `stored_objects` polices on `project_id` — the exposed column is
+          // always TenantId regardless of what the source calls it. A
+          // PostgreSQL-resident source's engine table is already mapped onto
+          // the catalog's exposed names (see `mapPostgresIntoClickHouse`), so
+          // its physical name IS `TenantId` — `sourceColumns` there names the
+          // *Postgres*-side column instead, which this proof never queries.
+          tenantColumn: isPostgresResident(view)
+            ? "TenantId"
+            : lwqlPhysicalColumn(view, "TenantId"),
         });
         const rows = await selectRows<{ TenantId: string }>(
           tenantA,
@@ -431,13 +501,12 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           )
         ).map((row) => row.TenantId);
       } finally {
-        await harness.applyAsAdmin([
-          lwqlRowPolicyStatement({
-            names: harness.names,
-            lwqlTable: sourceTable,
-            sourceDatabase: facts,
-          }),
-        ]);
+        // Reconverge the whole catalog from the definition — restores the
+        // simulations source-table policy detached above.
+        await harness.applyAccessModel({
+          views: LWQL_VIEW_CATALOG,
+          sourceDatabase: facts,
+        });
       }
 
       expect(
@@ -478,6 +547,94 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       expect(rows.map((row) => row.TenantId)).toEqual([
         harness.tenantA.tenantId,
       ]);
+    });
+  });
+
+  describe("when a caller joins a fact table to a derived PostgreSQL view", () => {
+    /**
+     * `trace_summaries` rows built with an explicit `TopicId`, mirroring
+     * `traceSummaryRow`'s shape (the private builder `seedRealFactRows` uses)
+     * with that one field added — the builder itself takes no `TopicId`
+     * parameter, so this inserts directly rather than widening the harness for
+     * one case.
+     */
+    /** @scenario "Traffic by topic name" */
+    it("returns one row per topic name with its trace count, scoped to the caller's tenant", async () => {
+      const topicTraceRow = ({
+        tenantId,
+        traceId,
+        topicId,
+      }: {
+        tenantId: string;
+        traceId: string;
+        topicId: string;
+      }) => ({
+        ProjectionId: `${tenantId}/${traceId}`,
+        TenantId: tenantId,
+        TraceId: traceId,
+        Version: "1",
+        Attributes: {},
+        OccurredAt: SEED_RECENT_WEEK.from,
+        UpdatedAt: SEED_RECENT_WEEK.from,
+        ComputedIOSchemaVersion: "1",
+        ComputedInput: "",
+        ComputedOutput: "",
+        TotalDurationMs: 1200,
+        SpanCount: 1,
+        ContainsErrorStatus: false,
+        ContainsOKStatus: true,
+        Models: [],
+        TotalCost: 0.001,
+        TokensEstimated: false,
+        TraceName: `trace ${traceId}`,
+        TopicId: topicId,
+        SubTopicId: null,
+      });
+
+      const tenantATopic1 = `${harness.tenantA.tenantId}-topic-1`;
+      const tenantATopic2 = `${harness.tenantA.tenantId}-topic-2`;
+      const tenantBTopic1 = `${harness.tenantB.tenantId}-topic-1`;
+
+      await harness.admin.insert({
+        table: `${facts}.trace_summaries`,
+        format: "JSONEachRow",
+        values: [
+          ...[0, 1, 2].map((index) =>
+            topicTraceRow({
+              tenantId: harness.tenantA.tenantId,
+              traceId: `${harness.tenantA.tenantId}-topic-trace-1-${index}`,
+              topicId: tenantATopic1,
+            }),
+          ),
+          topicTraceRow({
+            tenantId: harness.tenantA.tenantId,
+            traceId: `${harness.tenantA.tenantId}-topic-trace-2-0`,
+            topicId: tenantATopic2,
+          }),
+          topicTraceRow({
+            tenantId: harness.tenantB.tenantId,
+            traceId: `${harness.tenantB.tenantId}-topic-trace-1-0`,
+            topicId: tenantBTopic1,
+          }),
+        ],
+      });
+
+      const rows = await selectRows<{ TopicName: string; n: string }>(
+        tenantA,
+        `SELECT t.TopicName, count() AS n FROM ${database}.traces ` +
+          `JOIN ${database}.topics AS t ON traces.TopicId = t.TopicId ` +
+          `GROUP BY t.TopicName ORDER BY t.TopicName LIMIT 50`,
+      );
+
+      expect(rows.map((row) => row.TopicName)).toEqual([
+        `Topic ${harness.tenantA.tenantId} 1`,
+        `Topic ${harness.tenantA.tenantId} 2`,
+      ]);
+      expect(rows.map((row) => Number(row.n))).toEqual([3, 1]);
+      expect(
+        rows.some((row) => row.TopicName.includes(harness.tenantB.tenantId)),
+        "tenant B's topic name leaked through the join",
+      ).toBe(false);
     });
   });
 
@@ -550,7 +707,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * edge case — and the failure it produces is not a visible duplicate but
      * every aggregate over the dataset counting the evaluation twice.
      */
-    /** @scenario "A dataset whose sort key moves is deduplicated by its own identity" */
+    /** @scenario "A view whose sort key moves is deduplicated by its own identity" */
     it("returns one row for a record whose two versions carry two sort keys", async () => {
       const evaluationId = evaluationDedupId(harness.tenantA.tenantId);
 
@@ -622,6 +779,32 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         ).toBe(0);
       }
     });
+
+    /**
+     * The whole catalog, provisioned and read: every column of every view is
+     * projected as the restricted reader — not just the grain the fanout check
+     * names. `CREATE OR REPLACE VIEW` is lazy, so a column whose expression is
+     * invalid (a wrong `-Merge` combinator on an `AggregateFunction` state, a
+     * `mapFilter` over a non-map) survives provisioning and fails only when a
+     * row is projected. Selecting every column at `LIMIT 1` is what exercises
+     * each expression, and doing it as the reader role proves the grant covers
+     * every source column the projection reads.
+     */
+    /** @scenario "A LangWatchQL view returns one row per logical record, the latest version" */
+    it("projects every column of every view as the reader role", async () => {
+      for (const view of LWQL_VIEW_CATALOG) {
+        const columns = view.columns
+          .map((column) => `\`${column.name}\``)
+          .join(", ");
+        await expect(
+          selectRows(
+            tenantA,
+            `SELECT ${columns} FROM ${database}.${view.name} LIMIT 1`,
+          ),
+          `${view.name} could not be read column-complete as the reader role`,
+        ).resolves.toBeDefined();
+      }
+    });
   });
 
   /**
@@ -639,7 +822,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * expects, and a case that checks four of eleven measures is a case a
      * mislabelled twelfth walks straight past.
      */
-    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    /** @scenario "A pre-aggregated view returns one merged row per bucket" */
     it("returns one merged row, each measure the sum of its own column's parts", async () => {
       for (const [name, filter, parts, totals] of [
         // The grouped rollup: no Model/SpanType columns to filter on, so the
@@ -723,7 +906,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      * through to `system.columns` and therefore to the schema endpoint — a
      * caller would be told the name of an engine instead of a number's type.
      */
-    /** @scenario "A pre-aggregated dataset returns one merged row per bucket" */
+    /** @scenario "A pre-aggregated view returns one merged row per bucket" */
     it("publishes the measures as plain numeric types", async () => {
       const stored = await selectScalar<string>(
         harness.admin,
@@ -790,6 +973,41 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
   });
 
   describe("when captured content is reached through a LangWatchQL view", () => {
+    /** The gated set a caller without content permission gets. */
+    const withoutContent = lwqlGatedColumns({
+      protections: {
+        canSeeCapturedInput: false,
+        canSeeCapturedOutput: false,
+        canSeeCosts: true,
+      },
+      views: LWQL_VIEW_CATALOG,
+    });
+    /**
+     * Built per test rather than at describe time, because `database` is only
+     * known once the harness has provisioned it in `beforeAll`.
+     */
+    const policyFor = (gatedColumns: readonly string[]) => ({
+      allowedTables: lwqlAllowedTables({ database, views: LWQL_VIEW_CATALOG }),
+      gatedColumns,
+      defaultDatabase: database,
+    });
+    const withholdingPolicy = () => policyFor(withoutContent);
+    /**
+     * Derived, not hardcoded to `[]`, so the permitted-caller assertions also
+     * prove that holding every permission resolves to an empty gated set.
+     */
+    const permittedPolicy = () =>
+      policyFor(
+        lwqlGatedColumns({
+          protections: {
+            canSeeCapturedInput: true,
+            canSeeCapturedOutput: true,
+            canSeeCosts: true,
+          },
+          views: LWQL_VIEW_CATALOG,
+        }),
+      );
+
     /** @scenario "Captured content is reachable only through the gated columns" */
     it("strips every content key from the attribute maps while keeping the dimensions", async () => {
       const row = await selectRows<{
@@ -867,14 +1085,6 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
      */
     /** @scenario "Content-gated fields are refused in every expression position" */
     it("refuses a gated field in every expression position, over the canonical gated set", () => {
-      const withoutContent = lwqlGatedColumns({
-        protections: {
-          canSeeCapturedInput: false,
-          canSeeCapturedOutput: false,
-          canSeeCosts: true,
-        },
-        views: LWQL_VIEW_CATALOG,
-      });
       const contentColumns = LWQL_VIEW_CATALOG.flatMap((view) =>
         view.columns.filter(isContentGated).map((column) => column.name),
       );
@@ -897,16 +1107,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         }
       }
 
-      const policy = {
-        allowedTables: lwqlAllowedTables({
-          database,
-          views: LWQL_VIEW_CATALOG,
-        }),
-        gatedColumns: withoutContent,
-        defaultDatabase: database,
-      };
+      const withholding = withholdingPolicy();
+      const permitted = permittedPolicy();
       for (const [position, sql] of GATED_COLUMN_POSITIONS(database)) {
-        const result = validateLangWatchQL({ sql, ...policy });
+        const result = validateLangWatchQL({ sql, ...withholding });
         expect(result.ok, `${position}: a gated field was accepted`).toBe(
           false,
         );
@@ -918,17 +1122,6 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
 
       // The same queries pass for a caller who holds the permission, so the
       // refusals above are about the gate rather than about the SQL.
-      const permitted = {
-        ...policy,
-        gatedColumns: lwqlGatedColumns({
-          protections: {
-            canSeeCapturedInput: true,
-            canSeeCapturedOutput: true,
-            canSeeCosts: true,
-          },
-          views: LWQL_VIEW_CATALOG,
-        }),
-      };
       expect(
         permitted.gatedColumns,
         "a caller holding every permission still has fields withheld",
@@ -939,6 +1132,51 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           `${position}: refused a permitted caller, so the refusal is not the gate`,
         ).toBe(true);
       }
+    });
+
+    /**
+     * The reported bug: a column set resolves to withheld content in any
+     * position, so the validator refuses each shape with `WILDCARD_NOT_ALLOWED`
+     * — before the query reaches the shipped views. The final assertion runs the
+     * reported query directly as the restricted identity and gets the captured
+     * input back, which is why the database is not, and cannot be, the gate.
+     */
+    /** @scenario "The reported query is refused before it reaches the shipped views" */
+    /** @scenario "Content-gated fields are refused in every expression position" */
+    it("refuses every column-set shape that would resolve to withheld content", async () => {
+      const withholding = withholdingPolicy();
+      const permitted = permittedPolicy();
+      for (const [position, sql] of COLUMN_SET_POSITIONS(database)) {
+        const refused = validateLangWatchQL({ sql, ...withholding });
+        expect(refused.ok, `${position}: a column set was accepted`).toBe(
+          false,
+        );
+        expect(
+          refused.ok
+            ? []
+            : refused.violations.map((violation) => violation.code),
+          `${position}: refused for the wrong reason`,
+        ).toContain("WILDCARD_NOT_ALLOWED");
+        expect(
+          validateLangWatchQL({ sql, ...permitted }).ok,
+          `${position}: refused a permitted caller, so the refusal is not the gate`,
+        ).toBe(true);
+      }
+
+      // The database is not the gate: the same identity, running the reported
+      // query directly, is handed the withheld captured input.
+      const leaked = await selectRows<Record<string, unknown>>(
+        tenantA,
+        REPORTED_LEAK_QUERY(database),
+      );
+      expect(
+        leaked.length,
+        "the reported query returned no rows, so the leak assertion is vacuous",
+      ).toBeGreaterThan(0);
+      expect(
+        JSON.stringify(leaked).includes(SEEDED_CONTENT.traceInput),
+        "the database withheld the captured input, so this test no longer shows why the validator is the gate",
+      ).toBe(true);
     });
   });
 
@@ -1023,9 +1261,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       for (const view of LWQL_VIEW_CATALOG.filter(
         (candidate) => !isPostgresResident(candidate),
       )) {
+        const physicalTenantColumn = lwqlPhysicalColumn(view, "TenantId");
         const tenants = await selectRows<{ TenantId: string }>(
           harness.admin,
-          `SELECT DISTINCT TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
+          `SELECT DISTINCT ${physicalTenantColumn} AS TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
         );
         expect(
           tenants.map((row) => row.TenantId),
@@ -1145,5 +1384,199 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         `deduplicating costs more than reading undeduplicated. ${report}`,
       ).toBeLessThanOrEqual(measured.none!.filteredRows);
     }, 300_000);
+  });
+
+  describe("when an installation upgrades from a column list the current catalog no longer matches", () => {
+    /**
+     * Full reprovision: the approved-view statements, then the reader-role
+     * GRANT batch. Shared by every case in this describe block as the way to
+     * restore the shipped shape and its grants — the two re-grant-focused
+     * cases below each also run the approved-view statements on their own,
+     * without this GRANT batch, specifically to isolate what they are
+     * proving.
+     */
+    const reprovision = async (): Promise<void> => {
+      for (const statement of lwqlPostgresApprovedViewStatements({
+        schema: LWQL_POSTGRES_SCHEMA,
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(
+          result.exitCode,
+          `re-provisioning the approved views failed: ${result.stderr}`,
+        ).toBe(0);
+      }
+      for (const statement of postgresReaderRoleStatements({
+        reader: {
+          role: postgres.readerRole,
+          password: postgres.readerPassword,
+          schema: LWQL_POSTGRES_SCHEMA,
+          approvedViews: lwqlApprovedPostgresViewNames(),
+          ...DEFAULT_POSTGRES_READER_LIMITS,
+          connectionLimit: LWQL_TEST_POSTGRES_CONNECTION_LIMIT,
+        },
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(
+          result.exitCode,
+          `re-granting the reader role failed: ${result.stderr}`,
+        ).toBe(0);
+      }
+    };
+
+    /**
+     * `main`'s hand-written `lwql_annotations`, column-for-column: no `Comment`
+     * (never exposed before the derivation), `IsThumbsUp` straight after
+     * `TraceId`. The current derivation exposes `Comment` too, ahead of
+     * `IsThumbsUp` in the model's own field order — an insertion in the
+     * middle of the list, which `CREATE OR REPLACE VIEW` refuses outright.
+     */
+    /** @scenario "Re-provisioning an upgraded installation converges the approved views" */
+    it("converges without dropping the database when it re-provisions", async () => {
+      const view = "lwql_annotations";
+      await postgres.asAdmin(
+        `DROP VIEW IF EXISTS ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      await postgres.asAdmin(
+        `CREATE VIEW ${LWQL_POSTGRES_SCHEMA}."${view}" AS\n` +
+          `SELECT\n` +
+          `  "m"."projectId" AS "TenantId",\n` +
+          `  "m"."id" AS "AnnotationId",\n` +
+          `  "m"."traceId" AS "TraceId",\n` +
+          `  "m"."isThumbsUp" AS "IsThumbsUp",\n` +
+          `  "m"."createdAt" AS "CreatedAt",\n` +
+          `  "m"."updatedAt" AS "UpdatedAt"\n` +
+          `FROM ${LWQL_POSTGRES_SCHEMA}."Annotation" AS "m"`,
+      );
+      await postgres.asAdmin(
+        `GRANT SELECT ON ${LWQL_POSTGRES_SCHEMA}."${view}" TO ${postgres.readerRole}`,
+      );
+
+      await reprovision();
+
+      const derived = LWQL_VIEW_CATALOG.find(
+        (entry) => entry.name === "annotations",
+      );
+      if (!derived) {
+        throw new Error(
+          `lwql upgrade-path test: "annotations" is not in the shipped catalog`,
+        );
+      }
+      const columns = await postgres.asAdmin(
+        `SELECT column_name FROM information_schema.columns ` +
+          `WHERE table_schema = '${LWQL_POSTGRES_SCHEMA}' AND table_name = '${view}' ` +
+          `ORDER BY ordinal_position`,
+      );
+      expect(columns.stdout.trim().split("\n")).toEqual(
+        derived.columns.map((column) => column.name),
+      );
+
+      const read = await postgres.asReader(
+        `SELECT count(*) FROM ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      expect(
+        read.exitCode,
+        `the reader role could not select from "${view}" after re-provisioning: ${read.stderr}`,
+      ).toBe(0);
+
+      // Restore the shipped shape so no later case in this file reads a view
+      // this one intentionally mis-shaped.
+      await reprovision();
+    }, 120_000);
+
+    /** @scenario "Re-provisioning an upgraded installation converges the approved views" */
+    it("re-grants the reader role from inside the fallback branch, with no separate GRANT step", async () => {
+      const view = "lwql_annotations";
+      await postgres.asAdmin(
+        `DROP VIEW IF EXISTS ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      await postgres.asAdmin(
+        `CREATE VIEW ${LWQL_POSTGRES_SCHEMA}."${view}" AS\n` +
+          `SELECT\n` +
+          `  "m"."projectId" AS "TenantId",\n` +
+          `  "m"."id" AS "AnnotationId",\n` +
+          `  "m"."traceId" AS "TraceId",\n` +
+          `  "m"."isThumbsUp" AS "IsThumbsUp",\n` +
+          `  "m"."createdAt" AS "CreatedAt",\n` +
+          `  "m"."updatedAt" AS "UpdatedAt"\n` +
+          `FROM ${LWQL_POSTGRES_SCHEMA}."Annotation" AS "m"`,
+      );
+      // Grant, then revoke it again immediately — the test must start from
+      // provably no access, not from a grant that happens to still be there,
+      // or a pass here would not distinguish the DO block's own re-grant from
+      // a leftover privilege this setup step granted.
+      await postgres.asAdmin(
+        `GRANT SELECT ON ${LWQL_POSTGRES_SCHEMA}."${view}" TO ${postgres.readerRole}`,
+      );
+      await postgres.asAdmin(
+        `REVOKE SELECT ON ${LWQL_POSTGRES_SCHEMA}."${view}" FROM ${postgres.readerRole}`,
+      );
+      const revoked = await postgres.asReader(
+        `SELECT count(*) FROM ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      expect(
+        revoked.exitCode,
+        "setup did not actually revoke access — the test would prove nothing",
+      ).not.toBe(0);
+
+      // Only the approved-view statements, with readerRole passed and NO
+      // reader-role GRANT batch run afterward: if the reader can select
+      // below, the DO block's own fallback re-grant is what did it.
+      for (const statement of lwqlPostgresApprovedViewStatements({
+        schema: LWQL_POSTGRES_SCHEMA,
+        readerRole: postgres.readerRole,
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(
+          result.exitCode,
+          `re-provisioning "${view}" failed: ${result.stderr}`,
+        ).toBe(0);
+      }
+
+      const read = await postgres.asReader(
+        `SELECT count(*) FROM ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      expect(
+        read.exitCode,
+        `the reader role could not select from "${view}" after the fallback ` +
+          `branch's own re-grant, with no GRANT batch run: ${read.stderr}`,
+      ).toBe(0);
+
+      // Restore the shipped shape and its grants for later cases.
+      await reprovision();
+    }, 120_000);
+
+    /** @scenario "Re-provisioning an upgraded installation converges the approved views" */
+    it("keeps the grant across a no-change re-provision, because CREATE OR REPLACE never drops the view", async () => {
+      const view = "lwql_annotations";
+      // A clean baseline: the shipped shape, fully granted.
+      await reprovision();
+      const before = await postgres.asReader(
+        `SELECT count(*) FROM ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      expect(before.exitCode, "baseline grant is missing").toBe(0);
+
+      // Re-run only the approved-view statements — no readerRole, no GRANT
+      // batch. The column list is unchanged from the baseline just
+      // provisioned, so this takes the CREATE OR REPLACE branch, which never
+      // drops the view and therefore never needs a re-grant.
+      for (const statement of lwqlPostgresApprovedViewStatements({
+        schema: LWQL_POSTGRES_SCHEMA,
+      })) {
+        const result = await postgres.asAdmin(statement);
+        expect(
+          result.exitCode,
+          `re-provisioning "${view}" failed: ${result.stderr}`,
+        ).toBe(0);
+      }
+
+      const after = await postgres.asReader(
+        `SELECT count(*) FROM ${LWQL_POSTGRES_SCHEMA}."${view}"`,
+      );
+      expect(
+        after.exitCode,
+        `the grant did not survive a no-change re-provision with no GRANT ` +
+          `batch run: ${after.stderr}`,
+      ).toBe(0);
+    }, 120_000);
   });
 });

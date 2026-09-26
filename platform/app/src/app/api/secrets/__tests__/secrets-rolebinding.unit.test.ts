@@ -1,5 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
+
+const { findTeamMemberBindings, GrantsAccessListingRepository } = vi.hoisted(
+  () => {
+    const findTeamMemberBindings = vi.fn();
+    const GrantsAccessListingRepository = vi.fn(function () {
+      return { findTeamMemberBindings };
+    });
+    return { findTeamMemberBindings, GrantsAccessListingRepository };
+  },
+);
+
+vi.mock(
+  "~/server/app-layer/authz/repositories/access-listing.grants.repository",
+  () => ({
+    GrantsAccessListingRepository,
+  }),
+);
 
 vi.mock("~/server/db", () => ({
   prisma: {
@@ -10,9 +26,6 @@ vi.mock("~/server/db", () => ({
     },
     team: {
       findUnique: vi.fn(),
-    },
-    roleBinding: {
-      findFirst: vi.fn(),
     },
   },
 }));
@@ -108,14 +121,14 @@ describe("secrets API fallback owner lookup", () => {
     });
   });
 
-  describe("when team has only RoleBinding users (no TeamUser rows)", () => {
+  describe("when team has canonical grant users", () => {
     beforeEach(() => {
-      (prisma.roleBinding.findFirst as any).mockResolvedValue({
-        userId: "user-rolebinding-only",
-      });
+      findTeamMemberBindings.mockResolvedValue(
+        new Map([["team-1", [{ userId: "user-grants-only" }]]]),
+      );
     });
 
-    it("queries roleBinding with team scope for fallback owner", async () => {
+    it("queries the canonical team-member listing for fallback owner", async () => {
       const res = await app.request("/api/secrets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,18 +139,13 @@ describe("secrets API fallback owner lookup", () => {
       });
 
       expect(res.status).toBe(201);
-      expect(prisma.roleBinding.findFirst).toHaveBeenCalledWith({
-        where: {
-          organizationId: "org-1",
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: "team-1",
-          userId: { not: null },
-        },
-        select: { userId: true },
+      expect(findTeamMemberBindings).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        teamIds: ["team-1"],
       });
     });
 
-    it("uses the roleBinding userId as secret owner", async () => {
+    it("uses the canonical grant userId as secret owner", async () => {
       await app.request("/api/secrets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -150,17 +158,17 @@ describe("secrets API fallback owner lookup", () => {
       expect(prisma.projectSecret.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            createdById: "user-rolebinding-only",
-            updatedById: "user-rolebinding-only",
+            createdById: "user-grants-only",
+            updatedById: "user-grants-only",
           }),
         }),
       );
     });
   });
 
-  describe("when no RoleBinding users exist for the team", () => {
+  describe("when no canonical team members exist for the team", () => {
     beforeEach(() => {
-      (prisma.roleBinding.findFirst as any).mockResolvedValue(null);
+      findTeamMemberBindings.mockResolvedValue(new Map([["team-1", []]]));
     });
 
     it("falls back to system as owner", async () => {

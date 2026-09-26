@@ -23,16 +23,22 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => ({ redis: null }),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 describe("userRouter", () => {
   let prismaUpdateMock: ReturnType<typeof vi.fn>;

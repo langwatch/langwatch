@@ -15,17 +15,24 @@ import {
   describeWorkspace,
   ensureSignedIn,
   isGitRepository,
+  loginElsewhereMessage,
   packageManagerOf,
+  platformTakesTheKey,
   resolveShareRoot,
   ShareControlError,
+  SIGN_IN_FAILED_MESSAGE,
   waitForRequests,
   type ControlApi,
   type ControlRequest,
 } from "../requests";
+import { resolvePersonCredentials } from "../../../utils/apiKey";
 import type { KeyEvent, KeySource } from "../approval";
 import type { UiWriter } from "../ui";
 
 const ENDPOINT = "https://app.langwatch.test";
+
+const ANSI_SEQUENCE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const stripAnsi = (text: string): string => text.replace(ANSI_SEQUENCE, "");
 
 const requestNamed = (id: string, title: string): ControlRequest => ({
   id,
@@ -87,6 +94,46 @@ describe("given the share-control command", () => {
       ).toThrow(/filesystem root/);
     });
 
+    /** @scenario "A folder uv manages names uv as its package manager" */
+    it("names uv for a lock file, a tool.uv table, or a virtual environment uv made", () => {
+      const withLock = path.join(base, "with-lock");
+      fs.mkdirSync(withLock);
+      fs.writeFileSync(path.join(withLock, "package-lock.json"), "");
+      fs.writeFileSync(path.join(withLock, "uv.lock"), "");
+      expect(packageManagerOf(withLock)).toBe("uv");
+
+      const withTable = path.join(base, "with-table");
+      fs.mkdirSync(withTable);
+      fs.writeFileSync(
+        path.join(withTable, "pyproject.toml"),
+        '[project]\nname = "acme"\n\n[tool.uv]\ndev-dependencies = []\n',
+      );
+      expect(packageManagerOf(withTable)).toBe("uv");
+
+      // The r38 checkout: a pyproject with no uv table, no lock file, and a
+      // venv uv made. Nothing else names a manager, and that venv has no pip.
+      const withVenv = path.join(base, "with-venv");
+      fs.mkdirSync(path.join(withVenv, ".venv"), { recursive: true });
+      fs.writeFileSync(
+        path.join(withVenv, "pyproject.toml"),
+        '[project]\nname = "acme"\n\n[build-system]\nrequires = ["hatchling"]\n',
+      );
+      fs.writeFileSync(
+        path.join(withVenv, ".venv", "pyvenv.cfg"),
+        "home = /opt/python/bin\nimplementation = CPython\nuv = 0.10.12\nversion_info = 3.13.0\n",
+      );
+      expect(packageManagerOf(withVenv)).toBe("uv");
+
+      const plainVenv = path.join(base, "plain-venv");
+      fs.mkdirSync(path.join(plainVenv, ".venv"), { recursive: true });
+      fs.writeFileSync(
+        path.join(plainVenv, ".venv", "pyvenv.cfg"),
+        "home = /opt/python/bin\nversion = 3.12.1\n",
+      );
+      fs.writeFileSync(path.join(plainVenv, "requirements.txt"), "");
+      expect(packageManagerOf(plainVenv)).toBe("pip");
+    });
+
     it("reads the folder's package manager and git state", () => {
       const root = path.join(base, "project");
       fs.mkdirSync(root);
@@ -97,27 +144,355 @@ describe("given the share-control command", () => {
       const workspace = describeWorkspace(root);
       expect(workspace.root).toBe(root);
       expect(workspace.name).toBe("project");
+      expect(workspace.gitRepository).toBe(false);
+      expect(workspace.gitBranch).toBeUndefined();
       expect(workspace.packageManager).toBe("pnpm");
       expect(workspace.nodeVersion).toBe(process.version);
       expect(workspace.os).toContain(os.platform());
     });
   });
 
-  describe("when the machine has no device session", () => {
-    /** @scenario "The command signs in when there is no session" */
-    it("runs the login flow first and then resolves the credentials", async () => {
-      const login = vi.fn(async () => undefined);
-      const before = process.env.LANGWATCH_API_KEY;
-      process.env.LANGWATCH_API_KEY = "sk-lw-test-key";
-      try {
-        // With a key in the environment the resolver never reaches the config,
-        // so this proves the order: login first, credentials after.
+  describe("when the command signs in", () => {
+    const FOLDER_KEY = "sk-lw-folder-project-key";
+    const ENV_FILE = `LANGWATCH_API_KEY=${FOLDER_KEY}\nOTHER_SECRET=stays\n`;
+
+    let dir: string;
+    let configPath: string;
+    let envPath: string;
+    let printed: string[];
+    const before = {
+      config: process.env.LANGWATCH_CLI_CONFIG,
+      key: process.env.LANGWATCH_API_KEY,
+      endpoint: process.env.LANGWATCH_ENDPOINT,
+      cwd: process.cwd(),
+    };
+
+    const restoreEnv = (name: string, value: string | undefined): void => {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    };
+
+    /** A login as Riley at ACME, with whatever a case changes about it. */
+    const writeLogin = (overrides: Record<string, unknown> = {}): void => {
+      fs.writeFileSync(
+        configPath,
+        JSON.stringify({
+          gateway_url: ENDPOINT,
+          control_plane_url: ENDPOINT,
+          access_token: "session-token",
+          expires_at: Math.floor(Date.now() / 1000) + 3600,
+          cli_api_key: "sk-lw-login-key",
+          user: { id: "user_1", email: "riley@acme.test", name: "Riley" },
+          organization: { id: "org_1", slug: "acme", name: "ACME" },
+          personal_project: {
+            id: "project_personal",
+            slug: "riley-personal",
+            api_key: "sk-lw-personal-key",
+            validated_at: Math.floor(Date.now() / 1000),
+          },
+          ...overrides,
+        }),
+      );
+    };
+
+    /** The device login, standing in: it leaves a new login on the machine. */
+    const loginThatSignsIn = () =>
+      vi.fn(async () => {
+        writeLogin({ cli_api_key: "sk-lw-new-login-key" });
+      });
+
+    beforeEach(() => {
+      dir = fs.realpathSync(
+        fs.mkdtempSync(path.join(os.tmpdir(), "langy-signin-")),
+      );
+      configPath = path.join(dir, "home", "config.json");
+      fs.mkdirSync(path.dirname(configPath));
+      const folder = path.join(dir, "folder");
+      fs.mkdirSync(folder);
+      envPath = path.join(folder, ".env");
+      fs.writeFileSync(envPath, ENV_FILE);
+      process.chdir(folder);
+      process.env.LANGWATCH_CLI_CONFIG = configPath;
+      process.env.LANGWATCH_ENDPOINT = ENDPOINT;
+      delete process.env.LANGWATCH_API_KEY;
+      printed = [];
+      vi.spyOn(console, "log").mockImplementation((text) => {
+        printed.push(stripAnsi(String(text)));
+      });
+      vi.spyOn(console, "error").mockImplementation((text) => {
+        printed.push(stripAnsi(String(text)));
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+      process.chdir(before.cwd);
+      restoreEnv("LANGWATCH_CLI_CONFIG", before.config);
+      restoreEnv("LANGWATCH_API_KEY", before.key);
+      restoreEnv("LANGWATCH_ENDPOINT", before.endpoint);
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    describe("given a login and a project key in the folder's .env", () => {
+      /** @scenario "The login answers before a project key found in the folder" */
+      /** @scenario "The command names the login it uses" */
+      it("resolves the login's key on the personal project, never the folder's key", async () => {
+        writeLogin();
+        const login = loginThatSignsIn();
+
         const credentials = await ensureSignedIn({ login });
-        expect(credentials.apiKey).toBe("sk-lw-test-key");
-      } finally {
-        if (before === undefined) delete process.env.LANGWATCH_API_KEY;
-        else process.env.LANGWATCH_API_KEY = before;
-      }
+
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
+        expect(credentials.projectId).toBe("project_personal");
+        expect(printed).toContain("Using your login as Riley at ACME.");
+        const wrong = printed.filter(
+          (line) =>
+            line.includes("--project") ||
+            line.includes("personal project") ||
+            line.includes("API key"),
+        );
+        expect(wrong).toEqual([]);
+      });
+
+      /** @scenario "The folder's .env is left as it is" */
+      it("leaves the folder's .env and the key in the environment as they were", async () => {
+        writeLogin();
+
+        await ensureSignedIn({ login: loginThatSignsIn() });
+
+        expect(fs.readFileSync(envPath, "utf8")).toBe(ENV_FILE);
+        expect(process.env.LANGWATCH_API_KEY).toBe(FOLDER_KEY);
+      });
+    });
+
+    describe("given no login on the machine", () => {
+      /** @scenario "The command signs in when there is no session" */
+      it("runs the device login first and resolves the new login's key", async () => {
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(login).toHaveBeenCalledWith({ device: true });
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(
+          "No login on this machine yet. Signing in first.",
+        );
+        expect(printed).toContain("Using your login as Riley at ACME.");
+      });
+
+      /** @scenario "A key in the environment never stands in for the login" */
+      it("signs in even with a key exported in the shell, and never resolves that key", async () => {
+        process.env.LANGWATCH_API_KEY = "sk-lw-exported-in-the-shell";
+        const login = loginThatSignsIn();
+        const probed: string[] = [];
+
+        const credentials = await ensureSignedIn({
+          login,
+          isAccepted: async ({ apiKey }) => {
+            probed.push(apiKey);
+            return true;
+          },
+        });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(probed).toEqual(["sk-lw-new-login-key"]);
+        expect(process.env.LANGWATCH_API_KEY).toBe(
+          "sk-lw-exported-in-the-shell",
+        );
+      });
+
+      /** @scenario "The folder's .env is left as it is" */
+      it("leaves the folder's .env as it was through a sign-in", async () => {
+        await ensureSignedIn({ login: loginThatSignsIn() });
+
+        expect(fs.readFileSync(envPath, "utf8")).toBe(ENV_FILE);
+      });
+
+      /** @scenario "A sign-in that leaves no usable login ends with what to run" */
+      it("ends with what to run when the device login fails", async () => {
+        const login = vi.fn(async () => {
+          throw new Error("authorization request expired");
+        });
+
+        const failure = await ensureSignedIn({ login }).catch((e) => e);
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect((failure as Error).message).toBe(
+          `${SIGN_IN_FAILED_MESSAGE} (authorization request expired)`,
+        );
+      });
+
+      /** @scenario "A sign-in that leaves no usable login ends with what to run" */
+      it("ends with what to run when the login leaves no login key", async () => {
+        const login = vi.fn(async () => {
+          writeLogin({ cli_api_key: undefined });
+        });
+
+        const failure = await ensureSignedIn({ login }).catch((e) => e);
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect((failure as Error).message).toBe(SIGN_IN_FAILED_MESSAGE);
+      });
+    });
+
+    describe("given a login that cannot be used", () => {
+      const SIGNING_IN_AGAIN =
+        "The login on this machine can no longer be used. Signing in again.";
+
+      /** @scenario "A login that cannot be used signs in again" */
+      it("signs in again when the login holds no login key, not falling to the folder's key", async () => {
+        writeLogin({ cli_api_key: undefined });
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(SIGNING_IN_AGAIN);
+      });
+
+      /** @scenario "A login that cannot be used signs in again" */
+      it("signs in again when the server refuses the session", async () => {
+        writeLogin({
+          personal_project: {
+            id: "project_personal",
+            slug: "riley-personal",
+            api_key: "sk-lw-personal-key",
+            validated_at: 1,
+          },
+        });
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(
+            async () =>
+              new Response(JSON.stringify({ error: "unauthorized" }), {
+                status: 401,
+              }),
+          ),
+        );
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(SIGNING_IN_AGAIN);
+      });
+
+      /** @scenario "A login that cannot be used signs in again" */
+      it("signs in again when the platform turns the login's key down", async () => {
+        writeLogin();
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({
+          login,
+          isAccepted: async ({ apiKey }) => apiKey === "sk-lw-new-login-key",
+        });
+
+        expect(login).toHaveBeenCalledTimes(1);
+        expect(credentials.apiKey).toBe("sk-lw-new-login-key");
+        expect(printed).toContain(SIGNING_IN_AGAIN);
+      });
+
+      /** @scenario "A sign-in that leaves no usable login ends with what to run" */
+      it("ends with what to run when the new login is turned down too", async () => {
+        writeLogin();
+
+        const failure = await ensureSignedIn({
+          login: loginThatSignsIn(),
+          isAccepted: async () => false,
+        }).catch((e) => e);
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect((failure as Error).message).toBe(SIGN_IN_FAILED_MESSAGE);
+      });
+    });
+
+    describe("given a login made against another address than the command targets", () => {
+      const OTHER = "https://langwatch.other.test";
+
+      /** @scenario "The login's key is never sent to another address than its own" */
+      it("ends naming both addresses, sends no key and leaves the login alone", async () => {
+        writeLogin();
+        const loginBefore = fs.readFileSync(configPath, "utf8");
+        fs.writeFileSync(envPath, `${ENV_FILE}LANGWATCH_ENDPOINT=${OTHER}\n`);
+        delete process.env.LANGWATCH_ENDPOINT;
+        const fetchSpy = vi.fn();
+        vi.stubGlobal("fetch", fetchSpy);
+        const login = loginThatSignsIn();
+        const isAccepted = vi.fn(async () => true);
+
+        const failure = await ensureSignedIn({ login, isAccepted }).catch(
+          (e) => e,
+        );
+
+        expect(failure).toBeInstanceOf(ShareControlError);
+        expect((failure as Error).message).toBe(
+          loginElsewhereMessage({ loginEndpoint: ENDPOINT, endpoint: OTHER }),
+        );
+        expect((failure as Error).message).toContain("langwatch login --device");
+        expect(isAccepted).not.toHaveBeenCalled();
+        expect(fetchSpy).not.toHaveBeenCalled();
+        expect(login).not.toHaveBeenCalled();
+        expect(fs.readFileSync(configPath, "utf8")).toBe(loginBefore);
+      });
+
+      /** @scenario "The login's key is never sent to another address than its own" */
+      it("resolves no key for the other address, whoever asks", async () => {
+        writeLogin();
+        process.env.LANGWATCH_ENDPOINT = OTHER;
+
+        expect(await resolvePersonCredentials()).toBeUndefined();
+      });
+
+      /** @scenario "Two spellings of one address are the same address" */
+      it("reads a trailing slash and a capital letter as the same address", async () => {
+        writeLogin();
+        process.env.LANGWATCH_ENDPOINT = "https://APP.langwatch.test/";
+        const login = loginThatSignsIn();
+
+        const credentials = await ensureSignedIn({ login });
+
+        expect(login).not.toHaveBeenCalled();
+        expect(credentials.apiKey).toBe("sk-lw-login-key");
+      });
+    });
+  });
+
+  describe("when the platform is asked whether it takes the login's key", () => {
+    const credentials = { endpoint: ENDPOINT, apiKey: "sk-lw-login-key" };
+
+    /** @scenario "A login that cannot be used signs in again" */
+    it("says no on a 401", async () => {
+      const { impl } = fakeFetch({
+        "/api/v1/langy/control/requests": {
+          status: 401,
+          body: { message: "Invalid API key" },
+        },
+      });
+      expect(await platformTakesTheKey(credentials, { fetchImpl: impl })).toBe(
+        false,
+      );
+    });
+
+    it("says yes when the list answers, and on a failure that is not about the key", async () => {
+      const open = fakeFetch({
+        "/api/v1/langy/control/requests": { body: { requests: [] } },
+      });
+      expect(
+        await platformTakesTheKey(credentials, { fetchImpl: open.impl }),
+      ).toBe(true);
+      const down = fakeFetch({
+        "/api/v1/langy/control/requests": { status: 503, body: {} },
+      });
+      expect(
+        await platformTakesTheKey(credentials, { fetchImpl: down.impl }),
+      ).toBe(true);
     });
   });
 
@@ -174,6 +549,31 @@ describe("given the share-control command", () => {
       });
       await expect(api.list()).rejects.toThrow(
         "This request was cancelled. Ask Langy again.",
+      );
+    });
+
+    /** @scenario "A refusal with several tips prints as sentences" */
+    it("ends every tip with a stop before joining them", async () => {
+      const { impl } = fakeFetch({
+        "/api/v1/langy/control/requests": {
+          status: 404,
+          body: {
+            code: "langy_local_request_invalid",
+            message: "langy_local_request_invalid",
+            tips: [
+              "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own",
+              "A request is single use, so a second approval of the same one is refused",
+            ],
+          },
+        },
+      });
+      const api = createControlApi({
+        endpoint: ENDPOINT,
+        apiKey: "sk-lw-abc",
+        fetchImpl: impl,
+      });
+      await expect(api.list()).rejects.toThrow(
+        "Only the person Langy asked can approve a request; ask Langy for the code change again to get your own. A request is single use, so a second approval of the same one is refused.",
       );
     });
   });
@@ -274,11 +674,26 @@ describe("given the share-control command", () => {
           : { action: "approve" };
       }) as never;
 
+      // The picker lists the newest first, so the two need timestamps of their
+      // own: built from the clock they land in the same millisecond most of the
+      // time, and the run where they do not reverses the list.
+      const now = Date.parse("2026-01-01T12:00:00.000Z");
       const requests = [
-        requestNamed("req_1", "Instrument tracing"),
-        requestNamed("req_2", "Fix the refund scenario"),
+        {
+          ...requestNamed("req_1", "Instrument tracing"),
+          createdAt: new Date(now - 20_000).toISOString(),
+        },
+        {
+          ...requestNamed("req_2", "Fix the refund scenario"),
+          createdAt: new Date(now - 3 * 60_000).toISOString(),
+        },
       ];
-      const choice = await chooseRequest({ requests, root: "/work/acme", ask });
+      const choice = await chooseRequest({
+        requests,
+        root: "/work/acme",
+        ask,
+        now,
+      });
 
       const picker = asked[0]!.choices as Array<{
         title: string;

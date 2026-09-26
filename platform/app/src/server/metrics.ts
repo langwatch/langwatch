@@ -270,6 +270,7 @@ export const getAuthzDirectProjectionWriteCounter = (
 // healthy overall?".
 //
 // labels.reason ∈ "depth_direct" (incoming span attr already >= 1)
+//               | "depth_fold" (accumulated depth >= 1, no span on the event)
 //               | "parent_in_subtree" (parent span is in causal subtree)
 register.removeSingleMetric("langwatch_evaluator_loop_blocked_total");
 export const evaluatorLoopBlockedCounter = new Counter({

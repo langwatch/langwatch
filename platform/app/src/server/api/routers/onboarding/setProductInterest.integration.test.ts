@@ -6,16 +6,22 @@ const { mockIdentifyUser, mockCaptureException } = vi.hoisted(() => ({
   mockCaptureException: vi.fn(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 // Mock the organization/project routers (needed by initializeOrganization, not setIntegrationMethod)
 vi.mock("../organization", () => ({

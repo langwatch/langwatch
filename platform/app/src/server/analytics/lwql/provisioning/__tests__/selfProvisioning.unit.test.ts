@@ -19,7 +19,7 @@
  *    tables are dropped first so a changed catalog converges on upgrade.
  *
  * @see ../selfProvisioning.ts — the module under test
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 
 import { describe, expect, it } from "vitest";
@@ -30,10 +30,11 @@ import { qualified } from "../accessModel";
 import { lwqlSourceTables } from "../catalogStatements";
 import { productionLangWatchQLNames } from "../productionProvisioning";
 import {
+  canProvisionAppFunctions,
   LWQL_SELF_PROVISION_DEFAULTS,
   lwqlPostgresEndpointFromDatabaseUrl,
-  lwqlPostgresReaderModeFromEnv,
   lwqlSelfProvisionFromEnv,
+  probeAppFunctionStore,
   selfHostedClickHouseProvisioningStatements,
   selfHostedPostgresReaderStatements,
 } from "../selfProvisioning";
@@ -45,7 +46,6 @@ import {
 const IDENTIFIER_CHARACTER = /[A-Za-z0-9_]/;
 
 const ENABLED_ENV: NodeJS.ProcessEnv = {
-  LWQL_SELF_PROVISION: "true",
   LWQL_CLICKHOUSE_PASSWORD: "restricted-secret",
   LWQL_POSTGRES_READER_PASSWORD: "reader-secret",
   CLICKHOUSE_URL: "http://default:admin-secret@ch.internal:8123/langwatch",
@@ -53,19 +53,24 @@ const ENABLED_ENV: NodeJS.ProcessEnv = {
 };
 
 describe("lwqlDerivedConnectionFromEnv", () => {
-  it("returns null when self-provisioning is not enabled", () => {
+  // # Issue #8258
+  /** @scenario "Provisioning no longer reads a self-provision switch" */
+  it("derives the connection from the password and URL, ignoring any self-provision switch", () => {
+    // The gate is gone: the connection is derived whenever the password and a
+    // parseable CLICKHOUSE_URL are present, whatever LWQL_SELF_PROVISION says.
+    expect(lwqlDerivedConnectionFromEnv(ENABLED_ENV)).not.toBeNull();
     expect(
       lwqlDerivedConnectionFromEnv({
         ...ENABLED_ENV,
         LWQL_SELF_PROVISION: undefined,
       }),
-    ).toBeNull();
+    ).not.toBeNull();
     expect(
       lwqlDerivedConnectionFromEnv({
         ...ENABLED_ENV,
         LWQL_SELF_PROVISION: "1",
       }),
-    ).toBeNull();
+    ).not.toBeNull();
   });
 
   it("derives the connection from the admin URL with SaaS-convention defaults", () => {
@@ -400,47 +405,84 @@ describe("selfHostedPostgresReaderStatements", () => {
   });
 });
 
-describe("lwqlPostgresReaderModeFromEnv", () => {
-  describe("when LWQL_MANAGE_POSTGRES_READER is exactly 'true'", () => {
-    it("manages the reader role", () => {
+describe("given a self-hosted ClickHouse with more than one replica", () => {
+  describe("when it has no user_defined_zookeeper_path", () => {
+    /** @scenario "A multi-replica server without a shared function store is provisioned without the functions" */
+    it("is provisioned without the app functions", () => {
       expect(
-        lwqlPostgresReaderModeFromEnv({ LWQL_MANAGE_POSTGRES_READER: "true" }),
-      ).toBe("manage-role");
-    });
-  });
-
-  describe("when the flag is unset", () => {
-    it("re-grants only, never touching the role", () => {
-      expect(lwqlPostgresReaderModeFromEnv({})).toBe("grants-only");
-    });
-  });
-
-  describe("when a reader password is present without the flag", () => {
-    // The whole point of the explicit flag: SaaS/terraform sets the reader
-    // password for its own uses and the app must NOT create/rotate the role it
-    // owns out of band.
-    it("re-grants only, never inferring management from the password", () => {
-      expect(
-        lwqlPostgresReaderModeFromEnv({
-          LWQL_POSTGRES_READER_PASSWORD: "reader-secret",
+        canProvisionAppFunctions({
+          maxTotalReplicas: 3,
+          userDefinedZookeeperPath: "",
         }),
-      ).toBe("grants-only");
+      ).toBe(false);
+
+      const statements = selfHostedClickHouseProvisioningStatements({
+        names: NAMES,
+        restrictedPassword: "pw",
+        sourceDatabase: SOURCE_DATABASE,
+        postgres: {
+          endpoint: { host: "pg", port: 5432, database: "langwatch" },
+          readerPassword: "reader",
+        },
+        includeAppFunctions: false,
+      });
+
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(false);
+      expect(statements.some((s) => s.startsWith("CREATE USER"))).toBe(true);
     });
   });
 
-  describe("when the flag is set to a truthy-looking non-'true' value", () => {
-    it.each([
-      "1",
-      "false",
-      "TRUE",
-      "yes",
-      " true",
-    ])("treats %j as grants-only — only the exact string enables management", (value) => {
+  describe("when its function store is in Keeper", () => {
+    it("is provisioned with the app functions", () => {
       expect(
-        lwqlPostgresReaderModeFromEnv({
-          LWQL_MANAGE_POSTGRES_READER: value,
+        canProvisionAppFunctions({
+          maxTotalReplicas: 3,
+          userDefinedZookeeperPath: "/clickhouse/user_defined",
         }),
-      ).toBe("grants-only");
+      ).toBe(true);
+    });
+  });
+});
+
+describe("given a single-node ClickHouse", () => {
+  describe("when the function store is probed", () => {
+    /** @scenario "A single-node server is provisioned with the functions" */
+    it("reads no replicas and keeps the functions on local disk", async () => {
+      const probe = await probeAppFunctionStore({
+        query: async (sql) =>
+          sql.includes("system.replicas") ? [{ max_total_replicas: "0" }] : [],
+      });
+
+      expect(probe).toEqual({
+        maxTotalReplicas: 0,
+        userDefinedZookeeperPath: "",
+      });
+      expect(canProvisionAppFunctions(probe)).toBe(true);
+      const statements = selfHostedClickHouseProvisioningStatements({
+        names: NAMES,
+        restrictedPassword: "pw",
+        sourceDatabase: SOURCE_DATABASE,
+        postgres: {
+          endpoint: { host: "pg", port: 5432, database: "langwatch" },
+          readerPassword: "reader",
+        },
+      });
+      expect(
+        statements.some((s) => s.startsWith("CREATE OR REPLACE FUNCTION")),
+      ).toBe(true);
+    });
+
+    it("leaves the functions out of a server that cannot answer", async () => {
+      const probe = await probeAppFunctionStore({
+        query: async () => {
+          throw new Error("UNKNOWN_TABLE system.server_settings");
+        },
+      });
+
+      expect(probe).toBeNull();
+      expect(canProvisionAppFunctions(probe)).toBe(false);
     });
   });
 });

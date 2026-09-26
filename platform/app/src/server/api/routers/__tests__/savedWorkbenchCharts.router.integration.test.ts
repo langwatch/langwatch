@@ -11,7 +11,7 @@
  * force-enables the very flag under test — so consulting the real one would
  * make the switched-off case answer "on" and pass vacuously.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
@@ -30,6 +30,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 
 const isEnabled = vi.fn();
 
@@ -60,6 +61,7 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { lwqlResult } from "~/features/analytics-query/__tests__/lwqlFixtures";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
@@ -67,7 +69,6 @@ import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-c
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import type { Protections } from "../../../traces/protections";
-import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
 
@@ -171,23 +172,19 @@ async function seedCaller(orgId: string, perms: Permission[]): Promise<Caller> {
     },
   });
   const roleId = `crole-${uid}`;
-  await prisma.customRole.create({
-    data: {
-      id: roleId,
-      organizationId: orgId,
-      name: roleId,
-      permissions: perms,
-    },
+  await seedCustomRole(prisma, {
+    id: roleId,
+    organizationId: orgId,
+    name: roleId,
+    permissions: perms,
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: orgId,
-      userId: uid,
-      role: TeamUserRole.CUSTOM,
-      customRoleId: roleId,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: orgId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId: orgId,
+    userId: uid,
+    role: TeamUserRole.CUSTOM,
+    customRoleId: roleId,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: orgId,
   });
   return savedWorkbenchChartsRouter.createCaller(
     createInnerTRPCContext({
@@ -233,6 +230,12 @@ describe("the saved workbench chart router", () => {
    * created keeps cleanup a function of what the suite did.
    */
   afterAll(async () => {
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: [ORG, OTHER_ORG] } },
+    });
+    await prisma.role.deleteMany({
+      where: { organizationId: { in: [ORG, OTHER_ORG] } },
+    });
     const ids = (values: string[]) =>
       values.map((value) => `'${value}'`).join(",");
     await prisma.$executeRawUnsafe(
@@ -520,8 +523,12 @@ describe("the saved workbench chart router", () => {
             where: { id: PROJECT },
             select: { lwqlKey: true },
           });
-          expect(call.project.id).toBe(PROJECT);
-          expect(call.project.lwqlKey).toBe(project.lwqlKey);
+          expect(call.projects).toHaveLength(1);
+          const first = call.projects[0];
+          expect(first).toBeDefined();
+          if (!first) throw new Error("call.projects[0] is undefined");
+          expect(first.id).toBe(PROJECT);
+          expect(first.lwqlKey).toBe(project.lwqlKey);
         });
       });
     });

@@ -54,6 +54,19 @@ Membership consequences are grants-ledger events, not SCIM events: the reconcile
 
 **The actor is not the connection.** An earlier draft of this deliverable had membership facts carry `actor: { "type": "system", "id": "<connectionId>" }`. That is not buildable and has been dropped: `packages/actor/src/index.ts` defines system actors as a **closed registry of named principals**, and its own comment forbids call sites inventing `system:...` strings — a connection id is a per-customer value, so it can never be a registered name. The actor therefore stays the single global `system:scim`, and **which connection pushed a change lives on the `ScimSync` event**, which already carries `connectionId`. Nothing is lost: cross-organization safety comes from the token's connection scope at the API boundary, not from the actor stamp. `platform/app/ee/scim/scim.service.ts` carries a stale comment saying the actor "becomes the connection id" — it should be corrected when this deliverable is implemented.
 
+# Amendment — reconciliation is a visible surface (2026-08-25)
+
+[ADR-122](../adr/122-scim-reconciliation-is-a-visible-surface.md) adds the
+read side this deliverable's machinery earns: the org SCIM settings page grows
+a reconciliation panel (sync state, last push, people managed,
+directory-caused changes including removals, failures as customer words — on
+the D05 "see single sign-on" permission), and the D05 operator surface grows
+cross-customer SCIM oversight (dead letters linked to retired intents, retry
+history, the `externalId ↔ userId` mapping detail, and one guarded write: the
+recorded re-drive of a retired apply). Spec:
+`specs/identity/scim-reconciliation-surfaces.feature`. Both views read the
+projections and event log this document defines; nothing new is written.
+
 # Out of Scope
 
 - SCIM protocol surface changes (v2 Users+Groups already complete). Seat/billing classification (license system owns it; lite-member-as-role was the authz program).

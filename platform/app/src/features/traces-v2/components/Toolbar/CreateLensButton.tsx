@@ -2,7 +2,7 @@ import { Box, Button, Text } from "@chakra-ui/react";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
 import { Tooltip } from "../../../../components/ui/tooltip";
-import { useViewStore } from "../../stores/viewStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { LensNamePopover } from "./LensNamePopover";
 
 const BETA_TOOLTIP =
@@ -20,7 +20,7 @@ const BETA_TOOLTIP =
  * persists the new lens to localStorage and switches the active tab.
  */
 export const CreateLensButton: React.FC = () => {
-  const createLens = useViewStore((s) => s.createLens);
+  const createLens = useExplorerStore((s) => s.createLens);
 
   return (
     // Tooltip wraps a Box that *contains* the Popover instead of

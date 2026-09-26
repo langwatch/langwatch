@@ -24,6 +24,7 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 import { authorizeLangyApiKey } from "~/server/app-layer/langy/langyApiKeyAuthorization";
 import { prisma } from "~/server/db";
 import { sendCanary } from "~/server/health-probes/canary.service";
@@ -41,7 +42,25 @@ const sleep = (ms: number): Promise<void> =>
 
 // ── shared auth helper ───────────────────────────────────────────────
 
-async function authenticateProject(c: {
+const tokenResolver = TokenResolver.create(prisma);
+
+/**
+ * Resolves the project credential behind a health probe, or the refusal body to
+ * answer with.
+ *
+ * Routed through {@link TokenResolver.resolve} rather than a bespoke
+ * `prisma.project.findUnique({ where: { apiKey } })`, so an API key that
+ * self-scopes to exactly one project (not just a legacy project key) can
+ * authenticate a health probe too. Legacy project keys still resolve exactly
+ * as before (the resolver's legacy path is an exact `Project.apiKey` match),
+ * and an unknown, revoked, or ambiguous (multi-project) key gets the same
+ * vague "Invalid auth token" refusal. `authToken` is the raw token the caller
+ * sent, which the probes forward to their downstream canary requests.
+ *
+ * Returns either a refusal carrying the `status` and JSON `body` to answer with,
+ * or the resolved project plus that raw token.
+ */
+export async function authenticateProject(c: {
   req: { header: (name: string) => string | undefined };
 }) {
   const xAuthToken = c.req.header("x-auth-token");
@@ -52,22 +71,27 @@ async function authenticateProject(c: {
 
   if (!authToken) {
     return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
       status: 401 as const,
+      body: {
+        message:
+          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+      } as Record<string, unknown>,
     };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolved = await tokenResolver.resolve({
+    token: authToken,
+    projectId: c.req.header("x-project-id") ?? null,
   });
 
-  if (!project) {
-    return { error: "Invalid auth token.", status: 401 as const };
+  if (!resolved) {
+    return {
+      status: 401 as const,
+      body: { message: "Invalid auth token." } as Record<string, unknown>,
+    };
   }
 
-  return { project, authToken };
+  return { project: resolved.project, authToken };
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
@@ -76,10 +100,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/collector", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restParams: CollectorRESTParams = {
       spans: [
@@ -152,6 +176,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -159,6 +184,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -176,10 +202,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/evaluations", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     let response: Response | null = null;
     let attempts = 0;
@@ -191,6 +217,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -234,10 +261,10 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/processor", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
-    const { authToken } = auth;
+    const { project, authToken } = auth;
 
     const restTraceId = `trace_${nanoid()}`;
     const restParams: CollectorRESTParams = {
@@ -319,6 +346,7 @@ secured
         transport: "rest",
         url: `${env.BASE_HOST}/api/collector`,
         authToken,
+        projectId: project.id,
         body: restParams,
       }),
       sendCanary({
@@ -326,6 +354,7 @@ secured
         transport: "otlp",
         url: `${env.BASE_HOST}/api/otel/v1/traces`,
         authToken,
+        projectId: project.id,
         body: otelParams,
       }),
     ]);
@@ -360,7 +389,10 @@ secured
           const traceResponse = await fetch(
             `${env.BASE_HOST}/api/traces/${encodeURIComponent(traceId)}`,
             {
-              headers: { "X-Auth-Token": authToken },
+              headers: {
+                "X-Auth-Token": authToken,
+                "X-Project-Id": project.id,
+              },
             },
           );
           const fetchMs = Date.now() - fetchStart;
@@ -441,8 +473,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/triggers", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 
@@ -487,8 +519,8 @@ secured
   .access(publicEndpoint("subsystem health probe"))
   .get("/workflows", async (c) => {
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project, authToken } = auth;
 
@@ -512,6 +544,7 @@ secured
           method: "POST",
           headers: {
             "X-Auth-Token": authToken,
+            "X-Project-Id": project.id,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ input: "\u{1F425}" }),
@@ -614,8 +647,8 @@ secured
     c.header("Cache-Control", "no-store");
 
     const auth = await authenticateProject(c);
-    if ("error" in auth) {
-      return c.json({ message: auth.error }, { status: auth.status });
+    if ("body" in auth) {
+      return c.json(auth.body, { status: auth.status });
     }
     const { project } = auth;
 

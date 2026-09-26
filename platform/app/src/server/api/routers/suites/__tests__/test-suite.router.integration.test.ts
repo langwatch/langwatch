@@ -11,6 +11,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../../db";
@@ -79,6 +80,13 @@ describe("suites.test suites integration", () => {
     await prisma.teamUser.create({
       data: { userId: admin.id, teamId: team.id, role: TeamUserRole.ADMIN },
     });
+    await seedRoleBinding(prisma, {
+      organizationId: organization.id,
+      userId: admin.id,
+      role: TeamUserRole.ADMIN,
+      scopeType: "TEAM",
+      scopeId: team.id,
+    });
     caller = appRouter.createCaller(
       createInnerTRPCContext({
         session: { user: { id: admin.id }, expires: "1" },
@@ -98,6 +106,13 @@ describe("suites.test suites integration", () => {
     });
     await prisma.teamUser.create({
       data: { userId: viewer.id, teamId: team.id, role: TeamUserRole.VIEWER },
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: organization.id,
+      userId: viewer.id,
+      role: TeamUserRole.VIEWER,
+      scopeType: "TEAM",
+      scopeId: team.id,
     });
     viewerCaller = appRouter.createCaller(
       createInnerTRPCContext({
@@ -125,6 +140,7 @@ describe("suites.test suites integration", () => {
       ["evaluator", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],
       ["teamUser", { teamId }],
+      ["grant", { organizationId }],
       ["organizationUser", { organizationId }],
       ["team", { id: teamId }],
       ["user", { id: { in: userIds } }],

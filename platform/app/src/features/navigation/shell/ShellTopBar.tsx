@@ -31,7 +31,7 @@ export function ShellTopBar({
   state,
   shouldShowProductCluster,
 }: ShellTopBarProps) {
-  const { user, project, activeProductId, isDevelopment } = state;
+  const { user, project, activeProductId, showDevelopmentIndicator } = state;
   // The product cluster spans the sidebar column, so the organization and
   // the scope start at the left edge of the content column and stay there
   // whatever the product label is. A compact sidebar is narrower than the
@@ -51,7 +51,7 @@ export function ShellTopBar({
       gap={4}
       overflow="hidden"
     >
-      {(user?.impersonator || isDevelopment) && (
+      {(user?.impersonator || showDevelopmentIndicator) && (
         <Box
           position="absolute"
           top={-5}
@@ -85,7 +85,7 @@ export function ShellTopBar({
       </HStack>
 
       <HStack gap={2} justifyContent="flex-end" overflow="hidden">
-        {isDevelopment && <DevBadge />}
+        {showDevelopmentIndicator && <DevBadge />}
         {user && <ImpersonationBanner user={user} />}
         {project && <CommandBarTrigger />}
         <AppHeaderUserMenu showPresenceMenuItem={state.showPresenceMenuItem} />

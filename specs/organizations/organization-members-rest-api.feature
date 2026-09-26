@@ -160,3 +160,15 @@ Feature: Organization members and invites REST API
     Then the response status is 200
     And it still appears in the invite list with status REVOKED
     And revoking it again is refused with code invite_not_found and status 404
+
+  @integration
+  Scenario: A revocation landing during an acceptance stands
+    Given the organization has a pending invite
+    And the invitee is accepting it
+    When an admin revokes it in the same moment
+    Then the acceptance is refused as no longer open
+    And the invite reads REVOKED with no membership written
+    # Either write can be the one that waits on the row lock, so both re-read
+    # the row as the other left it. The reverse ordering is the same rule: a
+    # revoke that waited on an acceptance finds an ACCEPTED row and is
+    # refused as not found, rather than marking a member's invite REVOKED.

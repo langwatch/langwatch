@@ -11,16 +11,13 @@ import {
 } from "react";
 import { formatDurationSeconds } from "~/components/me/duration";
 import type { TranscriptEntry } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
+import { toolResultBodyToString } from "~/shared/traces/transcript/parsing";
+import { formatCost, formatTokens } from "../../../utils/formatters";
 import {
   type CacheRebuildEvent,
   findCacheRebuilds,
 } from "../sessionView/tokenTimeline";
-import { toolResultBodyToString } from "../transcript";
 import { classifyPromptText } from "./injectedNotice";
 import {
   CLAUDE_MARK_GRADIENT,

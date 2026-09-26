@@ -39,6 +39,11 @@ export const noOrgBouncerRoutes = [
   // /cli/auth?user_code=… into onboarding — the page handles the no-org
   // case itself by round-tripping through onboarding with return_to.
   "/cli/auth",
+  // Where a single sign-on test sign-in lands. The tester holds a session
+  // through a connection that is not live, so they belong to no organization
+  // BY DESIGN — bouncing them into the bootstrap is the exact outcome that
+  // page exists to replace.
+  "/auth/sso-test-complete",
   "/onboarding/welcome",
   "/onboarding/[team]/project",
   "/onboarding/product",

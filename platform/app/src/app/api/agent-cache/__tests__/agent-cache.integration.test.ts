@@ -7,7 +7,6 @@
  * Spec: specs/agent-cache/agent-cache.feature
  */
 
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { app as promptsApp } from "~/app/api/prompts/[[...route]]/app";
@@ -27,9 +26,9 @@ import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { AGENT_SANDBOX_API_KEY_NAME } from "~/server/api-key/reserved-names";
 import { prisma } from "~/server/db";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 import { MAX_VALUE_BYTES } from "../agent-cache.service";
 
@@ -133,15 +132,12 @@ describe("Feature: the agent cache", () => {
     await prisma.teamUser.create({
       data: { userId, teamId: testTeam.id, role: TeamUserRole.ADMIN },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     projectApiKey = `sk-lw-${nanoid(48)}`;
@@ -232,15 +228,12 @@ describe("Feature: the agent cache", () => {
         role: TeamUserRole.ADMIN,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId: personalOwnerId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: personalTeamId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId: personalOwnerId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: personalTeamId,
     });
     const personalProject = await prisma.project.create({
       data: {
@@ -266,6 +259,7 @@ describe("Feature: the agent cache", () => {
 
   afterAll(async () => {
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId: testOrganization.id }],
       ["roleBinding", { organizationId: testOrganization.id }],
       ["apiKey", { organizationId: testOrganization.id }],
       // The sandbox key is a restricted key, so its grants live in a custom

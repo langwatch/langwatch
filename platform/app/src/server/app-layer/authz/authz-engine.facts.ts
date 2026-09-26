@@ -23,6 +23,7 @@ import type {
   ShareLinkFactRow,
 } from "@langwatch/authz-server";
 import {
+  isBindingGrant,
   SHARE_LINK_PERMISSION,
   shareVisibilityAudience,
 } from "@langwatch/authz-server";
@@ -117,56 +118,50 @@ export function assembleFacts({
   };
 }): ExpectedFacts {
   const roles = inventory.roleRows
-    .slice()
-    .sort((a, b) => a.id.localeCompare(b.id))
+    .toSorted((a, b) => a.id.localeCompare(b.id))
     .map(legacyRoleToFact);
-  const bindingFacts = inventory.bindingRows
-    .slice()
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .flatMap((row) => {
-      const fact = bindingToFact({ row });
-      return fact ? [fact] : [];
-    });
-  // One coverage predicate for both suppression rules below: a user is
-  // "already bound" identically whether the binding names them or a group
-  // they belong to, and the two rules must never disagree about that.
+  const bindingFacts = stampUserFacts(
+    bindingFactsFromRows(inventory.bindingRows),
+    inventory.members,
+  );
   const covers = bindingCoverage({
     groupMemberships: inventory.groupMemberships,
   });
-  const teamFacts = teamMembershipFacts({
-    organizationId,
-    teamRows: inventory.teamRows,
-    bindingRows: inventory.bindingRows,
-    covers,
-  });
-  const organizationFacts = organizationLevelFacts({
-    organizationId,
-    members: inventory.members,
-    externalMembers: inventory.externalMembers,
-    bindingRows: inventory.bindingRows,
-    covers,
-    organizationCreatedAtMs: inventory.organizationCreatedAtMs,
-  });
+  const teamFacts = stampUserFacts(
+    teamMembershipFacts({
+      organizationId,
+      teamRows: inventory.teamRows,
+      bindingRows: inventory.bindingRows,
+      covers,
+    }),
+    inventory.members,
+  );
+  const organizationFacts = stampUserFacts(
+    organizationLevelFacts({
+      organizationId,
+      members: inventory.members,
+      externalMembers: inventory.externalMembers,
+      bindingRows: inventory.bindingRows,
+      covers,
+      organizationCreatedAtMs: inventory.organizationCreatedAtMs,
+    }),
+    inventory.members,
+  );
   const credentialFacts = inventory.credentials
-    .slice()
-    .sort((a, b) => a.projectId.localeCompare(b.projectId))
+    .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
     .map((credential) => credentialToFact({ organizationId, credential }));
   const shareLinks = inventory.shareLinkRows
-    .slice()
-    .sort((a, b) => a.id.localeCompare(b.id))
-    .map(
-      (row): ExpectedShareLink => ({
-        row,
-        fact: shareLinkToFact({ organizationId, row }),
-      }),
-    );
+    .toSorted((a, b) => a.id.localeCompare(b.id))
+    .map((row) => ({
+      row,
+      fact: shareLinkToFact({ organizationId, row }),
+    }));
 
-  const nonResourceFacts = [
-    ...bindingFacts,
-    ...teamFacts,
-    ...organizationFacts,
-    ...credentialFacts,
-  ];
+  const nonResourceFacts = bindingFacts.concat(
+    teamFacts,
+    organizationFacts,
+    credentialFacts,
+  );
   return {
     roles,
     bindingFacts,
@@ -238,11 +233,40 @@ function bindingToFact({ row }: { row: LegacyBindingRow }): GrantFact | null {
   };
 }
 
+function bindingFactsFromRows(rows: LegacyBindingRow[]): GrantFact[] {
+  return rows
+    .toSorted((a, b) => a.id.localeCompare(b.id))
+    .flatMap((row) => {
+      const fact = bindingToFact({ row });
+      return fact ? [fact] : [];
+    });
+}
+
 function bindingPrincipal(row: LegacyBindingRow): LedgerPrincipal | null {
   if (row.userId !== null) return { type: "user", id: row.userId };
   if (row.groupId !== null) return { type: "group", id: row.groupId };
   if (row.apiKeyId !== null) return { type: "apiKey", id: row.apiKeyId };
   return null;
+}
+
+/** Stamp imported USER facts with the membership lifetime in the inventory.
+ * Disabled seats keep the stamp so replay survives re-enable; current
+ * membership absence drops the fact fail-closed. */
+function stampUserFacts(
+  facts: GrantFact[],
+  members: OrganizationMemberFact[],
+): GrantFact[] {
+  const stamps = new Map(
+    members.map((member) => [member.userId, member.membershipStamp]),
+  );
+  return facts.flatMap((fact) => {
+    if (fact.principal.type !== "user" || !isBindingGrant(fact)) {
+      return [fact];
+    }
+    const membershipStamp = stamps.get(fact.principal.id);
+    // No current membership means no safe lifetime; omit the fact fail-closed.
+    return membershipStamp === undefined ? [] : [{ ...fact, membershipStamp }];
+  });
 }
 
 /**

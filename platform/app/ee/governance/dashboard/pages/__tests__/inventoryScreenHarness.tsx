@@ -43,16 +43,15 @@
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+import {
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+} from "@langwatch/authz";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, vi } from "vitest";
-
 import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
 
 const hoistedHarness = vi.hoisted(() => ({
   permissions: [] as string[],
@@ -78,7 +77,10 @@ export const harness = hoistedHarness;
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
   const holds = (permission: string) =>
-    hasPermissionWithHierarchy(hoistedHarness.permissions, permission);
+    permissionSatisfiedBy({
+      granted: new Set(hoistedHarness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -177,8 +179,7 @@ import InventoryPage from "../inventory";
 import { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
-export const ORG_ADMIN_PERMISSIONS =
-  getOrganizationRolePermissions("ADMIN").slice();
+export const ORG_ADMIN_PERMISSIONS = [...builtinRolePermissions("org-admin")];
 
 export function renderScreen({
   at = "/governance/inventory",
@@ -227,11 +228,16 @@ function ButtonReferences() {
       <Button size="sm" colorPalette="orange">
         reference solid small
       </Button>
-      {/* Add tool is not a bare button: it is this menu's trigger, and the
+      {/* Add source is not a bare button: it is this menu's trigger, and the
           trigger composition adds a class and its own emitted style. Comparing
-          it against a bare solid button fails on the wrapper rather than on
-          the variant, which would be a false alarm. So the reference wears the
+          it against a bare button fails on the wrapper rather than on the
+          variant, which would be a false alarm. So the references wear the
           same wrapper, and the comparison stays about the button. */}
+      <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
+        <Button size="sm" variant="outline">
+          reference outline small trigger
+        </Button>
+      </AddIngestionSourceMenu>
       <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
         <Button size="sm" colorPalette="orange">
           reference solid small trigger
@@ -266,6 +272,14 @@ export async function openTab(name: RegExp) {
   const tab = screen.getByRole("tab", { name });
   await userEvent.click(tab);
   await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+  // A selected tab is not a filled panel. The panel's content lands in a later
+  // commit than the selection, so a caller that queries on the click's own tick
+  // can read an empty panel and fail on a row that is about to render. Waiting
+  // for the panel to hold something is what makes every caller's first query
+  // safe, rather than each one remembering to use an async query.
+  await waitFor(() => {
+    expect(screen.getByRole("tabpanel").textContent ?? "").not.toBe("");
+  });
 }
 
 beforeEach(() => {

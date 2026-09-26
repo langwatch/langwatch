@@ -92,10 +92,10 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+import { withBlockKeys } from "~/shared/traces/transcript/parsing";
+import type { ContentBlock } from "~/shared/traces/transcript/types";
 import { BlockStack } from "../BlockStack";
 import { MessageCommentScope } from "../messageComments";
-import { withBlockKeys } from "../parsing";
-import type { ContentBlock } from "../types";
 
 const TRACE_ID = "trace-1";
 const BLOCKS: ContentBlock[] = [

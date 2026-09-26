@@ -60,6 +60,34 @@ export const SECRET_CREDENTIAL_MARKERS = [
   "CREDENTIAL",
 ] as const;
 
+/**
+ * Credentials whose exact bytes are the contract, so the whitespace around
+ * them is not noise to strip.
+ *
+ * Trimming is safe for a credential spent as an HTTP header or a query
+ * parameter: both discard the padding anyway, so stripping it early only
+ * spares the client rejecting the value outright. It is not safe for one
+ * spent as cryptographic key material, where every byte is part of the key
+ * and the platform cannot check its copy against the vendor's.
+ *
+ * `ELEVENLABS_WEBHOOK_SECRET` is the HMAC key in `verifyElevenLabsSignature`
+ * (`server/routes/elevenlabs.ts`), so the signing happens here.
+ * `AWS_SECRET_ACCESS_KEY` is signed with elsewhere: it leaves this process at
+ * `gateway/config.materialiser.ts` (as `secret_key`) and at
+ * `api/routers/modelProviders.utils.ts`, and is the root of the SigV4 signing
+ * chain downstream. In both cases one changed byte changes every signature
+ * computed from it.
+ *
+ * `customKeys.trimCredentials` is the single reader, and
+ * `credentialFieldClassification.unit.test.ts` walks the provider registry to
+ * keep this list and the registry in step: a field renamed there and left
+ * behind here would silently start getting trimmed again.
+ */
+export const EXACT_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
+  "AWS_SECRET_ACCESS_KEY",
+  "ELEVENLABS_WEBHOOK_SECRET",
+]);
+
 export const MASKED_KEY_PLACEHOLDER = "HAS_KEY••••••••••••••••••••••••";
 
 /**
@@ -117,4 +145,6 @@ export const KSUID_RESOURCES = {
   WEBHOOK_ENDPOINT: "webhookendpoint",
   EXPORT: "export",
   TRACE_EDIT_OVERLAY: "traceedit",
+  INSTANT_EVAL_RUN: "instanteval",
+  INSTANT_EVAL_QUERY: "instantevalquery",
 } as const;
