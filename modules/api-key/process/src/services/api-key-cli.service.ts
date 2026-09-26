@@ -5,6 +5,7 @@ import {
   cliKeySelectionSchema,
   loginKeyExpiresAt,
   CLI_LOGIN_KEY_NAME_PREFIX,
+  isCliKeyManagementPermission,
   type CliKeyScopeSummary,
   type CliKeySelection,
   type CliSessionKeyRevocation,
@@ -80,7 +81,7 @@ export class ApiKeyCliService {
     const permissions = [...new Set(selection.permissions)].filter(
       (permission) =>
         bindings.some((binding) => binding.scopeType === "ORGANIZATION") ||
-        !["organization:manage", "organization:delete", "team:manage"].includes(permission),
+        !isCliKeyManagementPermission(permission),
     );
     if (permissions.length === 0) {
       throw new CliKeySelectionInvalidError({
@@ -103,8 +104,7 @@ export class ApiKeyCliService {
     organizationId: string;
   }): Promise<CliKeySelection | null> {
     const defaults = ALL_PERMISSIONS.filter(
-      (permission) =>
-        !["organization:manage", "organization:delete", "team:manage"].includes(permission),
+      (permission) => !isCliKeyManagementPermission(permission),
     ) as AuthzPermission[];
     if (await this.policy.isOrgAdmin(input)) {
       return {

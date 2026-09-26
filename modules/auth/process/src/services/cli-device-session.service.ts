@@ -75,10 +75,10 @@ export interface CliDeviceCodeRecord {
   /** What the CLI is asking the browser to mint. Defaults to `device_session`. */
   credential_type: CliCredentialType;
   /**
-   * Whether the CLI asked for team management (`langwatch login --manage-teams`).
+   * Whether the CLI asked for management access (`langwatch login --management`).
    * Absent on records minted before the field, which read as not asked.
    */
-  team_management?: boolean;
+  management?: boolean;
   /** Set after browser-side approval. */
   user_id?: string;
   organization_id?: string;
@@ -228,7 +228,7 @@ export class CliDeviceSessionService {
   /** Mints a pending device code and its user-code index entry. */
   async startDeviceCode(input: {
     credentialType: CliCredentialType;
-    teamManagement?: boolean | undefined;
+    management?: boolean | undefined;
   }): Promise<CliDeviceCodeRecord> {
     const now = nowInstant().epochMilliseconds;
     const record: CliDeviceCodeRecord = {
@@ -238,7 +238,7 @@ export class CliDeviceSessionService {
       created_at: now,
       expires_at: now + DEVICE_CODE_TTL_SECONDS * 1000,
       credential_type: input.credentialType,
-      ...(input.teamManagement ? { team_management: true } : {}),
+      ...(input.management ? { management: true } : {}),
     };
     await this.store.set({
       key: deviceCodeKey(record.device_code),

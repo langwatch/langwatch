@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   categorizablePermissions,
   categoryPermissions,
-  CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
+  cliKeyManagementPermissions,
   computePermissionsFromSelections,
   defaultCliKeyPermissions,
   PERMISSION_CATEGORIES,
@@ -298,7 +298,7 @@ describe("the CLI login key default", () => {
     // An exclusion is only real when the request path agrees: the hierarchy
     // promotes a `:create`, `:update` or `:delete` check to the resource's
     // own `:manage`, so an excluded permission must not be reachable that way.
-    for (const excluded of CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS) {
+    for (const excluded of cliKeyManagementPermissions()) {
       expect(hasPermissionWithHierarchy(defaults, excluded)).toBe(false);
     }
   });
@@ -336,16 +336,20 @@ describe("the CLI login key default", () => {
     expect(new Set(computed)).toEqual(new Set(defaultCliKeyPermissions()));
   });
 
-  describe("when the login asked for team management", () => {
-    /** @scenario The approval screen includes team management when the CLI asked for it */
-    it("adds team:manage and nothing else", () => {
+  describe("when the login asked for management access", () => {
+    /** @scenario The approval screen shows management access when the CLI asked for it */
+    it("adds exactly the permissions a plain login leaves out", () => {
       const plain = new Set<string>(defaultCliKeyPermissions());
-      const withTeams = defaultCliKeyPermissions({ teamManagement: true });
+      const withManagement = defaultCliKeyPermissions({ management: true });
 
-      expect(withTeams).toContain("team:manage");
-      expect(withTeams.filter((permission) => !plain.has(permission))).toEqual(["team:manage"]);
-      expect(withTeams).not.toContain("organization:manage");
-      expect(withTeams).not.toContain("organization:delete");
+      expect(withManagement.filter((permission) => !plain.has(permission)).toSorted()).toEqual(
+        cliKeyManagementPermissions().toSorted(),
+      );
+      expect(withManagement.filter((permission) => !plain.has(permission)).toSorted()).toEqual([
+        "organization:delete",
+        "organization:manage",
+        "team:manage",
+      ]);
     });
   });
 });

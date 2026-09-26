@@ -15,7 +15,7 @@ import {
   setResolvedApiKey,
 } from "@/internal/credentialContext";
 
-import { loginPermissionsHint } from "../loginScopeHint";
+import { LOGIN_MANAGEMENT_PERMISSIONS, loginPermissionsHint } from "../loginScopeHint";
 
 const LOGIN_KEY = "sk-lw-login_secret";
 
@@ -102,43 +102,57 @@ describe("given the request authenticated with a key that is not the login", () 
   });
 });
 
-describe("given a team command refused for team:manage while running as the login", () => {
-  const teamRefusal = (key: string | undefined, code: string) =>
+describe("given a command refused for a management permission while running as the login", () => {
+  const refusalFor = (key: string | undefined, code: string, permission: string) =>
     runWithCredentialHolder(() => {
       if (key) setResolvedApiKey(key);
-      return loginPermissionsHint(code, { permission: "team:manage" });
+      return loginPermissionsHint(code, { permission });
     });
 
-  /** @scenario A team command refused on a CLI login key names the re-login command */
-  it("names the re-login that adds team management, whichever door refused it", () => {
+  /** @scenario A command refused for management access on a CLI login key names the re-login command */
+  it("names the re-login for every management permission, whichever door refused it", () => {
     loginWith(["project:view", "traces:view"]);
 
-    for (const code of [
-      "insufficient_permissions",
-      "permission_denied",
-      "api_key_permission_denied",
-    ]) {
-      expect(teamRefusal(LOGIN_KEY, code)).toContain("langwatch login --device --manage-teams");
+    for (const permission of LOGIN_MANAGEMENT_PERMISSIONS) {
+      for (const code of [
+        "insufficient_permissions",
+        "permission_denied",
+        "api_key_permission_denied",
+      ]) {
+        const hint = refusalFor(LOGIN_KEY, code, permission);
+        expect(hint).toContain("langwatch login --device --management");
+        expect(hint).toContain(permission);
+      }
     }
   });
 
-  /** @scenario A team command refused on a CLI login key names the re-login command */
-  it("names it for a login that recorded no permissions, since those leave team management out", () => {
+  /** @scenario A command refused for management access on a CLI login key names the re-login command */
+  it("names it for a login that recorded no permissions, since those leave management out", () => {
     loginWith(undefined);
 
-    expect(teamRefusal(LOGIN_KEY, "insufficient_permissions")).toContain("--manage-teams");
+    expect(refusalFor(LOGIN_KEY, "insufficient_permissions", "organization:manage")).toContain(
+      "--management",
+    );
   });
 
-  it("adds nothing when the login already carries team:manage, since the role refused it", () => {
+  it("adds nothing when the login already carries the refused permission, since the role refused it", () => {
     loginWith(["team:manage", "team:view"]);
 
-    expect(teamRefusal(LOGIN_KEY, "insufficient_permissions")).toBeUndefined();
+    expect(refusalFor(LOGIN_KEY, "insufficient_permissions", "team:manage")).toBeUndefined();
   });
 
   it("adds nothing when the refused key is not the login", () => {
     loginWith(["project:view"]);
 
-    expect(teamRefusal("sk-lw-some-other-key", "insufficient_permissions")).toBeUndefined();
+    expect(
+      refusalFor("sk-lw-some-other-key", "insufficient_permissions", "team:manage"),
+    ).toBeUndefined();
+  });
+
+  it("does not name the management re-login for a permission a plain login already covers", () => {
+    loginWith(["traces:view"]);
+
+    expect(refusalFor(LOGIN_KEY, "permission_denied", "project:create")).toBeUndefined();
   });
 });
 

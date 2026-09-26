@@ -56,8 +56,8 @@ describe("startDeviceCode", () => {
     expect(dc.interval).toBe(5);
   });
 
-  describe("when the login asks for team management", () => {
-    const deviceCodeBody = async (init: { teamManagement?: boolean }) => {
+  describe("when the login asks for management access", () => {
+    const deviceCodeBody = async (init: { management?: boolean }) => {
       const fetchImpl = vi.fn().mockResolvedValue(
         jsonResponse(200, {
           device_code: "DC",
@@ -72,16 +72,16 @@ describe("startDeviceCode", () => {
       return JSON.parse(request.body as string) as Record<string, unknown>;
     };
 
-    /** @scenario A CLI login with --manage-teams asks for team management */
-    it("sends team_management in the device code request", async () => {
-      await expect(deviceCodeBody({ teamManagement: true })).resolves.toMatchObject({
-        team_management: true,
+    /** @scenario A CLI login with --management asks for management access */
+    it("sends management in the device code request", async () => {
+      await expect(deviceCodeBody({ management: true })).resolves.toMatchObject({
+        management: true,
       });
     });
 
-    /** @scenario A plain CLI login does not ask for team management */
-    it("leaves team_management off the request otherwise", async () => {
-      await expect(deviceCodeBody({})).resolves.not.toHaveProperty("team_management");
+    /** @scenario A plain CLI login does not ask for management access */
+    it("leaves management off the request otherwise", async () => {
+      await expect(deviceCodeBody({})).resolves.not.toHaveProperty("management");
     });
   });
 });

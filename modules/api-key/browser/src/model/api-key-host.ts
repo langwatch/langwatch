@@ -95,8 +95,8 @@ export type CliDeviceCodeLookup =
       status: string;
       expiresAt: number;
       credentialType: CliCredentialType;
-      /** Whether the CLI asked for team management (`langwatch login --manage-teams`). */
-      teamManagement: boolean;
+      /** Whether the CLI asked for management access (`langwatch login --management`). */
+      management: boolean;
     }
   | { outcome: "expired" }
   | { outcome: "unknown" }

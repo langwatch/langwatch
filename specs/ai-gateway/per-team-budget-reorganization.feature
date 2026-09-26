@@ -127,35 +127,46 @@ Feature: Reorganizing gateway budgets per team from the CLI
       When a user opens the new budget drawer
       Then it says spend before the budget is created in the current window is not counted
 
-  Rule: Team management on a CLI login key is opt-in
+  Rule: Management access on a CLI login key is opt-in
+    A CLI login key leaves out organization:manage, organization:delete and
+    team:manage. `langwatch login --device --management` asks for them, and
+    the key gets only the ones the approving user holds.
 
     @unit
-    Scenario: A plain CLI login does not ask for team management
+    Scenario: A plain CLI login does not ask for management access
       When the user runs "langwatch login --device"
-      Then the device code request does not ask for team management
+      Then the device code request does not ask for management access
 
     @unit
-    Scenario: A CLI login with --manage-teams asks for team management
-      When the user runs "langwatch login --device --manage-teams"
-      Then the device code request asks for team management
+    Scenario: A CLI login with --management asks for management access
+      When the user runs "langwatch login --device --management"
+      Then the device code request asks for management access
 
     @unit
-    Scenario: The approval screen includes team management when the CLI asked for it
-      Given the CLI asked for team management
-      And the approving user can manage teams in the organization
-      When the approval screen computes the key's default permissions
-      Then team:manage is among them
+    Scenario: The approval screen shows management access when the CLI asked for it
+      Given the CLI asked for management access
+      And the approving user is an organization admin
+      When the approval screen opens
+      Then it shows one management access request listing what it adds
+      And the approved key carries organization:manage, organization:delete and team:manage
 
-    @unit
-    Scenario: Team management is refused to a user who cannot manage teams
-      Given the CLI asked for team management
-      And the approving user cannot manage teams in the organization
+    @integration
+    Scenario: Management access grants only the management permissions the user holds
+      Given the CLI asked for management access
+      And the approving user holds team:manage but not organization:manage or organization:delete
       When the approval is submitted
-      Then it fails with team_management_not_permitted
+      Then the key carries team:manage and no other management permission
+
+    @unit
+    Scenario: Management access is refused to a user who holds no management permission
+      Given the CLI asked for management access
+      And the approving user holds none of the management permissions
+      When the approval is submitted
+      Then it fails with management_not_permitted
       And no key is minted
 
     @unit
-    Scenario: A team command refused on a CLI login key names the re-login command
-      Given the CLI login key does not carry team:manage
-      When a team command is refused for missing team:manage
-      Then the error suggests running "langwatch login --device --manage-teams"
+    Scenario: A command refused for management access on a CLI login key names the re-login command
+      Given the CLI login key does not carry a management permission
+      When any command is refused for missing that permission
+      Then the error suggests running "langwatch login --device --management"

@@ -3,6 +3,8 @@
 
 import { Box, Button, HStack, Icon, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
 import {
+  CLI_KEY_MANAGEMENT_PERMISSIONS,
+  cliKeyManagementPermissions,
   computePermissionsFromSelections,
   defaultCliKeyPermissions,
   selectionsFromPermissions,
@@ -42,7 +44,7 @@ type LookupState =
       status: string;
       expiresAt: number;
       credentialType: CliCredentialType;
-      teamManagement: boolean;
+      management: boolean;
     }
   | { kind: "error"; message: string }
   | { kind: "expired" };
@@ -214,7 +216,7 @@ export default function CliAuthScreen() {
         status: result.status,
         expiresAt: result.expiresAt,
         credentialType: result.credentialType,
-        teamManagement: result.teamManagement,
+        management: result.management,
       });
     })();
     return () => {
@@ -225,9 +227,8 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
-  // `langwatch login --manage-teams` asked for team management on the key.
-  const requestsTeamManagement =
-    lookup.kind === "ready" && !requiresProject && lookup.teamManagement;
+  // `langwatch login --management` asked for management access on the key.
+  const requestsManagement = lookup.kind === "ready" && !requiresProject && lookup.management;
 
   // The user's own role bindings in the picked org: the ceiling the CLI key
   // can never exceed. Drives the scope defaults and which permission rows
@@ -320,21 +321,25 @@ export default function CliAuthScreen() {
   // one permission.
   const defaultCliKeyPermissionsHeld = useMemo<string[]>(() => {
     const held = new Set(cliKeyUserPermissions);
-    return defaultCliKeyPermissions({ teamManagement: requestsTeamManagement }).filter(
-      (permission) => held.has(permission),
+    return defaultCliKeyPermissions({ management: requestsManagement }).filter((permission) =>
+      held.has(permission),
     );
-  }, [cliKeyUserPermissions, requestsTeamManagement]);
+  }, [cliKeyUserPermissions, requestsManagement]);
 
-  // Team management rides on the whole organization. A person who cannot
-  // manage teams there is told so here, and the approval would be refused.
-  const cannotGrantTeamManagement =
-    requestsTeamManagement &&
+  // Management access rides on the whole organization, and the key gets only
+  // the management permissions the person holds there. Holding none is told
+  // here, and the approval would be refused.
+  const managementHeld = cliKeyManagementPermissions().filter((permission) =>
+    cliKeyUserPermissions.includes(permission),
+  );
+  const cannotGrantManagement =
+    requestsManagement &&
     !myBindings.isLoading &&
     selectedScopes.length > 0 &&
-    !cliKeyUserPermissions.includes("team:manage");
-  const teamManagementNeedsOrganization =
-    requestsTeamManagement &&
-    !cannotGrantTeamManagement &&
+    managementHeld.length === 0;
+  const managementNeedsOrganization =
+    requestsManagement &&
+    !cannotGrantManagement &&
     selectedScopes.length > 0 &&
     !selectedScopes.some((scopeEntry) => scopeEntry.scopeType === "ORGANIZATION");
 
@@ -380,8 +385,8 @@ export default function CliAuthScreen() {
     (myBindings.isLoading ||
       selectedScopes.length === 0 ||
       cliKeyPermissions.length === 0 ||
-      cannotGrantTeamManagement ||
-      teamManagementNeedsOrganization);
+      cannotGrantManagement ||
+      managementNeedsOrganization);
 
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
@@ -699,12 +704,11 @@ export default function CliAuthScreen() {
                         </Text>
                       )}
                     </VStack>
-                  ) : requestsTeamManagement ? (
+                  ) : requestsManagement ? (
                     <Text textStyle="xs" color="fg.muted" lineHeight="tall">
                       The key gets your access for everyday work: traces, datasets, prompts,
-                      evaluations, the AI Gateway, and project settings. The CLI also asked to
-                      manage teams, so it can create teams and add or remove team members. It cannot
-                      manage the organization.
+                      evaluations, the AI Gateway, and project settings, plus the management access
+                      below.
                     </Text>
                   ) : (
                     <Text textStyle="xs" color="fg.muted" lineHeight="tall">
@@ -715,25 +719,54 @@ export default function CliAuthScreen() {
                   )}
                 </Box>
 
-                {cannotGrantTeamManagement && (
+                {requestsManagement && !cannotGrantManagement && managementHeld.length > 0 && (
+                  <Box
+                    data-testid="cli-auth-management-request"
+                    borderWidth="1px"
+                    borderColor="blue.muted"
+                    borderRadius="lg"
+                    bg="blue.subtle"
+                    paddingX={5}
+                    paddingY={4}
+                  >
+                    <HStack align="flex-start" gap={3}>
+                      <Icon as={Info} boxSize={5} color="blue.fg" flexShrink={0} marginTop={0.5} />
+                      <VStack align="stretch" gap={1} flex={1}>
+                        <Text textStyle="sm" fontWeight="semibold" color="fg" lineHeight="snug">
+                          Management access requested
+                        </Text>
+                        <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+                          The CLI asked for management access. The key also gets:
+                        </Text>
+                        <Box as="ul" paddingStart={4} textStyle="xs" color="fg.muted">
+                          {managementHeld.map((permission) => (
+                            <li key={permission}>{CLI_KEY_MANAGEMENT_PERMISSIONS[permission]}</li>
+                          ))}
+                        </Box>
+                      </VStack>
+                    </HStack>
+                  </Box>
+                )}
+                {cannotGrantManagement && (
                   <StatusCard
                     palette="red"
                     icon={TriangleAlert}
-                    title="You cannot manage teams here"
+                    title="You have no management access here"
                   >
-                    The CLI asked to manage teams, and your account cannot manage teams in this
-                    organization. Deny this request and run <code>langwatch login --device</code>{" "}
-                    without <code>--manage-teams</code>, or ask an organization admin.
+                    The CLI asked for management access, and your account holds no management
+                    permission in this organization. Deny this request and run{" "}
+                    <code>langwatch login --device</code> without <code>--management</code>, or ask
+                    an organization admin.
                   </StatusCard>
                 )}
-                {teamManagementNeedsOrganization && (
+                {managementNeedsOrganization && (
                   <StatusCard
                     palette="orange"
                     icon={CircleAlert}
-                    title="Team management needs the organization"
+                    title="Management access needs the organization"
                   >
-                    The CLI asked to manage teams, which applies to the whole organization. Add the
-                    organization to what the CLI can access to approve.
+                    The CLI asked for management access, which applies to the whole organization.
+                    Add the organization to what the CLI can access to approve.
                   </StatusCard>
                 )}
               </>

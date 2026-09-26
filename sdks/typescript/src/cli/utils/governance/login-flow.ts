@@ -46,11 +46,11 @@ export interface RunUnifiedLoginOptions {
    */
   isQuiet?: boolean;
   /**
-   * `--manage-teams`: ask for the CLI key to also carry team management,
-   * which a CLI login leaves out by default. The approval page grants it only
-   * to a person who can manage teams in the organization.
+   * `--management`: ask for the CLI key to also carry the management
+   * permissions a CLI login leaves out by default. The approval grants only
+   * the ones the approving person holds in the organization.
    */
-  teamManagement?: boolean;
+  management?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -313,7 +313,7 @@ export async function runUnifiedLoginFlow(
     { baseUrl },
     {
       credentialType: kind,
-      teamManagement: kind === "device_session" && opts.teamManagement === true,
+      management: kind === "device_session" && opts.management === true,
     },
   );
   const verifyURL =

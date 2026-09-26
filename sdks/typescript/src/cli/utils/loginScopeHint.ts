@@ -1,7 +1,7 @@
 /**
  * Lists the permissions this machine's login carries on an authorization failure: a CLI login key
- * lacks `organization:manage` on purpose, and the fix is a re-login, not an escalation. A refusal
- * for team management names the one re-login that grants it.
+ * leaves the management permissions out on purpose, and the fix is a re-login, not an escalation. A
+ * refusal for any of them names the one re-login that grants it, whichever command was refused.
  * @see specs/typescript-sdk/cli-projects-api-keys.feature
  * @see specs/ai-gateway/per-team-budget-reorganization.feature
  */
@@ -10,7 +10,17 @@ import { scopedApiKey } from "@/internal/credentialContext";
 
 import { loadConfig } from "./governance/config";
 
-const TEAM_MANAGEMENT = "team:manage";
+/**
+ * The permissions a CLI login key leaves out unless the login asked for management access. Mirrors
+ * `CLI_KEY_MANAGEMENT_PERMISSIONS` in @langwatch/api-key-contract, which the SDK cannot import.
+ */
+export const LOGIN_MANAGEMENT_PERMISSIONS: readonly string[] = [
+  "organization:manage",
+  "organization:delete",
+  "team:manage",
+];
+
+export const MANAGEMENT_RELOGIN_COMMAND = "langwatch login --device --management";
 
 /** The codes a missing permission comes back as, depending on which door refused it. */
 const PERMISSION_REFUSAL_CODES = new Set([
@@ -46,20 +56,24 @@ export const loginPermissionsHint = (
   code: string,
   meta: Readonly<Record<string, unknown>> = {},
 ): string | undefined => {
-  const refusedTeamManagement =
-    meta.permission === TEAM_MANAGEMENT && PERMISSION_REFUSAL_CODES.has(code);
-  if (code !== "unauthorized" && !refusedTeamManagement) return undefined;
+  const refusedPermission = typeof meta.permission === "string" ? meta.permission : undefined;
+  const refusedManagement =
+    refusedPermission !== undefined &&
+    LOGIN_MANAGEMENT_PERMISSIONS.includes(refusedPermission) &&
+    PERMISSION_REFUSAL_CODES.has(code);
+  if (code !== "unauthorized" && !refusedManagement) return undefined;
 
   const login = loginUsedByThisRequest();
   if (!login) return undefined;
 
-  // A CLI login leaves team management out unless it was asked for, so a
-  // login without it is the reason, whatever role its owner holds.
-  if (refusedTeamManagement) {
+  // A CLI login leaves the management permissions out unless it was asked
+  // for them, so a login without the refused one is the reason, whatever role
+  // its owner holds.
+  if (refusedManagement) {
     // A login that carries it was refused by its owner's role, which no
     // re-login changes.
-    if (login.permissions?.includes(TEAM_MANAGEMENT)) return undefined;
-    return "Your CLI login does not include team management. Run `langwatch login --device --manage-teams` to add it (it needs team management in the organization), or use an API key that has team:manage.";
+    if (login.permissions?.includes(refusedPermission)) return undefined;
+    return `Your CLI login does not include management access (${refusedPermission}). Run \`${MANAGEMENT_RELOGIN_COMMAND}\` to add the management access you hold, or use an API key that has ${refusedPermission}.`;
   }
 
   const { permissions } = login;

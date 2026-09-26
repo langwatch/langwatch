@@ -31,7 +31,11 @@ function printAgentHintBanner(): void {
   console.log(
     chalk.gray("  --device                   AI tools / SSO (claude, codex, gemini, opencode)"),
   );
-  console.log(chalk.gray("  --device --manage-teams    same, and the key can also manage teams"));
+  console.log(
+    chalk.gray(
+      "  --device --management     same, plus the management access you hold (teams, organization)",
+    ),
+  );
   console.log(
     chalk.gray(
       "  --project [slug]           project SDK key into .env; with a slug, no browser (uses your device login)",
@@ -311,15 +315,15 @@ export const loginCommand = async (options?: {
   browser?: string;
   endpoint?: string;
   token?: string;
-  manageTeams?: boolean;
+  management?: boolean;
 }): Promise<void> => {
   try {
-    // Team management rides on the device login key only: a project key or
+    // Management access rides on the device login key only: a project key or
     // a pre-minted token never passes through the approval that grants it.
-    if (options?.manageTeams && (options.project || options.apiKey || options.token)) {
+    if (options?.management && (options.project || options.apiKey || options.token)) {
       console.error(
         chalk.red(
-          "Error: --manage-teams applies to the device login. Run `langwatch login --device --manage-teams`.",
+          "Error: --management applies to the device login. Run `langwatch login --device --management`.",
         ),
       );
       process.exit(1);
@@ -348,10 +352,10 @@ export const loginCommand = async (options?: {
     // mints a personal virtual key bound to the user. This is the
     // governance-plane onboarding for enterprise users, distinct from the
     // single-user API-key flow below.
-    if (options?.device || options?.manageTeams) {
+    if (options?.device || options?.management) {
       await runDeviceFlowLogin({
         browser: options.browser,
-        teamManagement: options.manageTeams === true,
+        management: options.management === true,
       });
       return;
     }

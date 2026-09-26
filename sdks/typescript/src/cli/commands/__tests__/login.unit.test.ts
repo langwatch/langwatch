@@ -208,31 +208,31 @@ describe("loginCommand", () => {
         expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       });
 
-      /** @scenario A plain CLI login does not ask for team management */
-      it("does not ask for team management", async () => {
+      /** @scenario A plain CLI login does not ask for management access */
+      it("does not ask for management access", async () => {
         await loginCommand({ device: true });
 
         expect(runDeviceFlowLogin).toHaveBeenCalledWith(
-          expect.objectContaining({ teamManagement: false }),
+          expect.objectContaining({ management: false }),
         );
       });
     });
 
-    describe("when the command is invoked with --device --manage-teams", () => {
-      /** @scenario A CLI login with --manage-teams asks for team management */
-      it("asks the device login for team management", async () => {
-        await loginCommand({ device: true, manageTeams: true });
+    describe("when the command is invoked with --device --management", () => {
+      /** @scenario A CLI login with --management asks for management access */
+      it("asks the device login for management access", async () => {
+        await loginCommand({ device: true, management: true });
 
         expect(runDeviceFlowLogin).toHaveBeenCalledWith(
-          expect.objectContaining({ teamManagement: true }),
+          expect.objectContaining({ management: true }),
         );
       });
     });
   });
 
-  describe("given --manage-teams with a project login", () => {
-    it("refuses, since only the device login key can carry team management", async () => {
-      await expect(loginCommand({ project: "checkout", manageTeams: true })).rejects.toThrow(
+  describe("given --management with a project login", () => {
+    it("refuses, since only the device login key can carry management access", async () => {
+      await expect(loginCommand({ project: "checkout", management: true })).rejects.toThrow(
         ProcessExitError,
       );
 

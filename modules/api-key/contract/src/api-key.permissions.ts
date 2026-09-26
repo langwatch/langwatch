@@ -285,23 +285,34 @@ export function categorizablePermissions(): AuthzPermission[] {
   }) as AuthzPermission[];
 }
 
-export const CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS: readonly AuthzPermission[] = [
-  "organization:manage",
-  "organization:delete",
-  "team:manage",
-];
-
 /**
- * The permissions a CLI login key starts from. Team management stays out
- * unless the login asked for it (`langwatch login --manage-teams`);
- * organization management and deletion are never on a CLI login key.
+ * The permissions a CLI login key leaves out unless the login asked for
+ * management access (`langwatch login --management`), each with what it lets
+ * the CLI do, as the approval screen lists it.
  */
+export const CLI_KEY_MANAGEMENT_PERMISSIONS = {
+  "organization:manage": "Manage the organization's settings, members and roles",
+  "organization:delete": "Delete the organization",
+  "team:manage": "Create teams and manage their members",
+} as const satisfies Partial<Record<AuthzPermission, string>>;
+
+export type CliKeyManagementPermission = keyof typeof CLI_KEY_MANAGEMENT_PERMISSIONS;
+
+export const cliKeyManagementPermissions = (): CliKeyManagementPermission[] =>
+  Object.keys(CLI_KEY_MANAGEMENT_PERMISSIONS) as CliKeyManagementPermission[];
+
+export const isCliKeyManagementPermission = (
+  permission: string,
+): permission is CliKeyManagementPermission =>
+  Object.hasOwn(CLI_KEY_MANAGEMENT_PERMISSIONS, permission);
+
+/** The permissions a CLI login key starts from; the management ones only when asked for. */
 export function defaultCliKeyPermissions({
-  teamManagement = false,
-}: { teamManagement?: boolean } = {}): AuthzPermission[] {
-  const excluded = new Set(CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS);
-  if (teamManagement) excluded.delete("team:manage");
-  return categorizablePermissions().filter((permission) => !excluded.has(permission));
+  management = false,
+}: { management?: boolean } = {}): AuthzPermission[] {
+  return categorizablePermissions().filter(
+    (permission) => management || !isCliKeyManagementPermission(permission),
+  );
 }
 
 export function categoryPermissions({

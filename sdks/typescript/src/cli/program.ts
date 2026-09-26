@@ -246,7 +246,7 @@ const loginCommand = async (options?: {
   apiKey?: string;
   device?: boolean;
   browser?: string;
-  manageTeams?: boolean;
+  management?: boolean;
 }): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
@@ -424,8 +424,8 @@ function registerLoginCommands(program: Command): void {
       "RFC 8628 device-flow login via your company SSO; signs this device in for the coding-assistant wrappers (credentials are issued on first use)",
     )
     .option(
-      "--manage-teams",
-      "With --device: the login key can also create teams and add or remove their members. Off by default; granted only if you can manage teams in the organization",
+      "--management",
+      "With --device: the login key also gets the management access you hold in the organization (create and manage teams, manage the organization's settings, members and roles, delete it). Off by default",
     )
     .option(
       "--project [slug]",
@@ -448,7 +448,7 @@ function registerLoginCommands(program: Command): void {
       browser?: string;
       endpoint?: string;
       token?: string;
-      manageTeams?: boolean;
+      management?: boolean;
     }) => {
       try {
         await loginCommand(options);
