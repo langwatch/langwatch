@@ -36,6 +36,9 @@ Transforms applied (and why each is safe for codegen):
      (and, when only one real member remains, inline it). The 3.1 idiom for an
      optional composed schema; 3.0 expresses it with `nullable`.
 
+  7. discriminator over inline oneOf/anyOf members -> dropped
+     oapi-codegen maps a discriminator only onto $ref members; the union stays.
+
 Usage:
     python3 downconvert.py <source-3.1.json> <dest-3.0.json>
 """
@@ -96,9 +99,17 @@ def convert(node):
                 # If exactly one real member remains and this node carries nothing
                 # else of substance, fold it up so codegen names the type cleanly.
                 if len(node[key]) == 1 and not (set(node.keys()) - {key, "nullable"}):
-                    only = node.pop(key)[0]
+                    # Converted first: its own keywords land here after (1)-(5) ran.
+                    only = convert(node.pop(key)[0])
                     node.update(only)
                     node["nullable"] = True
+
+    # (7) a discriminator over inline (unnamed) members: oapi-codegen can only map $ref members,
+    # so the discriminator is dropped and the members stay a plain oneOf union.
+    members = node.get("oneOf") or node.get("anyOf")
+    if "discriminator" in node and isinstance(members, list):
+        if any(isinstance(m, dict) and "$ref" not in m for m in members):
+            node.pop("discriminator")
 
     return {k: convert(v) for k, v in node.items()}
 

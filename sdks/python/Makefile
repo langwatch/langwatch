@@ -105,7 +105,7 @@ ensure-openapi-python-client:
 # generator was deleted with the monolith's task lane and has no replacement,
 # so this target reads the document as it stands and fails loudly if it is
 # missing rather than generating a client from nothing.
-API_SPEC = ../../apps/api/src/features/discovery/openapi-document.json
+API_SPEC = ../../specs/api-reference/openapi-document.json
 
 generate/api-client: ensure-openapi-python-client
 	@test -f $(API_SPEC) || { \
