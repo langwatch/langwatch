@@ -25,28 +25,22 @@ import {
 import { WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
-import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
 import { type EmailContent, EmailDelivery, ReactEmailMailRenderer } from "@langwatch/mail";
 import type { Logger } from "@langwatch/observability";
-import type { Encryption, Mail, ProcessMembers } from "@langwatch/process-stores/members";
+import type { Encryption, Mail } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { traceSchema, type TraceRecord } from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
+import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
-import type {
-  AutomationScheduledJobRepository,
-  ScheduledJobRecord,
-} from "../repositories/automation-scheduled-job.repository.ts";
 import { AutomationSettlementBreach } from "../repositories/automation-settlement-ledger.repository.ts";
 import type {
   AutomationSettlementEvaluationRepository,
@@ -75,6 +69,11 @@ import { GraphAlertDispatchService } from "../services/graph-alert-dispatch.serv
 import { GraphTriggerHeartbeatService } from "../services/graph-trigger-heartbeat.service.ts";
 import { AutomationPersistActionService } from "../services/persist-action.service.ts";
 import { AutomationPersistCapService } from "../services/persist-cap.service.ts";
+import { ReportChartService } from "../services/report-chart.service.ts";
+import {
+  ReportDispatchService,
+  type ReportDispatchDeps,
+} from "../services/report-dispatch.service.ts";
 import { RunawayContainmentService } from "../services/runaway-containment.service.ts";
 import { AutomationSettlementDispatchService } from "../services/trigger-settlement-dispatch.service.ts";
 import type {
@@ -100,8 +99,6 @@ import {
 
 /** What `buildAutomationInfrastructure` reads off process members. */
 export type AutomationProcessMembers = Readonly<{
-  prisma: ProcessMembers["prisma"];
-  redis: RedisConnection;
   logger: Logger;
   encryption: Encryption;
   mail: Mail;
@@ -150,12 +147,7 @@ export function buildAutomationInfrastructure(
     delivery,
     emailCaps,
     verifier: input.verifier,
-    // The report calendar, on the SAME `ScheduledJob` store the worker's loop
-    // claims a due row through — Eventing's own, not a second narrowing of it,
-    // so the row this process writes on save is the row that process reads.
-    jobs: new InstantScheduledJobRepository(new PrismaScheduledJobStore(members.prisma)),
     clock,
-    wake: new ApiSchedulerWake(members.redis),
     notifier: buildGraphAlertNotifier({ ...input, providers, clock, delivery, emailCaps }),
     logger: new ApiAutomationLogger(members.logger),
     slackTokens: new ApiAutomationSlackTokens(providers),
@@ -173,66 +165,10 @@ export function buildAutomationInfrastructure(
   };
 }
 
-/**
- * {@link AutomationScheduledJobRepository} over Eventing's `Date`-typed
- * store: converts to/from {@link Instant} here, once, instead of at every
- * call site.
- */
-class InstantScheduledJobRepository implements AutomationScheduledJobRepository {
-  constructor(private readonly store: PrismaScheduledJobStore) {}
-
-  upsertForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-    cron: string;
-    timezone: string;
-    nextRunAt: Instant;
-  }): Promise<void> {
-    return this.store.upsertForTarget({ ...input, nextRunAt: toDate(input.nextRunAt) });
-  }
-
-  deactivateForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-  }): Promise<void> {
-    return this.store.deactivateForTarget(input);
-  }
-
-  async findAllForProject(input: {
-    projectId: string;
-    targetType: string;
-  }): Promise<ScheduledJobRecord[]> {
-    const rows = await this.store.findAllForProject(input);
-    return rows.map((row) => ({
-      targetId: row.targetId,
-      nextRunAt: fromDate(row.nextRunAt),
-      lastSlot: row.lastSlot === null ? null : fromDate(row.lastSlot),
-      active: row.active,
-    }));
-  }
-}
-
 /** The process's own wall clock, as the feature reads time. */
 class ApiAutomationClock implements AutomationClock {
   now() {
     return nowInstant();
-  }
-}
-
-/**
- * The cross-process wake a freshly written schedule publishes, best-effort:
- * the worker's poll backstop is the correctness layer, so a dropped publish
- * only costs time until the next sweep, never a missed fire.
- */
-class ApiSchedulerWake extends SchedulerWake {
-  constructor(private readonly redis: RedisConnection) {
-    super();
-  }
-
-  publish(): void {
-    SchedulerService.publishWake(this.redis as never);
   }
 }
 
@@ -895,4 +831,64 @@ export class LoggedSettlementBreach extends AutomationSettlementBreach {
     );
     return Promise.resolve();
   }
+}
+
+/** Main's report handler (presets.ts, ADR-044 Phase 3c), over this module's own repositories. */
+export function createAutomationReportDispatcher(input: {
+  repositories: Pick<AutomationRepositories, "triggers" | "history" | "customGraphs">;
+  projects: AutomationProjectDirectory;
+  analytics: Pick<AnalyticsApi, "getTimeseries">;
+  delivery: AutomationNotificationDelivery;
+  crypto: AutomationSecretCrypto;
+  suppression: { filterSuppressed: ReportDispatchDeps["filterSuppressedRecipients"] };
+  baseHost: string;
+}): ReportDispatcher {
+  const { repositories } = input;
+  const deps: ReportDispatchDeps = {
+    findTrigger: ({ projectId, triggerId }) =>
+      repositories.triggers.findById({ triggerId, projectId }),
+    findProject: (projectId) => input.projects.findById(projectId),
+    delivery: input.delivery,
+    slackProvider: AutomationSlackSecretsService.create(input.crypto),
+    filterSuppressedRecipients: (recipients) => input.suppression.filterSuppressed(recipients),
+    listReportTraces: () =>
+      Promise.reject(
+        new Error(
+          "A trace-query report needs a typed trace list read, which TraceApi does not offer yet",
+        ),
+      ),
+    loadReportCharts: ({ projectId, source, from, to }) =>
+      ReportChartService.loadReportCharts({
+        deps: {
+          findCustomGraph: ({ projectId: project, customGraphId }) =>
+            repositories.customGraphs.findById({ customGraphId, projectId: project }),
+          loadDashboardGraphs: ({ projectId: project, dashboardId }) =>
+            repositories.customGraphs.findAllByDashboardId({ dashboardId, projectId: project }),
+          getTimeseries: (timeseries) => input.analytics.getTimeseries(timeseries),
+        },
+        source,
+        projectId,
+        from,
+        to,
+      }),
+    recordFire: async ({ projectId, triggerId, firedAt }) => {
+      await repositories.history.create({
+        projectId,
+        triggerId,
+        traceId: null,
+        customGraphId: null,
+        createdAt: firedAt,
+        resolvedAt: firedAt,
+      });
+    },
+    baseHost: input.baseHost,
+  };
+
+  return {
+    dispatch: ({ projectId, triggerId, slot }) =>
+      ReportDispatchService.dispatchScheduledReport({
+        deps,
+        fire: { projectId, triggerId, slot: Temporal.Instant.fromEpochMilliseconds(slot) },
+      }),
+  };
 }

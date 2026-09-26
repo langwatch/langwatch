@@ -1,12 +1,8 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ReportTraceRow } from "@langwatch/automation-contract";
-import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { defineServerModule } from "@langwatch/kernel";
-import type { TraceListItem } from "@langwatch/trace-contract";
 
 import {
   composeAutomationGraphActivity,
-  composeAutomationGraphDelivery,
   type AutomationGraphActivityDatabase,
 } from "./app/automation-graph-composition.build.ts";
 import { AutomationApp } from "./app/automation.app.ts";
@@ -21,11 +17,9 @@ import type {
   AutomationTriggerMatchRecorder,
 } from "./app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
-import type { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
 import { automationsEventing } from "./eventing/automations.pipeline.ts";
 import type { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
-import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
@@ -35,15 +29,10 @@ import {
   PrismaCustomGraphRepository,
   type CustomGraphDatabase,
 } from "./repositories/prisma/prisma.custom-graph.repository.ts";
-import type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
 import {
   PrismaGraphTriggerSentRepository,
   type GraphTriggerSentDatabase,
 } from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-import {
-  PrismaTriggerFireHistoryRepository,
-  type TriggerFireHistoryDatabase,
-} from "./repositories/prisma/prisma.trigger-fire-history.repository.ts";
 import {
   PrismaTriggerRepository,
   type TriggerDatabase,
@@ -54,21 +43,11 @@ import {
 } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type { TriggerRepository } from "./repositories/trigger.repository.ts";
 import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
-import { toReportTraceRow } from "./rules/report-trace-row.rules.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
-import {
-  AutomationSlackSecretsService,
-  type AutomationSecretCrypto,
-} from "./services/automation-slack-secrets.service.ts";
+import { type AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
-import { ReportChartService, type ReportChartDeps } from "./services/report-chart.service.ts";
-import {
-  ReportDispatchService,
-  type ReportDispatchDeps,
-} from "./services/report-dispatch.service.ts";
-import { ReportScheduleService } from "./services/report-schedule.service.ts";
 import {
   TriggerNoReplyService,
   TriggerNoReplyWarning,
@@ -77,6 +56,7 @@ import {
   UnsubscribeTokenService,
   type UnsubscribeTokenPayload,
 } from "./services/unsubscribe-token.service.ts";
+import { ReportScheduleBackfillTask } from "./tasks/report-schedule-backfill.task.ts";
 import { SlackAlertTask } from "./tasks/slack-alert.task.ts";
 import { createAutomationRest } from "./transport/automation.rest.ts";
 import { automationTrpcTransport } from "./transport/automation.trpc.ts";
@@ -96,7 +76,10 @@ export const automationServer = defineServerModule("automation")
     slackAutomationRest,
     unsubscribeRest,
   )
-  .withTasks(({ members }) => [SlackAlertTask.create({ baseHost: members.publicBaseUrl ?? "" })])
+  .withTasks(({ app, members }) => [
+    SlackAlertTask.create({ baseHost: members.publicBaseUrl ?? "" }),
+    ReportScheduleBackfillTask.create(app),
+  ])
   .withEventing(automationsEventing);
 
 /**
@@ -202,106 +185,6 @@ export function createAutomationEvaluationSubscriber(input: {
     triggerMatches: input.triggerMatches,
     matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
   });
-}
-
-/** Every table the scheduled-report calendar reads or writes. */
-export type AutomationReportCalendarDatabase = TriggerDatabase &
-  TriggerFireHistoryDatabase &
-  CustomGraphDatabase &
-  EmailSuppressionDatabase &
-  WebhookDeliveryDatabase;
-
-/**
- * The scheduled-report calendar this feature contributes to a process that runs
- * one: the reconciler its boot sweeps with, and the handler its scheduler fires.
- */
-export type AutomationReportCalendar = Readonly<{
-  /** Reads, writes and repairs the calendar rows behind report automations. */
-  schedules: ReportScheduleService;
-  /** Renders one due report and sends it through the process's own transports. */
-  dispatchScheduledReport(fire: ScheduledJobFire): Promise<void>;
-  /** A trace-list row as a report's template renders it. */
-  toReportTraceRow(input: { item: TraceListItem; projectUrl: string }): ReportTraceRow;
-}>;
-
-export function createAutomationReportCalendar(input: {
-  /** The one database client the composing process opened. */
-  database: AutomationReportCalendarDatabase;
-  clock: AutomationClock;
-  /** Where the process keeps its due-job rows, and how it wakes its peers. */
-  jobs: AutomationScheduledJobRepository;
-  wake: SchedulerWake;
-  /** The name and slug a report's links and headings are written with. */
-  projects: AutomationProjectDirectory;
-  /** The transports a report leaves through — the same ones every other notification uses. */
-  delivery: AutomationNotificationDelivery;
-  /** Reads the stored Slack bot token off a report trigger's action parameters. */
-  crypto: AutomationSecretCrypto;
-  /** The timeseries each chart panel is plotted from. */
-  getTimeseries: ReportChartDeps["getTimeseries"];
-  /** The traces a trace-query report lists, over the process's own trace tier. */
-  listReportTraces: ReportDispatchDeps["listReportTraces"];
-  /** This deployment's public origin. Every link in the message goes through it. */
-  baseHost: string;
-}): AutomationReportCalendar {
-  const { database, clock } = input;
-  const triggers = PrismaTriggerRepository.create(database, clock);
-  const fires = PrismaTriggerFireHistoryRepository.create(database);
-  const customGraphs = PrismaCustomGraphRepository.create(database);
-  // The SAME suppression read a graph alert filters its recipients through: an
-  // unsubscribe one half of this feature honoured and the other ignored is a
-  // customer who unsubscribed and still gets mail.
-  const graphDelivery = composeAutomationGraphDelivery({ database, clock });
-
-  const deps: ReportDispatchDeps = {
-    findTrigger: ({ projectId, triggerId }) => triggers.findById({ triggerId, projectId }),
-    findProject: (projectId) => input.projects.findById(projectId),
-    delivery: input.delivery,
-    slackProvider: AutomationSlackSecretsService.create(input.crypto),
-    filterSuppressedRecipients: (suppressed) => graphDelivery.filterSuppressed(suppressed),
-    listReportTraces: (traces) => input.listReportTraces(traces),
-    loadReportCharts: ({ projectId, source, from, to }) =>
-      ReportChartService.loadReportCharts({
-        deps: {
-          findCustomGraph: ({ projectId: project, customGraphId }) =>
-            customGraphs.findById({ customGraphId, projectId: project }),
-          loadDashboardGraphs: ({ projectId: project, dashboardId }) =>
-            customGraphs.findAllByDashboardId({ dashboardId, projectId: project }),
-          getTimeseries: (timeseries) => input.getTimeseries(timeseries),
-        },
-        source,
-        projectId,
-        from,
-        to,
-      }),
-    // A report's fire is a completed EVENT, not an open incident, so
-    // `resolvedAt` is stamped at write time. The automations list reads
-    // "currently firing" as `customGraphId != null AND resolvedAt IS NULL`, so
-    // a report row can never masquerade as a live alert.
-    recordFire: async ({ projectId, triggerId, firedAt }) => {
-      await fires.create({
-        projectId,
-        triggerId,
-        traceId: null,
-        customGraphId: null,
-        createdAt: firedAt,
-        resolvedAt: firedAt,
-      });
-    },
-    baseHost: input.baseHost,
-  };
-
-  return {
-    schedules: ReportScheduleService.create({
-      jobs: input.jobs,
-      clock,
-      wake: input.wake,
-      triggers,
-    }),
-    dispatchScheduledReport: (fire) =>
-      ReportDispatchService.dispatchScheduledReport({ deps, fire }),
-    toReportTraceRow: (row) => toReportTraceRow(row),
-  };
 }
 
 export {

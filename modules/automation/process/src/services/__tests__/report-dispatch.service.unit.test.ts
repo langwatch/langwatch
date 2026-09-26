@@ -10,7 +10,6 @@ import type {
   SlackPayload,
   Trigger,
 } from "@langwatch/automation-contract";
-import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -18,7 +17,11 @@ import { AutomationNotificationDelivery } from "../../channels/automation-notifi
 import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
 import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
 import { ReportChartService } from "../report-chart.service.ts";
-import { ReportDispatchService, type ReportDispatchDeps } from "../report-dispatch.service.ts";
+import {
+  ReportDispatchService,
+  type ReportDispatchDeps,
+  type ReportFire,
+} from "../report-dispatch.service.ts";
 
 const BASE_HOST = "https://app.langwatch.test";
 const PROJECT = { id: "project-1", name: "Checkout", slug: "checkout" };
@@ -103,11 +106,10 @@ function makeTrigger(overrides: Partial<Trigger> & { source: ReportSource }): Tr
   } as Trigger;
 }
 
-const FIRE: ScheduledJobFire = {
+const FIRE: ReportFire = {
   projectId: PROJECT.id,
-  targetType: "reportTrigger",
-  targetId: "report-1",
-  slot: SLOT,
+  triggerId: "report-1",
+  slot: fromDate(SLOT),
 };
 
 function makeDeps({

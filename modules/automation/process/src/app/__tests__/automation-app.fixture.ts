@@ -14,10 +14,8 @@ import { vi } from "vitest";
 
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
-import type { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
 import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
-import type { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
@@ -63,15 +61,9 @@ export function createCanonicalAutomationApp(): {
   const verifier: UnsubscribeTokenVerifier = {
     findVerifiedPayload: vi.fn(() => null),
   };
-  const jobs: AutomationScheduledJobRepository = {
-    upsertForTarget: vi.fn(async () => undefined),
-    deactivateForTarget: vi.fn(async () => undefined),
-    findAllForProject: vi.fn(async () => []),
-  };
   const clock: AutomationClock = {
     now: vi.fn<() => Instant>(() => nowInstant()),
   };
-  const wake: SchedulerWake = { publish: vi.fn() };
   const notifier: AutomationGraphNotifier = {
     dispatch: vi.fn<AutomationGraphNotifier["dispatch"]>(async () => ({
       channel: "none",
@@ -173,9 +165,7 @@ export function createCanonicalAutomationApp(): {
   });
   const members: AutomationInfrastructure = {
     verifier,
-    jobs,
     clock,
-    wake,
     notifier,
     logger,
     runaway,

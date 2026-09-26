@@ -1,5 +1,6 @@
 import {
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
+  REPORT_SCHEDULE_EVENT_TYPES,
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
   triggerMatchRecordedEventDataSchema,
@@ -19,6 +20,29 @@ import {
   graphAlertSweepWake,
   sweepSchema,
 } from "./graph-alert-sweep.process.ts";
+import {
+  ConfigureReportScheduleCommand,
+  PauseReportScheduleCommand,
+  RequestReportRunCommand,
+  ResumeReportScheduleCommand,
+} from "./report-schedule.commands.ts";
+import { reportScheduleEventSchemas, type ReportScheduleEvent } from "./report-schedule.events.ts";
+import {
+  REPORT_SCHEDULE_INTENT_TYPES,
+  reportDispatchIntentSchema,
+  runReportDispatch,
+  type ReportDispatcher,
+} from "./report-schedule.intent.ts";
+import {
+  INITIAL_REPORT_SCHEDULE_STATE,
+  REPORT_SCHEDULE_PROCESS_NAME,
+  reportRunRequested,
+  reportScheduleConfigured,
+  reportSchedulePaused,
+  reportScheduleResumed,
+  reportScheduleWake,
+  type ReportScheduleState,
+} from "./report-schedule.process.ts";
 import {
   logOverflowIntentSchema,
   notifyDigestIntentSchema,
@@ -62,7 +86,7 @@ const triggerMatchRecordedEventSchema = z.object({
 });
 
 export type TriggerMatchRecordedEvent = z.infer<typeof triggerMatchRecordedEventSchema>;
-export type AutomationEvent = TriggerMatchRecordedEvent;
+export type AutomationEvent = TriggerMatchRecordedEvent | ReportScheduleEvent;
 
 /** Only the executor dependencies are injected — the process-manager
  *  topology itself (states, intents, evolve/wake handlers, outbox tuning)
@@ -71,6 +95,7 @@ export interface AutomationsPipelineDeps {
   scheduledIntents: AutomationScheduledIntent;
   settlement: AutomationSettlementExecutor;
   retention: AutomationIntentRetentionRepository;
+  reports: ReportDispatcher;
 }
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */
@@ -81,7 +106,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
       type: "trigger",
     }),
   })
-    .withEvents([triggerMatchRecordedEventSchema])
+    .withEvents([triggerMatchRecordedEventSchema, ...reportScheduleEventSchemas])
     .withCommand("recordTriggerMatch", RecordTriggerMatchCommand, {
       serializeByAggregate: true,
       // ADR-066 pillar 2: a hot trigger appends one match per trace. Coalesce a
@@ -89,6 +114,10 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
       // tiny insert per match.
       coalesceMaxBatch: TRIGGER_MATCH_COALESCE_MAX_BATCH,
     })
+    .withCommand("configureReportSchedule", ConfigureReportScheduleCommand)
+    .withCommand("pauseReportSchedule", PauseReportScheduleCommand)
+    .withCommand("resumeReportSchedule", ResumeReportScheduleCommand)
+    .withCommand("requestReportRun", RequestReportRunCommand)
     .withProcessManager("triggerSettlement", (pm) =>
       pm
         .state<SettlementState>(INITIAL_SETTLEMENT_STATE)
@@ -180,6 +209,21 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
         // room to spare (see PERSIST_PAGE_MAX); the dispatcher releases any
         // batch tail that would run past it.
         .outbox({ maxAttempts: 8, leaseDurationMs: 300_000 }),
+    )
+    .withProcessManager(REPORT_SCHEDULE_PROCESS_NAME, (pm) =>
+      pm
+        .state<ReportScheduleState>(INITIAL_REPORT_SCHEDULE_STATE)
+        .intent(
+          REPORT_SCHEDULE_INTENT_TYPES.DISPATCH,
+          reportDispatchIntentSchema,
+          runReportDispatch(deps.reports),
+        )
+        .on(REPORT_SCHEDULE_EVENT_TYPES.CONFIGURED, reportScheduleConfigured)
+        .on(REPORT_SCHEDULE_EVENT_TYPES.PAUSED, reportSchedulePaused)
+        .on(REPORT_SCHEDULE_EVENT_TYPES.RESUMED, reportScheduleResumed)
+        .on(REPORT_SCHEDULE_EVENT_TYPES.RUN_REQUESTED, reportRunRequested)
+        .onWake(reportScheduleWake)
+        .outbox({ maxAttempts: 5, leaseDurationMs: 300_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm

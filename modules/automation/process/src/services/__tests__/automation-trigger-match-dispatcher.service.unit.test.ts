@@ -28,13 +28,18 @@ describe("AutomationTriggerMatchDispatcherService", () => {
     it("sends the match through recordTriggerMatch", async () => {
       const send = vi.fn(async () => undefined);
       const dispatcher = AutomationTriggerMatchDispatcherService.create();
+      const unused = () => ({
+        send: vi.fn(async () => undefined),
+        sendBatch: vi.fn(async () => undefined),
+        close: vi.fn(async () => undefined),
+        waitUntilReady: vi.fn(async () => undefined),
+      });
       dispatcher.connect({
-        recordTriggerMatch: {
-          send,
-          sendBatch: vi.fn(async () => undefined),
-          close: vi.fn(async () => undefined),
-          waitUntilReady: vi.fn(async () => undefined),
-        },
+        recordTriggerMatch: { ...unused(), send },
+        configureReportSchedule: unused(),
+        pauseReportSchedule: unused(),
+        resumeReportSchedule: unused(),
+        requestReportRun: unused(),
       });
 
       await dispatcher.send(match);

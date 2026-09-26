@@ -198,11 +198,6 @@ export {
   type TestFireSlackWebhook,
   type TestFireWebhook,
 } from "./channels/automation-test-fire.channel.ts";
-export { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
-export {
-  AutomationScheduledJobRepository,
-  type ScheduledJobRecord,
-} from "./repositories/automation-scheduled-job.repository.ts";
 
 /**
  * The feature's application: the one object all five of its doors call, and the
@@ -270,12 +265,9 @@ export {
   createAutomationEvaluationSubscriber,
   createAutomationGraphActivity,
   createAutomationMailEnvelope,
-  createAutomationReportCalendar,
   createAutomationSettlement,
   type AutomationMailEnvelope,
   type AutomationPersistCeiling,
-  type AutomationReportCalendar,
-  type AutomationReportCalendarDatabase,
   type AutomationRunawayCollaborator,
   type AutomationSettlement,
   type AutomationSettlementRepositories,

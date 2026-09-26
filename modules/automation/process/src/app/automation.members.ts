@@ -249,33 +249,6 @@ export interface AutomationEmailCapStore {
   eval(script: string, keyCount: number, key: string, seconds: string): Promise<unknown>;
 }
 
-export type ScheduledJobRecord = {
-  targetId: string;
-  nextRunAt: Instant;
-  lastSlot: Instant | null;
-  active: boolean;
-};
-
-export interface ScheduledJobStorePort {
-  upsertForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-    cron: string;
-    timezone: string;
-    nextRunAt: Instant;
-  }): Promise<void>;
-  deactivateForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-  }): Promise<void>;
-  findAllForProject(input: {
-    projectId: string;
-    targetType: string;
-  }): Promise<ScheduledJobRecord[]>;
-}
-
 export type UnsubscribeTokenPayload = {
   projectId: string;
   triggerId: string | null;

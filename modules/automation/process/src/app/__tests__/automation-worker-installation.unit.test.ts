@@ -28,7 +28,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { automationServer } from "../../automation.server.ts";
 import {
@@ -123,7 +123,12 @@ describe("given the automation module installed on the worker role", () => {
     const { keys } = await installedOn("worker");
 
     expect(keys.toSorted()).toEqual([
+      "automations:command:configureReportSchedule",
+      "automations:command:pauseReportSchedule",
       "automations:command:recordTriggerMatch",
+      "automations:command:requestReportRun",
+      "automations:command:resumeReportSchedule",
+      "automations:subscriber:pm:reportSchedule",
       "automations:subscriber:pm:triggerSettlement",
     ]);
   });
@@ -142,6 +147,13 @@ describe("given the automation module installed on the api role", () => {
     const { unrun } = await installedOn("api");
 
     expect(unrun).toContain("triggerSettlement");
+  });
+
+  /** @scenario "The api sends report schedule commands but never runs the schedule" */
+  it("names the report schedule among the process managers it will not run", async () => {
+    const { unrun } = await installedOn("api");
+
+    expect(unrun).toContain("reportSchedule");
   });
 });
 
@@ -456,5 +468,94 @@ describe("given a memory-tier worker whose automation passes its plan's ceiling"
     expect(trigger.active).toBe(true);
     expect(sent.map(({ to }) => to)).toEqual(["admin@acme.test"]);
     expect(counted).toEqual(["project-1"]);
+  });
+});
+
+async function reportingWorker() {
+  const eventing = eventingFor("worker");
+  const runtime = await process("worker", eventing, {
+    project: new SettlementProjectService(),
+  }).boot();
+  const automations = runtime.service(AutomationApi);
+  await automations.create(
+    automation("SEND_EMAIL", {
+      members: ["ops@acme.test"],
+      source: { kind: "dashboard", dashboardId: "dashboard-1" },
+      schedule: { cron: "0 9 * * 1", timezone: "UTC" },
+      compareToPrevious: false,
+    }),
+  );
+  const schedule = async () =>
+    (await automations.getReportSchedules({ projectId: "project-1" })).map(
+      ({ nextRunAt, active }) => ({ nextRunAt: nextRunAt?.getUTCDay() ?? null, active }),
+    );
+  const sync = (cron: string) =>
+    automations.syncReportSchedule({
+      projectId: "project-1",
+      triggerId: "trigger-1",
+      cron,
+      timezone: "UTC",
+    });
+  return { runtime, automations, schedule, sync };
+}
+
+describe("given a memory-tier worker hosting report schedules", () => {
+  /** @scenario "Saving a report schedules it for its next send" */
+  /** @scenario "A saved report starts counting without waiting for a restart" */
+  /** @scenario "The automations page shows the next send that will actually happen" */
+  it("reads the saved report's next Monday send back from its schedule process", async () => {
+    const worker = await reportingWorker();
+
+    await worker.sync("0 9 * * 1");
+
+    await vi.waitFor(async () =>
+      expect(await worker.schedule()).toEqual([{ nextRunAt: 1, active: true }]),
+    );
+    await worker.runtime.stop();
+  });
+
+  /** @scenario "Changing a report's cadence moves its next send" */
+  it("moves the next send to Friday when the cadence changes", async () => {
+    const worker = await reportingWorker();
+    await worker.sync("0 9 * * 1");
+
+    await worker.sync("0 17 * * 5");
+
+    await vi.waitFor(async () =>
+      expect(await worker.schedule()).toEqual([{ nextRunAt: 5, active: true }]),
+    );
+    await worker.runtime.stop();
+  });
+
+  /** @scenario "Pausing a report takes it off the schedule" */
+  /** @scenario "Resuming a report puts it back on the schedule" */
+  it("drops the next send on pause and restores it on the same entry on resume", async () => {
+    const worker = await reportingWorker();
+    await worker.sync("0 9 * * 1");
+
+    await worker.automations.removeReportSchedule({
+      projectId: "project-1",
+      triggerId: "trigger-1",
+    });
+    await vi.waitFor(async () =>
+      expect(await worker.schedule()).toEqual([{ nextRunAt: null, active: false }]),
+    );
+
+    await worker.sync("0 9 * * 1");
+    await vi.waitFor(async () =>
+      expect(await worker.schedule()).toEqual([{ nextRunAt: 1, active: true }]),
+    );
+    await worker.runtime.stop();
+  });
+
+  /** @scenario "Deleting a report takes it off the schedule" */
+  it("leaves a deleted report with no next send", async () => {
+    const worker = await reportingWorker();
+    await worker.sync("0 9 * * 1");
+
+    await worker.automations.delete({ projectId: "project-1", triggerId: "trigger-1" });
+
+    await vi.waitFor(async () => expect(await worker.schedule()).toEqual([]));
+    await worker.runtime.stop();
   });
 });

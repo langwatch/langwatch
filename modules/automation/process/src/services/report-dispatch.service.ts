@@ -12,7 +12,6 @@ import {
   findReportFromTriggerRow,
   type Trigger,
 } from "@langwatch/automation-contract";
-import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { Cron } from "croner";
@@ -21,6 +20,9 @@ import type { AutomationNotificationDelivery } from "../channels/automation-noti
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";
 
 const logger = createLogger("langwatch:report-dispatch");
+
+/** One due slot of one report automation. */
+export type ReportFire = { projectId: string; triggerId: string; slot: Instant };
 
 export interface ReportDispatchDeps {
   findTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
@@ -164,7 +166,7 @@ export class ReportDispatchService {
     fire,
   }: {
     deps: ReportDispatchDeps;
-    fire: ScheduledJobFire;
+    fire: ReportFire;
   }): Promise<void> {
     const loaded = await findDispatch({ deps, fire });
     if (!loaded) {
@@ -183,13 +185,13 @@ export class ReportDispatchService {
     // for, so a monthly report summarises its month and a daily one its day. A
     // trace-query report sends the traces matching its search query; a graph or
     // dashboard report sends the plotted series of each panel.
-    const to = fire.slot.getTime();
+    const to = fire.slot.epochMilliseconds;
     const from =
       to -
       ReportDispatchService.reportWindowMs({
         cron: report.schedule.cron,
         timezone: report.schedule.timezone,
-        slot: fromDate(fire.slot),
+        slot: fire.slot,
       });
 
     const { traces, charts } = await loadReportData({
@@ -212,7 +214,7 @@ export class ReportDispatchService {
       viewUrl: viewUrl(report.source, deps.baseHost, project.slug),
       traces,
       charts,
-      occurredAt: fromDate(fire.slot),
+      occurredAt: fire.slot,
       project: { id: project.id, name: project.name, slug: project.slug },
       baseHost: deps.baseHost,
     });
@@ -225,7 +227,7 @@ export class ReportDispatchService {
       deps,
       projectId: project.id,
       triggerId: trigger.id,
-      firedAt: fromDate(fire.slot),
+      firedAt: fire.slot,
     });
   }
 }
@@ -461,7 +463,7 @@ async function findDispatch({
   fire,
 }: {
   deps: ReportDispatchDeps;
-  fire: ScheduledJobFire;
+  fire: ReportFire;
 }): Promise<{
   trigger: Trigger;
   report: NonNullable<ReturnType<typeof findReportFromTriggerRow>>;
@@ -469,11 +471,11 @@ async function findDispatch({
 } | null> {
   const trigger = await deps.findTrigger({
     projectId: fire.projectId,
-    triggerId: fire.targetId,
+    triggerId: fire.triggerId,
   });
   if (!trigger?.active || trigger.deleted) {
     logger.info(
-      { triggerId: fire.targetId, projectId: fire.projectId },
+      { triggerId: fire.triggerId, projectId: fire.projectId },
       "Report trigger missing/inactive — skipping scheduled fire",
     );
 

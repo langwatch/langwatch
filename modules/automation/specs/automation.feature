@@ -28,11 +28,56 @@ Feature: Automation ownership
 
   @unit
   Scenario: Missing report schedules are repaired without resuming paused reports
-    Given an active report trigger without a scheduler row
-    And another report trigger with a paused scheduler row
+    Given an active report trigger without a schedule process
+    And another report trigger whose schedule process is paused
     When the automation service reconciles report schedules
-    Then it creates the missing schedule
+    Then it configures the missing schedule once, however often it runs
     And it leaves the paused schedule inactive
+
+  @unit
+  Scenario: A saved report is scheduled for its next cron slot
+    Given a report that sends daily at 09:00 UTC
+    When it is saved at 08:00
+    Then its schedule process wakes at 09:00 the same day
+
+  @unit
+  Scenario: A report fires at its cron time
+    Given a report scheduled for 09:00
+    When the clock reaches 09:00
+    Then the 09:00 slot is sent through the outbox
+    And the schedule wakes again at the next day's 09:00
+
+  @unit
+  Scenario: A paused report does not fire
+    Given a report scheduled for 09:00
+    When it is paused before 09:00
+    Then its schedule holds no wake and a stray wake sends nothing
+
+  @unit
+  Scenario: A resumed report fires at its next cron slot
+    Given a paused report
+    When it is resumed after its missed slot
+    Then its schedule wakes at the next slot, not the missed one
+
+  @unit
+  Scenario: Run now sends the report once and keeps the cadence
+    Given a scheduled report
+    When an operator asks for a run now twice with the same request
+    Then the report is sent once
+    And its next scheduled send is unchanged
+
+  @unit
+  Scenario: The automations page reads a report's next and last run from its schedule
+    Given a saved report
+    When the automations page lists report schedules
+    Then the next run is the schedule process's armed wake
+    And a paused report shows no next run
+
+  @unit
+  Scenario: The api sends report schedule commands but never runs the schedule
+    Given a process that installs the automation module over memory stores
+    When the process boots in the api role
+    Then the report schedule process manager is named among those it will not run
 
   @unit
   Scenario: Reports are not dispatched as trace or graph triggers

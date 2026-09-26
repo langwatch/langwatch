@@ -9,6 +9,6 @@ import type { AutomationApp } from "../app/automation.app.ts";
 export const automationsEventing = defineEventingModule({
   pipeline: "automations",
   build: ({ app, processStore }: EventingSetup<never, AutomationApp>) =>
-    app.eventingPipeline({ retention: processStore }),
+    app.eventingPipeline({ processStore }),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

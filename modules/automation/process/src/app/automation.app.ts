@@ -51,7 +51,7 @@ import {
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EventingCommands } from "@langwatch/eventing";
+import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import {
@@ -66,16 +66,14 @@ import { TraceApi } from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
-import type { SchedulerWake } from "../channels/automation-scheduler-wake.channel.ts";
 import type { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
 import {
   createAutomationsPipeline,
   type AutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
-import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
+import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
 import type { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
-import type { AutomationScheduledJobRepository } from "../repositories/automation-scheduled-job.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import { automationPlatformUrl } from "../rules/automation-platform-url.rules.ts";
 import { AutomationAuthoringService } from "../services/automation-authoring.service.ts";
@@ -104,6 +102,7 @@ import {
 } from "../services/unsubscribe-token.service.ts";
 import {
   buildAutomationInfrastructure,
+  createAutomationReportDispatcher,
   createAutomationSettlement,
   DatasetTraceMapper,
   LoggedSettlementBreach,
@@ -211,9 +210,7 @@ export interface AutomationAuditSink {
 
 export type AutomationInfrastructure = Readonly<{
   verifier: UnsubscribeTokenVerifier;
-  jobs: AutomationScheduledJobRepository;
   clock: AutomationClock;
-  wake: SchedulerWake;
   notifier: AutomationGraphNotifier;
   logger: AutomationLogger;
   slackTokens: AutomationSlackBotTokenDecryptor;
@@ -282,6 +279,7 @@ interface AutomationAppCollaborators {
   publicBaseUrl: string | undefined;
   evaluations: AutomationEvaluationSubscriberService;
   triggerMatches: AutomationTriggerMatchDispatcherService;
+  reportSchedules: ReportScheduleService;
   settlement: AutomationSettlement | undefined;
 }
 
@@ -303,15 +301,7 @@ export class AutomationApp implements AutomationApi {
   static readonly config = automationServerConfig;
   /** Unsubscribe links are signed with auth's session key, as main signed them (§6). */
   static readonly secrets = { unsubscribe: sessionSecret } as const;
-  static readonly reads = [
-    "prisma",
-    "redis",
-    "logger",
-    "encryption",
-    "mail",
-    "publicBaseUrl",
-    "isSaas",
-  ] as const;
+  static readonly reads = ["logger", "encryption", "mail", "publicBaseUrl", "isSaas"] as const;
 
   /**
    * Builds this process's own {@link AutomationInfrastructure} from the
@@ -338,6 +328,15 @@ export class AutomationApp implements AutomationApi {
         config: setup.config,
       });
       automation.#settlement = AutomationApp.#composeSettlement(setup, infrastructure, automation);
+      automation.#reportDispatcher = createAutomationReportDispatcher({
+        repositories: setup.repositories,
+        projects: setup.dependencies.projects,
+        analytics: setup.dependencies.analytics,
+        delivery: infrastructure.delivery,
+        crypto: setup.members.encryption,
+        suppression: automation.#automation,
+        baseHost: setup.members.publicBaseUrl ?? "",
+      });
       return automation;
     });
   }
@@ -440,6 +439,10 @@ export class AutomationApp implements AutomationApi {
       clock: members.clock,
       baseHost: members.publicBaseUrl ?? "",
     });
+    const reportSchedules = ReportScheduleService.create({
+      clock: members.clock,
+      triggers: repositories.triggers,
+    });
     const automation = AutomationService.create({
       triggers: repositories.triggers,
       history: repositories.history,
@@ -448,12 +451,7 @@ export class AutomationApp implements AutomationApi {
       customGraphs: repositories.customGraphs,
       webhookDeliveries: repositories.webhookDeliveries,
       verifier: members.verifier,
-      reportSchedules: ReportScheduleService.create({
-        jobs: members.jobs,
-        clock: members.clock,
-        wake: members.wake,
-        triggers: repositories.triggers,
-      }),
+      reportSchedules,
       clock: members.clock,
       graph,
       templates: AutomationTemplateService.create({
@@ -498,6 +496,7 @@ export class AutomationApp implements AutomationApi {
         matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
       }),
       triggerMatches,
+      reportSchedules,
       settlement: undefined,
     });
   }
@@ -511,7 +510,10 @@ export class AutomationApp implements AutomationApi {
   readonly #publicBaseUrl: string | undefined;
   readonly #evaluations: AutomationEvaluationSubscriberService;
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
+  readonly #reportSchedules: ReportScheduleService;
   #settlement: AutomationSettlement | undefined;
+  #reportDispatcher: ReportDispatcher | undefined;
+  #reportInstances: Pick<ProcessStore, "findByRef"> | undefined;
 
   private constructor(collaborators: AutomationAppCollaborators) {
     this.#automation = collaborators.automation;
@@ -523,24 +525,34 @@ export class AutomationApp implements AutomationApi {
     this.#publicBaseUrl = collaborators.publicBaseUrl;
     this.#evaluations = collaborators.evaluations;
     this.#triggerMatches = collaborators.triggerMatches;
+    this.#reportSchedules = collaborators.reportSchedules;
     this.#settlement = collaborators.settlement;
   }
 
   /** The `automations` pipeline, over the settlement {@link create} composed. */
-  eventingPipeline({
-    retention,
-  }: {
-    retention: AutomationIntentRetentionRepository;
-  }): AutomationsPipeline {
-    if (!this.#settlement) {
+  eventingPipeline({ processStore }: { processStore: ProcessStore }): AutomationsPipeline {
+    if (!this.#settlement || !this.#reportDispatcher) {
       throw new Error("Automation was asked for its pipeline, but no settlement was composed");
     }
-    return createAutomationsPipeline({ ...this.#settlement, retention });
+    this.#reportInstances = processStore;
+    return createAutomationsPipeline({
+      ...this.#settlement,
+      retention: processStore,
+      reports: this.#reportDispatcher,
+    });
   }
 
   /** Binds the registered `automations` pipeline's own senders. */
   connectCommands(commands: EventingCommands<AutomationsPipeline>): void {
     this.#triggerMatches.connect(commands);
+    if (this.#reportInstances) {
+      this.#reportSchedules.connect({ commands, instances: this.#reportInstances });
+    }
+  }
+
+  /** Configures every active report that has no schedule process yet (the tasks backfill). */
+  reconcileReportSchedules(): Promise<{ repaired: number }> {
+    return this.#reportSchedules.reconcile();
   }
 
   // -- evaluation reactions ----------------------------------------------------

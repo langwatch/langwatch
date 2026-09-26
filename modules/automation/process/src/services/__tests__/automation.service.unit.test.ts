@@ -12,9 +12,6 @@ import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AutomationClock } from "../../app/automation.members.ts";
-import { SchedulerWake } from "../../channels/automation-scheduler-wake.channel.ts";
-import { AutomationScheduledJobRepository } from "../../repositories/automation-scheduled-job.repository.ts";
-import type { ScheduledJobRecord } from "../../repositories/automation-scheduled-job.repository.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
 import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
@@ -126,42 +123,10 @@ class Verifier extends UnsubscribeTokenVerifier {
     return null;
   }
 }
-class Jobs extends AutomationScheduledJobRepository {
-  rows: ScheduledJobRecord[] = [];
-  async upsertForTarget(input: {
-    projectId: string;
-    targetType: string;
-    targetId: string;
-    cron: string;
-    timezone: string;
-    nextRunAt: Instant;
-  }) {
-    this.rows = [
-      ...this.rows.filter((row) => row.targetId !== input.targetId),
-      {
-        targetId: input.targetId,
-        nextRunAt: input.nextRunAt,
-        lastSlot: null,
-        active: true,
-      },
-    ];
-  }
-  async deactivateForTarget(input: { projectId: string; targetType: string; targetId: string }) {
-    for (const row of this.rows) {
-      if (row.targetId === input.targetId) row.active = false;
-    }
-  }
-  findAllForProject(): Promise<ScheduledJobRecord[]> {
-    return Promise.resolve(this.rows);
-  }
-}
 class Clock implements AutomationClock {
   now() {
     return Temporal.Instant.from("2026-01-01T00:00:00Z");
   }
-}
-class Wake extends SchedulerWake {
-  publish() {}
 }
 class Triggers extends TriggerRepository {
   reportTargets: ReportScheduleTarget[] = [];
@@ -262,12 +227,7 @@ const makeService = (
   triggers = new Triggers(),
   history = new Fires(),
   webhookDeliveries = new EmptyWebhookDeliveries(),
-  reportSchedules = ReportScheduleService.create({
-    jobs: new Jobs(),
-    clock: new Clock(),
-    wake: new Wake(),
-    triggers,
-  }),
+  reportSchedules = ReportScheduleService.create({ clock: new Clock(), triggers }),
   suppressions = new Suppressions(),
 ): AutomationService =>
   (() => {
@@ -514,12 +474,7 @@ describe("AutomationService email suppression", () => {
       new Triggers(),
       new Fires(),
       new EmptyWebhookDeliveries(),
-      ReportScheduleService.create({
-        jobs: new Jobs(),
-        clock: new Clock(),
-        wake: new Wake(),
-        triggers: new Triggers(),
-      }),
+      ReportScheduleService.create({ clock: new Clock(), triggers: new Triggers() }),
       repo,
     );
     await service.suppressEmail({
@@ -534,56 +489,5 @@ describe("AutomationService email suppression", () => {
         emails: ["alice@example.com", "bob@example.com"],
       }),
     ).toEqual(["bob@example.com"]);
-  });
-
-  /** @scenario "Missing report schedules are repaired without resuming paused reports" */
-  it("repairs missing report schedules without reactivating paused rows", async () => {
-    const triggers = new Triggers();
-    triggers.reportTargets = [
-      {
-        id: "missing",
-        projectId: "p",
-        actionParams: {
-          source: { kind: "dashboard", dashboardId: "dashboard" },
-          schedule: { cron: "0 9 * * *", timezone: "UTC" },
-          compareToPrevious: false,
-        },
-      },
-      {
-        id: "paused",
-        projectId: "p",
-        actionParams: {
-          source: { kind: "dashboard", dashboardId: "dashboard" },
-          schedule: { cron: "0 10 * * *", timezone: "UTC" },
-          compareToPrevious: false,
-        },
-      },
-    ];
-    const jobs = new Jobs();
-    jobs.rows = [
-      {
-        targetId: "paused",
-        nextRunAt: Temporal.Instant.from("2026-01-02T10:00:00Z"),
-        lastSlot: null,
-        active: false,
-      },
-    ];
-    const service = makeService(
-      triggers,
-      new Fires(),
-      new EmptyWebhookDeliveries(),
-      ReportScheduleService.create({
-        jobs,
-        clock: new Clock(),
-        wake: new Wake(),
-        triggers,
-      }),
-    );
-
-    expect(await service.reconcileReportSchedules()).toEqual({ repaired: 1 });
-    expect(jobs.rows.map((row) => [row.targetId, row.active])).toEqual([
-      ["paused", false],
-      ["missing", true],
-    ]);
   });
 });
