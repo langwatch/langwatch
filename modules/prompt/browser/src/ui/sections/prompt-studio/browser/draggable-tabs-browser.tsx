@@ -11,6 +11,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type DragStartEvent,
   DragOverlay,
   PointerSensor,
   useSensor,
@@ -109,8 +110,10 @@ function DraggableTabsBrowserRoot({ children, onTabMove }: DraggableTabsBrowserP
    * handleDragStart
    * Single Responsibility: Sets active drag state when drag begins.
    */
-  function handleDragStart(event: any) {
-    const { windowId, tabId, label } = event.active.data.current;
+  function handleDragStart(event: DragStartEvent) {
+    const dragged = event.active.data.current;
+    if (!dragged) return;
+    const { windowId, tabId, label } = dragged;
     setActiveDrag({ windowId, tabId, label });
   }
 

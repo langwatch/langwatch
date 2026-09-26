@@ -27,14 +27,33 @@ export interface ChatInputProps {
   isVisible?: boolean;
 }
 
-export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }: ChatInputProps) {
+/** Sends from this chat alone, restoring the text if the send fails. */
+async function sendLocally({
+  message,
+  onSend,
+  setInput,
+}: {
+  message: string;
+  onSend: ChatInputProps["onSend"];
+  setInput: (value: string) => void;
+}) {
+  setInput("");
+  try {
+    await onSend(message);
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    setInput(message);
+  }
+}
+
+/**
+ * The composer's text, local or synced across chat tabs, and how it sends:
+ * a synced send broadcasts, and each synced chat submits on the trigger.
+ */
+function useSyncedChatInput({ inProgress, onSend }: Pick<ChatInputProps, "inProgress" | "onSend">) {
   const { syncedInput, setSyncedInput, isSynced, setIsSynced, submitTrigger, triggerSubmit } =
     usePromptPlaygroundChatSync();
-  const tabId = useTabId();
-  const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
   const [localInput, setLocalInput] = useState("");
-  const [isHovered, setIsHovered] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isTabActive = useIsTabActive();
   const lastProcessedTrigger = useRef<number>(
@@ -84,20 +103,9 @@ export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }
 
     const message = currentInput;
 
-    if (isSynced) {
-      // Broadcast to all synced chats
-      triggerSubmit(message);
-      // Note: actual send happens via useEffect listening to submitTrigger
-    } else {
-      // Local-only send
-      setCurrentInput("");
-      try {
-        await onSend(message);
-      } catch (error) {
-        console.error("Failed to send message:", error);
-        setCurrentInput(message);
-      }
-    }
+    // A synced send broadcasts; each synced chat sends from the trigger effect.
+    if (isSynced) triggerSubmit(message);
+    else await sendLocally({ message, onSend, setInput: setCurrentInput });
 
     // Keep focus on the textarea after sending
     textareaRef.current?.focus();
@@ -115,6 +123,32 @@ export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }
       if (!inProgress) void handleSend();
     }
   };
+
+  return {
+    currentInput,
+    setCurrentInput,
+    isSynced,
+    setIsSynced,
+    textareaRef,
+    handleSend,
+    handleKeyDown,
+  };
+}
+
+export function SyncedChatInput({ inProgress, onSend, isVisible = true, onStop }: ChatInputProps) {
+  const {
+    currentInput,
+    setCurrentInput,
+    isSynced,
+    setIsSynced,
+    textareaRef,
+    handleSend,
+    handleKeyDown,
+  } = useSyncedChatInput({ inProgress, onSend });
+  const tabId = useTabId();
+  const windowCount = useDraggableTabsBrowserStore((state) => state.windows.length);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
   if (!isVisible) return null;
 

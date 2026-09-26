@@ -1,13 +1,13 @@
 import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
 import { useFormContext } from "react-hook-form";
 
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import { ModelSelectFieldMini } from "../../elements/prompts/forms/fields/model-select-field-mini.tsx";
-import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
-import { DeployPromptDialog } from "./deploy-prompt-dialog.tsx";
+import { DeployPromptDialog } from "../prompt-studio/dialogs/deploy-prompt-dialog.tsx";
+import { GeneratePromptApiSnippetDialog } from "../prompt-studio/dialogs/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
 import { VersionHistoryButton } from "./version-history-button.tsx";
 
@@ -46,7 +46,7 @@ export function PromptEditorHeader({
   variant = "full",
   openHistoryOnLoad,
 }: PromptEditorHeaderProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project } = usePromptProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");

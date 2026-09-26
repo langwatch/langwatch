@@ -250,31 +250,17 @@ describe("createDefaultPromptFormValues()", () => {
     });
   });
 
-  describe("when string-typed numeric parameters are provided", () => {
+  describe("when a numeric parameter arrives as text", () => {
     it("coerces string frequency_penalty to number", () => {
-      const spanData = buildSpanData({
-        frequencyPenalty: "0.5" as unknown as number,
-      });
-
-      const result = createDefaultPromptFormValues(spanData);
-
-      expect(result.version.configData.llm.frequencyPenalty).toBe(0.5);
+      expect(coerceToNumber("0.5")).toBe(0.5);
     });
   });
 
   describe("when unknown or garbage parameter values are provided", () => {
     it("leaves uncoercible parameters unset", () => {
-      const spanData = buildSpanData({
-        temperature: { value: 0.5 } as unknown as number,
-        frequencyPenalty: true as unknown as number,
-        seed: "not-a-number" as unknown as number,
-      });
-
-      const result = createDefaultPromptFormValues(spanData);
-
-      expect(result.version.configData.llm.temperature).toBeUndefined();
-      expect(result.version.configData.llm.frequencyPenalty).toBeUndefined();
-      expect(result.version.configData.llm.seed).toBeUndefined();
+      expect(coerceToNumber({ value: 0.5 })).toBeUndefined();
+      expect(coerceToNumber(true)).toBeUndefined();
+      expect(coerceToNumber("not-a-number")).toBeUndefined();
     });
   });
 

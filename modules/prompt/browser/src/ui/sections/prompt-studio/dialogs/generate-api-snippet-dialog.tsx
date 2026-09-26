@@ -209,13 +209,13 @@ export function GenerateApiSnippetDialog({
 GenerateApiSnippetDialog.Trigger = function Trigger({
   children,
 }: {
-  children: React.ReactElement;
+  children: React.ReactElement<{ onClick?: React.MouseEventHandler<HTMLButtonElement> }>;
 }) {
   const ctx = useContext(ApiSnippetDialogContext);
 
   if (!ctx) throw new Error("Trigger must be used within GenerateApiSnippetDialog");
   // Clone the child and inject onClick to open the dialog
-  return React.cloneElement(children as React.ReactElement<any>, {
+  return React.cloneElement(children, {
     onClick: ctx.onOpen,
   });
 } as React.FC<{ children: React.ReactElement }>;

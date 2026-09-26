@@ -1,11 +1,11 @@
 import { Button, HStack, Spacer } from "@chakra-ui/react";
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
-import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
 import { useFormContext } from "react-hook-form";
 
+import { usePromptProject } from "../../../behavior/use-prompt-project.ts";
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
-import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
+import { GeneratePromptApiSnippetDialog } from "../prompt-studio/dialogs/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";
 import { VersionHistoryButton } from "./version-history-button.tsx";
 
@@ -49,7 +49,7 @@ export function PromptEditorFooter({
   onApply,
   onDiscard,
 }: PromptEditorFooterProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project } = usePromptProject();
   // Form context may not be available when rendered outside FormProvider
   // (e.g., in Drawer.Footer or StudioDrawerWrapper footer slot).
   // Falls back gracefully when all values are provided via props.

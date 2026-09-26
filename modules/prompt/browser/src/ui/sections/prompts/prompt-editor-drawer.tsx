@@ -15,7 +15,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationMappings } from "@langwatch/experiment-browser/evaluation-mappings";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-contract/mapping-validation";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -33,6 +32,7 @@ import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useLatestPromptVersion } from "../../../behavior/prompts/use-latest-prompt-version.ts";
 import { usePromptConfigForm } from "../../../behavior/prompts/use-prompt-config-form.ts";
+import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
 import {
@@ -43,11 +43,11 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "../../../prompt-form.ts";
 import { FormOutputsSection } from "../../elements/outputs/form-outputs-section.tsx";
-import { PromptMessagesField } from "../../elements/prompts/forms/fields/message-history-fields/prompt-messages-field.tsx";
 import {
   type SaveDialogFormValues,
   SaveVersionDialog,
 } from "../../elements/prompts/forms/save-version-dialog.tsx";
+import { PromptMessagesField } from "../prompt-studio/fields/prompt-messages-field.tsx";
 import { ChangeHandleDialog } from "./forms/change-handle-dialog.tsx";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";

@@ -1,5 +1,6 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { useMemo } from "react";
+
+import { promptApi } from "../prompt-api.ts";
 
 export type TagDefinition = {
   name: string;
@@ -7,14 +8,17 @@ export type TagDefinition = {
 };
 
 export function usePromptTags({ projectId, enabled }: { projectId: string; enabled: boolean }) {
-  const query = api.promptTags.getAll.useQuery({ projectId }, { enabled: enabled && !!projectId });
+  const query = promptApi.promptTags.getAll.useQuery(
+    { projectId },
+    { enabled: enabled && !!projectId },
+  );
 
   // Memoized because callers put this array in effect dependencies. Mapping on
   // every render hands them a new reference each time, so an effect that reads
   // it and sets state re-arms itself from its own commit and the component
   // renders without ever settling.
   const data: TagDefinition[] = useMemo(
-    () => (query.data ?? []).map((t: any) => ({ name: t.name, id: t.id })),
+    () => (query.data ?? []).map((t) => ({ name: t.name, id: t.id })),
     [query.data],
   );
 

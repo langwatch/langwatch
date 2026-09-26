@@ -1,7 +1,6 @@
-import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Box, Field, HStack, Spacer, type StackProps, VStack } from "@chakra-ui/react";
 import {
   type AvailableSource,
-  type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
   useLayoutMode,
   type Variable,
@@ -23,9 +22,6 @@ import {
 } from "./editing-mode-title.tsx";
 import { AddMessageButton, MessageRoleLabel, RemoveMessageButton } from "./messages/index.ts";
 
-// Re-export for backwards compatibility
-export type { PromptEditingMode } from "./editing-mode-title.tsx";
-
 /**
  * Type for message field errors
  */
@@ -34,13 +30,16 @@ type MessageError = {
   content?: { message?: string };
 };
 
-type MessageRowProps = {
-  field: {
-    id: string;
-    role: "system" | "user" | "assistant";
-    content?: string;
-  };
-  idx: number;
+type MessageFieldArray = UseFieldArrayReturn<
+  PromptConfigFormValues,
+  "version.configData.messages",
+  "id"
+>;
+
+type MessageField = MessageFieldArray["fields"][number];
+
+/** What every message row of one field shares. */
+type MessageRowShared = {
   availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
   /** Available sources for variable insertion (datasets, runners, etc.) */
@@ -48,221 +47,192 @@ type MessageRowProps = {
   messageErrors?: string;
   hasMessagesError: boolean;
   getMessageError: (index: number, key: "role" | "content") => { message?: string } | undefined;
-  onRemove: () => void;
   onCreateVariable: (variable: Variable) => void;
   /** Callback when a variable mapping should be set */
   onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
-  onAddEdge?: (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-    idx: number,
-  ) => string | undefined;
+  /** Whether to render textareas in borderless mode (for horizontal layout) */
+  borderless: boolean;
+};
+
+type MessageRowProps = {
+  shared: MessageRowShared;
+  field: {
+    id: string;
+    role: "system" | "user" | "assistant";
+    content?: string;
+  };
+  idx: number;
+  onRemove: () => void;
   /** Whether to show role label and remove button */
   showControls?: boolean;
-  /** Whether to render textarea in borderless mode (for horizontal layout) */
-  borderless?: boolean;
   /** Whether this message fills remaining height (last message, borderless mode only). */
   fillHeight?: boolean;
 };
+
+/** Flex-fill props, applied only where a message fills the remaining height. */
+const fillWhen = (fill: boolean) => (fill ? { flex: 1, height: "100%" } : {});
+
+function MessageRowControls({
+  role,
+  onRemove,
+  ...layout
+}: {
+  role: MessageRowProps["field"]["role"];
+  onRemove: () => void;
+} & StackProps) {
+  return (
+    <HStack width="full" align="center" fontWeight="normal" textTransform="none" {...layout}>
+      {role !== "system" && <MessageRoleLabel messageRole={role} marginLeft={-1} />}
+      <Spacer />
+      {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
+    </HStack>
+  );
+}
+
+function MessageContent({
+  shared,
+  idx,
+  role,
+  fillHeight,
+}: {
+  shared: MessageRowShared;
+  idx: number;
+  role: MessageRowProps["field"]["role"];
+  fillHeight?: boolean;
+}) {
+  const form = useFormContext<PromptConfigFormValues>();
+  return (
+    <Controller
+      key={`message-row-${idx}-content`}
+      control={form.control}
+      name={`version.configData.messages.${idx}.content`}
+      render={({ field: controllerField }) => (
+        <PromptTextAreaWithVariables
+          variables={shared.availableFields}
+          otherNodesFields={shared.otherNodesFields}
+          availableSources={shared.availableSources}
+          value={controllerField.value ?? ""}
+          onChange={controllerField.onChange}
+          hasError={!!shared.getMessageError(idx, "content")}
+          onCreateVariable={shared.onCreateVariable}
+          onSetVariableMapping={shared.onSetVariableMapping}
+          showAddContextButton
+          borderless={shared.borderless}
+          fillHeight={fillHeight}
+          role={role}
+        />
+      )}
+    />
+  );
+}
 
 /**
  * Renders a single message row in the prompt messages field.
  */
 function MessageRow({
+  shared,
   field,
   idx,
-  availableFields,
-  otherNodesFields,
-  availableSources,
-  messageErrors,
-  hasMessagesError,
-  getMessageError,
   onRemove,
-  onCreateVariable,
-  onSetVariableMapping,
-  onAddEdge,
   showControls = true,
-  borderless = false,
   fillHeight = false,
 }: MessageRowProps) {
-  const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
 
   // Borderless mode: render simplified structure with flex support
-  if (borderless) {
+  if (shared.borderless) {
     return (
-      <Box
-        width="full"
-        height={fillHeight ? "100%" : undefined}
-        display="flex"
-        flexDirection="column"
-        flex={fillHeight ? 1 : undefined}
-      >
+      <Box width="full" display="flex" flexDirection="column" {...fillWhen(fillHeight)}>
         {showControls && (
-          <HStack
-            width="full"
-            align="center"
-            fontWeight="normal"
-            textTransform="none"
+          <MessageRowControls
+            role={role}
+            onRemove={onRemove}
             flexShrink={0}
             paddingX={3}
             paddingBottom={2}
-          >
-            {role !== "system" && <MessageRoleLabel role={role} marginLeft={-1} />}
-            <Spacer />
-            {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
-          </HStack>
-        )}
-        <Box flex={fillHeight ? 1 : undefined} height={fillHeight ? "100%" : undefined}>
-          <Controller
-            key={`message-row-${idx}-content`}
-            control={form.control}
-            name={`version.configData.messages.${idx}.content`}
-            render={({ field: controllerField }) => (
-              <PromptTextAreaWithVariables
-                variables={availableFields}
-                otherNodesFields={otherNodesFields}
-                availableSources={availableSources}
-                value={controllerField.value ?? ""}
-                onChange={controllerField.onChange}
-                hasError={!!getMessageError(idx, "content")}
-                onCreateVariable={onCreateVariable}
-                onSetVariableMapping={onSetVariableMapping}
-                onAddEdge={(id, handle, content) => {
-                  return onAddEdge?.(id, handle, content, idx);
-                }}
-                showAddContextButton
-                borderless={borderless}
-                fillHeight={fillHeight}
-                role={role}
-              />
-            )}
           />
+        )}
+        <Box {...fillWhen(fillHeight)}>
+          <MessageContent shared={shared} idx={idx} role={role} fillHeight={fillHeight} />
         </Box>
       </Box>
     );
   }
 
+  const contentError = shared.getMessageError(idx, "content");
   // Standard mode: use VerticalFormControl
   return (
     <VerticalFormControl
       width="full"
-      label={
-        showControls ? (
-          <HStack width="full" align="center" fontWeight="normal" textTransform="none">
-            {role !== "system" && <MessageRoleLabel role={role} marginLeft={-1} />}
-            <Spacer />
-            {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
-          </HStack>
-        ) : undefined
-      }
-      invalid={hasMessagesError}
-      error={messageErrors}
+      label={showControls ? <MessageRowControls role={role} onRemove={onRemove} /> : undefined}
+      invalid={shared.hasMessagesError}
+      error={shared.messageErrors}
       size="sm"
       marginTop={0}
     >
-      <Controller
-        key={`message-row-${idx}-content`}
-        control={form.control}
-        name={`version.configData.messages.${idx}.content`}
-        render={({ field: controllerField }) => (
-          <PromptTextAreaWithVariables
-            variables={availableFields}
-            otherNodesFields={otherNodesFields}
-            availableSources={availableSources}
-            value={controllerField.value ?? ""}
-            onChange={controllerField.onChange}
-            hasError={!!getMessageError(idx, "content")}
-            onCreateVariable={onCreateVariable}
-            onSetVariableMapping={onSetVariableMapping}
-            onAddEdge={(id, handle, content) => {
-              return onAddEdge?.(id, handle, content, idx);
-            }}
-            showAddContextButton
-            borderless={borderless}
-            role={role}
-          />
-        )}
-      />
-      {getMessageError(idx, "content") && (
-        <Field.ErrorText fontSize="13px">
-          {String(getMessageError(idx, "content")?.message ?? "")}
-        </Field.ErrorText>
+      <MessageContent shared={shared} idx={idx} role={role} />
+      {contentError && (
+        <Field.ErrorText fontSize="13px">{String(contentError.message ?? "")}</Field.ErrorText>
       )}
     </VerticalFormControl>
   );
 }
 
-/**
- * Single Responsibility: Render and manage the configurable prompt message list.
- */
-export function PromptMessagesField({
-  messageFields,
-  availableFields,
-  otherNodesFields,
-  availableSources,
-  onSetVariableMapping,
-  onAddEdge,
-}: {
-  messageFields: UseFieldArrayReturn<PromptConfigFormValues, "version.configData.messages", "id">;
-  /** Available variables with their types */
-  availableFields: Variable[];
-  otherNodesFields: Record<string, string[]>;
-  /** Available sources for variable insertion (datasets, runners, etc.) */
-  availableSources?: AvailableSource[];
-  /** Callback when a variable mapping should be set */
-  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
-  onAddEdge?: (
-    id: string,
-    handle: string,
-    content: PromptTextAreaOnAddMention,
-    idx: number,
-  ) => string | undefined;
-}) {
-  const form = useFormContext<PromptConfigFormValues>();
-  const { formState, control } = form;
-  const { errors } = formState;
+/** A signature of the messages, to tell a real change from a re-render. */
+const computeMessagesSignature = (messages: { role?: string; content?: string }[]): string =>
+  messages.map((m) => `${m.role}:${m.content ?? ""}`).join("|");
 
-  // Editing mode state - initialize to "prompt", then update based on messages
+/**
+ * The editing mode, derived from the messages until the user picks one, and
+ * switching to prompt mode ensures a system message exists.
+ */
+function useEditingMode(messageFields: MessageFieldArray) {
   const [editingMode, setEditingMode] = useState<PromptEditingMode>("prompt");
   const [hasUserChangedMode, setHasUserChangedMode] = useState(false);
 
-  // Track the last messages signature we computed mode from
-  // This allows us to re-compute when messages change (e.g., form reset)
+  // The signature last computed from, so a form reset re-derives the mode.
   const lastMessagesSignatureRef = useRef<string>("");
 
-  // Compute a signature from messages to detect changes
-  const computeMessagesSignature = (messages: { role?: string; content?: string }[]): string => {
-    return messages.map((m) => `${m.role}:${m.content ?? ""}`).join("|");
-  };
-
-  // Update editing mode when messages change (and user hasn't manually changed it)
   useEffect(() => {
     if (messageFields.fields.length === 0) return;
 
     const currentSignature = computeMessagesSignature(messageFields.fields);
-
-    // Only re-compute mode if:
-    // 1. User hasn't manually changed it, AND
-    // 2. Messages have actually changed from what we last computed from
     if (!hasUserChangedMode && currentSignature !== lastMessagesSignatureRef.current) {
-      const computedMode = getDefaultEditingMode(messageFields.fields);
-      setEditingMode(computedMode);
+      setEditingMode(getDefaultEditingMode(messageFields.fields));
       lastMessagesSignatureRef.current = currentSignature;
     }
   }, [messageFields.fields, hasUserChangedMode]);
 
-  // Access inputs field array to add new variables
+  const systemIndex = useMemo(
+    () => messageFields.fields.findIndex((m) => m.role === "system"),
+    [messageFields.fields],
+  );
+
+  const handleModeChange = useCallback(
+    (newMode: PromptEditingMode) => {
+      if (newMode === "prompt" && systemIndex < 0) {
+        messageFields.prepend({ role: "system", content: "" });
+      }
+      setEditingMode(newMode);
+      // The user chose, so the messages no longer override the mode.
+      setHasUserChangedMode(true);
+    },
+    [systemIndex, messageFields],
+  );
+
+  return { editingMode, systemIndex, handleModeChange };
+}
+
+/** Adds a variable the textarea created to the prompt's inputs, once. */
+function useCreateVariable() {
+  const form = useFormContext<PromptConfigFormValues>();
   const inputsFieldArray = useFieldArray({
-    control,
+    control: form.control,
     name: "version.configData.inputs",
   });
 
-  // Handle creating a new variable from the textarea
-  const handleCreateVariable = useCallback(
+  return useCallback(
     (variable: Variable) => {
-      // Check if variable already exists
       const existingInputs = form.getValues("version.configData.inputs") ?? [];
       const alreadyExists = existingInputs.some(
         (input: { identifier: string }) => input.identifier === variable.identifier,
@@ -277,19 +247,18 @@ export function PromptMessagesField({
     },
     [form, inputsFieldArray],
   );
+}
 
-  /**
-   * Get the error for a specific message field
-   */
+/** The messages' validation errors: per field, and joined for the group. */
+function useMessageErrors() {
+  const { errors } = useFormContext<PromptConfigFormValues>().formState;
+
   const getMessageError = (index: number, key: "role" | "content") => {
     const messageErrors =
       (errors.version?.configData?.messages as MessageError[] | undefined) ?? [];
     return messageErrors[index]?.[key];
   };
 
-  /**
-   * Get the error for the messages field group
-   */
   const messageErrors = useMemo(() => {
     const messages = errors.version?.configData?.messages;
     if (Array.isArray(messages)) {
@@ -299,165 +268,182 @@ export function PromptMessagesField({
     return typeof messages === "string" ? messages : undefined;
   }, [errors]);
 
-  const systemIndex = useMemo(
-    () => messageFields.fields.findIndex((m) => m.role === "system"),
-    [messageFields.fields],
-  );
+  return {
+    getMessageError,
+    messageErrors,
+    hasMessagesError: !!errors.version?.configData?.messages,
+  };
+}
 
+/** Prompt mode: only the system message, with no controls. */
+function PromptModeMessage({
+  shared,
+  systemField,
+  systemIndex,
+  onRemove,
+}: {
+  shared: MessageRowShared;
+  systemField: MessageField;
+  systemIndex: number;
+  onRemove: () => void;
+}) {
+  const { borderless } = shared;
+  return (
+    <Box {...fillWhen(borderless)} paddingX={borderless ? 1 : 0} paddingTop={borderless ? 2 : 0}>
+      <MessageRow
+        key="system-message-row"
+        shared={shared}
+        field={systemField}
+        idx={systemIndex}
+        onRemove={onRemove}
+        showControls={false}
+        fillHeight={borderless}
+      />
+    </Box>
+  );
+}
+
+/** Messages mode: every message, with controls. */
+function MessagesModeList({
+  shared,
+  messageFields,
+  systemField,
+  systemIndex,
+  showAddMessage,
+}: {
+  shared: MessageRowShared;
+  messageFields: MessageFieldArray;
+  systemField: MessageField | undefined;
+  systemIndex: number;
+  showAddMessage: boolean;
+}) {
+  const { borderless } = shared;
+  const nonSystemMessages = messageFields.fields.filter((_, idx) => idx !== systemIndex);
   const handleAdd = (role: "user" | "assistant") => {
     messageFields.append({ role, content: "" });
   };
 
-  // Ensure system message exists when switching to prompt mode
-  const handleModeChange = useCallback(
-    (newMode: PromptEditingMode) => {
-      if (newMode === "prompt" && systemIndex < 0) {
-        // Create a system message if it doesn't exist
-        messageFields.prepend({ role: "system", content: "" });
-      }
-      setEditingMode(newMode);
-      // Mark that user has manually changed the mode, so we don't override it
-      setHasUserChangedMode(true);
-    },
-    [systemIndex, messageFields],
+  return (
+    <>
+      {systemField && (
+        <Box
+          paddingX={1}
+          marginTop={2}
+          paddingBottom={borderless ? 3 : 0}
+          borderBottomWidth={borderless ? "1px" : 0}
+          borderColor="border"
+        >
+          <HStack width="full" paddingX={borderless ? 2 : 0} paddingBottom={borderless ? 2 : 0}>
+            <MessageRoleLabel messageRole="system" />
+            <Spacer />
+            {showAddMessage && <AddMessageButton onAdd={handleAdd} />}
+          </HStack>
+          <MessageRow
+            key="system-message-row"
+            shared={shared}
+            field={systemField}
+            idx={systemIndex}
+            onRemove={() => messageFields.remove(systemIndex)}
+            showControls={false}
+          />
+        </Box>
+      )}
+      {nonSystemMessages.map((field, mapIdx) => {
+        const idx = messageFields.fields.findIndex((f) => f.id === field.id);
+        const divided = borderless && mapIdx !== nonSystemMessages.length - 1;
+        const fills = borderless && !divided;
+        return (
+          <Box
+            key={`message-box-${idx}`}
+            paddingBottom={divided ? 3 : 0}
+            borderBottomWidth={divided ? "1px" : 0}
+            borderColor="border"
+            {...fillWhen(fills)}
+            paddingX={borderless ? 1 : 0}
+          >
+            <MessageRow
+              key={`message-row-${idx}`}
+              shared={shared}
+              field={field}
+              idx={idx}
+              onRemove={() => messageFields.remove(idx)}
+              showControls={true}
+              fillHeight={fills}
+            />
+          </Box>
+        );
+      })}
+    </>
   );
+}
 
-  const hasMessagesError = !!errors.version?.configData?.messages;
+/**
+ * Single Responsibility: Render and manage the configurable prompt message list.
+ */
+export function PromptMessagesField({
+  messageFields,
+  availableFields,
+  otherNodesFields,
+  availableSources,
+  onSetVariableMapping,
+}: {
+  messageFields: MessageFieldArray;
+  /** Available variables with their types */
+  availableFields: Variable[];
+  otherNodesFields: Record<string, string[]>;
+  /** Available sources for variable insertion (datasets, runners, etc.) */
+  availableSources?: AvailableSource[];
+  /** Callback when a variable mapping should be set */
+  onSetVariableMapping?: (identifier: string, sourceId: string, field: string) => void;
+}) {
+  const { editingMode, systemIndex, handleModeChange } = useEditingMode(messageFields);
+  const onCreateVariable = useCreateVariable();
+  const errors = useMessageErrors();
 
-  // Determine if we should use borderless mode (horizontal layout)
-  const layoutMode = useLayoutMode();
-  const borderless = layoutMode === "horizontal";
+  // Borderless mode is the horizontal layout.
+  const borderless = useLayoutMode() === "horizontal";
 
-  // Get the system message field
+  const shared: MessageRowShared = {
+    availableFields,
+    otherNodesFields,
+    availableSources,
+    ...errors,
+    onCreateVariable,
+    onSetVariableMapping,
+    borderless,
+  };
+
   const systemField = systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
-
-  // Get non-system messages
-  const nonSystemMessages = messageFields.fields.filter((_, idx) => idx !== systemIndex);
-
-  // Prompt mode shows only the system message, with no controls.
-  const isPromptMode = editingMode === "prompt";
 
   return (
     <Box
       width="full"
       padding={0}
-      height={borderless ? "100%" : undefined}
-      display={borderless ? "flex" : undefined}
-      flexDirection={borderless ? "column" : undefined}
+      {...(borderless && { height: "100%", display: "flex", flexDirection: "column" })}
     >
       <HStack width="full" flexShrink={0} paddingX={borderless ? 3 : 1}>
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
       </HStack>
 
-      <VStack
-        gap={2}
-        align="stretch"
-        width="full"
-        flex={borderless ? 1 : undefined}
-        height={borderless ? "100%" : undefined}
-      >
-        {isPromptMode && systemField && (
-          <Box
-            flex={borderless ? 1 : undefined}
-            height={borderless ? "100%" : undefined}
-            paddingX={borderless ? 1 : 0}
-            paddingTop={borderless ? 2 : 0}
-          >
-            <MessageRow
-              key="system-message-row"
-              field={systemField}
-              idx={systemIndex}
-              availableFields={availableFields}
-              otherNodesFields={otherNodesFields}
-              availableSources={availableSources}
-              messageErrors={messageErrors}
-              hasMessagesError={hasMessagesError}
-              getMessageError={getMessageError}
+      <VStack gap={2} align="stretch" width="full" {...fillWhen(borderless)}>
+        {editingMode === "prompt" ? (
+          systemField && (
+            <PromptModeMessage
+              shared={shared}
+              systemField={systemField}
+              systemIndex={systemIndex}
               onRemove={() => messageFields.remove(systemIndex)}
-              onCreateVariable={handleCreateVariable}
-              onSetVariableMapping={onSetVariableMapping}
-              onAddEdge={onAddEdge}
-              showControls={false}
-              borderless={borderless}
-              fillHeight={borderless}
             />
-          </Box>
-        )}
-        {!isPromptMode && (
-          // Messages mode: Show all messages with controls
-          <>
-            {systemField && (
-              <Box
-                paddingX={1}
-                marginTop={2}
-                paddingBottom={borderless ? 3 : 0}
-                borderBottomWidth={borderless ? "1px" : 0}
-                borderColor="border"
-              >
-                <HStack
-                  width="full"
-                  paddingX={borderless ? 2 : 0}
-                  paddingBottom={borderless ? 2 : 0}
-                >
-                  <MessageRoleLabel role="system" />
-                  <Spacer />
-                  {editingMode === "messages" && <AddMessageButton onAdd={handleAdd} />}
-                </HStack>
-                <MessageRow
-                  key="system-message-row"
-                  field={systemField}
-                  idx={systemIndex}
-                  availableFields={availableFields}
-                  otherNodesFields={otherNodesFields}
-                  availableSources={availableSources}
-                  messageErrors={messageErrors}
-                  hasMessagesError={hasMessagesError}
-                  getMessageError={getMessageError}
-                  onRemove={() => messageFields.remove(systemIndex)}
-                  onCreateVariable={handleCreateVariable}
-                  onSetVariableMapping={onSetVariableMapping}
-                  onAddEdge={onAddEdge}
-                  showControls={false}
-                  borderless={borderless}
-                />
-              </Box>
-            )}
-            {nonSystemMessages.map((field, mapIdx) => {
-              const idx = messageFields.fields.findIndex((f) => f.id === field.id);
-              const isLast = mapIdx === nonSystemMessages.length - 1;
-              return (
-                <Box
-                  key={`message-box-${idx}`}
-                  paddingBottom={borderless && !isLast ? 3 : 0}
-                  borderBottomWidth={borderless && !isLast ? "1px" : 0}
-                  borderColor="border"
-                  flex={borderless && isLast ? 1 : undefined}
-                  paddingX={borderless ? 1 : 0}
-                  height={borderless && isLast ? "100%" : undefined}
-                >
-                  <MessageRow
-                    key={`message-row-${idx}`}
-                    field={field}
-                    idx={idx}
-                    availableFields={availableFields}
-                    otherNodesFields={otherNodesFields}
-                    availableSources={availableSources}
-                    messageErrors={messageErrors}
-                    hasMessagesError={hasMessagesError}
-                    getMessageError={getMessageError}
-                    onRemove={() => messageFields.remove(idx)}
-                    onCreateVariable={handleCreateVariable}
-                    onSetVariableMapping={onSetVariableMapping}
-                    onAddEdge={onAddEdge}
-                    showControls={true}
-                    borderless={borderless}
-                    fillHeight={borderless && isLast}
-                  />
-                </Box>
-              );
-            })}
-          </>
+          )
+        ) : (
+          <MessagesModeList
+            shared={shared}
+            messageFields={messageFields}
+            systemField={systemField}
+            systemIndex={systemIndex}
+            showAddMessage={editingMode === "messages"}
+          />
         )}
       </VStack>
     </Box>

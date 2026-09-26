@@ -68,33 +68,39 @@ export function PromptBrowserWindowContent() {
   );
 }
 
-/** Manages form state and syncs form changes with tab data. */
-function PromptBrowserWindowInner(props: {
+/**
+ * Writes form edits into the tab's data, debounced; an external version change
+ * (an upgrade) cancels what is pending, and unmount flushes it.
+ */
+function useTabSyncedPromptForm(props: {
   initialConfigValues: DeepPartial<PromptConfigFormValues>;
   tabId: string;
   layoutMode: LayoutMode;
 }) {
   const form = usePromptConfigForm(props);
+  const { methods } = form;
+  const { tabId } = props;
+  const versionNumber = props.initialConfigValues?.versionMetadata?.versionNumber;
   const updateTabData = useDraggableTabsBrowserStore((state) => state.updateTabData);
 
   const updateTabDataDebounced = useMemo(() => debounce(updateTabData, 500), [updateTabData]);
 
   // Track version to cancel debounced updates when external upgrade happens
-  const lastVersionRef = useRef(props.initialConfigValues?.versionMetadata?.versionNumber);
+  const lastVersionRef = useRef(versionNumber);
 
   useEffect(() => {
-    const newVersion = props.initialConfigValues?.versionMetadata?.versionNumber;
+    const newVersion = versionNumber;
     if (newVersion !== lastVersionRef.current) {
       // Version changed externally (e.g., upgrade clicked) - cancel pending updates
       updateTabDataDebounced.cancel();
       lastVersionRef.current = newVersion;
     }
-  }, [props.initialConfigValues?.versionMetadata?.versionNumber, updateTabDataDebounced]);
+  }, [versionNumber, updateTabDataDebounced]);
 
   useEffect(() => {
-    const sub = form.methods.watch((values) => {
+    const sub = methods.watch((values) => {
       updateTabDataDebounced({
-        tabId: props.tabId,
+        tabId: tabId,
         updater: (data: TabData) => ({
           ...data,
           form: { currentValues: cloneDeep(values) },
@@ -114,7 +120,18 @@ function PromptBrowserWindowInner(props: {
       // this, switching back would restore stale tab.data.
       updateTabDataDebounced.flush();
     };
-  }, [form.methods, props.tabId, updateTabDataDebounced]);
+  }, [methods, tabId, updateTabDataDebounced]);
+
+  return form;
+}
+
+/** Manages form state and syncs form changes with tab data. */
+function PromptBrowserWindowInner(props: {
+  initialConfigValues: DeepPartial<PromptConfigFormValues>;
+  tabId: string;
+  layoutMode: LayoutMode;
+}) {
+  const form = useTabSyncedPromptForm(props);
 
   // Refs for measuring content and direct DOM manipulation during drag
   const containerRef = useRef<HTMLDivElement>(null);

@@ -3,16 +3,16 @@ import { Text, type TextProps } from "@chakra-ui/react";
 export type MessageRole = "system" | "user" | "assistant";
 
 export type MessageRoleLabelProps = Omit<TextProps, "children"> & {
-  role: MessageRole;
+  messageRole: MessageRole;
 };
 
 /**
  * Standardized label for a message role.
  * Used in prompt playground and HTTP agent test panel.
  */
-export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
-  const nonSystemLabel = role === "user" ? "User" : "Assistant";
-  const label = role === "system" ? "System prompt" : nonSystemLabel;
+export function MessageRoleLabel({ messageRole, ...props }: MessageRoleLabelProps) {
+  const nonSystemLabel = messageRole === "user" ? "User" : "Assistant";
+  const label = messageRole === "system" ? "System prompt" : nonSystemLabel;
 
   return (
     <Text
