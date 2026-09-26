@@ -22,8 +22,12 @@ type RestDiff struct {
 	Path     string             `json:"path"`
 	Module   string             `json:"module"`
 	Breaking bool               `json:"breaking"`
+	Ruling   string             `json:"ruling,omitempty"`
 	Changes  []ClassifiedChange `json:"changes"`
 }
+
+// Unruled says the operation carries a breaking change no ruling covers.
+func (diff *RestDiff) Unruled() bool { return diff.Breaking && diff.Ruling == "" }
 
 // RestParity is main's served document against the branch's.
 type RestParity struct {
@@ -124,7 +128,7 @@ func (collector *restCollector) addChanged(gap RestGap, change ClassifiedChange)
 	key := gap.Method + " " + gap.Path
 	diff := collector.changed[key]
 	if diff == nil {
-		diff = &RestDiff{Method: gap.Method, Path: gap.Path, Module: gap.Module}
+		diff = &RestDiff{Method: gap.Method, Path: gap.Path, Module: gap.Module, Ruling: ruledBreakingRest[key]}
 		collector.changed[key] = diff
 		collector.order = append(collector.order, key)
 	}
@@ -170,11 +174,11 @@ func countOperations(document map[string]any) int {
 	return count
 }
 
-// RestBreaking counts the changed operations that carry a breaking change.
+// RestBreaking counts the changed operations that carry an unruled breaking change.
 func (parity *RestParity) RestBreaking() int {
 	count := 0
-	for _, diff := range parity.Changed {
-		if diff.Breaking {
+	for index := range parity.Changed {
+		if parity.Changed[index].Unruled() {
 			count++
 		}
 	}

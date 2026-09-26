@@ -49,7 +49,7 @@ func (tally moduleTally) addRest(rest *RestParity) {
 		tally.row(gap.Module).Missing++
 	}
 	for index := range rest.Changed {
-		if rest.Changed[index].Breaking {
+		if rest.Changed[index].Unruled() {
 			tally.row(rest.Changed[index].Module).Breaking++
 		}
 	}
@@ -210,13 +210,20 @@ func writeSection(output *strings.Builder, title string, lines []string) {
 func writeRestSections(output *strings.Builder, rest RestParity, module string) {
 	writeSection(output, "Missing REST operations", restGapLines(rest.Missing, module))
 	writeSection(output, "Ruled retired REST operations, not defects", restGapLines(rest.Retired, module))
-	breaking := []string{}
+	breaking, ruled := []string{}, []string{}
 	for index := range rest.Changed {
-		if diff := rest.Changed[index]; diff.Module == module && diff.Breaking {
+		diff := rest.Changed[index]
+		switch {
+		case diff.Module != module || !diff.Breaking:
+		case diff.Ruling != "":
+			ruled = append(ruled, fmt.Sprintf("- ruling: %s\n", diff.Ruling))
+			ruled = append(ruled, restDiffLines(diff)...)
+		default:
 			breaking = append(breaking, restDiffLines(diff)...)
 		}
 	}
 	writeSection(output, "Breaking REST differences", breaking)
+	writeSection(output, "Ruled breaking REST differences, not defects", ruled)
 	if statuses := notComparedStatuses(rest, module); statuses > 0 {
 		fmt.Fprintf(output, "Documented error statuses differ on %d operations; parity there is not required, so they are not listed.\n", statuses)
 	}

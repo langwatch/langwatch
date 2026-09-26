@@ -187,3 +187,24 @@ func TestRetiredRestOperationsAreNotMissing(t *testing.T) {
 		t.Error("the direct-upload family alone is retired")
 	}
 }
+
+func TestARuledBreakingRestOperationIsNotCounted(t *testing.T) {
+	collector := &restCollector{moduleOf: func(string, string) string { return "project" }, changed: map[string]*RestDiff{}}
+	breaking := ClassifiedChange{Class: openapidiff.ClassBreaking}
+	breaking.Method, breaking.Path, breaking.Kind = "get", "/api/projects", "response_required_changed"
+	collector.addChanged(RestGap{Method: "GET", Path: "/api/projects", Module: "project"}, breaking)
+	unruled := breaking
+	unruled.Path = "/api/unruled"
+	collector.addChanged(RestGap{Method: "GET", Path: "/api/unruled", Module: "project"}, unruled)
+	parity := RestParity{}
+	for _, key := range collector.order {
+		parity.Changed = append(parity.Changed, *collector.changed[key])
+	}
+	if parity.RestBreaking() != 1 || parity.Changed[0].Ruling == "" {
+		t.Fatalf("breaking %d, changed %+v", parity.RestBreaking(), parity.Changed)
+	}
+	packet := renderPacket(ParityReport{Rest: &parity}, "project")
+	if !strings.Contains(packet, "Ruled breaking REST differences") || !strings.Contains(packet, "## Breaking REST differences") {
+		t.Errorf("packet:\n%s", packet)
+	}
+}
