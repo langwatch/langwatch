@@ -1965,7 +1965,10 @@ export function EvaluationsV3Table({
                     {/* Resize handle - custom handler for percentage-based resizing */}
                     {/* Double-click resets to default width */}
                     {!isFixedWidth && header.id !== "select" && (
-                      <div
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label="Resize column"
                         onMouseDown={createResizeHandler(header.id, columnType)}
                         onTouchStart={createResizeHandler(header.id, columnType)}
                         onDoubleClick={() => handleResizeDoubleClick(header.id, columnType)}

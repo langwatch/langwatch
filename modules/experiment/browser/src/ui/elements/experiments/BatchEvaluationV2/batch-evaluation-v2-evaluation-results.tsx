@@ -156,7 +156,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       >
         <HStack top={1} right={2} borderBottom="1px solid" borderColor="border">
           <Tabs.List minWidth={0}>
-            {Object.entries(resultsByEvaluator).map(([key, results]: [string, any]) => (
+            {Object.entries(resultsByEvaluator).map(([key, results]) => (
               <Tabs.Trigger
                 key={key}
                 value={key}
@@ -206,31 +206,29 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
           )}
         </HStack>
 
-        {Object.entries(resultsByEvaluator).map(
-          ([evaluator, results]: [string, any], index: number) => {
-            return tabIndex === index ? (
-              <Tabs.Content
-                key={evaluator}
-                value={evaluator}
-                padding={0}
-                minWidth="full"
-                minHeight="0"
-                overflow="auto"
-              >
-                <BatchEvaluationV2EvaluationResult
-                  evaluator={evaluator}
-                  results={results}
-                  datasetByIndex={datasetByIndex}
-                  datasetColumns={datasetColumns}
-                  predictedColumns={predictedColumns}
-                  isFinished={isFinished}
-                  size={size}
-                  workflowId={experiment.workflowId}
-                />
-              </Tabs.Content>
-            ) : null;
-          },
-        )}
+        {Object.entries(resultsByEvaluator).map(([evaluator, results], index: number) => {
+          return tabIndex === index ? (
+            <Tabs.Content
+              key={evaluator}
+              value={evaluator}
+              padding={0}
+              minWidth="full"
+              minHeight="0"
+              overflow="auto"
+            >
+              <BatchEvaluationV2EvaluationResult
+                evaluator={evaluator}
+                results={results}
+                datasetByIndex={datasetByIndex}
+                datasetColumns={datasetColumns}
+                predictedColumns={predictedColumns}
+                isFinished={isFinished}
+                size={size}
+                workflowId={experiment.workflowId}
+              />
+            </Tabs.Content>
+          ) : null;
+        })}
       </Tabs.Root>
     );
   },

@@ -18,22 +18,6 @@ function activeTraceContext(): { trace_id: string; span_id: string } | undefined
   return { trace_id: spanContext.traceId, span_id: spanContext.spanId };
 }
 
-// Lazy import for server-side PostHog to avoid bundling posthog-node in client code
-// This function is only called on the server side (when window is undefined)
-function getServerPostHogInstance() {
-  if (typeof window !== "undefined") {
-    return null;
-  }
-  // Dynamic require that only executes on server side
-  // Using a string-based require to prevent webpack from analyzing it for client bundles
-  try {
-    const posthogServer = new Function('return require("../server/posthog")')();
-    return posthogServer.getPostHogInstance();
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Converts an unknown value to an Error instance.
  * If the value is already an Error, returns it directly.
@@ -86,24 +70,6 @@ export function captureMessage(message: string, options?: CaptureExceptionOption
     ...activeTraceContext(),
   };
 
-  // Try server-side PostHog first
-  if (typeof window === "undefined") {
-    const serverPostHog = getServerPostHogInstance();
-    if (serverPostHog) {
-      try {
-        serverPostHog.capture({
-          distinctId: "server",
-          event: "$exception",
-          properties: exceptionProperties,
-        });
-        return;
-      } catch (err) {
-        console.error("Failed to capture message with server PostHog:", err);
-      }
-    }
-  }
-
-  // Client-side PostHog
   if (typeof window !== "undefined") {
     try {
       if (posthog?.__loaded) {
@@ -114,22 +80,6 @@ export function captureMessage(message: string, options?: CaptureExceptionOption
     } catch (err) {
       console.error("Failed to capture message with client PostHog:", err);
     }
-  }
-}
-
-/** Hands the exception to the server client, if one is configured. */
-function captureExceptionOnServer(properties: Record<string, unknown>): void {
-  const serverPostHog = getServerPostHogInstance();
-  if (!serverPostHog) return;
-
-  try {
-    serverPostHog.capture({
-      distinctId: "server",
-      event: "$exception",
-      properties,
-    });
-  } catch (err) {
-    console.error("Failed to capture exception with server PostHog:", err);
   }
 }
 
@@ -180,13 +130,8 @@ export function captureException(error: Error | string, options?: CaptureExcepti
     ...activeTraceContext(),
   };
 
-  // Try server-side PostHog first (for API routes, server components, etc.)
-  if (typeof window === "undefined") {
-    captureExceptionOnServer(exceptionProperties);
-    return;
-  }
+  if (typeof window === "undefined") return;
 
-  // Client-side PostHog (for browser/client components)
   captureExceptionOnClient({ error, options, properties: exceptionProperties });
 }
 

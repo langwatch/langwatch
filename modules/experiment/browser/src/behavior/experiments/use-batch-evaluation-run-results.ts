@@ -8,7 +8,11 @@ import type { Experiment, Project } from "@langwatch/workflow-contract";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 
-import { getEvaluationColumns } from "../../model/experiments/BatchEvaluationV2/utils.ts";
+import {
+  cellText,
+  getEvaluationColumns,
+  readKey,
+} from "../../model/experiments/BatchEvaluationV2/utils.ts";
 
 const collectPredictedColumns = (
   entriesPredictions: Record<string, unknown>[],
@@ -77,25 +81,25 @@ export const useBatchEvaluationResults = ({
     return undefined;
   }, [isFinished]);
 
-  const datasetByIndex = run.data?.dataset.reduce(
-    (acc: any, item: any) => {
-      acc[item.index] = item;
-      return acc;
-    },
-    {} as Record<number, ExperimentRunWithItems["dataset"][number]>,
-  );
+  const runData: ExperimentRunWithItems | null | undefined = run.data;
+  const datasetByIndex = runData?.dataset.reduce<
+    Record<number, ExperimentRunWithItems["dataset"][number]>
+  >((acc, item) => {
+    acc[item.index] = item;
+    return acc;
+  }, {});
 
   const datasetColumns = new Set(
-    Object.values(datasetByIndex ?? {}).flatMap((item: any) => Object.keys(item.entry ?? {})),
+    Object.values(datasetByIndex ?? {}).flatMap((item) => Object.keys(item.entry ?? {})),
   );
 
   // Retrocompatibility with old evaluations
-  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every((value: any) =>
+  const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every((value) =>
     Object.values(value?.predicted ?? {}).every((v) => typeof v === "object" && !Array.isArray(v)),
   );
-  let entriesPredictions = Object.values(datasetByIndex ?? {})
-    .map((value: any) => value.predicted!)
-    .filter(Boolean);
+  let entriesPredictions: Record<string, unknown>[] = Object.values(datasetByIndex ?? {}).flatMap<
+    Record<string, unknown>
+  >((value) => value.predicted ?? []);
   if (isItJustEndNode) {
     entriesPredictions = entriesPredictions.map((value) => ({
       end: value,
@@ -104,7 +108,7 @@ export const useBatchEvaluationResults = ({
 
   let predictedColumns = collectPredictedColumns(entriesPredictions);
 
-  const hasErrors = Object.values(datasetByIndex ?? {}).some((value: any) => value.error);
+  const hasErrors = Object.values(datasetByIndex ?? {}).some((value) => value.error);
   if (Object.keys(predictedColumns).length === 0 && hasErrors) {
     predictedColumns = {
       "": new Set(["error"]),
@@ -113,30 +117,29 @@ export const useBatchEvaluationResults = ({
 
   // Group evaluations by evaluator (and target if present for V3)
   // Key format: "evaluator" or "target:evaluator"
-  let resultsByEvaluator = run.data?.evaluations.reduce(
-    (acc: any, evaluation: any) => {
-      // For V3 evaluations, group by target + evaluator
-      // For V2, just use evaluator
-      const key = evaluation.targetId
-        ? `${evaluation.targetId}:${evaluation.evaluator}`
-        : evaluation.evaluator;
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key]!.push(evaluation);
-      return acc;
-    },
-    {} as Record<string, ExperimentRunWithItems["evaluations"]>,
-  );
+  let resultsByEvaluator = runData?.evaluations.reduce<
+    Record<string, ExperimentRunWithItems["evaluations"]>
+  >((acc, evaluation) => {
+    // For V3 evaluations, group by target + evaluator
+    // For V2, just use evaluator
+    const key = evaluation.targetId
+      ? `${evaluation.targetId}:${evaluation.evaluator}`
+      : evaluation.evaluator;
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key]!.push(evaluation);
+    return acc;
+  }, {});
 
   // Get target metadata for display names
-  const targetsMap = new Map((run.data?.targets ?? []).map((t: any) => [t.id, t]));
+  const targetsMap = new Map((runData?.targets ?? []).map((t) => [t.id, t] as const));
 
   resultsByEvaluator = Object.fromEntries(
     Object.entries(resultsByEvaluator ?? {}).toSorted((a, b) => a[0].localeCompare(b[0])),
   );
 
-  if (Object.keys(resultsByEvaluator ?? {}).length === 0 && (run.data?.dataset.length ?? 0) > 0) {
+  if (Object.keys(resultsByEvaluator ?? {}).length === 0 && (runData?.dataset.length ?? 0) > 0) {
     resultsByEvaluator = {
       Predictions: [],
     };
@@ -204,13 +207,10 @@ export const useBatchEvaluationDownloadCSV = ({
     }
 
     const evaluationColumns = Object.fromEntries(
-      Object.entries(resultsByEvaluator).map(([ev, res]: [string, any]) => [
-        ev,
-        getEvaluationColumns(res),
-      ]),
+      Object.entries(resultsByEvaluator).map(([ev, res]) => [ev, getEvaluationColumns(res)]),
     );
 
-    const totalRows = Math.max(...Object.values(datasetByIndex).map((d: any) => d.index + 1));
+    const totalRows = Math.max(...Object.values(datasetByIndex).map((d) => d.index + 1));
 
     const datasetHeaderList = Array.from(datasetColumns);
     const predictedHeaderList = Object.entries(predictedColumns).flatMap(([node, columns]) =>
@@ -231,24 +231,21 @@ export const useBatchEvaluationDownloadCSV = ({
       ),
     ].map((h) => h.toLowerCase().replaceAll(" ", "_"));
 
-    const stringify = (value: any) =>
-      typeof value === "object" ? JSON.stringify(value) : (value ?? "");
-
     const csvData: string[][] = Array.from({ length: totalRows }).map((_, index) => {
       const datasetEntry = datasetByIndex[index];
       const row: string[] = [];
       // Dataset values
       for (const col of datasetHeaderList) {
-        row.push(String(stringify(datasetEntry?.entry?.[col] ?? "")));
+        row.push(cellText(datasetEntry?.entry?.[col] ?? ""));
       }
       // Predicted values
       for (const key of predictedHeaderList) {
         const [node, col] = key.split(".") as [string, string];
-        let value = (datasetEntry?.predicted as any)?.[node]?.[col];
+        let value = readKey(datasetEntry?.predicted?.[node], col);
         if (value === undefined && node === "end") {
-          value = (datasetEntry?.predicted as any)?.[col];
+          value = datasetEntry?.predicted?.[col];
         }
-        row.push(String(stringify(value ?? "")));
+        row.push(cellText(value ?? ""));
       }
       // Cost and Duration (dataset values only to match previous behavior)
       row.push(datasetEntry?.cost != null ? String(datasetEntry.cost) : "");
@@ -258,10 +255,10 @@ export const useBatchEvaluationDownloadCSV = ({
         evaluator,
         { evaluationInputsColumns, evaluationResultsColumns },
       ] of evaluationHeaderTuples) {
-        const evaluation = resultsByEvaluator[evaluator]?.find((r: any) => r.index === index);
+        const evaluation = resultsByEvaluator[evaluator]?.find((r) => r.index === index);
         for (const col of Array.from(evaluationInputsColumns)) {
           const v = evaluation?.inputs?.[col];
-          row.push(String(typeof v === "object" ? JSON.stringify(v) : (v ?? "")));
+          row.push(cellText(v));
         }
         for (const col of Array.from(evaluationResultsColumns)) {
           if (col !== "details" && evaluation?.status === "error") {
@@ -272,9 +269,9 @@ export const useBatchEvaluationDownloadCSV = ({
             row.push("Skipped");
             continue;
           }
-          const v = (evaluation as any)?.[col];
+          const v = readKey(evaluation, col);
           if (col === "details") {
-            row.push(v != null ? String(v) : "");
+            row.push(v != null ? cellText(v) : "");
           } else if (v === false) {
             row.push("false");
           } else if (v === true) {
@@ -282,7 +279,7 @@ export const useBatchEvaluationDownloadCSV = ({
           } else if (!isNaN(Number(v))) {
             row.push(numeral(Number(v)).format("0.[00]"));
           } else {
-            row.push(v != null ? String(v) : "");
+            row.push(v != null ? cellText(v) : "");
           }
         }
       }

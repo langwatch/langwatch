@@ -69,6 +69,7 @@ import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
 
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
+import { readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { ChartTooltip } from "../analytics/chart-tooltip.tsx";
 import { FeedbackLink } from "../feedback-link.tsx";
 import { MetadataTag } from "../metadata-tag.tsx";
@@ -858,8 +859,8 @@ export const RunDetails = React.memo(
                             {predictor?.demos ? (
                               <RenderInputOutput
                                 value={JSON.stringify(
-                                  predictor.demos.map((demo: any) =>
-                                    demo._store ? demo._store : demo,
+                                  predictor.demos.map(
+                                    (demo: unknown) => readKey(demo, "_store") || demo,
                                   ),
                                 )}
                                 collapseStringsAfterLength={140}
@@ -1112,7 +1113,11 @@ export const RunDetails = React.memo(
   },
 );
 
-function CollapsableSignature({ signature }: { signature: Record<string, any> | undefined }) {
+function CollapsableSignature({
+  signature,
+}: {
+  signature: { signature?: string; fields?: Record<string, unknown> } | undefined;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <VStack>
@@ -1136,7 +1141,7 @@ function CollapsableSignature({ signature }: { signature: Record<string, any> | 
                 return [
                   key,
                   Object.fromEntries(
-                    Object.entries(value as any).filter(([key]) => key !== "__class__"),
+                    Object.entries(value ?? {}).filter(([key]) => key !== "__class__"),
                   ),
                 ];
               }),
@@ -1407,25 +1412,25 @@ export function DSPyExperimentSummary({
 
   const onApplyOptimization = (predictors: DSPyPredictor[]) => {
     const appliedOptimizations: AppliedOptimization[] = predictors.map((predictor) => {
+      const signatureFields: Record<string, Partial<AppliedOptimizationField>> = predictor.predictor
+        .signature?.fields ?? {};
       const optimization: AppliedOptimization = {
         id: predictor.name,
         instructions:
           predictor.predictor.extended_signature?.instructions ??
           predictor.predictor.signature?.instructions,
-        fields: Object.entries(predictor.predictor.signature?.fields ?? {}).map(
-          ([key, value]: [string, any]) => {
-            const field: AppliedOptimizationField = {
-              identifier: key,
-              field_type: value.field_type ?? "input",
-              prefix: value.prefix,
-              desc: value.desc,
-            };
+        fields: Object.entries(signatureFields).map(([key, value]) => {
+          const field: AppliedOptimizationField = {
+            identifier: key,
+            field_type: value.field_type ?? "input",
+            prefix: value.prefix,
+            desc: value.desc,
+          };
 
-            return field;
-          },
-        ),
+          return field;
+        }),
         demonstrations: predictor.predictor.demos
-          ?.map((demo: any) => demo._store ?? demo)
+          ?.map((demo: unknown) => readKey(demo, "_store") ?? demo)
           .filter(Boolean),
       };
       return optimization;

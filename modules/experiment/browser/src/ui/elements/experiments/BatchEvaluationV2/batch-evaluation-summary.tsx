@@ -1,5 +1,4 @@
 import { Box, Button, HStack, Separator, Spacer, Text, VStack } from "@chakra-ui/react";
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -8,8 +7,6 @@ import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { HoverableBigText } from "@langwatch/workflow-browser/hoverable-big-text";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -18,12 +15,7 @@ export function BatchEvaluationV2EvaluationSummary({
   showProgress = false,
   onStop,
 }: {
-  run: NonNullable<
-    UseTRPCQueryResult<
-      RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
-      TRPCClientErrorLike<WorkflowApiRouter>
-    >["data"]
-  >["runs"][number];
+  run: ExperimentRun;
   showProgress?: boolean;
   onStop?: () => void;
 }) {
@@ -65,7 +57,7 @@ export function BatchEvaluationV2EvaluationSummary({
       flexShrink={0}
     >
       <HStack width="100%" paddingY={4} paddingX={6} gap={5}>
-        {Object.entries(run.summary.evaluations).map(([_, evaluation]: [string, any]) => {
+        {Object.entries(run.summary.evaluations).map(([_, evaluation]) => {
           return (
             <React.Fragment key={evaluation.name}>
               <VStack align="start" gap={1}>

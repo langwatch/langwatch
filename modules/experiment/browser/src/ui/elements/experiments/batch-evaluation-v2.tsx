@@ -19,6 +19,7 @@ import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-tex
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
+import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
@@ -189,19 +190,13 @@ export function BatchEvaluationV2RunList({
     RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
     TRPCClientErrorLike<WorkflowApiRouter>
   >;
-  selectedRun:
-    | NonNullable<
-        UseTRPCQueryResult<
-          RouterOutputs["experiments"]["getExperimentBatchEvaluationRuns"],
-          TRPCClientErrorLike<WorkflowApiRouter>
-        >["data"]
-      >["runs"][number]
-    | undefined;
+  selectedRun: ExperimentRun | undefined;
   selectedRunId: string | undefined;
   setSelectedRunId: (runId: string) => void;
   size?: "sm" | "md";
 } & StackProps) {
-  const hasAnyVersion = batchEvaluationRuns.data?.runs.some((run: any) => run.workflowVersion);
+  const runs: ExperimentRun[] | undefined = batchEvaluationRuns.data?.runs;
+  const hasAnyVersion = runs?.some((run) => run.workflowVersion);
 
   const showRunsError = !batchEvaluationRuns.isLoading && !!batchEvaluationRuns.error;
   const showWaitingForRuns =
@@ -253,7 +248,7 @@ export function BatchEvaluationV2RunList({
       )}
       {showRuns && (
         <>
-          {!batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId) && (
+          {!runs?.find((r) => r.runId === selectedRunId) && (
             <HStack
               paddingX={size === "sm" ? 2 : 4}
               paddingY={size === "sm" ? 2 : 3}
@@ -276,7 +271,7 @@ export function BatchEvaluationV2RunList({
               </VStack>
             </HStack>
           )}
-          {batchEvaluationRuns.data?.runs.map((run: any, index: any) => {
+          {runs?.map((run, index) => {
             const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
             const runName = getRunDisplayName({
               commitMessage: run.workflowVersion?.commitMessage,
@@ -336,7 +331,7 @@ export function BatchEvaluationV2RunList({
                   <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
                     {Object.values(run.summary.evaluations)
                       .slice(0, 2)
-                      .map((evaluation: any, index: number) => (
+                      .map((evaluation, index) => (
                         <React.Fragment key={evaluation.name}>
                           {index > 0 && <Text>·</Text>}
                           <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>

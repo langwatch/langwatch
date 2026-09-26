@@ -19,7 +19,11 @@ import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { TraceIdPeek } from "../../../../behavior/lent-trace.tsx";
-import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
+import {
+  cellText,
+  getEvaluationColumns,
+  readKey,
+} from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 
 type EvaluationRowData = {
   rowNumber: number;
@@ -126,7 +130,7 @@ export function BatchEvaluationV2EvaluationResult({
           }
           return formatValue(val);
         },
-        text: (row) => stringify(row.datasetEntry?.entry?.[column] ?? "-"),
+        text: (row) => cellText(row.datasetEntry?.entry?.[column] ?? "-"),
       });
     }
 
@@ -136,8 +140,8 @@ export function BatchEvaluationV2EvaluationResult({
         const predictedValue = (row: EvaluationRowData) => {
           const entry = row.datasetEntry;
           if (entry?.error) return entry.error;
-          let value = (entry?.predicted as any)?.[node]?.[column];
-          if (value === void 0 && node === "end") value = (entry?.predicted as any)?.[column];
+          let value = readKey(entry?.predicted?.[node], column);
+          if (value === void 0 && node === "end") value = entry?.predicted?.[column];
           return value;
         };
         cols.push({
@@ -145,7 +149,7 @@ export function BatchEvaluationV2EvaluationResult({
           header: titleCase(column),
           minWidth: 150,
           render: (row) => formatValue(predictedValue(row)),
-          text: (row) => stringify(predictedValue(row) ?? "-"),
+          text: (row) => cellText(predictedValue(row) ?? "-"),
           cellState: (row) => (row.datasetEntry?.error ? "error" : undefined),
         });
       }
@@ -162,11 +166,11 @@ export function BatchEvaluationV2EvaluationResult({
             const { datasetEntry, evaluationsForEntry } = row;
             if (datasetEntry?.error) return "Error";
             const value = evaluationsForEntry[evaluator]?.inputs?.[column];
-            return evaluationsForEntry[evaluator] ? stringify(value ?? "-") : "-";
+            return evaluationsForEntry[evaluator] ? cellText(value ?? "-") : "-";
           },
           text: (row) => {
             if (row.datasetEntry?.error) return row.datasetEntry.error;
-            return stringify(row.evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-");
+            return cellText(row.evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-");
           },
           cellState: (row) => (row.datasetEntry?.error ? "error" : undefined),
         });
@@ -464,10 +468,6 @@ export function BatchEvaluationV2EvaluationResult({
   );
 }
 
-function stringify(value: any) {
-  return typeof value === "object" ? JSON.stringify(value) : `${value}`;
-}
-
 function titleCase(text: string) {
   return text
     .replace(/[_-]+/g, " ")
@@ -476,6 +476,6 @@ function titleCase(text: string) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatValue(val: any) {
-  return val !== void 0 && val !== null ? stringify(val) : "-";
+function formatValue(val: unknown) {
+  return val !== void 0 && val !== null ? cellText(val) : "-";
 }

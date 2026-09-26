@@ -95,15 +95,16 @@ export const useBatchEvaluationState = ({
   );
 
   const router = useRouter();
+  const runs: ExperimentRun[] | undefined = batchEvaluationRuns.data?.runs;
 
   const { selectedRunId_, selectedRun } = useMemo(() => {
     const selectedRunId_ =
       selectedRunId ??
       (typeof router.query.runId === "string" ? router.query.runId : null) ??
-      batchEvaluationRuns.data?.runs[0]?.runId;
-    const selectedRun = batchEvaluationRuns.data?.runs.find((r: any) => r.runId === selectedRunId_);
+      runs?.[0]?.runId;
+    const selectedRun = runs?.find((r) => r.runId === selectedRunId_);
     return { selectedRunId_, selectedRun };
-  }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
+  }, [selectedRunId, router.query.runId, runs]);
 
   useKeepFetchingWhileRunIsMissing({
     isRunMissing: !!selectedRunId && !selectedRun,
@@ -129,11 +130,11 @@ export const useBatchEvaluationState = ({
   }, [selectedRun]);
 
   useEffect(() => {
-    const hasUnfinishedRun = batchEvaluationRuns.data?.runs.some(
-      (r: any) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
+    const hasUnfinishedRun = runs?.some(
+      (r) => getFinishedAt(r.timestamps, nowInstant().epochMilliseconds) === undefined,
     );
     setIsSomeRunning(!!hasUnfinishedRun);
-  }, [batchEvaluationRuns.data?.runs]);
+  }, [runs]);
 
   return {
     batchEvaluationRuns,

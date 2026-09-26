@@ -3,7 +3,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { convertInlineToRowRecords, filterEmptyRows } from "../dataset-conversion.ts";
+import {
+  convertInlineToRowRecords,
+  type DatasetRowRecord,
+  filterEmptyRows,
+} from "../dataset-conversion.ts";
 import type { DatasetColumn } from "../types.ts";
 
 describe("Save as dataset utilities", () => {
@@ -44,10 +48,10 @@ describe("Save as dataset utilities", () => {
       expect(result).toHaveLength(0);
     });
 
-    it("handles undefined values as empty", () => {
-      const records = [
-        { id: "row_0", input: undefined as unknown as string, output: "" },
-        { id: "row_1", input: "value", output: undefined as unknown as string },
+    it("treats a missing value as empty", () => {
+      const records: DatasetRowRecord[] = [
+        { id: "row_0", output: "" },
+        { id: "row_1", input: "value" },
       ];
 
       const result = filterEmptyRows(records, ["input", "output"]);

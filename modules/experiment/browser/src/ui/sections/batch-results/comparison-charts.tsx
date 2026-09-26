@@ -13,7 +13,7 @@ import {
   ChartTooltip,
   RUN_COLORS,
 } from "@langwatch/experiment-browser-kit";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -473,9 +473,10 @@ export const ComparisonCharts = ({
     }
   };
 
+  const applyDefaultXAxis = useEffectEvent((option: XAxisOption) => setXAxisOption(option));
   // Update X-axis when default changes (e.g., entering/exiting compare mode)
   useEffect(() => {
-    setXAxisOption(defaultXAxis);
+    applyDefaultXAxis(defaultXAxis);
   }, [defaultXAxis]);
 
   // Metrics selector state
@@ -748,7 +749,7 @@ export const ComparisonCharts = ({
       ...prefixedAverages(data.scores, "score"),
       ...prefixedAverages(data.passRates, "pass"),
     }));
-  }, [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds]);
+  }, [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds, targetColors]);
 
   // Calculate dynamic Y-axis widths based on data
   const yAxisWidths = useMemo(() => {

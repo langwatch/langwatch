@@ -215,17 +215,17 @@ describe("MiniRunButton", () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     const parentClick = vi.fn();
+    document.body.addEventListener("click", parentClick);
 
     render(
       <ChakraProvider value={defaultSystem}>
-        <div onClick={parentClick}>
-          <MiniRunButton onClick={onClick} />
-        </div>
+        <MiniRunButton onClick={onClick} />
       </ChakraProvider>,
     );
 
     const button = screen.getByRole("button");
     await user.click(button);
+    document.body.removeEventListener("click", parentClick);
 
     expect(onClick).toHaveBeenCalled();
     expect(parentClick).not.toHaveBeenCalled();
