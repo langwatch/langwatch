@@ -213,7 +213,7 @@ secured.access(requires("triggers:create")).post(
       throw new TriggerFiltersRequiredError();
     }
 
-    const trigger = await prisma.trigger.create({
+    const trigger = await getApp().triggers.create({
       data: {
         id: nanoid(),
         name: body.name,
@@ -301,8 +301,9 @@ secured.access(requires("triggers:update")).patch(
     if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
     if (body.actionParams !== undefined) data.actionParams = body.actionParams;
 
-    const updated = await prisma.trigger.update({
-      where: { id, projectId: project.id },
+    const updated = await getApp().triggers.update({
+      triggerId: id,
+      projectId: project.id,
       data,
     });
 
