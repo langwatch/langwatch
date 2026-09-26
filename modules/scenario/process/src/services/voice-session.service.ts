@@ -1,12 +1,16 @@
 /** "Talk to it": gate, authorize and run main's voice-session handlers (voice-agents-v1). */
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { type AuthzApi, ProjectPermissionDeniedError } from "@langwatch/authz-contract";
 import { type FeatureFlagApi, VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import type {
   VoiceRecordingStream,
+  VoiceRunAudioRequest,
+  VoiceRunRecordingStream,
   VoiceSessionAudioRequest,
   VoiceSessionFinishRequest,
   VoiceSessionFinishResult,
@@ -15,16 +19,21 @@ import type {
   VoiceSessionMintResult,
   VoiceSessionTokenPayload,
   SimulationService,
+  WholeCallAudioInfrastructure,
 } from "@langwatch/scenario-contract";
 import {
   authorizeRecordingPlayback,
   createVoiceTransportRegistry,
   voiceCallMaxSeconds,
   finishVoiceSession,
+  getWholeCallAudio,
   mintVoiceSession,
+  twilioBasicAuthHeader,
   VoiceAgentsGateDisabledError,
+  VoiceRecordingKeyMissingError,
   VoiceSessionInvalidError,
 } from "@langwatch/scenario-contract/voice-runtime";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { VoiceRecordingChannel } from "../channels/voice-recording.channel.ts";
 import { voicePermissionsFor } from "../rules/voice-permissions.rules.ts";
@@ -33,6 +42,16 @@ import { createVoiceCallTraceRecorder } from "./voice-call-trace-writer.ts";
 import { createVoiceCallRunWriter } from "./voice-run-writer.ts";
 import { signVoiceSessionToken, verifyVoiceSessionToken } from "./voice-session-token.ts";
 import { createVoiceSessionInfrastructureFromServices } from "./voice-session.infrastructure.ts";
+import { createWholeCallAudioInfrastructure } from "./whole-call-audio.infrastructure.ts";
+
+const logger = createLogger("langwatch:voice:session-service");
+
+function asRecordingKeyMissing(error: unknown): never {
+  if (HandledError.isHandled(error) && error.code === "voice_key_missing") {
+    throw new VoiceRecordingKeyMissingError();
+  }
+  throw error;
+}
 
 type VoicePermission = "scenarios:create" | "scenarios:view" | "evaluations:manage";
 
@@ -47,6 +66,11 @@ type VoiceSessionOptions = {
   authz: Pick<AuthzApi, "hasPermission">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   recordings: VoiceRecordingChannel;
+  wholeCallAudio: WholeCallAudioInfrastructure;
+  auditLog: Pick<AuditLogApi, "record">;
+  twilioCredentials: {
+    getForProject(input: { projectId: string }): Promise<{ accountSid: string; authToken: string }>;
+  };
   verifyToken: (input: { token: string; now: number }) => VoiceSessionTokenPayload;
   maxDurationSeconds: number;
 };
@@ -60,10 +84,12 @@ export class VoiceSessionService {
   static compose(input: {
     peers: {
       agents: AgentApi;
+      auditLog: AuditLogApi;
       authz: AuthzApi;
       featureFlags: FeatureFlagApi;
       gateway: GatewayApi;
       modelProviders: ModelProviderApi;
+      traces: TraceApi;
     };
     scenarios: ScenarioService;
     simulations: SimulationService;
@@ -95,10 +121,7 @@ export class VoiceSessionService {
       },
       simulations: input.simulations,
       recordCallTraces: createVoiceCallTraceRecorder({
-        traces: {
-          // TraceApi has no raw-span write yet (handoff voice-panel §11); the recorder swallows.
-          recordSpan: () => Promise.reject(new Error("TraceApi has no recordSpan operation")),
-        },
+        traces: { recordSpan: (span) => peers.traces.recordSpan(span) },
       }),
       writeCallRun: createVoiceCallRunWriter({
         agents: {
@@ -116,6 +139,21 @@ export class VoiceSessionService {
       authz: peers.authz,
       featureFlags: peers.featureFlags,
       recordings: input.recordings,
+      wholeCallAudio: createWholeCallAudioInfrastructure({
+        simulations: input.simulations,
+        traces: peers.traces,
+      }),
+      auditLog: peers.auditLog,
+      twilioCredentials: {
+        async getForProject({ projectId }) {
+          const rows = await peers.modelProviders.findAllAccessibleForProject({ projectId });
+          const row = rows.find((r) => r.provider === "twilio" && r.enabled);
+          if (!row?.id) throw new VoiceRecordingKeyMissingError();
+          return peers.gateway
+            .getTwilioCredential({ modelProviderId: row.id })
+            .catch(asRecordingKeyMissing);
+        },
+      },
       verifyToken: ({ token, now }) =>
         verifyVoiceSessionToken({ token, now, secret: getSigningSecret(signingSecret) }),
       maxDurationSeconds: voiceCallMaxSeconds({
@@ -184,15 +222,89 @@ export class VoiceSessionService {
       projectId: input.projectId,
       conversationId: input.conversationId,
     });
-    const mediaType = "audio/mpeg" as const;
-    const stream = await this.options.recordings.open({
+    return this.#relay({
       url: `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(input.conversationId)}/audio`,
       headers: { "xi-api-key": credential.apiKey },
-      mediaType,
+      mediaType: "audio/mpeg",
+      signal: input.signal,
+    });
+  }
+
+  /** Main's run-audio door: the handle comes from the run's own spans, the authorization. */
+  async streamRunAudio(input: VoiceRunAudioRequest): Promise<VoiceRunRecordingStream> {
+    await this.#assertEnabled(input.projectId);
+    await this.#requirePermissions({
+      userId: input.userId,
+      projectId: input.projectId,
+      permissions: ["scenarios:view"],
+    });
+    const handle = await getWholeCallAudio({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      infrastructure: this.options.wholeCallAudio,
+    });
+    this.#auditRecordingAccess({ ...input, transport: handle.kind });
+
+    if (handle.kind === "elevenlabs") {
+      const credential = await this.options.infrastructure
+        .getCredential({ projectId: input.projectId, transport: "elevenlabs_convai" })
+        .catch(asRecordingKeyMissing);
+      if (credential.kind !== "elevenlabs") throw new VoiceRecordingKeyMissingError();
+      return this.#relay({
+        url: `${credential.baseUrl}/v1/convai/conversations/${encodeURIComponent(handle.conversationId)}/audio`,
+        headers: { "xi-api-key": credential.apiKey },
+        mediaType: "audio/mpeg",
+        signal: input.signal,
+      });
+    }
+
+    const credential = await this.options.twilioCredentials.getForProject(input);
+    const url = await this.options.recordings.getTwilioRecordingWavUrl({
+      credential,
+      callSid: handle.callSid,
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
+    return this.#relay({
+      url,
+      headers: { authorization: twilioBasicAuthHeader(credential) },
+      mediaType: "audio/wav",
+      signal: input.signal,
+    });
+  }
+
+  async #relay<M extends VoiceRunRecordingStream["mediaType"]>(input: {
+    url: string;
+    headers: Record<string, string>;
+    mediaType: M;
+    signal: AbortSignal | undefined;
+  }): Promise<{ stream: ReadableStream<Uint8Array>; mediaType: M }> {
+    const stream = await this.options.recordings.open({
+      url: input.url,
+      headers: input.headers,
+      mediaType: input.mediaType,
       ...(input.signal ? { signal: input.signal } : {}),
     });
 
-    return { stream, mediaType };
+    return { stream, mediaType: input.mediaType };
+  }
+
+  /** Recording access is PII: audited once authorized, fire-and-forget as main did. */
+  #auditRecordingAccess(input: {
+    userId: string;
+    projectId: string;
+    scenarioRunId: string;
+    transport: string;
+  }): void {
+    void this.options.auditLog
+      .record({
+        action: "voice.recording.accessed",
+        userId: input.userId,
+        projectId: input.projectId,
+        args: { scenarioRunId: input.scenarioRunId, transport: input.transport },
+      })
+      .catch((err: unknown) =>
+        logger.error({ err, projectId: input.projectId }, "Failed to audit recording access"),
+      );
   }
 
   /** A project without the flag reads as if the door did not exist (AC29). */

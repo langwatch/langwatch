@@ -34,6 +34,7 @@ import {
   type GatewayBudgetDebitRow,
   type GatewayBudgetResolutionTarget,
   type GatewayElevenLabsApiCredential,
+  type GatewayTwilioCredential,
   type GatewayElevenLabsWebhookAnswer,
   type GatewayVirtualKeyDirectBudget,
   type GuardrailAttachment,
@@ -154,6 +155,7 @@ import type {
 } from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
+import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
@@ -818,6 +820,7 @@ export class GatewayApp implements GatewayApi {
   #connectManagedKeys: ConnectManagedKeyService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
   #elevenLabsCredential: GatewayElevenLabsCredentialService | undefined;
+  #twilioCredential: TwilioCredentialService | undefined;
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
@@ -876,6 +879,9 @@ export class GatewayApp implements GatewayApi {
       : void 0;
     this.#elevenLabsCredential = members.elevenLabsWebhook
       ? GatewayElevenLabsCredentialService.create(members.elevenLabsWebhook.credentials)
+      : void 0;
+    this.#twilioCredential = members.elevenLabsWebhook
+      ? TwilioCredentialService.create(members.elevenLabsWebhook.credentials)
       : void 0;
   }
 
@@ -1079,6 +1085,13 @@ export class GatewayApp implements GatewayApi {
     if (!service) throw new Error("The ElevenLabs family was mounted without its members");
 
     return service.getApiCredential(input);
+  }
+
+  getTwilioCredential(input: { modelProviderId: string }): Promise<GatewayTwilioCredential> {
+    const service = this.#twilioCredential;
+    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
+
+    return service.getCredential(input);
   }
 
   // ── The billing reconciliation family (ADR-072) ─────────────────────────

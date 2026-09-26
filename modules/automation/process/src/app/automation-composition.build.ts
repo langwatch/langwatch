@@ -30,7 +30,7 @@ import type { Logger } from "@langwatch/observability";
 import type { Encryption, Mail } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
-import { traceSchema, type TraceRecord } from "@langwatch/trace-contract";
+import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
@@ -48,6 +48,7 @@ import type {
 } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationRepositories } from "../repositories/automation.repositories.ts";
 import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
+import { toReportTraceRow } from "../rules/report-trace-row.rules.ts";
 import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 import { AutomationNotificationDeliveryService } from "../services/automation-notification-delivery.service.ts";
 import { AutomationProviderRegistryService } from "../services/automation-provider-registry.service.ts";
@@ -833,11 +834,37 @@ export class LoggedSettlementBreach extends AutomationSettlementBreach {
   }
 }
 
+/** Main's `listReportTraces` (presets.ts): the author's query compiled onto the trace grid read. */
+export function createReportTraceList(input: {
+  traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
+  baseHost: string;
+}): ReportDispatchDeps["listReportTraces"] {
+  return async ({ projectId, projectSlug, query, from, to, limit }) => {
+    const filterWhere = input.traces.translateTraceFilter({
+      query,
+      tenantId: projectId,
+      timeRange: { from, to },
+    });
+    const page = await input.traces.readTraceList({
+      tenantId: projectId,
+      timeRange: { from, to },
+      sort: { columnId: "time", direction: "desc" },
+      page: 1,
+      pageSize: limit,
+      visibilityCutoffMs: null,
+      ...(filterWhere ? { filterWhere } : {}),
+    });
+    const projectUrl = `${input.baseHost}/${projectSlug}`;
+    return page.items.map((item) => toReportTraceRow({ item, projectUrl }));
+  };
+}
+
 /** Main's report handler (presets.ts, ADR-044 Phase 3c), over this module's own repositories. */
 export function createAutomationReportDispatcher(input: {
   repositories: Pick<AutomationRepositories, "triggers" | "history" | "customGraphs">;
   projects: AutomationProjectDirectory;
   analytics: Pick<AnalyticsApi, "getTimeseries">;
+  traces: Pick<TraceApi, "readTraceList" | "translateTraceFilter">;
   delivery: AutomationNotificationDelivery;
   crypto: AutomationSecretCrypto;
   suppression: { filterSuppressed: ReportDispatchDeps["filterSuppressedRecipients"] };
@@ -851,12 +878,7 @@ export function createAutomationReportDispatcher(input: {
     delivery: input.delivery,
     slackProvider: AutomationSlackSecretsService.create(input.crypto),
     filterSuppressedRecipients: (recipients) => input.suppression.filterSuppressed(recipients),
-    listReportTraces: () =>
-      Promise.reject(
-        new Error(
-          "A trace-query report needs a typed trace list read, which TraceApi does not offer yet",
-        ),
-      ),
+    listReportTraces: createReportTraceList({ traces: input.traces, baseHost: input.baseHost }),
     loadReportCharts: ({ projectId, source, from, to }) =>
       ReportChartService.loadReportCharts({
         deps: {

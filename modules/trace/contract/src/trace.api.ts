@@ -30,11 +30,12 @@ import type {
   TraceFullRecord,
   TraceFullThreadReadInput,
 } from "./trace-full-read.contract.ts";
+import type { RecordSpanCommandData } from "./trace-ingress.commands.ts";
 import type { ResolvedInstantEvalRun } from "./trace-instant-eval-chips.ts";
 import type { ExplorerInstantEvalRunInput } from "./trace-instant-eval.schemas.ts";
 import type { LangWatchQLTraceFilter } from "./trace-langwatch-ql-filter.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import type { DiscoverResult, FacetValuesResult } from "./trace-list-view.ts";
+import type { DiscoverResult, FacetValuesResult, TraceListPage } from "./trace-list-view.ts";
 import type { LogTraceContribution } from "./trace-log-contribution.ts";
 import type {
   TraceAttributedTrace,
@@ -91,6 +92,7 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
+import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
@@ -167,6 +169,14 @@ export interface TraceApi extends TraceOtlpIngestApi {
   /** The whole trace as one JSON object, spans included. */
   renderTraceJson(input: { trace: Trace }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
+  /** Main's `traces.recordSpan`: one raw OTLP span through the ingress command. */
+  recordSpan(input: RecordSpanCommandData): Promise<void>;
+  /** Main's `getNormalizedSpansByTraceId`: a trace's stored spans, attributes unresolved. */
+  findNormalizedSpansByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+    limit?: number;
+  }): Promise<NormalizedSpan[]>;
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
   getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
@@ -510,7 +520,16 @@ export interface TraceApi extends TraceOtlpIngestApi {
   >;
   getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
   cleanupTenantEmitter(tenantId: string): void;
-  readTraceList(params: unknown): Promise<unknown>;
+  readTraceList(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    sort: { columnId: string; direction: "asc" | "desc" };
+    page?: number;
+    pageSize: number;
+    cursor?: { sortValue: number; traceId: string };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    visibilityCutoffMs?: number | null;
+  }): Promise<TraceListPage>;
   readSessionGroups(params: unknown): Promise<unknown>;
   /**
    * The sidebar's facets under the active query: descriptors counted in the

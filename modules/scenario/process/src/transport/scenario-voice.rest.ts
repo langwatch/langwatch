@@ -1,6 +1,7 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   ScenarioApi,
+  voiceRunAudioParamsSchema,
   voiceSessionAudioParamsSchema,
   voiceSessionAudioQuerySchema,
 } from "@langwatch/scenario-contract";
@@ -21,6 +22,25 @@ export const scenarioVoiceRest = defineRestRouter(ScenarioApi)
     const recording = await app.streamVoiceSessionAudio({
       projectId: input.projectId,
       conversationId: input.conversationId,
+      userId: actor.id,
+      signal,
+    });
+
+    return response.stream(recording.stream, {
+      mediaType: recording.mediaType,
+      headers: { "Cache-Control": "no-store" },
+    });
+  })
+  .get("/api/voice/run/:scenarioRunId/audio", "streamVoiceRunAudio")
+  .withParams(voiceRunAudioParamsSchema)
+  .withQuery(voiceSessionAudioQuerySchema)
+  .withPermission("scenarios:view", { at: "route", param: "projectId" })
+  .withResponse("bytes", { produces: ["audio/mpeg", "audio/wav"] })
+  .withDocs({ description: "Stream a headless voice run's whole-call recording from its provider" })
+  .handle(async ({ app, input, actor, signal, response }) => {
+    const recording = await app.streamVoiceRunAudio({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
       userId: actor.id,
       signal,
     });

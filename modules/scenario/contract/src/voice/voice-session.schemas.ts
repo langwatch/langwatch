@@ -74,5 +74,20 @@ export type VoiceSessionAudioRequest = {
   userId: string;
   signal?: AbortSignal;
 };
+/** Main's `GET /api/voice/run/:scenarioRunId/audio`: a headless run's whole-call recording. */
+export const voiceRunAudioParamsSchema = z.object({
+  scenarioRunId: z.string().min(1).max(200),
+});
+export type VoiceRunAudioRequest = {
+  projectId: string;
+  scenarioRunId: string;
+  userId: string;
+  signal?: AbortSignal;
+};
 /** The provider's bytes relayed as they arrive; the key never leaves the server. */
 export type VoiceRecordingStream = { stream: ReadableStream<Uint8Array>; mediaType: "audio/mpeg" };
+/** A whole-call recording: ElevenLabs serves mpeg, Twilio serves wav. */
+export type VoiceRunRecordingStream = {
+  stream: ReadableStream<Uint8Array>;
+  mediaType: "audio/mpeg" | "audio/wav";
+};

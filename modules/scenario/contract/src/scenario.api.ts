@@ -84,6 +84,8 @@ import type {
 } from "./simulation.ts";
 import type {
   VoiceRecordingStream,
+  VoiceRunAudioRequest,
+  VoiceRunRecordingStream,
   VoiceSessionAudioRequest,
   VoiceSessionFinishRequest,
   VoiceSessionFinishResult,
@@ -231,6 +233,7 @@ export interface ScenarioApi {
   mintVoiceSession(input: VoiceSessionMintRequest): Promise<VoiceSessionMintResult>;
   finishVoiceSession(input: VoiceSessionFinishRequest): Promise<VoiceSessionFinishResult>;
   streamVoiceSessionAudio(input: VoiceSessionAudioRequest): Promise<VoiceRecordingStream>;
+  streamVoiceRunAudio(input: VoiceRunAudioRequest): Promise<VoiceRunRecordingStream>;
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
   list(input: { projectId: string }): Promise<Scenario[]>;

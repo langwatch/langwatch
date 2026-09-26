@@ -1,66 +1,63 @@
 /**
  * @vitest-environment node
  * @see specs/features/agents/voice-phone.feature
- * `findTwilioProviderForProject` resolves the enabled Twilio provider a key
- * needs; `findTwilioCredential` reads its three keys. Repository/Prisma mocked.
+ * `getCredential` reads a Twilio row's three keys, or refuses with `voice_key_missing`.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HandledError } from "@langwatch/handled-error";
+import { describe, expect, it } from "vitest";
 
-const findAllAccessibleForProject = vi.fn();
-const findUnique = vi.fn();
-const readCustomKeys = vi.fn();
+import {
+  GatewayElevenLabsCredentialRepository,
+  type GatewayElevenLabsProviderRow,
+} from "../repositories/gateway-elevenlabs-credential.repository.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
 
-const service = TwilioCredentialService.create({
-  providers: {
-    findById: (id) => findUnique(id),
-    listAccessible: (projectId) => findAllAccessibleForProject(projectId),
-  },
-  credentials: { readCustomKeys: (value) => readCustomKeys(value) },
-});
+class FixedProviderRows extends GatewayElevenLabsCredentialRepository {
+  constructor(private readonly row: GatewayElevenLabsProviderRow | null) {
+    super();
+  }
 
-beforeEach(() => vi.clearAllMocks());
+  async findProviderRow(): Promise<GatewayElevenLabsProviderRow | null> {
+    return this.row;
+  }
+}
 
-describe("findTwilioProviderForProject", () => {
-  describe("when the project has an enabled Twilio row", () => {
-    it("returns that row's id", async () => {
-      findAllAccessibleForProject.mockResolvedValue([
-        { id: "prov_openai", provider: "openai", enabled: true },
-        { id: "prov_twilio", provider: "twilio", enabled: true },
-      ]);
-      const result = await service.findProviderForProject({ projectId: "p1" });
-      expect(result).toEqual({ id: "prov_twilio" });
-    });
+function serviceOver(input: { provider: string; keys: Record<string, unknown> }) {
+  const reads: unknown[] = [];
+  const service = TwilioCredentialService.create({
+    providers: new FixedProviderRows({
+      provider: input.provider,
+      organizationId: "org_1",
+      customKeys: "cipher",
+    }),
+    credentials: {
+      readCustomKeys: (stored) => {
+        reads.push(stored);
+        return input.keys;
+      },
+    },
   });
+  return { service, reads };
+}
 
-  describe("when no enabled Twilio row is accessible", () => {
-    it("returns null for a disabled or non-Twilio project", async () => {
-      findAllAccessibleForProject.mockResolvedValue([
-        { id: "prov_twilio_off", provider: "twilio", enabled: false },
-        { id: "prov_openai", provider: "openai", enabled: true },
-      ]);
-      const result = await service.findProviderForProject({ projectId: "p1" });
-      expect(result).toBeNull();
-    });
-  });
-});
+async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
+  const error = await promise.catch((caught: unknown) => caught);
+  return HandledError.isHandled(error) ? error.code : undefined;
+}
 
-describe("findTwilioCredential", () => {
+const ALL_KEYS = {
+  TWILIO_ACCOUNT_SID: "AC123",
+  TWILIO_AUTH_TOKEN: "tok-secret",
+  TWILIO_FROM_NUMBER: "+14155550000",
+};
+
+describe("getCredential", () => {
   describe("when the row is a Twilio row with all three keys", () => {
     it("returns the account SID, auth token and from-number", async () => {
-      findUnique.mockResolvedValue({
-        provider: "twilio",
-        customKeys: "cipher",
-      });
-      readCustomKeys.mockReturnValue({
-        state: "read",
-        keys: {
-          TWILIO_ACCOUNT_SID: "AC123",
-          TWILIO_AUTH_TOKEN: "tok-secret",
-          TWILIO_FROM_NUMBER: "+14155550000",
-        },
-      });
-      const result = await service.findCredential({ modelProviderId: "prov_1" });
+      const { service } = serviceOver({ provider: "twilio", keys: ALL_KEYS });
+
+      const result = await service.getCredential({ modelProviderId: "prov_1" });
+
       expect(result).toEqual({
         accountSid: "AC123",
         authToken: "tok-secret",
@@ -70,29 +67,26 @@ describe("findTwilioCredential", () => {
   });
 
   describe("when a required key is missing", () => {
-    it("returns null rather than a half-formed credential", async () => {
-      findUnique.mockResolvedValue({
+    it("refuses with voice_key_missing rather than a half-formed credential", async () => {
+      const { service } = serviceOver({
         provider: "twilio",
-        customKeys: "cipher",
-      });
-      readCustomKeys.mockReturnValue({
-        state: "read",
         keys: { TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok-secret" },
       });
-      const result = await service.findCredential({ modelProviderId: "prov_1" });
-      expect(result).toBeNull();
+
+      expect(await codeOf(service.getCredential({ modelProviderId: "prov_1" }))).toBe(
+        "voice_key_missing",
+      );
     });
   });
 
   describe("when the row is not a Twilio row", () => {
-    it("returns null without reading any key", async () => {
-      findUnique.mockResolvedValue({
-        provider: "openai",
-        customKeys: "cipher",
-      });
-      const result = await service.findCredential({ modelProviderId: "prov_1" });
-      expect(result).toBeNull();
-      expect(readCustomKeys).not.toHaveBeenCalled();
+    it("refuses without reading any key", async () => {
+      const { service, reads } = serviceOver({ provider: "openai", keys: ALL_KEYS });
+
+      expect(await codeOf(service.getCredential({ modelProviderId: "prov_1" }))).toBe(
+        "voice_key_missing",
+      );
+      expect(reads).toEqual([]);
     });
   });
 });

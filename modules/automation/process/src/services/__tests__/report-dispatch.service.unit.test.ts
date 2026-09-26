@@ -3,6 +3,7 @@ import type {
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CustomGraph,
   ReportChart,
@@ -11,8 +12,10 @@ import type {
   Trigger,
 } from "@langwatch/automation-contract";
 import { fromDate } from "@langwatch/time";
+import type { TraceApi, TraceListItem } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { createReportTraceList } from "../../app/automation-composition.build.ts";
 import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { toReportTraceRow } from "../../rules/report-trace-row.rules.ts";
 import { AutomationSlackProvider } from "../../services/automation-slack-secrets.service.ts";
@@ -386,6 +389,83 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         triggerId: "report-1",
         firedAt: fromDate(SLOT),
       });
+    });
+  });
+});
+
+describe("the composed trace-query report", () => {
+  describe("given a report whose query matches one trace in the window", () => {
+    it("reads the trace grid through TraceApi and sends its row", async () => {
+      const item: TraceListItem = {
+        traceId: "trace-a",
+        timestamp: SLOT.getTime(),
+        name: "checkout",
+        serviceName: "shop",
+        durationMs: 1234,
+        totalCost: 0.0125,
+        nonBilledCost: 0,
+        totalTokens: 10,
+        inputTokens: null,
+        outputTokens: null,
+        cacheReadTokens: null,
+        cacheCreationTokens: null,
+        reasoningTokens: null,
+        contextSizeTokens: null,
+        models: ["gpt-5-mini"],
+        labels: [],
+        promptId: null,
+        promptVersionNumber: null,
+        status: "error",
+        spanCount: 1,
+        sizeBytes: 1,
+        input: "Where is my order?",
+        output: "It ships tomorrow.",
+        error: null,
+        conversationId: null,
+        userId: null,
+        origin: "application",
+        tokensEstimated: false,
+        ttft: null,
+        traceName: "checkout",
+        rootSpanType: null,
+      };
+      const filterWhere = { sql: "Status = {s:String}", params: { s: "error" } };
+      const readTraceList = vi.fn<TraceApi["readTraceList"]>(async () => ({
+        items: [item],
+        totalHits: 1,
+        evaluations: {},
+        nextCursor: null,
+      }));
+      const listReportTraces = createReportTraceList({
+        traces: createApiFixture<TraceApi>({
+          translateTraceFilter: () => filterWhere,
+          readTraceList,
+        }),
+        baseHost: BASE_HOST,
+      });
+      const mail = new FakeMailGateway();
+      const trigger = makeTrigger({
+        source: { kind: "traceQuery", filters: {}, topN: 3 },
+        filterQuery: "status:error",
+      });
+
+      await ReportDispatchService.dispatchScheduledReport({
+        deps: makeDeps({ trigger, mail, listReportTraces }),
+        fire: FIRE,
+      });
+
+      expect(readTraceList).toHaveBeenCalledWith({
+        tenantId: PROJECT.id,
+        timeRange: { from: SLOT.getTime() - 24 * 60 * 60 * 1000, to: SLOT.getTime() },
+        sort: { columnId: "time", direction: "desc" },
+        page: 1,
+        pageSize: 3,
+        visibilityCutoffMs: null,
+        filterWhere,
+      });
+      const [email] = mail.emails;
+      expect(email?.html).toContain(`${BASE_HOST}/${PROJECT.slug}/traces/trace-a`);
+      expect(email?.html).toContain("gpt-5-mini");
     });
   });
 });

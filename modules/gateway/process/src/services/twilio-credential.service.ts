@@ -1,59 +1,39 @@
 /**
- * Reads the stored Twilio credential for one provider row. A headless voice
- * run has no session to authorize `ModelProviderService` with, so this
- * keeps the query and decryption out of the runner. Nothing here throws.
+ * Reads the stored Twilio credential for one provider row (main's `getTwilioCredential`). A
+ * headless voice run and the run-audio door have no session to authorize `ModelProviderService`
+ * with, so this keeps the row read and decryption out of the runner.
  */
+import {
+  GatewayVoiceKeyMissingError,
+  type GatewayTwilioCredential,
+} from "@langwatch/gateway-contract";
 
-/** The account SID, auth token and origination number a phone run dials with. */
-export interface TwilioCredential {
-  /** The Twilio account the call is billed to. */
-  accountSid: string;
-  /** The account auth token. The one secret field of the three. */
-  authToken: string;
-  /** The account's own Twilio number (E.164) the call originates FROM. */
-  fromNumber: string;
-}
-
-export interface TwilioProviderReader {
-  findById(id: string): Promise<{ provider: string; customKeys: unknown } | null>;
-  listAccessible(
-    projectId: string,
-  ): Promise<readonly { id: string; provider: string; enabled: boolean }[]>;
-}
-
-export interface TwilioCredentialReader {
-  readCustomKeys(value: unknown): { keys: Record<string, unknown> };
-}
+import type { ElevenLabsCredentialCollaborators } from "./gateway-elevenlabs-credential.service.ts";
 
 export class TwilioCredentialService {
-  private constructor(
-    private readonly providers: TwilioProviderReader,
-    private readonly credentials: TwilioCredentialReader,
-  ) {}
+  private constructor(private readonly collaborators: ElevenLabsCredentialCollaborators) {}
 
-  static create(input: {
-    providers: TwilioProviderReader;
-    credentials: TwilioCredentialReader;
-  }): TwilioCredentialService {
-    return new TwilioCredentialService(input.providers, input.credentials);
+  static create(collaborators: ElevenLabsCredentialCollaborators): TwilioCredentialService {
+    return new TwilioCredentialService(collaborators);
   }
 
-  async findProviderForProject(input: { projectId: string }): Promise<{ id: string } | null> {
-    const rows = await this.providers.listAccessible(input.projectId);
-    const row = rows.find((candidate) => candidate.provider === "twilio" && candidate.enabled);
-    return row?.id ? { id: row.id } : null;
-  }
-
-  async findCredential(input: { modelProviderId: string }): Promise<TwilioCredential | null> {
-    const provider = await this.providers.findById(input.modelProviderId);
-    if (provider?.provider !== "twilio") return null;
-    const keys = this.credentials.readCustomKeys(provider.customKeys).keys;
+  /** A call needs all three keys; a half-configured row throws `voice_key_missing`. */
+  async getCredential(input: { modelProviderId: string }): Promise<GatewayTwilioCredential> {
+    const provider = await this.collaborators.providers.findProviderRow(input);
+    if (provider?.provider !== "twilio") throw new GatewayVoiceKeyMissingError();
+    const keys = this.collaborators.credentials.readCustomKeys(provider.customKeys);
     const accountSid = keys.TWILIO_ACCOUNT_SID;
     const authToken = keys.TWILIO_AUTH_TOKEN;
     const fromNumber = keys.TWILIO_FROM_NUMBER;
-    if (typeof accountSid !== "string" || accountSid.length === 0) return null;
-    if (typeof authToken !== "string" || authToken.length === 0) return null;
-    if (typeof fromNumber !== "string" || fromNumber.length === 0) return null;
+    if (typeof accountSid !== "string" || accountSid.length === 0) {
+      throw new GatewayVoiceKeyMissingError();
+    }
+    if (typeof authToken !== "string" || authToken.length === 0) {
+      throw new GatewayVoiceKeyMissingError();
+    }
+    if (typeof fromNumber !== "string" || fromNumber.length === 0) {
+      throw new GatewayVoiceKeyMissingError();
+    }
     return { accountSid, authToken, fromNumber };
   }
 }

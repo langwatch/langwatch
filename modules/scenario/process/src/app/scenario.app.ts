@@ -26,6 +26,8 @@ import {
   startScenarioTabPresence,
   ScenarioApi,
   type VoiceRecordingStream,
+  type VoiceRunAudioRequest,
+  type VoiceRunRecordingStream,
   type VoiceSessionAudioRequest,
   type VoiceSessionFinishRequest,
   type VoiceSessionFinishResult,
@@ -533,6 +535,10 @@ export class ScenarioApp implements ScenarioApi {
 
   streamVoiceSessionAudio(input: VoiceSessionAudioRequest): Promise<VoiceRecordingStream> {
     return this.#dependencies.voiceSessions.streamSessionAudio(input);
+  }
+
+  streamVoiceRunAudio(input: VoiceRunAudioRequest): Promise<VoiceRunRecordingStream> {
+    return this.#dependencies.voiceSessions.streamRunAudio(input);
   }
 
   downloadScenarioRunExport(

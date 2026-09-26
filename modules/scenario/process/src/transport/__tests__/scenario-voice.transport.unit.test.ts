@@ -6,7 +6,10 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { VoiceRecordingUnavailableError } from "@langwatch/scenario-contract/voice-runtime";
+import {
+  VoiceRecordingKeyMissingError,
+  VoiceRecordingUnavailableError,
+} from "@langwatch/scenario-contract/voice-runtime";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -138,6 +141,63 @@ describe("GET /api/voice/session/:conversationId/audio", () => {
 
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ code: "voice_recording_unavailable" });
+    });
+  });
+});
+
+function runAudioDoor(stream: ScenarioApi["streamVoiceRunAudio"]) {
+  const streamVoiceRunAudio = vi.fn(stream);
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => ({ actor: null, scope: null }),
+      identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
+      authorize: () => ({ permitted: true, organizationRole: null }),
+    },
+  });
+  const hono = runtime.mount(scenarioVoiceRest.router(), {
+    app: () => createApiFixture<ScenarioApi>({ streamVoiceRunAudio }),
+    onError: boundaryErrorHandler,
+  });
+  const request = () =>
+    hono.request("http://api.test/api/voice/run/scenariorun_1/audio?projectId=project_1");
+
+  return { request, streamVoiceRunAudio };
+}
+
+describe("GET /api/voice/run/:scenarioRunId/audio", () => {
+  describe("given a phone run whose Twilio recording is published", () => {
+    it("relays the bytes as audio/wav without caching", async () => {
+      const { request, streamVoiceRunAudio } = runAudioDoor(async () => ({
+        mediaType: "audio/wav",
+        stream: new Blob([new Uint8Array([4, 5])]).stream(),
+      }));
+
+      const response = await request();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("audio/wav");
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect([...new Uint8Array(await response.arrayBuffer())]).toEqual([4, 5]);
+      expect(streamVoiceRunAudio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project_1",
+          scenarioRunId: "scenariorun_1",
+          userId: "user_1",
+        }),
+      );
+    });
+  });
+
+  describe("given a run whose provider key is missing", () => {
+    it("refuses with voice_recording_key_missing", async () => {
+      const { request } = runAudioDoor(async () => {
+        throw new VoiceRecordingKeyMissingError();
+      });
+
+      const response = await request();
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ code: "voice_recording_key_missing" });
     });
   });
 });

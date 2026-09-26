@@ -332,6 +332,7 @@ export class AutomationApp implements AutomationApi {
         repositories: setup.repositories,
         projects: setup.dependencies.projects,
         analytics: setup.dependencies.analytics,
+        traces: setup.dependencies.traces,
         delivery: infrastructure.delivery,
         crypto: setup.members.encryption,
         suppression: automation.#automation,

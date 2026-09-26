@@ -1,4 +1,5 @@
 import {
+  getTwilioRecordingWavUrl,
   proxyAudioStream,
   VoiceRecordingUnavailableError,
 } from "@langwatch/scenario-contract/voice-runtime";
@@ -28,5 +29,17 @@ export class HttpVoiceRecordingChannel implements VoiceRecordingChannel {
     if (!response.body) throw new VoiceRecordingUnavailableError();
 
     return response.body;
+  }
+
+  getTwilioRecordingWavUrl(input: {
+    credential: { accountSid: string; authToken: string };
+    callSid: string;
+    signal?: AbortSignal;
+  }): Promise<string> {
+    return getTwilioRecordingWavUrl({
+      credential: input.credential,
+      callSid: input.callSid,
+      signal: input.signal ?? new AbortController().signal,
+    });
   }
 }

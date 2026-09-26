@@ -5,18 +5,14 @@
  */
 
 import type { SimulationService, WholeCallAudioInfrastructure } from "@langwatch/scenario-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 /** What resolving a call's audio reaches outside itself. */
 export interface WholeCallAudioCollaborators {
   /** The run the audio belongs to, read for the trace ids its messages carry. */
   simulations: Pick<SimulationService, "findScenarioRunData">;
   /** One trace's normalized spans, read for the attributes they carry. */
-  traces: {
-    getNormalizedSpansByTraceId(input: {
-      tenantId: string;
-      traceId: string;
-    }): Promise<readonly { spanAttributes: Record<string, unknown> }[]>;
-  };
+  traces: Pick<TraceApi, "findNormalizedSpansByTraceId">;
 }
 
 /** Compose the production infrastructure from the two reads it needs. */
@@ -50,7 +46,7 @@ export function createWholeCallAudioInfrastructure(
      *  `voice.elevenlabs.conversation_id`), so the normalized spans' own
      *  attribute records are handed straight to the scan. */
     async readSpanAttributes({ projectId, traceId }) {
-      const spans = await collaborators.traces.getNormalizedSpansByTraceId({
+      const spans = await collaborators.traces.findNormalizedSpansByTraceId({
         tenantId: projectId,
         traceId,
       });

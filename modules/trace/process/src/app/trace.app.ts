@@ -72,6 +72,8 @@ import {
   type TraceEventRollup,
   type TraceLegacyFilterInput,
   type TraceListPage,
+  type NormalizedSpan,
+  type RecordSpanCommandData,
   type TraceContentReadService,
   type TraceViewerService,
   type TraceApi,
@@ -342,6 +344,7 @@ export type TracesSpanReader = Readonly<{
   getSpansByTraceId(
     params: ByTrace & { limit?: number; visibilityCutoffMs?: number | null },
   ): Promise<Span[]>;
+  getNormalizedSpansByTraceId(params: ByTrace & { limit?: number }): Promise<NormalizedSpan[]>;
   findSpanById(
     params: ByTrace & { spanId: string; visibilityCutoffMs?: number | null },
   ): Promise<Span | null>;
@@ -960,6 +963,22 @@ export class TraceApp implements TraceApi, CollectorApp {
       instrumentationScope: null,
       occurredAt: parsed.occurredAt,
     });
+  }
+
+  async recordSpan(input: RecordSpanCommandData): Promise<void> {
+    const ingest = this.#dependencies.spanIngest;
+    if (!ingest) {
+      throw new TraceIngestionUnavailableError();
+    }
+    await ingest.recordSpan(input);
+  }
+
+  findNormalizedSpansByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+    limit?: number;
+  }): Promise<NormalizedSpan[]> {
+    return this.#dependencies.traces.spans.getNormalizedSpansByTraceId(input);
   }
 
   getEvaluationSpans(
