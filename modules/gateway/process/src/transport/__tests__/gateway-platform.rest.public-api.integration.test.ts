@@ -26,7 +26,11 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
-import { gatewayPlatformRest, gatewayRestCredential } from "../gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayRestCredential,
+} from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project_caller";
 const ORGANIZATION_ID = "organization_1";
@@ -79,19 +83,28 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
       actor: { kind: "legacyProjectKey" },
       actorUserId: `svc_${projectId}`,
     }),
+    authorizeKeyCaller: async () => ({
+      organizationId: ORGANIZATION_ID,
+      actor: { kind: "legacyProjectKey" },
+      actorUserId: `svc_${PROJECT_ID}`,
+    }),
     ...overrides,
   });
+  const door = ({ request }: { request: Request }) => {
+    if (!request.headers.get("Authorization")) throw new ProjectMissingCredentialsError();
+    if (refuse) refuse();
+    return {
+      actor: { type: "api_key" as const, id: "gateway-key" },
+      scope: { tier: "project" as const, id: PROJECT_ID },
+    };
+  };
+  const keyDoor = ({ request }: { request: Request }) => ({
+    ...door({ request }),
+    scope: { tier: "organization" as const, id: ORGANIZATION_ID },
+  });
   const runtime = createRestRuntime({
-    identity: {
-      authenticate: ({ request }: { request: Request }) => {
-        if (!request.headers.get("Authorization")) throw new ProjectMissingCredentialsError();
-        if (refuse) refuse();
-        return {
-          actor: { type: "api_key", id: "gateway-key" },
-          scope: { tier: "project", id: PROJECT_ID },
-        };
-      },
-    },
+    identity: { authenticate: door, identify: door },
+    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: passthroughIdempotency,
   });
   const hono = runtime.mount(gatewayPlatformRest.router(), {
@@ -100,6 +113,10 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
     facts: [
       bindRestMiddleware(gatewayRestCredential, (): GatewayRequestCredential => ({
         kind: "legacyProjectKey",
+      })),
+      bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_ID,
       })),
     ],
   });
