@@ -186,10 +186,10 @@ export class PrismaScenarioRepository extends ScenarioRepository {
 
       const touchedTestSuiteIds = await this.lockTouchedTestSuites(transaction, input, current);
       const versioned = touchesVersionedFields(input);
-      const updated = await this.persistUpdate(transaction, input, current, versioned);
+      const updated = await this.persistUpdate({ transaction, input, current, versioned });
 
       if (versioned) {
-        await this.appendVersion(transaction, input, current, updated);
+        await this.appendVersion({ transaction, input, current, updated });
       }
 
       if (input.testSuiteId !== void 0) {
@@ -589,12 +589,17 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return touched;
   }
 
-  private async persistUpdate(
-    transaction: Prisma.TransactionClient,
-    input: ScenarioWriteInput,
-    current: Scenario,
-    versioned: boolean,
-  ): Promise<Scenario> {
+  private async persistUpdate({
+    transaction,
+    input,
+    current,
+    versioned,
+  }: {
+    transaction: Prisma.TransactionClient;
+    input: ScenarioWriteInput;
+    current: Scenario;
+    versioned: boolean;
+  }): Promise<Scenario> {
     const {
       actor: _actor,
       changeDescription: _changeDescription,
@@ -632,12 +637,17 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     }
   }
 
-  private async appendVersion(
-    transaction: Prisma.TransactionClient,
-    input: ScenarioWriteInput,
-    current: Scenario,
-    updated: Scenario,
-  ): Promise<void> {
+  private async appendVersion({
+    transaction,
+    input,
+    current,
+    updated,
+  }: {
+    transaction: Prisma.TransactionClient;
+    input: ScenarioWriteInput;
+    current: Scenario;
+    updated: Scenario;
+  }): Promise<void> {
     const previousFields = snapshotFieldsOf(current);
     const updatedFields = snapshotFieldsOf(updated);
     await transaction.scenarioVersion.create({

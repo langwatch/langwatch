@@ -10,9 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const childScript = vi.hoisted(() => ({ current: "" }));
 vi.mock("../child-process-spawn.service.ts", () => ({
   ChildProcessSpawnService: {
-    resolve: () => ({
-      command: process.execPath,
-      args: ["-e", childScript.current],
+    create: () => ({
+      resolve: () => ({
+        command: process.execPath,
+        args: ["-e", childScript.current],
+      }),
     }),
   },
 }));

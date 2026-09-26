@@ -4,7 +4,6 @@
 
 import { createServer, type Server } from "node:http";
 
-import { createLogger } from "@langwatch/observability";
 import {
   type AgentInput,
   AgentRole,
@@ -13,7 +12,8 @@ import {
 } from "@langwatch/scenario";
 import type { LiteLLMParams, PromptConfigData } from "@langwatch/scenario-contract";
 import { HttpSerializedPromptConfigChannel } from "@langwatch/scenario-process";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { allowConsole, createTestLogger } from "@langwatch/test-harness";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const LITELLM_PARAMS: LiteLLMParams = {
   api_key: "test-key",
@@ -132,6 +132,9 @@ afterEach(async () => {
 });
 
 describe("prompt agent over four turns", () => {
+  // The AI SDK itself warns on the system message these prompts carry.
+  beforeEach(() => allowConsole());
+
   describe("given a template that reads the conversation history", () => {
     describe("when the model replies with whatever it was shown", () => {
       // The payload is the serialised conversation. A model that reproduces
@@ -277,8 +280,7 @@ describe("prompt agent over four turns", () => {
       /** @scenario "An unbindable input is reported on the run" */
       it("reports the unbound input by name and never records a value", async () => {
         model = await startEchoingModel();
-        const logger = createLogger("scenario-prompt-adapter-test");
-        const warn = vi.spyOn(logger, "warn").mockImplementation(() => void 0);
+        const { logger, lines } = createTestLogger();
         const config: PromptConfigData = {
           type: "prompt",
           promptId: "prompt_repro",
@@ -300,12 +302,12 @@ describe("prompt agent over four turns", () => {
           1,
         );
 
-        expect(warn).toHaveBeenCalledTimes(1);
-        const [fields, message] = warn.mock.calls[0] as [Record<string, unknown>, string];
-        expect(fields.unboundInputs).toEqual(["customer_tier"]);
-        expect(fields.promptId).toBe("prompt_repro");
+        const warnings = lines.filter((line) => line.level === 40);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]?.unboundInputs).toEqual(["customer_tier"]);
+        expect(warnings[0]?.promptId).toBe("prompt_repro");
         // Names only — the bound values never reach the log line.
-        expect(JSON.stringify([fields, message])).not.toContain("I need a refund");
+        expect(JSON.stringify(warnings)).not.toContain("I need a refund");
         // The rendered prompt shows the placeholder where the value would be.
         expect(model.systemPrompts()[0]).toContain("tier: [unbound input: customer_tier]");
       });

@@ -33,6 +33,14 @@ export type SimulationScenarioRunInput = {
   scenarioRunId: string;
 };
 
+/** One browser tab's live stream; a tab that names itself is registered as present. */
+export type SimulationUpdateWatchInput = {
+  projectId: string;
+  tabKey?: string;
+  tabId?: string;
+  signal?: AbortSignal;
+};
+
 export type SimulationBatchHistoryInput = {
   projectId: string;
   scenarioSetId: string;

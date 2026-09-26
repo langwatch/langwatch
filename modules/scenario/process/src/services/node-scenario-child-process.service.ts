@@ -125,7 +125,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
       labels: input.environment.labels,
       telemetry: input.environment.telemetry,
     });
-    const spawnConfig = ChildProcessSpawnService.resolve({
+    const spawnConfig = ChildProcessSpawnService.create().resolve({
       packageRoot: this.options.config.packageRoot,
       nodeEnv: this.options.config.nodeEnv,
       sourcePath: this.options.config.sourcePath,

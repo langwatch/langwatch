@@ -3,7 +3,6 @@
  * Refusals travel as handled errors (scenario_not_found@404, scenario_run_rejected@400).
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { ScenarioApi, scenarioTrpc } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
@@ -226,17 +225,9 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
 
   .procedure("getRunState")
   .withPermission("scenarios:view")
-  .handle(async ({ app, input }) => {
-    // A point lookup by unique run id, with no window, so runs older than any
-    // default range stay reachable.
-    const data = await app.findScenarioRunData({
-      projectId: input.projectId,
-      scenarioRunId: input.scenarioRunId,
-    });
-    if (!data) throw new NotFoundError("not_found", "Scenario run", input.scenarioRunId);
-
-    return data;
-  })
+  .handle(({ app, input }) =>
+    app.getRunState({ projectId: input.projectId, scenarioRunId: input.scenarioRunId }),
+  )
 
   .procedure("getScenarioSetBatchRunCount")
   .withPermission("scenarios:view")
@@ -294,34 +285,9 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
 
   .procedure("onSimulationUpdate")
   .withPermission("scenarios:view")
-  .handle(async function* ({ app, input, signal }) {
-    const { projectId, tabKey, tabId } = input;
-
-    logger.info({ projectId }, "Simulation run stream started");
-
-    const presence =
-      tabKey && tabId ? await app.startTabPresence({ projectId, tabKey, tabId }) : null;
-
-    if (presence?.parkedNavigate) {
-      // The same envelope the broadcast path emits, so the client parses one
-      // shape rather than two.
-      yield {
-        event: JSON.stringify(presence.parkedNavigate),
-        timestamp: nowInstant().epochMilliseconds,
-      };
-    }
-
-    try {
-      for await (const frame of app.simulationUpdates({ projectId, signal })) {
-        yield frame;
-      }
-    } catch (error) {
-      // A disconnect aborts the wait, which is the normal end of a stream and
-      // not something to answer as a stream error.
-      if ((error as { name?: string })?.name !== "AbortError") throw error;
-    } finally {
-      await presence?.stop();
-    }
+  .handle(({ app, input, signal }) => {
+    logger.info({ projectId: input.projectId }, "Simulation run stream started");
+    return app.watchSimulationUpdates({ ...input, signal });
   })
 
   // -- the Results tab -------------------------------------------------------

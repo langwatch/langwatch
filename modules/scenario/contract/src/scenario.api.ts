@@ -59,6 +59,13 @@ import type {
   ScenarioVersionRestoreInput,
   ScenarioVersionSummary,
 } from "./scenario.version.ts";
+import type {
+  SimulationBatchSummaryRest,
+  SimulationRunListInput,
+  SimulationRunListResponse,
+  SimulationRunLookupInput,
+  SimulationRunRestResponse,
+} from "./simulation-run.schemas.ts";
 import type { ComputeRunMetricsCommandData, SimulationQueueRun } from "./simulation.commands.ts";
 import type {
   SimulationAllSuitesInput,
@@ -69,6 +76,7 @@ import type {
   SimulationLastUpdatedInput,
   SimulationProjectDateRangeInput,
   SimulationScenarioRunInput,
+  SimulationUpdateWatchInput,
   SimulationScenarioSetRunsInput,
 } from "./simulation.service.ts";
 import type {
@@ -344,6 +352,17 @@ export interface ScenarioApi {
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }>;
   findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null>;
+  /** One run by its id. Throws `not_found` when the project holds none. */
+  getRunState(input: SimulationScenarioRunInput): Promise<SimulationRunData>;
+  /** The public API's run listing, by batch, by set, or across every suite. */
+  listSimulationRuns(input: SimulationRunListInput): Promise<SimulationRunListResponse>;
+  /** One run for the public API. Throws `SimulationRunNotFoundError` when absent. */
+  getSimulationRun(input: SimulationRunLookupInput): Promise<SimulationRunRestResponse>;
+  /** One batch's summary for the public API. Throws `BatchRunNotFoundError` when absent. */
+  getBatchSummary(input: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<SimulationBatchSummaryRest>;
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number>;
   getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
@@ -362,6 +381,8 @@ export interface ScenarioApi {
   }): AsyncIterable<SimulationStreamFrame>;
   /** Registers one open browser tab, and hands back how to retire it. */
   startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence>;
+  /** One tab's live stream: its parked navigate first, then the project's frames. */
+  watchSimulationUpdates(input: SimulationUpdateWatchInput): AsyncIterable<SimulationStreamFrame>;
 
   // -- the results tab -------------------------------------------------------
   getResultsOverview(input: {

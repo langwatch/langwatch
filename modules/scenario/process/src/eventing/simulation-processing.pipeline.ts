@@ -7,6 +7,7 @@ import {
   type FoldProjectionStore,
   type ProcessManagerApplier,
   type Projection,
+  type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SimulationProcessingEvent, SimulationService } from "@langwatch/scenario-contract";
@@ -147,12 +148,11 @@ function buildSimulationProcessingPipelineDefinition(
     .build();
 }
 
-/** The pipeline `SimulationProcessingPipelineAdapter.create` answers; commands
- * left `any`, as `AuthzPipeline` and `AnyPipelineDefinition` do. */
+/** The pipeline `SimulationProcessingPipelineAdapter.create` answers, its commands erased. */
 export type SimulationProcessingPipelineDefinition = StaticPipelineDefinition<
   SimulationProcessingEvent,
   Record<string, Projection>,
-  any
+  RegisteredCommand
 >;
 
 export class SimulationProcessingPipelineAdapter {

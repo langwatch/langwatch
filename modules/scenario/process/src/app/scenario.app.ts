@@ -100,6 +100,12 @@ import {
   type ScenarioRunScheduled,
   type SimulationRunData,
   type SimulationScenarioRunInput,
+  type SimulationUpdateWatchInput,
+  type SimulationBatchSummaryRest,
+  type SimulationRunListInput,
+  type SimulationRunListResponse,
+  type SimulationRunLookupInput,
+  type SimulationRunRestResponse,
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
   type SimulationService,
@@ -164,6 +170,7 @@ import {
   SimulationProcessingService,
   type SimulationPipelineSetup,
 } from "../services/simulation-processing.service.ts";
+import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
 import { VoiceSessionService } from "../services/voice-session.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
@@ -195,6 +202,8 @@ export interface ScenarioAppDependencies {
   connectedTargets: ConnectedTargetService;
   /** The platform's own links, in the interface the project's release flag names. */
   platformLinks: ScenarioPlatformLinkService;
+  /** The runs and batches a simulation produced, as the run drawer and the public API read them. */
+  runViews: SimulationRunViewService;
   /** "Talk to it": browser voice sessions and their recordings. */
   voiceSessions: VoiceSessionService;
 }
@@ -361,6 +370,11 @@ export class ScenarioApp implements ScenarioApi {
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
     };
     const broadcast = scenarioEventBroadcastChannels.live.create(setup.members.redis);
+    const platformLinks = ScenarioPlatformLinkService.create({
+      featureFlags: setup.dependencies.featureFlags,
+      projects: setup.dependencies.projects,
+      publicBaseUrl: setup.members.publicBaseUrl,
+    });
 
     return new ScenarioApp({
       agentTesting: AgentTestService.create({
@@ -400,7 +414,7 @@ export class ScenarioApp implements ScenarioApi {
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),
       scenarioTabs,
       users: setup.dependencies.users,
-      updates: SimulationUpdateStreamService.create(peers.presence),
+      updates: SimulationUpdateStreamService.create({ emitters: peers.presence, scenarioTabs }),
       resultAtoms: ResultAtomsService.create(repositories.resultAtoms, repositories.scenarios),
       runConfigurations: RunConfigurationsService.create(
         repositories.runConfigurations,
@@ -424,11 +438,8 @@ export class ScenarioApp implements ScenarioApi {
         entitlement: setup.dependencies.plans,
         projects: setup.dependencies.projects,
       }),
-      platformLinks: ScenarioPlatformLinkService.create({
-        featureFlags: setup.dependencies.featureFlags,
-        projects: setup.dependencies.projects,
-        publicBaseUrl: setup.members.publicBaseUrl,
-      }),
+      platformLinks,
+      runViews: SimulationRunViewService.create({ simulations, platformLinks }),
       voiceSessions: VoiceSessionService.compose({
         peers: setup.dependencies,
         scenarios,
@@ -1017,6 +1028,25 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.simulations.findScenarioRunData(input);
   }
 
+  getRunState(input: SimulationScenarioRunInput): Promise<SimulationRunData> {
+    return this.#dependencies.runViews.getRunState(input);
+  }
+
+  listSimulationRuns(input: SimulationRunListInput): Promise<SimulationRunListResponse> {
+    return this.#dependencies.runViews.listRuns(input);
+  }
+
+  getSimulationRun(input: SimulationRunLookupInput): Promise<SimulationRunRestResponse> {
+    return this.#dependencies.runViews.getRun(input);
+  }
+
+  getBatchSummary(input: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<SimulationBatchSummaryRest> {
+    return this.#dependencies.runViews.getBatchSummary(input);
+  }
+
   /** How many batch runs one suite has, for its pagination. */
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number> {
     return this.#dependencies.simulations.getBatchRunCountForScenarioSet(input);
@@ -1059,6 +1089,10 @@ export class ScenarioApp implements ScenarioApi {
     signal?: AbortSignal;
   }): AsyncIterable<SimulationStreamFrame> {
     return this.#dependencies.updates.watch(input);
+  }
+
+  watchSimulationUpdates(input: SimulationUpdateWatchInput): AsyncIterable<SimulationStreamFrame> {
+    return this.#dependencies.updates.watchForTab(input);
   }
 
   /**

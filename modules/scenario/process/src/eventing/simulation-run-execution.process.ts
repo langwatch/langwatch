@@ -21,7 +21,7 @@ import {
   handleRunFinished,
   handleRunQueued,
   handleTerminal,
-  SimulationRunExecutionEvolution,
+  buildSimulationRunEventView,
   simulationRunExecutionWake,
 } from "./simulation-run-execution-evolution.process.ts";
 import {
@@ -38,7 +38,7 @@ export {
   handleRunFinished,
   handleRunQueued,
   handleTerminal,
-  SimulationRunExecutionEvolution,
+  buildSimulationRunEventView,
   simulationRunExecutionWake,
 } from "./simulation-run-execution-evolution.process.ts";
 export {
@@ -113,7 +113,7 @@ export function simulationRunExecutionPM(
       .on(SIMULATION_RUN_EVENT_TYPES.EVALUATED, handleRunEvaluated)
       .on(SIMULATION_RUN_EVENT_TYPES.DELETED, handleTerminal)
       .onWake(simulationRunExecutionWake)
-      .toPayload((...args) => SimulationRunExecutionEvolution.buildSimulationRunEventView(...args))
+      .toPayload((...args) => buildSimulationRunEventView(...args))
       .outbox({
         // The execute intent is the run's only dispatch path: give it more
         // attempts than the generic default so a pod without a pool (or a

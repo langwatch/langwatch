@@ -11,7 +11,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/child-process-spawn.service.ts", () => ({
   ChildProcessSpawnService: {
-    resolve: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
+    create: () => ({
+      resolve: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
+    }),
   },
 }));
 

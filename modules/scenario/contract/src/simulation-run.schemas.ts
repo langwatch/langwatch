@@ -126,3 +126,23 @@ export const simulationBatchListResponseSchema = z.object({
   hasMore: z.boolean().optional(),
   nextCursor: z.string().optional(),
 });
+
+export type SimulationRunRestResponse = z.infer<
+  typeof scenarioRunRestResponseWithPlatformUrlSchema
+>;
+export type SimulationBatchSummaryRest = z.infer<typeof simulationBatchSummaryRestSchema>;
+export type SimulationRunListQuery = z.infer<typeof simulationRunListQuerySchema>;
+export type SimulationRunListResponse = z.infer<typeof simulationRunListResponseSchema>;
+
+/** A run listing for the public API, read in the project whose slug its links carry. */
+export type SimulationRunListInput = SimulationRunListQuery & {
+  projectId: string;
+  projectSlug: string;
+};
+
+/** One run for the public API, read in the project whose slug its link carries. */
+export type SimulationRunLookupInput = {
+  projectId: string;
+  projectSlug: string;
+  scenarioRunId: string;
+};
