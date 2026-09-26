@@ -121,30 +121,52 @@ export interface WidgetRenderResult {
  * sorted order the agent reads; the row that would cross the budget is
  * truncated and every row from there on is flagged `isMarkupTruncated`.
  *
- * The channel measures the serialized payload in UTF-8 BYTES, so this budget is
- * counted in bytes too — a character budget would undercount multibyte labels
- * (a 45,000-char markup of three-byte glyphs is ~135,000 bytes) and could still
- * trip `result_too_large`.
+ * The channel measures `JSON.stringify(completion)` in UTF-8 BYTES, so this
+ * budget is counted in *serialized* bytes: the JSON-escaped size of each markup
+ * string, not its raw size. A raw-byte budget still undercounts — markup full of
+ * `"`/`\\` roughly doubles when escaped, and multibyte labels cost their UTF-8
+ * width — so either could trip `result_too_large`. 40 KB of serialized markup
+ * leaves headroom under 64 KB for JSON structure and the non-markup fields.
  */
-export const DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES = 45_000;
+export const DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES = 40_000;
 
 const utf8ByteLength = (value: string): number =>
   new TextEncoder().encode(value).length;
 
 /**
- * Longest prefix of `value` that encodes within `maxBytes` UTF-8 bytes, found
- * by binary search on the character length so a multibyte codepoint is never
- * split. Returns "" when even the first codepoint overflows.
+ * UTF-8 byte cost this string adds to the serialized result: the length of its
+ * JSON-escaped form, minus the two enclosing quotes JSON always adds. This is
+ * what `\"`-doubling and multibyte glyphs actually cost inside the payload.
  */
-function truncateToUtf8Bytes(value: string, maxBytes: number): string {
-  if (maxBytes <= 0) return "";
-  if (utf8ByteLength(value) <= maxBytes) return value;
+const serializedMarkupBytes = (value: string): number =>
+  utf8ByteLength(JSON.stringify(value)) - 2;
+
+/**
+ * Longest prefix of `value` whose serialized (JSON-escaped) UTF-8 size is within
+ * `maxSerializedBytes`, found by binary search on the character length and then
+ * pulled back off any trailing lone high surrogate so a code point is never
+ * split (a bare high surrogate would serialize to a `\uXXXX` escape, not the
+ * intended glyph). Returns "" when even the first code point overflows.
+ */
+function truncateToSerializedBudget(
+  value: string,
+  maxSerializedBytes: number,
+): string {
+  if (maxSerializedBytes <= 0) return "";
+  if (serializedMarkupBytes(value) <= maxSerializedBytes) return value;
   let lo = 0;
   let hi = value.length;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
-    if (utf8ByteLength(value.slice(0, mid)) <= maxBytes) lo = mid;
-    else hi = mid - 1;
+    if (serializedMarkupBytes(value.slice(0, mid)) <= maxSerializedBytes) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  // A prefix ending on a high surrogate split a surrogate pair — drop it.
+  while (lo > 0 && (value.charCodeAt(lo - 1) & 0xfc00) === 0xd800) {
+    lo -= 1;
   }
   return value.slice(0, lo);
 }
@@ -158,8 +180,9 @@ function truncateToUtf8Bytes(value: string, maxBytes: number): string {
  * list — the markup of every card at once is a lot to hand an agent that only
  * wanted to know which ones errored. `capturedAt` becomes an ISO string, the
  * shape the result schema (and the agent) reads. Included markup is held to a
- * shared budget ({@link DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES}) so the
- * whole result stays under the UI-action channel's 64 KB ceiling.
+ * shared serialized budget
+ * ({@link DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES}) so the whole
+ * result stays under the UI-action channel's 64 KB ceiling.
  */
 export function buildWidgetRenderResult({
   receipts,
@@ -180,7 +203,8 @@ export function buildWidgetRenderResult({
       ...(widgetId === undefined ? {} : { widgetId }),
     },
   });
-  let markupByteBudgetLeft = DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES;
+  let markupByteBudgetLeft =
+    DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES;
   return {
     dashboardId,
     widgets: list.map((receipt) => {
@@ -197,8 +221,8 @@ export function buildWidgetRenderResult({
       };
       if (!isMarkupIncluded) return row;
       const full = receipt.markup ?? "";
-      const markup = truncateToUtf8Bytes(full, markupByteBudgetLeft);
-      markupByteBudgetLeft -= utf8ByteLength(markup);
+      const markup = truncateToSerializedBudget(full, markupByteBudgetLeft);
+      markupByteBudgetLeft -= serializedMarkupBytes(markup);
       return {
         ...row,
         markup,

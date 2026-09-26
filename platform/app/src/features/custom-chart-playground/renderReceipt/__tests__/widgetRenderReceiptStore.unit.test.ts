@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildWidgetRenderResult,
-  DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
+  DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES,
   listWidgetRenderReceipts,
   useWidgetRenderReceiptStore,
   type WidgetRenderReceipt,
@@ -161,6 +161,18 @@ describe("buildWidgetRenderResult", () => {
   });
 
   describe("when the markup across widgets would exceed the result budget", () => {
+    // Serialized (JSON-escaped) UTF-8 cost a markup string adds to the payload,
+    // matching how the store budgets it: escaped length minus the two quotes.
+    const serializedMarkupBytes = (markup: string): number =>
+      new TextEncoder().encode(JSON.stringify(markup)).length - 2;
+    const totalSerializedMarkupBytes = (
+      result: ReturnType<typeof buildWidgetRenderResult>,
+    ): number =>
+      result.widgets.reduce(
+        (sum, w) => sum + serializedMarkupBytes(w.markup ?? ""),
+        0,
+      );
+
     it("truncates rows past the shared budget and flags them, so the whole result stays under the channel ceiling", () => {
       // Three widgets each carrying markup a third of the budget plus a bit,
       // so the third must be cut. Big enough that unbounded aggregation would
@@ -178,12 +190,8 @@ describe("buildWidgetRenderResult", () => {
         shouldIncludeMarkup: true,
       });
 
-      const totalMarkupBytes = result.widgets.reduce(
-        (sum, w) => sum + new TextEncoder().encode(w.markup ?? "").length,
-        0,
-      );
-      expect(totalMarkupBytes).toBeLessThanOrEqual(
-        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
+      expect(totalSerializedMarkupBytes(result)).toBeLessThanOrEqual(
+        DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES,
       );
       // Something was cut, so at least one row must say so.
       expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
@@ -206,12 +214,8 @@ describe("buildWidgetRenderResult", () => {
         shouldIncludeMarkup: true,
       });
 
-      const totalMarkupBytes = result.widgets.reduce(
-        (sum, w) => sum + new TextEncoder().encode(w.markup ?? "").length,
-        0,
-      );
-      expect(totalMarkupBytes).toBeLessThanOrEqual(
-        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
+      expect(totalSerializedMarkupBytes(result)).toBeLessThanOrEqual(
+        DASHBOARD_RENDER_RESULT_SERIALIZED_MARKUP_BUDGET_BYTES,
       );
       // The whole serialized payload, quotes and all, stays under 64 KB.
       const serializedBytes = new TextEncoder().encode(
@@ -219,6 +223,59 @@ describe("buildWidgetRenderResult", () => {
       ).length;
       expect(serializedBytes).toBeLessThanOrEqual(64 * 1024);
       expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
+    });
+
+    it("keeps the serialized payload under the ceiling when markup is all JSON-escaped characters", () => {
+      // Worst case for a raw-byte budget: markup that is entirely `"`, each of
+      // which doubles to `\"` on serialization. A raw 45,000-byte budget would
+      // serialize to ~90,000 bytes and trip `result_too_large`; budgeting the
+      // serialized size holds the envelope under 64 KB.
+      const chunk = '"'.repeat(40_000);
+      const receipts = {
+        a: makeReceipt({ widgetId: "a", widgetName: "a", markup: chunk }),
+        b: makeReceipt({ widgetId: "b", widgetName: "b", markup: chunk }),
+      };
+
+      const result = buildWidgetRenderResult({
+        receipts,
+        dashboardId: "dash_1",
+        shouldIncludeMarkup: true,
+      });
+
+      const serializedBytes = new TextEncoder().encode(
+        JSON.stringify(result),
+      ).length;
+      expect(serializedBytes).toBeLessThanOrEqual(64 * 1024);
+      expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
+    });
+
+    it("never splits a surrogate pair at the truncation boundary", () => {
+      // Astral-plane emoji (surrogate pairs). Truncating on a UTF-16 index could
+      // leave a lone high surrogate that serializes to a `\uXXXX` escape instead
+      // of the glyph; the boundary must fall between whole code points.
+      const chunk = "😀".repeat(20_000);
+      const receipts = {
+        a: makeReceipt({ widgetId: "a", widgetName: "a", markup: chunk }),
+        b: makeReceipt({ widgetId: "b", widgetName: "b", markup: chunk }),
+      };
+
+      const result = buildWidgetRenderResult({
+        receipts,
+        dashboardId: "dash_1",
+        shouldIncludeMarkup: true,
+      });
+
+      expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
+      for (const w of result.widgets) {
+        const markup = w.markup ?? "";
+        // No unpaired surrogate survives round-tripping through UTF-8.
+        expect(new TextDecoder().decode(new TextEncoder().encode(markup))).toBe(
+          markup,
+        );
+        // Explicitly: the prefix does not end on a lone high surrogate.
+        const lastUnit = markup.charCodeAt(markup.length - 1);
+        expect((lastUnit & 0xfc00) === 0xd800).toBe(false);
+      }
     });
 
     it("does not flag a receipt whose full markup fit within the budget", () => {
