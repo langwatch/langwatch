@@ -12055,6 +12055,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12104,9 +12107,6 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/secrets
       '@langwatch/suite-contract':
-      '@langwatch/gateway-contract':
-        specifier: workspace:*
-        version: link:../../gateway/contract
         specifier: workspace:*
         version: link:../../suite/contract
       '@langwatch/task':
