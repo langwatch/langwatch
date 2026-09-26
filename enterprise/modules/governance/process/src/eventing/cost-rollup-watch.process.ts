@@ -4,9 +4,8 @@ import {
   type PulledUsageRetractedEvent,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
-import { computeNextRunAt } from "@langwatch/eventing/server";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, toDate } from "@langwatch/time";
+import { computeNextRunAt, Temporal } from "@langwatch/time";
 
 import type { CostRollupDayComparer } from "../app/governance.members.ts";
 import {
@@ -73,8 +72,8 @@ export function nextCostRollupCheckAt(after: number): number {
   return computeNextRunAt({
     cron: COST_ROLLUP_WATCH_CRON,
     timezone: COST_ROLLUP_WATCH_TIMEZONE,
-    after: toDate(Temporal.Instant.fromEpochMilliseconds(after)),
-  }).getTime();
+    after: Temporal.Instant.fromEpochMilliseconds(after),
+  }).epochMilliseconds;
 }
 
 /**

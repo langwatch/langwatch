@@ -83,17 +83,4 @@ export {
   PROCESS_RETENTION_FAILURES_METRIC_NAME,
   PROCESS_RETENTION_SWEPT_ROWS_METRIC_NAME,
 } from "./maintenance/otel.retention-metrics.adapter.ts";
-export { computeCatchUp, computeNextRunAt } from "./schedule/next-run-at.ts";
-export { SchedulerRegistry, schedulerRegistry } from "./schedule/scheduler.registry.ts";
-export { SchedulerService, type SchedulerServiceDeps } from "./schedule/scheduler.service.ts";
-export type {
-  ScheduledJobFire,
-  ScheduledJobRecord,
-  ScheduledJobStore,
-  SchedulerHandler,
-} from "./schedule/scheduler.types.ts";
-export {
-  NullScheduledJobStore,
-  PrismaScheduledJobStore,
-} from "./adapters/postgres/prisma-scheduled-job-store.ts";
 export { toPgTimestampUtc } from "./adapters/postgres/pg-timestamp.ts";

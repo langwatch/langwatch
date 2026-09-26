@@ -30,6 +30,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "croner": "catalog:",
     "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {

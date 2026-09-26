@@ -15108,9 +15108,6 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
-      croner:
-        specifier: 'catalog:'
-        version: 10.0.1
       ioredis:
         specifier: 'catalog:'
         version: 5.10.1
@@ -16304,6 +16301,9 @@ importers:
 
   packages/time:
     dependencies:
+      croner:
+        specifier: 'catalog:'
+        version: 10.0.1
       temporal-polyfill:
         specifier: ^1.0.4
         version: 1.0.4
