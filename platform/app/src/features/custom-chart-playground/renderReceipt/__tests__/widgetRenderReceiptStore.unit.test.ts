@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   buildWidgetRenderResult,
-  DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS,
+  DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
   listWidgetRenderReceipts,
   useWidgetRenderReceiptStore,
   type WidgetRenderReceipt,
@@ -178,14 +178,46 @@ describe("buildWidgetRenderResult", () => {
         shouldIncludeMarkup: true,
       });
 
-      const totalMarkup = result.widgets.reduce(
-        (sum, w) => sum + (w.markup?.length ?? 0),
+      const totalMarkupBytes = result.widgets.reduce(
+        (sum, w) => sum + new TextEncoder().encode(w.markup ?? "").length,
         0,
       );
-      expect(totalMarkup).toBeLessThanOrEqual(
-        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS,
+      expect(totalMarkupBytes).toBeLessThanOrEqual(
+        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
       );
       // Something was cut, so at least one row must say so.
+      expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
+    });
+
+    it("budgets multibyte markup by UTF-8 bytes so the serialized result stays under the channel ceiling", () => {
+      // Three-byte glyphs: a char budget would let ~3x the bytes through and
+      // trip the 64 KB `result_too_large` guard. Each widget alone carries far
+      // more than the budget in bytes.
+      const glyph = "中"; // CJK char, 3 UTF-8 bytes
+      const chunk = glyph.repeat(30_000); // ~90,000 bytes each
+      const receipts = {
+        a: makeReceipt({ widgetId: "a", widgetName: "a", markup: chunk }),
+        b: makeReceipt({ widgetId: "b", widgetName: "b", markup: chunk }),
+      };
+
+      const result = buildWidgetRenderResult({
+        receipts,
+        dashboardId: "dash_1",
+        shouldIncludeMarkup: true,
+      });
+
+      const totalMarkupBytes = result.widgets.reduce(
+        (sum, w) => sum + new TextEncoder().encode(w.markup ?? "").length,
+        0,
+      );
+      expect(totalMarkupBytes).toBeLessThanOrEqual(
+        DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES,
+      );
+      // The whole serialized payload, quotes and all, stays under 64 KB.
+      const serializedBytes = new TextEncoder().encode(
+        JSON.stringify(result),
+      ).length;
+      expect(serializedBytes).toBeLessThanOrEqual(64 * 1024);
       expect(result.widgets.some((w) => w.isMarkupTruncated)).toBe(true);
     });
 

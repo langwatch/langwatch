@@ -120,8 +120,34 @@ export interface WidgetRenderResult {
  * bytes each) and the non-markup fields of every row. Rows are filled in the
  * sorted order the agent reads; the row that would cross the budget is
  * truncated and every row from there on is flagged `isMarkupTruncated`.
+ *
+ * The channel measures the serialized payload in UTF-8 BYTES, so this budget is
+ * counted in bytes too — a character budget would undercount multibyte labels
+ * (a 45,000-char markup of three-byte glyphs is ~135,000 bytes) and could still
+ * trip `result_too_large`.
  */
-export const DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS = 45_000;
+export const DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES = 45_000;
+
+const utf8ByteLength = (value: string): number =>
+  new TextEncoder().encode(value).length;
+
+/**
+ * Longest prefix of `value` that encodes within `maxBytes` UTF-8 bytes, found
+ * by binary search on the character length so a multibyte codepoint is never
+ * split. Returns "" when even the first codepoint overflows.
+ */
+function truncateToUtf8Bytes(value: string, maxBytes: number): string {
+  if (maxBytes <= 0) return "";
+  if (utf8ByteLength(value) <= maxBytes) return value;
+  let lo = 0;
+  let hi = value.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (utf8ByteLength(value.slice(0, mid)) <= maxBytes) lo = mid;
+    else hi = mid - 1;
+  }
+  return value.slice(0, lo);
+}
 
 /**
  * The pure `receipts → dashboard.getWidgetRender result` mapping, kept out of
@@ -132,7 +158,7 @@ export const DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS = 45_000;
  * list — the markup of every card at once is a lot to hand an agent that only
  * wanted to know which ones errored. `capturedAt` becomes an ISO string, the
  * shape the result schema (and the agent) reads. Included markup is held to a
- * shared budget ({@link DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS}) so the
+ * shared budget ({@link DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES}) so the
  * whole result stays under the UI-action channel's 64 KB ceiling.
  */
 export function buildWidgetRenderResult({
@@ -154,7 +180,7 @@ export function buildWidgetRenderResult({
       ...(widgetId === undefined ? {} : { widgetId }),
     },
   });
-  let markupBudgetLeft = DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_CHARS;
+  let markupByteBudgetLeft = DASHBOARD_RENDER_RESULT_MARKUP_BUDGET_BYTES;
   return {
     dashboardId,
     widgets: list.map((receipt) => {
@@ -171,8 +197,8 @@ export function buildWidgetRenderResult({
       };
       if (!isMarkupIncluded) return row;
       const full = receipt.markup ?? "";
-      const markup = full.slice(0, markupBudgetLeft);
-      markupBudgetLeft -= markup.length;
+      const markup = truncateToUtf8Bytes(full, markupByteBudgetLeft);
+      markupByteBudgetLeft -= utf8ByteLength(markup);
       return {
         ...row,
         markup,
