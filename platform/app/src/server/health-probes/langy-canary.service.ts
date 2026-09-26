@@ -184,20 +184,16 @@ export async function runLangyCanary(
       deps.awaitSettlement({ ...started, signal: budget.signal }),
       aborted,
     ]);
-    if (
-      settlement !== null &&
-      "outcome" in settlement &&
-      settlement.outcome === "awaiting_user"
-    ) {
+    const settled =
+      settlement !== null && "aborted" in settlement ? null : settlement;
+    if (settled?.outcome === "awaiting_user") {
       logger.info(
-        { ...started, question: settlement.text },
+        { ...started, question: settled.text },
         "Langy canary turn is waiting on the user",
       );
     }
     return {
-      ...classifyLangyCanaryOutcome(
-        settlement !== null && "aborted" in settlement ? null : settlement,
-      ),
+      ...classifyLangyCanaryOutcome(settled),
       ...started,
       durationMs: deps.now() - startedAt,
     };
