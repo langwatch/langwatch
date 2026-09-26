@@ -3,7 +3,14 @@ import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 
 import type { api } from "../../../../behavior/langy-api.ts";
 
-type ApiUtils = ReturnType<typeof api.useUtils>;
+type ModelProviderUtils = ReturnType<typeof api.useUtils>["modelProvider"];
+
+/** The query utils a default-model follow-up reads, refreshes and re-resolves through. */
+type ApiUtils = {
+  modelProvider: Pick<ModelProviderUtils, "invalidate"> & {
+    getResolvedDefault: Pick<ModelProviderUtils["getResolvedDefault"], "getData" | "fetch">;
+  };
+};
 
 /**
  * Client-side follow-up to a server-side default-model write (a codex connect with

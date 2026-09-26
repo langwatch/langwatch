@@ -28,9 +28,9 @@ function buildUtils({
   const fetch = fetchFails
     ? vi.fn().mockRejectedValue(new Error("resolver unavailable"))
     : vi.fn().mockResolvedValue(nextModel ? { model: nextModel } : null);
-  const utils = {
+  const utils: Utils = {
     modelProvider: { invalidate, getResolvedDefault: { getData, fetch } },
-  } as unknown as Utils;
+  };
   return { utils, invalidate, getData, fetch };
 }
 
@@ -194,7 +194,15 @@ describe("syncLangyAfterDefaultModelWrite", () => {
     // Callers await this after their write already landed, so a throw here
     // reaches their catch and reports a saved config as a failed one.
     it("resolves rather than rejecting", async () => {
-      const utils = { modelProvider: {} } as unknown as Utils;
+      const unanswerable = () => {
+        throw new Error("no query client");
+      };
+      const utils: Utils = {
+        modelProvider: {
+          invalidate: unanswerable,
+          getResolvedDefault: { getData: unanswerable, fetch: unanswerable },
+        },
+      };
 
       await expect(
         syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" }),

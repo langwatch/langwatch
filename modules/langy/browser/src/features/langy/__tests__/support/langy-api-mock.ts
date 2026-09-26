@@ -69,9 +69,13 @@ export const withFallback = (explicit: Record<string, unknown>) =>
  */
 export const createTrpcUtils = ({
   onListInvalidate,
+  client = {},
 }: {
   onListInvalidate?: (input?: unknown) => void;
+  /** The imperative client a turn's transport and the UI-action claim run on. */
+  client?: Record<string, unknown>;
 } = {}) => ({
+  client,
   langy: {
     list: {
       getData: () => undefined,

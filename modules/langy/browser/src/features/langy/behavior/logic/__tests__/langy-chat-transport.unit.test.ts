@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import {
   createLangyChatTransport,
   type LangyChatTransportDeps,
+  type LangyTurnClient,
   type LangyTurnRequestContext,
 } from "../langy-chat-transport.ts";
 
@@ -22,27 +23,20 @@ const subscription = vi.fn<(path: string, input: unknown, opts: unknown) => Unsu
   unsubscribe: vi.fn(),
 }));
 
-// The mock mirrors the v11 PROXY client the transport now calls: procedures
-// are addressed as `trpcClient.langy.<proc>.mutate/subscribe`. The spies keep
-// receiving the dotted path so the assertions still name the procedure. (The
-// v10-era detached-`this` hazard died with the dotted-path client — every
-// proxy access mints a bound call.)
-vi.mock("../../../../../behavior/langy-api.ts", () => ({
-  trpcClient: {
-    langy: {
-      createConversation: {
-        mutate: (input: unknown) => mutation("langy.createConversation", input),
-      },
-      continueConversation: {
-        mutate: (input: unknown) => mutation("langy.continueConversation", input),
-      },
-      onTurnStream: {
-        subscribe: (input: unknown, opts: unknown) =>
-          subscription("langy.onTurnStream", input, opts),
-      },
+// The spies receive the dotted path so the assertions still name the procedure.
+const client: LangyTurnClient = {
+  langy: {
+    createConversation: {
+      mutate: (input: unknown) => mutation("langy.createConversation", input),
+    },
+    continueConversation: {
+      mutate: (input: unknown) => mutation("langy.continueConversation", input),
+    },
+    onTurnStream: {
+      subscribe: (input: unknown, opts: unknown) => subscription("langy.onTurnStream", input, opts),
     },
   },
-}));
+};
 
 function makeTransport(
   context: Partial<LangyTurnRequestContext> = {},
@@ -50,6 +44,7 @@ function makeTransport(
 ) {
   const onIds = vi.fn();
   const deps: LangyChatTransportDeps = {
+    client,
     getContext: () => ({
       projectId: "p1",
       conversationId: null,

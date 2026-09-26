@@ -74,6 +74,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   Fragment,
   Profiler,
+  type ProfilerOnRenderCallback,
   type ReactNode,
   useCallback,
   useEffect,
@@ -86,7 +87,7 @@ import { useProjectReach } from "../../../../behavior/home/use-project-reach.ts"
 // ONE definition of the wire shape, server-side, imported by both ends, the route
 // spreads `langyTurnContextSchema.shape` into its body schema, and this types the
 // payload against the same source.
-import { api, trpcClient } from "../../../../behavior/langy-api.ts";
+import { api, type LangyTrpcClient } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { useGlobalLangyShortcut } from "../../../../behavior/use-global-langy-shortcut.ts";
@@ -298,15 +299,9 @@ function useViewportWidth(): number {
   return width;
 }
 
-function langyProfilerRender(isDevelopment: boolean) {
-  return (
-    id: string,
-    phase: "mount" | "update" | "nested-update",
-    actualDuration: number,
-    baseDuration: number,
-    startTime: number,
-    commitTime: number,
-  ) => {
+function langyProfilerRender(isDevelopment: boolean): ProfilerOnRenderCallback {
+  return (...commit) => {
+    const [id, phase, actualDuration, baseDuration, startTime, commitTime] = commit;
     // Keep the profiler mounted in every build so React DevTools can inspect
     // it, but only log genuinely expensive commits during local investigation.
     if (!isDevelopment || actualDuration < 16) return;
@@ -325,11 +320,13 @@ function langyProfilerRender(isDevelopment: boolean) {
  * Carry out one typed UI action the agent asked THIS page for.
  */
 function dispatchUiActionToPage({
+  client,
   entry,
   projectId,
   seen,
   getHandlers,
 }: {
+  client: LangyTrpcClient;
   entry: { actionId: string; kind: string; payload: unknown };
   projectId: string | undefined;
   seen: Set<string>;
@@ -350,13 +347,13 @@ function dispatchUiActionToPage({
     getHandlers,
     isPageArriving: (kind) => isOnPageOwningAction({ kind, pathname: window.location.pathname }),
     claim: ({ actionId }) =>
-      trpcClient.langy.claimUiAction.mutate({
+      client.langy.claimUiAction.mutate({
         projectId,
         conversationId,
         actionId,
       }),
     complete: ({ actionId, ok, result, errorCode }) =>
-      trpcClient.langy.completeUiAction.mutate({
+      client.langy.completeUiAction.mutate({
         projectId,
         conversationId,
         actionId,
@@ -813,6 +810,7 @@ function LangyPanel({
   const transport = useMemo(
     () =>
       createLangyChatTransport({
+        client: utils.client,
         getContext: () => {
           const ctx = turnContextRef.current;
           if (!ctx) throw new Error("Langy turn context not ready");
@@ -861,6 +859,7 @@ function LangyPanel({
         onUiAction: (entry) => {
           if (isUiActionChannelClosedRef.current) return;
           dispatchUiActionToPage({
+            client: utils.client,
             entry,
             projectId: turnContextRef.current?.projectId,
             seen: uiActionSeenRef.current,

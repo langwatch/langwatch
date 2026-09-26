@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useEffect, useRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
@@ -24,24 +25,33 @@ import {
 /** What the browser would have done with the clicks the guard let through. */
 const navigation = { attempts: 0 };
 
+/** Bubble phase at the document, after React's own handlers: stands in for the browser leaving. */
+function useNavigationRecorder() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const record = (event: MouseEvent) => {
+      if (!(event.target instanceof Node) || !root.contains(event.target)) return;
+      if (!event.defaultPrevented) navigation.attempts += 1;
+      event.preventDefault();
+    };
+    document.addEventListener("click", record);
+    return () => document.removeEventListener("click", record);
+  }, []);
+  return ref;
+}
+
 /**
  * The panel root's wiring, in miniature: the guard's props on the root element
  * and the dialog beside it, exactly as LangyPanel mounts them.
  */
 function LangyPanelHarness({ answer }: { answer: string }) {
   const guard = useLangyExternalLinkGuard();
+  const recorder = useNavigationRecorder();
   return (
     <ChakraProvider value={defaultSystem}>
-      <div
-        data-testid="panel-root"
-        {...guard.guardProps}
-        // Bubble phase, so it runs after the guard: stands in for the browser
-        // actually leaving, and records whether the guard let the click go.
-        onClick={(event) => {
-          if (!event.defaultPrevented) navigation.attempts += 1;
-          event.preventDefault();
-        }}
-      >
+      <div data-testid="panel-root" {...guard.guardProps} ref={recorder}>
         <Markdown linkVariant="langy">{answer}</Markdown>
       </div>
       <LangyExternalLinkDialog {...guard.dialogProps} />
@@ -341,16 +351,10 @@ describe("given a link that is not a place to go", () => {
  */
 function ChromeAndAnswerHarness() {
   const guard = useLangyExternalLinkGuard();
+  const recorder = useNavigationRecorder();
   return (
     <ChakraProvider value={defaultSystem}>
-      <div
-        data-testid="panel-root"
-        {...guard.guardProps}
-        onClick={(event) => {
-          if (!event.defaultPrevented) navigation.attempts += 1;
-          event.preventDefault();
-        }}
-      >
+      <div data-testid="panel-root" {...guard.guardProps} ref={recorder}>
         <a
           href="https://auth.openai.com/device"
           target="_blank"

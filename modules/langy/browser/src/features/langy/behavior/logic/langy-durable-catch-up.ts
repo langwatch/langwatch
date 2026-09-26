@@ -8,7 +8,15 @@ import {
 import type { api } from "../../../../behavior/langy-api.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
-type ApiUtils = ReturnType<typeof api.useUtils>;
+type LangyUtils = ReturnType<typeof api.useUtils>["langy"];
+
+/** The two query utils a catch-up reads the durable tail with and refreshes the messages by. */
+type ApiUtils = {
+  langy: {
+    conversationEventsAfter: Pick<LangyUtils["conversationEventsAfter"], "fetch">;
+    messages: Pick<LangyUtils["messages"], "invalidate">;
+  };
+};
 
 /** Pages of durable tail one catch-up will fold before it gives up and refetches. */
 const MAX_CATCH_UP_PAGES = 3;

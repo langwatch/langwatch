@@ -1,7 +1,7 @@
 /**
  * The plan checklist — what a multi-step turn said it would do, and where it is.
  */
-import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { useReducedMotion, LangyCard } from "@langwatch/langy-browser-kit";
 import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
@@ -195,16 +195,9 @@ function PlanStepMarker({
 }) {
   if (item.status === "completed") {
     return (
-      <Box
-        color="green.fg"
-        display="flex"
-        flexShrink={0}
-        width="12px"
-        role="img"
-        aria-label={statusLabel}
-        data-plan-marker="completed"
-      >
-        <SquareCheck size={12} />
+      <Box color="green.fg" display="flex" flexShrink={0} width="12px" data-plan-marker="completed">
+        <SquareCheck size={12} aria-hidden />
+        <VisuallyHidden>{statusLabel}</VisuallyHidden>
       </Box>
     );
   }
@@ -216,8 +209,6 @@ function PlanStepMarker({
         justifyContent="center"
         alignItems="center"
         flexShrink={0}
-        role="img"
-        aria-label={statusLabel}
         data-plan-marker="in_progress"
       >
         <Box
@@ -227,6 +218,7 @@ function PlanStepMarker({
           background="orange.solid"
           css={pulsing ? { animation: `${dotPulse} 1.4s ease-in-out infinite` } : undefined}
         />
+        <VisuallyHidden>{statusLabel}</VisuallyHidden>
       </Box>
     );
   }
@@ -236,11 +228,10 @@ function PlanStepMarker({
       display="flex"
       flexShrink={0}
       width="12px"
-      role="img"
-      aria-label={statusLabel}
       data-plan-marker={item.status}
     >
-      <Square size={12} />
+      <Square size={12} aria-hidden />
+      <VisuallyHidden>{statusLabel}</VisuallyHidden>
     </Box>
   );
 }

@@ -48,12 +48,12 @@ function utilsWith({
     truncated: false,
   });
   const invalidate = vi.fn().mockResolvedValue(undefined);
-  const utils = {
+  const utils: Utils = {
     langy: {
       messages: { invalidate },
       conversationEventsAfter: { fetch },
     },
-  } as unknown as Utils;
+  };
   return { utils, fetch, invalidate };
 }
 
@@ -80,12 +80,12 @@ function utilsWithPages(
     });
   });
   const invalidate = vi.fn().mockResolvedValue(undefined);
-  const utils = {
+  const utils: Utils = {
     langy: {
       messages: { invalidate },
       conversationEventsAfter: { fetch },
     },
-  } as unknown as Utils;
+  };
   return { utils, fetch, invalidate };
 }
 
