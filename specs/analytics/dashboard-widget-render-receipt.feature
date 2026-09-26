@@ -46,6 +46,13 @@ Feature: A dashboard widget reports what it rendered so the agent can see it
     Then the page clears that widget's stored receipt
     And the agent is not shown a stale receipt for it
 
+  @integration
+  Scenario: The dashboard page clears a receipt when the frame stops responding
+    Given a widget that has already reported an "ok" receipt
+    When the frame's watchdog tears it down and shows the "stopped responding" panel
+    Then the page clears that widget's stored receipt
+    And the agent is not told the widget rendered fine while it is not running
+
   @unit
   Scenario: Langy reads one widget's receipt with its markup
     Given the user has the dashboard open and an agent turn is running

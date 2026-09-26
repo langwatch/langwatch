@@ -311,6 +311,46 @@ describe("a widget that reports what it rendered", () => {
     ).toBeUndefined();
   });
 
+  /** @scenario "The dashboard page clears a receipt when the frame stops responding" */
+  it("clears the receipt when the frame's watchdog tears it down", () => {
+    periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
+    executorMock.mockReturnValue(receiptExecutor());
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <DashboardWidgetFrame
+          id="graph_1"
+          graph={GRAPH}
+          projectId="project_1"
+          projectSlug="project"
+          maxHeight={300}
+          dashboardId="dash_1"
+        />
+      </ChakraProvider>,
+    );
+
+    act(() => {
+      lastFrameProps().onRenderReceipt?.({
+        status: "ok",
+        markup: "<div/>",
+        isMarkupTruncated: false,
+        height: 100,
+      });
+    });
+    expect(
+      useWidgetRenderReceiptStore.getState().receipts.graph_1,
+    ).toBeDefined();
+
+    // The watchdog tore the frame down: the "stopped responding" panel is on
+    // screen, so the last "ok" receipt is stale and must not be readable.
+    act(() => {
+      lastFrameProps().onFrameRunningChange?.(false);
+    });
+    expect(
+      useWidgetRenderReceiptStore.getState().receipts.graph_1,
+    ).toBeUndefined();
+  });
+
   /** @scenario "The dashboard page clears stale receipts when the frame cannot be rendered" */
   it("clears the receipt when the graph definition becomes invalid", () => {
     periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));

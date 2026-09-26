@@ -30,7 +30,7 @@ export const getWidgetRenderPayloadSchema = z
       .min(1)
       .optional()
       .describe(
-        "Return one widget's receipt including its rendered markup. Omit to list every widget on the open dashboard without markup.",
+        "Return one widget's receipt including its rendered markup. Omit to list the dashboard's sandboxed widget cards (the code-defined ones that run in a frame) without markup; classic chart cards publish no receipt and are not listed.",
       ),
     shouldIncludeMarkup: z
       .boolean()
