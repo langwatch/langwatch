@@ -454,6 +454,16 @@ export function ensureClaudeProjectTelemetryPin({
 	const hasOwnedKey = Object.keys(vars).some((k) => k in current);
 	const isLangwatchAuthored =
 		!hasOwnedKey || otelWiringLooksLangwatchAuthored(current);
+	// Whether an established LangWatch pin is already here, as opposed to
+	// "nothing to conflict with" (a fresh file, or one that merely lacks any
+	// of our current keys, e.g. carries only a hand-set legacy flag with no
+	// other langwatch-shaped wiring yet). isLangwatchAuthored's `!hasOwnedKey`
+	// branch is right for deciding it's safe to WRITE such a file, but wrong
+	// for deciding it's safe to STRIP a legacy key from it: that file was
+	// never langwatch's pin to begin with, so its OTEL_LOG_RAW_API_BODIES is
+	// not "the old default" - it's a setting we have no history with.
+	const hasLangwatchBlock =
+		hasOwnedKey && otelWiringLooksLangwatchAuthored(current);
 	// One-time migration: strip the legacy OTEL_LOG_RAW_API_BODIES from a
 	// pre-#8284 pin so it clears on upgrade (installAppEnv only merges). Only
 	// when the block is ours to touch, and only while it still lacks the
@@ -461,7 +471,7 @@ export function ensureClaudeProjectTelemetryPin({
 	// adds back later as a deliberate opt-in survives every later refresh.
 	const legacyKeys = legacyKeysToStrip("claude", current);
 	const strippedLegacy =
-		isLangwatchAuthored &&
+		hasLangwatchBlock &&
 		legacyKeys.length > 0 &&
 		appEnvHasAnyVar(target, legacyKeys) &&
 		removeAppEnvVars(target, legacyKeys);
