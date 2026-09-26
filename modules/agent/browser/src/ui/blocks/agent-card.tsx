@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Globe,
   MessageSquare,
+  Mic,
   type LucideIcon,
   MoreVertical,
   Pencil,
@@ -144,6 +145,8 @@ export type AgentCardProps = {
   onViewHistory?: () => void;
   /** Runs one scripted scenario against the agent and opens the run. */
   onTest?: () => void;
+  /** Opens the browser call panel — the voice agent equivalent of Test. */
+  onTalkToIt?: () => void;
 };
 
 export function AgentCard({
@@ -158,6 +161,7 @@ export function AgentCard({
   onSyncFromSource,
   onViewHistory,
   onTest,
+  onTalkToIt,
 }: AgentCardProps) {
   const isCopiedAgent = Boolean(agent.copiedFromAgentId);
   const hasCopies = (agent.copyCount ?? 0) > 0;
@@ -170,7 +174,7 @@ export function AgentCard({
       onClick={onClick}
       leading={<AgentCardIcon icon={agentTypeIcons[agent.type] ?? Bot} />}
       menu={
-        (onEdit || onDelete || onTest) && (
+        (onEdit || onDelete || onTest || onTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
             <Menu.Content className={CARD_MENU_CLASS} portalled={false}>
@@ -182,6 +186,15 @@ export function AgentCard({
               {onTest && (
                 <Menu.Item value="test" onClick={onTest} data-testid={`agent-test-${agent.id}`}>
                   <Play aria-hidden="true" size={14} /> Test agent
+                </Menu.Item>
+              )}
+              {onTalkToIt && (
+                <Menu.Item
+                  value="talk-to-it"
+                  onClick={onTalkToIt}
+                  data-testid={`agent-talk-${agent.id}`}
+                >
+                  <Mic aria-hidden="true" size={14} /> Talk to it
                 </Menu.Item>
               )}
               {agent.type === "workflow" && onOpenWorkflow && (

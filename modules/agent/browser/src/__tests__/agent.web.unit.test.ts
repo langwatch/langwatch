@@ -20,6 +20,7 @@ describe("the agent browser declaration", () => {
       "agentHttpEditor",
       "agentList",
       "agentTypeSelector",
+      "agentVoiceEditor",
       "agentWorkflowEditor",
       "agentWorkflowTargetEditor",
       "workflowSelector",

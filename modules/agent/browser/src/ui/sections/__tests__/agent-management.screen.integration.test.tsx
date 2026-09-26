@@ -220,6 +220,9 @@ class TestHost implements AgentManagementHost {
   describeFailure(failure: AgentFailureNotice): string {
     return failure.fallbackTitle;
   }
+  isFeatureEnabled(): boolean {
+    return true;
+  }
   openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string }): void {
     this.editorsOpened.push(input);
   }

@@ -10,6 +10,7 @@ import {
   useUiScope,
   type UiFeedback,
   type UiNavigation,
+  type UiSession,
 } from "@langwatch/browser-host/capabilities";
 import { resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
@@ -40,6 +41,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
       ) => void;
       navigation: UiNavigation;
       feedback: UiFeedback;
+      session: UiSession;
       openDrawer: (drawer: string, props?: Record<string, unknown>) => void;
       refreshAgentLimit: () => Promise<void>;
     },
@@ -87,8 +89,23 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
       .title;
   }
 
-  openAgentEditor({ drawer, agentId }: { drawer: AgentEditorDrawer; agentId?: string }): void {
-    this.deps.openDrawer(drawer, agentId ? { agentId } : {});
+  isFeatureEnabled(flag: string): boolean {
+    return this.deps.session.isFeatureEnabled(flag);
+  }
+
+  openAgentEditor({
+    drawer,
+    agentId,
+    talk,
+  }: {
+    drawer: AgentEditorDrawer;
+    agentId?: string;
+    talk?: boolean;
+  }): void {
+    this.deps.openDrawer(drawer, {
+      ...(agentId ? { agentId } : {}),
+      ...(talk ? { talk: "1" } : {}),
+    });
   }
 
   openConnectedAgent(agentId: string): void {
@@ -113,7 +130,7 @@ class CapabilityAgentManagementHost implements AgentManagementHost {
  * is what `mounts.load` resolves.
  */
 export default function AgentManagementHostMount({ children }: { children?: ReactNode }) {
-  const { navigation, route, feedback } = useUiCapabilities();
+  const { navigation, route, feedback, session } = useUiCapabilities();
   const rpc = useUiRpc();
   const scopeHost = useUiScope().scopeHost();
   const hostProject = scopeHost?.project();
@@ -133,10 +150,11 @@ export default function AgentManagementHostMount({ children }: { children?: Reac
         setQuery: (next, options) => route.setQuery(next, options),
         navigation,
         feedback,
+        session,
         openDrawer: (drawer, props) => openDrawer(drawer, props),
         refreshAgentLimit: () => Promise.resolve(),
       }),
-    [hostProject, agents, reading, route, navigation, feedback, openDrawer],
+    [hostProject, agents, reading, route, navigation, feedback, session, openDrawer],
   );
 
   return <AgentManagementHostProvider value={host}>{children}</AgentManagementHostProvider>;

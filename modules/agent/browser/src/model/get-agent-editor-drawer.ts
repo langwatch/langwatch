@@ -12,8 +12,7 @@ export function getAgentEditorDrawer(type: AgentType): AgentEditorDrawer {
     case "workflow":
       return "agentWorkflowEditor";
     case "voice":
-      // No `agentVoiceEditor` drawer is declared, so no name would answer.
-      throw new Error(`Unhandled agent type: ${type} — voice agents have no editor drawer yet`);
+      return "agentVoiceEditor";
     case "signature":
       throw new Error(`Unhandled agent type: ${type} — signature agents have no editor drawer`);
     case "connected":

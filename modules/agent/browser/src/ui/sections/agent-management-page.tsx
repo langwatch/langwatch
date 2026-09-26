@@ -105,6 +105,7 @@ export type AgentCardRenderInput = {
   onSyncFromSource?: () => void;
   onViewHistory?: () => void;
   onTest?: () => void;
+  onTalkToIt?: () => void;
 };
 
 export interface AgentManagementCard {
@@ -132,6 +133,8 @@ export type AgentManagementPageProps = {
   card: AgentManagementCard;
   connectedSection?: AgentManagementConnectedSection;
   onTest?: (agentId: string) => void;
+  /** Present only while voice agents are on; offered on voice agents' cards. */
+  onTalkToIt?: (agent: AgentWithFields) => void;
 };
 
 export function AgentManagementPage(props: AgentManagementPageProps) {
@@ -219,6 +222,10 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
                   onSyncFromSource: () => void handleSync(agent.id),
                   onViewHistory: () => props.navigation.openHistory(agent),
                   onTest: props.onTest ? () => props.onTest?.(agent.id) : void 0,
+                  onTalkToIt:
+                    agent.type === "voice" && props.onTalkToIt
+                      ? () => props.onTalkToIt?.(agent)
+                      : void 0,
                 })}
               </Fragment>
             ))}

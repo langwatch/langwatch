@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { VOICE_AGENTS_FLAG_KEY } from "../../features/voice-editor/model/voice-talk.ts";
 import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
 import {
   useAgentManagementHost,
@@ -276,6 +277,12 @@ export function AgentManagementScreen() {
         composition={composition}
         card={screenCard}
         onTest={(agentId) => testRun.mutate({ projectId, agentId })}
+        onTalkToIt={
+          host.isFeatureEnabled(VOICE_AGENTS_FLAG_KEY)
+            ? (agent) =>
+                host.openAgentEditor({ drawer: "agentVoiceEditor", agentId: agent.id, talk: true })
+            : void 0
+        }
         connectedSection={{
           Component: ConnectedAgentsSection,
           agents: connectedAgents,

@@ -1,7 +1,6 @@
 /**
  * What a browser installs when it installs agent: the drawers the address
- * bar opens (`?drawer.open=<name>`). `agentVoiceEditor` is not declared —
- * no wrapper for it has been ported to this branch yet.
+ * bar opens (`?drawer.open=<name>`).
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
@@ -47,6 +46,12 @@ export const agentWeb = defineWebModule("agent")
     agentHttpEditor: {
       load: async () => ({
         default: (await import("./ui/sections/agent-http-editor-drawer.tsx")).AgentHttpEditorDrawer,
+      }),
+    },
+    agentVoiceEditor: {
+      load: async () => ({
+        default: (await import("./features/voice-editor/ui/sections/agent-voice-editor-drawer.tsx"))
+          .AgentVoiceEditorDrawer,
       }),
     },
     agentConnectedDetail: {

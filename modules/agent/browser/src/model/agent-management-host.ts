@@ -31,7 +31,11 @@ export type AgentFailureNotice = {
   id?: string;
 };
 
-export type AgentEditorDrawer = "agentCodeEditor" | "agentHttpEditor" | "agentWorkflowEditor";
+export type AgentEditorDrawer =
+  | "agentCodeEditor"
+  | "agentHttpEditor"
+  | "agentWorkflowEditor"
+  | "agentVoiceEditor";
 
 export interface AgentManagementHost {
   project(): AgentHostProject | undefined;
@@ -55,7 +59,11 @@ export interface AgentManagementHost {
 
   describeFailure(failure: AgentFailureNotice): string;
 
-  openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string }): void;
+  /** Fail-closed: a flag not yet answered reads as off. */
+  isFeatureEnabled(flag: string): boolean;
+
+  /** `talk` opens a voice agent's editor straight onto its call panel. */
+  openAgentEditor(input: { drawer: AgentEditorDrawer; agentId?: string; talk?: boolean }): void;
 
   openConnectedAgent(agentId: string): void;
 
