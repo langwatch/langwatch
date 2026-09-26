@@ -24,5 +24,8 @@ var ruledBreakingRest = map[string]string{
 	"PATCH /api/projects/{id}":                 rulingPhantomField,
 	"GET /api/query/reference":                 rulingPhantomField,
 	"GET /api/query/schema":                    rulingPhantomField,
+	"POST /api/trace/search":                   rulingPhantomField,
+	"GET /api/trace/{id}":                      rulingPhantomField,
+	"POST /api/trace/{id}/unshare":             rulingPhantomField,
 	"POST /api/evaluations/batch/log_results":  rulingPhantomField,
 }
