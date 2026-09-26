@@ -395,10 +395,7 @@ export async function seedApplicationTraces({
             ...(shape === "healthy"
               ? { type: "llm", model: "gpt-5-mini" }
               : { type: "span" }),
-            name:
-              shape === "broken"
-                ? "unnamed-operation"
-                : undefined,
+            name: shape === "broken" ? "unnamed-operation" : undefined,
             input: {
               type: "text",
               value: `customer support question #${i}: where is my order?`,

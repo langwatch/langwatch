@@ -202,7 +202,10 @@ describe("every suggestion's pinned skill", () => {
 
     expect(named.length).toBeGreaterThan(0);
     for (const skillId of named) {
-      expect(findSkill(skillId), `no skill registered as "${skillId}"`).toBeDefined();
+      expect(
+        findSkill(skillId),
+        `no skill registered as "${skillId}"`,
+      ).toBeDefined();
     }
   });
 });

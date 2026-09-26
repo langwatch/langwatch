@@ -24,7 +24,9 @@ afterEach(() => {
   cleanup();
 });
 
-function renderEmptyState(onPick: (prompt: string, options?: { skill?: string }) => void) {
+function renderEmptyState(
+  onPick: (prompt: string, options?: { skill?: string }) => void,
+) {
   render(
     <ChakraProvider value={defaultSystem}>
       <EmptyState onPick={onPick} suggestions={SUGGESTIONS} />

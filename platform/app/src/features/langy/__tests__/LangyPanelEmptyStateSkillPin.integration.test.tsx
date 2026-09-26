@@ -75,7 +75,9 @@ vi.mock("@ai-sdk/react", () => ({
       sendMessage: (message: { role: string; parts: unknown[] }) =>
         options.transport.sendMessages({
           messages: [{ id: "m1", ...message }],
-        } as unknown as Parameters<ChatTransport<UIMessage>["sendMessages"]>[0]),
+        } as unknown as Parameters<
+          ChatTransport<UIMessage>["sendMessages"]
+        >[0]),
       stop: vi.fn(),
       status: "ready" as const,
       setMessages: vi.fn(),
@@ -276,7 +278,7 @@ afterEach(() => {
 
 describe("Feature: the empty state's latency chip pins the how-do-i skill", () => {
   describe("given the empty state is showing", () => {
-    describe("when the reader clicks \"How do I improve my agent's latency?\"", () => {
+    describe('when the reader clicks "How do I improve my agent\'s latency?"', () => {
       /** @scenario "The empty state offers the latency question" */
       it("carries the how-do-i skill on the outgoing turn", async () => {
         renderPanel();

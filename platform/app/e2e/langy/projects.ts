@@ -78,8 +78,8 @@ export async function createScratchProject(
       "createScratchProject: the test admin belongs to no organization",
     );
   }
-  const team = organization.teams.find((t) => !t.isPersonal) ??
-    organization.teams[0];
+  const team =
+    organization.teams.find((t) => !t.isPersonal) ?? organization.teams[0];
   if (!team) {
     throw new Error(
       `createScratchProject: organization ${organization.id} has no team to create into`,
@@ -108,7 +108,11 @@ export async function createScratchProject(
     for (const t of org.teams) {
       const project = t.projects.find((p) => p.slug === projectSlug);
       if (project) {
-        return { projectId: project.id, apiKey: project.apiKey, slug: project.slug };
+        return {
+          projectId: project.id,
+          apiKey: project.apiKey,
+          slug: project.slug,
+        };
       }
     }
   }
