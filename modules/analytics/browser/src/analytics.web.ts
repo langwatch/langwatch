@@ -36,6 +36,9 @@ export const analyticsWeb = defineWebModule("analytics")
     "pages/[project]/analytics/query": {
       load: () => import("./ui/sections/analytics/analytics-query.screen.tsx"),
     },
+    "pages/[project]/analytics/v2": {
+      load: () => import("./ui/sections/analytics/analytics-v2.screen.tsx"),
+    },
     "pages/[project]/analytics/custom/[id]": {
       load: () => import("./ui/sections/analytics/custom-graph.screen.tsx"),
     },

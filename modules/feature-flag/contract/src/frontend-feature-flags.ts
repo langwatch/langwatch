@@ -6,6 +6,10 @@
 import { z } from "zod";
 
 export const FRONTEND_FEATURE_FLAGS = [
+  // The Analytics v2 page (nine standard charts as dashboard widgets over
+  // LangWatchQL). Off by default; the page also gates on LangWatchQL being
+  // available for the project.
+  "release_analytics_v2",
   "release_ui_ai_gateway_menu_enabled",
   "release_ui_beta_annotations_trained_enabled",
   "release_voice_agents_enabled",
