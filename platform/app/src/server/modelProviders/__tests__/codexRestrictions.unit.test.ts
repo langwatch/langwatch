@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
   CODEX_DEFAULT_MODEL,
+  CODEX_EXCLUDED_FAST_FEATURE_KEYS,
   CONNECTION_TEST_FEATURE_KEY,
   isCodexAllowedFeature,
   isCodexModel,
@@ -35,7 +36,7 @@ describe("codexRestrictions", () => {
     expect(featureByKey(CONNECTION_TEST_FEATURE_KEY)).toBeFalsy();
   });
 
-  it("allows codex on Langy and the fast assists, nowhere else", () => {
+  it("allows codex on Langy and the runnable fast assists, nowhere else", () => {
     expect(
       isModelAllowedForFeature({
         modelId: CODEX_DEFAULT_MODEL,
@@ -43,6 +44,10 @@ describe("codexRestrictions", () => {
       }),
     ).toBe(true);
     for (const fast of featuresByRole("FAST")) {
+      // A FAST feature codex cannot actually execute (topic clustering runs
+      // through langevals/litellm, not the gateway) is excluded per-feature
+      // even though the FAST role default may still be codex — see #8287.
+      if (CODEX_EXCLUDED_FAST_FEATURE_KEYS.includes(fast.key)) continue;
       expect(
         isModelAllowedForFeature({
           modelId: CODEX_DEFAULT_MODEL,
@@ -58,6 +63,7 @@ describe("codexRestrictions", () => {
       "scenarios.judge",
       "scenarios.user_simulator",
       "scenarios.agent_under_test",
+      "analytics.topic_clustering_llm",
       "analytics.topic_clustering_embeddings",
     ]) {
       expect(
@@ -151,9 +157,11 @@ describe("codexRestrictions", () => {
         "workflows.commit_message",
         "scenarios.generator",
         "datasets.generator",
-        "analytics.topic_clustering_llm",
       ].sort(),
     );
     expect(isCodexAllowedFeature("prompt.create_default")).toBe(false);
+    // Topic clustering is a FAST feature but codex cannot execute it, so it is
+    // excluded from the allowed set even though FAST=codex stays writable (#8287).
+    expect(isCodexAllowedFeature("analytics.topic_clustering_llm")).toBe(false);
   });
 });
