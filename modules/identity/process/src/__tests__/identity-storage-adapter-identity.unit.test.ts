@@ -464,9 +464,9 @@ describe("better-auth over the identity storage adapter", () => {
 
         const listed = await context.internalAdapter.findAccounts(userId);
         const pinned = statedIdentifiers(stack).map((identifier) => identifier.accountId);
-        expect(
-          listed.map((row) => row.id).toSorted((a, b) => (a < b ? -1 : Number(a > b))),
-        ).toEqual(pinned.toSorted((a, b) => String(a).localeCompare(String(b))));
+        expect(listed.map((row) => String(row.id)).toSorted()).toEqual(
+          pinned.map((id) => String(id)).toSorted(),
+        );
 
         const google = listed.find((row) => row.providerId === "google");
         // The bridge row the mirror has been keeping this method's secrets

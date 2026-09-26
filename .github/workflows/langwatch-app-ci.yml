@@ -1165,7 +1165,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/platform-api..."
+          install: "@langwatch/platform-api... @langwatch/ui..."
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -1280,8 +1280,10 @@ jobs:
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
 
-      - name: Build mcp-server
-        run: pnpm --filter @langwatch/mcp-server run build
+      # The SDK, mcp-server, ksuid and mail resolve their `dist`; build:types
+      # reads the SDK's declarations, so all four build first.
+      - name: Build dist-resolving packages
+        run: pnpm ensure:built
 
       # apps/api and apps/worker declare no build — they run from source through
       # tsx. What is built here is the browser bundle the API process serves,
