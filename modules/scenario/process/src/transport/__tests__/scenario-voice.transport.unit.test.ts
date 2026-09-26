@@ -60,6 +60,32 @@ describe("the voice-session procedures", () => {
     });
   });
 
+  describe("given a request with no logged-in user", () => {
+    /** @scenario "An unauthenticated Talk to it request is refused" */
+    it("refuses it as unauthenticated and mints no session", async () => {
+      const mintVoiceSession = vi.fn<ScenarioApi["mintVoiceSession"]>(async () => mintResult);
+      const { caller } = scenarioTrpcCaller({
+        declaration: scenarioTrpcTransport,
+        app: stubScenarioApi({ mintVoiceSession }),
+        actor: null,
+      });
+
+      const refusal = await caller
+        .mintVoiceSession({
+          projectId: "project_1",
+          transport: "elevenlabs_convai",
+          agentId: "vendor_agent",
+        })
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(refusal).toMatchObject({ code: "UNAUTHORIZED" });
+      expect(mintVoiceSession).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a finished call", () => {
     it("hands the token, transcript and defaults to the app and answers main's shape", async () => {
       const finishVoiceSession = vi.fn<ScenarioApi["finishVoiceSession"]>(async () => finishResult);
@@ -166,6 +192,7 @@ function runAudioDoor(stream: ScenarioApi["streamVoiceRunAudio"]) {
 
 describe("GET /api/voice/run/:scenarioRunId/audio", () => {
   describe("given a phone run whose Twilio recording is published", () => {
+    /** @scenario "A phone run's published Twilio recording is relayed" */
     it("relays the bytes as audio/wav without caching", async () => {
       const { request, streamVoiceRunAudio } = runAudioDoor(async () => ({
         mediaType: "audio/wav",
@@ -189,6 +216,7 @@ describe("GET /api/voice/run/:scenarioRunId/audio", () => {
   });
 
   describe("given a run whose provider key is missing", () => {
+    /** @scenario "A run whose provider key is missing is refused by name" */
     it("refuses with voice_recording_key_missing", async () => {
       const { request } = runAudioDoor(async () => {
         throw new VoiceRecordingKeyMissingError();

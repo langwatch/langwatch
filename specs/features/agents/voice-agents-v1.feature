@@ -287,7 +287,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
 
   # AC13
-  @integration
+  @unit
   Scenario: An unauthenticated Talk to it request is refused
     Given a request to mint a voice session with no logged-in user
     When the request is handled

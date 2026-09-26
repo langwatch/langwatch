@@ -221,7 +221,10 @@ export function AgentManagementPage(props: AgentManagementPageProps) {
                   onPushToCopies: () => setAgentForPush({ id: agent.id, name: agent.name }),
                   onSyncFromSource: () => void handleSync(agent.id),
                   onViewHistory: () => props.navigation.openHistory(agent),
-                  onTest: props.onTest ? () => props.onTest?.(agent.id) : void 0,
+                  onTest:
+                    props.onTest && agent.type !== "signature" && agent.type !== "voice"
+                      ? () => props.onTest?.(agent.id)
+                      : void 0,
                   onTalkToIt:
                     agent.type === "voice" && props.onTalkToIt
                       ? () => props.onTalkToIt?.(agent)

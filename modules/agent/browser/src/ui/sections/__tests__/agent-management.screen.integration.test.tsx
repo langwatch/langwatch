@@ -316,6 +316,37 @@ describe("testing an agent from the real management screen", () => {
   });
 });
 
+describe("given a voice or a prompt agent on the management screen", () => {
+  const untestable: AgentWithFields[] = [
+    {
+      ...agent,
+      id: "agent_voice",
+      name: "Voice agent",
+      type: "voice",
+      config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+    },
+    {
+      ...agent,
+      id: "agent_signature",
+      name: "Prompt agent",
+      type: "signature",
+      config: { prompt: "summarize" },
+    },
+  ];
+
+  /** @scenario "Voice and prompt agent cards do not offer Test agent" */
+  it.each(untestable)("does not offer Test agent on the $type card", async (listed) => {
+    const user = userEvent.setup();
+    listedAgents.current = [listed];
+    await mountScreen();
+
+    await user.click(screen.getByRole("button", { name: `Actions for ${listed.name}` }));
+
+    expect(await screen.findByText("Edit")).toBeInTheDocument();
+    expect(screen.queryByTestId(`agent-test-${listed.id}`)).not.toBeInTheDocument();
+  });
+});
+
 beforeEach(() => {
   listedAgents.current = [agent];
   listFailure.current = null;
