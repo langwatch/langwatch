@@ -1777,7 +1777,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/playground": {
+    "/api/v1/playground": {
         parameters: {
             query?: never;
             header?: never;
@@ -3387,7 +3387,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/optimization/{workflowId}/{versionId}": {
+    "/api/v1/optimization/{workflowId}/{versionId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -3407,7 +3407,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{workflowId}/run": {
+    "/api/v1/workflows/{workflowId}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -3427,7 +3427,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/workflows/{workflowId}/{versionId}/run": {
+    "/api/v1/workflows/{workflowId}/{versionId}/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -3652,7 +3652,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/traces/facets": {
+    "/api/v1/traces/facets": {
         parameters: {
             query?: never;
             header?: never;
@@ -3678,7 +3678,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dataset/attachments": {
+    "/api/v1/dataset/attachments": {
         parameters: {
             query?: never;
             header?: never;
