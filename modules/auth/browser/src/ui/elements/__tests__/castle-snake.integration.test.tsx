@@ -153,7 +153,7 @@ describe("given a hosted deployment with the front door enabled", () => {
       expect(castleSnakeSource).not.toContain("matchMedia");
       // And the reason is written down beside it, so the next person to read
       // this file finds an argument rather than an apparent oversight.
-      expect(castleSnakeSource).toContain('Please do not "fix" this');
+      expect(castleSnakeSource).toContain('Do not "fix" this');
     });
   });
 });
