@@ -131,6 +131,46 @@ const agentRecord = (code: string, name = "custom code agent") => ({
   },
 });
 
+/**
+ * Stands in for the tRPC mutation's response. The real mutation resolves with
+ * the record the server stored, which is what the panel seeds its state from —
+ * and the server may normalize what it was sent (code-agent indentation), so
+ * `storedCode` can differ from the submitted code.
+ */
+const mutationRespondsWith = ({ storedCode }: { storedCode?: string } = {}) =>
+  mockMutate.mockImplementation(
+    (
+      input: { name?: string; config?: unknown },
+      opts?: { onSuccess?: (agent: unknown) => void },
+    ) => {
+      const submittedConfig = input.config as
+        | { parameters?: { identifier: string; value?: unknown }[] }
+        | undefined;
+      const submittedCode = submittedConfig?.parameters?.find(
+        (p) => p.identifier === "code",
+      )?.value;
+      const saved = agentRecord(
+        storedCode ?? (submittedCode as string),
+        input.name,
+      );
+      opts?.onSuccess?.(
+        submittedConfig
+          ? {
+              ...saved,
+              config: {
+                ...submittedConfig,
+                parameters: submittedConfig.parameters?.map((p) =>
+                  p.identifier === "code"
+                    ? { ...p, value: storedCode ?? p.value }
+                    : p,
+                ),
+              },
+            }
+          : saved,
+      );
+    },
+  );
+
 const agentNode = (
   code: string,
   overrides: Partial<AgentComponent> = {},
@@ -202,7 +242,7 @@ describe("given a code agent node in a workflow", () => {
         data: agentRecord("print('v1')"),
         isLoading: false,
       };
-      mockMutate.mockImplementation((_input, opts) => opts?.onSuccess?.());
+      mutationRespondsWith();
       const node = agentNode("print('v1')");
       const { rerenderPanel } = renderPanel(node);
 
@@ -267,6 +307,41 @@ describe("given a code agent node in a workflow", () => {
         "input",
         "context",
       ]);
+    });
+  });
+
+  describe("when the server normalizes the saved code", () => {
+    /** @scenario Saving adopts the record the server stored */
+    it("writes the stored code through to the node and cache, not the submitted code", () => {
+      mockAgentQuery.current = {
+        data: agentRecord("print('v1')"),
+        isLoading: false,
+      };
+      // The server dedents code-agent source on write (issue #3013), so the
+      // stored record differs from the submit.
+      mutationRespondsWith({ storedCode: "print('dedented')" });
+      renderPanel(agentNode("print('v1')"));
+
+      fireEvent.change(screen.getByTestId("code-textarea"), {
+        target: { value: "  print('dedented')" },
+      });
+      const footer = renderFooter();
+      fireEvent.click(footer.getByTestId("agent-save-button"));
+
+      const setNodePatch = mockSetNode.mock.calls.at(-1)![0] as {
+        data: AgentComponent;
+      };
+      expect(
+        setNodePatch.data.parameters?.find((p) => p.identifier === "code")
+          ?.value,
+      ).toBe("print('dedented')");
+
+      const cached = mockSetData.mock.calls.at(-1)![1] as {
+        config: { parameters: Array<{ identifier: string; value: unknown }> };
+      };
+      expect(
+        cached.config.parameters.find((p) => p.identifier === "code")?.value,
+      ).toBe("print('dedented')");
     });
   });
 

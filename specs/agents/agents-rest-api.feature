@@ -49,6 +49,13 @@ Feature: Agent REST API
     And the response includes the agent id, name, type, and config
 
   @integration
+  Scenario: Create a code agent normalizes Python indentation
+    Given a code agent whose Python source is indented the same amount on every line
+    When I call POST /api/v1/agents with that config
+    Then the stored code has the shared indentation removed
+    And the response returns the same normalized code
+
+  @integration
   Scenario: Create an agent validates config against type schema
     When I call POST /api/v1/agents with type "signature" and an invalid config
     Then the request fails with 422 Unprocessable Entity
@@ -91,6 +98,13 @@ Feature: Agent REST API
     Given an agent with id "agent_abc123" exists
     When I call PATCH /api/v1/agents/agent_abc123 with a new config
     Then the agent config is updated
+
+  @integration
+  Scenario: Update a code agent normalizes Python indentation
+    Given an existing code agent whose Python source is flush
+    When I call PATCH /api/v1/agents with source indented the same amount on every line
+    Then the stored code has the shared indentation removed
+    And the response returns the same normalized code
 
   @integration
   Scenario: Update a non-existent agent returns 404
