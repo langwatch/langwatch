@@ -1280,10 +1280,11 @@ jobs:
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
 
-      # The SDK, mcp-server, ksuid and mail resolve their `dist`; build:types
-      # reads the SDK's declarations, so all four build first.
-      - name: Build dist-resolving packages
-        run: pnpm ensure:built
+      # build:types reads the generated Prisma client and the SDK's
+      # declarations, so the generated files and the four dist-resolving
+      # packages (SDK, mcp-server, ksuid, mail) come first.
+      - name: Prepare files
+        run: pnpm start:prepare:files && pnpm ensure:built
 
       # apps/api and apps/worker declare no build — they run from source through
       # tsx. What is built here is the browser bundle the API process serves,
