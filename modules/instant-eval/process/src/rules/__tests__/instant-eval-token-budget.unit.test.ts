@@ -65,6 +65,18 @@ describe("given a text longer than its budget", () => {
       expect(estimateTokensFromBytes(prepared.text)).toBeLessThanOrEqual(100);
     });
 
+    /** @scenario "A text past its budget is cut rather than refused" */
+    it("keeps the opening and the ending, with a marker between them", () => {
+      const prepared = prepareInstantEvalText({
+        text: `User: I want a refund. ${"filler. ".repeat(1_000)}Assistant: refund issued.`,
+        budgetTokens: 100,
+      });
+
+      expect(prepared.text.startsWith("User: I want a refund.")).toBe(true);
+      expect(prepared.text.endsWith("Assistant: refund issued.")).toBe(true);
+      expect(prepared.text).toMatch(/tokens omitted from the middle/);
+    });
+
     it("leaves a text inside its budget exactly as it was", () => {
       const prepared = prepareInstantEvalText({ text: "short enough", budgetTokens: 100 });
 

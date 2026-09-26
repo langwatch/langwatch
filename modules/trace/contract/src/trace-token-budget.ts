@@ -61,3 +61,76 @@ export function cutToEstimatedTokensAtLineBreak({
   const lastBreak = cut.lastIndexOf("\n");
   return lastBreak > 0 ? cut.slice(0, lastBreak) : cut;
 }
+
+/**
+ * Cut a text to a token budget keeping its opening and its ending, with a
+ * marker naming what was left out: a head-only cut loses the ending a judge
+ * needs (judge benchmark, langwatch/tasks#905). `atLineBreak` keeps whole lines.
+ */
+export function cutToEstimatedTokensKeepingEnds({
+  text,
+  maxTokens,
+  atLineBreak = false,
+}: {
+  text: string;
+  maxTokens: number;
+  atLineBreak?: boolean;
+}): string {
+  const bytes = new TextEncoder().encode(text);
+  const limit = Math.max(0, maxTokens) * 4;
+  if (bytes.length <= limit) return text;
+
+  const markerBytes = new TextEncoder().encode(elisionMarker(Math.ceil(bytes.length / 4))).length;
+  const room = limit - markerBytes;
+  if (room < MIN_KEPT_END_BYTES * 2) {
+    return atLineBreak
+      ? cutToEstimatedTokensAtLineBreak({ text, maxTokens })
+      : cutToEstimatedTokens({ text, maxTokens });
+  }
+
+  const decoder = new TextDecoder();
+  const headEnd = characterBoundaryAtOrBefore({ bytes, limit: Math.floor(room / 2) });
+  const tailStart = characterBoundaryAtOrAfter({
+    bytes,
+    index: bytes.length - Math.ceil(room / 2),
+  });
+  let head = decoder.decode(bytes.subarray(0, headEnd));
+  let tail = decoder.decode(bytes.subarray(tailStart));
+  if (atLineBreak) {
+    // A break further than half an end away would throw that end away with it.
+    const lastBreak = head.lastIndexOf("\n");
+    if (lastBreak >= head.length / 2) head = head.slice(0, lastBreak);
+    const firstBreak = tail.indexOf("\n");
+    if (firstBreak >= 0 && firstBreak < tail.length / 2) tail = tail.slice(firstBreak + 1);
+  }
+  const omitted = Math.max(
+    1,
+    Math.ceil(
+      (bytes.length -
+        new TextEncoder().encode(head).length -
+        new TextEncoder().encode(tail).length) /
+        4,
+    ),
+  );
+  return `${head}${elisionMarker(omitted)}${tail}`;
+}
+
+/** Below this many bytes per end, a kept ending is too short to read. */
+const MIN_KEPT_END_BYTES = 64;
+
+function elisionMarker(omittedTokens: number): string {
+  return `\n\n[... ${omittedTokens} tokens omitted from the middle to fit the length limit ...]\n\n`;
+}
+
+/** The smallest index at or after `index` that starts a whole UTF-8 character. */
+function characterBoundaryAtOrAfter({
+  bytes,
+  index,
+}: {
+  bytes: Uint8Array;
+  index: number;
+}): number {
+  let start = Math.max(0, index);
+  while (start < bytes.length && (bytes[start]! & 0xc0) === 0x80) start++;
+  return start;
+}

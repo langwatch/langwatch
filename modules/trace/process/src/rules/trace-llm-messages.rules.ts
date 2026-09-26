@@ -1,4 +1,9 @@
-import type { Span, SpanInputOutput, Trace } from "@langwatch/trace-contract";
+import {
+  extractSystemInstructions,
+  type Span,
+  type SpanInputOutput,
+  type Trace,
+} from "@langwatch/trace-contract";
 import {
   type ChatMessage,
   coerceToChatMessages,
@@ -40,7 +45,10 @@ export function pickLlmSpanForTrace({ spans }: { spans: Span[] }): Span | null {
  * because the caller asked about *this* span.
  */
 export function extractLlmMessagesForSpan({ span }: { span: Span }): LlmTraceMessages {
-  const input = coerceSpanIOToChatMessages(span.input) ?? [];
+  const input = withSystemInstructions({
+    messages: coerceSpanIOToChatMessages(span.input) ?? [],
+    params: span.params,
+  });
   const output =
     coerceSpanIOToChatMessages(span.output) ??
     wrapAsMessage({ text: spanIOToText(span.output), role: "assistant" });
@@ -88,6 +96,22 @@ function coerceSpanIOToChatMessages(io: SpanInputOutput | null | undefined): Cha
   if (value === undefined || value === null) return null;
   if (typeof value === "string") return coerceToChatMessages(parseJSON(value));
   return coerceToChatMessages(value);
+}
+
+/**
+ * Canonicalisation moves a system prompt out of the input messages into
+ * `gen_ai.system_instructions`; a reader of the messages still needs it.
+ */
+function withSystemInstructions({
+  messages,
+  params,
+}: {
+  messages: ChatMessage[];
+  params: Span["params"];
+}): ChatMessage[] {
+  const system = extractSystemInstructions(params ?? null);
+  if (!system || messages.some((message) => message.role === "system")) return messages;
+  return [{ role: "system", content: system }, ...messages];
 }
 
 /** A typed span payload as plain text, for the non-chat fallback. */

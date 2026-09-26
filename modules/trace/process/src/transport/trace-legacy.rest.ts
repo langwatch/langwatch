@@ -224,7 +224,7 @@ async function readLegacyTrace({
     return answer(
       {
         trace_id: traceId,
-        formatted_trace: app.formatSpansDigest({ spans: trace.spans ?? [] }),
+        formatted_trace: await app.formatSpansDigest({ spans: trace.spans ?? [] }),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,

@@ -1,7 +1,11 @@
 import type { ChatMessage, Span, SpanInputOutput } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { pickLlmSpanForTrace, extractLlmMessagesForTrace } from "../trace-llm-messages.rules.ts";
+import {
+  extractLlmMessagesForSpan,
+  extractLlmMessagesForTrace,
+  pickLlmSpanForTrace,
+} from "../trace-llm-messages.rules.ts";
 
 const timestamps = { started_at: 1_700_000_000_000, finished_at: 1_700_000_001_000 };
 
@@ -172,6 +176,46 @@ describe("extractLlmMessagesForTrace", () => {
     /** @scenario "A trace with nothing to read returns nothing" */
     it("returns nothing", () => {
       expect(extractLlmMessagesForTrace({ trace: {}, spans: [] })).toBeNull();
+    });
+  });
+});
+
+describe("extractLlmMessagesForSpan", () => {
+  describe("given an LLM span whose system prompt canonicalisation moved to gen_ai.system_instructions", () => {
+    const withInstructions = (input: ChatMessage[]): Span => ({
+      ...chatSpan({
+        spanId: "llm",
+        input,
+        output: [{ role: "assistant", content: "Sure." }],
+      }),
+      params: { gen_ai: { system_instructions: "You are ACME's support agent." } },
+    });
+
+    /** @scenario "An LLM span's messages include its system prompt" */
+    it("starts the input side with that system prompt", () => {
+      const messages = extractLlmMessagesForSpan({
+        span: withInstructions([{ role: "user", content: "Refund me" }]),
+      });
+
+      expect(messages.input).toEqual([
+        { role: "system", content: "You are ACME's support agent." },
+        { role: "user", content: "Refund me" },
+      ]);
+      expect(messages.output).toEqual([{ role: "assistant", content: "Sure." }]);
+    });
+
+    /** @scenario "An LLM span's messages include its system prompt" */
+    it("does not add a second system message to an input that carries one", () => {
+      const messages = extractLlmMessagesForSpan({
+        span: withInstructions([
+          { role: "system", content: "Inline prompt" },
+          { role: "user", content: "Refund me" },
+        ]),
+      });
+
+      expect(messages.input.filter((message) => message.role === "system")).toEqual([
+        { role: "system", content: "Inline prompt" },
+      ]);
     });
   });
 });

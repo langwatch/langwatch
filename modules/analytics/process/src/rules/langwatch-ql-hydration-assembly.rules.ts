@@ -5,7 +5,7 @@
  */
 
 import type { LangWatchQLColumn } from "@langwatch/analytics-contract";
-import { cutToEstimatedTokens } from "@langwatch/trace-contract";
+import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 
 import {
   appFunctionKeyId,
@@ -71,8 +71,8 @@ export interface LangWatchQLHydrationResult {
 
 /**
  * Cuts one value to the per-value ceiling. Only a string is cut: the one
- * list-valued function is bounded by the thread read itself. The cut runs at a
- * quarter of the byte budget, which is a byte cut on a UTF-8 boundary.
+ * list-valued function is bounded by the thread read itself. The cut keeps both
+ * ends at a quarter of the byte budget, on UTF-8 boundaries.
  */
 export function capLangWatchQLValue({
   computed,
@@ -87,7 +87,7 @@ export function capLangWatchQLValue({
 
   return {
     ...computed,
-    value: cutToEstimatedTokens({ text: value, maxTokens: Math.floor(maxBytes / 4) }),
+    value: cutToEstimatedTokensKeepingEnds({ text: value, maxTokens: Math.floor(maxBytes / 4) }),
     isTruncated: true,
   };
 }

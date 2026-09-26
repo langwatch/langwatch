@@ -1,4 +1,8 @@
-import { cutToEstimatedTokens, estimateTokensFromBytes } from "../trace-token-budget.ts";
+import {
+  cutToEstimatedTokens,
+  cutToEstimatedTokensKeepingEnds,
+  estimateTokensFromBytes,
+} from "../trace-token-budget.ts";
 import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
@@ -105,7 +109,7 @@ function renderFinalTurnCut({
   const finalTurn = turnGroups[turnGroups.length - 1]!;
   const opening =
     spare > 0
-      ? cutToEstimatedTokens({
+      ? cutToEstimatedTokensKeepingEnds({
           text: joinConversationMarkdown(finalTurn.chunks),
           maxTokens: spare,
         }).trimEnd()

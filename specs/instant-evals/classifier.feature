@@ -82,6 +82,7 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
     Given a text estimated at twice its budget
     When it is prepared for the classifier
     Then it is cut to the budget on a character boundary
+    And the cut keeps the text's opening and its ending, with a marker naming what was left out
     And the verdict records that the text was cut
 
   @unit
@@ -141,7 +142,7 @@ Feature: The Instant Evals classifier interface — one judged question, priced 
   Scenario: A text the classifier refuses as too large is cut once and retried
     Given a classifier refusing the text as past its token cap, then answering
     When a question is asked
-    Then the text is sent again at three quarters of its length
+    Then the text is sent again at three quarters of its length, keeping its opening and its ending
     And the verdict comes back
 
   @unit

@@ -16,6 +16,7 @@ import {
   type LangevalsEvaluateParams,
 } from "../app/evaluation.members.ts";
 import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
+import { toLangevalsContexts } from "../rules/langevals-contexts.rules.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -109,8 +110,8 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
             {
               input: convertTo(data.input, "string"),
               output: convertTo(data.output, "string"),
-              contexts: convertTo(data.contexts, "string[]"),
-              expected_contexts: convertTo(data.expected_contexts, "string[]"),
+              contexts: toLangevalsContexts(data.contexts),
+              expected_contexts: toLangevalsContexts(data.expected_contexts),
               expected_output: convertTo(data.expected_output, "string"),
               conversation: convertTo(data.conversation, "array"),
             },

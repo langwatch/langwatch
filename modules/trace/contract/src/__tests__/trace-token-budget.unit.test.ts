@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   cutToEstimatedTokens,
   cutToEstimatedTokensAtLineBreak,
+  cutToEstimatedTokensKeepingEnds,
   estimateTokensFromBytes,
 } from "../trace-token-budget.ts";
 
@@ -76,6 +77,61 @@ describe("cutToEstimatedTokensAtLineBreak", () => {
       const cut = cutToEstimatedTokensAtLineBreak({ text: "a".repeat(100), maxTokens: 5 });
 
       expect(cut).toHaveLength(20);
+    });
+  });
+});
+
+describe("cutToEstimatedTokensKeepingEnds", () => {
+  const text = `OPENING ${"middle ".repeat(2_000)}ENDING`;
+
+  describe("given text within the budget", () => {
+    it("returns it untouched", () => {
+      expect(cutToEstimatedTokensKeepingEnds({ text: "short", maxTokens: 100 })).toBe("short");
+    });
+  });
+
+  describe("given text over the budget", () => {
+    /** @scenario "A text cut for a judge keeps its opening and its ending" */
+    it("keeps the opening and the ending with a marker naming what was left out", () => {
+      const cut = cutToEstimatedTokensKeepingEnds({ text, maxTokens: 200 });
+
+      expect(estimateTokensFromBytes(cut)).toBeLessThanOrEqual(200);
+      expect(cut.startsWith("OPENING")).toBe(true);
+      expect(cut.endsWith("ENDING")).toBe(true);
+      const omitted = Number(/\[\.\.\. (\d+) tokens omitted/.exec(cut)?.[1]);
+      expect(omitted).toBeGreaterThan(estimateTokensFromBytes(text) - 200);
+    });
+
+    /** @scenario "A text cut for a judge keeps its opening and its ending" */
+    it("does not leave a half-decoded character at either end", () => {
+      const cut = cutToEstimatedTokensKeepingEnds({ text: "漢".repeat(1_000), maxTokens: 101 });
+
+      expect(cut).not.toContain("\uFFFD");
+      expect(estimateTokensFromBytes(cut)).toBeLessThanOrEqual(101);
+    });
+
+    /** @scenario "A text cut for a judge keeps its opening and its ending" */
+    it("keeps whole lines when asked to", () => {
+      const lines = Array.from({ length: 400 }, (_, i) => `line number ${i}`).join("\n");
+
+      const cut = cutToEstimatedTokensKeepingEnds({
+        text: lines,
+        maxTokens: 150,
+        atLineBreak: true,
+      });
+
+      const kept = cut.split("\n").filter((line) => line && !line.startsWith("[..."));
+      expect(kept.every((line) => /^line number \d+$/.test(line))).toBe(true);
+      expect(kept[0]).toBe("line number 0");
+      expect(kept.at(-1)).toBe("line number 399");
+    });
+  });
+
+  describe("given a budget too small to keep two readable ends", () => {
+    it("falls back to cutting the head", () => {
+      expect(cutToEstimatedTokensKeepingEnds({ text, maxTokens: 20 })).toBe(
+        cutToEstimatedTokens({ text, maxTokens: 20 }),
+      );
     });
   });
 });

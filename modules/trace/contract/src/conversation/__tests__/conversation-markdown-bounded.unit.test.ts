@@ -103,6 +103,29 @@ describe("renderConversationMarkdown", () => {
       expect(result.text).toContain("truncated to fit the token budget");
     });
 
+    /** @scenario "A single turn larger than the whole budget is cut mid-turn" */
+    it("keeps the final turn's reply when it cuts that turn", () => {
+      const reply = `answer 3 ${"padding ".repeat(40)}FINAL REPLY`;
+      const turns = [
+        ...manyTurns(3),
+        makeTurn({
+          traceId: "t3",
+          timestamp: 1_700_000_003_000,
+          userText: `question 3 ${"padding ".repeat(40)}`,
+          output: reply,
+          assistantText: reply,
+        }),
+      ];
+      const oneTurn = renderConversationMarkdown({ turns: [turns[3]!] }).estimatedTokens;
+
+      const result = renderConversationMarkdown({ turns, maxTokens: Math.floor(oneTurn / 2) });
+
+      expect(result.estimatedTokens).toBeLessThanOrEqual(Math.floor(oneTurn / 2));
+      expect(result.text).toContain("question 3");
+      expect(result.text).toContain("FINAL REPLY");
+      expect(result.text).toMatch(/tokens omitted from the middle/);
+    });
+
     it("counts only the turns that were dropped whole as omitted", () => {
       const turns = manyTurns(4);
       const oneTurn = renderConversationMarkdown({
