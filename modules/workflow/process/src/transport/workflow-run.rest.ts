@@ -19,7 +19,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withNamespace("workflow-run")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("project")
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
 
   .post("/api/optimization/:workflowId/:versionId", "postApiOptimizationByWorkflowIdByVersionId")
   .withParams(workflowRunRestVersionedParamsSchema)

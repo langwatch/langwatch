@@ -15,15 +15,15 @@ export type TraceSearchResponse =
   paths["/api/v1/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * What `GET /api/traces/facets` takes. `field` is what splits the two answers: without it the
+ * What `GET /api/v1/traces/facets` takes. `field` is what splits the two answers: without it the
  * endpoint describes every facet the project has, with it one field's values.
  */
 export type TraceFacetsQuery = NonNullable<
-  paths["/api/traces/facets"]["get"]["parameters"]["query"]
+  paths["/api/v1/traces/facets"]["get"]["parameters"]["query"]
 >;
 
 export type TraceFacetsResponse =
-  paths["/api/traces/facets"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/traces/facets"]["get"]["responses"]["200"]["content"]["application/json"];
 
 type TraceGetResponseRaw =
   paths["/api/v1/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -90,7 +90,7 @@ export class TracesApiService {
    * reference names this door instead of inlining a snapshot of it.
    */
   async facets(query?: TraceFacetsQuery): Promise<TraceFacetsResponse> {
-    const { data, error, response } = await this.apiClient.GET("/api/traces/facets", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/traces/facets", {
       params: { query: query ?? {} },
     });
     if (error) this.handleApiError("read trace facets", error, response);

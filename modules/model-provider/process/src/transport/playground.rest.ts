@@ -1,6 +1,6 @@
 /**
- * `POST /api/playground` — the model playground's streaming proxy. The door
- * uses the browser session and the project named by its parsed header target.
+ * `POST /api/v1/playground` (and bare `/api/playground`) — the model playground's streaming
+ * proxy. The door uses the browser session and the project named by its parsed header target.
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
@@ -12,7 +12,7 @@ import {
 export const playgroundRest = defineRestRouter(ModelProviderApi)
   .withNamespace("playground")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
   .withCredential("browser")
 
   .post("/api/playground", "runPlaygroundCompletion")

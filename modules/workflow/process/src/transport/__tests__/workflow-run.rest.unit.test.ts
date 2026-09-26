@@ -42,4 +42,22 @@ describe("the synchronous workflow run routes", () => {
       inputs: { question: "hello" },
     });
   });
+
+  it.each([
+    "/api/v1/workflows/workflow_1/run",
+    "/api/workflows/workflow_1/run",
+    "/api/v1/optimization/workflow_1/version_1",
+    "/api/optimization/workflow_1/version_1",
+  ])("answers the same run at %s", async (path) => {
+    const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
+
+    const response = await mount(runSynchronous).request(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question: "hello" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: "success" });
+  });
 });

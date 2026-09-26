@@ -40,9 +40,9 @@ function mount(
     onError: createErrorHandler(),
   });
 
-  return (body: unknown = { messages: [] }) =>
+  return (body: unknown = { messages: [] }, path = "/api/playground") =>
     hono.fetch(
-      new Request("http://api.test/api/playground", {
+      new Request(`http://api.test${path}`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -90,4 +90,24 @@ describe("the playground door", () => {
       messages: [{ role: "user", content: "hello" }],
     });
   });
+
+  it.each(["/api/v1/playground", "/api/playground"])(
+    "answers the same completion at %s",
+    async (path) => {
+      const completion: ModelProviderPlaygroundCompletion = {
+        status: 200,
+        mediaType: "text/plain",
+        headers: { "content-type": "text/plain" },
+        body: (async function* () {
+          yield new TextEncoder().encode("ok");
+        })(),
+      };
+      const response = await mount({
+        modelProviders: { runPlaygroundCompletion: async () => completion },
+      })({ messages: [] }, path);
+
+      expect(response.status).toBe(200);
+      await expect(response.text()).resolves.toBe("ok");
+    },
+  );
 });

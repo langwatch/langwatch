@@ -40237,7 +40237,7 @@
         }
       }
     },
-    "/api/playground": {
+    "/api/v1/playground": {
       "post": {
         "operationId": "runPlaygroundCompletion",
         "responses": {
@@ -67398,7 +67398,7 @@
         }
       }
     },
-    "/api/optimization/{workflowId}/{versionId}": {
+    "/api/v1/optimization/{workflowId}/{versionId}": {
       "post": {
         "operationId": "postApiOptimizationByWorkflowIdByVersionId",
         "responses": {
@@ -67515,7 +67515,7 @@
         }
       }
     },
-    "/api/workflows/{workflowId}/run": {
+    "/api/v1/workflows/{workflowId}/run": {
       "post": {
         "operationId": "postApiWorkflowsByWorkflowIdRun",
         "responses": {
@@ -67623,7 +67623,7 @@
         }
       }
     },
-    "/api/workflows/{workflowId}/{versionId}/run": {
+    "/api/v1/workflows/{workflowId}/{versionId}/run": {
       "post": {
         "operationId": "postApiWorkflowsByWorkflowIdByVersionIdRun",
         "responses": {
@@ -70702,7 +70702,7 @@
         ]
       }
     },
-    "/api/traces/facets": {
+    "/api/v1/traces/facets": {
       "get": {
         "operationId": "getApiTracesFacets",
         "tags": [
@@ -71030,7 +71030,7 @@
         ]
       }
     },
-    "/api/dataset/attachments": {
+    "/api/v1/dataset/attachments": {
       "post": {
         "operationId": "postApiDatasetAttachments",
         "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",

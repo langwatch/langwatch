@@ -54,7 +54,7 @@ export async function formatSchema(
 /** What the field's values column says: the closed set, or where to read an open one. */
 const knownValuesCell = (field: { knownValues: readonly string[]; facetable: boolean }): string => {
   if (field.knownValues.length > 0) return field.knownValues.join(", ");
-  return field.facetable ? "open set, read them from GET /api/traces/facets" : "";
+  return field.facetable ? "open set, read them from GET /api/v1/traces/facets" : "";
 };
 
 function formatFilters(reference?: QueryReferenceResponse): string {

@@ -54,7 +54,7 @@ describe("formatSchema()", () => {
 
     it("says where the open value sets come from", async () => {
       const result = await formatSchema("filters", reference);
-      expect(result).toContain("/api/traces/facets");
+      expect(result).toContain("/api/v1/traces/facets");
     });
 
     it("shows worked filters", async () => {
