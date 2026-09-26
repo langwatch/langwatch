@@ -1,4 +1,3 @@
-import { microsoftProfileRekey } from "@ee/sso/microsoft-account-rekey";
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
@@ -17,6 +16,7 @@ import {
   identityStorageAdapter,
   lastWayInGuard,
   mfaCeremonies,
+  microsoftAccountRekey,
   PASSWORD_HASH_ROUNDS,
   passkeySignUp,
   passwordResetSessionBridge,
@@ -31,7 +31,6 @@ import {
   ssoRegisteredIssuers,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
-import { prisma } from "~/server/db";
 
 import { databaseHooks } from "./config/database-hooks";
 import { emailAndPassword } from "./config/email-and-password";
@@ -184,7 +183,7 @@ export const auth = betterAuth({
 
   secondaryStorage: store,
   socialProviders: buildSocialProviders(env, {
-    onMicrosoftProfile: microsoftProfileRekey({ prisma }),
+    onMicrosoftProfile: microsoftAccountRekey(),
   }),
 
   plugins: plugins({
