@@ -215,11 +215,15 @@ describe("the api process installation", () => {
   it("serves the drawer's coding-agent reads under codingAgents, not traces", () => {
     const procedures = serverModules
       .flatMap((module) => module.transports ?? [])
-      .flatMap((transport) =>
-        "protocol" in transport && transport.protocol === "trpc"
-          ? Object.keys(transport.contract.members).map((name) => `${transport.namespace}.${name}`)
-          : [],
-      );
+      .flatMap((transport) => {
+        if (transport.protocol !== "trpc" || !("contract" in transport)) return [];
+        const { contract } = transport;
+        if (typeof contract !== "object" || contract === null || !("members" in contract))
+          return [];
+        const { members } = contract;
+        if (typeof members !== "object" || members === null) return [];
+        return Object.keys(members).map((name) => `${transport.namespace}.${name}`);
+      });
 
     expect(procedures).toEqual(
       expect.arrayContaining(["codingAgents.session", "codingAgents.transcript"]),
