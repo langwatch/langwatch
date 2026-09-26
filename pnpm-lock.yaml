@@ -2483,6 +2483,9 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../../../../packages/error-presentation
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/gateway/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error

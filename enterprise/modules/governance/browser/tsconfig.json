@@ -11,6 +11,7 @@
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
+      "@langwatch/gateway-contract": ["../../../../modules/gateway/contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"],
       "@langwatch/authz-browser-kit/scope-picker": [
         "../../../../modules/authz/browser-kit/src/scope-picker/index.ts"
@@ -51,6 +52,9 @@
     },
     {
       "path": "../../../../packages/error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/handled-error/tsconfig.build.json"

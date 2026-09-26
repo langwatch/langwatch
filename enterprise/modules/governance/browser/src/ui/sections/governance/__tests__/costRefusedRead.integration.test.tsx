@@ -1,9 +1,12 @@
 /** @vitest-environment jsdom */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 import "@testing-library/jest-dom/vitest";
-import type React from "react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
+import { fakeGovernanceHost } from "../../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   /** tRPC's own code for the summary read: null when it answers cleanly. */
@@ -12,37 +15,7 @@ const harness = vi.hoisted(() => ({
   isEnterprise: true,
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-    organizations: [],
-    project: undefined,
-    hasPermission: () => true,
-    hasOrgPermission: () => true,
-    hasAnyPermission: () => true,
-  }),
-}));
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
-}));
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({
-    isEnterprise: harness.isEnterprise,
-    activePlan: undefined,
-  }),
-}));
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-}));
-vi.mock("~/components/NotFoundScene", () => ({
-  NotFoundScene: () => <div>this page does not exist</div>,
-}));
-vi.mock("~/components/LoadingScreen", () => ({
-  LoadingScreen: () => <div>loading</div>,
-}));
-
-vi.mock("~/utils/api", () => {
+vi.mock("../../../../behavior/governance-api.ts", () => {
   // Shaped the way tRPC hands a failure to a component: the code rides on
   // `error.data.code`, and the page reads that rather than the message.
   const failure = (code: string | null) =>
@@ -92,10 +65,19 @@ vi.mock("~/utils/api", () => {
 
 const { default: CostsPage } = await import("../governance-costs.screen.tsx");
 
+/** The org admin's real grants, over the plan the test names. */
+const costsHost = () =>
+  fakeGovernanceHost({
+    permissions: [...builtinRolePermissions("org-admin"), ...builtinRolePermissions("admin")],
+    plan: { isEnterprise: harness.isEnterprise, isLoading: false },
+  });
+
 function renderPage() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <CostsPage />
+      <GovernanceHostProvider value={costsHost()}>
+        <CostsPage />
+      </GovernanceHostProvider>
     </ChakraProvider>,
   );
 }

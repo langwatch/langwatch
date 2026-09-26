@@ -42,7 +42,8 @@ import {
 } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
-import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
+import type { AiToolEntry } from "../../../features/ai-tools/model/ai-tool-tile.ts";
+import { AiToolEntryDrawer } from "../../../features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx";
 import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/use-ai-tool-catalog.ts";
 import { DashboardSelect } from "../../../features/ingestion-sources/dashboard-select.tsx";
 import type { EnvironmentRow } from "../../../features/ingestion-sources/environments/discovered-environments.ts";
@@ -71,7 +72,11 @@ import {
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
 import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
+import { CatalogLayoutControl } from "../../../features/ingestion-sources/toolCatalog/catalog-layout-control.tsx";
+import { InventoryCatalogPane } from "../../../features/ingestion-sources/toolCatalog/inventory-catalog-pane.tsx";
+import { RemoveToolDialog } from "../../../features/ingestion-sources/toolCatalog/remove-tool-dialog.tsx";
 import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/tool-cards.ts";
+import type { ToolCatalogLayout } from "../../../features/ingestion-sources/toolCatalog/tool-catalog-cards.tsx";
 import { catalogCards } from "../../../features/ingestion-sources/toolCatalog/tool-catalog-tab.tsx";
 import { AddIngestionSourceMenu } from "../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
 import { PullCadenceField } from "../../../features/ingestion-sources/ui/elements/pull-cadence-field.tsx";
@@ -512,22 +517,23 @@ function useIngestionSourceMutations({
  * Keeping them apart also keeps either one small enough to follow.
  */
 function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManageTools: boolean }) {
-  /**
-   * The organization's tool registry, read here only for the resume strip's
-   * "N tools" figure (`countableCatalogCards`, below).
-   *
-   * The Catalog pane itself is `ToolCatalogPanel` — its own read, its own
-   * drawer, its own delete confirmation, all self-contained (see that
-   * component's docstring). This is a second instance of the same hook, kept
-   * to a different purpose; the underlying query is cached by organization
-   * id, so it is not a second network read.
-   */
   const catalog = useAiToolCatalog({
     organizationId: orgId,
     enabled: canManageTools,
   });
 
+  /* Page state, not a routed drawer: `AiToolEntryDrawer` takes its target as an in-memory entry. */
+  const [toolDrawer, setToolDrawer] = useState<
+    { mode: "create"; type: AiToolEntry["type"] } | { mode: "edit"; entry: AiToolEntry } | null
+  >(null);
+
+  const startToolRegistration = useCallback(() => {
+    setToolDrawer({ mode: "create", type: "coding_assistant" });
+  }, []);
+
   const sample = useSampleMode();
+
+  const [catalogLayout, setCatalogLayout] = useState<ToolCatalogLayout>("grid");
 
   const [addingEnvironment, setAddingEnvironment] = useState(false);
   /**
@@ -556,7 +562,12 @@ function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManage
 
   return {
     catalog,
+    toolDrawer,
+    setToolDrawer,
+    startToolRegistration,
     sample,
+    catalogLayout,
+    setCatalogLayout,
     addingEnvironment,
     setAddingEnvironment,
     addedEnvironments,
@@ -603,7 +614,9 @@ function useIngestionSourcesPage() {
     isPlanLoading,
     isPermissionLoading: isOrganizationLoading,
     canManage,
+    canManageTools,
     startComposer: composer.startComposer,
+    startToolRegistration: panes.startToolRegistration,
   });
 
   return {
@@ -791,19 +804,21 @@ function openAddFlow({
   requested,
   isEnterprise,
   canManage,
+  canManageTools,
   startComposer,
+  startToolRegistration,
 }: {
   requested: string;
   isEnterprise: boolean;
   canManage: boolean;
+  canManageTools: boolean;
   startComposer: (sourceType: SourceType) => void;
+  startToolRegistration: () => void;
 }) {
-  // `ADD_TOOL_PARAM` ("1") used to open a page-level tool-registration
-  // drawer. The Catalog pane is `ToolCatalogPanel` now, which owns that
-  // drawer's state itself and has no external open trigger, so the deep
-  // link degrades to a no-op rather than reaching into another
-  // component's state.
-  if (requested === ADD_TOOL_PARAM) return;
+  if (requested === ADD_TOOL_PARAM) {
+    if (canManageTools) startToolRegistration();
+    return;
+  }
   if (!canManage) return;
   const sourceType = requestedSourceType({ requested, isEnterprise });
   if (sourceType) startComposer(sourceType);
@@ -814,13 +829,17 @@ function useAddParam({
   isPlanLoading,
   isPermissionLoading,
   canManage,
+  canManageTools,
   startComposer,
+  startToolRegistration,
 }: {
   isEnterprise: boolean;
   isPlanLoading: boolean;
   isPermissionLoading: boolean;
   canManage: boolean;
+  canManageTools: boolean;
   startComposer: (sourceType: SourceType) => void;
+  startToolRegistration: () => void;
 }) {
   const [searchParams, setSearchParams] = useGovernanceSearchParams();
   const requested = searchParams.get("add");
@@ -835,7 +854,9 @@ function useAddParam({
       requested,
       isEnterprise,
       canManage,
+      canManageTools,
       startComposer,
+      startToolRegistration,
     });
     setSearchParams(withoutAddParam, { replace: true });
   }, [
@@ -844,7 +865,9 @@ function useAddParam({
     isPermissionLoading,
     isEnterprise,
     canManage,
+    canManageTools,
     startComposer,
+    startToolRegistration,
     setSearchParams,
   ]);
 }
@@ -862,12 +885,8 @@ function useAddParam({
  * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
  * the same component.
  *
- * THE CATALOG PANE IS `ToolCatalogPanel`, whole. Its `AiToolEntry` registry
- * read, its drag-to-reorder editor, its starter-pack import and its
- * registration drawer are all its own — mounted here rather than rebuilt,
- * so a tool registered from this page cannot drift from one registered from
- * the tool-catalog editor's own former standalone route. Registering and
- * editing a tool here opens that panel's own drawer.
+ * The Catalog pane is `ToolCatalogTab`, over the page's own registry read;
+ * registering or editing a tool opens `AiToolEntryDrawer` from the page.
  */
 const INVENTORY_TABS = ["catalog", "environments", "sources"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
@@ -875,27 +894,19 @@ type InventoryTab = (typeof INVENTORY_TABS)[number];
 const isInventoryTab = (value: string | null): value is InventoryTab =>
   INVENTORY_TABS.some((tab) => tab === value);
 
-/**
- * A selected non-default tab is part of the address (?tab=); the default stays
- * out of it, and an unknown or stale value degrades to the default instead of
- * a blank pane.
- *
- * The default is permission-sensitive — Catalog for `aiTools:manage` holders,
- * Sources otherwise — because the Catalog pane is `ToolCatalogPanel`, which
- * gates on that grant and shows a permission notice without it. So the bare
- * address means "your default pane" and can resolve differently for
- * different recipients of the same link; the `?tab=` form is the stable
- * shareable address.
- */
-function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
+/** The pane a bare address opens on, the same for every reader. */
+const DEFAULT_INVENTORY_TAB: InventoryTab = "catalog";
+
+/** A non-default tab lives in the address (?tab=); an unknown value degrades to the default. */
+function useInventoryTab() {
   const [searchParams, setSearchParams] = useGovernanceSearchParams();
   const requestedTab = searchParams.get("tab");
-  const inventoryTab = isInventoryTab(requestedTab) ? requestedTab : defaultTab;
+  const inventoryTab = isInventoryTab(requestedTab) ? requestedTab : DEFAULT_INVENTORY_TAB;
   const selectInventoryTab = (tab: string) =>
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (tab === defaultTab) next.delete("tab");
+        if (tab === DEFAULT_INVENTORY_TAB) next.delete("tab");
         else next.set("tab", tab);
         return next;
       },
@@ -1052,11 +1063,6 @@ function AddEnvironmentControl({ onAdd }: { onAdd: () => void }) {
  * on every screen, so a reader who found "See sample data" on Costs finds it
  * here without looking. At most one is solid: the single thing this pane is
  * for adding.
- *
- * The Catalog pane has none of its own: `ToolCatalogPanel` (below) owns its
- * own create affordance per tile type, the way the tool-catalog editor always
- * has, so a header-level "Add tool" here would be a second, differently
- * behaved copy of a create flow that already has a home.
  */
 function InventoryHeaderActions({
   page,
@@ -1067,8 +1073,11 @@ function InventoryHeaderActions({
 }) {
   return (
     <HStack gap={2} flexShrink={0}>
+      {inventoryTab === "catalog" && (
+        <CatalogLayoutControl layout={page.catalogLayout} onChange={page.setCatalogLayout} />
+      )}
       <SampleDataToggle active={page.sample.active} onToggle={page.sample.toggle} size="sm" />
-      {inventoryTab === "sources" && page.canManage && (
+      {page.canManage && (
         <AddSourceControl
           isEnterprise={page.isEnterprise}
           sourceCount={page.sourcesQuery.data?.length ?? 0}
@@ -1092,9 +1101,8 @@ function InventoryHeaderActions({
  * grant and a registry read still in flight both land on null, because "0
  * tools" is a claim about the organization and neither of them supports it.
  *
- * The pane itself is not built from this — `ToolCatalogPanel` reads the
- * registry again on its own hook instance and has its own loading and error
- * states. This is only what the COUNTERS may say, and the two answers are
+ * The pane itself is not built from this — it calls `catalogCards` again and
+ * has its own loading and error states. This is only what the COUNTERS may say, and the two answers are
  * deliberately allowed to differ: the pane may show a spinner while the tab
  * beside it simply shows no number.
  */
@@ -1157,9 +1165,7 @@ function InventorySummaryStrip({
 function InventoryPage() {
   const page = useIngestionSourcesPage();
   const { orgId, destinationCtx, sourcesQuery, mutations } = page;
-  const { inventoryTab, selectInventoryTab } = useInventoryTab({
-    defaultTab: page.canManageTools ? "catalog" : "sources",
-  });
+  const { inventoryTab, selectInventoryTab } = useInventoryTab();
 
   const cards = countableCatalogCards(page);
   const environments = environmentRows({
@@ -1211,7 +1217,15 @@ function InventoryPage() {
           // silence that leaves the Sources tab uncounted beside it.
           environmentCount={sources === undefined ? undefined : environments.length}
           sourceCount={sources?.length}
-          catalog={<ToolCatalogPanel />}
+          catalog={
+            <InventoryCatalogPane
+              catalog={page.catalog}
+              canManage={page.canManageTools}
+              sampleActive={page.sample.active}
+              layout={page.catalogLayout}
+              onEdit={(entry) => page.setToolDrawer({ mode: "edit", entry })}
+            />
+          }
           environments={
             <EnvironmentsTab
               canRead={page.canRead}
@@ -1253,6 +1267,19 @@ function InventoryOverlays({ page }: { page: ReturnType<typeof useIngestionSourc
       />
 
       <SecretModal details={page.secretModal} onClose={() => page.setSecretModal(null)} />
+
+      <AiToolEntryDrawer
+        organizationId={orgId}
+        state={page.toolDrawer}
+        onClose={() => page.setToolDrawer(null)}
+      />
+
+      <RemoveToolDialog
+        pending={page.catalog.pendingDelete}
+        isRemoving={page.catalog.isRemoving}
+        onCancel={() => page.catalog.setPendingDelete(null)}
+        onConfirm={page.catalog.confirmDelete}
+      />
 
       <EditingSourceDrawer
         orgId={orgId}

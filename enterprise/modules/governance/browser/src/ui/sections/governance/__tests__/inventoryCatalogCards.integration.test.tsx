@@ -218,13 +218,6 @@ describe("given an admin on the Inventory page", () => {
   describe("when the catalog is in view", () => {
     beforeEach(connectTools);
 
-    /** @scenario "Registering a tool opens the registration drawer" */
-    it("opens the tool registration drawer from Add tool", async () => {
-      renderScreen();
-      await userEvent.click(screen.getAllByRole("button", { name: /Add tool/ })[0]!);
-      expect(await screen.findByRole("heading", { name: /Add tool/ })).toBeInTheDocument();
-    });
-
     /** @scenario "The add deep link opens the registration drawer" */
     it("opens the registration drawer from the add deep link", async () => {
       renderScreen({ at: "/governance/inventory?tab=catalog&add=1" });

@@ -1,25 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment jsdom
- *
- * The inventory page is a tabbed shell whose selected tab is part of the
- * address (?tab=), with a permission-sensitive default: Catalog (the
- * tool-tiles editor) for admins holding aiTools:manage, Sources for
- * everyone else. These tests mount the real page over a host that holds a
- * live query string — the tab value is read back out of the address the
- * host reports, so the assertions run against the same address the user
- * sees: the default is never written to it, and an unknown value degrades
- * to the default instead of a blank pane.
- *
- * Only the boundaries are mocked, and there is now one of them: the tRPC
- * client. The layout chrome, the feature flag, the plan and the address all
- * come from the governance host, which is a test double rather than a mocked
- * module. The tab selection and what mounts inside each pane are the real
- * page's doing.
- *
+ * The inventory tab shell: ?tab= in the address, defaulting to Catalog for every reader.
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
  */
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -38,6 +25,12 @@ const VIEWER_PERMISSIONS = ["organization:view", "governance:view", "ingestionSo
 
 /** The viewer set plus the catalog's own grant. */
 const CATALOG_ADMIN_PERMISSIONS = [...VIEWER_PERMISSIONS, "aiTools:manage"];
+
+/** The org-member floor alone: neither the registry nor the source read. */
+const NO_SOURCES_READ_PERMISSIONS = ["organization:view", "governance:view"];
+
+/** The catalog admin plus the sources write grant. */
+const SOURCES_ADMIN_PERMISSIONS = [...CATALOG_ADMIN_PERMISSIONS, "ingestionSources:manage"];
 
 vi.mock("../../../../behavior/governance-api.ts", () => {
   const queryResult = () => ({
@@ -87,33 +80,48 @@ import InventoryPage from "../governance-inventory.screen.tsx";
 function renderInventoryAt({
   permissions,
   query = {},
+  isEnterprise = true,
 }: {
   permissions: readonly string[];
   query?: GovernanceQuery;
+  isEnterprise?: boolean;
 }) {
-  const host = fakeGovernanceHost({ permissions, query });
+  const host = fakeGovernanceHost({
+    permissions,
+    query,
+    plan: { isEnterprise, isLoading: false },
+  });
   renderWithGovernanceHost(<InventoryPage />, { host });
   return host;
 }
 
 beforeEach(() => {
+  window.sessionStorage.clear();
   harness.requested = [];
 });
 
 afterEach(() => cleanup());
 
 describe("the inventory tab shell", () => {
-  describe("when an aiTools:manage admin opens the bare address", () => {
+  /** @scenario "Switching governance tabs unmounts the inactive content" */
+  it("unmounts the catalog content when switching to Sources", async () => {
+    renderInventoryAt({ permissions: VIEWER_PERMISSIONS });
+    const content = screen.getByRole("tabpanel").firstElementChild;
+    expect(content).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /^Sources/ }));
+    await waitFor(() => expect(content).not.toBeInTheDocument());
+  });
+
+  describe("when an admin opens the bare address", () => {
     /** @scenario "The inventory default tab stays out of the address" */
-    it("selects Catalog, mounts the tool-tiles editor, and writes no tab parameter", () => {
+    it("selects Catalog, mounts the tools catalog, and writes no tab parameter", () => {
       const host = renderInventoryAt({ permissions: CATALOG_ADMIN_PERMISSIONS });
 
-      expect(screen.getByRole("tab", { name: "Catalog" }).getAttribute("aria-selected")).toBe(
-        "true",
-      );
-      // The editor body carries its own inner tab strip, unchanged from
-      // the retired tool-catalog page.
-      expect(screen.getByRole("tab", { name: "Tool Tiles" })).toBeTruthy();
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("tool-catalog-empty")).toBeVisible();
+      // Guards against re-mounting the retired tile editor on this pane.
+      expect(screen.queryByRole("tab", { name: "Tool Tiles" })).toBeNull();
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
       expect(host.recording.queries).toEqual([]);
     });
   });
@@ -121,57 +129,105 @@ describe("the inventory tab shell", () => {
   describe("when an aiTools:manage admin addresses the Sources tab", () => {
     /** @scenario "The Sources tab is addressable" */
     it("selects Sources and mounts the table", () => {
-      renderInventoryAt({
-        permissions: CATALOG_ADMIN_PERMISSIONS,
-        query: { tab: "sources" },
-      });
+      renderInventoryAt({ permissions: CATALOG_ADMIN_PERMISSIONS, query: { tab: "sources" } });
 
-      expect(screen.getByRole("tab", { name: "Sources" }).getAttribute("aria-selected")).toBe(
+      expect(screen.getByRole("tab", { name: /^Sources/ })).toHaveAttribute(
+        "aria-selected",
         "true",
       );
       expect(harness.requested).toContain("ingestionSources.list");
     });
   });
 
-  describe("when a delegated viewer opens the bare address", () => {
-    /** @scenario "A delegated viewer without aiTools:manage defaults to Sources" */
-    it("selects Sources, mounts the table, and writes no tab parameter", () => {
+  describe("when a delegated viewer without aiTools:manage opens the bare address", () => {
+    /** @scenario "The bare address opens the same pane for every reader" */
+    it("lands on Catalog, the same pane the admin gets, and writes no tab parameter", () => {
       const host = renderInventoryAt({ permissions: VIEWER_PERMISSIONS });
 
-      expect(screen.getByRole("tab", { name: "Sources" }).getAttribute("aria-selected")).toBe(
-        "true",
-      );
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute("aria-selected", "true");
       expect(harness.requested).toContain("ingestionSources.list");
       expect(host.recording.queries).toEqual([]);
     });
 
-    /** @scenario "A delegated viewer without aiTools:manage defaults to Sources" */
-    it("still lists the Catalog tab, which shows the permission notice in-pane", async () => {
+    /** @scenario "The Sources tab is addressable" */
+    it("can still reach Sources, which selects and writes the tab parameter", async () => {
       const host = renderInventoryAt({ permissions: VIEWER_PERMISSIONS });
 
-      const catalogTab = screen.getByRole("tab", { name: "Catalog" });
-      fireEvent.click(catalogTab);
+      const sourcesTab = screen.getByRole("tab", { name: /^Sources/ });
+      fireEvent.click(sourcesTab);
 
-      // Selection round-trips through the address (?tab=catalog), and the
-      // pane mounts a tick after the trigger's aria state flips.
-      await waitFor(() => expect(catalogTab.getAttribute("aria-selected")).toBe("true"));
-      expect(host.recording.queries).toEqual([{ next: { tab: "catalog" }, replace: true }]);
-      expect(await screen.findByText(/aiTools:manage/)).toBeTruthy();
+      await waitFor(() => expect(sourcesTab).toHaveAttribute("aria-selected", "true"));
+      expect(host.recording.queries).toEqual([{ next: { tab: "sources" }, replace: true }]);
+    });
+  });
+
+  describe("when the reader holds neither the registry nor the source grant", () => {
+    /** @scenario "A reader without the registry grant meets the grant, not an empty catalog" */
+    it("still selects Catalog, and names the grant instead of reporting no tools", () => {
+      renderInventoryAt({ permissions: NO_SOURCES_READ_PERMISSIONS });
+
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText(/aiTools:manage/)).toBeVisible();
+      expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
+      expect(harness.requested).not.toContain("aiTools.adminList");
+      expect(harness.requested).not.toContain("ingestionSources.list");
+      // No count: a "0" would claim an empty organization this reader cannot see.
+      expect(screen.getByRole("tab", { name: "Catalog" }).textContent).toBe("Catalog");
+    });
+  });
+
+  describe("when an admin arrives on the retired anomaly-rules tab value", () => {
+    /** @scenario "The retired anomaly-rules tab value lands on the catalog" */
+    it("lists no Anomaly rules tab and falls back to the catalog", () => {
+      renderInventoryAt({
+        permissions: [...CATALOG_ADMIN_PERMISSIONS, "anomalyRules:view"],
+        query: { tab: "anomaly-rules" },
+      });
+
+      expect(screen.queryByRole("tab", { name: /anomaly/i })).toBeNull();
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("tool-catalog-empty")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the address carries an add parameter for an offered type", () => {
+    /** @scenario "An add parameter opens the composer on that source type and leaves the address" */
+    it("opens the composer on that type and strips the parameter", async () => {
+      const host = renderInventoryAt({
+        permissions: SOURCES_ADMIN_PERMISSIONS,
+        query: { tab: "sources", add: "claude_code" },
+      });
+
+      expect(await screen.findByRole("heading", { name: /Add Claude Code/ })).toBeVisible();
+      await waitFor(() =>
+        expect(host.recording.queries).toContainEqual({ next: { tab: "sources" }, replace: true }),
+      );
+    });
+  });
+
+  describe("when the address carries an add parameter for a plan-locked type", () => {
+    /** @scenario "A locked add parameter is ignored and leaves the address" */
+    it("opens nothing and still strips the parameter", async () => {
+      const host = renderInventoryAt({
+        permissions: SOURCES_ADMIN_PERMISSIONS,
+        query: { tab: "sources", add: "claude_code" },
+        isEnterprise: false,
+      });
+
+      await waitFor(() =>
+        expect(host.recording.queries).toContainEqual({ next: { tab: "sources" }, replace: true }),
+      );
+      expect(screen.queryByRole("heading", { name: /Add Claude Code/ })).not.toBeInTheDocument();
     });
   });
 
   describe("when the address carries an unknown tab value", () => {
     /** @scenario "An unknown tab value falls back to the default" */
-    it("selects the admin default and mounts the editor instead of a blank pane", () => {
-      renderInventoryAt({
-        permissions: CATALOG_ADMIN_PERMISSIONS,
-        query: { tab: "nonsense" },
-      });
+    it("selects the default and mounts the catalog instead of a blank pane", () => {
+      renderInventoryAt({ permissions: CATALOG_ADMIN_PERMISSIONS, query: { tab: "nonsense" } });
 
-      expect(screen.getByRole("tab", { name: "Catalog" }).getAttribute("aria-selected")).toBe(
-        "true",
-      );
-      expect(screen.getByRole("tab", { name: "Tool Tiles" })).toBeTruthy();
+      expect(screen.getByRole("tab", { name: "Catalog" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("tool-catalog-empty")).toBeVisible();
     });
   });
 });

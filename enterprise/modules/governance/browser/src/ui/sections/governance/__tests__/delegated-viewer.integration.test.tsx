@@ -252,9 +252,12 @@ describe("governance pages for a delegated viewer", () => {
   describe("when the viewer can read ingestion sources but not manage them", () => {
     /** @scenario "The sources tab offers no controls a viewer cannot use" */
     it("offers no source authoring controls", () => {
+      // Addressed rather than defaulted: the inventory opens on Catalog, and the
+      // write notice under test lives on the Sources pane.
       renderPage({
         Page: InventoryPage,
         permissions: [...DELEGATED_VIEWER, "ingestionSources:view"],
+        query: { tab: "sources" },
       });
 
       expect(screen.queryByRole("button", { name: /Add source/ })).toBeNull();

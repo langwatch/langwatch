@@ -4,10 +4,13 @@
  * Tests cost breakdown panels handle real answers and loading states correctly.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 import "@testing-library/jest-dom/vitest";
-import type React from "react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
+import { fakeGovernanceHost } from "../../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   /** What each activity read answers. `undefined` means it has not answered. */
@@ -48,35 +51,7 @@ const harness = vi.hoisted(() => ({
   periodRecords: undefined as unknown,
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({
-    isLoading: false,
-    organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-    organizations: [],
-    project: undefined,
-    hasPermission: () => true,
-    hasOrgPermission: () => true,
-    hasAnyPermission: () => true,
-  }),
-}));
-
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
-}));
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({ isEnterprise: true, activePlan: undefined }),
-}));
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-}));
-vi.mock("~/components/NotFoundScene", () => ({
-  NotFoundScene: () => <div>this page does not exist</div>,
-}));
-vi.mock("~/components/LoadingScreen", () => ({
-  LoadingScreen: () => <div>loading</div>,
-}));
-
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../../behavior/governance-api.ts", () => ({
   api: {
     governanceCost: {
       spendByModel: {
@@ -180,10 +155,19 @@ vi.mock("~/utils/api", () => ({
 
 import CostsPage from "../governance-costs.screen.tsx";
 
+/** The org admin's real grants, over the plan the test names. */
+const costsHost = () =>
+  fakeGovernanceHost({
+    permissions: [...builtinRolePermissions("org-admin"), ...builtinRolePermissions("admin")],
+    plan: { isEnterprise: true, isLoading: false },
+  });
+
 const renderScreen = () =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <CostsPage />
+      <GovernanceHostProvider value={costsHost()}>
+        <CostsPage />
+      </GovernanceHostProvider>
     </ChakraProvider>,
   );
 

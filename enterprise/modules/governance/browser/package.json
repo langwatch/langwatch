@@ -34,6 +34,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",

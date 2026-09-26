@@ -14,6 +14,9 @@ export default defineConfig({
       "@langwatch/enterprise-governance-contract": fileURLToPath(
         new URL("../contract/src/index.ts", import.meta.url),
       ),
+      "@langwatch/gateway-contract": fileURLToPath(
+        new URL("../../../../modules/gateway/contract/src/index.ts", import.meta.url),
+      ),
     },
   },
 });
