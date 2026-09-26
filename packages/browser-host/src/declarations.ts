@@ -24,6 +24,16 @@ export type UiAuthenticationOverviewCardProps = {
  * string scopes to that organization, `null` means no organization context
  * (onboarding), `undefined` means the caller's organization is still loading.
  */
+export type UiTalkToItPanelProps = {
+  projectId: string;
+  projectSlug: string;
+  transport: string;
+  agentId: string;
+  agentRowId?: string;
+  name?: string;
+  onAgentCreated?: (agentRowId: string) => void;
+};
+
 export type UiJoinOfferProps = {
   currentOrganizationId: string | null | undefined;
   /** The way past, where "keep working on my own" is not what declining means. */
@@ -171,6 +181,7 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
+  talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;
   traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
   tracePreviewHoverCard: UiDeclaredComponent<UiTracePreviewHoverCardProps>;

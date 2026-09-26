@@ -38,6 +38,7 @@
     "@dnd-kit/core": "catalog:",
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
+    "@elevenlabs/client": "catalog:",
     "@emotion/react": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/agent-contract": "workspace:*",

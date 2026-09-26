@@ -3,12 +3,13 @@
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
 } from "@langwatch/model-provider-contract";
+import type { scenarioTrpc } from "@langwatch/scenario-contract";
 
 /**
  * A payload no contract package publishes yet.
@@ -24,8 +25,14 @@ type QL = { query: { input: Unpublished; output: Unpublished[] } };
 type M = { mutation: { input: Unpublished; output: Unpublished } };
 type S = { subscription: { input: Unpublished; output: Unpublished } };
 
+/** The voice-session doors, read off the contract rather than restated. */
+type VoiceSessionProcedures = Pick<
+  ContractApiMap<typeof scenarioTrpc>["scenarios"],
+  "mintVoiceSession" | "finishVoiceSession"
+>;
+
 export type ScenarioApiMap = {
-  scenarios: {
+  scenarios: VoiceSessionProcedures & {
     getAll: QL;
     getById: Q;
     getByIdIncludingArchived: Q;

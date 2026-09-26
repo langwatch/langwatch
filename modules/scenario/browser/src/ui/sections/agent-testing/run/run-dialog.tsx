@@ -7,14 +7,17 @@
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useCallback, useState } from "react";
 
+import { useVoiceAgentsEnabled } from "../../../../behavior/use-voice-agents-enabled.ts";
 import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field.tsx";
 import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context.ts";
+import { RunDialogCallBody } from "./run-dialog-call-body.tsx";
 import { RunDialogFields } from "./run-dialog-fields.tsx";
 import { RunDialogFooter } from "./run-dialog-footer.tsx";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types.ts";
 import { RUN_MISSING_MAPPINGS_TOOLTIP } from "./run-evaluators.ts";
 import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form.ts";
 import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit.ts";
+import { voiceCallTargetOf } from "./voice-call-target.ts";
 
 export type { RunDialogProps, RunDialogSubject, RunStartedInfo } from "./run-dialog-types.ts";
 
@@ -191,6 +194,11 @@ function RunDialogContent({
   subject: RunDialogSubject;
   onClose: () => void;
 } & ReturnType<typeof useRunDialogState>) {
+  // The panel opens in place of the fields; leaving the call returns to the dialog.
+  const [isCalling, setIsCalling] = useState(false);
+  const voiceAgentsEnabled = useVoiceAgentsEnabled();
+  const voiceCall = voiceAgentsEnabled ? voiceCallTargetOf({ form, subject }) : null;
+
   return (
     <Dialog.Root
       open={!!subject}
@@ -210,25 +218,32 @@ function RunDialogContent({
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
         <RunDialogHeader subject={subject} />
-        <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
-          <OpenListContext.Provider value={reportOpenList}>
-            <RunDialogFields
-              form={form}
-              isBusy={controller.isBusy}
-              onNameListOpenChange={setIsNameListOpen}
+        {isCalling && voiceCall ? (
+          <RunDialogCallBody voiceCall={voiceCall} onBack={() => setIsCalling(false)} />
+        ) : (
+          <>
+            <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+              <OpenListContext.Provider value={reportOpenList}>
+                <RunDialogFields
+                  form={form}
+                  isBusy={controller.isBusy}
+                  onNameListOpenChange={setIsNameListOpen}
+                />
+              </OpenListContext.Provider>
+            </Dialog.Body>
+            <RunDialogFooter
+              controller={controller}
+              isRunBlocked={isRunBlocked({ form, controller })}
+              blockedReason={runBlockedReason({ subject, form, controller })}
+              warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
+              onRun={onRun}
+              {...(voiceCall ? { onCallItMyself: () => setIsCalling(true) } : {})}
+              caseCount={form.caseCount}
+              targetCount={form.runTargets.length}
+              onClose={onClose}
             />
-          </OpenListContext.Provider>
-        </Dialog.Body>
-        <RunDialogFooter
-          controller={controller}
-          isRunBlocked={isRunBlocked({ form, controller })}
-          blockedReason={runBlockedReason({ subject, form, controller })}
-          warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
-          onRun={onRun}
-          caseCount={form.caseCount}
-          targetCount={form.runTargets.length}
-          onClose={onClose}
-        />
+          </>
+        )}
       </Dialog.Content>
     </Dialog.Root>
   );
