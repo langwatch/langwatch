@@ -357,18 +357,72 @@ export class PrismaProjectRepository
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
-    const result = await this.prisma.project.updateMany({
-      where: {
-        id: input.id,
-        archivedAt: null,
-        team: { organizationId: input.organizationId },
-      },
-      data: input.data,
-    });
-    if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+    for (let attempt = 1; attempt < TEAM_MOVE_ATTEMPTS; attempt++) {
+      try {
+        return await this.updateOnce(input);
+      } catch (error) {
+        if (!isRecordNotFound(error)) throw error;
+      }
+    }
+    return this.updateOnce(input);
+  }
+
+  private async updateOnce(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    const where = {
+      id: input.id,
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+    };
+    const movedFrom = await this.teamBeingLeft({ where, teamId: input.data.teamId });
+    if (movedFrom === null) {
+      const result = await this.prisma.project.updateMany({ where, data: input.data });
+      if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+      return this.mapProjectRequired(
+        await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      );
+    }
+
+    // The gateway caches a key's team budgets by the team of its project. A
+    // team move appends to the change feed it long-polls, in the same write,
+    // and only while the project is still on the team read above, so a
+    // concurrent move re-reads instead of recording a stale origin.
     return this.mapProjectRequired(
-      await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      await this.prisma.project.update({
+        where: { ...where, teamId: movedFrom },
+        data: {
+          ...input.data,
+          gatewayChangeEvents: {
+            create: {
+              organizationId: input.organizationId,
+              kind: "BUDGET_UPDATED",
+              payload: { projectTeamMoved: { fromTeamId: movedFrom, toTeamId: input.data.teamId } },
+            },
+          },
+        },
+      }),
     );
+  }
+
+  /**
+   * The team a project is leaving, when an update moves it to another one;
+   * `null` when the update keeps its team. A project outside the organization
+   * reads as not moving, so the plain update path refuses it as not found.
+   */
+  private async teamBeingLeft({
+    where,
+    teamId,
+  }: {
+    where: Prisma.ProjectWhereInput & { id: string };
+    teamId: string | undefined;
+  }): Promise<string | null> {
+    if (teamId === undefined) return null;
+    const current = await this.prisma.project.findFirst({ where, select: { teamId: true } });
+    if (!current || current.teamId === teamId) return null;
+    return current.teamId;
   }
 
   async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
@@ -630,4 +684,12 @@ export class PrismaProjectRepository
       traceSharingEnabled: row.traceSharingEnabled,
     });
   }
+}
+
+/** How many times an update re-reads the team when a concurrent move changed it underneath. */
+const TEAM_MOVE_ATTEMPTS = 3;
+
+/** Prisma P2025: the conditional move found the project on another team than the one it read. */
+function isRecordNotFound(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 }

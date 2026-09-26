@@ -87,7 +87,9 @@ The browser shows an "Approve" or "Send API key" button (depending on the chosen
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
 
 - **Scopes**: an organization admin gets the whole organization by default; other members get their teams plus their personal workspace. You can narrow the selection to specific teams or projects.
-- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Organization management stays off by default: the key cannot manage members and roles, or manage the organization, unless you turn those on under **Customize**.
+- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Management access stays off by default: the key cannot manage teams, or manage the organization's settings, members and roles. It can never delete the organization.
+
+To manage those from the CLI, log in with `langwatch login --device --management`. The authorize screen then shows a management access request listing what it adds. It needs the organization as the key's scope, and the key gets only the management permissions you hold in the organization; if you hold none, the approval is refused. Any command refused on a login key for one of these permissions names this re-login command.
 
 Project administration is the one thing that rides along. Model providers and project settings are gated by the project management permission, and that same permission answers a project create or delete request, so a key that can configure model providers can also create and delete projects in the scopes it covers. To withhold it, set **Project** to **Read** under **Customize**, which turns model provider writes off with it.
 
@@ -613,11 +615,16 @@ langwatch projects get proj_01HZX9K3MN...
 # Update project metadata
 langwatch projects update proj_01HZX9K3MN... --name "Renamed"
 
+# Move a project to another team (project and team by id, slug or name)
+langwatch projects move checkout --team Payments
+
 # Archive a project (soft-delete)
 langwatch projects delete proj_01HZX9K3MN...
 ```
 
 When creating a project, the CLI displays the service API key exactly once. Save it immediately. It cannot be retrieved later.
+
+A move runs the same checks as the project settings screen: the team must be an active team of the same organization, and a project cannot cross the personal workspace boundary. Gateway keys that send traces to the project switch to the new team's budgets right away.
 
 ### API keys
 
@@ -718,13 +725,16 @@ Teams group projects and the people who work on them.
 langwatch teams list
 langwatch teams get team_01HZ...
 langwatch teams create --name "Engineering"
+langwatch teams create --name "Payments" --copy-members-from team_01HZ...
 langwatch teams update team_01HZ... --name "Platform Engineering"
 langwatch teams archive team_01HZ...
 
 langwatch teams members list team_01HZ...
-langwatch teams members add team_01HZ... user_01HZX... --role MEMBER
+langwatch teams members add team_01HZ... user_01HZX... user_01HZY... --role MEMBER
 langwatch teams members remove team_01HZ... user_01HZX...
 ```
+
+`--copy-members-from` adds every member of the source team with the role they hold there. A member holding only a custom role is listed as not copied; bind it with `langwatch role-bindings create`. `teams members add` takes several users; one that cannot be added does not stop the rest, and the command fails naming it.
 
 ### Groups
 
@@ -926,6 +936,8 @@ langwatch gateway-budgets reset bgt_01HZ... --reason "contract renewed"
 langwatch gateway-budgets archive bgt_01HZ...
 ```
 
+A budget counts spend from the moment it is created: spend earlier in the current window is not counted against it. The budget commands take a project key or an organization key; an organization key needs no project.
+
 `--scope` is `organization|team|project|virtual-key|principal|group`, each paired with its own id flag. `--window` accepts `minute|hour|day|week|month|total|manual`, `--on-breach` is `block` (default) or `warn`, and `--limit` is USD. `--cycle-anchor-at` takes an RFC 3339 instant and cannot be used with `total` or `manual`; it is fixed at creation. List output colourises spent-vs-limit, red at 100%, yellow from 80%.
 
 ### Webhooks
@@ -990,6 +1002,7 @@ Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
 | `projects list        | get`                 | `project:view`        |
 | `projects create`     | `project:create`     |
 | `projects update`     | `project:update`     |
+| `projects move`       | `project:update`     |
 | `projects delete`     | `project:delete`     |
 | `api-keys list`       | `organization:view`  |
 | `api-keys create      | revoke`              | `organization:manage` |

@@ -10,6 +10,7 @@ export * from "./gateway.money.ts";
 export * from "./gateway-guardrail.ts";
 export * from "./gateway.realtime-session.ts";
 export * from "./gateway.api.ts";
+export * from "./gateway-key-caller.schemas.ts";
 export * from "./license-token.ts";
 export * from "./gateway-budget.trpc.ts";
 export * from "./gateway-cache-rule.trpc.ts";

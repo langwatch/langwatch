@@ -207,6 +207,37 @@ describe("loginCommand", () => {
         expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
         expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       });
+
+      /** @scenario A plain CLI login does not ask for management access */
+      it("does not ask for management access", async () => {
+        await loginCommand({ device: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ management: false }),
+        );
+      });
+    });
+
+    describe("when the command is invoked with --device --management", () => {
+      /** @scenario A CLI login with --management asks for management access */
+      it("asks the device login for management access", async () => {
+        await loginCommand({ device: true, management: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ management: true }),
+        );
+      });
+    });
+  });
+
+  describe("given --management with a project login", () => {
+    it("refuses, since only the device login key can carry management access", async () => {
+      await expect(loginCommand({ project: "checkout", management: true })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(runDeviceFlowLogin).not.toHaveBeenCalled();
+      expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
     });
   });
 

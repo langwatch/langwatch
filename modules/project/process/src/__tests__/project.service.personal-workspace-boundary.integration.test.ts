@@ -2,7 +2,8 @@
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -29,12 +30,6 @@ const credentials: ProjectCredentials = {
   generateApiKey: () => `sk-lw-test-${nanoid(16)}`,
 };
 
-/**
- * Only the `newTeamName` branch of `create` reaches Organization, and no test
- * here takes it: every case names an existing team.
- */
-const unusedOrganizations = {} as OrganizationApi;
-
 describe.skipIf(!DB_URL)(
   "given a personal workspace beside a shared team in one organization",
   () => {
@@ -43,10 +38,23 @@ describe.skipIf(!DB_URL)(
       logger: createTestLogger().logger,
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
+    /**
+     * The one Organization read every case here makes: the named team, live,
+     * in the organization. No case takes the `newTeamName` branch.
+     */
+    const organizations = createApiFixture<OrganizationApi>({
+      getTeam: async ({ teamId, organizationId }) => {
+        const team = await prisma.team.findFirst({
+          where: { id: teamId, organizationId, archivedAt: null },
+        });
+        if (!team) throw new TeamNotFoundError(teamId);
+        return team;
+      },
+    });
     const projects = ProjectService.create({
       repository: PrismaProjectRepository.create({ prisma }),
       credentials,
-      organizations: unusedOrganizations,
+      organizations,
     });
 
     let organizationId: string;

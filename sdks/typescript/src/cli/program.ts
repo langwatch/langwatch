@@ -4,7 +4,7 @@
 
 import { Command, Option } from "commander";
 
-import { setRequestedProject } from "../internal/credentialContext";
+import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -21,7 +21,13 @@ import {
   rendersOwnResult,
   type RawOutputFlags,
 } from "./utils/output";
-import { applyProjectOption, PROJECT_FLAG_HELP, projectSelectorOf } from "./utils/projectOption";
+import {
+  applyProjectOption,
+  COMMANDS_WITHOUT_PROJECT,
+  commandPath,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
 
 declare const __CLI_VERSION__: string;
 
@@ -246,6 +252,7 @@ const loginCommand = async (options?: {
   apiKey?: string;
   device?: boolean;
   browser?: string;
+  management?: boolean;
 }): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
@@ -306,6 +313,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     // the action runs so `resolveCredentials` reads it without the action
     // having to accept the value and pass it on.
     setRequestedProject(projectSelectorOf(actionCommand));
+    setRunsOutsideProject(commandPath(actionCommand) in COMMANDS_WITHOUT_PROJECT);
   });
 
   registerLoginCommands(program);
@@ -423,6 +431,10 @@ function registerLoginCommands(program: Command): void {
       "RFC 8628 device-flow login via your company SSO; signs this device in for the coding-assistant wrappers (credentials are issued on first use)",
     )
     .option(
+      "--management",
+      "With --device: the login key also gets the management access you hold in the organization (create and manage teams, manage the organization's settings, members and roles). Off by default",
+    )
+    .option(
       "--project [slug]",
       "Project login: write a project's SDK key to .env (for the SDK, `langwatch eval`, prompts). With a slug it uses your existing device login, no browser and no prompts; without one you pick the project in the browser, which needs an interactive terminal and exits 1 in a non-TTY. Prefer this one if user is working on an agent project rather than trying to instrument their coding assistant.",
     )
@@ -443,6 +455,7 @@ function registerLoginCommands(program: Command): void {
       browser?: string;
       endpoint?: string;
       token?: string;
+      management?: boolean;
     }) => {
       try {
         await loginCommand(options);
@@ -4775,6 +4788,20 @@ function registerProjectsCommands(program: Command): void {
 
   emitsResult(
     projectsCmd
+      .command("move <project>")
+      .description(
+        "Move a project to another team; gateway keys tracing to it switch to the new team's budgets",
+      )
+      .requiredOption("--team <team>", "Destination team: id, slug or name")
+      .option("-f, --format <format>", "Output format: text (default) or json", "text"),
+    async (project: string, options: { team: string }) => {
+      const { moveProjectCommand: impl } = await import("./commands/projects/move.js");
+      return impl({ project, team: options.team });
+    },
+  );
+
+  emitsResult(
+    projectsCmd
       .command("delete <id>")
       .description("Archive a project (soft-delete)")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
@@ -5124,8 +5151,12 @@ function registerTeamsCommands(program: Command): void {
       .command("create")
       .description("Create a team")
       .requiredOption("--name <name>", "Team name")
+      .option(
+        "--copy-members-from <teamId>",
+        "Add every member of this team to the new one, with the role they hold there",
+      )
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (options: { name: string }) => {
+    async (options: { name: string; copyMembersFrom?: string }) => {
       const { createTeamCommand: impl } = await import("./commands/teams/create.js");
       return impl(options);
     },
@@ -5169,13 +5200,13 @@ function registerTeamsCommands(program: Command): void {
 
   emitsResult(
     teamMembersCmd
-      .command("add <teamId> <userId>")
-      .description("Add a member to a team")
-      .option("--role <role>", "Role the member gets on the team: ADMIN, MEMBER or VIEWER")
+      .command("add <teamId> <userIds...>")
+      .description("Add one or more members to a team")
+      .option("--role <role>", "Role every member gets on the team: ADMIN, MEMBER or VIEWER")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
-    async (teamId: string, userId: string, options: { role?: string }) => {
-      const { addTeamMemberCommand: impl } = await import("./commands/teams/members.js");
-      return impl({ teamId, userId, options });
+    async (teamId: string, userIds: string[], options: { role?: string }) => {
+      const { addTeamMembersCommand: impl } = await import("./commands/teams/members.js");
+      return impl({ teamId, userIds, options });
     },
   );
 

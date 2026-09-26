@@ -1,5 +1,6 @@
 import {
   ApiKeyScopeViolationError,
+  cliKeyManagementPermissions,
   type ApiKeyApi,
   type CliKeyScopeSummary,
   type CliKeySelection,
@@ -569,11 +570,17 @@ async function approve({
     );
   }
 
+  const management =
+    record.management === true
+      ? await managementPermissionsHeld({ flow, person, organizationId: organization_id })
+      : [];
+
   const keySelection = await keySelectionFieldsFor({
     flow,
     person,
     organizationId: organization_id,
     requested: parsed.data.key_selection,
+    management,
   });
 
   await flow.sessions().approveDeviceCode({
@@ -848,13 +855,26 @@ async function keySelectionFieldsFor({
   person,
   organizationId,
   requested,
+  management,
 }: {
   flow: CliDeviceFlowCollaborators;
   person: CliBrowserSession;
   organizationId: string;
   requested: z.output<typeof approveRequestSchema>["key_selection"];
+  /** The management permissions to add: the ones the approver holds, when the CLI asked. */
+  management: readonly string[];
 }): Promise<Readonly<{ keySelection?: CliKeySelection }>> {
   if (requested) {
+    // Management permissions are organization-wide: a key bound only to teams
+    // or projects cannot carry them, and dropping them quietly would leave the
+    // CLI refused on its first management command.
+    if (
+      management.length > 0 &&
+      !requested.bindings.some((binding) => binding.scope_type === "ORGANIZATION")
+    ) {
+      throw managementNeedsOrganization();
+    }
+
     const keySelection = await flow.apiKeys().validateCliSelection({
       userId: person.id,
       organizationId,
@@ -863,7 +883,7 @@ async function keySelectionFieldsFor({
           scopeType: binding.scope_type,
           scopeId: binding.scope_id,
         })),
-        permissions: requested.permissions,
+        permissions: withManagement(requested.permissions, management),
       },
     });
 
@@ -886,20 +906,95 @@ async function keySelectionFieldsFor({
     );
   }
 
+  const [keySelection] = await findDefaultKeySelections({ flow, person, organizationId });
+  if (!keySelection || management.length === 0) return keySelection ? { keySelection } : {};
+
+  if (!keySelection.bindings.some((binding) => binding.scopeType === "ORGANIZATION")) {
+    throw managementNeedsOrganization();
+  }
+
+  return {
+    keySelection: {
+      ...keySelection,
+      permissions: withManagement(keySelection.permissions, management).toSorted(),
+    },
+  };
+}
+
+/** The key a CLI login gets when the approval names none; empty when it cannot be resolved. */
+async function findDefaultKeySelections({
+  flow,
+  person,
+  organizationId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  person: CliBrowserSession;
+  organizationId: string;
+}): Promise<CliKeySelection[]> {
   try {
     const keySelection = await flow
       .apiKeys()
       .findDefaultCliSelection({ userId: person.id, organizationId });
-
-    return keySelection ? { keySelection } : {};
+    return keySelection ? [keySelection] : [];
   } catch (err) {
     logger.warn(
       { err, userId: person.id, organizationId },
       "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
     );
 
-    return {};
+    return [];
   }
+}
+
+function withManagement(permissions: readonly string[], management: readonly string[]): string[] {
+  return [...new Set([...permissions, ...management])];
+}
+
+function managementNeedsOrganization(): CliDeviceFlowRefusedError {
+  return refused(
+    "management_needs_organization",
+    "Management access applies to the whole organization. Select the organization as the key's access, or run `langwatch login --device` without --management.",
+    400,
+  );
+}
+
+/**
+ * The management permissions the approver holds in the organization, asked one
+ * at a time against their own ceiling. Holding none refuses `--management` by
+ * name before anything is stamped.
+ */
+async function managementPermissionsHeld({
+  flow,
+  person,
+  organizationId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  person: CliBrowserSession;
+  organizationId: string;
+}): Promise<string[]> {
+  const held: string[] = [];
+  for (const permission of cliKeyManagementPermissions()) {
+    try {
+      await flow.apiKeys().validateCliSelection({
+        userId: person.id,
+        organizationId,
+        selection: {
+          bindings: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+          permissions: [permission],
+        },
+      });
+      held.push(permission);
+    } catch (error) {
+      if (!(error instanceof ApiKeyScopeViolationError)) throw error;
+    }
+  }
+  if (held.length > 0) return held;
+
+  throw refused(
+    "management_not_permitted",
+    "You hold no management permission in this organization, so the CLI key cannot include management access. Ask an organization admin, or run `langwatch login --device` without --management.",
+    403,
+  );
 }
 
 /**
@@ -988,6 +1083,7 @@ async function startDeviceFlow({
 
   const record = await flow.sessions().startDeviceCode({
     credentialType: parsed.data.credential_type,
+    management: parsed.data.management,
   });
   const verificationUri = verificationUriOf(flow);
 
@@ -1034,6 +1130,9 @@ async function lookupDeviceFlow({
     // the approve-only flow, `project_api_key` shows a project picker whose
     // key is sent to the CLI. Defaults for records minted before the field.
     credential_type: record.credential_type ?? "device_session",
+    // The approval screen adds management access to the key's default
+    // permissions when the CLI asked for it with `--management`.
+    management: record.management === true,
   });
 }
 

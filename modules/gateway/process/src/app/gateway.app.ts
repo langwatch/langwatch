@@ -3,7 +3,7 @@
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import type { RestIdentity } from "@langwatch/api/rest";
-import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
+import { type AuthzPermission, AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
@@ -15,6 +15,9 @@ import type {
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
   type GatewayBudgetOverviewForUser,
+  type GatewayAuthorizedKeyCaller,
+  type GatewayKeyCaller,
+  type GatewayKeyCallerReach,
   type GatewayRequestCredential,
   type GatewayVirtualKeyScope,
   type VirtualKeyWithScopes,
@@ -99,6 +102,7 @@ import {
   WebhookApi,
   type WebhookSpendEventRow,
 } from "@langwatch/webhook-contract";
+import { TRPCError } from "@trpc/server";
 import type { z } from "zod";
 
 import { elevenLabsConversationChannels } from "../channels/elevenlabs-conversation-channels.registry.ts";
@@ -2023,5 +2027,65 @@ export class GatewayApp implements GatewayApi {
       scopes: [{ scopeType: "ORGANIZATION", scopeId: input.organizationId }],
       permission: input.permission,
     });
+  }
+
+  /**
+   * One gate for every kind of API key: a legacy project key holds its own
+   * project and nothing wider, a scoped key is checked as the key and its
+   * owner together, at its resolved project or, with none, its organization.
+   */
+  async authorizeKeyCaller(input: {
+    caller: GatewayKeyCaller;
+    permission: AuthzPermission;
+    reach: GatewayKeyCallerReach;
+  }): Promise<GatewayAuthorizedKeyCaller> {
+    const { caller, permission, reach } = input;
+    const authorized =
+      caller.kind === "project"
+        ? {
+            organizationId: await this.organizationIdForProject(caller.projectId),
+            projectId: caller.projectId,
+            actor: { kind: "legacyProjectKey", projectId: caller.projectId },
+            actorUserId: `svc_${caller.projectId}`,
+          }
+        : {
+            organizationId: caller.organizationId,
+            projectId: caller.resolvedProject?.id ?? null,
+            actor: {
+              kind: "apiKey",
+              apiKeyId: caller.apiKeyId,
+              userId: caller.userId,
+              organizationId: caller.organizationId,
+            },
+            actorUserId: caller.userId ?? `svc_${caller.resolvedProject?.id ?? caller.apiKeyId}`,
+          };
+    const scope: GatewayVirtualKeyScope =
+      reach === "caller" && authorized.projectId
+        ? { scopeType: "PROJECT", scopeId: authorized.projectId }
+        : { scopeType: "ORGANIZATION", scopeId: authorized.organizationId };
+
+    try {
+      await this.#dependencies.assertCanOperateOnAnyScope({
+        actor: authorized.actor,
+        scopes: [scope],
+        permission,
+      });
+    } catch (error) {
+      if (!(error instanceof TRPCError) || error.code !== "FORBIDDEN") throw error;
+      throw new PermissionDeniedError({
+        permission,
+        scope: {
+          type: scope.scopeType === "PROJECT" ? "project" : "organization",
+          id: scope.scopeId,
+        },
+        denialReason: "no-binding",
+      });
+    }
+
+    return {
+      organizationId: authorized.organizationId,
+      actor: authorized.actor,
+      actorUserId: authorized.actorUserId,
+    };
   }
 }

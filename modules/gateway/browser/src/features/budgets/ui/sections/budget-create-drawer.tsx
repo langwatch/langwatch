@@ -31,6 +31,10 @@ import { readHandledError } from "../../../../model/handled-error.ts";
  */
 const UNREACHABLE_SCOPE_CODE = "gateway_budget_scope_unreachable";
 
+/** A budget created partway through its window starts at zero, which the form says up front. */
+const BUDGET_COUNTS_FROM_CREATION =
+  "The budget counts spend from when you create it. Spend earlier in the current window is not counted.";
+
 type BudgetCreateDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -664,6 +668,9 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                 />
               </Field.Root>
             </HStack>
+            <Text fontSize="xs" color="fg.muted" data-testid="budget-counts-from-creation">
+              {BUDGET_COUNTS_FROM_CREATION}
+            </Text>
             {isScheduledWindow && (
               <Field.Root>
                 <Field.Label>

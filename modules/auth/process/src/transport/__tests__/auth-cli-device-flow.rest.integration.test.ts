@@ -3,7 +3,10 @@
  * The RFC 8628 CLI device grant end to end, over the real session service.
  * @see specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  */
-import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import {
+  ApiKeyScopeViolationError,
+  cliKeyManagementPermissions,
+} from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
@@ -22,6 +25,13 @@ import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-de
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";
+const MANAGEMENT_PERMISSIONS: readonly string[] = cliKeyManagementPermissions();
+
+/** A key selection that reaches the whole organization, as the approval screen sends it. */
+const organizationKey = {
+  bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+  permissions: ["traces:view"],
+};
 
 describe("given a CLI starting a device login", () => {
   describe("when the browser approves it and the CLI polls", () => {
@@ -167,6 +177,175 @@ describe("given a CLI starting a device login", () => {
 
       expect(refused.status).toBe(403);
       await expect(refused.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+    });
+  });
+
+  describe("when the CLI asked for management access with --management", () => {
+    const startWithManagement = async (api: ReturnType<typeof mount>) =>
+      (await (await api.post("/api/auth/cli/device-code", { management: true })).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+
+    /** @scenario The approval screen shows management access when the CLI asked for it */
+    it("tells the approval page, and stamps every management permission an admin holds", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const grant = await startWithManagement(api);
+
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+      await expect(looked.json()).resolves.toMatchObject({ management: true });
+
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: organizationKey,
+      });
+
+      expect(approved.status).toBe(200);
+      expect(world.validatedSelections.at(-1)?.permissions).toEqual([
+        "traces:view",
+        "organization:manage",
+        "team:manage",
+      ]);
+      expect(world.validatedSelections.at(-1)?.permissions).not.toContain("organization:delete");
+    });
+
+    describe("and the approver holds only some of the management permissions", () => {
+      /** @scenario Management access grants only the management permissions the user holds */
+      it("stamps the ones they hold and leaves the rest out", async () => {
+        const world = deviceFlowWorld({ heldManagement: ["team:manage"] });
+        const api = mount(world);
+        const grant = await startWithManagement(api);
+
+        const approved = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+          key_selection: organizationKey,
+        });
+
+        expect(approved.status).toBe(200);
+        expect(world.validatedSelections.at(-1)?.permissions).toEqual([
+          "traces:view",
+          "team:manage",
+        ]);
+      });
+    });
+
+    describe("and the approver holds none of them", () => {
+      /** @scenario Management access is refused to a user who holds no management permission */
+      it("refuses the approval by name and stamps nothing", async () => {
+        const world = deviceFlowWorld({ heldManagement: [] });
+        const api = mount(world);
+        const grant = await startWithManagement(api);
+
+        const refused = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+          key_selection: organizationKey,
+        });
+
+        expect(refused.status).toBe(403);
+        await expect(refused.json()).resolves.toMatchObject({
+          error: "management_not_permitted",
+        });
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+        expect(exchanged.status).toBe(428);
+        expect(world.mintedKeys).toEqual([]);
+      });
+    });
+
+    describe("and the approval binds no organization scope", () => {
+      it("refuses rather than quietly dropping management access", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = await startWithManagement(api);
+
+        const refused = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+          key_selection: {
+            bindings: [{ scope_type: "TEAM", scope_id: "team-1" }],
+            permissions: ["traces:view"],
+          },
+        });
+
+        expect(refused.status).toBe(400);
+        await expect(refused.json()).resolves.toMatchObject({
+          error: "management_needs_organization",
+        });
+      });
+
+      describe("when the approval names no selection and the default key reaches no organization", () => {
+        it("refuses rather than minting a key without management access", async () => {
+          const world = deviceFlowWorld({
+            defaultSelection: {
+              bindings: [{ scopeType: "TEAM", scopeId: "team-1" }],
+              permissions: ["traces:view"],
+            },
+          });
+          const api = mount(world);
+          const grant = await startWithManagement(api);
+
+          const refused = await api.post("/api/auth/cli/approve", {
+            user_code: grant.user_code,
+            organization_id: ORGANIZATION_ID,
+          });
+
+          expect(refused.status).toBe(400);
+          await expect(refused.json()).resolves.toMatchObject({
+            error: "management_needs_organization",
+          });
+        });
+      });
+    });
+
+    describe("and the approval names no selection", () => {
+      it("adds the held management permissions to an organization-wide default key", async () => {
+        const world = deviceFlowWorld({
+          defaultSelection: {
+            bindings: [{ scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }],
+            permissions: ["traces:view"],
+          },
+        });
+        const api = mount(world);
+        const grant = await startWithManagement(api);
+
+        const approved = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+
+        expect(approved.status).toBe(200);
+      });
+    });
+  });
+
+  describe("when the CLI did not ask for management access", () => {
+    /** @scenario A plain CLI login does not ask for management access */
+    it("stamps the selection the page sent, without management permissions", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+      await expect(looked.json()).resolves.toMatchObject({ management: false });
+
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: organizationKey,
+      });
+
+      expect(world.validatedSelections.at(-1)?.permissions).toEqual(["traces:view"]);
     });
   });
 
@@ -559,6 +738,13 @@ function deviceFlowWorld(
     mintToken?: string;
     mintError?: () => Error;
     validateSelectionError?: () => Error;
+    /** The management permissions the approver holds; all of them when unset. */
+    heldManagement?: string[];
+    /** The key an approval that names no selection gets. */
+    defaultSelection?: {
+      bindings: { scopeType: string; scopeId: string }[];
+      permissions: string[];
+    };
     signedIn?: boolean;
     publicBaseUrl?: string | undefined;
   } = {},
@@ -576,6 +762,8 @@ function deviceFlowWorld(
     store: InMemoryDeviceSessionStore;
     mintedKeys: { deviceLabel: string; userId: string }[];
     revokedForLogout: { apiKeyId: string; userId: string }[];
+    /** Every key selection validated, in order, the approval's own last. */
+    validatedSelections: { permissions: string[] }[];
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,
@@ -585,6 +773,7 @@ function deviceFlowWorld(
     store,
     mintedKeys: [],
     revokedForLogout: [],
+    validatedSelections: [],
   };
 
   const directory: AuthDirectory = {
@@ -626,14 +815,27 @@ function deviceFlowWorld(
             scope: { kind: "organization" as const, projectIds: [], permissions: [] },
           });
         },
-        validateCliSelection: (input: { selection: unknown }) => {
+        validateCliSelection: (input: { selection: { permissions: string[] } }) => {
           if (overrides.validateSelectionError) {
             return Promise.reject(overrides.validateSelectionError());
           }
+          const beyondCeiling = input.selection.permissions.find(
+            (permission) =>
+              MANAGEMENT_PERMISSIONS.includes(permission) &&
+              overrides.heldManagement !== undefined &&
+              !overrides.heldManagement.includes(permission),
+          );
+          if (beyondCeiling) {
+            return Promise.reject(
+              new ApiKeyScopeViolationError(`${beyondCeiling} exceeds ceiling`),
+            );
+          }
+          world.validatedSelections.push(input.selection);
 
           return Promise.resolve(input.selection);
         },
-        findDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
+        findDefaultCliSelection: () =>
+          Promise.resolve(overrides.defaultSelection ?? { bindings: [], permissions: [] }),
         revokeCliLoginKeyForLogout: (input: { apiKeyId: string; userId: string }) => {
           world.revokedForLogout.push({ apiKeyId: input.apiKeyId, userId: input.userId });
 
