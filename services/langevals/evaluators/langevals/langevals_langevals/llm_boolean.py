@@ -1,4 +1,3 @@
-import json
 from typing import Literal, Optional, cast
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
@@ -13,12 +12,68 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from langevals_core.image_support import build_content_parts
+from langevals_core.tool_calls import (
+    JudgeAnswerError,
+    read_boolean,
+    read_tool_call_arguments,
+)
 from pydantic import BaseModel, Field
 import litellm
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.cost_calculator import completion_cost
 import dspy
+
+
+# Most customer prompts state a fail condition ("return false if the answer
+# mentions a competitor"). The field is named `result`, not `passed`, and
+# every description says it carries the value the instructions ask for, so a
+# judge never flips it into its own "did the output pass" reading.
+RESULT_FRAMING = (
+    "Answer by calling the `evaluation` function, setting `result` to exactly the "
+    "true or false value the instructions above ask you to return. If they say "
+    "when to return false, return false in that case and true in every other "
+    "case. If they say when to return true, return true in that case and false "
+    "in every other case. `result` is not a rating of the output, never invert it."
+)
+
+EVALUATION_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "evaluation",
+        "description": (
+            "Record the true or false value the instructions ask for. Write a "
+            "short reasoning first, then the result."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "reasoning": {
+                    "type": "string",
+                    "description": (
+                        "A short reasoning, written before the result: name the "
+                        "condition the instructions give and the value they ask for "
+                        "when it holds, say whether it holds for this content, then "
+                        "state the value that follows."
+                    ),
+                },
+                "result": {
+                    "type": "boolean",
+                    "description": (
+                        "Exactly the value the instructions ask you to return. If they "
+                        "say when to return false: false in that case, true otherwise. "
+                        "If they say when to return true: true in that case, false "
+                        "otherwise. Not a judgment of whether the content is good."
+                    ),
+                },
+            },
+            "required": ["reasoning", "result"],
+        },
+    },
+}
+
+
+def judge_system_prompt(prompt: str) -> str:
+    return f"{prompt}\n\n{RESULT_FRAMING}"
 
 
 class CustomLLMBooleanEntry(EvaluatorEntry):
@@ -104,45 +159,32 @@ class CustomLLMBooleanEvaluator(
                 messages=[
                     {
                         "role": "system",
-                        "content": self.settings.prompt
-                        + ". Always output a valid json for the function call",
+                        "content": judge_system_prompt(self.settings.prompt),
                     },
                     {
                         "role": "user",
                         "content": content,
                     },
                 ],
-                tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "evaluation",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "reasoning": {
-                                        "type": "string",
-                                        "description": "use this field to ponder and write a short reasoning behind the decision written before a result is actually given",
-                                    },
-                                    "passed": {
-                                        "type": "boolean",
-                                        "description": "your final veredict, reply true or false if the content passes the test or not",
-                                    },
-                                },
-                                "required": ["reasoning", "passed"],
-                            },
-                            "description": "use this function to write your thoughts on the reasoning, then decide if it passed or not with this json structure",
-                        },
-                    },
-                ],
+                tools=[EVALUATION_TOOL],
                 tool_choice={"type": "function", "function": {"name": "evaluation"}},  # type: ignore
             )
 
             response = cast(ModelResponse, response)
-            choice = cast(Choices, response.choices[0])
-            arguments = json.loads(
-                cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+            tool_arguments = read_tool_call_arguments(
+                response,
+                "evaluation",
+                required=["reasoning", "result"],
+                model=self.settings.model,
             )
+            result = read_boolean(tool_arguments["result"])
+            if result is None:
+                raise JudgeAnswerError(
+                    "evaluation",
+                    "sent a result that is neither true nor false",
+                    self.settings.model,
+                )
+            arguments = {"passed": result, "reasoning": tool_arguments["reasoning"]}
             cost = completion_cost(completion_response=response)
 
         return CustomLLMBooleanResult(

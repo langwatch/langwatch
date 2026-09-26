@@ -18,6 +18,9 @@ Feature: Evaluator judge reasoning and tool compatibility
   # Bindings:
   #   services/langevals/langevals_core/langevals_core/litellm_patch.py
   #   services/langevals/langevals_core/tests/test_tool_reasoning_compatibility.py
+  #   services/langevals/langevals_core/tests/test_forced_tool_choice_fallback.py
+  #   services/langevals/tests/deterministic/test_llm_boolean_polarity_framing.py
+  #   services/langevals/evaluators/langevals/tests/test_llm_boolean.py (real calls)
 
   @unit
   Scenario: A judge reaches a verdict on a model that would otherwise refuse it
@@ -84,3 +87,61 @@ Feature: Evaluator judge reasoning and tool compatibility
       | reason                                                |
       | for a reason unrelated to its reasoning setting       |
       | over its reasoning setting, with no verdict asked for |
+
+  # Some models refuse any tool_choice that forces a function, reasoning or
+  # not (Claude Opus 5.5 on Bedrock), and Claude refuses it while thinking is
+  # on. The judge then asks with tool_choice "auto" instead.
+  @unit
+  Scenario: A judge reaches a verdict on a model that refuses a forced function call
+    Given an evaluator model that refuses a forced function call
+    When the evaluator asks that model to judge
+    Then the request is sent again with tool_choice "auto"
+    And the evaluation reaches a verdict from the function call
+
+  @unit
+  Scenario: A model seen refusing a forced function call is asked with auto from then on
+    Given an evaluator model that already refused a forced function call in this process
+    When the evaluator asks that model to judge again
+    Then the request goes out with tool_choice "auto" on the first attempt
+
+  @unit
+  Scenario: A judge that skips its function under auto is reminded once
+    Given an evaluator model asked with tool_choice "auto"
+    And it answers in prose without calling the verdict function
+    When the evaluator reads the answer
+    Then the request is sent once more with a reminder to call the function
+
+  @unit
+  Scenario: A judge that never calls its function fails with a clear error
+    Given an evaluator model that answers without a usable call to the verdict function
+    When the evaluator reads the answer
+    Then the evaluation fails with an error naming the model and what was wrong with the answer
+
+  @unit
+  Scenario: A refusal that is not about the forced function call reaches the caller untouched
+    Given the model refuses the request for a reason other than a forced function call
+    When the evaluator runs
+    Then the caller receives the refusal exactly as the model gave it
+    And no second request is sent
+
+  # Most customer boolean prompts state a fail condition ("return false if the
+  # answer mentions a competitor"). The judge's result is the value the
+  # instructions ask for, never its own reading of whether the output passed.
+  @unit
+  Scenario: The boolean judge is told its result is exactly what the instructions ask for
+    Given a boolean judge prompt
+    When the evaluator asks the model to judge
+    Then the system prompt is the customer's prompt followed by the result framing
+    And the verdict field is named result and described as the value the instructions ask for
+
+  @unit @regression
+  Scenario Outline: A fail-condition prompt yields false when its condition holds and true when it does not
+    Given the boolean judge prompt "Return false if the answer mentions a competitor"
+    And an output that <mentions> a competitor
+    When the evaluator runs
+    Then the evaluation's passed field is <result>
+
+    Examples:
+      | mentions         | result |
+      | mentions         | false  |
+      | does not mention | true   |

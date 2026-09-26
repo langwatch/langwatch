@@ -1,5 +1,5 @@
-import json
 from typing import Optional, cast
+from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     MAX_TOKENS_HARD_LIMIT,
@@ -14,7 +14,6 @@ from langevals_core.base_evaluator import (
 from langevals_core.image_support import build_content_parts
 from pydantic import Field
 import litellm
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.cost_calculator import completion_cost
 import dspy
@@ -127,7 +126,7 @@ class CustomLLMScoreEvaluator(
                                 },
                                 "required": ["reasoning", "final_score"],
                             },
-                            "description": "use this function to write your thoughts on the reasoning, then decide on the final score with this json structure",
+                            "description": "Record the evaluation: a short reasoning first, then the final score.",
                         },
                     },
                 ],
@@ -135,9 +134,11 @@ class CustomLLMScoreEvaluator(
             )
 
             response = cast(ModelResponse, response)
-            choice = cast(Choices, response.choices[0])
-            arguments = json.loads(
-                cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+            arguments = read_tool_call_arguments(
+                response,
+                "evaluation",
+                required=["reasoning", "final_score"],
+                model=self.settings.model,
             )
             cost = completion_cost(completion_response=response)
 

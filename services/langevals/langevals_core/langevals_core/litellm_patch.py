@@ -109,6 +109,73 @@ def tool_reasoning_conflict(
     return ToolReasoningConflictError(kwargs.get("model"))
 
 
+# Models seen refusing a forced tool_choice in this process, so later calls go
+# straight to "auto" instead of paying a refused round trip first.
+# Example: bedrock/global.anthropic.claude-opus-5-5 refuses it on every call.
+forced_tool_choice_refusers: set[str] = set()
+
+# Sent after an "auto" answer that skipped the function the evaluator forced.
+TOOL_CALL_REMINDER = (
+    "Answer only by calling the `{name}` function, with every required field."
+)
+
+
+def is_forced_tool_choice(tool_choice) -> bool:
+    if isinstance(tool_choice, dict):
+        return True
+    return tool_choice in ("required", "any")
+
+
+def forced_tool_name(kwargs: dict) -> Optional[str]:
+    """The one function a forced tool_choice names, or None for "any tool"."""
+    tool_choice = kwargs.get("tool_choice")
+    if isinstance(tool_choice, dict):
+        function = tool_choice.get("function") or {}
+        return function.get("name") or tool_choice.get("name")
+    tools = kwargs.get("tools") or []
+    if len(tools) == 1:
+        return (tools[0].get("function") or {}).get("name")
+    return None
+
+
+def forced_tool_choice_refused(kwargs: dict, exception: BaseException) -> bool:
+    """Whether the provider refused a tool_choice that forces a function:
+    Claude Opus 5.5 always ('tool_choice: type "tool" and "any" are not
+    supported'), Claude with thinking on ("...when tool_choice forces tool use")."""
+    if not kwargs.get("tools") or not is_forced_tool_choice(kwargs.get("tool_choice")):
+        return False
+    message = str(exception).lower()
+    if "tool_choice" not in message:
+        return False
+    return any(
+        marker in message
+        for marker in ("not supported", "thinking", "forces tool use", "not compatible")
+    )
+
+
+def calls_tool(response, name: Optional[str]) -> bool:
+    try:
+        tool_calls = response.choices[0].message.tool_calls or []
+    except (AttributeError, IndexError, TypeError):
+        return False
+    if name is None:
+        return len(tool_calls) > 0
+    return any(getattr(call.function, "name", None) in (name, None) for call in tool_calls)
+
+
+def auto_tool_choice_attempts(kwargs: dict):
+    """The retries once a forced tool_choice is refused: tool_choice "auto",
+    then, if that answer skipped the function, once more with a reminder.
+    Callers stop at the first answer that calls the function."""
+    relaxed = {**kwargs, "tool_choice": "auto"}
+    yield relaxed
+    reminder = {
+        "role": "user",
+        "content": TOOL_CALL_REMINDER.format(name=forced_tool_name(kwargs) or "provided"),
+    }
+    yield {**relaxed, "messages": [*(kwargs.get("messages") or []), reminder]}
+
+
 def apply_tool_reasoning_compatibility(kwargs: dict) -> dict:
     """
     Switch reasoning off for the models that reject function tools while it is
@@ -465,11 +532,39 @@ def patch_litellm():
     originals["embedding"] = litellm.embedding
     originals["completion_cost"] = litellm.cost_calculator.completion_cost
 
+    def complete_with_auto_tool_choice(args, kwargs):
+        name = forced_tool_name(kwargs)
+        response = None
+        for attempt in auto_tool_choice_attempts(kwargs):
+            response = originals["completion"](*args, **attempt)
+            if calls_tool(response, name):
+                break
+        return response
+
+    async def acomplete_with_auto_tool_choice(args, kwargs):
+        name = forced_tool_name(kwargs)
+        response = None
+        for attempt in auto_tool_choice_attempts(kwargs):
+            response = await originals["acompletion"](*args, **attempt)
+            if calls_tool(response, name):
+                break
+        return response
+
     def patched_completion(*args, **kwargs):
         kwargs = patch_litellm_params(kwargs)
 
         try:
-            return originals["completion"](*args, **kwargs)
+            if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+                kwargs.get("tool_choice")
+            ):
+                return complete_with_auto_tool_choice(args, kwargs)
+            try:
+                return originals["completion"](*args, **kwargs)
+            except Exception as exception:
+                if not forced_tool_choice_refused(kwargs, exception):
+                    raise
+                forced_tool_choice_refusers.add(kwargs.get("model"))
+                return complete_with_auto_tool_choice(args, kwargs)
         except Exception as exception:
             conflict = tool_reasoning_conflict(kwargs, exception)
             if conflict is not None:
@@ -482,7 +577,17 @@ def patch_litellm():
         kwargs = patch_litellm_params(kwargs)
 
         try:
-            return await originals["acompletion"](*args, **kwargs)
+            if kwargs.get("model") in forced_tool_choice_refusers and is_forced_tool_choice(
+                kwargs.get("tool_choice")
+            ):
+                return await acomplete_with_auto_tool_choice(args, kwargs)
+            try:
+                return await originals["acompletion"](*args, **kwargs)
+            except Exception as exception:
+                if not forced_tool_choice_refused(kwargs, exception):
+                    raise
+                forced_tool_choice_refusers.add(kwargs.get("model"))
+                return await acomplete_with_auto_tool_choice(args, kwargs)
         except Exception as exception:
             conflict = tool_reasoning_conflict(kwargs, exception)
             if conflict is not None:
