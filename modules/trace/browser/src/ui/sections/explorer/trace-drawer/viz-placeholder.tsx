@@ -41,7 +41,7 @@ import { WaterfallView } from "./waterfall-view/index.ts";
 // That's the only viz heavy enough to keep code-split — the others are
 // statically imported so tab switches stay synchronous.
 const SequenceView = lazy(() =>
-  import("../../../../index.ts").then((m) => ({ default: m.SequenceView })),
+  import("../../sequence/sequence-view.tsx").then((m) => ({ default: m.SequenceView })),
 );
 
 interface VizPlaceholderProps {

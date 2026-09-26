@@ -96,7 +96,7 @@ function LabelResizeHandle({ onResize }: { onResize: (deltaPx: number) => void }
 
   return (
     <Box
-      role="separator"
+      as="hr"
       aria-orientation="vertical"
       aria-label="Resize attribute name column"
       data-resize-handle-state={state}
@@ -111,6 +111,8 @@ function LabelResizeHandle({ onResize }: { onResize: (deltaPx: number) => void }
         if (state === "hover") setState("idle");
       }}
       width="4px"
+      height="auto"
+      borderTopWidth={0}
       flexShrink={0}
       cursor="col-resize"
       alignSelf="stretch"

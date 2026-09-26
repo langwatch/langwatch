@@ -1,9 +1,9 @@
+import mermaid from "mermaid";
 import { type Dispatch, type RefObject, type SetStateAction, useEffect, useState } from "react";
 
 import { EASTER_EGG_IMAGE_URL } from "../use-konami-easter-egg.ts";
 
-// Mermaid is loaded via a true `await import()` inside the effect so it stays in its
-// own chunk.
+// Mermaid stays in its own chunk: `SequenceView` is its only importer and loads through `lazy()`.
 
 const MINIMAP_W = 200;
 const MINIMAP_H = 72;
@@ -111,7 +111,6 @@ export function useMermaidRenderer({
 
     void (async () => {
       try {
-        const mermaid = (await import("mermaid")).default;
         if (cancelled) return;
         mermaid.initialize({
           startOnLoad: false,

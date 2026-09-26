@@ -24,21 +24,8 @@ export type TraceInputOutputProps = {
   collapseStringsAfterLength?: number;
 };
 
-export const TraceInputOutput = memo(function TraceInputOutput({
-  value: initialValue,
-  showTools,
-  collectMediaParts,
-  renderMediaPart,
-  isPythonRepr,
-  parsePythonInsideJson,
-  renderJsonViewer,
-  copyToClipboard,
-  onCopyFailure,
-  copyIcon,
-  renderTooltip,
-  collapsed,
-  collapseStringsAfterLength,
-}: TraceInputOutputProps) {
+/** A string that holds JSON is read as that JSON; a JSON-encoded string is unwrapped once. */
+function readTraceValue(initialValue: unknown): { value: unknown; json: object | undefined } {
   let value = initialValue;
   let json: object | undefined;
 
@@ -63,8 +50,31 @@ export const TraceInputOutput = memo(function TraceInputOutput({
     json = undefined;
   }
 
+  return { value, json };
+}
+
+export const TraceInputOutput = memo(function TraceInputOutput({
+  value: initialValue,
+  showTools,
+  collectMediaParts,
+  renderMediaPart,
+  isPythonRepr,
+  parsePythonInsideJson,
+  renderJsonViewer,
+  copyToClipboard,
+  onCopyFailure,
+  copyIcon,
+  renderTooltip,
+  collapsed,
+  collapseStringsAfterLength,
+}: TraceInputOutputProps) {
+  const { value, json } = useMemo(() => readTraceValue(initialValue), [initialValue]);
+
   const [raw, setRaw] = useState(false);
-  const mediaParts = useMemo(() => collectMediaParts(json ?? value), [value]);
+  const mediaParts = useMemo(
+    () => collectMediaParts(json ?? value),
+    [collectMediaParts, json, value],
+  );
 
   const copyValue = () => {
     if (json) {

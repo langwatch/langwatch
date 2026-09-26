@@ -39,8 +39,6 @@ export function useSpanLangwatchSignals() {
     return map;
   }, [rows]);
 
-  const base = (shared
-    ? asSharedQueryResult(shared.spanSignals)
-    : query) as unknown as typeof query;
+  const base = shared ? asSharedQueryResult(shared.spanSignals) : query;
   return { ...base, signalsBySpanId };
 }

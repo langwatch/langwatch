@@ -1,8 +1,11 @@
+import type { RouterFromMap } from "@langwatch/api/web";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { QueryClient } from "@tanstack/react-query";
-import { createTRPCClientProxy, httpBatchLink, TRPCUntypedClient } from "@trpc/client";
+import { createTRPCClient, TRPCClientError, type TRPCLink } from "@trpc/client";
+import { observable } from "@trpc/server/observable";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { TraceApiMap } from "../../../../../behavior/trace-api.ts";
 import {
   fetchSpanTreePages,
   mergeSpanTreeDelta,
@@ -42,27 +45,23 @@ type Page = {
 const input = { projectId: "p1", traceId: "t1" };
 
 function makeUtils(pages: Page[]) {
-  const query = vi.fn();
+  const query =
+    vi.fn<(path: string, input: unknown, opts: { signal?: AbortSignal }) => Promise<Page>>();
   for (const page of pages) query.mockResolvedValueOnce(page);
-  // The real thing `api.useUtils().client` returns: a `createTRPCClientProxy` wrapper,
-  // NOT the client itself.
-  const untyped = new TRPCUntypedClient({
-    links: [httpBatchLink({ url: "http://localhost/api/trpc" })],
-  });
-  // Stub `query` on the prototype chain, never as an own property: the proxy
-  // resolves a key to the raw client only when the client OWNS it, so an own
-  // `query` makes `utils.client.query` the real function and papers over the
-  // bug above. Inherited — as on the real client — it stays a path proxy.
-  const proto = Object.create(TRPCUntypedClient.prototype) as object;
-  (proto as { query: typeof query }).query = query;
-  Object.setPrototypeOf(untyped, proto);
+  const answerFromQuery: TRPCLink<RouterFromMap<TraceApiMap>> =
+    () =>
+    ({ op }) =>
+      observable((observer) => {
+        query(op.path, op.input, { signal: op.signal ?? undefined })
+          .then((data) => {
+            observer.next({ result: { data } });
+            observer.complete();
+          })
+          .catch((error: Error) => observer.error(TRPCClientError.from(error)));
+      });
   const utils = {
-    // v10 types the proxy factory against the legacy `TRPCClient` interop
-    // shape, not the `TRPCUntypedClient` it actually wraps at runtime.
-    client: createTRPCClientProxy(
-      untyped as unknown as Parameters<typeof createTRPCClientProxy>[0],
-    ),
-  } as unknown as Parameters<typeof fetchSpanTreePages>[0]["utils"];
+    client: createTRPCClient<RouterFromMap<TraceApiMap>>({ links: [answerFromQuery] }),
+  };
   return { utils, query };
 }
 

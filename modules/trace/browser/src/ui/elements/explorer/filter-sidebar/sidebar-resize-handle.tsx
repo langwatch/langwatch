@@ -86,7 +86,7 @@ export function SidebarResizeHandle({
 
   return (
     <Box
-      role="separator"
+      as="hr"
       aria-orientation="vertical"
       aria-label="Resize filters sidebar"
       data-resize-handle-state={state}
@@ -95,6 +95,8 @@ export function SidebarResizeHandle({
       right={0}
       bottom={0}
       width="4px"
+      height="auto"
+      borderTopWidth={0}
       cursor="col-resize"
       // Lift above the table contents so the handle is grabbable even when
       // a cell hover effect or chip would normally win the pointer.

@@ -90,7 +90,7 @@ const mapThreadToDatasetEntry = (
         source && source in THREAD_MAPPINGS
           ? THREAD_MAPPINGS[source as keyof typeof THREAD_MAPPINGS]
           : undefined;
-      let value = source_?.mapping(thread);
+      let value: unknown = source_?.mapping(thread);
 
       // If source is traces and selectedFields are specified, filter the trace objects
       if (source === "traces" && selectedFields && selectedFields.length > 0) {
@@ -99,12 +99,12 @@ const mapThreadToDatasetEntry = (
           for (const field of selectedFields) {
             const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
             if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(trace as any, "", "", {});
+              filteredTrace[field] = traceMapping.mapping(trace, "", "", {});
             }
           }
           return filteredTrace;
         });
-        value = filteredTraces as any;
+        value = filteredTraces;
       }
 
       return [

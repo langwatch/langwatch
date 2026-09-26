@@ -25,11 +25,10 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/compat/next-dynamic.ts", () => ({
-  default: () =>
-    function StubbedDynamic() {
-      return null;
-    },
+vi.mock("@microlink/react-json-view", () => ({
+  default: function StubbedReactJson() {
+    return null;
+  },
 }));
 
 vi.mock("@langwatch/design-system/color-mode", () => ({

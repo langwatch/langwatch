@@ -27,7 +27,7 @@ export function useSpansFullCanonical(enabled: boolean) {
     placeholderData: keepPreviousData,
   });
 
-  if (shared) return asSharedQueryResult(shared.spansFull) as unknown as typeof query;
+  if (shared) return asSharedQueryResult(shared.spansFull);
   return query;
 }
 

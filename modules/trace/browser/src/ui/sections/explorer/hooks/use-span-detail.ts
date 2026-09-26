@@ -32,7 +32,7 @@ export function useSpanDetailCanonical() {
     // trace-level events timeline covers the share page; per-span events in
     // the payload are an ADR-057 follow-up.
     const detail = spanId ? shared.spansFull.find((s) => s.spanId === spanId) : undefined;
-    return asSharedQueryResult(detail) as unknown as typeof query;
+    return asSharedQueryResult(detail);
   }
   return query;
 }

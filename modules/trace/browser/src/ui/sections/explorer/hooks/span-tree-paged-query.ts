@@ -1,9 +1,8 @@
 import type { SpanTreeCursor, SpanTreeNode } from "@langwatch/trace-contract";
 import type { QueryClient } from "@tanstack/react-query";
-import { getUntypedClient } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
 
-import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
+import { api } from "../../../../behavior/trace-api.ts";
 
 /*
  * Traces can carry 20k–100k+ spans, so the span tree is never fetched as a single
@@ -23,7 +22,7 @@ export interface SpanTreeQueryInput {
   occurredAtMs?: number;
 }
 
-type TrpcUtils = ReturnType<typeof api.useUtils>;
+type TrpcUtils = { client: Pick<ReturnType<typeof api.useUtils>["client"], "traces"> };
 
 /**
  * React Query key of the assembled span tree — identical to the key the tRPC
@@ -72,21 +71,12 @@ export async function fetchSpanTreePages({
   };
   // Vanilla queries for abort signal (drawer close cancels mid-page);
   // tree cached under spanTree key, not per-page React Query entries.
-  const client = getUntypedClient(
-    utils.client as unknown as Parameters<typeof getUntypedClient>[0],
-  );
-  const queryPage = client.query.bind(client) as (
-    path: "traces.spanTreePaginated",
-    input: SpanTreeQueryInput & { limit: number; cursor?: SpanTreeCursor },
-    opts?: { signal?: AbortSignal },
-  ) => Promise<RouterOutputs["traces"]["spanTreePaginated"]>;
   let cursor: SpanTreeCursor | undefined;
   for (;;) {
     if (signal?.aborted) {
       throw new DOMException("span tree fetch aborted", "AbortError");
     }
-    const page = await queryPage(
-      "traces.spanTreePaginated",
+    const page = await utils.client.traces.spanTreePaginated.query(
       { ...input, limit: SPAN_TREE_PAGE_SIZE, cursor },
       { signal },
     );

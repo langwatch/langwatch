@@ -33,6 +33,7 @@ export function asSharedQueryResult<T>(data: T): {
   data: T;
   isLoading: false;
   isFetching: false;
+  isFetched: true;
   isError: false;
   isSuccess: true;
   error: null;
@@ -42,6 +43,7 @@ export function asSharedQueryResult<T>(data: T): {
     data,
     isLoading: false,
     isFetching: false,
+    isFetched: true,
     isError: false,
     isSuccess: true,
     error: null,

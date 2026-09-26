@@ -3,9 +3,8 @@ import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isPythonRepr, parsePythonInsideJson } from "@langwatch/trace-contract";
 import type { CollapsedFieldProps } from "@microlink/react-json-view";
-import React from "react";
+import React, { lazy, Suspense } from "react";
 
-import dynamic from "../../../behavior/compat/next-dynamic.ts";
 import {
   collectMediaParts,
   type MediaPartData,
@@ -15,9 +14,7 @@ import { CopyIcon } from "../../elements/icons/copy.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { TraceMediaPart } from "./trace-media-part.tsx";
 
-const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
-  loading: () => <div />,
-});
+const ReactJson = lazy(() => import("@microlink/react-json-view"));
 
 type RenderInputOutputProps = {
   value: unknown;
@@ -65,22 +62,24 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   };
 
   const renderJsonViewer = (value: object, options: TraceJsonViewOptions) => (
-    <ReactJson
-      src={value}
-      name={false}
-      displayDataTypes={false}
-      displayObjectSize={props.displayObjectSize ?? false}
-      shouldCollapse={props.shouldCollapse}
-      enableClipboard={false}
-      collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
-      collapsed={options.collapsed}
-      style={{
-        fontSize: "13px",
-        backgroundColor: "transparent",
-      }}
-      theme={colorMode === "dark" ? "twilight" : "rjv-default"}
-      displayArrayKey={false}
-    />
+    <Suspense fallback={<div />}>
+      <ReactJson
+        src={value}
+        name={false}
+        displayDataTypes={false}
+        displayObjectSize={props.displayObjectSize ?? false}
+        shouldCollapse={props.shouldCollapse}
+        enableClipboard={false}
+        collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
+        collapsed={options.collapsed}
+        style={{
+          fontSize: "13px",
+          backgroundColor: "transparent",
+        }}
+        theme={colorMode === "dark" ? "twilight" : "rjv-default"}
+        displayArrayKey={false}
+      />
+    </Suspense>
   );
 
   return (

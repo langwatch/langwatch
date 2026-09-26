@@ -38,13 +38,12 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-// The legacy view lazy-loads react-json-view; stub the dynamic loader so the
+// The legacy view lazy-loads react-json-view; stub the viewer so the
 // JSON pane stays out of jsdom (the audio players render above it regardless).
-vi.mock("../../../../behavior/compat/next-dynamic.ts", () => ({
-  default: () =>
-    function StubbedDynamic() {
-      return null;
-    },
+vi.mock("@microlink/react-json-view", () => ({
+  default: function StubbedReactJson() {
+    return null;
+  },
 }));
 
 vi.mock("@langwatch/design-system/color-mode", () => ({

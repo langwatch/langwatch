@@ -61,10 +61,7 @@ function harness(calls: RecordedCall[]) {
 
   return function Harness({ children }: { children: ReactNode }) {
     return (
-      <traceApi.Provider
-        client={client as unknown as Parameters<typeof traceApi.Provider>[0]["client"]}
-        queryClient={queryClient}
-      >
+      <traceApi.Provider client={client} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
         </QueryClientProvider>

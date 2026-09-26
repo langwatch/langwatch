@@ -98,7 +98,7 @@ export function useSpanTreeCanonical() {
   }, [sseConnected, isReady, isLive, shared, utils, queryArgs.projectId, queryArgs.traceId]);
 
   if (shared) {
-    return asSharedQueryResult(shared.spanTree) as unknown as typeof treeQuery;
+    return asSharedQueryResult(shared.spanTree);
   }
   return treeQuery;
 }

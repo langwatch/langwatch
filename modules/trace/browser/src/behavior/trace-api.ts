@@ -277,9 +277,8 @@ export type TraceApiMap = {
       query: {
         input: TraceScope &
           SpanReadHint & {
-            page?: number;
-            pageSize?: number;
-            cursor?: { startTimeMs: number; spanId: string } | null;
+            limit?: number;
+            cursor?: { startTimeMs: number; spanId: string };
           };
         output: {
           nodes: SpanTreeNode[];

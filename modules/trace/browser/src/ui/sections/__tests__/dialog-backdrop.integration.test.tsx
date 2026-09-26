@@ -74,13 +74,10 @@ describe("Dialog backdrop", () => {
     /** @scenario Caller cannot override the backdrop with a dark fill */
     it("strips bg/background/backgroundColor and warns in dev", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      renderOpenDialog({
-        // Cast to widen the type so we exercise the runtime guard, since
-        // the type-level Omit already forbids these keys at compile time.
-        backdropProps: { bg: "blackAlpha.700" } as unknown as Parameters<
-          typeof Dialog.Content
-        >[0]["backdropProps"],
-      });
+      // A props object built elsewhere escapes the literal-only Omit check;
+      // the runtime guard is what holds.
+      const callerBackdropProps = { className: "caller-backdrop", bg: "blackAlpha.700" };
+      renderOpenDialog({ backdropProps: callerBackdropProps });
       const backdrop = getBackdrop();
       const inlineBg = backdrop.style.background || backdrop.style.backgroundColor;
       expect(inlineBg).not.toMatch(/blackalpha|rgba\(0,\s*0,\s*0,/i);
@@ -97,7 +94,7 @@ describe("Dialog backdrop", () => {
       renderOpenDialog({
         backdropProps: {
           style: { backgroundColor: "black" },
-        } as unknown as Parameters<typeof Dialog.Content>[0]["backdropProps"],
+        },
       });
       const backdrop = getBackdrop();
       expect(backdrop.style.backgroundColor).toBe("transparent");
