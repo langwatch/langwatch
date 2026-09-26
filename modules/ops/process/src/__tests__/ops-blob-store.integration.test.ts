@@ -1,6 +1,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import {
   blobHolderSetKey,
@@ -16,9 +17,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../app/ops-operations.ts";
 import type { QueuePayloadDecoder, QueuePayloadDecoding } from "../app/ops.app.ts";
-import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
 import type { OpsService } from "../services/ops.service.ts";
-import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -27,14 +26,7 @@ const QUEUE = "{test/blobrepo}";
 const PROJECT = "project-blobrepo";
 const HASH = "blobrepohash01";
 
-const schedulerRepository: SchedulerOpsRepository = {
-  tryFindByIdForOps: async () => null,
-  setActiveForOps: async () => false,
-  releaseSlotForOps: async () => false,
-  requestImmediateRunForOps: async () => false,
-  findForOps: async () => [],
-  listPausedForOps: async () => ({ rows: [], total: 0 }),
-};
+const schedules = createApiFixture<AutomationApi>({ findAllReportSchedules: async () => [] });
 
 const projects = createApiFixture<ProjectApi>({ listNamesByIds: async () => [] });
 
@@ -83,8 +75,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       redis,
       queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {
-        repository: schedulerRepository,
-        wake: NoopSchedulerWakeService.create(),
+        schedules,
         projects,
       },
     }).build();

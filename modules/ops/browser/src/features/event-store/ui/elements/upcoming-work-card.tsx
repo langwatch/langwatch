@@ -96,7 +96,7 @@ export function UpcomingWorkCard({
   const rows = useMemo(() => {
     const merged: TimedWorkRow[] = [];
     for (const job of schedules) {
-      if (!job.active) continue;
+      if (!job.active || job.nextRunAt === null) continue;
       merged.push({
         key: `schedule:${job.id}`,
         kind: "schedule",

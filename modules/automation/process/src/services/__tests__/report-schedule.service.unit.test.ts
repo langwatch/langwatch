@@ -85,13 +85,18 @@ function processBackedSchedules(triggers: MemoryTriggerRepository) {
       requestReportRun: sender("run", reportRunRequested),
     },
   });
-  return { service, sent };
+  return { service, sent, store };
 }
 
-async function report(triggers: MemoryTriggerRepository, id: string, active = true) {
+async function report(
+  triggers: MemoryTriggerRepository,
+  id: string,
+  active = true,
+  projectId = "p",
+) {
   await triggers.create({
     id,
-    projectId: "p",
+    projectId,
     name: id,
     action: "SEND_EMAIL",
     actionParams: {
@@ -101,7 +106,7 @@ async function report(triggers: MemoryTriggerRepository, id: string, active = tr
     },
     filters: {},
   });
-  await triggers.update({ id, projectId: "p", triggerKind: "REPORT", active });
+  await triggers.update({ id, projectId, triggerKind: "REPORT", active });
 }
 
 describe("ReportScheduleService", () => {
@@ -158,6 +163,111 @@ describe("ReportScheduleService", () => {
         ["missing", true],
         ["paused", false],
       ]);
+    });
+  });
+
+  describe("given reports in two projects, one paused by an operator", () => {
+    /** @scenario "The operator scheduler lists every report's schedule across projects" */
+    it("lists each configured report with its project and cron, the paused one without a next run", async () => {
+      const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+      await report(triggers, "daily", true, "p");
+      await report(triggers, "weekly", true, "q");
+      await report(triggers, "unconfigured", true, "q");
+      const { service } = processBackedSchedules(triggers);
+      await service.sync({
+        projectId: "p",
+        triggerId: "daily",
+        schedule: { cron: "0 9 * * *", timezone: "UTC" },
+      });
+      await service.sync({
+        projectId: "q",
+        triggerId: "weekly",
+        schedule: { cron: "0 9 * * 1", timezone: "Europe/Amsterdam" },
+      });
+      await service.setActive({ projectId: "q", triggerId: "weekly", active: false });
+
+      const schedules = (await service.findAllAcrossProjects()).toSorted((left, right) =>
+        left.triggerId.localeCompare(right.triggerId),
+      );
+
+      expect(
+        schedules.map(({ triggerId, projectId, cron, timezone, active, nextRunAt }) => ({
+          triggerId,
+          projectId,
+          cron,
+          timezone,
+          active,
+          nextRunAt,
+        })),
+      ).toEqual([
+        {
+          triggerId: "daily",
+          projectId: "p",
+          cron: "0 9 * * *",
+          timezone: "UTC",
+          active: true,
+          nextRunAt: new Date("2026-01-01T09:00:00Z"),
+        },
+        {
+          triggerId: "weekly",
+          projectId: "q",
+          cron: "0 9 * * 1",
+          timezone: "Europe/Amsterdam",
+          active: false,
+          nextRunAt: null,
+        },
+      ]);
+    });
+  });
+
+  describe("given a scheduled report", () => {
+    /** @scenario "An operator's pause and resume drive the report's schedule" */
+    it("holds no wake while paused and wakes at the next slot once resumed", async () => {
+      const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+      await report(triggers, "r");
+      const { service, sent } = processBackedSchedules(triggers);
+      await service.sync({
+        projectId: "p",
+        triggerId: "r",
+        schedule: { cron: "0 9 * * *", timezone: "UTC" },
+      });
+
+      await service.setActive({ projectId: "p", triggerId: "r", active: false });
+      const [paused] = await service.findAllAcrossProjects();
+      await service.setActive({ projectId: "p", triggerId: "r", active: true });
+      const [resumed] = await service.findAllAcrossProjects();
+
+      expect(sent).toEqual(["configure:r", "pause:r", "resume:r"]);
+      expect([paused?.active, paused?.nextRunAt]).toEqual([false, null]);
+      expect([resumed?.active, resumed?.nextRunAt]).toEqual([
+        true,
+        new Date("2026-01-01T09:00:00Z"),
+      ]);
+    });
+
+    /** @scenario "Each operator run-now is its own request" */
+    it("sends each run-now as a distinct request and keeps the cadence", async () => {
+      const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+      await report(triggers, "r");
+      const { service, sent, store } = processBackedSchedules(triggers);
+      await service.sync({
+        projectId: "p",
+        triggerId: "r",
+        schedule: { cron: "0 9 * * *", timezone: "UTC" },
+      });
+      const ref = { processName: REPORT_SCHEDULE_PROCESS_NAME, projectId: "p", processKey: "r" };
+
+      await service.requestRun({ projectId: "p", triggerId: "r" });
+      const first = (await store.findByRef<ReportScheduleState>({ ref }))?.state.lastRunRequestId;
+      await service.requestRun({ projectId: "p", triggerId: "r" });
+      const second = (await store.findByRef<ReportScheduleState>({ ref }))?.state.lastRunRequestId;
+
+      expect(sent).toEqual(["configure:r", "run:r", "run:r"]);
+      expect(first).toEqual(expect.any(String));
+      expect(second).not.toBe(first);
+      expect((await service.getAll({ projectId: "p" }))[0]?.nextRunAt).toEqual(
+        new Date("2026-01-01T09:00:00Z"),
+      );
     });
   });
 });

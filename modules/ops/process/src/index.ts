@@ -17,11 +17,8 @@ export type {
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export type { OpsOperationsOptions } from "./app/ops-operations.ts";
-export type { SchedulerWakeRedis } from "./repositories/redis/redis.scheduler-wake.repository.ts";
 export type { OpsSnapshotRedis } from "./app/ops.app.ts";
 export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
-export type { ScheduledJobRecord } from "./repositories/scheduler-ops.repository.ts";
-export type { SchedulerWake } from "./app/ops.app.ts";
 export {
   type AdminAccess,
   AdminAccessService,

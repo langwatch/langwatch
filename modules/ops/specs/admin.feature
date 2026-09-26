@@ -47,15 +47,15 @@ Feature: Platform administration package boundary
 
   @unit
   Scenario: A manual scheduler run follows the ordinary due path
-    Given an active schedule with no claimed slot
+    Given an active report schedule
     When an operator requests an immediate run
-    Then the schedule is made due rather than invoking its target directly
-    And the scheduler is woken after the audited control
+    Then automation's report schedule is asked for one run rather than the target being invoked
+    And the control is audited once the command is accepted
 
   @unit
-  Scenario: Scheduler controls refuse stale or racing state
-    Given a paused schedule or a live or non-stale claimed slot
-    When an operator requests a conflicting control
+  Scenario: Scheduler controls refuse what a report schedule cannot do
+    Given a report schedule, which never holds a slot lease
+    When an operator asks to clear its stuck slot
     Then the service refuses with its stable scheduler error
     And no audit entry is written for the refused control
 

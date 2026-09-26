@@ -2,7 +2,6 @@ import { nowInstant } from "@langwatch/time";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { isSlotStale } from "../../model/scheduler-presentation.ts";
 import { SchedulerContentView } from "./scheduler-content.tsx";
 import { SchedulerRowActions } from "./scheduler-row-actions.tsx";
 
@@ -27,14 +26,13 @@ export function SchedulerContent() {
       isLoading={jobsQuery.isLoading}
       hasAccess={hasAccess}
       now={now}
-      renderActions={(job, status, renderNow) => (
+      renderActions={(job, status) => (
         <SchedulerRowActions
           scheduleId={job.id}
           targetType={job.targetType}
           targetId={job.targetId}
           projectName={job.projectName}
           status={status}
-          canClearSlot={isSlotStale({ job, now: renderNow })}
           onDone={() => void jobsQuery.refetch()}
         />
       )}

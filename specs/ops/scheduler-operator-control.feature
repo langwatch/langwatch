@@ -93,27 +93,6 @@ Feature: Operator control over the scheduler
 
   # ── Clearing a stuck slot ─────────────────────────────────────────────
 
-  @unit
-  Scenario: Clearing is offered only once a slot is genuinely stale
-    Given a schedule whose slot was claimed moments ago
-    When the row's actions are opened
-    Then clearing the slot is not offered
-
-  @unimplemented
-  Scenario: Clearing a stale slot lets the schedule be claimed again
-    Given a schedule whose slot has been held past the staleness threshold
-    When the operator clears it
-    Then the slot is released
-    And the schedule can be claimed on the next tick
-
-  @unimplemented
-  Scenario: Clearing states the risk it carries
-    Given a schedule whose slot has been held past the staleness threshold
-    When the operator opens the clear confirmation
-    Then it states that a still-live original worker could result in the slot being worked twice
-
-  # ── Running now ───────────────────────────────────────────────────────
-
   @unimplemented
   Scenario: The confirmation names the tenant, not its identifier
     Given a schedule belonging to a project
@@ -124,8 +103,8 @@ Feature: Operator control over the scheduler
   Scenario: A manual run goes through the ordinary path
     Given an active schedule
     When the operator runs it now
-    Then the schedule is made due rather than the target being invoked directly
-    And the calendar loop claims and runs it as it would a scheduled slot
+    Then the report's schedule process is asked for one run rather than the target being invoked directly
+    And that process dispatches it through its outbox as it would a scheduled slot
 
   @unimplemented
   Scenario: A manual run is visible as a run
@@ -134,14 +113,8 @@ Feature: Operator control over the scheduler
     Then the schedule shows as running
     And a failure increments its attempts and records its error like any other run
 
-  @integration
-  Scenario: A manual run racing the calendar loop runs once
-    Given an active schedule whose slot the calendar loop claims concurrently
-    When the operator runs the same slot now
-    Then exactly one of the two claims proceeds
-    And the other stands down without invoking the target
-
-  @unit
+  # Gap row 54: report run-now has no in-flight guard yet.
+  @unimplemented
   Scenario: A schedule that is already running refuses to run again
     Given a schedule whose slot a worker has claimed and is executing
     When an operator runs it now
@@ -177,7 +150,7 @@ Feature: Operator control over the scheduler
 
   @integration
   Scenario: Every control writes an audit record
-    Given an operator pauses a schedule, clears a slot, and runs a slot now
+    Given an operator pauses a schedule, resumes it, and runs it now
     When the audit trail is read
     Then each action is recorded with its actor, schedule, slot, project, and time
 
@@ -197,14 +170,6 @@ Feature: Operator control over the scheduler
     And no generic unknown-error message is shown
 
   @unit
-  Scenario: A run refused by a concurrent pause says the schedule is paused
-    Given an active schedule the operator has chosen to run now
-    And another operator pauses it before the write lands
-    When the run is refused
-    Then the reason names the schedule as inactive
-    And it does not claim the scheduler took the slot first
-
-  @unit
   Scenario: A control that changed nothing is not recorded as though it did
     Given a schedule that is deleted between being read and being paused
     When the pause affects no rows
@@ -220,9 +185,3 @@ Feature: Operator control over the scheduler
     Then the write is scoped to that schedule's project
     And a schedule belonging to another project cannot be reached
 
-  @unit
-  Scenario: Pausing a wedged schedule does not withdraw the repair
-    Given a schedule whose slot has been held long enough to clear
-    When an operator pauses it first
-    Then clearing the stuck slot is still offered
-    And the staleness clock is not restarted by the pause

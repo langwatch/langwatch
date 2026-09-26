@@ -6,8 +6,10 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import { explainHandledError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-operations.ts";
@@ -42,9 +44,8 @@ function backoffice(connectionDecides = true) {
     auth: createApiFixture<AuthApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
-      repository: {} as never,
-      wake: {} as never,
-      projects: {} as never,
+      schedules: createApiFixture<AutomationApi>(),
+      projects: createApiFixture<ProjectApi>(),
     },
   }).build();
 }

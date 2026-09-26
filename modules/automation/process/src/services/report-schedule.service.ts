@@ -1,10 +1,12 @@
 import {
   reportActionParamsSchema,
+  type OperatorReportSchedule,
   type ReportActionParams,
   type ReportSchedule,
   type ReportScheduleInput,
 } from "@langwatch/automation-contract";
-import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
+import type { EventingCommands, PersistedProcessInstance, ProcessStore } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
 import { Temporal, toDate } from "@langwatch/time";
 
 import type { AutomationClock } from "../app/automation.members.ts";
@@ -78,16 +80,22 @@ export class ReportScheduleService {
     });
   }
 
-  async requestRun(input: {
-    projectId: string;
-    triggerId: string;
-    requestId: string;
-  }): Promise<void> {
+  /** Each call is its own request, so the process dispatches it exactly once. */
+  async requestRun(input: { projectId: string; triggerId: string }): Promise<void> {
     await this.senders().requestReportRun.send({
       ...this.envelope(input.projectId),
       triggerId: input.triggerId,
-      requestId: input.requestId,
+      requestId: generate("reportrun").toString(),
     });
+  }
+
+  async setActive(input: { projectId: string; triggerId: string; active: boolean }): Promise<void> {
+    const target = { projectId: input.projectId, triggerId: input.triggerId };
+    if (input.active) {
+      await this.resume(target);
+      return;
+    }
+    await this.remove(target);
   }
 
   /** Configures every active report with no process instance yet; a paused one keeps its pause. */
@@ -123,19 +131,33 @@ export class ReportScheduleService {
         triggerId: trigger.id,
       });
       if (!instance) continue;
-      const { state, nextWakeAt } = instance;
-      schedules.push({
-        triggerId: trigger.id,
-        nextRunAt:
-          state.active && nextWakeAt !== null
-            ? toDate(Temporal.Instant.fromEpochMilliseconds(nextWakeAt))
-            : null,
-        lastRunAt:
-          state.lastSlot === null
-            ? null
-            : toDate(Temporal.Instant.fromEpochMilliseconds(state.lastSlot)),
-        active: state.active,
-      });
+      schedules.push(toReportSchedule({ triggerId: trigger.id, instance }));
+    }
+
+    return schedules;
+  }
+
+  /** Every active report's configured schedule, across projects; one never configured is absent. */
+  async findAllAcrossProjects(): Promise<OperatorReportSchedule[]> {
+    const targets = await this.triggers.findActiveReportTargets();
+    const reportIds = new Set(targets.map((target) => target.id));
+    const projectIds = [...new Set(targets.map((target) => target.projectId))];
+    const schedules: OperatorReportSchedule[] = [];
+    for (const projectId of projectIds) {
+      const triggers = await this.triggers.findAllByProjectId({ projectId });
+      for (const trigger of triggers) {
+        if (!reportIds.has(trigger.id)) continue;
+        const instance = await this.findInstance({ projectId, triggerId: trigger.id });
+        if (!instance?.state.cron || !instance.state.timezone) continue;
+        schedules.push({
+          ...toReportSchedule({ triggerId: trigger.id, instance }),
+          projectId,
+          cron: instance.state.cron,
+          timezone: instance.state.timezone,
+          createdAt: trigger.createdAt,
+          updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(instance.updatedAt)),
+        });
+      }
     }
 
     return schedules;
@@ -161,4 +183,26 @@ export class ReportScheduleService {
     }
     return this.#commands;
   }
+}
+
+function toReportSchedule({
+  triggerId,
+  instance,
+}: {
+  triggerId: string;
+  instance: PersistedProcessInstance<ReportScheduleState>;
+}): ReportSchedule {
+  const { state, nextWakeAt } = instance;
+  return {
+    triggerId,
+    nextRunAt:
+      state.active && nextWakeAt !== null
+        ? toDate(Temporal.Instant.fromEpochMilliseconds(nextWakeAt))
+        : null,
+    lastRunAt:
+      state.lastSlot === null
+        ? null
+        : toDate(Temporal.Instant.fromEpochMilliseconds(state.lastSlot)),
+    active: state.active,
+  };
 }

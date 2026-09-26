@@ -26,6 +26,17 @@ export const reportScheduleStatusSchema = z.object({
 });
 export type ReportSchedule = z.infer<typeof reportScheduleStatusSchema>;
 
+/** One report's schedule as the operator scheduler lists it, across projects. */
+export const operatorReportScheduleSchema = z.object({
+  ...reportScheduleStatusSchema.shape,
+  projectId: z.string(),
+  cron: z.string(),
+  timezone: z.string(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+export type OperatorReportSchedule = z.infer<typeof operatorReportScheduleSchema>;
+
 export const triggerFireStatsSchema = z.object({
   triggerId: z.string(),
   lastFiredAt: z.date().nullable(),

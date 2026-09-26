@@ -6,7 +6,7 @@ import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { canRunNow, type SchedulerJobStatus } from "../../model/scheduler-presentation.ts";
-type PendingAction = "pause" | "resume" | "clear" | "run" | null;
+type PendingAction = "pause" | "resume" | "run" | null;
 
 /** Per-row controls (ADR-091). Confirmations name PROJECT (cross-tenant; risk is
  * right action on wrong row). */
@@ -16,7 +16,6 @@ export function SchedulerRowActions({
   targetId,
   projectName,
   status,
-  canClearSlot,
   onDone,
 }: {
   scheduleId: string;
@@ -26,8 +25,6 @@ export function SchedulerRowActions({
   /** Resolved project NAME, or null when it could not be resolved. */
   projectName: string | null;
   status: SchedulerJobStatus;
-  /** Only true once the slot has been held past the staleness threshold. */
-  canClearSlot: boolean;
   onDone: () => void;
 }) {
   const showErrorToast = useShowErrorToast();
@@ -47,7 +44,6 @@ export function SchedulerRowActions({
   });
 
   const setActive = api.ops.setScheduleActive.useMutation(settle("Schedule updated"));
-  const clearSlot = api.ops.clearScheduleSlot.useMutation(settle("Slot cleared"));
   const runNow = api.ops.runScheduleNow.useMutation(settle("Run requested"));
 
   const isPaused = status === "paused";
@@ -81,11 +77,6 @@ export function SchedulerRowActions({
               <Menu.Item value="active" onClick={() => setPending(isPaused ? "resume" : "pause")}>
                 {isPaused ? "Resume" : "Pause"}
               </Menu.Item>
-              {canClearSlot && (
-                <Menu.Item value="clear" onClick={() => setPending("clear")}>
-                  Clear stuck slot
-                </Menu.Item>
-              )}
             </Menu.Content>
           </Menu.Positioner>
         </Portal>
@@ -99,8 +90,7 @@ export function SchedulerRowActions({
         tenant={tenant}
         onRunNow={() => runNow.mutate({ scheduleId })}
         onSetActive={(active) => setActive.mutate({ scheduleId, active })}
-        onClearSlot={() => clearSlot.mutate({ scheduleId })}
-        busy={runNow.isPending || setActive.isPending || clearSlot.isPending}
+        busy={runNow.isPending || setActive.isPending}
       />
     </>
   );
@@ -116,7 +106,6 @@ function SchedulerConfirmations({
   tenant,
   onRunNow,
   onSetActive,
-  onClearSlot,
   busy,
 }: {
   pending: PendingAction;
@@ -126,7 +115,6 @@ function SchedulerConfirmations({
   tenant: string | null;
   onRunNow: () => void;
   onSetActive: (active: boolean) => void;
-  onClearSlot: () => void;
   busy: boolean;
 }) {
   // Run-now is the only control that can deliver something to a customer, so it
@@ -165,17 +153,6 @@ function SchedulerConfirmations({
         isLoading={busy}
         title="Resume this schedule?"
         description={`${target} will go back on the calendar for ${project} and run at its next scheduled time.`}
-      >
-        <TargetIdentity targetId={targetId} />
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={pending === "clear"}
-        onClose={onClose}
-        onConfirm={onClearSlot}
-        isLoading={busy}
-        title="Clear this stuck slot?"
-        description={`This releases the run ${target} has been holding for ${project} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
       >
         <TargetIdentity targetId={targetId} />
       </ConfirmDialog>

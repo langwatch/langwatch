@@ -23,7 +23,6 @@ import { NullQueueRepository } from "../repositories/queue.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { BlobStoreRedisRepository } from "../repositories/redis/redis.blob-store.repository.ts";
-import type { SchedulerOpsRepository } from "../repositories/scheduler-ops.repository.ts";
 import {
   type AdminAccess,
   AdminAccessService,
@@ -39,7 +38,7 @@ import { type AdminAuditSink, ImpersonationService } from "../services/impersona
 import { OpsService } from "../services/ops.service.ts";
 import { QueueService } from "../services/queue.service.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
-import type { SchedulerWake, QueuePayloadDecoder } from "./ops.app.ts";
+import type { OpsAppDependencies, QueuePayloadDecoder } from "./ops.app.ts";
 
 export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   database: AdminDatabase & SchedulerAuditDatabase;
@@ -55,8 +54,7 @@ export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
-    repository: SchedulerOpsRepository;
-    wake: SchedulerWake;
+    schedules: OpsAppDependencies["automations"];
     projects: ProjectApi;
   };
 }

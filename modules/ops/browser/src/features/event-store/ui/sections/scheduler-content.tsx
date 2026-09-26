@@ -144,8 +144,11 @@ function ScheduleRow({
         </Text>
       </Table.Cell>
       <Table.Cell>
-        <Text textStyle="xs" title={readableDate(job.nextRunAt).toLocaleString()}>
-          {formatTimeAgo(toEpochMs(job.nextRunAt), now)}
+        <Text
+          textStyle="xs"
+          title={job.nextRunAt ? readableDate(job.nextRunAt).toLocaleString() : undefined}
+        >
+          {job.nextRunAt ? formatTimeAgo(toEpochMs(job.nextRunAt), now) : "not scheduled"}
         </Text>
       </Table.Cell>
       <Table.Cell color="fg.muted">

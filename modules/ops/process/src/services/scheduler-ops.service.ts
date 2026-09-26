@@ -1,3 +1,4 @@
+import type { AutomationApi, OperatorReportSchedule } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   OpsScheduledJob,
@@ -5,70 +6,52 @@ import type {
   SchedulerControlAction,
 } from "@langwatch/ops-contract";
 import {
-  SLOT_STALE_AFTER_MS,
-  ScheduleAlreadyInFlightError,
   ScheduleInactiveError,
   ScheduleNotFoundError,
-  ScheduleRunInProgressError,
   ScheduleSlotNotStaleError,
 } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { type SchedulerWake } from "../app/ops.app.ts";
 import type { SchedulerAuditRepository } from "../repositories/ops-audit.repository.ts";
-import type {
-  SchedulerOpsRepository,
-  ScheduledJobRecord,
-} from "../repositories/scheduler-ops.repository.ts";
 
 const logger = createLogger("langwatch:ops:scheduler");
 
-/** Cross-tenant scheduler controls; manual runs only make work due. */
+/** Main's scheduler named a report's schedule by this target type. */
+const REPORT_TARGET_TYPE = "reportTrigger";
+
+type ReportSchedules = Pick<
+  AutomationApi,
+  "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun"
+>;
+
+/** The operator view over automation's report schedules; every control is an automation command. */
 export class SchedulerOpsService {
-  private readonly repository: SchedulerOpsRepository;
+  private readonly schedules: ReportSchedules;
   private readonly audit: SchedulerAuditRepository;
-  private readonly wake: SchedulerWake;
-  private readonly projects: ProjectApi;
+  private readonly projects: Pick<ProjectApi, "listNamesByIds">;
 
   private constructor(deps: {
-    repository: SchedulerOpsRepository;
+    schedules: ReportSchedules;
     audit: SchedulerAuditRepository;
-    wake: SchedulerWake;
-    projects: ProjectApi;
+    projects: Pick<ProjectApi, "listNamesByIds">;
   }) {
-    this.repository = deps.repository;
+    this.schedules = deps.schedules;
     this.audit = deps.audit;
-    this.wake = deps.wake;
     this.projects = deps.projects;
   }
 
   static create(input: {
-    repository: SchedulerOpsRepository;
+    schedules: ReportSchedules;
     audit: SchedulerAuditRepository;
-    wake: SchedulerWake;
-    projects: ProjectApi;
+    projects: Pick<ProjectApi, "listNamesByIds">;
   }): SchedulerOpsService {
-    return new SchedulerOpsService({
-      repository: input.repository,
-      audit: input.audit,
-      wake: input.wake,
-      projects: input.projects,
-    });
+    return new SchedulerOpsService(input);
   }
 
   async listScheduledJobs({ limit = 200 }: { limit?: number }): Promise<OpsScheduledJob[]> {
-    const rows = await this.repository.findForOps({
-      limit: Math.min(Math.max(limit, 1), 500),
-    });
+    const rows = (await this.findOrdered()).slice(0, Math.min(Math.max(limit, 1), 500));
 
-    const names = await this.resolveProjectNames(rows);
-
-    return rows.map((row) =>
-      toOpsScheduledJob({
-        row,
-        projectName: names.get(row.projectId) ?? null,
-      }),
-    );
+    return this.present(rows);
   }
 
   /** Returns inactive schedules separately: the main listing is active-first. */
@@ -77,20 +60,11 @@ export class SchedulerOpsService {
   }: {
     limit?: number;
   }): Promise<{ schedules: OpsScheduledJob[]; total: number }> {
-    const { rows, total } = await this.repository.listPausedForOps({
-      limit: Math.min(Math.max(limit, 1), 200),
-    });
-
-    const names = await this.resolveProjectNames(rows);
+    const paused = (await this.findOrdered()).filter((row) => !row.active);
 
     return {
-      total,
-      schedules: rows.map((row) =>
-        toOpsScheduledJob({
-          row,
-          projectName: names.get(row.projectId) ?? null,
-        }),
-      ),
+      total: paused.length,
+      schedules: await this.present(paused.slice(0, Math.min(Math.max(limit, 1), 200))),
     };
   }
 
@@ -98,8 +72,6 @@ export class SchedulerOpsService {
   async listRecentActions({ limit = 20 }: { limit?: number }): Promise<SchedulerAuditEntryView[]> {
     return this.audit.findRecent({ limit: Math.min(Math.max(limit, 1), 100) });
   }
-
-  // ── Controls (ADR-091) ────────────────────────────────────────────────
 
   async setActive({
     scheduleId,
@@ -111,14 +83,11 @@ export class SchedulerOpsService {
     actorUserId: string;
   }): Promise<OpsScheduledJob> {
     const row = await this.getSchedule(scheduleId);
-    const applied = await this.repository.setActiveForOps({
-      id: scheduleId,
+    await this.schedules.setReportScheduleActive({
       projectId: row.projectId,
+      triggerId: row.triggerId,
       active,
     });
-    if (!applied) {
-      this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
-    }
 
     await this.record({
       actorUserId,
@@ -129,94 +98,46 @@ export class SchedulerOpsService {
     return this.readBack(scheduleId);
   }
 
-  /** Releases only a stale slot, never a live worker. */
+  /** A report schedule holds no slot lease (its sends retry in the outbox), so none is stale. */
   async clearStuckSlot({
     scheduleId,
-    actorUserId,
-    now = new Date(),
   }: {
     scheduleId: string;
     actorUserId: string;
-    now?: Date;
   }): Promise<OpsScheduledJob> {
-    const row = await this.getSchedule(scheduleId);
-    if (!row.currentSlot) {
-      this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
-    }
+    await this.getSchedule(scheduleId);
 
-    const heldForMs = now.getTime() - row.updatedAt.getTime();
-    if (heldForMs < SLOT_STALE_AFTER_MS) {
-      this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
-    }
-
-    const released = await this.repository.releaseSlotForOps({
-      id: scheduleId,
-      projectId: row.projectId,
-      expectedNextRunAt: row.nextRunAt,
-      now,
-    });
-    if (!released) {
-      this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
-    }
-
-    await this.record({
-      actorUserId,
-      action: "ops.scheduler.clear_slot",
-      row,
-    });
-    this.wake.wake();
-
-    return this.readBack(scheduleId);
+    return this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
   }
 
-  /** Makes work due; the scheduler loop still claims and runs it. */
+  /** Asks automation for one extra send; the schedule's own process dispatches it. */
   async runNow({
     scheduleId,
     actorUserId,
-    now = new Date(),
   }: {
     scheduleId: string;
     actorUserId: string;
-    now?: Date;
   }): Promise<OpsScheduledJob> {
     const row = await this.getSchedule(scheduleId);
     if (!row.active) {
       this.refuse({ error: new ScheduleInactiveError(), scheduleId });
     }
 
-    if (row.currentSlot) {
-      this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
-    }
-
-    const queued = await this.repository.requestImmediateRunForOps({
-      id: scheduleId,
-      projectId: row.projectId,
-      expectedNextRunAt: row.nextRunAt,
-      now,
-    });
-    if (!queued) {
-      const current = await this.repository.tryFindByIdForOps({ id: scheduleId });
-      if (current && !current.active) {
-        this.refuse({ error: new ScheduleInactiveError(), scheduleId });
-      }
-
-      if (current?.currentSlot) {
-        this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
-      }
-
-      this.refuse({ error: new ScheduleAlreadyInFlightError(), scheduleId });
-    }
-
+    await this.schedules.requestReportRun({ projectId: row.projectId, triggerId: row.triggerId });
     await this.record({ actorUserId, action: "ops.scheduler.run_now", row });
-    this.wake.wake();
 
     return this.readBack(scheduleId);
   }
 
-  private async getSchedule(scheduleId: string): Promise<ScheduledJobRecord> {
-    const row = await this.repository.tryFindByIdForOps({ id: scheduleId });
+  private async findOrdered(): Promise<OperatorReportSchedule[]> {
+    return (await this.schedules.findAllReportSchedules()).toSorted(compareActiveThenSoonest);
+  }
+
+  private async getSchedule(scheduleId: string): Promise<OperatorReportSchedule> {
+    const rows = await this.schedules.findAllReportSchedules();
+    const row = rows.find((candidate) => candidate.triggerId === scheduleId);
     if (!row) {
-      this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
+      return this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
     }
 
     return row;
@@ -228,14 +149,14 @@ export class SchedulerOpsService {
     throw error;
   }
 
+  /** The schedule as automation holds it now; its process applies the command shortly after. */
   private async readBack(scheduleId: string): Promise<OpsScheduledJob> {
-    const row = await this.getSchedule(scheduleId);
-    const names = await this.resolveProjectNames([row]);
+    const [job] = await this.present([await this.getSchedule(scheduleId)]);
+    if (!job) {
+      return this.refuse({ error: new ScheduleNotFoundError(), scheduleId });
+    }
 
-    return toOpsScheduledJob({
-      row,
-      projectName: names.get(row.projectId) ?? null,
-    });
+    return job;
   }
 
   /** Audit failures do not undo a completed control. */
@@ -246,28 +167,37 @@ export class SchedulerOpsService {
   }: {
     actorUserId: string;
     action: SchedulerControlAction;
-    row: ScheduledJobRecord;
+    row: OperatorReportSchedule;
   }): Promise<void> {
     try {
       await this.audit.append({
         actorUserId,
         action,
-        scheduleId: row.id,
+        scheduleId: row.triggerId,
         projectId: row.projectId,
-        slot: row.currentSlot ?? row.nextRunAt,
+        slot: row.nextRunAt,
       });
     } catch (error) {
       logger.warn(
-        { error, action, scheduleId: row.id },
+        { error, action, scheduleId: row.triggerId },
         "Failed to record scheduler operator action",
       );
     }
   }
 
+  private async present(rows: readonly OperatorReportSchedule[]): Promise<OpsScheduledJob[]> {
+    const names = await this.resolveProjectNames(rows);
+
+    return rows.map((row) =>
+      toOpsScheduledJob({ row, projectName: names.get(row.projectId) ?? null }),
+    );
+  }
+
   private async resolveProjectNames(
-    rows: readonly ScheduledJobRecord[],
+    rows: readonly OperatorReportSchedule[],
   ): Promise<Map<string, string>> {
     const projectIds = [...new Set(rows.map((row) => row.projectId))];
+    if (projectIds.length === 0) return new Map();
 
     try {
       const projects = await this.projects.listNamesByIds({ projectIds });
@@ -279,28 +209,39 @@ export class SchedulerOpsService {
   }
 }
 
+function compareActiveThenSoonest(
+  left: OperatorReportSchedule,
+  right: OperatorReportSchedule,
+): number {
+  if (left.active !== right.active) return left.active ? -1 : 1;
+  const leftAt = left.nextRunAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  const rightAt = right.nextRunAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  if (leftAt !== rightAt) return leftAt < rightAt ? -1 : 1;
+  return left.triggerId.localeCompare(right.triggerId);
+}
+
 function toOpsScheduledJob({
   row,
   projectName,
 }: {
-  row: ScheduledJobRecord;
+  row: OperatorReportSchedule;
   projectName: string | null;
 }): OpsScheduledJob {
   return {
-    id: row.id,
+    id: row.triggerId,
     projectName,
     projectId: row.projectId,
-    targetType: row.targetType,
-    targetId: row.targetId,
+    targetType: REPORT_TARGET_TYPE,
+    targetId: row.triggerId,
     cron: row.cron,
     timezone: row.timezone,
-    nextRunAt: row.nextRunAt.toISOString(),
-    lastSlot: row.lastSlot ? row.lastSlot.toISOString() : null,
+    nextRunAt: row.nextRunAt ? row.nextRunAt.toISOString() : null,
+    lastSlot: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     active: row.active,
     createdAt: row.createdAt.toISOString(),
-    currentSlot: row.currentSlot ? row.currentSlot.toISOString() : null,
-    attempts: row.attempts,
-    lastError: row.lastError ?? null,
+    currentSlot: null,
+    attempts: 0,
+    lastError: null,
     updatedAt: row.updatedAt.toISOString(),
   };
 }

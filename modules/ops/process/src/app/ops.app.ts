@@ -435,6 +435,11 @@ export interface OpsAppDependencies {
   identity: IdentityApiContract;
   projects: ProjectApiContract;
   auditLog: AuditLogApi;
+  /** The report schedules the operator scheduler lists and controls. */
+  automations: Pick<
+    AutomationApi,
+    "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun"
+  >;
 }
 
 /** The process-owned adapters used to make one Ops capability at boot. */
@@ -1872,9 +1877,4 @@ export interface OpsReplayRuntime {
  */
 export interface OpsReplayRuntimeFactory {
   create(): OpsReplayRuntime;
-}
-
-/** Wakes the scheduler loop after an operator makes work due. */
-export interface SchedulerWake {
-  wake(): void;
 }

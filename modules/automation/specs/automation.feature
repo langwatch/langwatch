@@ -74,6 +74,27 @@ Feature: Automation ownership
     And a paused report shows no next run
 
   @unit
+  Scenario: The operator scheduler lists every report's schedule across projects
+    Given reports in two projects, one of them paused by an operator
+    When the operator scheduler asks automation for its report schedules
+    Then each configured report is listed with its project, cron, timezone and active state
+    And the paused one shows no next run
+
+  @unit
+  Scenario: An operator's pause and resume drive the report's schedule
+    Given a scheduled report
+    When an operator pauses its schedule and later resumes it
+    Then the schedule holds no wake while paused
+    And it wakes at the next cron slot once resumed
+
+  @unit
+  Scenario: Each operator run-now is its own request
+    Given a scheduled report
+    When an operator asks for a run now twice
+    Then each request sends the report
+    And its next scheduled send is unchanged
+
+  @unit
   Scenario: The api sends report schedule commands but never runs the schedule
     Given a process that installs the automation module over memory stores
     When the process boots in the api role

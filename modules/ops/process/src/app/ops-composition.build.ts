@@ -5,7 +5,6 @@ import type { EventSourcing, ProcessStore } from "@langwatch/eventing";
  * (deleted by b383462d96) used to hand-compose. Answers each api-unavailable
  * capability with its named refusal, exactly as that composition did.
  */
-import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import type { ResourceOwnership } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import { OpsCapabilityUnavailableError, type OpsServerConfig } from "@langwatch/ops-contract";
@@ -34,7 +33,6 @@ import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.se
 import { DefaultOpsSnapshotService } from "../services/ops-snapshot-reader.service.ts";
 import { QueueOpsMetricsSourceService } from "../services/queue.ops-queue-metrics-source.service.ts";
 import { QueueService } from "../services/queue.service.ts";
-import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
 import type {
   StorageStatsClickHouseClient,
   StorageStatsInstance,
@@ -252,11 +250,7 @@ export function buildOpsInfrastructure(input: {
         users: dependencies.users,
         auth: dependencies.auth,
         scheduler: {
-          repository: new PrismaScheduledJobStore(members.prisma),
-          // The scheduler's own polling backstop preserves correctness
-          // without a wake, which is what makes the noop the package's
-          // answer rather than a degradation this composition invented.
-          wake: NoopSchedulerWakeService.create(),
+          schedules: dependencies.automations,
           projects: dependencies.projects,
         },
       }).build();

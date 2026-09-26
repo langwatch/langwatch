@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-/** A claimed slot must be untouched this long before an operator may clear it. */
-export const SLOT_STALE_AFTER_MS = 15 * 60_000;
-
 export const opsScheduledJobSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -10,7 +7,8 @@ export const opsScheduledJobSchema = z.object({
   targetId: z.string(),
   cron: z.string(),
   timezone: z.string(),
-  nextRunAt: z.string(),
+  /** Null while paused: a paused report schedule arms no next run. */
+  nextRunAt: z.string().nullable(),
   lastSlot: z.string().nullable(),
   active: z.boolean(),
   projectName: z.string().nullable(),

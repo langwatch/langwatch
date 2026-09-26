@@ -35,6 +35,7 @@ import {
   type CustomGraphNameRef,
   type EmailSuppression,
   type EmailSuppressionRow,
+  type OperatorReportSchedule,
   type ReportSchedule,
   type SlackChannelListing,
   type TestFireInput,
@@ -793,6 +794,25 @@ export class AutomationApp implements AutomationApi {
   /** Retires one report's calendar entry. Idempotent. */
   removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void> {
     return this.#automation.removeReportSchedule(input);
+  }
+
+  /** Every live report's schedule across projects, for the operator scheduler. */
+  findAllReportSchedules(): Promise<OperatorReportSchedule[]> {
+    return this.#reportSchedules.findAllAcrossProjects();
+  }
+
+  /** An operator's pause or resume of one report's schedule. */
+  setReportScheduleActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<void> {
+    return this.#reportSchedules.setActive(input);
+  }
+
+  /** An operator's run-now: one extra send, the cadence unchanged. */
+  requestReportRun(input: { projectId: string; triggerId: string }): Promise<void> {
+    return this.#reportSchedules.requestRun(input);
   }
 
   /** Flushes the project's dispatch cache. */

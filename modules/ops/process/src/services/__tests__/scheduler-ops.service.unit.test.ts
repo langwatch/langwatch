@@ -1,89 +1,78 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
+import type { AutomationApi, OperatorReportSchedule } from "@langwatch/automation-contract";
+import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import type { ScheduledJobRecord } from "../../index.ts";
 import { SchedulerAuditRepository } from "../../repositories/ops-audit.repository.ts";
-import type { SchedulerOpsRepository } from "../../repositories/scheduler-ops.repository.ts";
 import { SchedulerOpsService } from "../scheduler-ops.service.ts";
-import { NoopSchedulerWakeService } from "../scheduler-wake.service.ts";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
-const projects = createApiFixture<ProjectApi>({ listNamesByIds: async () => [] });
-
-const record = (over: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord => ({
-  id: "sched_1",
+const schedule = (over: Partial<OperatorReportSchedule> = {}): OperatorReportSchedule => ({
+  triggerId: "report_1",
   projectId: "project_acme",
-  targetType: "scheduled_report",
-  targetId: "report_1",
   cron: "0 3 21 * *",
   timezone: "UTC",
   nextRunAt: at(600_000),
-  lastSlot: at(-600_000),
-  currentSlot: null,
-  attempts: 0,
-  lastError: null,
+  lastRunAt: at(-600_000),
   active: true,
   createdAt: at(-86_400_000),
   updatedAt: at(-1_000),
   ...over,
 });
 
-class SchedulerRepositoryStub implements SchedulerOpsRepository {
-  readonly tryFindByIdForOps =
-    vi.fn<(params: { id: string }) => Promise<ScheduledJobRecord | null>>();
-  readonly setActiveForOps =
-    vi.fn<(params: { id: string; projectId: string; active: boolean }) => Promise<boolean>>();
-  readonly releaseSlotForOps =
-    vi.fn<
-      (params: {
-        id: string;
-        projectId: string;
-        expectedNextRunAt: Date;
-        now: Date;
-      }) => Promise<boolean>
-    >();
-  readonly requestImmediateRunForOps =
-    vi.fn<
-      (params: {
-        id: string;
-        projectId: string;
-        expectedNextRunAt: Date;
-        now: Date;
-      }) => Promise<boolean>
-    >();
-  readonly findForOps = vi.fn<(params: { limit: number }) => Promise<ScheduledJobRecord[]>>();
-  readonly listPausedForOps =
-    vi.fn<(params: { limit: number }) => Promise<{ rows: ScheduledJobRecord[]; total: number }>>();
-}
-
-class SchedulerAuditRepositoryStub extends SchedulerAuditRepository {
-  readonly append = vi.fn().mockResolvedValue(void 0);
-  readonly findRecent = vi.fn().mockResolvedValue([]);
-}
-
-const makeService = (row: ScheduledJobRecord | null) => {
-  const repo = new SchedulerRepositoryStub();
-  repo.tryFindByIdForOps.mockResolvedValue(row);
-  repo.setActiveForOps.mockResolvedValue(true);
-  repo.releaseSlotForOps.mockResolvedValue(true);
-  repo.requestImmediateRunForOps.mockResolvedValue(true);
-  repo.findForOps.mockResolvedValue([]);
-  repo.listPausedForOps.mockResolvedValue({ rows: [], total: 0 });
-  const audit = new SchedulerAuditRepositoryStub();
-  const wake = NoopSchedulerWakeService.create();
-  const wakeSpy = vi.spyOn(wake, "wake");
-  const service = SchedulerOpsService.create({
-    repository: repo,
-    audit,
-    wake,
-    projects,
-  });
-  return { service, repo, audit, wake: wakeSpy };
+type AuditEntry = {
+  actorUserId: string;
+  action: SchedulerControlAction;
+  scheduleId: string;
+  projectId: string;
+  slot: Date | null;
 };
+
+class RecordingAudit extends SchedulerAuditRepository {
+  readonly entries: AuditEntry[] = [];
+  failing = false;
+
+  async append(entry: AuditEntry): Promise<void> {
+    if (this.failing) throw new Error("audit down");
+    this.entries.push(entry);
+  }
+
+  async findRecent(): Promise<SchedulerAuditEntryView[]> {
+    return [];
+  }
+}
+
+function makeService(rows: OperatorReportSchedule[]) {
+  const commands: string[] = [];
+  const schedules = createApiFixture<AutomationApi>({
+    findAllReportSchedules: async () => rows,
+    setReportScheduleActive: async ({ projectId, triggerId, active }) => {
+      commands.push(`${active ? "resume" : "pause"}:${projectId}/${triggerId}`);
+    },
+    requestReportRun: async ({ projectId, triggerId }) => {
+      commands.push(`run:${projectId}/${triggerId}`);
+    },
+  });
+  const projects = createApiFixture<ProjectApi>({
+    listNamesByIds: async ({ projectIds }) =>
+      projectIds.map((id) => ({
+        id,
+        name: id === "project_acme" ? "Acme" : id,
+        slug: id,
+        teamId: "team",
+        organizationId: "organization",
+        isPersonal: false,
+        ownerUserId: null,
+      })),
+  });
+  const audit = new RecordingAudit();
+  const service = SchedulerOpsService.create({ schedules, audit, projects });
+
+  return { service, audit, commands };
+}
 
 const codeOf = async (run: () => Promise<unknown>): Promise<string> => {
   try {
@@ -97,18 +86,69 @@ const codeOf = async (run: () => Promise<unknown>): Promise<string> => {
   return "did-not-throw";
 };
 
-describe("scheduler controls", () => {
-  beforeEach(() => vi.clearAllMocks());
+describe("SchedulerOpsService", () => {
+  describe("given report schedules in several projects", () => {
+    describe("when the operator lists them", () => {
+      it("shows active ones first, soonest first, each named by its project", async () => {
+        const { service } = makeService([
+          schedule({ triggerId: "later", nextRunAt: at(900_000) }),
+          schedule({ triggerId: "paused", active: false, nextRunAt: null }),
+          schedule({ triggerId: "sooner", nextRunAt: at(60_000) }),
+        ]);
+
+        const jobs = await service.listScheduledJobs({ limit: 10 });
+
+        expect(jobs.map(({ id, active, projectName }) => [id, active, projectName])).toEqual([
+          ["sooner", true, "Acme"],
+          ["later", true, "Acme"],
+          ["paused", false, "Acme"],
+        ]);
+        expect(jobs[0]).toMatchObject({
+          targetType: "reportTrigger",
+          targetId: "sooner",
+          currentSlot: null,
+          attempts: 0,
+          lastError: null,
+        });
+      });
+
+      it("counts every paused schedule even when the page holds fewer", async () => {
+        const { service } = makeService([
+          schedule({ triggerId: "a", active: false, nextRunAt: null }),
+          schedule({ triggerId: "b", active: false, nextRunAt: null }),
+          schedule({ triggerId: "c" }),
+        ]);
+
+        const page = await service.listPausedSchedules({ limit: 1 });
+
+        expect(page.total).toBe(2);
+        expect(page.schedules.map((job) => [job.id, job.nextRunAt])).toEqual([["a", null]]);
+      });
+    });
+  });
 
   describe("given a schedule that no longer exists", () => {
     describe("when a control is invoked", () => {
       /** @scenario "A refused control explains itself in the operator's terms" */
       it("refuses with a cause the operator can act on", async () => {
-        const { service } = makeService(null);
+        const { service } = makeService([]);
 
         expect(await codeOf(() => service.runNow({ scheduleId: "gone", actorUserId: "u1" }))).toBe(
           "schedule_not_found",
         );
+      });
+
+      /** @scenario "A control that changed nothing is not recorded as though it did" */
+      it("sends no command and writes no audit record", async () => {
+        const { service, audit, commands } = makeService([]);
+
+        expect(
+          await codeOf(() =>
+            service.setActive({ scheduleId: "gone", active: false, actorUserId: "u1" }),
+          ),
+        ).toBe("schedule_not_found");
+        expect(commands).toEqual([]);
+        expect(audit.entries).toEqual([]);
       });
     });
   });
@@ -117,12 +157,12 @@ describe("scheduler controls", () => {
     describe("when an operator runs it now", () => {
       /** @scenario "An inactive schedule refuses to run" */
       it("refuses, naming the schedule as inactive", async () => {
-        const { service, repo } = makeService(record({ active: false }));
+        const { service, commands } = makeService([schedule({ active: false, nextRunAt: null })]);
 
         expect(
-          await codeOf(() => service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
+          await codeOf(() => service.runNow({ scheduleId: "report_1", actorUserId: "u1" })),
         ).toBe("schedule_inactive");
-        expect(repo.requestImmediateRunForOps).not.toHaveBeenCalled();
+        expect(commands).toEqual([]);
       });
     });
   });
@@ -130,415 +170,84 @@ describe("scheduler controls", () => {
   describe("given an active schedule", () => {
     describe("when an operator runs it now", () => {
       /** @scenario "A manual run goes through the ordinary path" */
-      it("makes it due rather than invoking the target directly", async () => {
-        const { service, repo } = makeService(record());
+      it("asks the report's own schedule for a run rather than invoking the target", async () => {
+        const { service, commands } = makeService([schedule()]);
 
-        await service.runNow({
-          scheduleId: "sched_1",
-          actorUserId: "u1",
-          now: NOW,
-        });
+        await service.runNow({ scheduleId: "report_1", actorUserId: "u1" });
 
-        // The loop claims and executes; ops only moves the row's due instant.
-        expect(repo.requestImmediateRunForOps).toHaveBeenCalledWith({
-          id: "sched_1",
-          projectId: "project_acme",
-          expectedNextRunAt: at(600_000),
-          now: NOW,
-        });
-      });
-
-      /** @scenario "A schedule that is already running refuses to run again" */
-      it("refuses while a worker is executing the schedule", async () => {
-        // A claimed slot leaves `nextRunAt` holding the LEASE instant, which
-        // looks like an ordinary future timestamp — so the fencing guard alone
-        // waves this through. `claim()` then re-claims (its COALESCE preserves
-        // rather than refuses) and a second worker delivers the same slot.
-        const { service, repo } = makeService(record({ currentSlot: at(-30_000) }));
-
-        expect(
-          await codeOf(() =>
-            service.runNow({
-              scheduleId: "sched_1",
-              actorUserId: "u1",
-              now: NOW,
-            }),
-          ),
-        ).toBe("schedule_run_in_progress");
-        expect(repo.requestImmediateRunForOps).not.toHaveBeenCalled();
-      });
-
-      it("reports the run in progress when a slot is claimed mid-flight", async () => {
-        // The service read an idle row, a worker claimed it before the write
-        // landed, and the repository predicate refused. The re-read is what
-        // turns that into the right words.
-        const { service, repo } = makeService(record());
-        repo.requestImmediateRunForOps.mockResolvedValue(false);
-        repo.tryFindByIdForOps
-          .mockResolvedValueOnce(record())
-          .mockResolvedValueOnce(record({ currentSlot: at(-1_000) }));
-
-        expect(
-          await codeOf(() =>
-            service.runNow({
-              scheduleId: "sched_1",
-              actorUserId: "u1",
-              now: NOW,
-            }),
-          ),
-        ).toBe("schedule_run_in_progress");
-      });
-
-      it("guards the write on the fencing value it read", async () => {
-        const { service, repo } = makeService(record());
-
-        await service.runNow({
-          scheduleId: "sched_1",
-          actorUserId: "u1",
-          now: NOW,
-        });
-
-        const call = repo.requestImmediateRunForOps.mock.calls[0]?.[0];
-        expect(call).toBeDefined();
-        if (!call) {
-          throw new Error("Expected the scheduler repository to receive the control request");
-        }
-        expect(call.expectedNextRunAt).toEqual(at(600_000));
-      });
-
-      it("pokes the loop so it fires without waiting for the backstop", async () => {
-        const { service, wake } = makeService(record());
-
-        await service.runNow({
-          scheduleId: "sched_1",
-          actorUserId: "u1",
-          now: NOW,
-        });
-
-        expect(wake).toHaveBeenCalled();
+        expect(commands).toEqual(["run:project_acme/report_1"]);
       });
 
       /** @scenario "A manual scheduler run follows the ordinary due path" */
-      it("makes the schedule due and wakes the scheduler after recording the control", async () => {
-        const { service, repo, audit, wake } = makeService(record());
+      it("records the audited control after the command is accepted", async () => {
+        const { service, audit } = makeService([schedule()]);
 
-        await service.runNow({ scheduleId: "sched_1", actorUserId: "u1", now: NOW });
+        const job = await service.runNow({ scheduleId: "report_1", actorUserId: "u1" });
 
-        expect(repo.requestImmediateRunForOps).toHaveBeenCalledOnce();
-        expect(audit.append).toHaveBeenCalledOnce();
-        expect(wake).toHaveBeenCalled();
-        expect(audit.append.mock.invocationCallOrder[0]).toBeLessThan(
-          wake.mock.invocationCallOrder[0]!,
-        );
-      });
-
-      /** @scenario "Scheduler controls refuse stale or racing state" */
-      it("refuses a conflicting control with its stable code and records nothing", async () => {
-        const racing = makeService(record());
-        racing.repo.requestImmediateRunForOps.mockResolvedValue(false);
-        expect(
-          await codeOf(() => racing.service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
-        ).toBe("schedule_already_in_flight");
-        expect(racing.audit.append).not.toHaveBeenCalled();
-
-        const paused = makeService(record({ active: false }));
-        expect(
-          await codeOf(() => paused.service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
-        ).toBe("schedule_inactive");
-        expect(paused.audit.append).not.toHaveBeenCalled();
-
-        const fresh = makeService(record({ currentSlot: at(-1_000), updatedAt: at(-1_000) }));
-        expect(
-          await codeOf(() =>
-            fresh.service.clearStuckSlot({ scheduleId: "sched_1", actorUserId: "u1", now: NOW }),
-          ),
-        ).toBe("schedule_slot_not_stale");
-        expect(fresh.audit.append).not.toHaveBeenCalled();
-      });
-
-      it("records the action against its actor and schedule", async () => {
-        const { service, audit } = makeService(record());
-
-        await service.runNow({
-          scheduleId: "sched_1",
-          actorUserId: "user_42",
-          now: NOW,
-        });
-
-        expect(audit.append).toHaveBeenCalledWith(
-          expect.objectContaining({
-            actorUserId: "user_42",
+        expect(audit.entries).toEqual([
+          {
+            actorUserId: "u1",
             action: "ops.scheduler.run_now",
-            scheduleId: "sched_1",
+            scheduleId: "report_1",
             projectId: "project_acme",
-          }),
-        );
+            slot: at(600_000),
+          },
+        ]);
+        expect(job).toMatchObject({ id: "report_1", projectName: "Acme" });
       });
     });
-  });
 
-  describe("given the loop claims the slot first", () => {
-    describe("when the operator's run lands after it", () => {
-      /** @scenario "A manual run racing the calendar loop runs once" */
-      it("changes nothing and says the scheduler got there first", async () => {
-        const { service, repo } = makeService(record());
-        repo.requestImmediateRunForOps.mockResolvedValue(false);
+    describe("when an operator tries to clear its slot", () => {
+      /** @scenario "Scheduler controls refuse what a report schedule cannot do" */
+      it("refuses with its stable code, since no slot is ever held, and records nothing", async () => {
+        const { service, audit, commands } = makeService([schedule()]);
 
         expect(
-          await codeOf(() => service.runNow({ scheduleId: "sched_1", actorUserId: "u1" })),
-        ).toBe("schedule_already_in_flight");
-      });
-    });
-  });
-
-  describe("given a slot claimed moments ago", () => {
-    describe("when an operator tries to clear it", () => {
-      /** @scenario "Clearing is offered only once a slot is genuinely stale" */
-      it("refuses, because it is still current", async () => {
-        const { service, repo } = makeService(
-          record({ currentSlot: at(-1_000), updatedAt: at(-1_000) }),
-        );
-
-        expect(
-          await codeOf(() =>
-            service.clearStuckSlot({
-              scheduleId: "sched_1",
-              actorUserId: "u1",
-              now: NOW,
-            }),
-          ),
+          await codeOf(() => service.clearStuckSlot({ scheduleId: "report_1", actorUserId: "u1" })),
         ).toBe("schedule_slot_not_stale");
-        expect(repo.releaseSlotForOps).not.toHaveBeenCalled();
+        expect(commands).toEqual([]);
+        expect(audit.entries).toEqual([]);
+      });
+    });
+
+    describe("when an operator pauses and then resumes it", () => {
+      /** @scenario "Every control writes an audit record" */
+      it("records pause and resume distinctly, with actor, schedule, slot and project", async () => {
+        const { service, audit } = makeService([schedule()]);
+
+        await service.setActive({ scheduleId: "report_1", active: false, actorUserId: "u1" });
+        await service.setActive({ scheduleId: "report_1", active: true, actorUserId: "u2" });
+
+        expect(audit.entries.map(({ action, actorUserId }) => [action, actorUserId])).toEqual([
+          ["ops.scheduler.pause", "u1"],
+          ["ops.scheduler.resume", "u2"],
+        ]);
       });
     });
   });
 
-  describe("given a schedule with no slot in flight", () => {
-    it("refuses to clear anything", async () => {
-      const { service } = makeService(record({ currentSlot: null }));
-
-      expect(
-        await codeOf(() =>
-          service.clearStuckSlot({
-            scheduleId: "sched_1",
-            actorUserId: "u1",
-            now: NOW,
-          }),
-        ),
-      ).toBe("schedule_slot_not_stale");
-    });
-  });
-
-  describe("given a slot held past the staleness threshold", () => {
-    describe("when an operator clears it", () => {
-      it("releases it so the schedule can be claimed again", async () => {
-        const { service, repo } = makeService(
-          record({
-            currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
-            updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
-          }),
-        );
-
-        await service.clearStuckSlot({
-          scheduleId: "sched_1",
-          actorUserId: "u1",
-          now: NOW,
-        });
-
-        expect(repo.releaseSlotForOps).toHaveBeenCalledWith(
-          expect.objectContaining({ id: "sched_1", now: NOW }),
-        );
-      });
-
-      it("records the repair", async () => {
-        const { service, audit } = makeService(
-          record({
-            currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
-            updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
-          }),
-        );
-
-        await service.clearStuckSlot({
-          scheduleId: "sched_1",
-          actorUserId: "u1",
-          now: NOW,
-        });
-
-        expect(audit.append).toHaveBeenCalledWith(
-          expect.objectContaining({ action: "ops.scheduler.clear_slot" }),
-        );
-      });
-    });
-  });
-
-  describe("given an operator pauses a schedule", () => {
-    it("marks it inactive without touching an in-flight slot", async () => {
-      const { service, repo } = makeService(record({ currentSlot: at(-1_000) }));
-
-      await service.setActive({
-        scheduleId: "sched_1",
-        active: false,
-        actorUserId: "u1",
-      });
-
-      expect(repo.setActiveForOps).toHaveBeenCalledWith({
-        id: "sched_1",
-        projectId: "project_acme",
-        active: false,
-      });
-      expect(repo.releaseSlotForOps).not.toHaveBeenCalled();
-    });
-
-    /** @scenario "Every control writes an audit record" */
-    it("records pause and resume distinctly", async () => {
-      const { service, audit } = makeService(record());
-
-      await service.setActive({
-        scheduleId: "sched_1",
-        active: false,
-        actorUserId: "u1",
-      });
-      await service.setActive({
-        scheduleId: "sched_1",
-        active: true,
-        actorUserId: "u1",
-      });
-
-      expect(audit.append.mock.calls.map((c) => c[0].action)).toEqual([
-        "ops.scheduler.pause",
-        "ops.scheduler.resume",
-      ]);
-    });
-  });
-
-  describe("given another operator pauses the schedule mid-flight", () => {
-    describe("when the run-now write finds no matching row", () => {
-      /** @scenario "A run refused by a concurrent pause says the schedule is paused" */
-      it("names the pause rather than blaming the scheduler", async () => {
-        const { service, repo } = makeService(record());
-        repo.requestImmediateRunForOps.mockResolvedValue(false);
-        // The re-read sees what the write saw: somebody paused it.
-        repo.tryFindByIdForOps
-          .mockResolvedValueOnce(record())
-          .mockResolvedValueOnce(record({ active: false }));
-
-        expect(
-          await codeOf(() =>
-            service.runNow({
-              scheduleId: "sched_1",
-              actorUserId: "u1",
-              now: NOW,
-            }),
-          ),
-        ).toBe("schedule_inactive");
-      });
-    });
-  });
-
-  describe("given a schedule deleted between the read and the write", () => {
-    describe("when a pause affects no rows", () => {
-      /** @scenario "A control that changed nothing is not recorded as though it did" */
-      it("reports it missing and writes no audit record", async () => {
-        const { service, repo, audit } = makeService(record());
-        repo.setActiveForOps.mockResolvedValue(false);
-
-        expect(
-          await codeOf(() =>
-            service.setActive({
-              scheduleId: "sched_1",
-              active: false,
-              actorUserId: "u1",
-            }),
-          ),
-        ).toBe("schedule_not_found");
-        expect(audit.append).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("given any control writing to a schedule", () => {
+  describe("given any control on a schedule", () => {
     /** @scenario "A control names its project in the write, not only in the copy" */
-    it("scopes every write to the row's project", async () => {
-      // Each control gets the row shape it is legal against: clearing needs a
-      // stale claimed slot, run-now needs an idle one.
-      const wedged = record({
-        currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
-        updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
-      });
+    it("scopes every command to the schedule's project", async () => {
+      const { service, commands } = makeService([
+        schedule({ triggerId: "report_1", projectId: "project_other" }),
+      ]);
 
-      const paused = makeService(record());
-      await paused.service.setActive({
-        scheduleId: "sched_1",
-        active: false,
-        actorUserId: "u1",
-      });
+      await service.setActive({ scheduleId: "report_1", active: false, actorUserId: "u1" });
+      await service.runNow({ scheduleId: "report_1", actorUserId: "u1" });
 
-      const cleared = makeService(wedged);
-      await cleared.service.clearStuckSlot({
-        scheduleId: "sched_1",
-        actorUserId: "u1",
-        now: NOW,
-      });
-
-      const ran = makeService(record());
-      await ran.service.runNow({
-        scheduleId: "sched_1",
-        actorUserId: "u1",
-        now: NOW,
-      });
-
-      for (const write of [
-        paused.repo.setActiveForOps,
-        cleared.repo.releaseSlotForOps,
-        ran.repo.requestImmediateRunForOps,
-      ]) {
-        expect(write).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project_acme" }));
-      }
-    });
-  });
-
-  describe("given a wedged schedule an operator paused first", () => {
-    describe("when they then clear the stuck slot", () => {
-      /** @scenario "Pausing a wedged schedule does not withdraw the repair" */
-      it("still allows the repair", async () => {
-        // Pausing is the first thing an operator does to a wedged schedule.
-        // The repair reads `updatedAt` as worker liveness, so a pause that
-        // touched it would hide the repair for another full staleness window
-        // at exactly the moment it is wanted.
-        const { service, repo } = makeService(
-          record({
-            active: false,
-            currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000),
-            updatedAt: at(-SLOT_STALE_AFTER_MS - 60_000),
-          }),
-        );
-
-        await expect(
-          service.clearStuckSlot({
-            scheduleId: "sched_1",
-            actorUserId: "u1",
-            now: NOW,
-          }),
-        ).resolves.toBeDefined();
-        expect(repo.releaseSlotForOps).toHaveBeenCalled();
-      });
+      expect(commands).toEqual(["pause:project_other/report_1", "run:project_other/report_1"]);
     });
   });
 
   describe("given the audit sink is failing", () => {
     describe("when a control succeeds", () => {
       it("does not report a failure that did not happen", async () => {
-        // The mutation already landed; throwing here would invite the operator
-        // to do it twice.
-        const { service, audit } = makeService(record());
-        audit.append.mockRejectedValue(new Error("audit down"));
+        const { service, audit } = makeService([schedule()]);
+        audit.failing = true;
 
         await expect(
-          service.runNow({
-            scheduleId: "sched_1",
-            actorUserId: "u1",
-            now: NOW,
-          }),
+          service.runNow({ scheduleId: "report_1", actorUserId: "u1" }),
         ).resolves.toBeDefined();
       });
     });

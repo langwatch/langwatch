@@ -1,11 +1,10 @@
 /** Derives overdue status (ADR-091); most important fact—calendar loop behind/stopped.
  * Page previously just rendered nextRunAt text. */
 
-import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import { toEpochMs } from "@langwatch/time";
 
 export interface SchedulerJobLike {
-  nextRunAt: string;
+  nextRunAt: string | null;
   lastSlot: string | null;
   currentSlot: string | null;
   attempts: number;
@@ -40,6 +39,7 @@ export function deriveStatus({
 
 /** Milliseconds past due; zero or negative when the schedule is not late. */
 export function latenessMs({ job, now }: { job: SchedulerJobLike; now: number }): number {
+  if (job.nextRunAt === null) return 0;
   return now - toEpochMs(job.nextRunAt);
 }
 
@@ -69,19 +69,6 @@ export function canRunNow({
   return status !== "paused" && status !== "running" && status !== "retrying";
 }
 
-/** Whether a slot has been held long enough that clearing it is a repair. */
-export function isSlotStale({
-  job,
-  now,
-}: {
-  job: SchedulerJobLike & { updatedAt?: string };
-  now: number;
-}): boolean {
-  if (!job.currentSlot) return false;
-  const heldSince = job.updatedAt ?? job.currentSlot;
-  return now - toEpochMs(heldSince) >= SLOT_STALE_AFTER_MS;
-}
-
 /** Action-needed rows first, then by firing time (sooner-first matches operator reading). */
 export function compareForAttention({
   a,
@@ -96,7 +83,7 @@ export function compareForAttention({
     ATTENTION_ORDER.indexOf(deriveStatus({ job: a, now })) -
     ATTENTION_ORDER.indexOf(deriveStatus({ job: b, now }));
   if (rank !== 0) return rank;
-  return toEpochMs(a.nextRunAt) - toEpochMs(b.nextRunAt);
+  return dueAtMs(a) - dueAtMs(b);
 }
 
 export interface SchedulerHeaderCounts {
@@ -172,4 +159,9 @@ export function deriveLoopHealth({ jobs, now }: { jobs: SchedulerJobLike[]; now:
   if (!anythingOverdue) return { healthy: true, lastFiredAt };
   const quietFor = lastFiredAt === null ? Infinity : now - lastFiredAt;
   return { healthy: quietFor < LOOP_STALE_MS, lastFiredAt };
+}
+
+/** A paused schedule arms no next run, so it sorts after every one that does. */
+function dueAtMs(job: SchedulerJobLike): number {
+  return job.nextRunAt === null ? Number.POSITIVE_INFINITY : toEpochMs(job.nextRunAt);
 }

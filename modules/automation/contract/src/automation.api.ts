@@ -26,7 +26,12 @@ import type { CustomGraphNameRef } from "./custom-graph.ts";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
 import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
-import type { ReportSchedule, TriggerFire, TriggerFireStats } from "./trigger.queries.ts";
+import type {
+  OperatorReportSchedule,
+  ReportSchedule,
+  TriggerFire,
+  TriggerFireStats,
+} from "./trigger.queries.ts";
 import type { Trigger } from "./trigger.ts";
 import type { WebhookDeliveryRow } from "./webhook-delivery.ts";
 
@@ -121,6 +126,16 @@ export interface AutomationApi {
     timezone: string;
   }): Promise<void>;
   removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** Every live report's schedule across projects, for the operator scheduler. */
+  findAllReportSchedules(): Promise<OperatorReportSchedule[]>;
+  /** An operator's pause or resume of one report's schedule; the automation stays as saved. */
+  setReportScheduleActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<void>;
+  /** An operator's run-now: one extra send, the cadence unchanged. */
+  requestReportRun(input: { projectId: string; triggerId: string }): Promise<void>;
   invalidate(projectId: string): Promise<void>;
   assertTraceConditionPresent(filters: Record<string, unknown> | undefined): void;
   assertConditionSurvivesEdit(input: {
