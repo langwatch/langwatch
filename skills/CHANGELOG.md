@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.5.0](https://github.com/langwatch/langwatch/compare/skills@v1.4.0...skills@v1.5.0) (2026-09-26)
+
+
+### Features
+
+* **analytics:** sandboxed custom chart widgets over LWQL ([#7870](https://github.com/langwatch/langwatch/issues/7870)) ([279b657](https://github.com/langwatch/langwatch/commit/279b6572ce15d9c0d6f791ed7e95afb469be2765))
+* **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
+* **query:** self-describing LangWatchQL door + whoami --json ([#8085](https://github.com/langwatch/langwatch/issues/8085)) ([#8113](https://github.com/langwatch/langwatch/issues/8113)) ([5b17bde](https://github.com/langwatch/langwatch/commit/5b17bde8e2497714d489504d13d8306393be429c))
+* **traces-v2:** enter to search, a routed search bar, instant evals in the filter bar, Langy in sync with the explorer ([#8234](https://github.com/langwatch/langwatch/issues/8234)) ([a4db9f8](https://github.com/langwatch/langwatch/commit/a4db9f83d4483804a113640cda81072d0fbc11e1))
+* webinar learnings, connected agent scope, scenario names, search hints, deep links, judge and Langy fixes ([#8236](https://github.com/langwatch/langwatch/issues/8236)) ([2054720](https://github.com/langwatch/langwatch/commit/2054720f391a2fcec60b86870a98d87345ccf6ee))
+
+
+### Bug Fixes
+
+* **skills:** skill tests drive Claude Code through the Scenario SDK adapter, which leaves no orphan process ([#7911](https://github.com/langwatch/langwatch/issues/7911)) ([a3aba37](https://github.com/langwatch/langwatch/commit/a3aba3766466ad2b487f04ca89e15b79cf82c1b1))
+
+
+### Documentation
+
+* **agent-testing:** a development agent in a container registers a new row per hostname ([#7981](https://github.com/langwatch/langwatch/issues/7981)) ([edcbebd](https://github.com/langwatch/langwatch/commit/edcbebd572fba9e24ac7571e17583e80d95e6aa2))
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/skills@v1.3.0...skills@v1.4.0) (2026-09-06)
 
 
