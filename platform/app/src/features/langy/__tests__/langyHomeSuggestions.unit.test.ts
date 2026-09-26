@@ -7,6 +7,7 @@
  * specs/langy/langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
+import { findSkill } from "~/shared/langy/langySkills";
 import { SETUP_SUGGESTIONS, SUGGESTIONS } from "../components/EmptyState";
 import {
   HOME_SUGGESTION_COUNT,
@@ -37,6 +38,13 @@ describe("selectLangySuggestions", () => {
         HOME_SUGGESTION_COUNT,
       );
     }
+  });
+
+  it("keeps the panel count equal to the catalog it renders", () => {
+    // PANEL_SUGGESTION_COUNT cannot be derived from SUGGESTIONS without a
+    // circular import (the catalog lives in the EmptyState component), so
+    // this pins the two together instead.
+    expect(PANEL_SUGGESTION_COUNT).toBe(SUGGESTIONS.length);
   });
 
   describe("given a project with nothing in it", () => {
@@ -143,5 +151,61 @@ describe("selectLangySuggestions", () => {
 
       expect(chosen.map((s) => s.label)).not.toContain("Onboard your agent");
     });
+  });
+});
+
+// Backs specs/langy/langy-how-do-i-latency.feature. The latency playbook
+// works from a standing start — the playbook itself branches on whether
+// telemetry exists — so the chip that starts it must be offered to every
+// project, not gated behind traces/evaluations/experiments like the rest of
+// SUGGESTIONS.
+describe("the how-do-i latency suggestion", () => {
+  /** @scenario "The empty state offers the latency question" */
+  it("offers the exact latency question with no requirement on the project", () => {
+    const latency = SUGGESTIONS.find(
+      (s) => s.prompt === "How do I improve my agent's latency?",
+    );
+
+    expect(
+      latency,
+      'no suggestion has the prompt "How do I improve my agent\'s latency?"',
+    ).toBeDefined();
+    expect(latency?.label).toBe("How do I improve my agent's latency?");
+    expect(latency?.requires).toBe("nothing");
+  });
+
+  /** @scenario "The empty state offers the latency question" */
+  it("pins the how-do-i skill so the agent cannot skip loading it", () => {
+    const latency = SUGGESTIONS.find(
+      (s) => s.prompt === "How do I improve my agent's latency?",
+    );
+
+    expect(latency?.skill).toBe("how-do-i");
+  });
+
+  it("names no skill on the other suggestions", () => {
+    const others = SUGGESTIONS.filter(
+      (s) => s.prompt !== "How do I improve my agent's latency?",
+    );
+
+    for (const suggestion of others) {
+      expect(suggestion.skill).toBeUndefined();
+    }
+  });
+});
+
+describe("every suggestion's pinned skill", () => {
+  it("names a real, resolvable Langy skill", () => {
+    const named = [...SUGGESTIONS, ...SETUP_SUGGESTIONS]
+      .map((s) => s.skill)
+      .filter((skill): skill is string => Boolean(skill));
+
+    expect(named.length).toBeGreaterThan(0);
+    for (const skillId of named) {
+      expect(
+        findSkill(skillId),
+        `no skill registered as "${skillId}"`,
+      ).toBeDefined();
+    }
   });
 });

@@ -706,8 +706,16 @@ export function makeLangyAdapter(
      * sends one and a suite that does not leaves this out.
      */
     pageContext?: PageContextChip[];
+    /**
+     * The project this conversation runs against. Defaults to the suite's
+     * usual `PROJECT_ID` — a scratch-project scenario (the how-do-i-latency
+     * telemetry premises) passes a different id so one test FILE can target
+     * several projects without every OTHER adapter having to know about it.
+     */
+    projectId?: string;
   } = {},
 ): LangyAdapter {
+  const projectId = options.projectId ?? PROJECT_ID;
   const state: LangySessionState = {
     conversationId: null,
     currentTurnId: null,
@@ -741,7 +749,7 @@ export function makeLangyAdapter(
         idempotencyKey: crypto.randomUUID(),
         trigger: "submit-message" as const,
         messages,
-        projectId: PROJECT_ID,
+        projectId,
         ...(options.pageContext ? { pageContext: options.pageContext } : {}),
       };
       const { path, body } = state.conversationId
@@ -765,7 +773,7 @@ export function makeLangyAdapter(
       const settledTools: SettledToolCall[] = [];
       const { text, hasEndedOnText } = await streamTurnText({
         cookie,
-        params: { projectId: PROJECT_ID, conversationId, turnId },
+        params: { projectId, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
         onNarration: (narration) => segments.push({ kind: "text", narration }),
         onToolFrame: (event) => state.toolEvents.push(event),

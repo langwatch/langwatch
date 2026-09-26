@@ -55,6 +55,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
+| "How do I …?" (a question about method; goes here first even when a later row names the topic) | `how-do-i` | the `skill` tool with name `how-do-i` (a skill, not a `langwatch` subcommand), then the playbook's own checks |
 | Primary, traces are the ask: "find the traces where" | `find-traces` | `langwatch ui call explorer.setFilter` |
 | Secondary, traces feed a task | `find-traces` | `langwatch trace search --filter` |
 | "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only` (errors live on spans), `langwatch trace get <id>` |

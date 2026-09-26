@@ -950,6 +950,17 @@
             ]
           },
           {
+            "group": "Playbooks",
+            "pages": [
+              {
+                "group": "How do I",
+                "pages": [
+                  "playbooks/how-do-i/improve-agent-latency"
+                ]
+              }
+            ]
+          },
+          {
             "group": "Models & Cost",
             "pages": [
               "langy/models",

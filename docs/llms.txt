@@ -654,6 +654,12 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Local development](https://langwatch.ai/docs/langy/local-development.md): Share a folder on your machine with Langy: it edits your code there, runs your own tests, and opens the pull request for you
 - [Insights across your traces](https://langwatch.ai/docs/langy/insights.md): Ask Langy what changed and it analyzes patterns across thousands of your traces, compares this week to previous weeks, and can set up alerts and automations for what matters.
 
+## Playbooks
+
+### How do I
+
+- [How do I improve my agent's latency?](https://langwatch.ai/docs/playbooks/how-do-i/improve-agent-latency.md): Find where your agent spends its time and give evidence-backed recommendations, branching on whether telemetry is set up correctly.
+
 ## Models & Cost
 
 - [Langy Models and Bring Your Own Key](https://langwatch.ai/docs/langy/models.md): Choose the model Langy runs on and connect your own provider API keys through the LangWatch AI Gateway.

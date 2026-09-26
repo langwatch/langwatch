@@ -124,6 +124,13 @@
 		"category": "skill"
 	},
 	{
+		"id": "how-do-i",
+		"label": "How do i",
+		"description": "Answer a \"How do I <topic>?\" question by following a baked playbook. The skill resolves the topic to a playbook, loads it, builds a task list from its prerequisites, runs the checks, and follows whichever branch matches. All the domain knowledge lives in the playbook, not here.",
+		"category": "skill",
+		"userPrompt": "How do I …?"
+	},
+	{
 		"id": "level-up",
 		"label": "Level up",
 		"description": "Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.",
