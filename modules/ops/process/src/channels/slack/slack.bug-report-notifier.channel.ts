@@ -1,6 +1,6 @@
 import type { BugReport } from "@langwatch/ops-contract";
 
-import type { BugReportNotifier } from "../app/ops.app.ts";
+import type { BugReportNotifier } from "../../app/ops.app.ts";
 
 /**
  * Posts one Block Kit message. The deployment binds its own Slack Web API
@@ -32,7 +32,7 @@ const DEFAULT_BASE_HOST = "https://app.langwatch.ai";
  * configured (production); silently a no-op everywhere else so intake never
  * depends on Slack being reachable or configured.
  */
-export class SlackBugReportNotifierService implements BugReportNotifier {
+export class SlackBugReportNotifierChannel implements BugReportNotifier {
   private constructor(
     private readonly transport: OpsSlackAlertTransport,
     private readonly config: SlackBugReportNotifierConfig,
@@ -41,8 +41,8 @@ export class SlackBugReportNotifierService implements BugReportNotifier {
   static create(input: {
     transport: OpsSlackAlertTransport;
     config: SlackBugReportNotifierConfig;
-  }): SlackBugReportNotifierService {
-    return new SlackBugReportNotifierService(input.transport, input.config);
+  }): SlackBugReportNotifierChannel {
+    return new SlackBugReportNotifierChannel(input.transport, input.config);
   }
 
   async notify({ report }: { report: BugReport }): Promise<void> {

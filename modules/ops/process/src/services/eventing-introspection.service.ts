@@ -1,4 +1,4 @@
-import { killSwitchDescriptorsFor, type StaticPipelineDefinition } from "@langwatch/eventing";
+import { type EventSourcing, killSwitchDescriptorsFor } from "@langwatch/eventing";
 
 import {
   type OpsEventingIntrospection,
@@ -8,20 +8,19 @@ import {
   type OpsProjectionMetadata,
 } from "../app/ops.app.ts";
 
-type AnyPipelineDefinition = StaticPipelineDefinition<any, any, any>;
+/** One pipeline definition exactly as the eventing runtime holds it. */
+type AnyPipelineDefinition = EventSourcing["definitions"][number];
 
 /**
  * Reads the pipeline definitions the process composed. The definitions are
  * resolved lazily on every call because a composition registers pipelines
  * during boot and an explorer may be built before the last one lands.
  */
-export class EventingOpsIntrospectionService implements OpsEventingIntrospection {
+export class EventingIntrospectionService implements OpsEventingIntrospection {
   private constructor(private readonly definitions: () => readonly AnyPipelineDefinition[]) {}
 
-  static create(
-    definitions: () => readonly AnyPipelineDefinition[],
-  ): EventingOpsIntrospectionService {
-    return new EventingOpsIntrospectionService(definitions);
+  static create(definitions: () => readonly AnyPipelineDefinition[]): EventingIntrospectionService {
+    return new EventingIntrospectionService(definitions);
   }
 
   projections(): OpsProjectionMetadata[] {

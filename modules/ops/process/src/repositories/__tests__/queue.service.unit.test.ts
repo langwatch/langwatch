@@ -81,8 +81,8 @@ describe("QueueService", () => {
         clusters: [],
       });
       await expect(
-        service.tryGetGroupDetail({ queueName: "missing", groupId: "group" }),
-      ).resolves.toBeNull();
+        service.findGroupsById({ queueName: "missing", groupId: "group" }),
+      ).resolves.toEqual([]);
     });
   });
 
@@ -550,7 +550,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("tryGetGroupDetail()", () => {
+  describe("findGroupsById()", () => {
     describe("when group exists", () => {
       it("returns the matching group", async () => {
         const group = createGroup({ groupId: "target" });
@@ -570,17 +570,17 @@ describe("QueueService", () => {
         });
         const service = QueueService.create({ repo });
 
-        const result = await service.tryGetGroupDetail({
+        const result = await service.findGroupsById({
           queueName: "q1",
           groupId: "target",
         });
 
-        expect(result).toEqual(group);
+        expect(result).toEqual([group]);
       });
     });
 
     describe("when group not found", () => {
-      it("returns null", async () => {
+      it("returns no group", async () => {
         const queue: QueueInfo = {
           name: "q1",
           displayName: "q1",
@@ -597,28 +597,28 @@ describe("QueueService", () => {
         });
         const service = QueueService.create({ repo });
 
-        const result = await service.tryGetGroupDetail({
+        const result = await service.findGroupsById({
           queueName: "q1",
           groupId: "missing",
         });
 
-        expect(result).toBeNull();
+        expect(result).toEqual([]);
       });
     });
 
     describe("when queue not found", () => {
-      it("returns null", async () => {
+      it("returns no group", async () => {
         const repo = createMockRepo({
           scanQueues: vi.fn().mockResolvedValue([]),
         });
         const service = QueueService.create({ repo });
 
-        const result = await service.tryGetGroupDetail({
+        const result = await service.findGroupsById({
           queueName: "missing",
           groupId: "g1",
         });
 
-        expect(result).toBeNull();
+        expect(result).toEqual([]);
       });
     });
   });

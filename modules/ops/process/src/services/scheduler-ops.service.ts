@@ -192,7 +192,7 @@ export class SchedulerOpsService {
         action,
         scheduleId: row.triggerId,
         projectId: row.projectId,
-        slot: row.nextRunAt,
+        slot: row.nextRunAt?.toISOString() ?? null,
       });
     } catch (error) {
       logger.warn(

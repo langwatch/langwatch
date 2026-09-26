@@ -4,9 +4,10 @@ import {
   tryParseLiveSnapshot,
   SNAPSHOT_VERSION,
 } from "@langwatch/ops-contract";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import type { Redis } from "ioredis";
 import { describe, expect, it } from "vitest";
 
-import type { OpsSnapshotRedis } from "../../../app/ops.app.ts";
 import {
   LEASE_TTL_SECONDS,
   SNAPSHOT_LEASE_KEY,
@@ -18,39 +19,35 @@ import {
  * real GET/SET-NX/EVAL semantics for the lease. The lease's whole job is who
  * wins a race, so a mock that always says yes would test nothing.
  */
-class FakeRedis implements OpsSnapshotRedis {
+class FakeRedis {
   private store = new Map<string, string>();
   public evalCalls = 0;
 
-  async set(
-    key: string,
-    value: string,
-    _ex?: string,
-    _ttl?: number,
-    nx?: string,
-  ): Promise<string | null> {
+  async set(...args: unknown[]): Promise<string | null> {
+    const [key = "", value = "", , , nx] = args.map(String);
     if (nx === "NX" && this.store.has(key)) return null;
     this.store.set(key, value);
     return "OK";
   }
 
-  async tryGet(key: string): Promise<string | null> {
-    return this.store.get(key) ?? null;
+  async get(key: unknown): Promise<string | null> {
+    return this.store.get(String(key)) ?? null;
   }
 
-  async incr(key: string): Promise<number> {
-    const next = Number(this.store.get(key) ?? 0) + 1;
-    this.store.set(key, String(next));
+  async incr(key: unknown): Promise<number> {
+    const next = Number(this.store.get(String(key)) ?? 0) + 1;
+    this.store.set(String(key), String(next));
     return next;
   }
 
   /** TTL, in seconds, of the most recent successful lease renewal. */
   public lastRenewTtlSeconds: number | null = null;
 
-  async eval(script: string, numKeys: number, ...rest: string[]): Promise<number> {
+  async eval(...args: unknown[]): Promise<number> {
     this.evalCalls++;
-    const keys = rest.slice(0, numKeys);
-    const argv = rest.slice(numKeys);
+    const [script = "", numKeys = "0", ...rest] = args.map(String);
+    const keys = rest.slice(0, Number(numKeys));
+    const argv = rest.slice(Number(numKeys));
 
     if (script.includes("DEL")) return this.release({ keys, argv });
     if (script.includes("EXPIRE")) return this.renew({ keys, argv });
@@ -103,9 +100,19 @@ class FakeRedis implements OpsSnapshotRedis {
   }
 }
 
+/** The fake behind a real ioredis client that answers only these four commands. */
+function redisOver(fake: FakeRedis): Redis {
+  return redisDouble({
+    get: (key) => fake.get(key),
+    set: (...args) => fake.set(...args),
+    incr: (key) => fake.incr(key),
+    eval: (...args) => fake.eval(...args),
+  });
+}
+
 const makeRepo = () => {
   const redis = new FakeRedis();
-  return { redis, repo: RedisOpsSnapshotRepository.create(redis) };
+  return { redis, repo: RedisOpsSnapshotRepository.create(redisOver(redis)) };
 };
 
 const liveSnapshot = (over: { computedAt: number }): LiveSnapshot => ({
@@ -146,8 +153,8 @@ describe("RedisOpsSnapshotRepository", () => {
     describe("when both try to acquire the lease", () => {
       it("grants it to exactly one", async () => {
         const { redis } = makeRepo();
-        const first = RedisOpsSnapshotRepository.create(redis);
-        const second = RedisOpsSnapshotRepository.create(redis);
+        const first = RedisOpsSnapshotRepository.create(redisOver(redis));
+        const second = RedisOpsSnapshotRepository.create(redisOver(redis));
 
         const a = await first.acquireOrRenewLease({ writerId: "writer-a" });
         const b = await second.acquireOrRenewLease({ writerId: "writer-b" });
@@ -175,8 +182,8 @@ describe("RedisOpsSnapshotRepository", () => {
       /** @scenario "A new writer takes over when the holder stops renewing" */
       it("lets another writer acquire it under a new epoch", async () => {
         const { redis } = makeRepo();
-        const dead = RedisOpsSnapshotRepository.create(redis);
-        const next = RedisOpsSnapshotRepository.create(redis);
+        const dead = RedisOpsSnapshotRepository.create(redisOver(redis));
+        const next = RedisOpsSnapshotRepository.create(redisOver(redis));
 
         const before = await dead.acquireOrRenewLease({ writerId: "dead" });
         redis.expireLease();
@@ -193,8 +200,8 @@ describe("RedisOpsSnapshotRepository", () => {
       /** @scenario "Graceful shutdown releases the lease immediately" */
       it("frees it without waiting for the TTL", async () => {
         const { redis } = makeRepo();
-        const leaving = RedisOpsSnapshotRepository.create(redis);
-        const arriving = RedisOpsSnapshotRepository.create(redis);
+        const leaving = RedisOpsSnapshotRepository.create(redisOver(redis));
+        const arriving = RedisOpsSnapshotRepository.create(redisOver(redis));
 
         await leaving.acquireOrRenewLease({ writerId: "leaving" });
         await leaving.releaseLease();
@@ -212,8 +219,8 @@ describe("RedisOpsSnapshotRepository", () => {
       /** @scenario "Losing the lease mid-flight does not corrupt the snapshot" */
       it("does neither, leaving the new holder untouched", async () => {
         const { redis } = makeRepo();
-        const lapsed = RedisOpsSnapshotRepository.create(redis);
-        const holder = RedisOpsSnapshotRepository.create(redis);
+        const lapsed = RedisOpsSnapshotRepository.create(redisOver(redis));
+        const holder = RedisOpsSnapshotRepository.create(redisOver(redis));
 
         await lapsed.acquireOrRenewLease({ writerId: "lapsed" });
         redis.expireLease();
@@ -225,7 +232,7 @@ describe("RedisOpsSnapshotRepository", () => {
         await lapsed.releaseLease();
 
         expect(renewAttempt.isHeld).toBe(false);
-        expect(await redis.tryGet(SNAPSHOT_LEASE_KEY)).toBe(held.token);
+        expect(await redis.get(SNAPSHOT_LEASE_KEY)).toBe(held.token);
       });
     });
   });

@@ -6,8 +6,8 @@ import {
   tryParseDetailSnapshot,
   tryParseLiveSnapshot,
 } from "@langwatch/ops-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 
-import { type OpsSnapshotRedis } from "../../app/ops.app.ts";
 import { type OpsSnapshotRead, OpsSnapshotRepository } from "../ops-snapshot.repository.ts";
 
 /**
@@ -76,11 +76,11 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
   /** The value this instance last wrote into the lease key, or null. */
   private currentToken: string | null = null;
 
-  static create(redis: OpsSnapshotRedis): RedisOpsSnapshotRepository {
+  static create(redis: RedisConnection): RedisOpsSnapshotRepository {
     return new RedisOpsSnapshotRepository(redis);
   }
 
-  private constructor(private readonly redis: OpsSnapshotRedis) {
+  private constructor(private readonly redis: RedisConnection) {
     super();
   }
 
@@ -182,12 +182,12 @@ export class RedisOpsSnapshotRepository extends OpsSnapshotRepository {
   }
 
   async readLive(): Promise<OpsSnapshotRead<LiveSnapshot>> {
-    const snapshot = tryParseLiveSnapshot(await this.redis.tryGet(SNAPSHOT_LIVE_KEY));
+    const snapshot = tryParseLiveSnapshot(await this.redis.get(SNAPSHOT_LIVE_KEY));
     return snapshot ? { kind: "hit", snapshot } : { kind: "miss" };
   }
 
   async readDetail(): Promise<OpsSnapshotRead<DetailSnapshot>> {
-    const snapshot = tryParseDetailSnapshot(await this.redis.tryGet(SNAPSHOT_DETAIL_KEY));
+    const snapshot = tryParseDetailSnapshot(await this.redis.get(SNAPSHOT_DETAIL_KEY));
     return snapshot ? { kind: "hit", snapshot } : { kind: "miss" };
   }
 }

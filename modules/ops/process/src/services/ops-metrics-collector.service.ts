@@ -117,7 +117,7 @@ export class OpsMetricsCollectorService {
 
   /** The pipeline tree the sidebar walks, for a set of scanned queues. */
   static buildPipelineTree(params: { queues: QueueInfo[]; seedKeys?: string[] }): PipelineNode[] {
-    return OpsDashboardViewService.buildPipelineTree(params);
+    return OpsDashboardViewService.create().buildPipelineTree(params);
   }
 
   private constructor(params: {

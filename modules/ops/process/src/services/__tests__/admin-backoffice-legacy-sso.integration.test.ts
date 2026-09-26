@@ -12,7 +12,8 @@ import { readHandledError } from "@langwatch/error-presentation/read-handled-err
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import { OpsOperations } from "../../app/ops-operations.ts";
+import { OpsOperations } from "../../app/ops-composition.build.ts";
+import type { OpsEventExplorer, OpsProcessExplorer, OpsReplayRunner } from "../../app/ops.app.ts";
 import { AuditStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -46,6 +47,12 @@ function backoffice(connectionDecides = true) {
     scheduler: {
       schedules: createApiFixture<AutomationApi>(),
       projects: createApiFixture<ProjectApi>(),
+    },
+    explorers: {
+      eventExplorer: createApiFixture<OpsEventExplorer>(),
+      managerExplorer: createApiFixture<OpsProcessExplorer>(),
+      replay: createApiFixture<OpsReplayRunner>(),
+      snapshots: null,
     },
   }).build();
 }

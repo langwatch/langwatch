@@ -42,7 +42,7 @@ export abstract class SchedulerAuditRepository {
     action: SchedulerControlAction;
     scheduleId: string;
     projectId: string;
-    slot: Date | null;
+    slot: string | null;
   }): Promise<void>;
 
   abstract findRecent(params: { limit: number }): Promise<SchedulerAuditEntryView[]>;

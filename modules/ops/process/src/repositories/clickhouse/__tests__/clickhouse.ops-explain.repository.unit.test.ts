@@ -23,7 +23,7 @@ describe("OpsClickHouseRuntime", () => {
 
   it("returns null when no typed ops endpoint was composed", () => {
     const runtime = OpsClickHouseRuntime.create({ buildTime: false });
-    expect(runtime.resolveClient()).toBeNull();
+    expect(runtime.findClient()).toBeNull();
   });
 
   it("lazily builds, caches, and closes a typed endpoint client", async () => {
@@ -31,13 +31,13 @@ describe("OpsClickHouseRuntime", () => {
       url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
       buildTime: false,
     });
-    const a = runtime.resolveClient();
-    const b = runtime.resolveClient();
-    expect(a).not.toBeNull();
-    expect(b).toBe(a);
+    const a = runtime.findClient();
+    const b = runtime.findClient();
+    expect(a).toEqual({ client: expect.anything(), usingFallback: false });
+    expect(b?.client).toBe(a?.client);
     await runtime.close();
     expect(clickHouseMocks.close).toHaveBeenCalledOnce();
-    expect(runtime.resolveClient()).toBeNull();
+    expect(runtime.findClient()).toBeNull();
   });
 
   it("does not materialize a client during BUILD_TIME", async () => {
@@ -45,7 +45,7 @@ describe("OpsClickHouseRuntime", () => {
       url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
       buildTime: true,
     });
-    expect(runtime.resolveClient()).toBeNull();
+    expect(runtime.findClient()).toBeNull();
     await runtime.close();
   });
 });

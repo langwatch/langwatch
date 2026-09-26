@@ -32,7 +32,7 @@ export class OpsDashboardViewService {
     return new OpsDashboardViewService();
   }
 
-  static buildPipelineTree({
+  buildPipelineTree({
     queues,
     seedKeys = [],
   }: {
@@ -41,7 +41,7 @@ export class OpsDashboardViewService {
   }): PipelineNode[] {
     const pipelineMap: PipelineCounts = new Map();
     const ensurePath = (pName: string, jType?: string, jName?: string) =>
-      OpsDashboardViewService.ensurePath({ pipelineMap, pName, jType, jName });
+      this.ensurePath({ pipelineMap, pName, jType, jName });
 
     for (const key of seedKeys) {
       const parts = key.split("/");
@@ -65,14 +65,14 @@ export class OpsDashboardViewService {
       }
     }
 
-    const tree = OpsDashboardViewService.foldPipelineCounts(pipelineMap);
+    const tree = this.foldPipelineCounts(pipelineMap);
     tree.sort((a, b) => a.name.localeCompare(b.name));
 
     return tree;
   }
 
   /** Creates the pipeline, job-type and job-name levels a path names, keeping existing counts. */
-  private static ensurePath({
+  private ensurePath({
     pipelineMap,
     pName,
     jType,
@@ -96,7 +96,7 @@ export class OpsDashboardViewService {
   }
 
   /** Rolls the per-path counts up into the tree the sidebar renders, totals at every level. */
-  private static foldPipelineCounts(
+  private foldPipelineCounts(
     pipelineMap: Map<
       string,
       Map<string, Map<string, { pending: number; active: number; blocked: number }>>
@@ -146,7 +146,7 @@ export class OpsDashboardViewService {
     return tree;
   }
 
-  static build({
+  build({
     window,
     latestDetail,
     writerId,
@@ -161,15 +161,15 @@ export class OpsDashboardViewService {
     const redisInfo = window.latestRedisInfo;
 
     const { totalGroups, blockedGroups, parkedGroups, totalPendingJobs } =
-      OpsDashboardViewService.queueTotals(fullQueues);
+      this.queueTotals(fullQueues);
 
     const treeSeedKeys = [...new Set([...window.currentPausedKeys, ...window.knownPipelinePaths])];
-    const pipelineTree = OpsDashboardViewService.buildPipelineTree({
+    const pipelineTree = this.buildPipelineTree({
       queues: fullQueues,
       seedKeys: treeSeedKeys,
     });
 
-    const topErrors = OpsDashboardViewService.topErrorsOf(fullQueues);
+    const topErrors = this.topErrorsOf(fullQueues);
 
     const queues: QueueSummaryInfo[] = fullQueues.map(({ groups: _groups, ...summary }) => summary);
 
@@ -178,7 +178,7 @@ export class OpsDashboardViewService {
       blockedGroups,
       parkedGroups,
       totalPendingJobs,
-      ...OpsDashboardViewService.ratesOf({ window, redisInfo }),
+      ...this.ratesOf({ window, redisInfo }),
       throughputHistory: [...window.throughputBuffer],
       pipelineTree,
       queues,
@@ -213,7 +213,7 @@ export class OpsDashboardViewService {
   }
 
   /** Every rate, peak and resource figure the header tiles read. */
-  private static ratesOf({
+  private ratesOf({
     window,
     redisInfo,
   }: {
@@ -263,7 +263,7 @@ export class OpsDashboardViewService {
   }
 
   /** The blocked groups' errors, clustered by normalized message, worst first. */
-  private static topErrorsOf(fullQueues: QueueInfo[]): {
+  private topErrorsOf(fullQueues: QueueInfo[]): {
     normalizedMessage: string;
     sampleMessage: string;
     sampleStack: string | null;
@@ -318,7 +318,7 @@ export class OpsDashboardViewService {
   }
 
   /** The rollup across every scanned queue. */
-  private static queueTotals(fullQueues: QueueInfo[]): {
+  private queueTotals(fullQueues: QueueInfo[]): {
     totalGroups: number;
     blockedGroups: number;
     parkedGroups: number;

@@ -417,12 +417,15 @@ export type OpsReplayRunner = {
  * The operations capability as the process composes it: the portable service
  * plus the explorers, the replay runner and the optional snapshot collector.
  */
-export type OpsCapability = OpsService & {
+export type OpsCapability = OpsService;
+
+/** What the capability carries beside the operations: the explorers, replay and snapshot reader. */
+export type OpsExplorers = Readonly<{
   eventExplorer: OpsEventExplorer;
   managerExplorer: OpsProcessExplorer;
   replay: OpsReplayRunner;
   snapshots: OpsSnapshotService | null;
-};
+}>;
 
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
@@ -1815,19 +1818,6 @@ export interface OpsEventingIntrospection {
    * their `init`/`apply` so the explorer can rebuild state without a store.
    */
   dejaViewProjections(): OpsDejaViewProjection[];
-}
-
-export interface OpsSnapshotRedis {
-  eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
-  set(
-    key: string,
-    value: string,
-    expiryMode: "EX",
-    expirySeconds: number,
-    condition: "NX",
-  ): Promise<unknown>;
-  tryGet(key: string): Promise<string | null>;
-  incr(key: string): Promise<number>;
 }
 
 /**

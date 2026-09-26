@@ -22,7 +22,7 @@ export class MemorySchedulerAuditRepository extends SchedulerAuditRepository {
     action: SchedulerControlAction;
     scheduleId: string;
     projectId: string;
-    slot: Date | null;
+    slot: string | null;
   }): Promise<void> {
     this.store.schedulerAudit.push({
       id: generate(SCHEDULER_AUDIT_KSUID_RESOURCE).toString(),

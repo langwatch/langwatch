@@ -10,13 +10,28 @@ import { PlanTypes, SubscriptionStatus } from "@langwatch/prisma-client/generate
 import { type Instant, toDate } from "@langwatch/time";
 import { defaultHandler, getListHandler, getOneHandler } from "ra-data-simple-prisma";
 
+import { toBackofficeUserRow } from "../../rules/backoffice-user-row.rules.ts";
 import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
-import { PrismaAdminUserMapper, USER_BACKOFFICE_INCLUDE } from "./prisma.admin-user.mapper.ts";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
 } from "./prisma.admin.repository.ts";
+
+const USER_BACKOFFICE_INCLUDE = {
+  orgMemberships: {
+    include: {
+      organization: {
+        include: {
+          teams: {
+            where: { archivedAt: null },
+            include: { projects: { where: { archivedAt: null } } },
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 /**
  * Private Prisma/React-Admin adapter for the Ops backoffice surface.
@@ -75,7 +90,7 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
             ...query.where,
             include: USER_BACKOFFICE_INCLUDE,
             map: (users: UserWithBackofficeIncludes[]) =>
-              users.map((user) => PrismaAdminUserMapper.map(user)),
+              users.map((user) => toBackofficeUserRow(user)),
           },
         );
       case "organization":

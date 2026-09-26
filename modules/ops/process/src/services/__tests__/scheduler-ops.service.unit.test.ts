@@ -35,7 +35,7 @@ type AuditEntry = {
   action: SchedulerControlAction;
   scheduleId: string;
   projectId: string;
-  slot: Date | null;
+  slot: string | null;
 };
 
 class RecordingAudit extends SchedulerAuditRepository {
@@ -273,7 +273,7 @@ describe("SchedulerOpsService", () => {
             action: "ops.scheduler.run_now",
             scheduleId: "report_1",
             projectId: "project_acme",
-            slot: at(600_000),
+            slot: at(600_000).toISOString(),
           },
         ]);
         expect(job).toMatchObject({ id: "report_1", projectName: "Acme" });

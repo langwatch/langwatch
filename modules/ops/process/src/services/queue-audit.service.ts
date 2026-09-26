@@ -20,9 +20,9 @@ const TARGET_KIND_BY_ACTION: Record<QueueControlAction, string> = {
 };
 
 /** Records queue dead-letter operator actions on the shared audit log. */
-export class AuditLogQueueAuditService implements QueueAuditSink {
-  static create({ auditLog }: { auditLog: AuditLogApi }): AuditLogQueueAuditService {
-    return new AuditLogQueueAuditService(auditLog);
+export class QueueAuditService implements QueueAuditSink {
+  static create({ auditLog }: { auditLog: AuditLogApi }): QueueAuditService {
+    return new QueueAuditService(auditLog);
   }
 
   private constructor(private readonly auditLog: AuditLogApi) {}

@@ -16,8 +16,7 @@ export type {
 } from "./app/ops.app.ts";
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
-export type { OpsOperationsOptions } from "./app/ops-operations.ts";
-export type { OpsSnapshotRedis } from "./app/ops.app.ts";
+export type { OpsOperationsOptions } from "./app/ops-composition.build.ts";
 export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
 export {
   type AdminAccess,
@@ -50,7 +49,7 @@ export type {
 export type {
   OpsSlackAlertTransport,
   SlackBugReportNotifierConfig,
-} from "./services/slack.bug-report-notifier.service.ts";
+} from "./channels/slack/slack.bug-report-notifier.channel.ts";
 
 // The system-migration ops model, its cohort policy and the Prisma/Redis
 // implementations of the runner's repository interfaces. All were
@@ -64,10 +63,10 @@ export {
   OpsSystemMigrations,
   UserStartupMigrationsUnsupportedError,
   type OpsSystemMigrationsOptions,
-} from "./app/ops-system-migrations.ts";
+} from "./app/ops-system-migrations-composition.build.ts";
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
-export { RoutingTableOrganizationDataplaneService } from "./services/routing-table.organization-dataplane.service.ts";
+export { RoutingTableOrganizationDataplaneService } from "./services/organization-dataplane.service.ts";
 export type { OrganizationDataplane, OrganizationDataplaneResolver } from "./app/ops.app.ts";
 export type { OrganizationCohortAdmission } from "./services/system-migration-cohort.service.ts";
 export { SystemMigrationsPassTask } from "./tasks/system-migrations-pass.task.ts";

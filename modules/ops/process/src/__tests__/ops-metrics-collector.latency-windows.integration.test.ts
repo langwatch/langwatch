@@ -11,7 +11,6 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
 import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
 import { RedisOpsMetricsRepository } from "../repositories/redis/redis.ops-metrics.repository.ts";
-import { RedisOpsSnapshotRedisRepository } from "../repositories/redis/redis.ops-snapshot-redis.repository.ts";
 import { RedisOpsSnapshotRepository } from "../repositories/redis/redis.ops-snapshot.repository.ts";
 import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
 import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
@@ -108,9 +107,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
 
         const ops = OpsMetricsTestAdapter.create();
         ops.setQueueNames([name]);
-        const snapshotRepository = RedisOpsSnapshotRepository.create(
-          RedisOpsSnapshotRedisRepository.create(redis),
-        );
+        const snapshotRepository = RedisOpsSnapshotRepository.create(redis);
         const snapshots = DefaultOpsSnapshotService.create(snapshotRepository);
         const collector = OpsMetricsCollectorService.create({
           metrics: RedisOpsMetricsRepository.create({ redis }),
