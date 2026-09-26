@@ -63,7 +63,7 @@ export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 export OTEL_LOG_USER_PROMPTS=1
 export OTEL_LOG_TOOL_DETAILS=1
 export OTEL_LOG_TOOL_CONTENT=1
-export OTEL_LOG_RAW_API_BODIES=1
+export OTEL_LOG_ASSISTANT_RESPONSES=1
 export OTEL_RESOURCE_ATTRIBUTES=service.name=claude-code
 # Fast flush so a short dogfood session lands before the operator gets bored.
 export OTEL_METRIC_EXPORT_INTERVAL=5000
@@ -195,7 +195,7 @@ write_claude_workdir() {
     "OTEL_LOG_USER_PROMPTS": "1",
     "OTEL_LOG_TOOL_DETAILS": "1",
     "OTEL_LOG_TOOL_CONTENT": "1",
-    "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "1",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "$ENDPOINT",
     "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer $LW_API_KEY",
     "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code",

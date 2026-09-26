@@ -45,14 +45,16 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
     //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
     //                      file paths) onto tool_decision/result so
     //                      the trace shows WHAT the tool did
-    //   RAW_API_BODIES     emits api_request_body + api_response_body
-    //                      events carrying the FULL JSON of every API
-    //                      call: system prompts, rolling message
-    //                      history, assistant response text +
-    //                      reasoning, tool_use blocks. Only OTel
-    //                      surface that carries assistant text. The
-    //                      langwatch receiver caps oversized bodies
-    //                      to keep the CH merge ceiling safe.
+    //   ASSISTANT_RESPONSES emits the light
+    //                      claude_code.assistant_response event
+    //                      carrying just the reply text (claude-code
+    //                      2.1.193+). This is the surface we use for
+    //                      assistant text. We do NOT set
+    //                      OTEL_LOG_RAW_API_BODIES: it serialises the
+    //                      entire request + response JSON on every
+    //                      model call — avoidable cost for content the
+    //                      light events already carry. Set it yourself
+    //                      only to debug the full request JSON (#8284).
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
       `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
@@ -63,7 +65,10 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
       `export OTEL_LOG_USER_PROMPTS=1`,
       `export OTEL_LOG_TOOL_DETAILS=1`,
       `export OTEL_LOG_TOOL_CONTENT=1`,
-      `export OTEL_LOG_RAW_API_BODIES=1`,
+      `export OTEL_LOG_ASSISTANT_RESPONSES=1`,
+      // Pasted by hand, so an older RAW_API_BODIES line is not replaced
+      // for the user; note it rather than `unset` the documented opt-in.
+      `# Upgrading? Remove any older OTEL_LOG_RAW_API_BODIES=1 line from your shell rc unless you intentionally want the full request/response JSON.`,
       base,
       `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
     ].join("\n");
