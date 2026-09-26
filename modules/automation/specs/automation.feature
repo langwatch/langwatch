@@ -79,6 +79,12 @@ Feature: Automation ownership
     When the process boots in the api role
     Then the report schedule process manager is named among those it will not run
 
+  @integration
+  Scenario: The api process removes an automation's report schedule through the pipeline's senders
+    Given the api process, which holds no process store
+    When a report is scheduled and then removed
+    Then both commands are sent and neither refuses
+
   @unit
   Scenario: Reports are not dispatched as trace or graph triggers
     Given an active report trigger with a report source

@@ -7,8 +7,9 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { RestHost } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
@@ -66,7 +67,7 @@ async function bootApi() {
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
-    processStore: InMemoryProcessStore.createForTesting(),
+    processManagerMode: "producer-only",
   });
   const stores: Partial<ProcessMembers> = {
     logger: createTestLogger().logger,
@@ -372,6 +373,22 @@ describe("the api process installation", () => {
       });
       expect(answers).toEqual(OTLP_POSTS.map(([path]) => [path, 401, ["message"]]));
       expect((await post("/elsewhere/v1/metrics", OTLP_METRIC_BATCH)).status).toBe(404);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The api process removes an automation's report schedule through the pipeline's senders" */
+  it("schedules and removes a report on the api role, where no pipeline is hosted", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const automations = runtime.service(AutomationApi);
+      const report = { projectId: "project-1", triggerId: "trigger-1" };
+      await expect(
+        automations.syncReportSchedule({ ...report, cron: "0 9 * * 1", timezone: "UTC" }),
+      ).resolves.toBeUndefined();
+      await expect(automations.removeReportSchedule(report)).resolves.toBeUndefined();
     } finally {
       await runtime.stop();
     }

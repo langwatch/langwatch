@@ -73,9 +73,8 @@ function processBackedSchedules(triggers: MemoryTriggerRepository) {
     close: async () => {},
     waitUntilReady: async () => {},
   });
-  const service = ReportScheduleService.create({ clock: new Clock(), triggers });
+  const service = ReportScheduleService.create({ clock: new Clock(), triggers, instances: store });
   service.connect({
-    instances: store,
     commands: {
       recordTriggerMatch: sender("recordTriggerMatch", () => {
         throw new Error("the report schedule never records a trigger match");
@@ -153,8 +152,8 @@ describe("ReportScheduleService", () => {
       expect(sent).toEqual(["configure:paused", "pause:paused", "configure:missing"]);
       expect(
         (await service.getAll({ projectId: "p" }))
-          .map(({ triggerId, active }) => [triggerId, active])
-          .toSorted(),
+          .toSorted((left, right) => left.triggerId.localeCompare(right.triggerId))
+          .map(({ triggerId, active }) => [triggerId, active]),
       ).toEqual([
         ["missing", true],
         ["paused", false],

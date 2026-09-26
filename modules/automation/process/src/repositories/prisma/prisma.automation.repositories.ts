@@ -1,3 +1,4 @@
+import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
@@ -51,6 +52,7 @@ export class PostgresAutomationRepositories {
         connection: members.redis,
       }),
       emailCaps: RedisAutomationEmailCapRepository.create({ connection: members.redis }),
+      processStore: PrismaProcessStore.create({ database }),
     };
   }
 }

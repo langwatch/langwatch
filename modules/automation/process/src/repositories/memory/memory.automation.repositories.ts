@@ -1,3 +1,5 @@
+import { InMemoryProcessStore } from "@langwatch/eventing";
+
 import type { AutomationRepositories } from "../automation.repositories.ts";
 import { MemoryAutomationCallCounterRepository } from "./memory.automation-call-counter.repository.ts";
 import { MemoryAutomationContainmentClaimRepository } from "./memory.automation-containment-claim.repository.ts";
@@ -36,6 +38,7 @@ export class MemoryAutomationRepositories {
       webhookRateLimits: MemoryAutomationWebhookRateLimitRepository.create(),
       containmentClaims: MemoryAutomationContainmentClaimRepository.create(),
       emailCaps: MemoryAutomationEmailCapRepository.create(),
+      processStore: InMemoryProcessStore.createForLocalDevelopment(),
     };
   }
 }

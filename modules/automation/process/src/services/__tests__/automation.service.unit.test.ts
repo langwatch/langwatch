@@ -8,6 +8,7 @@ import type {
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import { TriggerNotFoundError } from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -227,7 +228,11 @@ const makeService = (
   triggers = new Triggers(),
   history = new Fires(),
   webhookDeliveries = new EmptyWebhookDeliveries(),
-  reportSchedules = ReportScheduleService.create({ clock: new Clock(), triggers }),
+  reportSchedules = ReportScheduleService.create({
+    clock: new Clock(),
+    triggers,
+    instances: InMemoryProcessStore.createForTesting(),
+  }),
   suppressions = new Suppressions(),
 ): AutomationService =>
   (() => {
@@ -474,7 +479,11 @@ describe("AutomationService email suppression", () => {
       new Triggers(),
       new Fires(),
       new EmptyWebhookDeliveries(),
-      ReportScheduleService.create({ clock: new Clock(), triggers: new Triggers() }),
+      ReportScheduleService.create({
+        clock: new Clock(),
+        triggers: new Triggers(),
+        instances: InMemoryProcessStore.createForTesting(),
+      }),
       repo,
     );
     await service.suppressEmail({

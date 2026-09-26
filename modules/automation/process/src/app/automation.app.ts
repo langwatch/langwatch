@@ -443,6 +443,7 @@ export class AutomationApp implements AutomationApi {
     const reportSchedules = ReportScheduleService.create({
       clock: members.clock,
       triggers: repositories.triggers,
+      instances: repositories.processStore,
     });
     const automation = AutomationService.create({
       triggers: repositories.triggers,
@@ -546,9 +547,10 @@ export class AutomationApp implements AutomationApi {
   /** Binds the registered `automations` pipeline's own senders. */
   connectCommands(commands: EventingCommands<AutomationsPipeline>): void {
     this.#triggerMatches.connect(commands);
-    if (this.#reportInstances) {
-      this.#reportSchedules.connect({ commands, instances: this.#reportInstances });
-    }
+    this.#reportSchedules.connect({
+      commands,
+      ...(this.#reportInstances ? { instances: this.#reportInstances } : {}),
+    });
   }
 
   /** Configures every active report that has no schedule process yet (the tasks backfill). */

@@ -15,25 +15,28 @@ import {
 } from "../eventing/report-schedule.process.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
 
+type ReportScheduleInstances = Pick<ProcessStore, "findByRef">;
 type ReportScheduleConnection = Readonly<{
   commands: EventingCommands<AutomationsPipeline>;
-  instances: Pick<ProcessStore, "findByRef">;
+  instances?: ReportScheduleInstances;
 }>;
 
 /** Drives each report automation's `reportSchedule` process manager and reads its state back. */
 export class ReportScheduleService {
-  #connection: ReportScheduleConnection | undefined;
+  #commands: EventingCommands<AutomationsPipeline> | undefined;
 
   private constructor(
     private readonly clock: AutomationClock,
     private readonly triggers: TriggerRepository,
+    private instances: ReportScheduleInstances,
   ) {}
 
   static create(deps: {
     clock: AutomationClock;
     triggers: TriggerRepository;
+    instances: ReportScheduleInstances;
   }): ReportScheduleService {
-    return new ReportScheduleService(deps.clock, deps.triggers);
+    return new ReportScheduleService(deps.clock, deps.triggers, deps.instances);
   }
 
   static findReportActionParams(actionParams: unknown): ReportActionParams | null {
@@ -42,9 +45,10 @@ export class ReportScheduleService {
     return parsed.success ? parsed.data : null;
   }
 
-  /** Binds the registered `automations` pipeline's senders and its process store. Called once. */
+  /** Binds the pipeline's senders; a process hosting the pipeline lends its process store too. */
   connect(connection: ReportScheduleConnection): void {
-    this.#connection = connection;
+    this.#commands = connection.commands;
+    if (connection.instances) this.instances = connection.instances;
   }
 
   async sync(input: {
@@ -52,7 +56,7 @@ export class ReportScheduleService {
     triggerId: string;
     schedule: ReportScheduleInput;
   }): Promise<void> {
-    await this.connected().commands.configureReportSchedule.send({
+    await this.senders().configureReportSchedule.send({
       ...this.envelope(input.projectId),
       triggerId: input.triggerId,
       cron: input.schedule.cron,
@@ -61,14 +65,14 @@ export class ReportScheduleService {
   }
 
   async remove(input: { projectId: string; triggerId: string }): Promise<void> {
-    await this.connected().commands.pauseReportSchedule.send({
+    await this.senders().pauseReportSchedule.send({
       ...this.envelope(input.projectId),
       triggerId: input.triggerId,
     });
   }
 
   async resume(input: { projectId: string; triggerId: string }): Promise<void> {
-    await this.connected().commands.resumeReportSchedule.send({
+    await this.senders().resumeReportSchedule.send({
       ...this.envelope(input.projectId),
       triggerId: input.triggerId,
     });
@@ -79,7 +83,7 @@ export class ReportScheduleService {
     triggerId: string;
     requestId: string;
   }): Promise<void> {
-    await this.connected().commands.requestReportRun.send({
+    await this.senders().requestReportRun.send({
       ...this.envelope(input.projectId),
       triggerId: input.triggerId,
       requestId: input.requestId,
@@ -138,7 +142,7 @@ export class ReportScheduleService {
   }
 
   private findInstance(input: { projectId: string; triggerId: string }) {
-    return this.connected().instances.findByRef<ReportScheduleState>({
+    return this.instances.findByRef<ReportScheduleState>({
       ref: {
         processName: REPORT_SCHEDULE_PROCESS_NAME,
         projectId: input.projectId,
@@ -151,12 +155,10 @@ export class ReportScheduleService {
     return { tenantId: projectId, occurredAt: this.clock.now().epochMilliseconds };
   }
 
-  private connected(): ReportScheduleConnection {
-    if (!this.#connection) {
-      throw new Error(
-        "automations registered no report schedule senders; this process hosts no automations pipeline",
-      );
+  private senders(): EventingCommands<AutomationsPipeline> {
+    if (!this.#commands) {
+      throw new Error("automations registered no report schedule senders");
     }
-    return this.#connection;
+    return this.#commands;
   }
 }

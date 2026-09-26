@@ -1,3 +1,5 @@
+import type { ProcessStore } from "@langwatch/eventing";
+
 import type { AutomationCallCounterRepository } from "./automation-call-counter.repository.ts";
 import type { AutomationContainmentClaimRepository } from "./automation-containment-claim.repository.ts";
 import type { AutomationEmailCapRepository } from "./automation-email-cap.repository.ts";
@@ -29,4 +31,6 @@ export interface AutomationRepositories {
   readonly webhookRateLimits: AutomationWebhookRateLimitRepository;
   readonly containmentClaims: AutomationContainmentClaimRepository;
   readonly emailCaps: AutomationEmailCapRepository;
+  /** The report schedules' process-manager rows, read on every role (the api hosts no pipeline). */
+  readonly processStore: Pick<ProcessStore, "findByRef">;
 }
