@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.5.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.4.0...python-sdk@v1.5.0) (2026-09-26)
+
+
+### Features
+
+* **instant-evals:** meter judgements on the gateway spend spine, a Stripe meter and a 1 USD free budget ([#8220](https://github.com/langwatch/langwatch/issues/8220)) ([e5a2252](https://github.com/langwatch/langwatch/commit/e5a22526eca51e242d9018e3ac24928fe9250131))
+* **instant-evals:** the CLI that waits for the answer, the target shorthand and estimate before spend ([#8216](https://github.com/langwatch/langwatch/issues/8216)) ([c01b277](https://github.com/langwatch/langwatch/commit/c01b277a7631308a2d45dfa5ac97dd3a46ef58ff))
+* **instant-evals:** the Instant Eval run, a judgment job over an LWQL statement with progress and persisted judgments ([#8208](https://github.com/langwatch/langwatch/issues/8208)) ([e337419](https://github.com/langwatch/langwatch/commit/e33741926479c94f6d0b6d2b80d76e886dc1e109))
+* **onboarding:** a Langy-guided onboarding after sign-up, behind a flag for the A/B test ([#7920](https://github.com/langwatch/langwatch/issues/7920)) ([5f5b591](https://github.com/langwatch/langwatch/commit/5f5b591c2dd55beb5991064b7ce55dc6509b0255))
+
+
+### Bug Fixes
+
+* **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
+* **instant-evals:** end-to-end dogfood on main, five fixes in how numbers and words reach the caller ([#8233](https://github.com/langwatch/langwatch/issues/8233)) ([c5c0030](https://github.com/langwatch/langwatch/commit/c5c00301250d6c8354b126732c56e80e3dda9514))
+
 ## [1.4.0](https://github.com/langwatch/langwatch/compare/python-sdk@v1.3.1...python-sdk@v1.4.0) (2026-09-06)
 
 
