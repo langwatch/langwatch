@@ -1,6 +1,7 @@
 import {
   type AgentCallSignal,
   AgentApi,
+  type VoiceTransport,
   type AgentWorkflowInput,
   type UpdateAgentWorkflowConfigInput,
   agentServerConfig,
@@ -241,6 +242,22 @@ export class AgentApp implements AgentApi {
   }
   registerConnected(input: RegisterConnectedAgentInput): Promise<Agent> {
     return this.#agents.registerConnected(input);
+  }
+  createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<Agent> {
+    return this.#agents.createVoiceAgent(input);
+  }
+  hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean> {
+    return this.#agents.hasVoiceAgentForExternalId(input);
   }
   touchLastSeenAt(input: GetAgentInput & { at: Instant }): Promise<void> {
     return this.#agents.touchLastSeenAt(input);

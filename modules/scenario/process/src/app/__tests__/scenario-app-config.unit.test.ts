@@ -26,6 +26,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   scenarioExecutorPeers,
+  scenarioTestSecrets,
+  scenarioVoicePeers,
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
@@ -33,7 +35,7 @@ import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
-function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
+async function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
@@ -53,11 +55,12 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     config: scenarioTestConfig,
     resources: createApiFixture<ResourceOwnership>(),
-    secrets: {} as never,
+    secrets: scenarioTestSecrets,
     members: {
       ...scenarioHostMembers,
       redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
@@ -78,7 +81,7 @@ describe("ScenarioApp built the way production composes it", () => {
   describe("given a deployment that configured a public base URL", () => {
     /** @scenario "A scenario's platform link answers when a public base URL is configured" */
     it("answers a platform link instead of refusing by name", async () => {
-      const app = buildProductionApp("https://app.langwatch.test");
+      const app = await buildProductionApp("https://app.langwatch.test");
 
       await expect(
         app.platformUrl({
@@ -95,7 +98,7 @@ describe("ScenarioApp built the way production composes it", () => {
   describe("given no browser tab is open on the project's simulations", () => {
     /** @scenario "A browser-tab offer with no open tab answers undelivered with the run's link" */
     it("answers undelivered with the batch run's link", async () => {
-      const app = buildProductionApp("https://app.langwatch.test");
+      const app = await buildProductionApp("https://app.langwatch.test");
 
       const offer = await app.offerScenarioBrowserTab({
         projectId: "project_1",
@@ -112,7 +115,7 @@ describe("ScenarioApp built the way production composes it", () => {
   describe("given a deployment that named no public base URL", () => {
     /** @scenario "A scenario's platform link refuses by name without a public base URL" */
     it("still refuses by name, as it did before this deployment had a config seam", async () => {
-      const app = buildProductionApp(undefined);
+      const app = await buildProductionApp(undefined);
 
       await expect(
         app.platformUrl({
@@ -129,7 +132,7 @@ describe("given a subscriber watching simulation updates", () => {
   /** @scenario "Simulation updates release tenant listeners when the stream aborts" */
   it("delivers the original frame and releases the listener on disconnect", async () => {
     const emitter = new EventEmitter();
-    const app = buildProductionApp(undefined, emitter);
+    const app = await buildProductionApp(undefined, emitter);
     const controller = new AbortController();
     const updates = app
       .simulationUpdates({

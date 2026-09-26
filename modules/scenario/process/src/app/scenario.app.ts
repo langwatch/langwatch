@@ -5,12 +5,14 @@ import {
   type AgentTestTurnResult,
 } from "@langwatch/agent-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -23,6 +25,12 @@ import {
   type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
+  type VoiceRecordingStream,
+  type VoiceSessionAudioRequest,
+  type VoiceSessionFinishRequest,
+  type VoiceSessionFinishResult,
+  type VoiceSessionMintRequest,
+  type VoiceSessionMintResult,
   type CancelScenarioBatchInput,
   type CancelScenarioRunInput,
   type ComputeRunMetricsCommandData,
@@ -112,6 +120,7 @@ import {
   type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
 import { SecretApi } from "@langwatch/secret-contract";
+import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
 import { SuiteApi } from "@langwatch/suite-contract";
 /**
  * The scenario feature's application: what all of its doors call.
@@ -124,6 +133,7 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
+import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
 import {
   buildScenarioLifecyclePipeline,
   type ScenarioLifecyclePipeline,
@@ -153,6 +163,7 @@ import {
   type SimulationPipelineSetup,
 } from "../services/simulation-processing.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
+import { VoiceSessionService } from "../services/voice-session.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 
 const lifecycleLogger = createLogger("langwatch:scenario:lifecycle");
@@ -182,6 +193,8 @@ export interface ScenarioAppDependencies {
   connectedTargets: ConnectedTargetService;
   /** The platform's own links, in the interface the project's release flag names. */
   platformLinks: ScenarioPlatformLinkService;
+  /** "Talk to it": browser voice sessions and their recordings. */
+  voiceSessions: VoiceSessionService;
 }
 
 /**
@@ -223,6 +236,10 @@ export const scenarioAppDependencyTokens = {
   workflows: WorkflowApi,
   /** Which testing interface a project reads, for the links this module hands out. */
   featureFlags: FeatureFlagApi,
+  /** The voice doors' conditional permission probe (#8021). */
+  authz: AuthzApi,
+  /** The project's ElevenLabs key, read server-side for voice sessions. */
+  gateway: GatewayApi,
 };
 
 /**
@@ -284,15 +301,29 @@ export class ScenarioApp implements ScenarioApi {
     "nodeEnvironment",
   ] as const;
   static readonly config = scenarioConfig;
+  /** Main's voice-session signing key: CREDENTIALS_SECRET, else NEXTAUTH_SECRET. */
+  static readonly secrets = {
+    voiceSessionSigning: credentialsSecret,
+    voiceSessionSigningFallback: sessionSecret,
+  } as const;
 
-  static create(
+  static async create(
     setup: FeatureSetup<
       typeof scenarioAppDependencyTokens,
       ScenarioAppMembers,
       ScenarioServerConfig,
       ScenarioRepositories
     >,
-  ): ScenarioApp {
+  ): Promise<ScenarioApp> {
+    const { secrets } = setup;
+    const signingSecret = await secrets.into(
+      ScenarioApp.secrets.voiceSessionSigning,
+      (credentials) =>
+        secrets.into(
+          ScenarioApp.secrets.voiceSessionSigningFallback,
+          (session) => credentials ?? session,
+        ),
+    );
     const simulationCommands = SimulationCommandDispatcherService.create();
     const composed = buildScenarioComposition({
       encryption: setup.members.encryption,
@@ -396,6 +427,15 @@ export class ScenarioApp implements ScenarioApi {
         projects: setup.dependencies.projects,
         publicBaseUrl: setup.members.publicBaseUrl,
       }),
+      voiceSessions: VoiceSessionService.compose({
+        peers: setup.dependencies,
+        scenarios,
+        simulations,
+        signingSecret,
+        voicePublicBaseUrl: config.voicePublicBaseUrl,
+        voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+        recordings: voiceRecordingChannels.live.create(),
+      }),
       lifecycle: buildScenarioLifecyclePipeline({
         announce: (signal) => setup.dependencies.billing.recordScenarioCreated(signal),
         claim: (key, ttlSeconds) => setup.members.idempotency.claim(key, ttlSeconds),
@@ -481,6 +521,18 @@ export class ScenarioApp implements ScenarioApi {
 
   generateScenario(input: ScenarioGenerateRequest): Promise<ScenarioGenerateResponse> {
     return this.#dependencies.generation.generate(input);
+  }
+
+  mintVoiceSession(input: VoiceSessionMintRequest): Promise<VoiceSessionMintResult> {
+    return this.#dependencies.voiceSessions.mint(input);
+  }
+
+  finishVoiceSession(input: VoiceSessionFinishRequest): Promise<VoiceSessionFinishResult> {
+    return this.#dependencies.voiceSessions.finish(input);
+  }
+
+  streamVoiceSessionAudio(input: VoiceSessionAudioRequest): Promise<VoiceRecordingStream> {
+    return this.#dependencies.voiceSessions.streamSessionAudio(input);
   }
 
   downloadScenarioRunExport(

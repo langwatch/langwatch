@@ -44,6 +44,12 @@ import {
 } from "./simulation.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
+import {
+  voiceSessionFinishInputSchema,
+  voiceSessionFinishResultSchema,
+  voiceSessionMintInputSchema,
+  voiceSessionMintResultSchema,
+} from "./voice/voice-session.schemas.ts";
 
 /** The project every procedure below is asked of. */
 const projectSchema = z.object({ projectId: z.string() });
@@ -419,4 +425,14 @@ export const scenarioTrpc = defineTrpcContract("scenarios")
     }),
   )
   .withOutput(runConfigurationEntrySchema.array())
+
+  /** Main's `POST /api/voice/session`: a signed-URL session for a browser call. */
+  .mutation("mintVoiceSession")
+  .withInput(voiceSessionMintInputSchema)
+  .withOutput(voiceSessionMintResultSchema)
+
+  /** Main's `POST /api/voice/session/:sessionId/finish`: the hung-up call, ingested. */
+  .mutation("finishVoiceSession")
+  .withInput(voiceSessionFinishInputSchema)
+  .withOutput(voiceSessionFinishResultSchema)
   .build();

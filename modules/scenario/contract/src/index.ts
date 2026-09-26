@@ -80,6 +80,7 @@ export * from "./voice/voice-countdown.ts";
 export { VOICE_CALL_MAX_SECONDS_DEFAULT } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
+export * from "./voice/voice-session.schemas.ts";
 // Types only. The transports themselves live behind
 // `@langwatch/scenario-contract/voice-runtime`, because value-importing them
 // drags the ElevenLabs SDK, grpc and ffmpeg-static into every browser bundle

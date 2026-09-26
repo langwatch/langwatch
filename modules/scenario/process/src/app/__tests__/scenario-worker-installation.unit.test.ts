@@ -7,6 +7,7 @@ import { EventEmitter } from "node:events";
 import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -14,6 +15,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -28,14 +30,17 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { scenarioTestConfig } from "../../__tests__/support/scenario-app-setup.fixture.ts";
+import {
+  scenarioInstallationSecrets,
+  scenarioTestConfig,
+} from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { scenarioServer } from "../../scenario.server.ts";
 import type { ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 const projectId = "project-1";
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
-  return createApp({ role })
+  return createApp({ role, secrets: scenarioInstallationSecrets() })
     .withModules([withMemoryRepositories(scenarioServer)])
     .withConfig({ scenario: scenarioTestConfig })
     .withStores(memoryStores())
@@ -79,6 +84,8 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       secret: createApiFixture<SecretApi>(),
       workflow: createApiFixture<WorkflowApi>(),
       "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+      authz: createApiFixture<AuthzApi>(),
+      gateway: createApiFixture<GatewayApi>(),
     });
 }
 

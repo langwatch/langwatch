@@ -205,7 +205,7 @@ export class PrismaAgentRepository
           environment: input.identity?.environment,
           ownerUserId: input.identity?.ownerUserId,
           hostLabel: input.identity?.hostLabel,
-          identityKey: input.identity?.identityKey,
+          identityKey: input.identity?.identityKey ?? input.identityKey,
           lastSeenAt: input.identity ? new Date() : void 0,
         },
       })
@@ -339,6 +339,14 @@ export class PrismaAgentRepository
       });
 
     return mapAgentRow(row);
+  }
+
+  async findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent[]> {
+    const rows = await this.prisma.agent.findMany({
+      where: { projectId: input.projectId, identityKey: input.identityKey },
+    });
+
+    return rows.map(mapAgentRow);
   }
 
   async touchLastSeenAt(input: AgentPresenceInput): Promise<void> {

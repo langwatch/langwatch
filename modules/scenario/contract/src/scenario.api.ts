@@ -82,6 +82,14 @@ import type {
   SimulationStreamFrame,
   SimulationSetData,
 } from "./simulation.ts";
+import type {
+  VoiceRecordingStream,
+  VoiceSessionAudioRequest,
+  VoiceSessionFinishRequest,
+  VoiceSessionFinishResult,
+  VoiceSessionMintRequest,
+  VoiceSessionMintResult,
+} from "./voice/voice-session.schemas.ts";
 
 export interface TestAgentRunInput {
   projectId: string;
@@ -220,6 +228,9 @@ export interface ScenarioApi {
   downloadScenarioRunExport(
     input: ScenarioRunExportDownloadInput,
   ): Promise<ScenarioRunExportDownload>;
+  mintVoiceSession(input: VoiceSessionMintRequest): Promise<VoiceSessionMintResult>;
+  finishVoiceSession(input: VoiceSessionFinishRequest): Promise<VoiceSessionFinishResult>;
+  streamVoiceSessionAudio(input: VoiceSessionAudioRequest): Promise<VoiceRecordingStream>;
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult>;
   testAgentRun(input: TestAgentRunInput): Promise<AgentTestRunResult>;
   list(input: { projectId: string }): Promise<Scenario[]>;

@@ -24,7 +24,7 @@ import {
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
-function buildEventFamily(
+async function buildEventFamily(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
@@ -41,7 +41,7 @@ function buildEventFamily(
     featureFlags?: Partial<FeatureFlagApi>;
   } = {},
 ) {
-  const world = createScenarioRestTestApp({
+  const world = await createScenarioRestTestApp({
     simulations: options.simulations,
     tabs: options.tabs,
     redis: options.redis,
@@ -71,12 +71,12 @@ function buildEventFamily(
   };
 }
 
-function deleteEvents(family: ReturnType<typeof buildEventFamily>, query = "") {
+function deleteEvents(family: Awaited<ReturnType<typeof buildEventFamily>>, query = "") {
   return family.request(`/api/scenario-events${query}`, { method: "DELETE" });
 }
 
 function postJson(
-  family: ReturnType<typeof buildEventFamily>,
+  family: Awaited<ReturnType<typeof buildEventFamily>>,
   path: string,
   body: Record<string, unknown>,
 ) {
@@ -92,7 +92,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "DELETE without a scope is refused" */
     it("refuses an unscoped archive", async () => {
       const getRunIdsForSet = vi.fn();
-      const family = buildEventFamily({ simulations: { getRunIdsForSet } });
+      const family = await buildEventFamily({ simulations: { getRunIdsForSet } });
 
       expect((await deleteEvents(family)).status).toBe(422);
       expect(getRunIdsForSet).not.toHaveBeenCalled();
@@ -100,7 +100,7 @@ describe("the scenario-events REST declaration", () => {
 
     /** @scenario "Peer archive calls require exactly one scope" */
     it("gives peer callers the named scope error for absent or ambiguous scope", async () => {
-      const world = createScenarioRestTestApp();
+      const world = await createScenarioRestTestApp();
 
       await expect(
         world.app.archiveScenarioEvents({ projectId: PROJECT_ID }),
@@ -119,7 +119,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "DELETE with both scenarioSetId and scenarioRunId is refused" */
     it("refuses two archive scopes", async () => {
       const getRunIdsForSet = vi.fn();
-      const family = buildEventFamily({ simulations: { getRunIdsForSet } });
+      const family = await buildEventFamily({ simulations: { getRunIdsForSet } });
 
       const response = await deleteEvents(family, "?scenarioSetId=set-a&scenarioRunId=run-a");
       expect(response.status).toBe(422);
@@ -129,7 +129,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "DELETE with empty scenarioSetId is refused" */
     it("refuses an empty set id", async () => {
       const getRunIdsForSet = vi.fn();
-      const family = buildEventFamily({ simulations: { getRunIdsForSet } });
+      const family = await buildEventFamily({ simulations: { getRunIdsForSet } });
 
       expect((await deleteEvents(family, "?scenarioSetId=")).status).toBe(422);
       expect(getRunIdsForSet).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "DELETE with scenarioRunId archives exactly that run" */
     it("archives only the project run and reports its id", async () => {
       const deleteRun = vi.fn(async () => {});
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           findScenarioRunData: async () => simulationRun("run-a"),
           deleteRun,
@@ -162,7 +162,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "DELETE with a scenarioRunId the project does not hold is not found" */
     it("answers 404 without dispatching a delete", async () => {
       const deleteRun = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { findScenarioRunData: async () => null, deleteRun },
       });
 
@@ -176,7 +176,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "Archiving one set leaves runs in other sets untouched" */
     it("dispatches only the ids selected for that set", async () => {
       const deleteRun = vi.fn(async () => {});
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           getRunIdsForSet: async () => ({ runIds: ["run-a", "run-b"], reachedCap: false }),
           deleteRun,
@@ -195,7 +195,7 @@ describe("the scenario-events REST declaration", () => {
 
     it("returns an empty archive result without dispatching deletes", async () => {
       const deleteRun = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           getRunIdsForSet: async () => ({ runIds: [], reachedCap: false }),
           deleteRun,
@@ -228,7 +228,7 @@ describe("the scenario-events REST declaration", () => {
             });
           }),
       );
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           getRunIdsForSet: async () => ({
             runIds: Array.from({ length: 17 }, (_, index) => `run-${index}`),
@@ -261,7 +261,7 @@ describe("the scenario-events REST declaration", () => {
         .mockResolvedValueOnce(void 0)
         .mockRejectedValueOnce(new Error("delete failed"))
         .mockResolvedValueOnce(void 0);
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           getRunIdsForSet: async () => ({
             runIds: ["run-a", "run-b", "run-c"],
@@ -278,7 +278,7 @@ describe("the scenario-events REST declaration", () => {
 
     /** @scenario "Reaching the 10k cap reports hasMore true" */
     it("reports that another archive page remains", async () => {
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: {
           getRunIdsForSet: async () => ({ runIds: ["run-a"], reachedCap: true }),
           deleteRun: async () => {},
@@ -296,7 +296,7 @@ describe("the scenario-events REST declaration", () => {
     it("reports undelivered without parking or broadcasting", async () => {
       const setPending = vi.fn();
       const publish = vi.fn(async () => 1);
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         tabs: { countAfter: async () => 0, setPending },
         redis: { publish },
       });
@@ -320,7 +320,7 @@ describe("the scenario-events REST declaration", () => {
         calls.push("broadcast");
         return 1;
       });
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
         redis: { publish },
       });
@@ -343,7 +343,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "A handoff never crosses projects" */
     it("uses the authenticated project when checking presence", async () => {
       const countAfter = vi.fn(async () => 0);
-      const family = buildEventFamily({ tabs: { countAfter } });
+      const family = await buildEventFamily({ tabs: { countAfter } });
 
       await postJson(family, "/api/scenario-events/browser-tab", {
         tabKey: "tab-a",
@@ -357,7 +357,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "The handoff endpoint refuses an unauthenticated caller" */
     it("answers 401 before checking the tab", async () => {
       const countAfter = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         authenticated: false,
         tabs: { countAfter },
       });
@@ -374,7 +374,7 @@ describe("the scenario-events REST declaration", () => {
     it("ignores a caller-supplied URL and broadcasts this instance's URL", async () => {
       const setPending = vi.fn(async () => {});
       const publish = vi.fn(async () => 1);
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         tabs: { countAfter: async () => 1, setPending },
         redis: { publish },
       });
@@ -402,7 +402,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("dispatches no event after extraction fails", async () => {
       const messageSnapshot = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot },
         extractInlineMedia: async () => {
           throw new Error("storage unavailable");
@@ -417,7 +417,7 @@ describe("the scenario-events REST declaration", () => {
     /** @scenario "Ingest logs list every stored_objects id extracted for an event" */
     it("logs every externalised object id", async () => {
       logInfo.mockClear();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot: async () => {} },
         extractInlineMedia: async ({ event }) => ({
           rewrittenEvent: event,
@@ -450,7 +450,7 @@ describe("the scenario-events usage gate", () => {
     /** @scenario "A scenario event past the monthly usage limit is refused" */
     it("refuses the event with the plan limit and dispatches nothing", async () => {
       const messageSnapshot = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot },
         plans: planLimitReached,
       });
@@ -464,7 +464,7 @@ describe("the scenario-events usage gate", () => {
     /** @scenario "Archiving scenario runs past the monthly usage limit is refused" */
     it("refuses the archive with the plan limit and deletes nothing", async () => {
       const deleteRun = vi.fn();
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { findScenarioRunData: async () => simulationRun("run-a"), deleteRun },
         plans: planLimitReached,
       });
@@ -478,7 +478,7 @@ describe("the scenario-events usage gate", () => {
   describe("when the organization is within its allowance", () => {
     it("asks for the organization the project belongs to", async () => {
       const assertWithinUsageLimit = vi.fn(async () => {});
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot: async () => {} },
         plans: { assertWithinUsageLimit },
       });
@@ -494,7 +494,7 @@ describe("the scenario-events links", () => {
   describe("when the project reads Agent Testing", () => {
     /** @scenario "A reported event links to its run set in the interface the project reads" */
     it("answers the external run set under /agent-testing/results", async () => {
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot: async () => {} },
         featureFlags: { isEnabled: async () => true },
       });
@@ -511,7 +511,7 @@ describe("the scenario-events links", () => {
 
     /** @scenario "A browser-tab handoff links to its batch in the interface the project reads" */
     it("hands the batch over under /agent-testing/results", async () => {
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         tabs: { countAfter: async () => 0 },
         featureFlags: { isEnabled: async () => true },
       });
@@ -531,7 +531,7 @@ describe("the scenario-events links", () => {
   describe("when the flag cannot be read", () => {
     /** @scenario "A flag read that fails links to the Simulations pages" */
     it("answers the Simulations address", async () => {
-      const family = buildEventFamily({
+      const family = await buildEventFamily({
         simulations: { messageSnapshot: async () => {} },
         featureFlags: {
           isEnabled: async () => {

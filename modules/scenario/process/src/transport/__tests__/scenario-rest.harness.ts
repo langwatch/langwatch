@@ -29,6 +29,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
   scenarioExecutorPeers,
+  scenarioTestSecrets,
+  scenarioVoicePeers,
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
@@ -41,7 +43,7 @@ export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
 export const ORGANIZATION_ID = "organization_scenario_rest";
 
-export function createScenarioRestTestApp(
+export async function createScenarioRestTestApp(
   options: {
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
@@ -59,7 +61,7 @@ export function createScenarioRestTestApp(
   );
   const redis = createApiFixture<ScenarioEventBroadcastPublisher>(options.redis ?? {}, "Redis");
 
-  const app = ScenarioApp.create({
+  const app = await ScenarioApp.create({
     repositories: {
       ...MemoryScenarioRepositories.create(),
       ...(options.tabs
@@ -89,6 +91,7 @@ export function createScenarioRestTestApp(
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(
         options.featureFlags ?? { isEnabled: async () => false },
         "Feature flag API",
@@ -106,7 +109,7 @@ export function createScenarioRestTestApp(
     },
     resources: createApiFixture<ResourceOwnership>(),
     config: scenarioTestConfig,
-    secrets: {} as never,
+    secrets: scenarioTestSecrets,
   });
 
   return { app, simulations, redis };

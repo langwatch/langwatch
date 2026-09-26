@@ -12,7 +12,7 @@ import {
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
-function buildSimulationRunsFamily(
+async function buildSimulationRunsFamily(
   options: {
     findBatchSummary?: SimulationService["findBatchSummary"];
     getRunDataForBatchRun?: SimulationService["getRunDataForBatchRun"];
@@ -26,7 +26,7 @@ function buildSimulationRunsFamily(
     options.getRunDataForBatchRun ?? vi.fn<SimulationService["getRunDataForBatchRun"]>();
   const getRunDataForScenarioSet =
     options.getRunDataForScenarioSet ?? vi.fn<SimulationService["getRunDataForScenarioSet"]>();
-  const world = createScenarioRestTestApp({
+  const world = await createScenarioRestTestApp({
     simulations: { findBatchSummary, getRunDataForBatchRun, getRunDataForScenarioSet },
     featureFlags: options.featureFlags,
   });
@@ -99,7 +99,7 @@ describe("the simulation-runs REST declaration", () => {
     /** @scenario "A batch summary is addressable by its batch run id" */
     it("serves all batch counts and the completion flag", async () => {
       const findBatchSummary = vi.fn(async () => batchSummary());
-      const family = buildSimulationRunsFamily({ findBatchSummary });
+      const family = await buildSimulationRunsFamily({ findBatchSummary });
 
       const response = await family.request("/api/simulation-runs/batches/batch-a");
       expect(response.status).toBe(200);
@@ -118,7 +118,7 @@ describe("the simulation-runs REST declaration", () => {
 
     /** @scenario "An unknown batch run id answers 404" */
     it("names the miss with the code the caller can act on", async () => {
-      const family = buildSimulationRunsFamily();
+      const family = await buildSimulationRunsFamily();
 
       const response = await family.request("/api/simulation-runs/batches/missing");
       expect(response.status).toBe(404);
@@ -136,7 +136,7 @@ describe("the simulation-runs REST declaration", () => {
         lastUpdatedAt: 2,
         runs: [run("run-a", "batch-a")],
       }));
-      const family = buildSimulationRunsFamily({ getRunDataForBatchRun });
+      const family = await buildSimulationRunsFamily({ getRunDataForBatchRun });
 
       const response = await family.request("/api/simulation-runs?batchRunId=batch-a");
       expect(response.status).toBe(200);
@@ -180,7 +180,7 @@ describe("the simulation-runs REST declaration", () => {
     /** @scenario "A simulation run links to its run drawer in the interface the project reads" */
     it("links every listed run under /agent-testing, reading the flag once", async () => {
       const isEnabled = vi.fn(async () => true);
-      const family = buildSimulationRunsFamily({
+      const family = await buildSimulationRunsFamily({
         featureFlags: { isEnabled },
         getRunDataForBatchRun: async () => ({
           changed: true as const,
@@ -212,7 +212,7 @@ describe("the simulation-runs REST declaration", () => {
           hasMore: false,
         }),
       );
-      const family = buildSimulationRunsFamily({ getRunDataForScenarioSet });
+      const family = await buildSimulationRunsFamily({ getRunDataForScenarioSet });
 
       const response = await family.request("/api/simulation-runs?scenarioSetId=set-a");
       expect(response.status).toBe(200);
@@ -229,7 +229,7 @@ describe("the simulation-runs REST declaration", () => {
       const getRunDataForScenarioSet = vi.fn<SimulationService["getRunDataForScenarioSet"]>(
         async () => ({ runs: [], hasMore: true, nextCursor: "next" }),
       );
-      const family = buildSimulationRunsFamily({ getRunDataForScenarioSet });
+      const family = await buildSimulationRunsFamily({ getRunDataForScenarioSet });
 
       const response = await family.request(
         "/api/simulation-runs?scenarioSetId=set-a&include=messages",

@@ -29,6 +29,8 @@ export type PersistAgentInput = {
   workflowId?: string;
   copiedFromAgentId?: string;
   identity?: ConnectedAgentIdentity;
+  /** A voice row's dedupe key; a connected row carries its key inside `identity`. */
+  identityKey?: string;
 };
 
 export type UpdatePersistedAgentInput = UpdateAgentCommand & {
@@ -59,5 +61,6 @@ export interface AgentRepository {
   findConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]>;
   findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]>;
   registerConnected(input: RegisterPersistedAgentInput): Promise<Agent>;
+  findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent[]>;
   touchLastSeenAt(input: AgentPresenceInput): Promise<void>;
 }

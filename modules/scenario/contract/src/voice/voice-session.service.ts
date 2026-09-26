@@ -12,6 +12,7 @@ import {
   scenarioRunIdForConversation,
 } from "./call-record.ts";
 import type { VoiceSessionTokenPayload } from "./voice-session-token.payload.ts";
+import type { VoiceSessionFinishResult, VoiceSessionMintResult } from "./voice-session.schemas.ts";
 import {
   type ElevenLabsCredential,
   type VoiceTransportCredential,
@@ -256,16 +257,6 @@ function runnerFor(
  *  runs at most the budget, and finish arrives soon after. */
 export const VOICE_SESSION_TOKEN_GRACE_MS = 10 * 60 * 1000;
 
-export interface MintResult {
-  transport: VoiceTransport;
-  /** The signed session token binding this call to its project and agent. The
-   *  browser carries it back to finish; it replaces the bare id and never
-   *  carries the provider key. */
-  sessionToken: string;
-  maxDurationSeconds: number;
-  connect: { signedUrl: string };
-}
-
 // Ask transport for signed URL. Vendor agent id from saved row if present; from request if draft.
 // Throws VoiceAgentRowNotFoundError, VoiceKeyMissingError, or VoiceMintFailedError.
 export async function mintVoiceSession({
@@ -285,7 +276,7 @@ export async function mintVoiceSession({
   /** The saved agent row id, when the drawer already has one. */
   agentRowId?: string;
   maxDurationSeconds: number;
-}): Promise<MintResult> {
+}): Promise<VoiceSessionMintResult> {
   const row = agentRowId ? await ports.getVoiceAgentRow({ projectId, agentRowId }) : undefined;
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
@@ -318,24 +309,6 @@ export async function mintVoiceSession({
     maxDurationSeconds,
     connect,
   };
-}
-
-export interface FinishResult {
-  runId: string;
-  agentId: string;
-  /** Where the run's turns came from. */
-  source: CallRecord["source"];
-  /** True only when the provider fetch itself errored (not "not ready yet"):
-   *  the panel shows the fetch-failed notice (AC15). */
-  hasFetchFailed: boolean;
-  hasAudio: boolean;
-  /** The same-origin proxy URL the panel plays the recording through, when the
-   *  provider returned audio. Absent otherwise, and the panel renders no
-   *  player. */
-  audioUrl?: string;
-  /** The set the run landed in, so the panel links to it. Set only for a
-   *  "Call it myself" run written under a scenario. */
-  scenarioSetId?: string;
 }
 
 /**
@@ -452,7 +425,7 @@ function terminalRunResult({
   scenarioRunId: string;
   token: VoiceSessionTokenPayload;
   existing: ExistingRun;
-}): FinishResult {
+}): VoiceSessionFinishResult {
   return {
     runId: scenarioRunId,
     agentId: token.agentId ?? existing.agentId ?? "",
@@ -633,7 +606,7 @@ async function finishDrawerCall(
     conversationId: string;
     scenarioRunId: string;
   },
-): Promise<FinishResult> {
+): Promise<VoiceSessionFinishResult> {
   const { record, hasFetchFailed, agentRowId } = await ingestFinishedCall(input, {
     transport,
     conversationId,
@@ -669,7 +642,7 @@ export async function finishVoiceSession(input: {
   /** Set for a "Call it myself" run: the scenario the call is scored under
    *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
   scenarioId?: string;
-}): Promise<FinishResult> {
+}): Promise<VoiceSessionFinishResult> {
   const { ports, token } = input;
   const transport = token.transport;
   const conversationId = input.conversationId?.trim() || token.sessionId;

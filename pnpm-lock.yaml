@@ -12104,6 +12104,9 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/secrets
       '@langwatch/suite-contract':
+      '@langwatch/gateway-contract':
+        specifier: workspace:*
+        version: link:../../gateway/contract
         specifier: workspace:*
         version: link:../../suite/contract
       '@langwatch/task':

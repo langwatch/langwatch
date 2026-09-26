@@ -76,7 +76,7 @@ describe("the scenario lifecycle pipeline", () => {
 
   describe("when a scenario is created through the app", () => {
     it("sends the command with how many scenarios the project now holds", async () => {
-      const { app } = createScenarioRestTestApp();
+      const { app } = await createScenarioRestTestApp();
       const { sender, sent } = recordingSender();
       app.connectLifecycleCommands({ recordScenarioCreated: sender });
 
@@ -104,7 +104,7 @@ describe("the scenario lifecycle pipeline", () => {
   describe("when the worker's subscriber handles scenario_created", () => {
     it("announces the scenario to billing", async () => {
       const announced: ScenarioCreatedSignal[] = [];
-      const { app } = createScenarioRestTestApp({
+      const { app } = await createScenarioRestTestApp({
         billing: {
           recordScenarioCreated: async (input) => {
             announced.push(input);
@@ -120,7 +120,7 @@ describe("the scenario lifecycle pipeline", () => {
     });
 
     it("lets a billing failure reach the queue, which records it", async () => {
-      const { app } = createScenarioRestTestApp({
+      const { app } = await createScenarioRestTestApp({
         billing: {
           recordScenarioCreated: async () => {
             throw new Error("billing unavailable");

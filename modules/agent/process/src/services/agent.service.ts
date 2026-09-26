@@ -1,5 +1,9 @@
 import {
+  AgentAlreadyExistsError,
   AgentRegisterOnlyError,
+  voiceAgentIdentityKey,
+  type VoiceAgentConfig,
+  type VoiceTransport,
   type AgentWorkflowInput,
   type AgentWorkflowConfig,
   type UpdateAgentWorkflowConfigInput,
@@ -119,6 +123,60 @@ export class AgentService {
 
   registerConnected(input: RegisterConnectedAgentInput): Promise<Agent> {
     return this.#repository.registerConnected({ ...input, type: "connected" });
+  }
+
+  /** Deduped by identity key; the create race re-reads and reuses the winner (#8020). */
+  async createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<Agent> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentId,
+    });
+    const [existing] = await this.#repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    if (existing) return existing;
+
+    const config: VoiceAgentConfig =
+      input.transport === "phone"
+        ? { transport: "phone", phoneNumber: input.agentId, callDirection: "outbound" }
+        : { transport: input.transport, agentId: input.agentId };
+    try {
+      return await this.#repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "voice",
+        config,
+        identityKey,
+      });
+    } catch (error) {
+      if (!(error instanceof AgentAlreadyExistsError)) throw error;
+      const [raced] = await this.#repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey,
+      });
+      if (!raced) throw error;
+      return raced;
+    }
+  }
+
+  async hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean> {
+    const agents = await this.#repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey: voiceAgentIdentityKey(input),
+    });
+    return agents.some((agent) => agent.type === "voice");
   }
 
   getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]> {

@@ -9,6 +9,7 @@ import { StalledRunsBackfillTask } from "./tasks/stalled-runs-backfill.task.ts";
 import { scenarioEventsRest } from "./transport/scenario-event.rest.ts";
 import { scenarioGenerateRest } from "./transport/scenario-generate.rest.ts";
 import { scenarioRunExportRest } from "./transport/scenario-run-export.rest.ts";
+import { scenarioVoiceRest } from "./transport/scenario-voice.rest.ts";
 import { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";
 import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 import { createSimulationRunsRest } from "./transport/simulation-run.rest.ts";
@@ -23,6 +24,7 @@ export const scenarioServer = defineServerModule("scenario")
     scenarioEventsRest,
     scenarioGenerateRest,
     scenarioRunExportRest,
+    scenarioVoiceRest,
     scenarioTrpcTransport,
   )
   // Which surface a write declares itself through, off the caller's own

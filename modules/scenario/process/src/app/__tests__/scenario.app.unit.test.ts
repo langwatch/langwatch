@@ -29,6 +29,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   scenarioExecutorPeers,
+  scenarioTestSecrets,
+  scenarioVoicePeers,
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
@@ -36,7 +38,7 @@ import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
-function harness() {
+async function harness() {
   const commands: SimulationQueueRun[] = [];
 
   // Queueing is the only run capability the envelope reaches.
@@ -46,7 +48,7 @@ function harness() {
     },
   };
 
-  const app = ScenarioApp.create({
+  const app = await ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
@@ -62,11 +64,12 @@ function harness() {
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),
+      ...scenarioVoicePeers(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
     },
     config: scenarioTestConfig,
     resources: {} as ResourceOwnership,
-    secrets: {} as never,
+    secrets: scenarioTestSecrets,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
@@ -117,7 +120,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     };
 
     it("records only the secret names on the metadata", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ secretParameters });
 
@@ -128,7 +131,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     // that reached the metadata would be readable from a stored run forever,
     // so this is the assertion the whole rule exists for.
     it("keeps every secret value out of the metadata", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ secretParameters });
 
@@ -138,7 +141,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     });
 
     it("carries the values beside the metadata, on the command's own field", async () => {
-      const { queue, queued } = harness();
+      const { queue, queued } = await harness();
 
       await queue({ secretParameters });
 
@@ -148,7 +151,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run with no secret parameters", () => {
     it("sends no secret field at all rather than an empty one", async () => {
-      const { queue, queued } = harness();
+      const { queue, queued } = await harness();
 
       await queue({ secretParameters: {} });
 
@@ -156,7 +159,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     });
 
     it("records no secret names on the metadata", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ secretParameters: {} });
 
@@ -166,7 +169,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run pointed at a target", () => {
     it("records the target and its kind in the reserved namespace", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ target: { type: "workflow", referenceId: "workflow-9" } });
 
@@ -177,7 +180,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     });
 
     it("passes the same target through as the command's own field", async () => {
-      const { queue, queued } = harness();
+      const { queue, queued } = await harness();
 
       await queue({ target: { type: "workflow", referenceId: "workflow-9" } });
 
@@ -187,7 +190,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run queued from a known scenario version", () => {
     it("stamps the version in the reserved namespace", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ scenarioVersion: 4 });
 
@@ -201,7 +204,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run whose scenario version is unknown", () => {
     it("omits the key rather than recording an empty version", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ scenarioVersion: undefined });
 
@@ -212,7 +215,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
   describe("given a run carrying a note", () => {
     /** @scenario "The note is written under the top-level note key of the run metadata" */
     it("writes the note beside the reserved namespace, never inside it", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ note: "nightly regression" });
 
@@ -221,7 +224,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     });
 
     it("drops a note of only spaces", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ note: "   " });
 
@@ -231,7 +234,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("given a run carrying resolved parameters", () => {
     it("records them under their own key", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ parameters: { account_tier: "platinum", region: "eu-central" } });
 
@@ -247,7 +250,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
      * @scenario "A run queued without a note records metadata identical to before notes existed"
      */
     it("records only the reserved namespace", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue();
 
@@ -259,7 +262,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
   describe("when the command is addressed", () => {
     it("names the project as the tenant and the set under its own field", async () => {
-      const { queue, queued } = harness();
+      const { queue, queued } = await harness();
 
       await queue();
 
@@ -275,7 +278,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
     it("stamps the moment the run was queued", async () => {
       const before = Date.now();
-      const { queue, queued } = harness();
+      const { queue, queued } = await harness();
 
       await queue();
 
@@ -286,7 +289,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
   describe("given a run started against a named target", () => {
     /** @scenario "A single-scenario run records which target it ran against" */
     it("records the target the run was pointed at", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ target: { type: "prompt", referenceId: "prompt-9" } });
 
@@ -297,7 +300,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
 
     /** @scenario "A single-scenario run records that scenario version" */
     it("records the scenario version the run was started from", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ scenarioVersion: 7 });
 
@@ -311,7 +314,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
     /** @scenario "A one-off run started in the app records the person who started it" */
     /** @scenario "The actor sits beside the scenario version, not at the top level" */
     it("records the person beside the scenario version rather than at the top level", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ actor: { id: "user-1", label: "user" }, scenarioVersion: 3 });
 
@@ -324,7 +327,7 @@ describe("ScenarioApp.queueSimulationRun", () => {
   describe("given a run carrying a note", () => {
     /** @scenario "A note on a single scenario run is stored with that run" */
     it("stores the note with the queued run", async () => {
-      const { queue, metadata } = harness();
+      const { queue, metadata } = await harness();
 
       await queue({ note: "nightly regression" });
 
@@ -338,7 +341,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
     it("refuses the read by name instead of crashing on the missing member", async () => {
       // Neither the member nor the ClickHouse the module would derive it
       // from: the only shape that still owes the caller a refusal.
-      const app = ScenarioApp.create({
+      const app = await ScenarioApp.create({
         repositories: {
           ...MemoryScenarioRepositories.create(),
         },
@@ -356,11 +359,12 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           retention: createApiFixture<DataRetentionApi>(),
           suites: createApiFixture<SuiteApi>(),
           ...scenarioExecutorPeers(),
+          ...scenarioVoicePeers(),
           featureFlags: createApiFixture<FeatureFlagApi>(),
         },
         config: scenarioTestConfig,
         resources: {} as ResourceOwnership,
-        secrets: {} as never,
+        secrets: scenarioTestSecrets,
         members: {
           ...scenarioHostMembers,
           redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
@@ -386,7 +390,7 @@ describe("given a process that supplies no simulations member but does read Clic
   /** @scenario "Simulation reads are derived from the deployment's own ClickHouse" */
   it("serves the read from ClickHouse instead of refusing", async () => {
     const asked: { tenantId: string }[] = [];
-    const app = ScenarioApp.create({
+    const app = await ScenarioApp.create({
       repositories: MemoryScenarioRepositories.create(),
       dependencies: {
         agents: createApiFixture<AgentApi>(),
@@ -402,11 +406,12 @@ describe("given a process that supplies no simulations member but does read Clic
         retention: createApiFixture<DataRetentionApi>(),
         suites: createApiFixture<SuiteApi>(),
         ...scenarioExecutorPeers(),
+        ...scenarioVoicePeers(),
         featureFlags: createApiFixture<FeatureFlagApi>(),
       },
       config: scenarioTestConfig,
       resources: {} as ResourceOwnership,
-      secrets: {} as never,
+      secrets: scenarioTestSecrets,
       members: {
         ...scenarioHostMembers,
         redis: createApiFixture<ScenarioEventBroadcastPublisher>(),

@@ -33,6 +33,7 @@ import {
   type GatewayBudgetCheckResult,
   type GatewayBudgetDebitRow,
   type GatewayBudgetResolutionTarget,
+  type GatewayElevenLabsApiCredential,
   type GatewayElevenLabsWebhookAnswer,
   type GatewayVirtualKeyDirectBudget,
   type GuardrailAttachment,
@@ -121,6 +122,7 @@ import { GatewayBudgetLedgerService } from "../services/gateway-budget-ledger.se
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
+import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
@@ -815,6 +817,7 @@ export class GatewayApp implements GatewayApi {
   #agentCache: GatewayAgentCacheService | undefined;
   #connectManagedKeys: ConnectManagedKeyService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
+  #elevenLabsCredential: GatewayElevenLabsCredentialService | undefined;
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
@@ -870,6 +873,9 @@ export class GatewayApp implements GatewayApi {
       : void 0;
     this.#elevenLabsWebhook = members.elevenLabsWebhook
       ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
+      : void 0;
+    this.#elevenLabsCredential = members.elevenLabsWebhook
+      ? GatewayElevenLabsCredentialService.create(members.elevenLabsWebhook.credentials)
       : void 0;
   }
 
@@ -1064,6 +1070,15 @@ export class GatewayApp implements GatewayApi {
     if (!service) throw new Error("The ElevenLabs family was mounted without its members");
 
     return service.receive(input);
+  }
+
+  getElevenLabsApiCredential(input: {
+    modelProviderId: string;
+  }): Promise<GatewayElevenLabsApiCredential> {
+    const service = this.#elevenLabsCredential;
+    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
+
+    return service.getApiCredential(input);
   }
 
   // ── The billing reconciliation family (ADR-072) ─────────────────────────

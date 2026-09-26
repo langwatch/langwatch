@@ -69,10 +69,12 @@ describe("the scenarios tRPC transport", () => {
       const { router } = harness({});
 
       const names = Object.keys(router._def.procedures);
-      expect(names).toHaveLength(33);
+      expect(names).toHaveLength(35);
       expect(names).toContain("scenarios.getAll");
       expect(names).toContain("scenarios.onSimulationUpdate");
       expect(names).toContain("scenarios.getRunConfigurations");
+      expect(names).toContain("scenarios.mintVoiceSession");
+      expect(names).toContain("scenarios.finishVoiceSession");
     });
   });
 

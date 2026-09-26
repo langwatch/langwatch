@@ -10,8 +10,10 @@ import {
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
-function buildScenarioFamily(runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0]) {
-  const { app } = createScenarioRestTestApp();
+async function buildScenarioFamily(
+  runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
+) {
+  const { app } = await createScenarioRestTestApp();
   const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(createScenarioRest().router(), {
     app: () => app,
@@ -27,7 +29,7 @@ function buildScenarioFamily(runtimeOptions?: Parameters<typeof createScenarioRe
 }
 
 async function createScenario(
-  family: ReturnType<typeof buildScenarioFamily>,
+  family: Awaited<ReturnType<typeof buildScenarioFamily>>,
   body: Record<string, unknown>,
 ) {
   return family.request("/api/scenarios", {
@@ -43,7 +45,7 @@ describe("the scenarios REST declaration", () => {
       // A legacy project key names no person: the door's actor rule answers
       // the project id for `actorId`, which is not a `User` row. Before the
       // fix this crashed the write with the `lastUpdatedById` foreign key.
-      const family = buildScenarioFamily({ viewerUserId: null, actorId: PROJECT_ID });
+      const family = await buildScenarioFamily({ viewerUserId: null, actorId: PROJECT_ID });
 
       const response = await createScenario(family, {
         name: "Project-key Scenario",
@@ -60,7 +62,7 @@ describe("the scenarios REST declaration", () => {
   describe("when creating with model overrides and turn limits", () => {
     /** @scenario "Create over REST accepts model overrides and turn limits" */
     it("carries the values back on create and read", async () => {
-      const family = buildScenarioFamily();
+      const family = await buildScenarioFamily();
       const createdResponse = await createScenario(family, {
         name: "Overrides Scenario",
         situation: "User asks for a refund",
@@ -92,7 +94,7 @@ describe("the scenarios REST declaration", () => {
   describe("when clearing a model override", () => {
     /** @scenario "Update over REST clears a model override with null" */
     it("stores and returns null", async () => {
-      const family = buildScenarioFamily();
+      const family = await buildScenarioFamily();
       const createdResponse = await createScenario(family, {
         name: "Clear Override Scenario",
         situation: "User asks for help",
@@ -116,7 +118,7 @@ describe("the scenarios REST declaration", () => {
   describe("when a model override has no provider prefix", () => {
     /** @scenario "REST rejects a model override with no provider prefix" */
     it("refuses the request during input parsing", async () => {
-      const family = buildScenarioFamily();
+      const family = await buildScenarioFamily();
       const response = await createScenario(family, {
         name: "Bad Model Scenario",
         situation: "User asks for help",
@@ -130,7 +132,7 @@ describe("the scenarios REST declaration", () => {
   describe("when partially updating an existing scenario", () => {
     /** @scenario "PATCH updates a scenario the same way PUT does" */
     it("changes only the named field", async () => {
-      const family = buildScenarioFamily();
+      const family = await buildScenarioFamily();
       const createdResponse = await createScenario(family, {
         name: "Patch Me",
         situation: "Original situation",
@@ -162,7 +164,7 @@ describe("given an id no scenario in this project carries", () => {
    * @scenario "A scenario this project does not hold is refused as a named miss"
    */
   it("answers 404 with the code the caller can act on", async () => {
-    const family = buildScenarioFamily();
+    const family = await buildScenarioFamily();
 
     const response = await family.request("/api/scenarios/scenario-nobody-holds");
 

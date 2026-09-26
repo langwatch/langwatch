@@ -26,6 +26,8 @@ export const scenarioConfig = Config.define((c) => ({
   langwatchEndpoint: c.env("LANGWATCH_ENDPOINT", trimmedOptional),
   /** The worker media listener's public origin, forwarded only to voice children. */
   voicePublicBaseUrl: c.env("VOICE_PUBLIC_BASE_URL", trimmedOptional),
+  /** The browser call's length cap in seconds; unusable values fall back to the default. */
+  voiceCallMaxSeconds: c.env("VOICE_CALL_MAX_SECONDS", passthrough),
   blockLocalHttpCalls,
   allowedProxyHosts,
   defaultModel: langwatchDefaultModel,

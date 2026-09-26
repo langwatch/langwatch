@@ -197,6 +197,9 @@ export type GatewayAgentCacheWriteInput = Readonly<{
   ttlSeconds?: number;
 }>;
 
+/** The key and host a stored ElevenLabs row reads conversations back with. Server-side only. */
+export type GatewayElevenLabsApiCredential = Readonly<{ apiKey: string; baseUrl: string }>;
+
 export type GatewayElevenLabsWebhookAnswer = Readonly<{
   status: 200 | 400 | 401 | 404;
   body: Readonly<{ received: true }> | Readonly<{ error: string }>;
@@ -430,6 +433,10 @@ export interface GatewayApi extends GatewayInternalProtocol {
     rawBody: string;
     signature: string | undefined;
   }): Promise<GatewayElevenLabsWebhookAnswer>;
+  /** Throws `voice_key_missing` when the row is not ElevenLabs or holds no key. */
+  getElevenLabsApiCredential(input: {
+    modelProviderId: string;
+  }): Promise<GatewayElevenLabsApiCredential>;
 
   /** Refuses an organization id that names no organization. */
   assertOrganizationExists(organizationId: string): Promise<void>;

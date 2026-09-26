@@ -23,6 +23,7 @@ import type {
 } from "./agent.queries.ts";
 import type * as agentQueriesModule from "./agent.queries.ts";
 import type { Agent, AgentWithFields } from "./agent.ts";
+import type { VoiceTransport } from "./config/voice.ts";
 import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
 import type {
   AgentCallSignal,
@@ -75,6 +76,19 @@ export interface AgentApi {
   }): Promise<CallOutcome>;
   exists(input: { id: string; projectId: string }): Promise<boolean>;
   registerConnected(input: RegisterConnectedAgentInput): Promise<Agent>;
+  /** The voice row a "Talk to it" hang-up saves, deduped by its identity key (#8020). */
+  createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<Agent>;
+  hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean>;
   touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
   executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
   listWithPresence(input: {

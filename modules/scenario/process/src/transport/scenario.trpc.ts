@@ -26,6 +26,17 @@ const resultsWindow = <Filter extends { startDate?: number }>(filter: Filter) =>
   startDate: filter.startDate ?? nowInstant().epochMilliseconds - THIRTY_DAYS_MS,
 });
 
+/** Main's voice door: evaluations:manage only when the call creates an agent (#8021). */
+const voiceSessionAuthorization = {
+  reason:
+    "The voice flag and scenarios:create are checked in the app; evaluations:manage only when " +
+    "the call creates an agent, which a finish learns from its verified session token.",
+  permissions: ["scenarios:create", "evaluations:manage"],
+  enforces: {
+    projectId: "VoiceSessionService authorizes the caller on this project before any read or write",
+  },
+} as const;
+
 export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   // -- the cases a project defines -------------------------------------------
   .procedure("create")
@@ -353,4 +364,13 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .procedure("getRunConfigurations")
   .withPermission("scenarios:view")
   .handle(({ app, input }) => app.getRunConfigurations(input))
+
+  // -- "Talk to it": main's voice-session doors ---------------------------------
+  .procedure("mintVoiceSession")
+  .serviceAuthorized(voiceSessionAuthorization)
+  .handle(({ app, input, actor }) => app.mintVoiceSession({ ...input, userId: actor.id }))
+
+  .procedure("finishVoiceSession")
+  .serviceAuthorized(voiceSessionAuthorization)
+  .handle(({ app, input, actor }) => app.finishVoiceSession({ ...input, userId: actor.id }))
   .build();

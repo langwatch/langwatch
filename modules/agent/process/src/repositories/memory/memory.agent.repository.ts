@@ -98,11 +98,11 @@ export class MemoryAgentRepository implements AgentRepository {
   }
 
   async create(input: PersistAgentInput): Promise<Agent> {
+    const identityKey = input.identity?.identityKey ?? input.identityKey;
     const identityExists =
-      input.identity &&
+      identityKey !== undefined &&
       [...this.#agents.values()].some(
-        (agent) =>
-          agent.projectId === input.projectId && agent.identityKey === input.identity?.identityKey,
+        (agent) => agent.projectId === input.projectId && agent.identityKey === identityKey,
       );
 
     if (this.#agents.has(input.id) || identityExists) {
@@ -120,7 +120,7 @@ export class MemoryAgentRepository implements AgentRepository {
       environment: input.identity?.environment ?? null,
       ownerUserId: input.identity?.ownerUserId ?? null,
       hostLabel: input.identity?.hostLabel ?? null,
-      identityKey: input.identity?.identityKey ?? null,
+      identityKey: identityKey ?? null,
       lastSeenAt: input.identity ? now : null,
     });
 
@@ -192,6 +192,14 @@ export class MemoryAgentRepository implements AgentRepository {
     return structuredClone(
       this.#visible(input.projectId).filter(
         (agent) => agent.type === "connected" && agent.name === input.name,
+      ),
+    );
+  }
+
+  async findByIdentityKey(input: { projectId: string; identityKey: string }): Promise<Agent[]> {
+    return structuredClone(
+      [...this.#agents.values()].filter(
+        (agent) => agent.projectId === input.projectId && agent.identityKey === input.identityKey,
       ),
     );
   }
