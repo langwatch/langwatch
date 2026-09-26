@@ -219,3 +219,59 @@ describe("extractLlmMessagesForSpan", () => {
     });
   });
 });
+
+describe("given an LLM span recorded in the OTel GenAI parts format", () => {
+  const partsSpan: Span = span({
+    spanId: "chat",
+    type: "llm",
+    input: {
+      type: "json",
+      value: [
+        { role: "user", parts: [{ type: "text", content: "Where is order ACME-10442?" }] },
+        {
+          role: "assistant",
+          parts: [
+            { type: "tool_call", id: "call_1", name: "lookup_order", arguments: { id: "10442" } },
+          ],
+        },
+        {
+          role: "tool",
+          parts: [{ type: "tool_call_response", id: "call_1", response: { status: "in_transit" } }],
+        },
+      ],
+    },
+    output: {
+      type: "text",
+      value: JSON.stringify([
+        { role: "assistant", parts: [{ type: "text", content: "It is in transit." }] },
+      ]),
+    },
+  });
+
+  /** @scenario "An LLM span recorded in the OTel GenAI parts format reads as chat messages" */
+  it("reads its text, tool calls and tool results as chat messages", () => {
+    const messages = extractLlmMessagesForSpan({ span: partsSpan });
+
+    expect(messages.input).toEqual([
+      { role: "user", content: "Where is order ACME-10442?" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "lookup_order", arguments: '{"id":"10442"}' },
+          },
+        ],
+      },
+      { role: "tool", content: '{"status":"in_transit"}', tool_call_id: "call_1" },
+    ]);
+    expect(messages.output).toEqual([{ role: "assistant", content: "It is in transit." }]);
+  });
+
+  /** @scenario "An LLM span recorded in the OTel GenAI parts format reads as chat messages" */
+  it("is the span chosen to stand for the trace", () => {
+    expect(pickLlmSpanForTrace({ spans: [partsSpan] })?.span_id).toBe("chat");
+  });
+});

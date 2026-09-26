@@ -197,6 +197,14 @@ Feature: Reading a trace the way the drawer reads it
     And a span whose input already carries a system message is not given a second one
 
   @unit
+  Scenario: An LLM span recorded in the OTel GenAI parts format reads as chat messages
+    Given an LLM span whose messages carry parts instead of content
+    When the span's messages are read
+    Then each text part becomes the message content
+    And tool call parts become tool calls and tool call responses become tool messages
+    And the span can stand for its trace
+
+  @unit
   Scenario: A conversation transcript renders the same on every day
     Given a thread rendered as a conversation transcript
     When it is rendered at two different times
