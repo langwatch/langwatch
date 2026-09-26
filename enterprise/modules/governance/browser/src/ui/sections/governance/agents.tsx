@@ -35,6 +35,7 @@ import {
   useAgentFilters,
 } from "../../../features/agents/index.ts";
 import { GovernanceSyncButton, governanceSyncStatus } from "../../../features/agents/sync/index.ts";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import {
   GovernanceEmptyState,
   GovernanceEmptyStateAction,
@@ -514,4 +515,4 @@ function AgentsPage() {
   );
 }
 
-export default AgentsPage;
+export default withGovernanceSection(AgentsPage);

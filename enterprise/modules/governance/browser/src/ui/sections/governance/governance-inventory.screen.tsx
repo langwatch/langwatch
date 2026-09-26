@@ -91,6 +91,7 @@ import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx"
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import {
   type DestinationContext,
   type Source,
@@ -4975,4 +4976,4 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
   );
 }
 
-export default InventoryPage;
+export default withGovernanceSection(InventoryPage);

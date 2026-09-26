@@ -10,6 +10,7 @@ import { Link } from "../../../ui/elements/governance-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 const fmtUsd = (n: number | string) => {
   const v = typeof n === "string" ? Number(n) : n;
   return v === 0 ? "$0.00" : numeral(v).format("$0,0.00");
@@ -173,4 +174,4 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default GovernanceUserDetailPage;
+export default withGovernanceSection(GovernanceUserDetailPage);

@@ -10,6 +10,7 @@ import { Link } from "../../../ui/elements/governance-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 type SpendByTeam = RouterOutputs["activityMonitor"]["spendByTeam"][number];
 type SortField = "spend" | "requests" | "lastActivity";
 
@@ -338,4 +339,4 @@ function Row({ team }: { team: SpendByTeam }) {
   );
 }
 
-export default GovernanceTeamsListPage;
+export default withGovernanceSection(GovernanceTeamsListPage);

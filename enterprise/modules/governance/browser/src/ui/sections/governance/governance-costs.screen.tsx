@@ -5,6 +5,7 @@ import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 
 const BILLED_COST_FLAG = "release_ui_governance_billed_cost_enabled";
 const COSTS_PERMISSION = "governanceCost:view";
@@ -23,4 +24,4 @@ function CostsScreen() {
   return <CostsPage />;
 }
 
-export default CostsScreen;
+export default withGovernanceSection(CostsScreen);

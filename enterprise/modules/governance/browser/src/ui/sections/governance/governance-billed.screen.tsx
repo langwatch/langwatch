@@ -1,21 +1,12 @@
-import { Heading, Text, VStack } from "@chakra-ui/react";
-
-import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 
 /**
- * Placeholder for the Billed view: ships behind
- * `release_ui_governance_billed_cost_enabled` ahead of the spend views.
+ * The unfinished Billed destination stays unavailable even when Costs is on, as on main.
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature (billed-cost section).
  */
 function BilledPage() {
-  return (
-    <GovernanceLayout pageTitle="Billed · AI Governance · LangWatch">
-      <VStack align="stretch" gap={6} width="full">
-        <Heading size="md">Billed</Heading>
-        <Text color="fg.muted">Billed views are on their way. Nothing to see here yet.</Text>
-      </VStack>
-    </GovernanceLayout>
-  );
+  return <NotFoundScene />;
 }
 
-export default BilledPage;
+export default withGovernanceSection(BilledPage);

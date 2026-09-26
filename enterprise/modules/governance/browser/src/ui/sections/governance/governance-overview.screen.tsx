@@ -12,6 +12,7 @@ import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 
 /**
  * The overview: a greeting, the inline palette, the ways in, and the two
@@ -66,4 +67,4 @@ function GovernanceOverviewPage() {
   );
 }
 
-export default GovernanceOverviewPage;
+export default withGovernanceSection(GovernanceOverviewPage);

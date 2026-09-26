@@ -58,6 +58,7 @@ import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx"
 import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
 
@@ -1032,7 +1033,7 @@ function SecretRevealModal({
   );
 }
 
-export default IngestionSourceDetailPage;
+export default withGovernanceSection(IngestionSourceDetailPage);
 
 function ingestEndpointMode({
   isOtel,

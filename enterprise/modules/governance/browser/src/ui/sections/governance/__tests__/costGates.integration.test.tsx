@@ -81,7 +81,12 @@ describe("the Costs screen gates", () => {
 
   describe("when the flag is on and the grant is held", () => {
     it("opens the cost screen and issues its reads", () => {
-      renderCosts({ enabledFlags: ["release_ui_governance_billed_cost_enabled"] });
+      renderCosts({
+        enabledFlags: [
+          "release_ui_ai_governance_enabled",
+          "release_ui_governance_billed_cost_enabled",
+        ],
+      });
 
       expect(screen.queryByText("This page is not here")).toBeNull();
       expect(harness.requested).toContain("governanceCost.summary");

@@ -4,6 +4,7 @@ import { Heading, VStack } from "@chakra-ui/react";
 
 import { AnomalyRulesTab } from "../../../features/ingestion-sources/anomaly-rules-tab";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 
 /**
  * The retired standalone address for anomaly rules. The rules now live in
@@ -25,4 +26,4 @@ function AnomalyRulesPage() {
   );
 }
 
-export default AnomalyRulesPage;
+export default withGovernanceSection(AnomalyRulesPage);

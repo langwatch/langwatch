@@ -32,6 +32,7 @@ import {
   exploreQueryLine,
   matchesTemplate,
 } from "../../../model/explore-query.ts";
+import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
 // Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
@@ -293,4 +294,4 @@ function ControlSelect({
   );
 }
 
-export default AnalyticsPage;
+export default withGovernanceSection(AnalyticsPage);
