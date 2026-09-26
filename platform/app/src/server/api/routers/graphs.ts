@@ -1,5 +1,4 @@
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { allocateNextGridRow } from "~/server/analytics/allocateNextGridRow";
 import {
@@ -12,6 +11,7 @@ import {
   BUILDER_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
 } from "~/server/analytics/chartKinds";
+import { generateCustomGraphId } from "~/server/analytics/customGraphId";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { placeableKindFilter } from "~/server/analytics/placeableKindFilter";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
@@ -99,7 +99,7 @@ export const graphsRouter = createTRPCRouter({
 
         return await tx.customGraph.create({
           data: {
-            id: nanoid(),
+            id: generateCustomGraphId(),
             name: input.name,
             graph: graph,
             projectId: input.projectId,
