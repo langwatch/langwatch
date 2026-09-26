@@ -4,8 +4,8 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
-import type { LangWatchQLExecutor } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import type { LangWatchQLExecutorRepository } from "../../repositories/langwatch-ql-executor.repository.ts";
 import {
   type LangWatchQLClickHouseHarness,
   startLangWatchQLClickHouse,
@@ -16,7 +16,7 @@ const MISSING_COLUMN = "trace_idd_typo";
 
 describe("given SQL that names a column no dataset has", () => {
   let harness: LangWatchQLClickHouseHarness;
-  let executor: LangWatchQLExecutor;
+  let executor: LangWatchQLExecutorRepository;
   let database: string;
 
   /** Whatever the executor threw, or a sentence saying it threw nothing. */
@@ -35,7 +35,7 @@ describe("given SQL that names a column no dataset has", () => {
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({ suite: "unknownidentifier" });
     database = harness.names.database;
-    executor = ClickHouseLangWatchQLExecutorAdapter.create({
+    executor = ClickHouseLangWatchQLExecutorRepository.create({
       connection: {
         ...harness.restrictedConnection(),
         database,

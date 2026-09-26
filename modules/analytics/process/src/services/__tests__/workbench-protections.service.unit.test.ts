@@ -12,11 +12,19 @@ import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  resolveApiKeyProtections,
-  resolveProjectProtections,
-  resolveWorkbenchProtections,
-  resolveWorkbenchRunCaller,
-} from "../workbench-protections.rules.ts";
+  WorkbenchProtectionsService,
+  type WorkbenchProtectionsDependencies,
+} from "../workbench-protections.service.ts";
+
+function serviceOver(
+  input: Partial<WorkbenchProtectionsDependencies>,
+): WorkbenchProtectionsService {
+  return WorkbenchProtectionsService.create({
+    authz: input.authz ?? createApiFixture<AuthzApi>({}, "unused authz"),
+    dataPrivacy: input.dataPrivacy ?? createApiFixture<DataPrivacyApi>({}, "unused data privacy"),
+    projects: input.projects ?? createApiFixture<ProjectApi>({}, "unused projects"),
+  });
+}
 
 /** Every permission answers the same boolean, so a case only has to name one. */
 function authzAnswering(granted: boolean): {
@@ -103,16 +111,14 @@ function projectsWith(project: Project | null): {
   return { projects: createApiFixture<ProjectApi>({ findById }, "workbench projects"), findById };
 }
 
-describe("resolveWorkbenchProtections", () => {
+describe("resolveMemberProtections", () => {
   describe("given a member permitted every declared check", () => {
     /** @scenario "A member permitted every declared check sees costs and captured content" */
     it("sees costs and the default policy's captured content", async () => {
       const { authz } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveWorkbenchProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
         userId: "user-1",
         projectId: "project-1",
       });
@@ -131,9 +137,7 @@ describe("resolveWorkbenchProtections", () => {
       const { authz } = authzAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveWorkbenchProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
         userId: "user-1",
         projectId: "project-1",
       });
@@ -149,9 +153,7 @@ describe("resolveWorkbenchProtections", () => {
       const { authz, hasPermission } = authzAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      await resolveWorkbenchProtections({
-        authz,
-        dataPrivacy,
+      await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
         userId: "user-1",
         projectId: "project-1",
       });
@@ -182,9 +184,7 @@ describe("resolveWorkbenchProtections", () => {
         throw new Error("data-privacy resolver unavailable");
       });
 
-      const resolved = await resolveWorkbenchProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveMemberProtections({
         userId: "user-1",
         projectId: "project-1",
       });
@@ -199,7 +199,7 @@ describe("resolveWorkbenchProtections", () => {
   });
 });
 
-describe("resolveWorkbenchRunCaller", () => {
+describe("resolveRunCaller", () => {
   describe("given a project that no longer exists", () => {
     /** @scenario "A run-caller resolution for a missing project refuses rather than running as no one" */
     it("refuses with project_not_found instead of resolving a caller for it", async () => {
@@ -208,10 +208,7 @@ describe("resolveWorkbenchRunCaller", () => {
       const { projects } = projectsWith(null);
 
       await expect(
-        resolveWorkbenchRunCaller({
-          authz,
-          dataPrivacy,
-          projects,
+        serviceOver({ authz, dataPrivacy, projects }).resolveRunCaller({
           userId: "user-1",
           projectId: "project-missing",
         }),
@@ -227,10 +224,7 @@ describe("resolveWorkbenchRunCaller", () => {
       const { projects } = projectsWith(projectWith({ id: "project-1", lwqlKey: "lwql-secret" }));
 
       await expect(
-        resolveWorkbenchRunCaller({
-          authz,
-          dataPrivacy,
-          projects,
+        serviceOver({ authz, dataPrivacy, projects }).resolveRunCaller({
           userId: "user-1",
           projectId: "project-1",
         }),
@@ -249,9 +243,7 @@ describe("resolveApiKeyProtections", () => {
       const { authz, hasApiKeyPermission } = authzApiKeyAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveApiKeyProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
         projectId: "project-1",
         credential: LEGACY_PROJECT_KEY_CREDENTIAL,
       });
@@ -267,9 +259,7 @@ describe("resolveApiKeyProtections", () => {
       const { authz, hasApiKeyPermission } = authzApiKeyAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveApiKeyProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
         projectId: "project-1",
         credential: API_KEY_CREDENTIAL,
       });
@@ -291,9 +281,7 @@ describe("resolveApiKeyProtections", () => {
       const { authz } = authzApiKeyAnswering(false);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveApiKeyProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
         projectId: "project-1",
         credential: API_KEY_CREDENTIAL,
       });
@@ -310,9 +298,7 @@ describe("resolveApiKeyProtections", () => {
         throw new Error("data-privacy resolver unavailable");
       });
 
-      const resolved = await resolveApiKeyProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
         projectId: "project-1",
         credential: API_KEY_CREDENTIAL,
       });
@@ -348,9 +334,7 @@ describe("resolveApiKeyProtections", () => {
         },
       }));
 
-      const resolved = await resolveApiKeyProtections({
-        authz,
-        dataPrivacy,
+      const resolved = await serviceOver({ authz, dataPrivacy }).resolveApiKeyProtections({
         projectId: "project-1",
         credential: API_KEY_CREDENTIAL,
       });
@@ -365,7 +349,9 @@ describe("given a job judging a project's own rows", () => {
     it("reads the public cut of the content and the project's own costs", async () => {
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
 
-      const resolved = await resolveProjectProtections({ dataPrivacy, projectId: "project-1" });
+      const resolved = await serviceOver({ dataPrivacy }).resolveProjectProtections({
+        projectId: "project-1",
+      });
 
       expect(resolved).toEqual({
         canSeeCosts: true,
@@ -379,7 +365,9 @@ describe("given a job judging a project's own rows", () => {
         throw new Error("the policy store is away");
       });
 
-      const resolved = await resolveProjectProtections({ dataPrivacy, projectId: "project-1" });
+      const resolved = await serviceOver({ dataPrivacy }).resolveProjectProtections({
+        projectId: "project-1",
+      });
 
       expect(resolved).toEqual({
         canSeeCosts: true,

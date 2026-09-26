@@ -20,7 +20,7 @@ import {
   type LangWatchQLConnection,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
-  LangWatchQLExecutor,
+  LangWatchQLExecutorRepository,
 } from "../langwatch-ql-executor.repository.ts";
 import {
   isClickHouseObjectAccessDeniedError,
@@ -98,13 +98,13 @@ function refusalFor({
 }
 
 /** An executor that runs LangWatchQL as the restricted identity. */
-export class ClickHouseLangWatchQLExecutorAdapter extends LangWatchQLExecutor {
+export class ClickHouseLangWatchQLExecutorRepository extends LangWatchQLExecutorRepository {
   static create({
     connection,
   }: {
     connection: LangWatchQLConnection;
-  }): ClickHouseLangWatchQLExecutorAdapter {
-    return new ClickHouseLangWatchQLExecutorAdapter(
+  }): ClickHouseLangWatchQLExecutorRepository {
+    return new ClickHouseLangWatchQLExecutorRepository(
       connection,
       createClient({
         url: connection.url,

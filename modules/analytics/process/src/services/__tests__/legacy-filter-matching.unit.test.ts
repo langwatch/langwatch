@@ -259,7 +259,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
       // matches the whole project — the exact hole the validation closes.
       const filters = {
         "metadata.labels": { region: { country: { code: ["eu"] } } },
-      } as unknown as TriggerFilters;
+      };
       expect(SUBJECT.matchesTraceFilters({ traceData: data, filters: filters })).toBe(false);
     });
 
@@ -267,7 +267,7 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
       const data = makeTraceData();
       const filters = {
         "metadata.labels": { region: { country: { code: [] } } },
-      } as unknown as TriggerFilters;
+      };
       expect(SUBJECT.matchesTraceFilters({ traceData: data, filters: filters })).toBe(true);
     });
   });
@@ -504,13 +504,12 @@ describe("LegacyFilterMatchingService.matchesTraceFilters", () => {
     it("does not match when the filter carries a non-empty condition (fail-closed)", () => {
       const data = makeTraceData();
       // events.event_details.value is a phantom field — not a real FilterField,
-      // handled at runtime via the UNSUPPORTED_FIELDS string set — so the literal
-      // is cast to exercise the fail-closed path.
+      // handled at runtime via the UNSUPPORTED_FIELDS string set.
       const filters = {
         "events.event_details.value": {
           exception: { message: ["x"] },
         },
-      } as unknown as TriggerFilters;
+      };
       // events.event_details.value is an UNSUPPORTED_FIELD — a non-empty condition
       // on it must force NO-MATCH rather than skip-to-pass (mirrors metadata.key).
       expect(SUBJECT.matchesTraceFilters({ traceData: data, filters: filters })).toBe(false);

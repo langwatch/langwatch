@@ -15,8 +15,8 @@ import { NotFoundError } from "@langwatch/handled-error";
 import { PROJECT_KIND, type Project, type ProjectApi } from "@langwatch/project-contract";
 
 import { strictestLangWatchQLProtections } from "../rules/langwatch-ql-query-scope.rules.ts";
-import { keyPermitted, resolveApiKeyProtections } from "../rules/workbench-protections.rules.ts";
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
+import { WorkbenchProtectionsService } from "./workbench-protections.service.ts";
 
 /** The projects one query may read, and the protections its content is redacted by. */
 export type LangWatchQLQueryScope = Readonly<{
@@ -25,7 +25,7 @@ export type LangWatchQLQueryScope = Readonly<{
 }>;
 
 type ScopeDependencies = Readonly<{
-  authz: Pick<AuthzApi, "hasApiKeyPermission">;
+  authz: Pick<AuthzApi, "hasPermission" | "hasApiKeyPermission">;
   dataPrivacy: Pick<DataPrivacyApi, "getResolvedForProject">;
   projects: Pick<ProjectApi, "findById" | "listByOrganization">;
 }>;
@@ -40,7 +40,11 @@ export class LangWatchQLQueryScopeService {
     return new LangWatchQLQueryScopeService(dependencies);
   }
 
-  private constructor(private readonly dependencies: ScopeDependencies) {}
+  private readonly protections: WorkbenchProtectionsService;
+
+  private constructor(private readonly dependencies: ScopeDependencies) {
+    this.protections = WorkbenchProtectionsService.create(dependencies);
+  }
 
   /** The readable set and the strictest protections across it. */
   async resolve({ reach }: { reach: LangWatchQLKeyReach }): Promise<LangWatchQLQueryScope> {
@@ -53,7 +57,7 @@ export class LangWatchQLQueryScopeService {
     const protections: LangWatchQLProtections[] = [];
     for (const { project, credential } of readable) {
       protections.push(
-        await resolveApiKeyProtections({ ...this.dependencies, projectId: project.id, credential }),
+        await this.protections.resolveApiKeyProtections({ projectId: project.id, credential }),
       );
     }
 
@@ -71,8 +75,7 @@ export class LangWatchQLQueryScopeService {
     if (reach.kind === "project") return true;
     if (!reach.resolvedProject) return false;
 
-    return keyPermitted({
-      authz: this.dependencies.authz,
+    return this.protections.keyPermitted({
       credential: {
         kind: "apiKey",
         apiKeyId: reach.apiKeyId,
@@ -123,8 +126,7 @@ export class LangWatchQLQueryScopeService {
         projectId: project.id,
         teamId: project.teamId,
       };
-      const viewable = await keyPermitted({
-        authz: this.dependencies.authz,
+      const viewable = await this.protections.keyPermitted({
         credential,
         permission: "analytics:view",
       });

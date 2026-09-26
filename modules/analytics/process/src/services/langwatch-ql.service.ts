@@ -19,7 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {
-  LangWatchQLExecutor,
+  LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
@@ -186,7 +186,7 @@ export interface LangWatchQLServiceDependencies {
    * identity provisioned — in which case every query is refused rather than run
    * with weaker guarantees.
    */
-  readonly executor: LangWatchQLExecutor | null;
+  readonly executor: LangWatchQLExecutorRepository | null;
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
@@ -423,7 +423,7 @@ export class LangWatchQLService {
     validation,
     granularity,
   }: {
-    readonly executor: LangWatchQLExecutor;
+    readonly executor: LangWatchQLExecutorRepository;
     readonly projects: readonly LangWatchQLCaller[];
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;

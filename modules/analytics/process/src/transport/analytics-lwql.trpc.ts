@@ -7,6 +7,7 @@
 import {
   analyticsLwqlTrpc,
   LangWatchQLNotEnabledError,
+  type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLProtections,
@@ -26,6 +27,8 @@ export interface AnalyticsLwqlApi {
   isLangWatchQLAvailable(): boolean;
   /** The project's own rollout switch, read rather than enforced. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+  /** Whether the Workbench is open to this project, and why not when it is not. */
+  workbenchAvailability(input: { projectId: string }): Promise<LangWatchQLAvailability>;
   /** What this member may see of the project's content. */
   resolveProtections(input: { projectId: string; userId: string }): Promise<LangWatchQLProtections>;
   /** The project identity a member's execution runs under, and its protections. */
@@ -52,17 +55,7 @@ async function assertWorkbenchEnabled(app: AnalyticsLwqlApi, projectId: string):
 export const analyticsLwqlTrpcTransport = defineTrpcRouter(AnalyticsLwqlApi, analyticsLwqlTrpc)
   .procedure("availability")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
-    if (!(await app.isWorkbenchEnabled({ projectId: input.projectId }))) {
-      return { available: false, reason: "disabled" as const };
-    }
-
-    if (!app.isLangWatchQLAvailable()) {
-      return { available: false, reason: "unprovisioned" as const };
-    }
-
-    return { available: true };
-  })
+  .handle(({ app, input }) => app.workbenchAvailability({ projectId: input.projectId }))
 
   .procedure("schema")
   .withPermission("analytics:view")

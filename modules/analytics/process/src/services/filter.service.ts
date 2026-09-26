@@ -6,7 +6,10 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 
-import type { FilterOption, FilterOptions } from "../repositories/filter-options.repository.ts";
+import type {
+  FilterOption,
+  FilterOptionsRepository,
+} from "../repositories/filter-options.repository.ts";
 
 export type GetFilterOptionsInput = {
   projectId: string;
@@ -31,9 +34,9 @@ export class FilterService {
    * rather than a fault - it fails at the call, with the same message it
    * always did, instead of at boot.
    */
-  private constructor(private readonly repository: FilterOptions | null) {}
+  private constructor(private readonly repository: FilterOptionsRepository | null) {}
 
-  static create(options: { repository: FilterOptions | null }): FilterService {
+  static create(options: { repository: FilterOptionsRepository | null }): FilterService {
     return new FilterService(options.repository);
   }
 

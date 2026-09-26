@@ -9,6 +9,7 @@ import {
   type AnalyticsTimeseriesBuilderInput,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
+import { toDate } from "@langwatch/time";
 
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules.ts";
 import {
@@ -92,9 +93,9 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
 
     const builderInput = {
       projectId: query.tenantId,
-      startDate: query.startDate,
-      endDate: query.endDate,
-      previousPeriodStartDate: query.previousPeriodStartDate,
+      startDate: toDate(query.startDate),
+      endDate: toDate(query.endDate),
+      previousPeriodStartDate: toDate(query.previousPeriodStartDate),
       series: query.input.series,
       filters: query.input.filters,
       groupBy: query.input.groupBy,

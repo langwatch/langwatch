@@ -273,13 +273,6 @@ describe("memory-safety", () => {
           expect(block).toContain("clickhouse_settings");
         }
       });
-
-      // PORT NOTE (needs-design-review, spec-rebind): resolution was pinned through
-      // `clickhouse.resolveClient(`, which wrapped every client with `wrapWithDefaultSettings`
-      // for memory-safety defaults. That function is gone; `trace-legacy-read.repository.ts`
-      // now injects `resolveClickHouseClient` instead, and whether it still guarantees those
-      // defaults is a design decision, not a mechanical rename -- left unported.
-      it.skip("clickhouse-trace.service.ts resolves through the App, which wraps with default settings", () => {});
     });
   });
 

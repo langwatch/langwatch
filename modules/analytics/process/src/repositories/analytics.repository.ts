@@ -6,14 +6,15 @@ import type {
   AnalyticsTimeseriesInput,
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import type { Instant } from "@langwatch/time";
 
 export interface AnalyticsTimeseriesQuery {
   readonly table: AnalyticsTable;
   readonly tenantId: string;
   readonly input: AnalyticsTimeseriesInput;
-  readonly startDate: Date;
-  readonly endDate: Date;
-  readonly previousPeriodStartDate: Date;
+  readonly startDate: Instant;
+  readonly endDate: Instant;
+  readonly previousPeriodStartDate: Instant;
   readonly adjustedTimeScale: number | "full" | undefined;
   readonly maxResultRows: number | undefined;
 }

@@ -11,8 +11,8 @@ import {
 } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
-import type { LangWatchQLExecutor } from "../../repositories/langwatch-ql-executor.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import type { LangWatchQLExecutorRepository } from "../../repositories/langwatch-ql-executor.repository.ts";
 import {
   type LangWatchQLClickHouseHarness,
   recordSeedControl,
@@ -35,7 +35,7 @@ const ROW_COUNT = 10_010;
 
 describe("given the LangWatchQL settings profile's ceilings", () => {
   let harness: LangWatchQLClickHouseHarness;
-  let executor: LangWatchQLExecutor;
+  let executor: LangWatchQLExecutorRepository;
   let database: string;
 
   /** The full statement list: `CREATE USER OR REPLACE` would orphan a lone replaced profile. */
@@ -65,7 +65,7 @@ describe("given the LangWatchQL settings profile's ceilings", () => {
   beforeAll(async () => {
     harness = await startLangWatchQLClickHouse({ suite: "scanceiling" });
     database = harness.names.database;
-    executor = ClickHouseLangWatchQLExecutorAdapter.create({
+    executor = ClickHouseLangWatchQLExecutorRepository.create({
       connection: {
         ...harness.restrictedConnection(),
         database,

@@ -5,6 +5,7 @@
  */
 
 import type { AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
+import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AnalyticsTimeseriesQuery } from "../../analytics.repository.ts";
@@ -24,8 +25,8 @@ const fakeClient = {
 };
 
 function makeQuery(overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesQuery {
-  const startDate = new Date("2026-07-01T00:00:00.000Z");
-  const endDate = new Date("2026-07-16T00:00:00.000Z");
+  const startDate = Temporal.Instant.from("2026-07-01T00:00:00.000Z");
+  const endDate = Temporal.Instant.from("2026-07-16T00:00:00.000Z");
   return {
     table: "trace_summaries",
     tenantId: "project-1",

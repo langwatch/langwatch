@@ -20,10 +20,10 @@ export function createLangWatchQLService(
 import {
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
-  LangWatchQLExecutor,
+  LangWatchQLExecutorRepository,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
 
-export class RecordingLangWatchQLExecutor extends LangWatchQLExecutor {
+export class RecordingLangWatchQLExecutor extends LangWatchQLExecutorRepository {
   readonly calls: LangWatchQLExecutionRequest[] = [];
 
   constructor(private readonly result: Partial<LangWatchQLExecutionResult> = {}) {

@@ -7,7 +7,7 @@ import type {
   SharedFiltersInput,
 } from "@langwatch/analytics-contract";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { addDays, differenceInCalendarDays } from "@langwatch/time";
+import { addDays, differenceInCalendarDays, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsAdapter } from "../../index.ts";
@@ -147,8 +147,8 @@ describe("AnalyticsService", () => {
       { maxResultRows: 250 },
     );
 
-    expect(repository.lastQuery?.previousPeriodStartDate).toEqual(
-      new Date("2026-01-07T12:00:00.000Z"),
+    expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
+      Temporal.Instant.from("2026-01-07T12:00:00.000Z").epochMilliseconds,
     );
     expect(repository.lastQuery?.maxResultRows).toBe(250);
   });
@@ -164,8 +164,8 @@ describe("AnalyticsService", () => {
       input({ startDate: startDate.getTime(), endDate: endDate.getTime(), timeScale: 60 }),
     );
 
-    expect(repository.lastQuery?.previousPeriodStartDate).toEqual(
-      new Date("2026-01-11T00:00:00.000Z"),
+    expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
+      Temporal.Instant.from("2026-01-11T00:00:00.000Z").epochMilliseconds,
     );
   });
 
@@ -180,8 +180,8 @@ describe("AnalyticsService", () => {
     );
 
     const calendarDays = differenceInCalendarDays(endDate, startDate) + 1;
-    expect(repository.lastQuery?.previousPeriodStartDate).toEqual(
-      addDays(startDate, -Math.max(1, calendarDays)),
+    expect(repository.lastQuery?.previousPeriodStartDate.epochMilliseconds).toBe(
+      addDays(startDate, -Math.max(1, calendarDays)).getTime(),
     );
   });
 

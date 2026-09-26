@@ -7,7 +7,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
 import {
-  LangWatchQLExecutor,
+  LangWatchQLExecutorRepository,
   type LangWatchQLExecutionRequest,
   type LangWatchQLExecutionResult,
 } from "../../repositories/langwatch-ql-executor.repository.ts";
@@ -25,7 +25,7 @@ const EVERYTHING_VISIBLE = {
 };
 
 /** Answers every statement with the rows it was given, recording what it was sent. */
-class RecordingExecutor extends LangWatchQLExecutor {
+class RecordingExecutor extends LangWatchQLExecutorRepository {
   readonly requests: LangWatchQLExecutionRequest[] = [];
 
   constructor(private readonly rows: readonly Record<string, unknown>[]) {

@@ -2,7 +2,7 @@ import type { FilterField } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 
 import {
-  FilterOptions,
+  FilterOptionsRepository,
   type FilterOption,
   type FindFilterOptionsInput,
 } from "../filter-options.repository.ts";
@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:filters:repository");
 /**
  * Reads the distinct values a filter can offer.
  */
-export class FilterOptionsClickHouseRepository extends FilterOptions {
+export class FilterOptionsClickHouseRepository extends FilterOptionsRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {
     super();
   }

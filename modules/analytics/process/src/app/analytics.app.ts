@@ -19,6 +19,7 @@ import {
   type AnalyticsTimeseriesReadOptions,
   type AnalyticsTimeseriesResult,
   type AnalyticsTopDocumentsResult,
+  type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
   type LangWatchQLKeyReach,
@@ -49,18 +50,17 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { NotFoundError } from "@langwatch/handled-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
-import type { Instant } from "@langwatch/time";
+import { toEpochMs, type Instant } from "@langwatch/time";
 import { TraceApi, type Trace, TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 
 import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
 import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
 import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
-import { applyLwqlTargetOverrides, LWQL_CONNECTION_DEFAULTS } from "../langwatch-ql/connection.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { ClickHouseAnalyticsRecencyRepository } from "../repositories/clickhouse/clickhouse.analytics-recency.repository.ts";
@@ -69,6 +69,11 @@ import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/cli
 import type { LangWatchQLAppFunctionStoreRepository } from "../repositories/langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { ClickHouseAdminStatements } from "../repositories/langwatch-ql-provisioning.repository.ts";
+import {
+  filterFieldRequiresKey,
+  filterFieldRequiresSubkey,
+} from "../rules/analytics-filter-catalogue.rules.ts";
+import { readLegacyTimeseriesBody } from "../rules/analytics-legacy-body.rules.ts";
 import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } from "../rules/analytics-platform-url.rules.ts";
 import { lwqlHydrationKeyCap } from "../rules/langwatch-ql-app-function-catalog.rules.ts";
 import { canProvisionAppFunctions } from "../rules/langwatch-ql-app-function-store.rules.ts";
@@ -77,18 +82,18 @@ import { statementMightCallEvalFunction } from "../rules/langwatch-ql-eval-funct
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
-import {
-  resolveApiKeyProtections as resolveApiKeyProtectionsRule,
-  resolveProjectProtections as resolveProjectProtectionsRule,
-  resolveWorkbenchProtections,
-  resolveWorkbenchRunCaller,
-} from "../rules/workbench-protections.rules.ts";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
+import {
+  LangWatchQLConnectionService,
+  LWQL_CONNECTION_DEFAULTS,
+} from "../services/langwatch-ql-connection.service.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../services/langwatch-ql-executor.service.ts";
 import { LangWatchQLHydrationComputeService } from "../services/langwatch-ql-hydration-compute.service.ts";
 import {
   LangWatchQLHydrationReadService,
+  type LangWatchQLThreadTraceReadInput,
+  type LangWatchQLTraceReadInput,
   type LangWatchQLTraceSource,
 } from "../services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../services/langwatch-ql-hydration.service.ts";
@@ -97,10 +102,15 @@ import {
   LangWatchQLQueryScopeService,
   type LangWatchQLQueryScope,
 } from "../services/langwatch-ql-query-scope.service.ts";
+import { WorkbenchProtectionsService } from "../services/workbench-protections.service.ts";
 import {
   convergeLwqlAccessModel,
   type LwqlProvisioningDatabase,
 } from "../tasks/lwql-provision.task.ts";
+import type {
+  AnalyticsLegacyApi,
+  AnalyticsLegacyTimeseriesAnswer,
+} from "../transport/analytics-legacy.rest.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
 
 /**
@@ -337,7 +347,7 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
     projectId,
     traceIds,
     protections,
-  }: Parameters<LangWatchQLTraceSource["readTraces"]>[0]): Promise<readonly Trace[]> {
+  }: LangWatchQLTraceReadInput): Promise<readonly Trace[]> {
     return this.traces.readTracesWithSpans({ projectId, traceIds: [...traceIds], protections });
   }
 
@@ -346,7 +356,7 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
     threadKeys,
     protections,
     maxTraces,
-  }: Parameters<LangWatchQLTraceSource["readThreadTraces"]>[0]): Promise<readonly Trace[]> {
+  }: LangWatchQLThreadTraceReadInput): Promise<readonly Trace[]> {
     return this.traces.readThreadsTraces({
       projectId,
       threadIds: [...threadKeys],
@@ -361,7 +371,7 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
  * attention: a transport reaches this object through the operations-only feature-API
  * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
  */
-export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
+export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi {
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -403,7 +413,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     const lwqlConfig = setup.config.langwatchQl;
     const { admin, postgres, database } = setup.members.langwatchQl;
     const target = admin.configured
-      ? applyLwqlTargetOverrides({
+      ? LangWatchQLConnectionService.create().applyTargetOverrides({
           target: admin.target,
           explicitUrl: lwqlConfig.url,
           explicitDatabase: lwqlConfig.database,
@@ -467,10 +477,12 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   #playgroundAccess: CustomChartPlaygroundAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
+  #protections: WorkbenchProtectionsService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
+    this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#publicBaseUrl = publicBaseUrl;
     this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
     this.#hydration = LangWatchQLHydrationService.create({
@@ -518,6 +530,12 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
    * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
   filterOptions(request: AnalyticsFilterOptionsRequest): Promise<AnalyticsFilterOption[]> {
+    if (filterFieldRequiresKey(request.field) && !request.key) {
+      throw new ValidationError(`Field ${request.field} requires a key to be defined`);
+    }
+    if (filterFieldRequiresSubkey(request.field) && !request.subkey) {
+      throw new ValidationError(`Field ${request.field} requires a subkey to be defined`);
+    }
     const scopeFilters = Object.fromEntries(
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
@@ -764,6 +782,35 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     return lwqlHydrationKeyCap(input.appFunctions);
   }
 
+  /** Whether the Workbench is open to this project: rollout first, then a provisioned identity. */
+  async workbenchAvailability(input: { projectId: string }): Promise<LangWatchQLAvailability> {
+    if (!(await this.isWorkbenchEnabled({ projectId: input.projectId }))) {
+      return { available: false, reason: "disabled" };
+    }
+    if (!this.isLangWatchQLAvailable()) {
+      return { available: false, reason: "unprovisioned" };
+    }
+    return { available: true };
+  }
+
+  /** The legacy `POST /api/analytics` body, read and refused in that family's own sentences. */
+  async answerLegacyTimeseries(
+    input: Readonly<{ raw: string; projectId: string }>,
+  ): Promise<AnalyticsLegacyTimeseriesAnswer> {
+    const reading = readLegacyTimeseriesBody(input.raw);
+    if (!reading.accepted) return { status: 400, body: reading.refusal };
+
+    return {
+      status: 200,
+      body: await this.getTimeseries({
+        ...reading.body,
+        projectId: input.projectId,
+        startDate: toEpochMs(reading.body.startDate),
+        endDate: toEpochMs(reading.body.endDate),
+      }),
+    };
+  }
+
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
     return lwqlEnabled({
@@ -778,9 +825,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     userId: string;
     projectId: string;
   }): Promise<LangWatchQLProtections> {
-    return resolveWorkbenchProtections({
-      authz: this.#dependencies.authz,
-      dataPrivacy: this.#dependencies.dataPrivacy,
+    return this.#protections.resolveMemberProtections({
       userId: input.userId,
       projectId: input.projectId,
     });
@@ -795,9 +840,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     projectId: string;
     credential: RestCredentialPrincipal;
   }): Promise<LangWatchQLProtections> {
-    return resolveApiKeyProtectionsRule({
-      authz: this.#dependencies.authz,
-      dataPrivacy: this.#dependencies.dataPrivacy,
+    return this.#protections.resolveApiKeyProtections({
       projectId: input.projectId,
       credential: input.credential,
     });
@@ -829,10 +872,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   resolveProjectProtections(
     input: Readonly<{ projectId: string }>,
   ): Promise<LangWatchQLProtections> {
-    return resolveProjectProtectionsRule({
-      dataPrivacy: this.#dependencies.dataPrivacy,
-      projectId: input.projectId,
-    });
+    return this.#protections.resolveProjectProtections({ projectId: input.projectId });
   }
 
   /**
@@ -841,10 +881,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
    * Refuses with `project_not_found` when the project no longer exists.
    */
   resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller> {
-    return resolveWorkbenchRunCaller({
-      authz: this.#dependencies.authz,
-      dataPrivacy: this.#dependencies.dataPrivacy,
-      projects: this.#dependencies.projects,
+    return this.#protections.resolveRunCaller({
       userId: input.userId,
       projectId: input.projectId,
     });

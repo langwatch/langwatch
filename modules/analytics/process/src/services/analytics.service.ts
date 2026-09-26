@@ -16,7 +16,14 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import { addDays, differenceInCalendarDays, nowInstant } from "@langwatch/time";
+import {
+  addDays,
+  differenceInCalendarDays,
+  fromDate,
+  nowInstant,
+  Temporal,
+  type Instant,
+} from "@langwatch/time";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 
 import type { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
@@ -33,20 +40,23 @@ type CacheEntry = {
 };
 
 function currentAndPreviousDates(
-  startDate: Date,
-  endDate: Date,
+  startDate: Instant,
+  endDate: Instant,
   period?: number,
 ): {
-  readonly startDate: Date;
-  readonly endDate: Date;
-  readonly previousPeriodStartDate: Date;
+  readonly startDate: Instant;
+  readonly endDate: Instant;
+  readonly previousPeriodStartDate: Instant;
 } {
   // Whole days, always: the scale arrives in minutes and a sub-day scale is a
   // fraction of one, which Temporal refuses outright rather than truncating the
   // way the retired library did.
   const periodInDays = period === undefined ? 1 : Math.ceil(period / MINUTES_PER_DAY);
-  const days = Math.max(periodInDays, differenceInCalendarDays(endDate, startDate) + 1);
-  const previousPeriodStartDate = addDays(startDate, -days);
+  const days = Math.max(
+    periodInDays,
+    differenceInCalendarDays(endDate.epochMilliseconds, startDate.epochMilliseconds) + 1,
+  );
+  const previousPeriodStartDate = fromDate(addDays(startDate.epochMilliseconds, -days));
 
   return { startDate, endDate, previousPeriodStartDate };
 }
@@ -61,8 +71,8 @@ function adjustTimeScaleForBucketCap({
   endDate,
 }: {
   timeScale: number | "full" | undefined;
-  startDate: Date;
-  endDate: Date;
+  startDate: Instant;
+  endDate: Instant;
 }): number | "full" {
   if (timeScale === undefined) {
     return MINUTES_PER_DAY;
@@ -72,7 +82,8 @@ function adjustTimeScaleForBucketCap({
     return timeScale;
   }
 
-  const estimatedBuckets = (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE / timeScale;
+  const estimatedBuckets =
+    (endDate.epochMilliseconds - startDate.epochMilliseconds) / MS_PER_MINUTE / timeScale;
 
   return estimatedBuckets > MAX_TIMESERIES_BUCKETS ? MINUTES_PER_DAY : timeScale;
 }
@@ -180,8 +191,8 @@ export class AnalyticsService extends AnalyticsServiceContract {
     parsed: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult> {
-    const startDate = new Date(parsed.startDate);
-    const endDate = new Date(parsed.endDate);
+    const startDate = Temporal.Instant.fromEpochMilliseconds(parsed.startDate);
+    const endDate = Temporal.Instant.fromEpochMilliseconds(parsed.endDate);
     const { previousPeriodStartDate } = currentAndPreviousDates(
       startDate,
       endDate,

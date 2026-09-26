@@ -4,22 +4,35 @@
  * body that is not JSON, `{ error }` for one that parses and fails validation.
  */
 import {
-  AnalyticsApi,
   analyticsTimeseriesResponseSchema,
   analyticsTimeseriesRestBodySchema,
   legacySentenceErrorSchema,
+  type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import {
-  coerceToEpoch,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { zodErrorMessage } from "@langwatch/config";
+import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
+
+/** What the legacy door answers: its own sentence refusals, or the series. */
+export type AnalyticsLegacyTimeseriesAnswer =
+  | Readonly<{ status: 400; body: { readonly message: string } | { readonly error: string } }>
+  | Readonly<{ status: 200; body: AnalyticsTimeseriesResult }>;
+
+/** What the legacy door reaches: the raw body, read and refused in the family's own sentences. */
+export interface AnalyticsLegacyApi {
+  answerLegacyTimeseries(
+    input: Readonly<{ raw: string; projectId: string }>,
+  ): Promise<AnalyticsLegacyTimeseriesAnswer>;
+}
+
+export const AnalyticsLegacyApi = moduleApi<AnalyticsLegacyApi>()("analytics");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -40,8 +53,8 @@ const LEGACY_DESCRIPTION =
 export const analyticsLegacyRest: Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<AnalyticsApi>;
-}> = defineRestRouter(AnalyticsApi)
+  router: () => RestTransportDeclaration<AnalyticsLegacyApi>;
+}> = defineRestRouter(AnalyticsLegacyApi)
   .withNamespace("analytics-legacy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")
@@ -67,34 +80,5 @@ export const analyticsLegacyRest: Readonly<{
       },
     },
   })
-  .handle(async ({ app, raw, scope }) => {
-    const body = parsedJson(raw);
-
-    if (body === undefined) return { status: 400 as const, body: { message: "Bad request" } };
-
-    const parsed = analyticsTimeseriesRestBodySchema.safeParse(body);
-
-    if (!parsed.success) {
-      return { status: 400 as const, body: { error: zodErrorMessage(parsed.error) } };
-    }
-
-    return {
-      status: 200 as const,
-      body: await app.getTimeseries({
-        ...parsed.data,
-        projectId: scope.id,
-        startDate: coerceToEpoch(parsed.data.startDate),
-        endDate: coerceToEpoch(parsed.data.endDate),
-      }),
-    };
-  })
+  .handle(({ app, raw, scope }) => app.answerLegacyTimeseries({ raw, projectId: scope.id }))
   .build();
-
-/** The body as JSON, or `undefined` for a body that is not JSON at all. */
-function parsedJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return undefined;
-  }
-}
