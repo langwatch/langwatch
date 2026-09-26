@@ -1134,6 +1134,10 @@ second schema or a cast. Routing (group id, score) is computed from the typed va
 the group queue as send options; the queue never reads a payload. A process manager's intents keep their
 schema's type through a self-referencing generic and sealed closures, like projections and commands
 (Alex, 2026-09-25).
+A list mixing definitions of different types holds them as closures over `unknown` payloads, each
+parsing with its own schema at the queue boundary — never `any`, never a rule exception (Alex, 2026-09-26).
+Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
+eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
 
 A module may host several pipelines: it calls `.withEventing(...)` once per
 pipeline, each a `defineEventingModule` declaration over the same app and
@@ -1641,7 +1645,8 @@ route's REST response schema (§8) — migrate the summary/description/tags
 into the route's own `.withDocs()` call and drop any hand-written success
 body outright; an error keeps only its status and a sentence via `errors`,
 and a response that truly needs its own schema goes through
-`documentedResponses()`, never raw JSON.
+`documentedResponses()`, never raw JSON. · the eventing `ScheduledJob` scheduler
+(`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`) — a keyed process manager (§9).
 
 ---
 
