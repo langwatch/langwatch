@@ -343,6 +343,7 @@ describe("the gateway platform family's idempotent creates", () => {
   });
 
   /** @scenario A retried cache-rule create does not mint a second rule */
+  /** @scenario The other keyed creates take the same header */
   it("does not call createCacheRule twice for a replayed request", async () => {
     const row = cacheRuleRow();
     const createCacheRule = vi.fn(async () => row);
@@ -359,6 +360,7 @@ describe("the gateway platform family's idempotent creates", () => {
 
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
+    expect(second.headers.get("X-Idempotent-Replay")).toBe("true");
     expect(createCacheRule).toHaveBeenCalledTimes(1);
   });
 });
