@@ -251,6 +251,12 @@ var organizationLevelReads = map[string]bool{
 	"GET /api/prompts/tags": true,
 }
 
+// catalogReads answer every caller the same fixed identifiers (checkup's
+// check ids), so an owner ID showing up there proves nothing.
+var catalogReads = map[string]bool{
+	"GET /api/checkup": true,
+}
+
 func (engine *probeEngine) foreignKeys() []foreignKey {
 	return []foreignKey{
 		{label: "key-b", key: engine.options.Keys.ProjectKeyB, scope: map[string]bool{
@@ -306,7 +312,8 @@ func (engine *probeEngine) classifyPermission(operation Operation, foreign forei
 	owner := engine.ownerIDs[operationKeyOf(operation)]
 	leakedA, okA := leakedID(ownerSet(owner, true), transcript.A, foreign.scope)
 	leakedB, okB := leakedID(ownerSet(owner, false), transcript.B, foreign.scope)
-	shared := foreign.sameOrganization && organizationLevelReads[strings.ToUpper(operation.Method)+" "+operation.Path]
+	read := strings.ToUpper(operation.Method) + " " + operation.Path
+	shared := catalogReads[read] || (foreign.sameOrganization && organizationLevelReads[read])
 	if (okA || okB) && !shared {
 		return []Finding{{
 			Kind:        FindingPermissionLeak,

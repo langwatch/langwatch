@@ -331,6 +331,11 @@ func TestOrganizationLevelReadIsNotASiblingLeak(t *testing.T) {
 	if findings := engine.classifyPermission(operation, keys[1], transcript); len(findings) != 1 || findings[0].Kind != FindingPermissionLeak {
 		t.Fatalf("foreign-organization key = %+v, want one permission_leak", findings)
 	}
+	checkup := Operation{Method: "GET", Path: "/api/checkup"}
+	engine.ownerIDs[operationKeyOf(checkup)] = owner
+	if findings := engine.classifyPermission(checkup, keys[1], transcript); len(findings) != 0 {
+		t.Fatalf("catalog ids = %+v, want none", findings)
+	}
 }
 
 // The settle is event-driven: a list that only shows the entity on a later
