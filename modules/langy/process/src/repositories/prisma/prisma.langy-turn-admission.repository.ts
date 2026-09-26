@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository.ts";
@@ -47,7 +48,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
           async (tx: LangyDatabaseTransaction) => {
             const now = new Date();
             const leaseExpiresAt = new Date(now.getTime() + PREPARATION_LEASE_MS);
-            const claimToken = crypto.randomUUID();
+            const claimToken = generate("langy").toString();
 
             let receipt = await tx.langyTurnRequest.findUnique({
               where: {

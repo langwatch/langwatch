@@ -34,7 +34,7 @@ describe("Feature: the gate reads the conversation's model", () => {
       it("matches the bare model against the Anthropic list and answers yes", async () => {
         const providerRows = rowsSource([row()]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "anthropic/claude-fable-5-1",
           providerRows,
@@ -56,7 +56,7 @@ describe("Feature: the gate reads the conversation's model", () => {
       it("answers yes", async () => {
         const providerRows = rowsSource([row({ id: "mp_eu", routingHandle: "eu" })]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "eu/claude-opus-6",
           providerRows,
@@ -72,7 +72,7 @@ describe("Feature: the gate reads the conversation's model", () => {
       it("answers no for a handle nothing in scope carries", async () => {
         const providerRows = rowsSource([row()]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "eu/claude-opus-6",
           providerRows,
@@ -96,7 +96,7 @@ describe("Feature: the gate reads the conversation's model", () => {
           }),
         ]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "openai/gpt-5.6-terra",
           providerRows,
@@ -118,7 +118,7 @@ describe("Feature: the gate reads the conversation's model", () => {
           }),
         ]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "openai/gpt-9",
           providerRows,
@@ -141,7 +141,7 @@ describe("Feature: the gate reads the conversation's model", () => {
           row({ id: "mp_other", provider: "openai" }),
         ]);
 
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "mp_openai/gpt-5.6-terra",
           providerRows,
@@ -171,12 +171,12 @@ describe("Feature: the gate reads the conversation's model", () => {
           }),
         ]);
 
-        const first = await SkipPermissionsService.canModelSkipPermissions({
+        const first = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "openai/gpt-7",
           providerRows,
         });
-        const second = await SkipPermissionsService.canModelSkipPermissions({
+        const second = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "openai/gpt-8",
           providerRows,
@@ -191,7 +191,7 @@ describe("Feature: the gate reads the conversation's model", () => {
   describe("given a model reference with no provider prefix", () => {
     describe("when the gate is asked whether the model may skip", () => {
       it("answers no, because nothing names the provider that vouches for it", async () => {
-        const decision = await SkipPermissionsService.canModelSkipPermissions({
+        const decision = await SkipPermissionsService.create().canModelSkipPermissions({
           projectId: PROJECT_ID,
           model: "gpt-6",
           providerRows: rowsSource([]),

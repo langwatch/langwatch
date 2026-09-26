@@ -4,7 +4,8 @@ import { nowInstant } from "@langwatch/time";
  * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
  */
 export abstract class LangyGithubPrCounter {
-  abstract tryGet(key: string): Promise<string | null>;
+  /** The key's count, zero when the key does not exist. */
+  abstract count(key: string): Promise<number>;
   abstract incr(key: string): Promise<number>;
   abstract decr(key: string): Promise<number>;
   abstract incrby(key: string, amount: number): Promise<number>;
@@ -73,8 +74,7 @@ export class LangyGithubPrQuotaService {
     const key = `langy:gh:prs:${userId}:${bucket}`;
     let count: number;
     try {
-      const raw = await connection.tryGet(key);
-      count = raw ? Number.parseInt(raw, 10) : 0;
+      count = await connection.count(key);
     } catch {
       return {
         allowed: true,
@@ -304,8 +304,7 @@ export class LangyGithubPrQuotaService {
       // read-before-decrement. Not atomic, but the decrement is best-effort
       // anyway (a race here yields a slightly under-counted cap, not an
       // underflow to negative that would grant unlimited permits).
-      const raw = await connection.tryGet(key);
-      const n = parseInt(raw ?? "0", 10);
+      const n = await connection.count(key);
       if (n > 0) {
         await conn.decr(key);
       }

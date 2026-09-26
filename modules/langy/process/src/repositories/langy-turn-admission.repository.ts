@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: null repositories intentionally empty.
 
 export type LangyTurnAdmissionClaim =
@@ -67,7 +68,7 @@ export class NullLangyTurnAdmissionRepository extends LangyTurnAdmissionReposito
   async claim(input: { conversationId: string; turnId: string }): Promise<LangyTurnAdmissionClaim> {
     return {
       kind: "claimed",
-      claimToken: crypto.randomUUID(),
+      claimToken: generate("langy").toString(),
       conversationId: input.conversationId,
       turnId: input.turnId,
     };

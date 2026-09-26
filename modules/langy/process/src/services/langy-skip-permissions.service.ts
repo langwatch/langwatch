@@ -108,7 +108,7 @@ export class SkipPermissionsService {
    * Answers whether `model` may run with permission checks skipped. `model`
    * may be "openai/gpt-6", "mp_abc123/gpt-6", or a routing handle.
    */
-  static async canModelSkipPermissions({
+  async canModelSkipPermissions({
     projectId,
     model,
     providerRows,

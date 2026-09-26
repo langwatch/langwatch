@@ -18,8 +18,9 @@ const expire = vi.fn();
 
 /** The composed counter, when a deployment has one. */
 class FakeCounter extends LangyGithubPrCounter {
-  tryGet(key: string) {
-    return get(key) as Promise<string | null>;
+  async count(key: string): Promise<number> {
+    const raw: unknown = await get(key);
+    return typeof raw === "string" ? Number.parseInt(raw, 10) : 0;
   }
   incr(key: string) {
     return incr(key) as Promise<number>;

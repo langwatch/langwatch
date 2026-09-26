@@ -76,7 +76,7 @@ export class LangyTurnTailService {
     onAbandoned,
     pollMs = SETTLEMENT_POLL_MS,
     confirmPolls = SETTLEMENT_CONFIRM_POLLS,
-    delay = (ms, signal) => LangyTurnSettlementWaiterService.abortableDelay(ms, signal),
+    delay = (ms, signal) => LangyTurnSettlementWaiterService.create().abortableDelay(ms, signal),
   }: {
     readHealth: ReadTurnHealth;
     signal: AbortSignal;

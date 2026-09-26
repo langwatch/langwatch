@@ -1,5 +1,3 @@
-import { clearTimeout, setTimeout } from "node:timers";
-
 import {
   LangyWaitExpiredError,
   type LangyUserWaitEndedEventData,
@@ -144,18 +142,6 @@ export function toPollResponse(wait: StoredUserWait): PollWaitResponse {
         }
       : {}),
   };
-}
-
-export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(done, ms);
-    function done(): void {
-      signal?.removeEventListener("abort", done);
-      clearTimeout(timer);
-      resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
-  });
 }
 
 /** A card as it starts: pending, with only the fields the caller gave. */

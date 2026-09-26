@@ -1,4 +1,5 @@
 import { LangyLocalWorkspaceOfflineError } from "@langwatch/langy-contract";
+import { nowInstant } from "@langwatch/time";
 
 import {
   type ConnectedWorkspace,
@@ -65,7 +66,10 @@ export class LangyLocalPresenceMemoryRepository extends LangyLocalPresenceReposi
     conversationId,
     ...owed
   }: Omit<OwedConnectTurn, "owedAt"> & { conversationId: string }): Promise<void> {
-    this.store.owedConnectTurns.set(conversationId, { ...owed, owedAt: Date.now() });
+    this.store.owedConnectTurns.set(conversationId, {
+      ...owed,
+      owedAt: nowInstant().epochMilliseconds,
+    });
   }
 
   async readOwedConnectTurn(conversationId: string): Promise<OwedConnectTurnLookup> {

@@ -4,6 +4,8 @@
  * share one terminal.
  */
 
+import { clearTimeout, setTimeout } from "node:timers";
+
 import { HandledError } from "@langwatch/handled-error";
 import {
   LangyLocalRecordNotFoundError,
@@ -28,7 +30,6 @@ import {
   blankUserWait,
   given,
   refuseSettled,
-  sleep,
   storedUserWaitSchema,
   toPollResponse,
   type StoredUserWait,
@@ -487,4 +488,16 @@ export class UserWaitService {
       });
     }
   }
+}
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      signal?.removeEventListener("abort", done);
+      clearTimeout(timer);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }

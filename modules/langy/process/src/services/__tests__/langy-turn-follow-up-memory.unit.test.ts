@@ -12,7 +12,7 @@ import {
  * capabilities change, and gone whenever the fleet rolls.
  */
 import type { LangyMessageRow } from "../../repositories/langy-message.repository.ts";
-import { LANGY_REFERENT_POLICY } from "../langy-conversation-memory.service.ts";
+import { LANGY_REFERENT_POLICY } from "../../rules/langy-conversation-memory.rules.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 function makeDeps(over: LangyTurnDepsOverrides = {}) {

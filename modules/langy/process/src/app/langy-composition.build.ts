@@ -46,8 +46,9 @@ class LangyGithubPrRedisCounter extends LangyGithubPrCounter {
     super();
   }
 
-  tryGet(key: string): Promise<string | null> {
-    return this.redis.get(key);
+  async count(key: string): Promise<number> {
+    const raw = await this.redis.get(key);
+    return raw ? Number.parseInt(raw, 10) : 0;
   }
 
   incr(key: string): Promise<number> {

@@ -101,8 +101,7 @@ describe("LangyKeyIdentityService", () => {
     // The bridge's signature admits no payload at all — the only way to name an
     // actor is to own the key. This asserts that surface property: a caller
     // supplying someone else's id alongside the key cannot influence the answer.
-    const resolved = apiKeyToken({ userId: "owner-1" });
-    (resolved as unknown as Record<string, unknown>).actorUserId = "victim-2";
+    const resolved = { ...apiKeyToken({ userId: "owner-1" }), actorUserId: "victim-2" };
 
     const result = await LangyKeyIdentityService.create({ featureFlags: service }).resolve({
       resolved,

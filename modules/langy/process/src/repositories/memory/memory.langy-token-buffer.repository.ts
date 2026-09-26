@@ -49,7 +49,7 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
       }
       if (this.store.endedStreams.has(key)) return;
       const beat = this.store.heartbeats.get(key);
-      if (beat !== undefined && Date.now() - beat > LIVENESS_WINDOW_MS) return;
+      if (beat !== undefined && nowInstant().epochMilliseconds - beat > LIVENESS_WINDOW_MS) return;
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
   }
@@ -116,7 +116,10 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
   }
 
   async heartbeat(input: { conversationId: string; turnId: string; now?: number }): Promise<void> {
-    this.store.heartbeats.set(this.store.turnKey(input), input.now ?? Date.now());
+    this.store.heartbeats.set(
+      this.store.turnKey(input),
+      input.now ?? nowInstant().epochMilliseconds,
+    );
   }
   async liveness(input: {
     conversationId: string;

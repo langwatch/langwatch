@@ -12,11 +12,13 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 import { trace } from "@opentelemetry/api";
 
-import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import {
+  extractLangyConversationMemory,
   LANGY_REFERENT_POLICY,
-  LangyConversationMemoryService,
-} from "./langy-conversation-memory.service.ts";
+  renderLangyConversationMemory,
+  renderLangyConversationTranscript,
+} from "../rules/langy-conversation-memory.rules.ts";
+import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import type { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnOverrideService } from "./langy-turn-override.service.ts";
 import {
@@ -267,12 +269,13 @@ export class LangyTurnPreparationService {
     }
 
     const durableMessages = memoryResult.status === "fulfilled" ? memoryResult.value : [];
-    const transcript = LangyConversationMemoryService.renderTranscript({
+    const transcript = renderLangyConversationTranscript({
       messages: durableMessages,
       currentPrompt: args.userText,
+      segmenter: new Intl.Segmenter(),
     });
-    const memory = LangyConversationMemoryService.render(
-      LangyConversationMemoryService.extract({ messages: durableMessages }),
+    const memory = renderLangyConversationMemory(
+      extractLangyConversationMemory({ messages: durableMessages }),
     );
     const override =
       overrideResult.status === "fulfilled"

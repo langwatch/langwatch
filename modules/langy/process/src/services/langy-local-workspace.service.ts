@@ -92,7 +92,7 @@ export class LangyLocalWorkspaceService {
     projectId: string;
     model: string;
   }): Promise<SkipPermissionsDecision> {
-    return SkipPermissionsService.canModelSkipPermissions({
+    return SkipPermissionsService.create().canModelSkipPermissions({
       ...input,
       providerRows: {
         findAllAccessibleForProject: async (projectId) =>

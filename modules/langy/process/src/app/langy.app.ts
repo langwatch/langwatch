@@ -87,6 +87,7 @@ import type { z } from "zod";
 
 import { HttpLangyWorkerChannel } from "../channels/http/http.langy-worker.channel.ts";
 import { UnavailableLangyWorkerChannel } from "../channels/unavailable.langy-worker.channel.ts";
+import { buildLangyConversationCommands } from "../eventing/langy-conversation.commands.ts";
 import type { LangySessionKeyReapDeps } from "../eventing/langy-session-key-reap.intent.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import type {
@@ -110,6 +111,7 @@ import { LangyPanelEgressService } from "../services/langy-panel-egress.service.
 import { LangyPanelLocalService } from "../services/langy-panel-local.service.ts";
 import { LangyPostgresService } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
+import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
 import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key-metrics-otel.service.ts";
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
@@ -118,10 +120,8 @@ import { LangyUiActionPageService } from "../services/langy-ui-action-page.servi
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
 import type { LangyService } from "../services/langy.service.ts";
-import { langyRestPrometheusMetrics } from "../services/prometheus.langy-rest-metrics.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
-import { buildLangyConversationCommands } from "./langy-eventing.build.ts";
 import type { LangyConversationCommands, LocalControlRuntime } from "./langy.members.ts";
 
 /**
@@ -209,7 +209,7 @@ export class LangyApp implements LangyApiContract {
   static readonly secrets = langySecrets;
   /**
    * `eventing` is the agent-pipeline dispatcher's own producer registration
-   * (`langy-eventing.build.ts`). `rateLimiter` is the per-project counter
+   * (`eventing/langy-conversation.commands.ts`). `rateLimiter` is the per-project counter
    * every turn is checked against.
    */
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
@@ -403,7 +403,7 @@ export class LangyApp implements LangyApiContract {
   private constructor(private readonly dependencies: LangyAppDependencies) {
     this.#internal = LangyInternalService.create(
       dependencies.langy,
-      langyRestPrometheusMetrics(),
+      LangyRestMetricsPrometheusService.create(),
       dependencies.redis !== null,
     );
   }
@@ -607,9 +607,7 @@ export class LangyApp implements LangyApiContract {
    * pays for, so the project's window is spent here and an over-limit caller
    * never reaches the engine.
    */
-  async startConversationTurn(
-    input: Parameters<LangyApiContract["startConversationTurn"]>[0],
-  ): Promise<{
+  async startConversationTurn(input: langyContractModule.LangyStartConversationTurnInput): Promise<{
     conversationId: string;
     turnId: string;
   }> {
@@ -622,7 +620,7 @@ export class LangyApp implements LangyApiContract {
   awaitTurnSettlement(input: LangyTurnSettlementWaitInput): Promise<LangyTurnSettlementWait> {
     const { redis, repositories } = this.dependencies;
 
-    return LangyTurnSettlementWaiterService.awaitTurnSettlement({
+    return LangyTurnSettlementWaiterService.create().awaitTurnSettlement({
       ...input,
       langy: this,
       openBuffer: redis
@@ -661,9 +659,7 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.turnExists(input);
   }
 
-  ingestAgentTurnResult(
-    input: Parameters<LangyApiContract["ingestAgentTurnResult"]>[0],
-  ): Promise<void> {
+  ingestAgentTurnResult(input: langyContractModule.LangyTurnResultInput): Promise<void> {
     return this.dependencies.langy.ingestAgentTurnResult(input);
   }
 

@@ -41,7 +41,7 @@ export class LangyTurnSettlementWaiterService {
 
   private constructor() {}
 
-  static abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
+  abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
     if (signal.aborted) {
       return Promise.resolve(false);
     }
@@ -59,12 +59,12 @@ export class LangyTurnSettlementWaiterService {
     });
   }
 
-  static deriveSettlementFromEvents(
+  deriveSettlementFromEvents(
     events: LangyConversationTurnWireEvent[],
     turnId: string,
   ): LangyTurnSettlement | null {
     for (const event of events) {
-      const settlement = LangyTurnSettlementWaiterService.settlementFromEvent(event, turnId);
+      const settlement = this.settlementFromEvent(event, turnId);
       if (settlement) {
         return settlement;
       }
@@ -73,7 +73,7 @@ export class LangyTurnSettlementWaiterService {
     return null;
   }
 
-  private static settlementFromEvent(
+  private settlementFromEvent(
     event: LangyConversationTurnWireEvent,
     turnId: string,
   ): LangyTurnSettlement | null {
@@ -113,7 +113,7 @@ export class LangyTurnSettlementWaiterService {
     return null;
   }
 
-  private static async readSettlementFromFold(input: {
+  private async readSettlementFromFold(input: {
     langy: LangyTurnSettlementReader;
     projectId: string;
     conversationId: string;
@@ -142,10 +142,7 @@ export class LangyTurnSettlementWaiterService {
         return null;
       }
 
-      const settlement = LangyTurnSettlementWaiterService.deriveSettlementFromEvents(
-        page.events,
-        input.turnId,
-      );
+      const settlement = this.deriveSettlementFromEvents(page.events, input.turnId);
       if (settlement) {
         return settlement;
       }
@@ -160,15 +157,15 @@ export class LangyTurnSettlementWaiterService {
     return null;
   }
 
-  private static neverSettles(): Promise<never> {
+  private neverSettles(): Promise<never> {
     return new Promise<never>(() => {});
   }
 
-  private static isTerminalFrame(entry: { type: string }): boolean {
+  private isTerminalFrame(entry: { type: string }): boolean {
     return entry.type === "end" || entry.type === "error";
   }
 
-  private static async watchBufferForTerminal(
+  private async watchBufferForTerminal(
     buffer: LangyTokenBufferRepository,
     input: { conversationId: string; turnId: string; signal: AbortSignal },
   ): Promise<void> {
@@ -176,7 +173,7 @@ export class LangyTurnSettlementWaiterService {
       conversationId: input.conversationId,
       turnId: input.turnId,
     });
-    if (reads.some(({ entry }) => LangyTurnSettlementWaiterService.isTerminalFrame(entry))) {
+    if (reads.some(({ entry }) => this.isTerminalFrame(entry))) {
       return;
     }
 
@@ -186,15 +183,15 @@ export class LangyTurnSettlementWaiterService {
       fromId: lastId,
       signal: input.signal,
     })) {
-      if (LangyTurnSettlementWaiterService.isTerminalFrame(entry)) {
+      if (this.isTerminalFrame(entry)) {
         return;
       }
     }
 
-    await LangyTurnSettlementWaiterService.neverSettles();
+    await this.neverSettles();
   }
 
-  private static armBufferWatch(input: {
+  private armBufferWatch(input: {
     openBuffer: OpenLangyTurnBuffer | null;
     conversationId: string;
     turnId: string;
@@ -208,22 +205,19 @@ export class LangyTurnSettlementWaiterService {
     const { buffer, release } = opened;
 
     return {
-      terminalSeen: LangyTurnSettlementWaiterService.watchBufferForTerminal(buffer, input).catch(
-        () => LangyTurnSettlementWaiterService.neverSettles(),
-      ),
+      terminalSeen: this.watchBufferForTerminal(buffer, input).catch(() => this.neverSettles()),
       release,
     };
   }
 
-  private static async waitForNextPoll(
+  private async waitForNextPoll(
     terminalSeen: Promise<void> | null,
     pollMs: number,
     signal: AbortSignal,
   ): Promise<"tick" | "terminal" | "abort"> {
-    const delay: Promise<"tick" | "abort"> = LangyTurnSettlementWaiterService.abortableDelay(
-      pollMs,
-      signal,
-    ).then((completed): "tick" | "abort" => (completed ? "tick" : "abort"));
+    const delay: Promise<"tick" | "abort"> = this.abortableDelay(pollMs, signal).then(
+      (completed): "tick" | "abort" => (completed ? "tick" : "abort"),
+    );
     if (!terminalSeen) {
       return delay;
     }
@@ -233,7 +227,7 @@ export class LangyTurnSettlementWaiterService {
     return Promise.race([terminal, delay]);
   }
 
-  static async awaitTurnSettlement(input: {
+  async awaitTurnSettlement(input: {
     langy: LangyTurnSettlementReader;
     openBuffer: OpenLangyTurnBuffer | null;
     projectId: string;
@@ -243,22 +237,18 @@ export class LangyTurnSettlementWaiterService {
     signal: AbortSignal;
     pollIntervalMs?: number;
   }): Promise<LangyTurnSettlementWait> {
-    const armed = LangyTurnSettlementWaiterService.armBufferWatch(input);
+    const armed = this.armBufferWatch(input);
     let terminalSeen = armed.terminalSeen;
     let pollMs = terminalSeen ? bufferedPollMs : (input.pollIntervalMs ?? fallbackPollMs);
 
     try {
       while (!input.signal.aborted) {
-        const settlement = await LangyTurnSettlementWaiterService.readSettlementFromFold(input);
+        const settlement = await this.readSettlementFromFold(input);
         if (settlement) {
           return { kind: "settled", settlement };
         }
 
-        const outcome = await LangyTurnSettlementWaiterService.waitForNextPoll(
-          terminalSeen,
-          pollMs,
-          input.signal,
-        );
+        const outcome = await this.waitForNextPoll(terminalSeen, pollMs, input.signal);
         if (outcome === "abort") {
           return { kind: "stopped" };
         }
