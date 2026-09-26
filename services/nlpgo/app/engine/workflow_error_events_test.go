@@ -29,9 +29,18 @@ func TestExecuteStream_WorkflowErrorEventCarriesErrorType(t *testing.T) {
 			// A code node with no runner wired: a deterministic failure that
 			// names itself rather than depending on a Python subprocess.
 			{ID: "code-1", Type: dsl.ComponentCode},
+			// A wired End node keeps this a realistic full-run shape. Without
+			// it the planner rejects the workflow outright (#3198) and the test
+			// would assert against that error instead of the
+			// code_runner_unavailable failure it is actually about. The End node
+			// never executes here — code-1 fails first — so the frame under test
+			// is unchanged. Same treatment the modelless-signature and
+			// ifelse_branching fixtures already got.
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.input", Target: "code-1", TargetHandle: "inputs.input"},
+			{Source: "code-1", Target: "end"},
 		},
 	}
 

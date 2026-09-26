@@ -85,7 +85,12 @@ func setupStack(t *testing.T) *stack {
 
 // executorAdapter is a copy of cmd.engineAdapter — kept inline so the
 // integration test doesn't depend on the cmd package (avoids forcing
-// the test binary to also pull in os.Args parsing).
+// the test binary to also pull in os.Args parsing). It is a hand copy, not a
+// shared implementation, so it can drift from prod (it already had once:
+// UntilNodeID went unset here while cmd/engine_adapter.go set it, silently
+// mistranslating a "run until here" request and leaving the planner's
+// WithUntilNode exemption uncovered at this API-surface level — #3198 review).
+// A future change to cmd.engineAdapter should be checked against this copy too.
 type executorAdapter struct {
 	eng *engine.Engine
 }
@@ -106,6 +111,7 @@ func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequ
 		ProjectID:         req.ProjectID,
 		ThreadID:          req.ThreadID,
 		NodeID:            req.NodeID,
+		UntilNodeID:       req.UntilNodeID,
 		Type:              req.Type,
 		RunID:             req.RunID,
 		WorkflowVersionID: req.WorkflowVersionID,
@@ -144,6 +150,7 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 		ProjectID:         req.ProjectID,
 		ThreadID:          req.ThreadID,
 		NodeID:            req.NodeID,
+		UntilNodeID:       req.UntilNodeID,
 		Type:              req.Type,
 		RunID:             req.RunID,
 		WorkflowVersionID: req.WorkflowVersionID,
@@ -192,6 +199,105 @@ func postSync(t *testing.T, stack *stack, body string) *app.WorkflowResult {
 	var out app.WorkflowResult
 	require.NoError(t, json.Unmarshal(respBody, &out))
 	return &out
+}
+
+// TestSync_WorkflowWithNoEndNodeReturnsClearError pins the issue #3198
+// fix at the API surface: a full-run workflow with no End node used to
+// return status:"success" with an empty result — the uninterpretable
+// "completed without success or error status". It must now surface as a
+// clear status:"error" naming the missing End node, so the caller (Studio
+// / the scenario agent) can show an actionable message. The engine reports
+// errors through the result body (HTTP 200), which postSync asserts, not
+// via HTTP status codes — consistent with every other engine error.
+func TestSync_WorkflowWithNoEndNodeReturnsClearError(t *testing.T) {
+	stack := setupStack(t)
+	defer stack.close()
+
+	// entry -> code, NO end node. Passes every other planner check
+	// (ids/kinds/edges/cycle) so the rejection is unambiguously the
+	// missing End node.
+	body := `{
+	  "trace_id": "test-missing-end",
+	  "origin": "workflow",
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{
+	        "outputs":[{"identifier":"q","type":"str"}],
+	        "dataset":{"inline":{"records":{"q":["hello world"]}}},
+	        "entry_selection":0,
+	        "train_size":1.0,"test_size":0.0,"seed":1
+	      }},
+	      {"id":"code","type":"code","data":{
+	        "outputs":[{"identifier":"q","type":"str"}]
+	      }}
+	    ],
+	    "edges":[
+	      {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"code","targetHandle":"inputs.q","type":"default"}
+	    ],
+	    "state":{}
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+
+	// Before the fix: status "success" with an empty result. Now: a clear error.
+	require.Equal(t, "error", res.Status,
+		"a workflow with no End node must surface as status:error, not a silent success (#3198)")
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "End node",
+		"the error must name the missing End node so the caller can act on it")
+}
+
+// TestSync_WorkflowWithUnwiredEndNodeReturnsClearError is the case a
+// presence-only guard misses (#3198): the End node IS in the node table, so
+// the missing-End check passes, but nothing feeds it, so reachability
+// scoping drops it from the plan, it never executes, and the run finalized
+// as `status:"success"` with an empty result. On the Studio canvas this is
+// the likelier author mistake of the two — leaving the End node dangling is
+// easier than deleting it.
+//
+// @scenario "The execute_sync API answers a workflow with an unwired End node with an error envelope"
+func TestSync_WorkflowWithUnwiredEndNodeReturnsClearError(t *testing.T) {
+	stack := setupStack(t)
+	defer stack.close()
+
+	// A runnable entry node plus a dangling "end" with no inbound edge, and
+	// nothing else that can fail. Every other planner check passes, so the
+	// rejection is unambiguously the unwired End node — and no node error
+	// can mask it.
+	body := `{
+	  "trace_id": "test-unwired-end",
+	  "origin": "workflow",
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{
+	        "outputs":[{"identifier":"q","type":"str"}],
+	        "dataset":{"inline":{"records":{"q":["hello world"]}}},
+	        "entry_selection":0,
+	        "train_size":1.0,"test_size":0.0,"seed":1
+	      }},
+	      {"id":"end","type":"end","data":{
+	        "inputs":[{"identifier":"output","type":"str"}]
+	      }}
+	    ],
+	    "edges":[],
+	    "state":{}
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+
+	// Before the fix: status "success" with RESULT=nil — reproduced on this
+	// branch during review.
+	require.Equal(t, "error", res.Status,
+		"a workflow whose End node is unwired must surface as status:error, not a silent success (#3198)")
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "End node has no wired inputs",
+		"the error must name the specific misconfiguration so the caller can act on it")
 }
 
 // TestSync_DatasetEntrySelectionThroughHTTPServer exercises the very
