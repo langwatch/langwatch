@@ -7,6 +7,11 @@ import type {
   AppendStore,
   MapProjectionDefinition,
 } from "../../projections/mapProjection.types.ts";
+import {
+  sealFoldProjection,
+  sealMapProjection,
+  sealStateProjection,
+} from "../../projections/sealedProjection.ts";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
@@ -200,7 +205,7 @@ function mapProjectionOver({
     source: "pipeline",
     pauseKey: `${PIPELINE}/handler/${name}`,
     kind: "map",
-    definition,
+    ...sealMapProjection(definition),
   };
 }
 
@@ -366,7 +371,7 @@ describe("ReplayService", () => {
         source: "pipeline",
         pauseKey: `${PIPELINE}/projection/${foldName}`,
         kind: "fold",
-        definition: foldDefinition,
+        ...sealFoldProjection(foldDefinition),
       };
 
       const bulkAppend = vi.fn<BulkAppend>(async () => undefined);
@@ -393,7 +398,7 @@ describe("ReplayService", () => {
         source: "pipeline",
         pauseKey: `${PIPELINE}/stateProjection/${stateName}`,
         kind: "state",
-        definition: stateDefinition,
+        ...sealStateProjection(stateDefinition),
       };
 
       const service = serviceOver([

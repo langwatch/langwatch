@@ -88,9 +88,14 @@ interface RuntimeStores {
   processStore?: ProcessStore;
 }
 
-/**
- * Type helper to convert registered commands union to a record of queue processors.
- */
+/** A registered pipeline as a lookup by name holds it: senders that parse their payload on send. */
+interface RegisteredCommandSenders {
+  readonly name: string;
+  readonly service: { readonly close: () => Promise<void> };
+  readonly commands: Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>;
+}
+
+/** Type helper to convert registered commands union to a record of queue processors. */
 type CommandsToProcessors<Commands extends RegisteredCommand> = {
   [K in Commands as K["name"]]: EventSourcedQueueProcessor<K["payload"] & Record<string, unknown>>;
 };
@@ -101,7 +106,7 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
  */
 export class EventSourcing {
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.runtime");
-  private readonly pipelines = new Map<string, PipelineWithCommandHandlers<any, any>>();
+  private readonly pipelines = new Map<string, RegisteredCommandSenders>();
   private readonly _definitions: StaticPipelineDefinition<any, any, any>[] = [];
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
@@ -221,7 +226,7 @@ export class EventSourcing {
    * Retrieves a registered pipeline by name.
    * Throws if the pipeline has not been registered yet.
    */
-  getPipeline(name: string): PipelineWithCommandHandlers<any, any> {
+  getPipeline(name: string): RegisteredCommandSenders {
     const pipeline = this.pipelines.get(name);
     if (!pipeline) {
       throw new Error(
@@ -255,7 +260,7 @@ export class EventSourcing {
   ): PipelineWithCommandHandlers<
     RegisteredPipeline<EventType, ProjectionTypes>,
     [Commands] extends [NoCommands]
-      ? Record<string, EventSourcedQueueProcessor<any>>
+      ? Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>
       : CommandsToProcessors<Commands>
   > {
     return this.tracer.withActiveSpan(
@@ -343,13 +348,13 @@ export class EventSourcing {
   ): PipelineWithCommandHandlers<
     RegisteredPipeline<EventType, ProjectionTypes>,
     [Commands] extends [NoCommands]
-      ? Record<string, EventSourcedQueueProcessor<any>>
+      ? Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>
       : CommandsToProcessors<Commands>
   > {
     type ReturnType = PipelineWithCommandHandlers<
       RegisteredPipeline<EventType, ProjectionTypes>,
       [Commands] extends [NoCommands]
-        ? Record<string, EventSourcedQueueProcessor<any>>
+        ? Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>
         : CommandsToProcessors<Commands>
     >;
     this.assertRegistrable(definition);
@@ -371,9 +376,9 @@ export class EventSourcing {
         definition.metadata.name,
         definition.metadata.aggregateType,
         definition.metadata,
-      ) as ReturnType;
+      );
       this.pipelines.set(definition.metadata.name, disabled);
-      return disabled;
+      return disabled as ReturnType;
     }
 
     const eventStore = this.eventStore as EventStore<EventType>;
@@ -437,10 +442,10 @@ export class EventSourcing {
 
     const result = Object.assign(pipeline, {
       commands: dispatchers,
-    }) as ReturnType;
+    });
 
     this.pipelines.set(definition.metadata.name, result);
-    return result;
+    return result as ReturnType;
   }
 
   /**

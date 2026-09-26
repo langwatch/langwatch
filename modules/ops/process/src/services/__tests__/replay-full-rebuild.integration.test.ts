@@ -9,6 +9,7 @@ import {
   type ReplayEvent,
   type ReplayEventSource,
   ReplayService as EventingReplayService,
+  sealMapProjection,
   unmarkBatch,
 } from "@langwatch/eventing";
 import IORedis, { type Redis } from "ioredis";
@@ -291,6 +292,12 @@ describe("ops replay full rebuild", () => {
       data: {},
     };
 
+    const replayedSpans: MapProjectionDefinition<{ src: string }, Event> = {
+      name: PROJECTION_NAME,
+      eventTypes: ["trace.span_received"],
+      map: (mapped) => ({ src: mapped.aggregateId }),
+      store: { append: async () => undefined, bulkAppend },
+    };
     const mapProjection: RegisteredMapProjection = {
       projectionName: PROJECTION_NAME,
       pipelineName: PIPELINE,
@@ -298,12 +305,7 @@ describe("ops replay full rebuild", () => {
       source: "pipeline",
       pauseKey: `${PIPELINE}/handler/${PROJECTION_NAME}`,
       kind: "map",
-      definition: {
-        name: PROJECTION_NAME,
-        eventTypes: ["trace.span_received"],
-        map: (mapped: ReplayEvent) => ({ src: mapped.aggregateId }),
-        store: { append: async () => undefined, bulkAppend },
-      } as unknown as MapProjectionDefinition<any, Event>,
+      ...sealMapProjection(replayedSpans),
     };
 
     const runtimeFactory = new (class implements OpsReplayRuntimeFactory {

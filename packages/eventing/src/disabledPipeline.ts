@@ -80,7 +80,7 @@ export class DisabledPipeline<
   readonly name: string;
   readonly aggregateType: AggregateType;
   readonly service: EventSourcingService<EventType, ProjectionTypes>;
-  readonly commands: Record<string, EventSourcedQueueProcessor<any>>;
+  readonly commands: Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>;
   readonly metadata: PipelineMetadata;
 
   constructor(name: string, aggregateType: AggregateType, metadata: PipelineMetadata) {

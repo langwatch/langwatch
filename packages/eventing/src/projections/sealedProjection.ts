@@ -60,11 +60,18 @@ export function sealFoldProjection<State, E extends Event>(
   return { definition: fold, open: (use) => use(fold) };
 }
 
+/** The guard admitting a pipeline event into a projection that declared the subset it consumes. */
+export function projectionConsumes<Own extends Event, E extends Event>(projection: {
+  readonly eventTypes: readonly string[];
+}): (event: E) => event is E & Own {
+  return (event: E): event is E & Own =>
+    projection.eventTypes.length === 0 || projection.eventTypes.includes(event.type);
+}
+
 export function sealMapProjection<MapRecord, Own extends Event, E extends Event>(
   map: MapProjectionDefinition<MapRecord, Own>,
 ): SealedMapProjection<E> {
-  const consumes = (event: E): event is E & Own =>
-    map.eventTypes.length === 0 || map.eventTypes.includes(event.type);
+  const consumes = projectionConsumes<Own, E>(map);
   return { definition: map, open: (use) => use(map, consumes) };
 }
 

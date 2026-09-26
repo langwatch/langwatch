@@ -6,18 +6,24 @@ export type MappedCommand<P> = {
   sendBatch?: (data: P[], options?: QueueSendOptions<P>) => Promise<void>;
 };
 
-export type MapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>> = {
-  [K in keyof T]: T[K] extends EventSourcedQueueProcessor<infer P> ? MappedCommand<P> : never;
+export type MapCommands<Payloads extends Record<string, Record<string, unknown>>> = {
+  [K in keyof Payloads]: MappedCommand<Payloads[K]>;
 };
 
-export function mapCommands<T extends Record<string, EventSourcedQueueProcessor<any>>>(
-  commands: T,
-): MapCommands<T> {
-  const result = {} as Record<string, MappedCommand<unknown>>;
-  for (const [name, processor] of Object.entries(commands)) {
-    const command = ((data, options) => processor.send(data, options)) as MappedCommand<unknown>;
-    command.sendBatch = (data, options) => processor.sendBatch(data, options);
-    result[name] = command;
+function mapCommand<P extends Record<string, unknown>>(
+  processor: EventSourcedQueueProcessor<P>,
+): MappedCommand<P> {
+  return Object.assign((data: P, options?: QueueSendOptions<P>) => processor.send(data, options), {
+    sendBatch: (data: P[], options?: QueueSendOptions<P>) => processor.sendBatch(data, options),
+  });
+}
+
+export function mapCommands<Payloads extends Record<string, Record<string, unknown>>>(commands: {
+  [K in keyof Payloads]: EventSourcedQueueProcessor<Payloads[K]>;
+}): MapCommands<Payloads> {
+  const result: Partial<MapCommands<Payloads>> = {};
+  for (const name in commands) {
+    result[name] = mapCommand(commands[name]);
   }
-  return result as MapCommands<T>;
+  return result as MapCommands<Payloads>;
 }

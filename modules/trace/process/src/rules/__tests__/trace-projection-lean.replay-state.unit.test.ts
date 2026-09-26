@@ -1,10 +1,12 @@
 import {
+  type Event,
   nullLog,
   type ProjectionStoreContext,
   type RegisteredStateProjection,
   type ReplayContext,
   replayStateProjection,
   runFoldMapReplay,
+  sealStateProjection,
   type StateProjectionDefinition,
   type StateProjectionStore,
   type StoredProjection,
@@ -60,7 +62,7 @@ function spyStore() {
 }
 
 function registered(store: StateProjectionStore<CounterState>): RegisteredStateProjection {
-  const definition: StateProjectionDefinition<CounterState, any> = {
+  const definition: StateProjectionDefinition<CounterState, Event> = {
     name: "counter",
     version: "2026-07-16",
     eventTypes: ["counter.incremented"],
@@ -75,7 +77,7 @@ function registered(store: StateProjectionStore<CounterState>): RegisteredStateP
     pipelineName: "langy_conversation_processing",
     aggregateType: "langy_conversation",
     source: "pipeline",
-    definition,
+    ...sealStateProjection(definition),
     pauseKey: "langy_conversation_processing/stateProjection/counter",
     kind: "state",
   };

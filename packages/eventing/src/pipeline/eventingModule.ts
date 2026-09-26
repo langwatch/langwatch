@@ -36,7 +36,11 @@ export type EventingCommandSender<Payload> = EventSourcedQueueProcessor<
  * command answers an empty record rather than a name a caller can misspell.
  */
 export type EventingCommands<Definition> =
-  Definition extends StaticPipelineDefinition<any, any, infer Commands extends RegisteredCommand>
+  Definition extends StaticPipelineDefinition<
+    infer _EventType,
+    infer _Projections,
+    infer Commands extends RegisteredCommand
+  >
     ? [Commands] extends [NoCommands]
       ? Readonly<Record<never, never>>
       : Readonly<{ [Name in Commands as Name["name"]]: EventingCommandSender<Name["payload"]> }>

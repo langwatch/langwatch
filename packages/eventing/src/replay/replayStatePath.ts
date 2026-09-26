@@ -8,7 +8,7 @@ import {
   type ReplayEventSource,
   maxEventPosition,
 } from "./replayEventSource.ts";
-import { StateAccumulator } from "./replayExecutor.ts";
+import { type ReplayAccumulator, StateAccumulator } from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { aggregateKey } from "./replayMarkers.ts";
 import type {
@@ -68,7 +68,9 @@ async function replayTenantForState({
 > {
   // One accumulator per tenant: a projection key may group several aggregates,
   // so we fold the whole tenant before writing one row per key.
-  const accumulator = new StateAccumulator(projection.definition, ctx.accumulatorOpts);
+  const accumulator = projection.open<ReplayAccumulator>(
+    (definition) => new StateAccumulator(definition, ctx.accumulatorOpts),
+  );
   const totalBatches = Math.ceil(tenantAggregates.length / aggregateBatchSize);
   let aggregatesCompleted = aggregatesCompletedSoFar;
   let totalEventsReplayed = totalEventsReplayedSoFar;
@@ -322,7 +324,7 @@ async function replayStateBatch({
   batch: DiscoveredAggregate[];
   tenantId: string;
   batchSize: number;
-  accumulator: StateAccumulator;
+  accumulator: ReplayAccumulator;
   onProgress: (eventsProcessed: number) => void;
 }): Promise<number> {
   const eventTypes = projection.definition.eventTypes;

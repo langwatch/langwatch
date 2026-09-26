@@ -8,7 +8,12 @@ import type {
   OccurredAtBounds,
   ReplayEvent,
 } from "./replayEventSource.ts";
-import { FoldAccumulator, MapAccumulator } from "./replayExecutor.ts";
+import {
+  FoldAccumulator,
+  MapAccumulator,
+  type MapReplayAccumulator,
+  type ReplayAccumulator,
+} from "./replayExecutor.ts";
 import type { ReplayLogWriter } from "./replayLog.ts";
 import { nullLog } from "./replayLog.ts";
 import {
@@ -783,8 +788,8 @@ async function markDrainAndCutoff({
 }
 
 interface BatchAccumulators {
-  foldAccumulators: Map<string, FoldAccumulator>;
-  mapAccumulators: Map<string, MapAccumulator>;
+  foldAccumulators: Map<string, ReplayAccumulator>;
+  mapAccumulators: Map<string, MapReplayAccumulator>;
 }
 
 /** One accumulator per selected projection present in this batch. */
@@ -797,16 +802,22 @@ function buildAccumulators({
   groups: BatchGroups;
   selected: SelectedProjections;
 }): BatchAccumulators {
-  const foldAccumulators = new Map<string, FoldAccumulator>();
-  const mapAccumulators = new Map<string, MapAccumulator>();
+  const foldAccumulators = new Map<string, ReplayAccumulator>();
+  const mapAccumulators = new Map<string, MapReplayAccumulator>();
   for (const projName of groups.projNames) {
     const foldProj = selected.projectionByName.get(projName);
     if (foldProj) {
-      foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition, ctx.accumulatorOpts));
+      foldAccumulators.set(
+        projName,
+        foldProj.open<ReplayAccumulator>((fold) => new FoldAccumulator(fold, ctx.accumulatorOpts)),
+      );
     }
     const mapProj = selected.mapProjectionByName.get(projName);
     if (mapProj) {
-      mapAccumulators.set(projName, new MapAccumulator(mapProj.definition, ctx.accumulatorOpts));
+      mapAccumulators.set(
+        projName,
+        mapProj.open<MapReplayAccumulator>((map) => new MapAccumulator(map, ctx.accumulatorOpts)),
+      );
     }
   }
   return { foldAccumulators, mapAccumulators };

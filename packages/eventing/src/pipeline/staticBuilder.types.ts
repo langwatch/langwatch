@@ -22,7 +22,7 @@ import type { PipelineMetadata } from "./types.ts";
  * by both {@link CommandHandlerOptions} declarations. Declared once so both
  * interfaces extend it rather than hand-syncing two copies.
  */
-export interface CommandSerializationOptions<Payload = any> {
+export interface CommandSerializationOptions<Payload> {
   /**
    * Serialize this command with every other command enabling the option for
    * the same tenant and aggregate, keeping command handling, event append and
@@ -42,7 +42,7 @@ export interface CommandSerializationOptions<Payload = any> {
 /**
  * Options for configuring a command handler in a static pipeline definition.
  */
-export interface CommandHandlerOptions<Payload = any> extends CommandSerializationOptions<Payload> {
+export interface CommandHandlerOptions<Payload> extends CommandSerializationOptions<Payload> {
   /**
    * Operator stop for this component, resolved per tenant at dispatch time.
    * Absent means the generated key; a `customKey` must also be what the

@@ -63,8 +63,9 @@ export type CommandsUnionToRegistry<C extends RegisteredCommand> = {
 };
 
 // Convenience: command name union from a StaticPipelineDefinition
-export type CommandNamesFromPipeline<P extends StaticPipelineDefinition<any, any, any>> =
-  keyof CommandsUnionToRegistry<P extends StaticPipelineDefinition<any, any, infer C> ? C : never>;
+export type CommandNamesFromPipeline<P> = keyof CommandsUnionToRegistry<
+  P extends StaticPipelineDefinition<infer _EventType, infer _Projections, infer C> ? C : never
+>;
 
 /** Builder for creating static pipeline definitions without runtime dependencies. */
 export class PipelineBuilder<

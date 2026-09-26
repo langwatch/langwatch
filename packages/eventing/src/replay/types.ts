@@ -1,17 +1,18 @@
 import type { Event } from "../domain/types.ts";
-import type { FoldProjectionDefinition } from "../projections/foldProjection.types.ts";
-import type { MapProjectionDefinition } from "../projections/mapProjection.types.ts";
-import type { StateProjectionDefinition } from "../projections/stateProjection.types.ts";
+import type {
+  SealedFoldProjection,
+  SealedMapProjection,
+  SealedStateProjection,
+} from "../projections/sealedProjection.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
 import type { DiscoveredAggregate, ReplayEventSource } from "./replayEventSource.ts";
 import type { ReplayRedis } from "./replayRedis.ts";
 
-export interface RegisteredFoldProjection {
+export interface RegisteredFoldProjection extends SealedFoldProjection<Event> {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
   source: "pipeline" | "global";
-  definition: FoldProjectionDefinition<any, Event>;
   /**
    * Pause-set entry consumed by the GroupQueue Lua dispatcher. Folds are
    * enqueued as `__jobType=projection`, so this is `{pipeline}/projection/{name}`.
@@ -22,12 +23,11 @@ export interface RegisteredFoldProjection {
   targetTable?: string;
 }
 
-export interface RegisteredMapProjection {
+export interface RegisteredMapProjection extends SealedMapProjection<Event> {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
   source: "pipeline" | "global";
-  definition: MapProjectionDefinition<any, Event>;
   /**
    * Pause-set entry consumed by the GroupQueue Lua dispatcher. Maps are
    * enqueued as `__jobType=handler`, so this is `{pipeline}/handler/{name}`.
@@ -43,12 +43,11 @@ export interface RegisteredMapProjection {
  * Unlike fold/map, replay rebuilds its `StateProjectionStore` from `init()`
  * (never `store.load`); re-running is idempotent since the output is deterministic.
  */
-export interface RegisteredStateProjection {
+export interface RegisteredStateProjection extends SealedStateProjection<Event> {
   projectionName: string;
   pipelineName: string;
   aggregateType: string;
   source: "pipeline" | "global";
-  definition: StateProjectionDefinition<any, Event>;
   /**
    * Pause-set entry for parity/introspection. State projections enqueue as
    * `__jobType=stateProjection`, so this is `{pipeline}/stateProjection/{name}`.

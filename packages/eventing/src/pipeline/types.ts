@@ -93,9 +93,6 @@ export interface RegisteredPipeline<
 /**
  * Pipeline with command handlers attached under a `commands` property.
  */
-export type PipelineWithCommandHandlers<
-  Pipeline extends RegisteredPipeline<any, any>,
-  Dispatchers extends Record<string, EventSourcedQueueProcessor<any>>,
-> = Pipeline & {
+export type PipelineWithCommandHandlers<Pipeline, Dispatchers> = Pipeline & {
   commands: Dispatchers;
 };
