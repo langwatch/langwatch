@@ -239,41 +239,39 @@ const scenarioAudioMessageSchema = z.object({
   ),
 });
 
+const agUiToolCallSchema = z.looseObject({
+  id: z.string().optional(),
+  type: z.literal("function").optional(),
+  function: z
+    .looseObject({
+      name: z.string().optional(),
+      arguments: z.string().optional(),
+    })
+    .optional(),
+  encryptedValue: z.string().optional(),
+});
+
 /**
- * Describes the small message boundary AG-UI needs instead of pulling its
- * validator into the Zod schema graph. The richer LangWatch schema stays
- * primary; this branch only covers AG-UI-only roles like `activity`.
+ * The AG-UI message boundary, loose so its validator stays out of the Zod graph;
+ * the fields restate `@ag-ui/core` MessageSchema so the body documents them as main did.
  */
 const agUiMessageSchema = z.looseObject({
   id: z.string(),
   role: z.enum(["developer", "system", "assistant", "user", "tool", "activity", "reasoning"]),
-  content: z.unknown().optional(),
-  toolCalls: z
-    .array(
-      z.looseObject({
-        id: z.string().optional(),
-        function: z
-          .looseObject({
-            name: z.string().optional(),
-            arguments: z.string().optional(),
-          })
-          .optional(),
-      }),
-    )
+  content: z
+    .union([
+      z.string(),
+      z.array(z.looseObject({ metadata: z.unknown().optional() })),
+      z.record(z.string(), z.unknown()),
+    ])
     .optional(),
-  tool_calls: z
-    .array(
-      z.looseObject({
-        id: z.string().optional(),
-        function: z
-          .looseObject({
-            name: z.string().optional(),
-            arguments: z.string().optional(),
-          })
-          .optional(),
-      }),
-    )
-    .optional(),
+  name: z.string().optional(),
+  encryptedValue: z.string().optional(),
+  toolCallId: z.string().optional(),
+  error: z.string().optional(),
+  activityType: z.string().optional(),
+  toolCalls: z.array(agUiToolCallSchema).optional(),
+  tool_calls: z.array(agUiToolCallSchema).optional(),
 });
 
 /**

@@ -40,7 +40,7 @@ export class ModelProviderQueryService {
     return [
       ...saved
         .filter((provider) => this.shouldKeep(provider, system))
-        .map((provider) => this.toSummary(provider)),
+        .map((provider) => this.toSummary({ provider, system })),
       ...system.filter((provider) => provider.enabled && !savedProviders.has(provider.provider)),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
@@ -52,7 +52,9 @@ export class ModelProviderQueryService {
       .getProjectScopes(parsed.projectId)
       .then((projectScopes) => this.options.repository.findForProject(projectScopes))
       .then((saved) =>
-        saved.map((provider) => modelProviderSummarySchema.parse(this.toSummary(provider))),
+        saved.map((provider) =>
+          modelProviderSummarySchema.parse(this.toSummary({ provider, system: [] })),
+        ),
       )
       .catch((error: unknown) => {
         if (HandledError.isHandled(error) && error.code === "project_not_found") return [];
@@ -79,7 +81,7 @@ export class ModelProviderQueryService {
     return [
       ...saved
         .filter((provider) => this.shouldKeep(provider, system))
-        .map((provider) => this.toSummary(provider)),
+        .map((provider) => this.toSummary({ provider, system })),
       ...system.filter((provider) => provider.enabled && !savedProviders.has(provider.provider)),
     ].map((provider) => modelProviderSummarySchema.parse(provider));
   }
@@ -92,7 +94,7 @@ export class ModelProviderQueryService {
     const stored = saved.filter((provider) => this.shouldKeep(provider, system));
     const storedProviders = new Set(stored.map((provider) => provider.provider));
     const providers = [
-      ...stored.map((provider) => this.toSummary(provider)),
+      ...stored.map((provider) => this.toSummary({ provider, system })),
       ...system.filter((provider) => !storedProviders.has(provider.provider)),
     ];
     const selected = this.selectProjectProviders(providers, chain, input.provider);
@@ -219,12 +221,21 @@ export class ModelProviderQueryService {
     return provider.customModels.length > 0 || provider.customEmbeddingsModels.length > 0;
   }
 
-  private toSummary(provider: ModelProvider): ModelProviderSummary {
+  /** A stored row reads its registry default's `disabledByDefault`, as main's did. */
+  private toSummary({
+    provider,
+    system,
+  }: {
+    provider: ModelProvider;
+    system: ModelProviderSummary[];
+  }): ModelProviderSummary {
     const metadata = this.options.catalog.metadata(provider.provider);
+    const registryDefault = system.find((candidate) => candidate.provider === provider.provider);
 
     return {
       ...provider,
       ...metadata,
+      disabledByDefault: registryDefault?.disabledByDefault ?? metadata.disabledByDefault,
       customKeys: this.options.credentialPolicy.toMaskedKeys(provider.customKeys),
       extraHeaders: this.options.credentialPolicy.maskHeaders(provider.extraHeaders),
       isSystem: false,

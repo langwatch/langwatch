@@ -19,12 +19,30 @@ export const namespacedEvaluatorParamsSchema = z.object({
 });
 
 export const batchEvaluationInputSchema = z.object({
-  evaluation: z.string(),
-  experimentSlug: z.string().optional(),
-  batchId: z.string().optional(),
-  datasetSlug: z.string(),
-  data: z.looseObject({}).optional().nullable(),
-  settings: z.looseObject({}).optional().nullable(),
+  evaluation: z
+    .string()
+    .describe("Which evaluator to run, addressed the same way the evaluate endpoints address it"),
+  experimentSlug: z
+    .string()
+    .optional()
+    .describe(
+      "Groups the results under an experiment. Omit it and a batch id is generated instead.",
+    ),
+  batchId: z
+    .string()
+    .optional()
+    .describe("Older name for experimentSlug, used when that is absent"),
+  datasetSlug: z.string().describe("The saved dataset to evaluate"),
+  data: z
+    .looseObject({})
+    .optional()
+    .nullable()
+    .describe("Extra fields merged into every row before evaluating"),
+  settings: z
+    .looseObject({})
+    .optional()
+    .nullable()
+    .describe("Per-call overrides of the evaluator's settings"),
 });
 
 export type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
@@ -34,13 +52,44 @@ export type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchem
  * Schema declared here, not imported from @langwatch/evaluator-browser, per value-import boundary.
  */
 export const evaluationInputSchema = z.object({
-  trace_id: z.string().optional().nullable(),
-  evaluation_id: z.string().optional().nullable(),
+  trace_id: z
+    .string()
+    .optional()
+    .nullable()
+    .describe("Attaches the result to a trace you already sent"),
+  evaluation_id: z
+    .string()
+    .optional()
+    .nullable()
+    .describe("Supply your own id to make the call idempotent"),
   evaluator_id: z.string().optional().nullable(),
-  name: z.string().optional().nullable(),
-  data: z.looseObject({}).optional().nullable(),
-  settings: z.looseObject({}).optional().nullable(),
-  as_guardrail: z.boolean().optional().nullable().default(false),
+  name: z
+    .string()
+    .optional()
+    .nullable()
+    .describe("Overrides the name the result is recorded under"),
+  data: z
+    .looseObject({})
+    .optional()
+    .nullable()
+    .describe(
+      "What the evaluator scores. Which fields are required depends on the evaluator; its own entry under Built-in Evaluators lists them.",
+    ),
+  settings: z
+    .looseObject({})
+    .optional()
+    .nullable()
+    .describe(
+      "Per-call overrides of the evaluator's settings. Anything omitted falls back to the saved evaluator or monitor, then to the evaluator's own defaults.",
+    ),
+  as_guardrail: z
+    .boolean()
+    .optional()
+    .nullable()
+    .default(false)
+    .describe(
+      "Evaluate as a guardrail: a skipped or failed evaluation answers `passed` rather than an error, so a caller can gate on one field. The /api/guardrails path sets this for you.",
+    ),
 });
 
 export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;

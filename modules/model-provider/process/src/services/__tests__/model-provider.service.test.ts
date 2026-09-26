@@ -8,6 +8,7 @@ import {
   type ModelProvider,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
+  type ModelProviderSummary,
   type CodexTokenKeys,
   CODEX_DEFAULT_MODEL,
   DEFAULT_AZURE_API_VERSION,
@@ -629,8 +630,10 @@ class Catalog extends ModelProviderCatalog {
   exists(providerName: string): boolean {
     return providerName === "openai";
   }
-  systemProviders(): Promise<[]> {
-    return Promise.resolve([]);
+  system: ModelProviderSummary[] = [];
+
+  systemProviders(): Promise<ModelProviderSummary[]> {
+    return Promise.resolve(this.system);
   }
   validateApiKey(): Promise<ModelProviderApiKeyValidation> {
     return Promise.resolve({ valid: true });
@@ -1194,6 +1197,26 @@ describe("ModelProviderService", () => {
   it("masks credentials in frontend summaries", async () => {
     const result = await service().listForProject({ projectId: "project_1" });
     expect(result[0]?.customKeys).toEqual({ apiKey: "••••" });
+  });
+  /** @scenario "A stored provider reads disabledByDefault from its registry default" */
+  it("marks a stored provider disabled by default when its registry default is off", async () => {
+    const catalog = new Catalog();
+    catalog.system = [
+      {
+        ...provider({ id: "system_openai", customKeys: null, scopes: [] }),
+        enabled: false,
+        models: [],
+        embeddingsModels: [],
+        disabledByDefault: true,
+        isSystem: true,
+        embeddingsUnsupported: false,
+      },
+    ];
+    const providers = await service(new Providers(), catalog).getForProject({
+      projectId: "project_1",
+    });
+    expect(providers.openai?.isSystem).toBe(false);
+    expect(providers.openai?.disabledByDefault).toBe(true);
   });
   /** @scenario "every saved provider row in the project's scope is readable with its skip list" */
   it("reads every saved row in scope with its stored skip list, keys masked", async () => {

@@ -197,6 +197,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Report batch evaluation results",
+    requestBody: { schema: eSBatchEvaluationRESTParamsSchema },
     description:
       "Report the rows of a batch evaluation against an experiment, so its scores and progress show up in the app. This is the second half of an SDK batch evaluation: create the experiment with `POST /api/experiment/init`, then post rows here as they finish. Identify the experiment by either `experiment_id` or `experiment_slug`. Bodies up to 20MB are accepted.",
     tags: ["Evaluations"],
@@ -232,6 +233,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run an evaluator",
+    requestBody: { schema: evaluationInputSchema },
     description:
       "Run one evaluator over a single input and get its score back. Built-in evaluators whose id has two segments, such as `ragas/faithfulness`, are addressed with the two-segment form of this path. Bodies up to 30MB are accepted.",
     tags: ["Evaluations"],
@@ -260,6 +262,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run a namespaced evaluator",
+    requestBody: { schema: evaluationInputSchema },
     description:
       "Run one evaluator whose id has two segments, such as `ragas/faithfulness` or `langevals/valid_format`. Identical to the single-segment form in every other respect; the id is simply split across two path segments.",
     tags: ["Evaluations"],
@@ -285,6 +288,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Run an evaluator as a guardrail",
+    requestBody: { schema: evaluationInputSchema },
     description:
       "Run an evaluator inline and gate on one boolean. Same call as the evaluate path with `as_guardrail` set: every outcome carries `passed`, so an evaluator that skips or fails does not block the request it was guarding. Check `passed` and let the request through when it is true.",
     tags: ["Evaluations"],
@@ -309,6 +313,7 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({
     summary: "Evaluate a dataset",
+    requestBody: { schema: batchEvaluationInputSchema },
     description:
       "Run one evaluator across a saved dataset and record the result against an experiment. Name the dataset by slug and the evaluator the same way the evaluate endpoints do; results are grouped under `experimentSlug`, or under a generated batch id when you omit it. Bodies up to 30MB are accepted.",
     tags: ["Datasets"],

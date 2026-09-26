@@ -45,6 +45,12 @@ Feature: Model Provider service
     Then every entry carries disabledByDefault and extraHeaders
 
   @unit
+  Scenario: A stored provider reads disabledByDefault from its registry default
+    Given a project has a stored provider whose registry default is not enabled on this deployment
+    When the project's providers are read
+    Then the stored provider is disabled by default
+
+  @unit
   Scenario: The platform chain borrows the Google credential from data privacy
     Given data privacy holds the deployment's Google application credential
     When the platform provider chain is read
