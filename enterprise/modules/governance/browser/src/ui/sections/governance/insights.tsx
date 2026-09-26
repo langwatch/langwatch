@@ -13,7 +13,10 @@ import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
 } from "../../../features/insights/insights-setup-drawer.tsx";
-import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
 /**
@@ -128,4 +131,4 @@ function InboxEmptyBrief({
   );
 }
 
-export default withGovernanceSection(InsightsPage);
+export default withGovernanceSection(InsightsPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

@@ -32,7 +32,10 @@ import {
   exploreQueryLine,
   matchesTemplate,
 } from "../../../model/explore-query.ts";
-import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
 // Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
@@ -294,4 +297,4 @@ function ControlSelect({
   );
 }
 
-export default withGovernanceSection(AnalyticsPage);
+export default withGovernanceSection(AnalyticsPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

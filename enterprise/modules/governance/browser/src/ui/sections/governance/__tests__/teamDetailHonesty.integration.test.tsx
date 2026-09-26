@@ -44,7 +44,7 @@ const renderPage = () =>
   renderWithGovernanceHost(<TeamDetailPage />, {
     host: fakeGovernanceHost({
       params: { id: TEAM_ID },
-      permissions: ["activityMonitor:view"],
+      permissions: ["governance:view", "activityMonitor:view"],
       organizations: [
         {
           ...FAKE_ORGANIZATION,

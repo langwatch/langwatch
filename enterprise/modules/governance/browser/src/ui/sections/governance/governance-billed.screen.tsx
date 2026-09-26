@@ -1,5 +1,8 @@
 import { NotFoundScene } from "../../../ui/elements/not-found-scene.tsx";
-import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
 
 /**
  * The unfinished Billed destination stays unavailable even when Costs is on, as on main.
@@ -9,4 +12,4 @@ function BilledPage() {
   return <NotFoundScene />;
 }
 
-export default withGovernanceSection(BilledPage);
+export default withGovernanceSection(BilledPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

@@ -2,7 +2,10 @@ import { Badge, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { BellPlus, Plus } from "lucide-react";
 
-import { withGovernanceSection } from "../../../ui/sections/governance-section-gate.tsx";
+import {
+  GOVERNANCE_BILLED_COST_FLAG,
+  withGovernanceSection,
+} from "../../../ui/sections/governance-section-gate.tsx";
 import { Link } from "../../elements/governance-link.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
@@ -71,4 +74,4 @@ function SignalsPage() {
   );
 }
 
-export default withGovernanceSection(SignalsPage);
+export default withGovernanceSection(SignalsPage, { releaseFlag: GOVERNANCE_BILLED_COST_FLAG });

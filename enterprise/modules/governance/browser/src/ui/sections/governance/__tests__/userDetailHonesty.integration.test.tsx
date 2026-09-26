@@ -40,7 +40,7 @@ const renderPage = () =>
   renderWithGovernanceHost(<UserDetailPage />, {
     host: fakeGovernanceHost({
       params: { id: ACTOR },
-      permissions: ["activityMonitor:view"],
+      permissions: ["governance:view", "activityMonitor:view"],
     }),
   });
 
