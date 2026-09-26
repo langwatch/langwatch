@@ -8,6 +8,7 @@ import type {
 import {
   ScheduleInactiveError,
   ScheduleNotFoundError,
+  ScheduleRunInProgressError,
   ScheduleSlotNotStaleError,
 } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -110,7 +111,7 @@ export class SchedulerOpsService {
     return this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
   }
 
-  /** Asks automation for one extra send; the schedule's own process dispatches it. */
+  /** Asks automation for one extra send; refused while a previous run-now is still in flight. */
   async runNow({
     scheduleId,
     actorUserId,
@@ -121,6 +122,9 @@ export class SchedulerOpsService {
     const row = await this.getSchedule(scheduleId);
     if (!row.active) {
       this.refuse({ error: new ScheduleInactiveError(), scheduleId });
+    }
+    if (row.runningSlot) {
+      this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
     }
 
     await this.schedules.requestReportRun({ projectId: row.projectId, triggerId: row.triggerId });
@@ -239,7 +243,7 @@ function toOpsScheduledJob({
     lastSlot: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     active: row.active,
     createdAt: row.createdAt.toISOString(),
-    currentSlot: null,
+    currentSlot: row.runningSlot ? row.runningSlot.toISOString() : null,
     attempts: 0,
     lastError: null,
     updatedAt: row.updatedAt.toISOString(),

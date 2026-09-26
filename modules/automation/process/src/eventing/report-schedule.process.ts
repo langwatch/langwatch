@@ -1,5 +1,6 @@
 import type {
   ReportRunRequestedEventData,
+  ReportRunSettledEventData,
   ReportScheduleConfiguredEventData,
   ReportScheduleTargetEventData,
 } from "@langwatch/automation-contract";
@@ -24,6 +25,8 @@ export type ReportScheduleState = {
   active: boolean;
   lastSlot: number | null;
   lastRunRequestId: string | null;
+  /** A run-now whose dispatch is neither sent nor finally failed; absent on pre-guard instances. */
+  pendingRun?: { requestId: string; slot: number } | null;
 };
 
 export const INITIAL_REPORT_SCHEDULE_STATE: ReportScheduleState = {
@@ -33,6 +36,7 @@ export const INITIAL_REPORT_SCHEDULE_STATE: ReportScheduleState = {
   active: false,
   lastSlot: null,
   lastRunRequestId: null,
+  pendingRun: null,
 };
 
 /** The report's first run strictly after `after`, in its own timezone. */
@@ -108,25 +112,38 @@ export const reportScheduleResumed: Handler<ReportScheduleTargetEventData> = (
     after: Math.max(context.at, context.now),
   });
 
-/** Main's run-now made the slot due at once; the cadence after it is unchanged. */
+/** Main's run-now made the slot due at once and refused while a run was in flight. */
 export const reportRunRequested: Handler<ReportRunRequestedEventData> = (state, data, context) => {
   const after = Math.max(context.at, context.now);
-  if (!state.active || state.lastRunRequestId === data.requestId) {
+  if (!state.active || state.lastRunRequestId === data.requestId || state.pendingRun) {
     return settle({ state, after });
   }
   return settle({
-    state: { ...state, lastSlot: context.at, lastRunRequestId: data.requestId },
+    state: {
+      ...state,
+      lastSlot: context.at,
+      lastRunRequestId: data.requestId,
+      pendingRun: { requestId: data.requestId, slot: context.at },
+    },
     after,
     intents: [
       context.intents.dispatchReport(`run:${data.requestId}`, {
         triggerId: data.triggerId,
         slot: context.at,
+        requestId: data.requestId,
       }),
     ],
   });
 };
 
-/** A fleet that was down fires the missed slot once, then resumes from the present. */
+/** The run-now's dispatch was sent or finally failed, so another may be asked for. */
+export const reportRunSettled: Handler<ReportRunSettledEventData> = (state, data, context) =>
+  settle({
+    state: state.pendingRun?.requestId === data.requestId ? { ...state, pendingRun: null } : state,
+    after: Math.max(context.at, context.now),
+  });
+
+/** A down fleet fires the missed slot once; a scheduled send supersedes an unsettled run-now. */
 export const reportScheduleWake: WakeHandler<ReportScheduleState, ReportScheduleIntents> = (
   state,
   context,
@@ -135,7 +152,7 @@ export const reportScheduleWake: WakeHandler<ReportScheduleState, ReportSchedule
     return { state, nextWakeAt: null, intents: [] };
   }
   return settle({
-    state: { ...state, lastSlot: context.at },
+    state: { ...state, lastSlot: context.at, pendingRun: null },
     after: Math.max(context.at, context.now),
     intents: [
       context.intents.dispatchReport(`report:${context.at}`, {

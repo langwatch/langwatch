@@ -32,6 +32,8 @@ export const operatorReportScheduleSchema = z.object({
   projectId: z.string(),
   cron: z.string(),
   timezone: z.string(),
+  /** The slot of a run-now whose dispatch has not yet been sent or finally failed. */
+  runningSlot: z.date().nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

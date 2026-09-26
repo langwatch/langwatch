@@ -542,6 +542,7 @@ export class AutomationApp implements AutomationApi {
       ...this.#settlement,
       retention: processStore,
       reports: this.#reportDispatcher,
+      reportRuns: this.#reportSchedules,
     });
   }
 

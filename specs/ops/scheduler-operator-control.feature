@@ -113,8 +113,7 @@ Feature: Operator control over the scheduler
     Then the schedule shows as running
     And a failure increments its attempts and records its error like any other run
 
-  # Gap row 54: report run-now has no in-flight guard yet.
-  @unimplemented
+  @unit
   Scenario: A schedule that is already running refuses to run again
     Given a schedule whose slot a worker has claimed and is executing
     When an operator runs it now

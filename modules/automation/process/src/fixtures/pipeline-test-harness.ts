@@ -10,7 +10,10 @@ import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
 } from "../eventing/automation.pipeline.ts";
-import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
+import type {
+  ReportDispatcher,
+  ReportRunSettlement,
+} from "../eventing/report-schedule.intent.ts";
 import { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
 
 class InertSettlementExecutor extends AutomationSettlementExecutor {
@@ -54,17 +57,20 @@ export function automationProcessDefinition({
   scheduledIntents = new InertScheduledIntents(),
   retention = new InertIntentRetention(),
   reports = { dispatch: async () => {} },
+  reportRuns = { settleRun: async () => {} },
 }: {
   name: "triggerSettlement" | "graphAlertSweep" | "webhookDeliveryPrune" | "reportSchedule";
   scheduledIntents?: AutomationScheduledIntent;
   retention?: AutomationIntentRetentionRepository;
   reports?: ReportDispatcher;
+  reportRuns?: ReportRunSettlement;
 }): ProcessManagerDefinition {
   const dependencies: AutomationsPipelineDeps = {
     settlement: new InertSettlementExecutor(),
     scheduledIntents,
     retention,
     reports,
+    reportRuns,
   };
   const pipeline = createAutomationsPipeline(dependencies);
   const definition = pipeline.processManagers.get(name);

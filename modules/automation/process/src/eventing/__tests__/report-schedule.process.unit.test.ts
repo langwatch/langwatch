@@ -4,10 +4,15 @@ import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { automationProcessDefinition } from "../../fixtures/pipeline-test-harness.ts";
-import { reportDispatchIntentSchema } from "../report-schedule.intent.ts";
+import {
+  REPORT_DISPATCH_MAX_ATTEMPTS,
+  reportDispatchIntentSchema,
+  type ReportRunSettlement,
+} from "../report-schedule.intent.ts";
 import {
   INITIAL_REPORT_SCHEDULE_STATE,
   reportRunRequested,
+  reportRunSettled,
   reportScheduleConfigured,
   reportSchedulePaused,
   reportScheduleResumed,
@@ -30,6 +35,25 @@ function context(now: number) {
       dispatchReport: { schema: reportDispatchIntentSchema, run: async () => {} },
     }),
   };
+}
+
+function intentContext({ messageKey, attempt }: { messageKey: string; attempt: number }) {
+  return {
+    processName: "reportSchedule",
+    projectId: "project-1",
+    processKey: "trigger-1",
+    tenantId: "project-1",
+    messageKey,
+    attempt,
+  };
+}
+
+class RecordingRuns implements ReportRunSettlement {
+  readonly settled: string[] = [];
+
+  async settleRun(input: { requestId: string; outcome: string }): Promise<void> {
+    this.settled.push(`${input.requestId}:${input.outcome}`);
+  }
 }
 
 function configuredAt(now: number): ProcessEvolution<ReportScheduleState> {
@@ -128,6 +152,126 @@ describe("report schedule process", () => {
         expect(first.nextWakeAt).toBe(MONDAY_0900);
         expect(repeat.intents).toEqual([]);
       });
+    });
+  });
+
+  describe("given a run-now whose dispatch has not settled", () => {
+    const requested = () =>
+      reportRunRequested(
+        configuredAt(MONDAY_0800).state,
+        { triggerId: "trigger-1", requestId: "request-1" },
+        context(MONDAY_0800),
+      );
+
+    describe("when another run-now is requested", () => {
+      /** @scenario "A run-now asked for while another is in flight sends nothing" */
+      it("dispatches nothing more, so the report is sent once", () => {
+        const second = reportRunRequested(
+          requested().state,
+          { triggerId: "trigger-1", requestId: "request-2" },
+          context(MONDAY_0800 + 5),
+        );
+
+        expect(second.intents).toEqual([]);
+        expect(second.state.pendingRun).toEqual({ requestId: "request-1", slot: MONDAY_0800 });
+        expect(second.nextWakeAt).toBe(MONDAY_0900);
+      });
+    });
+
+    describe("when its dispatch settles", () => {
+      /** @scenario "A run-now settles when its report is sent or finally fails" */
+      it("accepts the next run-now, and ignores a settlement for another request", () => {
+        const stray = reportRunSettled(
+          requested().state,
+          { triggerId: "trigger-1", requestId: "request-0", outcome: "sent" },
+          context(MONDAY_0800 + 1),
+        );
+        const settled = reportRunSettled(
+          stray.state,
+          { triggerId: "trigger-1", requestId: "request-1", outcome: "failed" },
+          context(MONDAY_0800 + 2),
+        );
+        const next = reportRunRequested(
+          settled.state,
+          { triggerId: "trigger-1", requestId: "request-2" },
+          context(MONDAY_0800 + 3),
+        );
+
+        expect(stray.state.pendingRun).toEqual({ requestId: "request-1", slot: MONDAY_0800 });
+        expect(settled.state.pendingRun).toBeNull();
+        expect(settled.nextWakeAt).toBe(MONDAY_0900);
+        expect(next.intents?.map(({ messageKey }) => messageKey)).toEqual(["run:request-2"]);
+      });
+    });
+
+    describe("when the next scheduled slot fires first", () => {
+      /** @scenario "A scheduled send supersedes a run-now that never settled" */
+      it("sends the slot and accepts run-now again", () => {
+        const wake = reportScheduleWake(requested().state, context(MONDAY_0900));
+
+        expect(wake.intents?.map(({ messageKey }) => messageKey)).toEqual([
+          `report:${MONDAY_0900}`,
+        ]);
+        expect(wake.state.pendingRun).toBeNull();
+      });
+    });
+  });
+
+  describe("given the dispatch intent of a run-now", () => {
+    const run = ({
+      runs,
+      dispatch,
+      attempt,
+    }: {
+      runs: RecordingRuns;
+      dispatch: () => Promise<void>;
+      attempt: number;
+    }) =>
+      automationProcessDefinition({
+        name: "reportSchedule",
+        reports: { dispatch },
+        reportRuns: runs,
+      }).config.intents.dispatchReport!.run(
+        { triggerId: "trigger-1", slot: MONDAY_0800, requestId: "request-1" },
+        intentContext({ messageKey: "run:request-1", attempt }),
+      );
+
+    /** @scenario "A run-now settles when its report is sent or finally fails" */
+    it("settles as sent once the report is sent", async () => {
+      const runs = new RecordingRuns();
+
+      await run({ runs, dispatch: async () => {}, attempt: 1 });
+
+      expect(runs.settled).toEqual(["request-1:sent"]);
+    });
+
+    /** @scenario "A run-now settles when its report is sent or finally fails" */
+    it("leaves a retryable failure unsettled and settles the final attempt as failed", async () => {
+      const runs = new RecordingRuns();
+      const failing = async () => {
+        throw new Error("smtp down");
+      };
+
+      await expect(run({ runs, dispatch: failing, attempt: 1 })).rejects.toThrow("smtp down");
+      expect(runs.settled).toEqual([]);
+      await expect(
+        run({ runs, dispatch: failing, attempt: REPORT_DISPATCH_MAX_ATTEMPTS }),
+      ).rejects.toThrow("smtp down");
+      expect(runs.settled).toEqual(["request-1:failed"]);
+    });
+
+    it("never settles a scheduled slot's dispatch, since no run-now waits on it", async () => {
+      const runs = new RecordingRuns();
+
+      await automationProcessDefinition({
+        name: "reportSchedule",
+        reportRuns: runs,
+      }).config.intents.dispatchReport!.run(
+        { triggerId: "trigger-1", slot: MONDAY_0900 },
+        intentContext({ messageKey: `report:${MONDAY_0900}`, attempt: 1 }),
+      );
+
+      expect(runs.settled).toEqual([]);
     });
   });
 });

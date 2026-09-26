@@ -2,8 +2,10 @@ import {
   reportActionParamsSchema,
   type OperatorReportSchedule,
   type ReportActionParams,
+  type ReportRunOutcome,
   type ReportSchedule,
   type ReportScheduleInput,
+  type Trigger,
 } from "@langwatch/automation-contract";
 import type { EventingCommands, PersistedProcessInstance, ProcessStore } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
@@ -11,6 +13,7 @@ import { Temporal, toDate } from "@langwatch/time";
 
 import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationsPipeline } from "../eventing/automation.pipeline.ts";
+import type { ReportRunSettlement } from "../eventing/report-schedule.intent.ts";
 import {
   REPORT_SCHEDULE_PROCESS_NAME,
   type ReportScheduleState,
@@ -24,7 +27,7 @@ type ReportScheduleConnection = Readonly<{
 }>;
 
 /** Drives each report automation's `reportSchedule` process manager and reads its state back. */
-export class ReportScheduleService {
+export class ReportScheduleService implements ReportRunSettlement {
   #commands: EventingCommands<AutomationsPipeline> | undefined;
 
   private constructor(
@@ -89,6 +92,21 @@ export class ReportScheduleService {
     });
   }
 
+  /** Records how a run-now's dispatch ended, so the schedule accepts the next one. */
+  async settleRun(input: {
+    projectId: string;
+    triggerId: string;
+    requestId: string;
+    outcome: ReportRunOutcome;
+  }): Promise<void> {
+    await this.senders().settleReportRun.send({
+      ...this.envelope(input.projectId),
+      triggerId: input.triggerId,
+      requestId: input.requestId,
+      outcome: input.outcome,
+    });
+  }
+
   async setActive(input: { projectId: string; triggerId: string; active: boolean }): Promise<void> {
     const target = { projectId: input.projectId, triggerId: input.triggerId };
     if (input.active) {
@@ -137,26 +155,17 @@ export class ReportScheduleService {
     return schedules;
   }
 
-  /** Every active report's configured schedule, across projects; one never configured is absent. */
+  /** Every report that is not deleted, across projects, paused ones included. */
   async findAllAcrossProjects(): Promise<OperatorReportSchedule[]> {
-    const targets = await this.triggers.findActiveReportTargets();
+    const targets = await this.triggers.findAllReportTargets();
     const reportIds = new Set(targets.map((target) => target.id));
     const projectIds = [...new Set(targets.map((target) => target.projectId))];
     const schedules: OperatorReportSchedule[] = [];
     for (const projectId of projectIds) {
       const triggers = await this.triggers.findAllByProjectId({ projectId });
-      for (const trigger of triggers) {
-        if (!reportIds.has(trigger.id)) continue;
+      for (const trigger of triggers.filter(({ id }) => reportIds.has(id))) {
         const instance = await this.findInstance({ projectId, triggerId: trigger.id });
-        if (!instance?.state.cron || !instance.state.timezone) continue;
-        schedules.push({
-          ...toReportSchedule({ triggerId: trigger.id, instance }),
-          projectId,
-          cron: instance.state.cron,
-          timezone: instance.state.timezone,
-          createdAt: trigger.createdAt,
-          updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(instance.updatedAt)),
-        });
+        schedules.push(...toOperatorSchedules({ projectId, trigger, instance }));
       }
     }
 
@@ -205,4 +214,46 @@ function toReportSchedule({
         : toDate(Temporal.Instant.fromEpochMilliseconds(state.lastSlot)),
     active: state.active,
   };
+}
+
+/** A report never scheduled while paused reads its cron from the saved automation instead. */
+function toOperatorSchedules({
+  projectId,
+  trigger,
+  instance,
+}: {
+  projectId: string;
+  trigger: Trigger;
+  instance: PersistedProcessInstance<ReportScheduleState> | null;
+}): OperatorReportSchedule[] {
+  if (instance?.state.cron && instance.state.timezone) {
+    const running = instance.state.pendingRun;
+    return [
+      {
+        ...toReportSchedule({ triggerId: trigger.id, instance }),
+        projectId,
+        cron: instance.state.cron,
+        timezone: instance.state.timezone,
+        runningSlot: running ? toDate(Temporal.Instant.fromEpochMilliseconds(running.slot)) : null,
+        createdAt: trigger.createdAt,
+        updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(instance.updatedAt)),
+      },
+    ];
+  }
+  const params = ReportScheduleService.findReportActionParams(trigger.actionParams);
+  if (instance || trigger.active || !params) return [];
+  return [
+    {
+      triggerId: trigger.id,
+      projectId,
+      cron: params.schedule.cron,
+      timezone: params.schedule.timezone,
+      nextRunAt: null,
+      lastRunAt: trigger.lastRunAt,
+      active: false,
+      runningSlot: null,
+      createdAt: trigger.createdAt,
+      updatedAt: trigger.updatedAt,
+    },
+  ];
 }

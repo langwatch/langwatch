@@ -1,6 +1,7 @@
 import {
   REPORT_SCHEDULE_EVENT_TYPES,
   reportRunRequestedEventDataSchema,
+  reportRunSettledEventDataSchema,
   reportScheduleConfiguredEventDataSchema,
   reportScheduleTargetEventDataSchema,
 } from "@langwatch/automation-contract";
@@ -33,11 +34,18 @@ export const reportRunRequestedEventSchema = z.object({
   data: reportRunRequestedEventDataSchema,
 });
 
+export const reportRunSettledEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(REPORT_SCHEDULE_EVENT_TYPES.RUN_SETTLED),
+  data: reportRunSettledEventDataSchema,
+});
+
 export const reportScheduleEventSchemas = [
   reportScheduleConfiguredEventSchema,
   reportSchedulePausedEventSchema,
   reportScheduleResumedEventSchema,
   reportRunRequestedEventSchema,
+  reportRunSettledEventSchema,
 ] as const;
 
 export type ReportScheduleEvent = z.infer<(typeof reportScheduleEventSchemas)[number]>;

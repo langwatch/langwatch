@@ -90,9 +90,45 @@ Feature: Automation ownership
   @unit
   Scenario: Each operator run-now is its own request
     Given a scheduled report
-    When an operator asks for a run now twice
+    When an operator asks for a run now, and again once the first was sent
     Then each request sends the report
     And its next scheduled send is unchanged
+
+  @unit
+  Scenario: A run-now asked for while another is in flight sends nothing
+    Given a report whose run-now has been neither sent nor finally failed
+    When another run-now is asked for
+    Then nothing more is dispatched
+    And the report is sent once
+
+  @unit
+  Scenario: A run-now settles when its report is sent or finally fails
+    Given a run-now being dispatched
+    When the report is sent, or its final delivery attempt fails
+    Then the report's schedule records the run as settled
+    And the next run-now is accepted
+    But a failure that will be retried leaves the run in flight
+
+  @unit
+  Scenario: A scheduled send supersedes a run-now that never settled
+    Given a run-now whose settlement was never recorded
+    When the report's next scheduled slot fires
+    Then the slot is sent
+    And run-now is accepted again
+
+  @unit
+  Scenario: The operator scheduler lists paused reports and leaves deleted ones out
+    Given a report paused by its customer, one paused before it was ever scheduled, and a deleted one
+    When the operator scheduler asks automation for its report schedules
+    Then both paused reports are listed as inactive with their cron
+    And the deleted report is not listed
+
+  @unit
+  Scenario: The operator scheduler shows a run-now in flight until it settles
+    Given a report with a run-now being dispatched
+    When the operator scheduler asks automation for its report schedules
+    Then the report shows the run's slot as in flight
+    And once the run settles it no longer does
 
   @unit
   Scenario: The api sends report schedule commands but never runs the schedule

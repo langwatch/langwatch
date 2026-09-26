@@ -12,6 +12,7 @@ import {
   INITIAL_REPORT_SCHEDULE_STATE,
   REPORT_SCHEDULE_PROCESS_NAME,
   reportRunRequested,
+  reportRunSettled,
   reportScheduleConfigured,
   reportSchedulePaused,
   reportScheduleResumed,
@@ -83,6 +84,7 @@ function processBackedSchedules(triggers: MemoryTriggerRepository) {
       pauseReportSchedule: sender("pause", reportSchedulePaused),
       resumeReportSchedule: sender("resume", reportScheduleResumed),
       requestReportRun: sender("run", reportRunRequested),
+      settleReportRun: sender("settle", reportRunSettled),
     },
   });
   return { service, sent, store };
@@ -220,6 +222,84 @@ describe("ReportScheduleService", () => {
     });
   });
 
+  describe("given a customer-paused report, one paused before it was ever scheduled, and a deleted one", () => {
+    /** @scenario "The operator scheduler lists paused reports and leaves deleted ones out" */
+    it("lists both paused reports as inactive with their cron and leaves the deleted one out", async () => {
+      const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+      await report(triggers, "paused");
+      await report(triggers, "legacy", false);
+      await report(triggers, "deleted");
+      const { service } = processBackedSchedules(triggers);
+      await service.sync({
+        projectId: "p",
+        triggerId: "paused",
+        schedule: { cron: "0 9 * * *", timezone: "UTC" },
+      });
+      await service.remove({ projectId: "p", triggerId: "paused" });
+      await triggers.update({ id: "paused", projectId: "p", active: false });
+      await triggers.update({ id: "deleted", projectId: "p", deleted: true });
+
+      const schedules = (await service.findAllAcrossProjects()).toSorted((left, right) =>
+        left.triggerId.localeCompare(right.triggerId),
+      );
+
+      expect(
+        schedules.map(({ triggerId, cron, active, nextRunAt, runningSlot }) => ({
+          triggerId,
+          cron,
+          active,
+          nextRunAt,
+          runningSlot,
+        })),
+      ).toEqual([
+        {
+          triggerId: "legacy",
+          cron: "0 9 * * *",
+          active: false,
+          nextRunAt: null,
+          runningSlot: null,
+        },
+        {
+          triggerId: "paused",
+          cron: "0 9 * * *",
+          active: false,
+          nextRunAt: null,
+          runningSlot: null,
+        },
+      ]);
+    });
+  });
+
+  describe("given a report with a run-now in flight", () => {
+    /** @scenario "The operator scheduler shows a run-now in flight until it settles" */
+    it("shows the run's slot until its dispatch settles", async () => {
+      const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
+      await report(triggers, "r");
+      const { service, store } = processBackedSchedules(triggers);
+      await service.sync({
+        projectId: "p",
+        triggerId: "r",
+        schedule: { cron: "0 9 * * *", timezone: "UTC" },
+      });
+      const ref = { processName: REPORT_SCHEDULE_PROCESS_NAME, projectId: "p", processKey: "r" };
+
+      await service.requestRun({ projectId: "p", triggerId: "r" });
+      const [running] = await service.findAllAcrossProjects();
+      const requestId = (await store.findByRef<ReportScheduleState>({ ref }))?.state
+        .lastRunRequestId;
+      await service.settleRun({
+        projectId: "p",
+        triggerId: "r",
+        requestId: requestId ?? "",
+        outcome: "sent",
+      });
+      const [settled] = await service.findAllAcrossProjects();
+
+      expect(running?.runningSlot).toEqual(new Date("2026-01-01T08:00:00Z"));
+      expect(settled?.runningSlot).toBeNull();
+    });
+  });
+
   describe("given a scheduled report", () => {
     /** @scenario "An operator's pause and resume drive the report's schedule" */
     it("holds no wake while paused and wakes at the next slot once resumed", async () => {
@@ -246,7 +326,7 @@ describe("ReportScheduleService", () => {
     });
 
     /** @scenario "Each operator run-now is its own request" */
-    it("sends each run-now as a distinct request and keeps the cadence", async () => {
+    it("sends each run-now as a distinct request once the previous one settled", async () => {
       const triggers = MemoryTriggerRepository.create(MemoryAutomationStore.create());
       await report(triggers, "r");
       const { service, sent, store } = processBackedSchedules(triggers);
@@ -259,10 +339,16 @@ describe("ReportScheduleService", () => {
 
       await service.requestRun({ projectId: "p", triggerId: "r" });
       const first = (await store.findByRef<ReportScheduleState>({ ref }))?.state.lastRunRequestId;
+      await service.settleRun({
+        projectId: "p",
+        triggerId: "r",
+        requestId: first ?? "",
+        outcome: "sent",
+      });
       await service.requestRun({ projectId: "p", triggerId: "r" });
       const second = (await store.findByRef<ReportScheduleState>({ ref }))?.state.lastRunRequestId;
 
-      expect(sent).toEqual(["configure:r", "run:r", "run:r"]);
+      expect(sent).toEqual(["configure:r", "run:r", "settle:r", "run:r"]);
       expect(first).toEqual(expect.any(String));
       expect(second).not.toBe(first);
       expect((await service.getAll({ projectId: "p" }))[0]?.nextRunAt).toEqual(

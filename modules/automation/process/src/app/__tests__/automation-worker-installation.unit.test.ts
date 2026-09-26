@@ -128,6 +128,7 @@ describe("given the automation module installed on the worker role", () => {
       "automations:command:recordTriggerMatch",
       "automations:command:requestReportRun",
       "automations:command:resumeReportSchedule",
+      "automations:command:settleReportRun",
       "automations:subscriber:pm:reportSchedule",
       "automations:subscriber:pm:triggerSettlement",
     ]);

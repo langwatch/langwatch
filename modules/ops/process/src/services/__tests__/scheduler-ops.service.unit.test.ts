@@ -18,6 +18,7 @@ const schedule = (over: Partial<OperatorReportSchedule> = {}): OperatorReportSch
   nextRunAt: at(600_000),
   lastRunAt: at(-600_000),
   active: true,
+  runningSlot: null,
   createdAt: at(-86_400_000),
   updatedAt: at(-1_000),
   ...over,
@@ -163,6 +164,31 @@ describe("SchedulerOpsService", () => {
           await codeOf(() => service.runNow({ scheduleId: "report_1", actorUserId: "u1" })),
         ).toBe("schedule_inactive");
         expect(commands).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a schedule with a run-now still in flight", () => {
+    describe("when the operator lists it", () => {
+      it("shows the run's slot as the one in flight", async () => {
+        const { service } = makeService([schedule({ runningSlot: at(-1_000) })]);
+
+        const [job] = await service.listScheduledJobs({ limit: 10 });
+
+        expect(job?.currentSlot).toBe(at(-1_000).toISOString());
+      });
+    });
+
+    describe("when an operator runs it now", () => {
+      /** @scenario "A schedule that is already running refuses to run again" */
+      it("refuses, naming the run in progress, and asks for no run", async () => {
+        const { service, audit, commands } = makeService([schedule({ runningSlot: at(-1_000) })]);
+
+        expect(
+          await codeOf(() => service.runNow({ scheduleId: "report_1", actorUserId: "u1" })),
+        ).toBe("schedule_run_in_progress");
+        expect(commands).toEqual([]);
+        expect(audit.entries).toEqual([]);
       });
     });
   });

@@ -2,6 +2,7 @@ import {
   REPORT_SCHEDULE_COMMAND_TYPES,
   REPORT_SCHEDULE_EVENT_TYPES,
   reportRunRequestedEventDataSchema,
+  reportRunSettledEventDataSchema,
   reportScheduleConfiguredEventDataSchema,
   reportScheduleTargetEventDataSchema,
 } from "@langwatch/automation-contract";
@@ -51,5 +52,16 @@ export const RequestReportRunCommand = defineCommand({
   schema: reportRunRequestedEventDataSchema,
   aggregateId: ({ triggerId }) => triggerId,
   idempotencyKey: ({ triggerId, requestId }) => `${triggerId}:report_run:${requestId}`,
+  spanAttributes: ({ triggerId }) => ({ "automation.trigger.id": triggerId }),
+});
+
+export const SettleReportRunCommand = defineCommand({
+  commandType: REPORT_SCHEDULE_COMMAND_TYPES.SETTLE_RUN,
+  eventType: REPORT_SCHEDULE_EVENT_TYPES.RUN_SETTLED,
+  eventVersion: REPORT_SCHEDULE_EVENT_VERSION,
+  aggregateType: "trigger",
+  schema: reportRunSettledEventDataSchema,
+  aggregateId: ({ triggerId }) => triggerId,
+  idempotencyKey: ({ triggerId, requestId }) => `${triggerId}:report_run_settled:${requestId}`,
   spanAttributes: ({ triggerId }) => ({ "automation.trigger.id": triggerId }),
 });

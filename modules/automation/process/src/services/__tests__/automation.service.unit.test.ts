@@ -148,6 +148,9 @@ class Triggers extends TriggerRepository {
   findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
     return Promise.resolve(this.reportTargets);
   }
+  findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return Promise.resolve(this.reportTargets);
+  }
   claimSend(input: { triggerId: string; traceId: string; projectId: string }) {
     this.claimSendCalls.push(input);
     return Promise.resolve(true);

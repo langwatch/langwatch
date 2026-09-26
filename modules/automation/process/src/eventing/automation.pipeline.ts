@@ -25,18 +25,22 @@ import {
   PauseReportScheduleCommand,
   RequestReportRunCommand,
   ResumeReportScheduleCommand,
+  SettleReportRunCommand,
 } from "./report-schedule.commands.ts";
 import { reportScheduleEventSchemas, type ReportScheduleEvent } from "./report-schedule.events.ts";
 import {
+  REPORT_DISPATCH_MAX_ATTEMPTS,
   REPORT_SCHEDULE_INTENT_TYPES,
   reportDispatchIntentSchema,
   runReportDispatch,
   type ReportDispatcher,
+  type ReportRunSettlement,
 } from "./report-schedule.intent.ts";
 import {
   INITIAL_REPORT_SCHEDULE_STATE,
   REPORT_SCHEDULE_PROCESS_NAME,
   reportRunRequested,
+  reportRunSettled,
   reportScheduleConfigured,
   reportSchedulePaused,
   reportScheduleResumed,
@@ -96,6 +100,7 @@ export interface AutomationsPipelineDeps {
   settlement: AutomationSettlementExecutor;
   retention: AutomationIntentRetentionRepository;
   reports: ReportDispatcher;
+  reportRuns: ReportRunSettlement;
 }
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */
@@ -118,6 +123,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
     .withCommand("pauseReportSchedule", PauseReportScheduleCommand)
     .withCommand("resumeReportSchedule", ResumeReportScheduleCommand)
     .withCommand("requestReportRun", RequestReportRunCommand)
+    .withCommand("settleReportRun", SettleReportRunCommand)
     .withProcessManager("triggerSettlement", (pm) =>
       pm
         .state<SettlementState>(INITIAL_SETTLEMENT_STATE)
@@ -216,14 +222,15 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
         .intent(
           REPORT_SCHEDULE_INTENT_TYPES.DISPATCH,
           reportDispatchIntentSchema,
-          runReportDispatch(deps.reports),
+          runReportDispatch({ dispatcher: deps.reports, runs: deps.reportRuns }),
         )
         .on(REPORT_SCHEDULE_EVENT_TYPES.CONFIGURED, reportScheduleConfigured)
         .on(REPORT_SCHEDULE_EVENT_TYPES.PAUSED, reportSchedulePaused)
         .on(REPORT_SCHEDULE_EVENT_TYPES.RESUMED, reportScheduleResumed)
         .on(REPORT_SCHEDULE_EVENT_TYPES.RUN_REQUESTED, reportRunRequested)
+        .on(REPORT_SCHEDULE_EVENT_TYPES.RUN_SETTLED, reportRunSettled)
         .onWake(reportScheduleWake)
-        .outbox({ maxAttempts: 5, leaseDurationMs: 300_000 }),
+        .outbox({ maxAttempts: REPORT_DISPATCH_MAX_ATTEMPTS, leaseDurationMs: 300_000 }),
     )
     .withProcessManager("graphAlertSweep", (pm) =>
       pm

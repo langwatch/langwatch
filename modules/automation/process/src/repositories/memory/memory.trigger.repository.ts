@@ -59,6 +59,14 @@ export class MemoryTriggerRepository extends TriggerRepository {
     );
   }
 
+  findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return Promise.resolve(
+      this.rows()
+        .filter((row) => row.triggerKind === "REPORT" && !row.deleted)
+        .map((row) => ({ id: row.id, projectId: row.projectId, actionParams: row.actionParams })),
+    );
+  }
+
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
     if (this.claimed(input)) return Promise.resolve(false);
     this.memory.sends.push({ ...input });

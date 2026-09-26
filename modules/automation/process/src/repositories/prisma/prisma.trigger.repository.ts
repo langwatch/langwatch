@@ -88,6 +88,15 @@ export class PrismaTriggerRepository extends TriggerRepository {
 			-- @tenancy: report-schedule reconciliation cross-tenant sweep (worker boot)
 		`;
   }
+  async findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return this.database.$queryRaw<ReportScheduleTarget[]>`
+			SELECT "id", "projectId", "actionParams"
+			FROM "Trigger"
+			WHERE "triggerKind" = 'REPORT'
+			  AND "deleted" = false
+			-- @tenancy: operator scheduler cross-tenant listing (ops)
+		`;
+  }
   async claimSend(input: {
     triggerId: string;
     traceId: string;

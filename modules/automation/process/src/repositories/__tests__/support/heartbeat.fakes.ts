@@ -27,6 +27,10 @@ export class HeartbeatTriggerRepository extends TriggerRepository {
     return unavailable();
   }
 
+  findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return unavailable();
+  }
+
   claimSend(): Promise<boolean> {
     return unavailable();
   }

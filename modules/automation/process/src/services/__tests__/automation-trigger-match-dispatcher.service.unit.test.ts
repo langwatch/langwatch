@@ -40,6 +40,7 @@ describe("AutomationTriggerMatchDispatcherService", () => {
         pauseReportSchedule: unused(),
         resumeReportSchedule: unused(),
         requestReportRun: unused(),
+        settleReportRun: unused(),
       });
 
       await dispatcher.send(match);

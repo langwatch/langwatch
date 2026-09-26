@@ -18,6 +18,8 @@ export abstract class TriggerRepository {
     since?: number;
   }): Promise<AutomationUsageCount>;
   abstract findActiveReportTargets(): Promise<ReportScheduleTarget[]>;
+  /** Every report that is not deleted, paused ones included, across projects. */
+  abstract findAllReportTargets(): Promise<ReportScheduleTarget[]>;
   abstract claimSend(input: {
     triggerId: string;
     traceId: string;
