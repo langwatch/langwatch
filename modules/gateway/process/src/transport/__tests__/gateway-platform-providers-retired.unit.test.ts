@@ -1,5 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
+  bindRestMiddleware,
   createRestRuntime,
   type IdempotentRunner,
   type RestErrorHandler,
@@ -13,7 +14,11 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayProjectCredential,
+} from "../gateway-platform.rest.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -36,6 +41,16 @@ const runOnce: IdempotentRunner = async ({ handler }) => {
   return { isReplayed: false, status: response.status, response };
 };
 
+const projectDoor = () => ({
+  actor: { type: "api_key" as const, id: "api-key-1" },
+  scope: { tier: "project" as const, id: PROJECT_ID },
+});
+
+const keyDoor = () => ({
+  actor: { type: "user" as const, id: "user-1" },
+  scope: { tier: "organization" as const, id: "organization-1" },
+});
+
 /** The tombstones reach no operation, so the fixture needs no members. */
 function mountedPlatform() {
   const app = createApiFixture<GatewayApi>({});
@@ -44,15 +59,21 @@ function mountedPlatform() {
     // whole family refuses to mount without the port. It runs and keeps no
     // receipt: no test here replays anything.
     idempotency: runOnce,
-    identity: {
-      authenticate: () => ({
-        actor: { type: "api_key", id: "api-key-1" },
-        scope: { tier: "project", id: PROJECT_ID },
-      }),
-    },
+    identity: { authenticate: projectDoor, identify: projectDoor },
+    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
   });
 
-  return runtime.mount(gatewayPlatformRest.router(), { app: () => app, onError: renderError });
+  return runtime.mount(gatewayPlatformRest.router(), {
+    app: () => app,
+    onError: renderError,
+    facts: [
+      bindRestMiddleware(gatewayKeyCaller, () => ({
+        kind: "project" as const,
+        projectId: PROJECT_ID,
+      })),
+      bindRestMiddleware(gatewayProjectCredential, () => ({ kind: "legacyProjectKey" as const })),
+    ],
+  });
 }
 
 const RETIRED = [

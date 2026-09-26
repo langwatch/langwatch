@@ -335,6 +335,19 @@ describe("the CLI login key default", () => {
 
     expect(new Set(computed)).toEqual(new Set(defaultCliKeyPermissions()));
   });
+
+  describe("when the login asked for team management", () => {
+    /** @scenario The approval screen includes team management when the CLI asked for it */
+    it("adds team:manage and nothing else", () => {
+      const plain = new Set<string>(defaultCliKeyPermissions());
+      const withTeams = defaultCliKeyPermissions({ teamManagement: true });
+
+      expect(withTeams).toContain("team:manage");
+      expect(withTeams.filter((permission) => !plain.has(permission))).toEqual(["team:manage"]);
+      expect(withTeams).not.toContain("organization:manage");
+      expect(withTeams).not.toContain("organization:delete");
+    });
+  });
 });
 
 describe("contract: computePermissionsFromSelections → CustomRolePermissionsSchema", () => {

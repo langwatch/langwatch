@@ -1,4 +1,10 @@
-import { bindRestCredential, bindRestMiddleware, ForbiddenError } from "@langwatch/api/rest";
+import {
+  bindRestCredential,
+  bindRestMiddleware,
+  ForbiddenError,
+  keyCredentialOfRequest,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -16,7 +22,11 @@ import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayInternalRest } from "./transport/gateway-internal.rest.ts";
-import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
+import {
+  gatewayKeyCaller,
+  gatewayPlatformRest,
+  gatewayProjectCredential,
+} from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendEventTrpcTransport } from "./transport/gateway-spend-event.trpc.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
@@ -53,6 +63,23 @@ export const gatewayServer = defineServerModule("gateway")
       // The callback arrives publicly and the application verifies the raw bytes
       // against the provider row's own stored secret, so the header is all the
       // transport carries.
+      // Organization-owned rows take any API key; the application asks the
+      // permission at the reach the operation needs.
+      bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),
+      // A project-door write authorizes as the key that called it, not as a
+      // browser session it never had.
+      bindRestMiddleware(gatewayProjectCredential, (context) => {
+        const resolved = projectCredentialOfRequest(context.req.raw);
+
+        return resolved.type === "apiKey"
+          ? {
+              kind: "apiKey" as const,
+              apiKeyId: resolved.apiKeyId,
+              userId: resolved.userId,
+              organizationId: resolved.organizationId,
+            }
+          : { kind: "legacyProjectKey" as const };
+      }),
       bindRestMiddleware(elevenLabsSignature, (context) => ({
         signature: context.req.header("elevenlabs-signature"),
       })),

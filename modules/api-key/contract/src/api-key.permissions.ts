@@ -291,8 +291,16 @@ export const CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS: readonly AuthzPermission[] = 
   "team:manage",
 ];
 
-export function defaultCliKeyPermissions(): AuthzPermission[] {
+/**
+ * The permissions a CLI login key starts from. Team management stays out
+ * unless the login asked for it (`langwatch login --manage-teams`);
+ * organization management and deletion are never on a CLI login key.
+ */
+export function defaultCliKeyPermissions({
+  teamManagement = false,
+}: { teamManagement?: boolean } = {}): AuthzPermission[] {
   const excluded = new Set(CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS);
+  if (teamManagement) excluded.delete("team:manage");
   return categorizablePermissions().filter((permission) => !excluded.has(permission));
 }
 

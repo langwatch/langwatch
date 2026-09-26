@@ -30,6 +30,13 @@ export interface CreateGatewayBudgetOptions {
   cycleAnchorAt?: string;
 }
 
+/**
+ * A budget created partway through its window starts at zero: what its scope
+ * spent earlier in the window is not counted against it.
+ */
+export const BUDGET_COUNTS_FROM_CREATION_NOTE =
+  "This budget counts spend from now on. Spend earlier in the current window is not counted.";
+
 const ALLOWED_WINDOWS = [
   "minute",
   "hour",
@@ -139,6 +146,8 @@ export const createGatewayBudgetCommand = async (
             `${chalk.bold("Anchor:")}   ${new Date(budget.cycle_anchor_at).toLocaleString()}`,
           );
         }
+        console.log();
+        console.log(chalk.gray(BUDGET_COUNTS_FROM_CREATION_NOTE));
         console.log();
       },
     };

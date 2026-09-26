@@ -223,6 +223,59 @@ describe("given an organization admin", () => {
   });
 });
 
+describe("given the CLI asked for team management", () => {
+  const teamManagementLookup = {
+    outcome: "pending" as const,
+    userCode: "WDJB-MJHT",
+    status: "pending",
+    expiresAt: Date.now() + 600_000,
+    credentialType: "device_session" as const,
+    teamManagement: true,
+  };
+
+  describe("when an organization admin approves", () => {
+    /** @scenario The approval screen includes team management when the CLI asked for it */
+    it("sends team:manage with the organization binding", async () => {
+      const user = userEvent.setup();
+      state.bindings = [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "ADMIN" }];
+      const host = hostFor({ lookup: teamManagementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+      expect(await screen.findByText(/The CLI also asked to manage teams/)).toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Approve" })).not.toBeDisabled(),
+      );
+      await user.click(screen.getByRole("button", { name: "Approve" }));
+      await waitFor(() => expect(host.approvals).toHaveLength(1));
+
+      expect(host.approvals[0]!.keySelection?.bindings).toEqual([
+        { scopeType: "ORGANIZATION", scopeId: "org-1" },
+      ]);
+      expect(host.approvals[0]!.keySelection?.permissions).toContain("team:manage");
+      expect(host.approvals[0]!.keySelection?.permissions).not.toContain("organization:manage");
+    });
+  });
+
+  describe("when a member who cannot manage teams opens it", () => {
+    /** @scenario Team management is refused to a user who cannot manage teams */
+    it("says so and keeps approve unavailable", async () => {
+      const user = userEvent.setup();
+      state.bindings = [
+        { scopeType: "TEAM", scopeId: "team-1", role: "MEMBER" },
+        { scopeType: "TEAM", scopeId: "team-personal", role: "ADMIN" },
+      ];
+      const host = hostFor({ lookup: teamManagementLookup });
+      renderWithApiKeyHost(<CliAuthScreen />, host);
+      await confirmCode(user);
+
+      expect(await screen.findByText("You cannot manage teams here")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+      expect(host.approvals).toEqual([]);
+    });
+  });
+});
+
 describe("given a member of two shared teams", () => {
   /** @scenario regular member defaults to their own teams plus personal workspace */
   it("preselects the teams they hold and their own workspace, never the organization", async () => {
@@ -313,6 +366,7 @@ describe("given the CLI asked for a project API key", () => {
     status: "pending",
     expiresAt: Date.now() + 600_000,
     credentialType: "project_api_key" as const,
+    teamManagement: false,
   };
 
   describe("when the organization has shared projects", () => {
@@ -369,6 +423,7 @@ describe("given a second login is opened in the same tab", () => {
         status: "pending",
         expiresAt: Date.now() + 600_000,
         credentialType: "device_session",
+        teamManagement: false,
       },
     });
     rerender(

@@ -3,6 +3,12 @@ import { z } from "zod";
 export const deviceCodeRequestSchema = z.object({
   scopes: z.array(z.string()).optional(),
   credential_type: z.enum(["device_session", "project_api_key"]).default("device_session"),
+  /**
+   * `langwatch login --manage-teams`: the CLI key should also carry
+   * `team:manage`, which a CLI login key leaves out by default. Granted only
+   * when the approving person can manage teams in the organization.
+   */
+  team_management: z.boolean().default(false),
 });
 
 export const clientInfoSchema = z

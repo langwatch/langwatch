@@ -569,11 +569,17 @@ async function approve({
     );
   }
 
+  const teamManagement = record.team_management === true;
+  if (teamManagement) {
+    await assertCanGrantTeamManagement({ flow, person, organizationId: organization_id });
+  }
+
   const keySelection = await keySelectionFieldsFor({
     flow,
     person,
     organizationId: organization_id,
     requested: parsed.data.key_selection,
+    teamManagement,
   });
 
   await flow.sessions().approveDeviceCode({
@@ -848,13 +854,29 @@ async function keySelectionFieldsFor({
   person,
   organizationId,
   requested,
+  teamManagement,
 }: {
   flow: CliDeviceFlowCollaborators;
   person: CliBrowserSession;
   organizationId: string;
   requested: z.output<typeof approveRequestSchema>["key_selection"];
+  teamManagement: boolean;
 }): Promise<Readonly<{ keySelection?: CliKeySelection }>> {
   if (requested) {
+    // Team management is organization-wide: a key bound only to teams or
+    // projects cannot carry it, and dropping it quietly would leave the CLI
+    // refused on its first team command.
+    if (
+      teamManagement &&
+      !requested.bindings.some((binding) => binding.scope_type === "ORGANIZATION")
+    ) {
+      throw refused(
+        "team_management_needs_organization",
+        "Team management applies to the whole organization. Select the organization as the key's access, or run `langwatch login --device` without --manage-teams.",
+        400,
+      );
+    }
+
     const keySelection = await flow.apiKeys().validateCliSelection({
       userId: person.id,
       organizationId,
@@ -863,7 +885,7 @@ async function keySelectionFieldsFor({
           scopeType: binding.scope_type,
           scopeId: binding.scope_id,
         })),
-        permissions: requested.permissions,
+        permissions: withTeamManagement(requested.permissions, teamManagement),
       },
     });
 
@@ -890,8 +912,20 @@ async function keySelectionFieldsFor({
     const keySelection = await flow
       .apiKeys()
       .findDefaultCliSelection({ userId: person.id, organizationId });
+    if (!keySelection) return {};
 
-    return keySelection ? { keySelection } : {};
+    const organizationWide = keySelection.bindings.some(
+      (binding) => binding.scopeType === "ORGANIZATION",
+    );
+    return {
+      keySelection:
+        teamManagement && organizationWide
+          ? {
+              ...keySelection,
+              permissions: withTeamManagement(keySelection.permissions, true).toSorted(),
+            }
+          : keySelection,
+    };
   } catch (err) {
     logger.warn(
       { err, userId: person.id, organizationId },
@@ -899,6 +933,48 @@ async function keySelectionFieldsFor({
     );
 
     return {};
+  }
+}
+
+/** The permission `langwatch login --manage-teams` adds to the CLI key. */
+const TEAM_MANAGEMENT_PERMISSION = "team:manage";
+
+function withTeamManagement(permissions: readonly string[], teamManagement: boolean): string[] {
+  return teamManagement && !permissions.includes(TEAM_MANAGEMENT_PERMISSION)
+    ? [...permissions, TEAM_MANAGEMENT_PERMISSION]
+    : [...permissions];
+}
+
+/**
+ * Refuses `--manage-teams` by name for a person who cannot manage teams, before
+ * anything is stamped: a generic scope violation would not say which part of
+ * the approval was the problem.
+ */
+async function assertCanGrantTeamManagement({
+  flow,
+  person,
+  organizationId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  person: CliBrowserSession;
+  organizationId: string;
+}): Promise<void> {
+  try {
+    await flow.apiKeys().validateCliSelection({
+      userId: person.id,
+      organizationId,
+      selection: {
+        bindings: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        permissions: [TEAM_MANAGEMENT_PERMISSION],
+      },
+    });
+  } catch (error) {
+    if (!(error instanceof ApiKeyScopeViolationError)) throw error;
+    throw refused(
+      "team_management_not_permitted",
+      "You cannot manage teams in this organization, so the CLI key cannot include team management. Ask an organization admin, or run `langwatch login --device` without --manage-teams.",
+      403,
+    );
   }
 }
 
@@ -988,6 +1064,7 @@ async function startDeviceFlow({
 
   const record = await flow.sessions().startDeviceCode({
     credentialType: parsed.data.credential_type,
+    teamManagement: parsed.data.team_management,
   });
   const verificationUri = verificationUriOf(flow);
 
@@ -1034,6 +1111,9 @@ async function lookupDeviceFlow({
     // the approve-only flow, `project_api_key` shows a project picker whose
     // key is sent to the CLI. Defaults for records minted before the field.
     credential_type: record.credential_type ?? "device_session",
+    // The approval screen adds team management to the key's default
+    // permissions when the CLI asked for it with `--manage-teams`.
+    team_management: record.team_management === true,
   });
 }
 

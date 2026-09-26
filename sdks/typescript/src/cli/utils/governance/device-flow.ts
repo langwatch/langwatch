@@ -145,10 +145,13 @@ export interface DeviceFlowOptions {
  */
 export async function startDeviceCode(
   opts: DeviceFlowOptions,
-  init: { credentialType?: CredentialType } = {},
+  init: { credentialType?: CredentialType; teamManagement?: boolean } = {},
 ): Promise<DeviceCode> {
   const body: Record<string, unknown> = {};
   if (init.credentialType) body.credential_type = init.credentialType;
+  // Sent only when asked, so a login without --manage-teams reads exactly as
+  // it did before the flag existed.
+  if (init.teamManagement) body.team_management = true;
   const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", body);
   if (!dc.interval || dc.interval <= 0) dc.interval = 5;
   return dc;

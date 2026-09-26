@@ -112,6 +112,17 @@ describe("BudgetCreateDrawer", () => {
     cleanup();
   });
 
+  describe("when the drawer opens", () => {
+    /** @scenario The budget creation drawer notes that spend before creation is not counted */
+    it("says spend earlier in the current window is not counted", () => {
+      renderDrawer();
+
+      expect(screen.getByTestId("budget-counts-from-creation").textContent).toBe(
+        "The budget counts spend from when you create it. Spend earlier in the current window is not counted.",
+      );
+    });
+  });
+
   describe("given the server refused the scope as unreachable", () => {
     describe("when a different target is picked", () => {
       /** @scenario "The offer to keep an unreachable budget does not follow the form to another scope" */

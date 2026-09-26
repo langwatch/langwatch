@@ -31,6 +31,7 @@ function printAgentHintBanner(): void {
   console.log(
     chalk.gray("  --device                   AI tools / SSO (claude, codex, gemini, opencode)"),
   );
+  console.log(chalk.gray("  --device --manage-teams    same, and the key can also manage teams"));
   console.log(
     chalk.gray(
       "  --project [slug]           project SDK key into .env; with a slug, no browser (uses your device login)",
@@ -310,8 +311,20 @@ export const loginCommand = async (options?: {
   browser?: string;
   endpoint?: string;
   token?: string;
+  manageTeams?: boolean;
 }): Promise<void> => {
   try {
+    // Team management rides on the device login key only: a project key or
+    // a pre-minted token never passes through the approval that grants it.
+    if (options?.manageTeams && (options.project || options.apiKey || options.token)) {
+      console.error(
+        chalk.red(
+          "Error: --manage-teams applies to the device login. Run `langwatch login --device --manage-teams`.",
+        ),
+      );
+      process.exit(1);
+    }
+
     // First, so every flow below reads a config that already says how to run
     // this CLI; the Claude Code plugin's hooks look it up there.
     recordCliLocation();
@@ -335,8 +348,11 @@ export const loginCommand = async (options?: {
     // mints a personal virtual key bound to the user. This is the
     // governance-plane onboarding for enterprise users, distinct from the
     // single-user API-key flow below.
-    if (options?.device) {
-      await runDeviceFlowLogin({ browser: options.browser });
+    if (options?.device || options?.manageTeams) {
+      await runDeviceFlowLogin({
+        browser: options.browser,
+        teamManagement: options.manageTeams === true,
+      });
       return;
     }
 

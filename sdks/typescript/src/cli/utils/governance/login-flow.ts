@@ -45,6 +45,12 @@ export interface RunUnifiedLoginOptions {
    * wiring changes are printed; the rest is left to `langwatch login`.
    */
   isQuiet?: boolean;
+  /**
+   * `--manage-teams`: ask for the CLI key to also carry team management,
+   * which a CLI login leaves out by default. The approval page grants it only
+   * to a person who can manage teams in the organization.
+   */
+  teamManagement?: boolean;
 }
 
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
@@ -303,7 +309,13 @@ export async function runUnifiedLoginFlow(
     );
   }
 
-  const dc = await startDeviceCode({ baseUrl }, { credentialType: kind });
+  const dc = await startDeviceCode(
+    { baseUrl },
+    {
+      credentialType: kind,
+      teamManagement: kind === "device_session" && opts.teamManagement === true,
+    },
+  );
   const verifyURL =
     dc.verification_uri_complete ??
     `${normalizeEndpoint(dc.verification_uri)}?user_code=${encodeURIComponent(dc.user_code)}`;

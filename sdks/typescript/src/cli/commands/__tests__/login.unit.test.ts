@@ -207,6 +207,37 @@ describe("loginCommand", () => {
         expect(runDeviceFlowLogin).toHaveBeenCalledTimes(1);
         expect(runUnifiedLoginFlow).not.toHaveBeenCalled();
       });
+
+      /** @scenario A plain CLI login does not ask for team management */
+      it("does not ask for team management", async () => {
+        await loginCommand({ device: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ teamManagement: false }),
+        );
+      });
+    });
+
+    describe("when the command is invoked with --device --manage-teams", () => {
+      /** @scenario A CLI login with --manage-teams asks for team management */
+      it("asks the device login for team management", async () => {
+        await loginCommand({ device: true, manageTeams: true });
+
+        expect(runDeviceFlowLogin).toHaveBeenCalledWith(
+          expect.objectContaining({ teamManagement: true }),
+        );
+      });
+    });
+  });
+
+  describe("given --manage-teams with a project login", () => {
+    it("refuses, since only the device login key can carry team management", async () => {
+      await expect(loginCommand({ project: "checkout", manageTeams: true })).rejects.toThrow(
+        ProcessExitError,
+      );
+
+      expect(runDeviceFlowLogin).not.toHaveBeenCalled();
+      expect(fetchProjectKeyBySlug).not.toHaveBeenCalled();
     });
   });
 

@@ -20,6 +20,7 @@ import type {
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
 import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
+import type { GatewayKeyCaller, GatewayRequestCredential } from "./gateway-key-caller.schemas.ts";
 import type {
   GatewayPrincipalDailySpend,
   GatewayPrincipalModelSpend,
@@ -69,18 +70,18 @@ import type { VirtualKeyConfig } from "./virtual-key-config.ts";
 import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
 
 /**
- * The REST credential a project door presented, as this module is told about
- * it: a scoped API key acts as its owning user, a legacy project key carries
- * none and acts as a stable synthetic machine principal.
+ * Where a key caller's permission is asked. `caller` is the key's own reach:
+ * its project when it resolved one, else its organization. `organization` is
+ * the whole organization, for a write to an organization-owned row.
  */
-export type GatewayRequestCredential =
-  | Readonly<{
-      kind: "apiKey";
-      apiKeyId: string;
-      userId: string | null;
-      organizationId: string;
-    }>
-  | Readonly<{ kind: "legacyProjectKey" }>;
+export type GatewayKeyCallerReach = "caller" | "organization";
+
+/** A key caller the application authorized: its organization and who a write is recorded as. */
+export type GatewayAuthorizedKeyCaller = Readonly<{
+  organizationId: string;
+  actor: GatewayCaller;
+  actorUserId: string;
+}>;
 
 /** A minted or read virtual key, published in the public REST surface's snake_case shape. */
 export type GatewayVirtualKeySnakeDto = {
@@ -458,6 +459,16 @@ export interface GatewayApi extends GatewayInternalProtocol {
     actor: GatewayCaller;
     actorUserId: string;
   };
+  /**
+   * Authorizes any API key for one permission, at the key's own reach or at
+   * the whole organization. Refuses with `permission_denied` naming the
+   * permission, never with a credential error: the key itself was valid.
+   */
+  authorizeKeyCaller(input: {
+    caller: GatewayKeyCaller;
+    permission: string;
+    reach: GatewayKeyCallerReach;
+  }): Promise<GatewayAuthorizedKeyCaller>;
   /** Tenant-wide write by project credential, checked at the organization. */
   authorizeOrganizationWideOperation(input: {
     actor: GatewayCaller;

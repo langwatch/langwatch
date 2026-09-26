@@ -42,6 +42,7 @@ type LookupState =
       status: string;
       expiresAt: number;
       credentialType: CliCredentialType;
+      teamManagement: boolean;
     }
   | { kind: "error"; message: string }
   | { kind: "expired" };
@@ -213,6 +214,7 @@ export default function CliAuthScreen() {
         status: result.status,
         expiresAt: result.expiresAt,
         credentialType: result.credentialType,
+        teamManagement: result.teamManagement,
       });
     })();
     return () => {
@@ -223,6 +225,9 @@ export default function CliAuthScreen() {
   const credentialType: CliCredentialType =
     lookup.kind === "ready" ? lookup.credentialType : "device_session";
   const requiresProject = credentialType === "project_api_key";
+  // `langwatch login --manage-teams` asked for team management on the key.
+  const requestsTeamManagement =
+    lookup.kind === "ready" && !requiresProject && lookup.teamManagement;
 
   // The user's own role bindings in the picked org: the ceiling the CLI key
   // can never exceed. Drives the scope defaults and which permission rows
@@ -315,8 +320,23 @@ export default function CliAuthScreen() {
   // one permission.
   const defaultCliKeyPermissionsHeld = useMemo<string[]>(() => {
     const held = new Set(cliKeyUserPermissions);
-    return defaultCliKeyPermissions().filter((permission) => held.has(permission));
-  }, [cliKeyUserPermissions]);
+    return defaultCliKeyPermissions({ teamManagement: requestsTeamManagement }).filter(
+      (permission) => held.has(permission),
+    );
+  }, [cliKeyUserPermissions, requestsTeamManagement]);
+
+  // Team management rides on the whole organization. A person who cannot
+  // manage teams there is told so here, and the approval would be refused.
+  const cannotGrantTeamManagement =
+    requestsTeamManagement &&
+    !myBindings.isLoading &&
+    selectedScopes.length > 0 &&
+    !cliKeyUserPermissions.includes("team:manage");
+  const teamManagementNeedsOrganization =
+    requestsTeamManagement &&
+    !cannotGrantTeamManagement &&
+    selectedScopes.length > 0 &&
+    !selectedScopes.some((scopeEntry) => scopeEntry.scopeType === "ORGANIZATION");
 
   // The customized rows, re-narrowed to the ceiling of whatever is selected
   // NOW. Changing the scopes after customizing shrinks the ceiling, and a
@@ -357,7 +377,11 @@ export default function CliAuthScreen() {
   // empty permission list.
   const isDeviceSessionSelectionIncomplete =
     !requiresProject &&
-    (myBindings.isLoading || selectedScopes.length === 0 || cliKeyPermissions.length === 0);
+    (myBindings.isLoading ||
+      selectedScopes.length === 0 ||
+      cliKeyPermissions.length === 0 ||
+      cannotGrantTeamManagement ||
+      teamManagementNeedsOrganization);
 
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
@@ -675,6 +699,13 @@ export default function CliAuthScreen() {
                         </Text>
                       )}
                     </VStack>
+                  ) : requestsTeamManagement ? (
+                    <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+                      The key gets your access for everyday work: traces, datasets, prompts,
+                      evaluations, the AI Gateway, and project settings. The CLI also asked to
+                      manage teams, so it can create teams and add or remove team members. It cannot
+                      manage the organization.
+                    </Text>
                   ) : (
                     <Text textStyle="xs" color="fg.muted" lineHeight="tall">
                       The key gets your access for everyday work: traces, datasets, prompts,
@@ -683,6 +714,28 @@ export default function CliAuthScreen() {
                     </Text>
                   )}
                 </Box>
+
+                {cannotGrantTeamManagement && (
+                  <StatusCard
+                    palette="red"
+                    icon={TriangleAlert}
+                    title="You cannot manage teams here"
+                  >
+                    The CLI asked to manage teams, and your account cannot manage teams in this
+                    organization. Deny this request and run <code>langwatch login --device</code>{" "}
+                    without <code>--manage-teams</code>, or ask an organization admin.
+                  </StatusCard>
+                )}
+                {teamManagementNeedsOrganization && (
+                  <StatusCard
+                    palette="orange"
+                    icon={CircleAlert}
+                    title="Team management needs the organization"
+                  >
+                    The CLI asked to manage teams, which applies to the whole organization. Add the
+                    organization to what the CLI can access to approve.
+                  </StatusCard>
+                )}
               </>
             )}
 

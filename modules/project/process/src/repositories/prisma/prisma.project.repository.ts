@@ -357,18 +357,58 @@ export class PrismaProjectRepository
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
-    const result = await this.prisma.project.updateMany({
-      where: {
-        id: input.id,
-        archivedAt: null,
-        team: { organizationId: input.organizationId },
-      },
-      data: input.data,
-    });
-    if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+    const where = {
+      id: input.id,
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+    };
+    const movedFrom = await this.teamBeingLeft({ where, teamId: input.data.teamId });
+    if (movedFrom === null) {
+      const result = await this.prisma.project.updateMany({ where, data: input.data });
+      if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+      return this.mapProjectRequired(
+        await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      );
+    }
+
+    // The gateway resolves a key's team budgets from the team of the project
+    // it traces to, and caches the result. A team move appends to the change
+    // feed it long-polls, in the same write, so the gateway re-resolves the
+    // keys tracing to this project instead of enforcing the old team's
+    // budgets until the cache expires.
     return this.mapProjectRequired(
-      await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      await this.prisma.project.update({
+        where,
+        data: {
+          ...input.data,
+          gatewayChangeEvents: {
+            create: {
+              organizationId: input.organizationId,
+              kind: "BUDGET_UPDATED",
+              payload: { projectTeamMoved: { fromTeamId: movedFrom, toTeamId: input.data.teamId } },
+            },
+          },
+        },
+      }),
     );
+  }
+
+  /**
+   * The team a project is leaving, when an update moves it to another one;
+   * `null` when the update keeps its team. A project outside the organization
+   * reads as not moving, so the plain update path refuses it as not found.
+   */
+  private async teamBeingLeft({
+    where,
+    teamId,
+  }: {
+    where: Prisma.ProjectWhereInput & { id: string };
+    teamId: string | undefined;
+  }): Promise<string | null> {
+    if (teamId === undefined) return null;
+    const current = await this.prisma.project.findFirst({ where, select: { teamId: true } });
+    if (!current || current.teamId === teamId) return null;
+    return current.teamId;
   }
 
   async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {

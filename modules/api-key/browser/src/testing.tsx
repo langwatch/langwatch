@@ -170,6 +170,7 @@ export class FakeApiKeyHost extends ApiKeyHostApi {
         status: "pending",
         expiresAt: nowInstant().epochMilliseconds + 10 * 60_000,
         credentialType: "device_session",
+        teamManagement: false,
       },
     );
   }

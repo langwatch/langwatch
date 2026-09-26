@@ -1236,6 +1236,7 @@
                 "projects create",
                 "projects get",
                 "projects update",
+                "projects move",
                 "projects delete"
               ],
               "skill": null,

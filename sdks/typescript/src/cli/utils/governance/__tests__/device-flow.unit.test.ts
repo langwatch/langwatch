@@ -55,6 +55,35 @@ describe("startDeviceCode", () => {
     const dc = await startDeviceCode({ baseUrl: "http://x", fetchImpl });
     expect(dc.interval).toBe(5);
   });
+
+  describe("when the login asks for team management", () => {
+    const deviceCodeBody = async (init: { teamManagement?: boolean }) => {
+      const fetchImpl = vi.fn().mockResolvedValue(
+        jsonResponse(200, {
+          device_code: "DC",
+          user_code: "X-Y",
+          verification_uri: "http://x/cli/auth",
+          expires_in: 600,
+          interval: 5,
+        }),
+      );
+      await startDeviceCode({ baseUrl: "http://x", fetchImpl }, init);
+      const [, request] = fetchImpl.mock.calls[0] as [string, RequestInit];
+      return JSON.parse(request.body as string) as Record<string, unknown>;
+    };
+
+    /** @scenario A CLI login with --manage-teams asks for team management */
+    it("sends team_management in the device code request", async () => {
+      await expect(deviceCodeBody({ teamManagement: true })).resolves.toMatchObject({
+        team_management: true,
+      });
+    });
+
+    /** @scenario A plain CLI login does not ask for team management */
+    it("leaves team_management off the request otherwise", async () => {
+      await expect(deviceCodeBody({})).resolves.not.toHaveProperty("team_management");
+    });
+  });
 });
 
 describe("exchange", () => {

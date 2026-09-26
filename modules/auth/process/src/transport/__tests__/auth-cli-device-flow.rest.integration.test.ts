@@ -170,6 +170,115 @@ describe("given a CLI starting a device login", () => {
     });
   });
 
+  describe("when the CLI asked for team management with --manage-teams", () => {
+    const startWithTeamManagement = async (api: ReturnType<typeof mount>) =>
+      (await (await api.post("/api/auth/cli/device-code", { team_management: true })).json()) as {
+        device_code: string;
+        user_code: string;
+      };
+
+    /** @scenario The approval screen includes team management when the CLI asked for it */
+    it("tells the approval page, and stamps team:manage on an admin's key", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const grant = await startWithTeamManagement(api);
+
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+      await expect(looked.json()).resolves.toMatchObject({ team_management: true });
+
+      const approved = await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: {
+          bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+
+      expect(approved.status).toBe(200);
+      expect(world.validatedSelections.at(-1)?.permissions).toEqual(["traces:view", "team:manage"]);
+    });
+
+    describe("and the approver cannot manage teams", () => {
+      /** @scenario Team management is refused to a user who cannot manage teams */
+      it("refuses the approval by name and stamps nothing", async () => {
+        const world = deviceFlowWorld({ cannotManageTeams: true });
+        const api = mount(world);
+        const grant = await startWithTeamManagement(api);
+
+        const refused = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+          key_selection: {
+            bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+            permissions: ["traces:view"],
+          },
+        });
+
+        expect(refused.status).toBe(403);
+        await expect(refused.json()).resolves.toMatchObject({
+          error: "team_management_not_permitted",
+        });
+        const exchanged = await api.post("/api/auth/cli/exchange", {
+          device_code: grant.device_code,
+        });
+        expect(exchanged.status).toBe(428);
+        expect(world.mintedKeys).toEqual([]);
+      });
+    });
+
+    describe("and the approval binds no organization scope", () => {
+      it("refuses rather than quietly dropping team management", async () => {
+        const world = deviceFlowWorld();
+        const api = mount(world);
+        const grant = await startWithTeamManagement(api);
+
+        const refused = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+          key_selection: {
+            bindings: [{ scope_type: "TEAM", scope_id: "team-1" }],
+            permissions: ["traces:view"],
+          },
+        });
+
+        expect(refused.status).toBe(400);
+        await expect(refused.json()).resolves.toMatchObject({
+          error: "team_management_needs_organization",
+        });
+      });
+    });
+  });
+
+  describe("when the CLI did not ask for team management", () => {
+    /** @scenario A plain CLI login does not ask for team management */
+    it("stamps the selection the page sent, without team:manage", async () => {
+      const world = deviceFlowWorld();
+      const api = mount(world);
+      const grant = (await (await api.post("/api/auth/cli/device-code", {})).json()) as {
+        user_code: string;
+      };
+
+      const looked = await api.get(
+        `/api/auth/cli/lookup?user_code=${encodeURIComponent(grant.user_code)}`,
+      );
+      await expect(looked.json()).resolves.toMatchObject({ team_management: false });
+
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+        key_selection: {
+          bindings: [{ scope_type: "ORGANIZATION", scope_id: ORGANIZATION_ID }],
+          permissions: ["traces:view"],
+        },
+      });
+
+      expect(world.validatedSelections.at(-1)?.permissions).toEqual(["traces:view"]);
+    });
+  });
+
   describe("when the approver loses access between approve and exchange", () => {
     /** @scenario "access lost between approve and exchange ends the login" */
     it("answers a fatal access_denied and burns the device code", async () => {
@@ -559,6 +668,8 @@ function deviceFlowWorld(
     mintToken?: string;
     mintError?: () => Error;
     validateSelectionError?: () => Error;
+    /** The approver holds no team management in the organization. */
+    cannotManageTeams?: boolean;
     signedIn?: boolean;
     publicBaseUrl?: string | undefined;
   } = {},
@@ -576,6 +687,8 @@ function deviceFlowWorld(
     store: InMemoryDeviceSessionStore;
     mintedKeys: { deviceLabel: string; userId: string }[];
     revokedForLogout: { apiKeyId: string; userId: string }[];
+    /** Every key selection validated, in order, the approval's own last. */
+    validatedSelections: { permissions: string[] }[];
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,
@@ -585,6 +698,7 @@ function deviceFlowWorld(
     store,
     mintedKeys: [],
     revokedForLogout: [],
+    validatedSelections: [],
   };
 
   const directory: AuthDirectory = {
@@ -626,10 +740,14 @@ function deviceFlowWorld(
             scope: { kind: "organization" as const, projectIds: [], permissions: [] },
           });
         },
-        validateCliSelection: (input: { selection: unknown }) => {
+        validateCliSelection: (input: { selection: { permissions: string[] } }) => {
           if (overrides.validateSelectionError) {
             return Promise.reject(overrides.validateSelectionError());
           }
+          if (overrides.cannotManageTeams && input.selection.permissions.includes("team:manage")) {
+            return Promise.reject(new ApiKeyScopeViolationError("team:manage exceeds ceiling"));
+          }
+          world.validatedSelections.push(input.selection);
 
           return Promise.resolve(input.selection);
         },

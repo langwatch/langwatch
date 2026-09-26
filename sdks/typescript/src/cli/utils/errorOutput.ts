@@ -105,7 +105,7 @@ const detailLines = (domain: CliHandledError): string[] => {
  */
 const withCliAdvice = (domain: CliHandledError): CliHandledError => {
   const enriched = withFallbackSuggestions(domain);
-  const hint = loginPermissionsHint(enriched.code);
+  const hint = loginPermissionsHint(enriched.code, enriched.meta);
   if (!hint) return enriched;
   return { ...enriched, suggestions: [...(enriched.suggestions ?? []), hint] };
 };
