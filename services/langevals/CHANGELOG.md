@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.0](https://github.com/langwatch/langwatch/compare/langevals@v3.1.0...langevals@v3.2.0) (2026-09-26)
+
+
+### Features
+
+* **sso:** an organization brings its own identity provider (2/2) ([#7633](https://github.com/langwatch/langwatch/issues/7633)) ([d41f19a](https://github.com/langwatch/langwatch/commit/d41f19a46efa61e7f792dfff6e7fc6e94d873ffc))
+
+
+### Bug Fixes
+
+* **evaluators:** forward generation params on every path, Claude temperature/top_p rule in langevals, lift the ragas 16384 cap, skipped rows show as skipped ([#8154](https://github.com/langwatch/langwatch/issues/8154)) ([3d3dc10](https://github.com/langwatch/langwatch/commit/3d3dc1042097e8433e217ad88c833db7f46226be))
+* **selfhost:** issues found dogfooding the 3.18 Helm install on EKS ([#8313](https://github.com/langwatch/langwatch/issues/8313)) ([0b5f84c](https://github.com/langwatch/langwatch/commit/0b5f84cf0c60e915360e7b12455d2e74117f807f))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langevals@v3.0.0...langevals@v3.1.0) (2026-09-12)
 
 
