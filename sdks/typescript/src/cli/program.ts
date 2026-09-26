@@ -425,7 +425,7 @@ function registerLoginCommands(program: Command): void {
     )
     .option(
       "--management",
-      "With --device: the login key also gets the management access you hold in the organization (create and manage teams, manage the organization's settings, members and roles, delete it). Off by default",
+      "With --device: the login key also gets the management access you hold in the organization (create and manage teams, manage the organization's settings, members and roles). Off by default",
     )
     .option(
       "--project [slug]",

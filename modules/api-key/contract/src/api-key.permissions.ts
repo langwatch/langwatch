@@ -292,9 +292,13 @@ export function categorizablePermissions(): AuthzPermission[] {
  */
 export const CLI_KEY_MANAGEMENT_PERMISSIONS = {
   "organization:manage": "Manage the organization's settings, members and roles",
-  "organization:delete": "Delete the organization",
   "team:manage": "Create teams and manage their members",
 } as const satisfies Partial<Record<AuthzPermission, string>>;
+
+/** Never on a default CLI login key, not even with `--management`: too destructive. */
+export const CLI_KEY_NEVER_DEFAULT_PERMISSIONS: readonly AuthzPermission[] = [
+  "organization:delete",
+];
 
 export type CliKeyManagementPermission = keyof typeof CLI_KEY_MANAGEMENT_PERMISSIONS;
 
@@ -306,12 +310,19 @@ export const isCliKeyManagementPermission = (
 ): permission is CliKeyManagementPermission =>
   Object.hasOwn(CLI_KEY_MANAGEMENT_PERMISSIONS, permission);
 
+/** Whether a default CLI login key leaves this permission out. */
+export const isOffByDefaultOnCliKey = (permission: string): boolean =>
+  isCliKeyManagementPermission(permission) ||
+  (CLI_KEY_NEVER_DEFAULT_PERMISSIONS as readonly string[]).includes(permission);
+
 /** The permissions a CLI login key starts from; the management ones only when asked for. */
 export function defaultCliKeyPermissions({
   management = false,
 }: { management?: boolean } = {}): AuthzPermission[] {
   return categorizablePermissions().filter(
-    (permission) => management || !isCliKeyManagementPermission(permission),
+    (permission) =>
+      !CLI_KEY_NEVER_DEFAULT_PERMISSIONS.includes(permission) &&
+      (management || !isCliKeyManagementPermission(permission)),
   );
 }
 

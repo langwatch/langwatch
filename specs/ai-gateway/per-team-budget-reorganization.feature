@@ -128,9 +128,10 @@ Feature: Reorganizing gateway budgets per team from the CLI
       Then it says spend before the budget is created in the current window is not counted
 
   Rule: Management access on a CLI login key is opt-in
-    A CLI login key leaves out organization:manage, organization:delete and
-    team:manage. `langwatch login --device --management` asks for them, and
-    the key gets only the ones the approving user holds.
+    A CLI login key leaves out organization:manage and team:manage.
+    `langwatch login --device --management` asks for them, and the key gets
+    only the ones the approving user holds. organization:delete is never on a
+    CLI login key, with or without --management.
 
     @unit
     Scenario: A plain CLI login does not ask for management access
@@ -148,12 +149,12 @@ Feature: Reorganizing gateway budgets per team from the CLI
       And the approving user is an organization admin
       When the approval screen opens
       Then it shows one management access request listing what it adds
-      And the approved key carries organization:manage, organization:delete and team:manage
+      And the approved key carries organization:manage and team:manage but not organization:delete
 
     @integration
     Scenario: Management access grants only the management permissions the user holds
       Given the CLI asked for management access
-      And the approving user holds team:manage but not organization:manage or organization:delete
+      And the approving user holds team:manage but not organization:manage
       When the approval is submitted
       Then the key carries team:manage and no other management permission
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   categorizablePermissions,
   categoryPermissions,
+  CLI_KEY_NEVER_DEFAULT_PERMISSIONS,
   cliKeyManagementPermissions,
   computePermissionsFromSelections,
   defaultCliKeyPermissions,
@@ -298,7 +299,10 @@ describe("the CLI login key default", () => {
     // An exclusion is only real when the request path agrees: the hierarchy
     // promotes a `:create`, `:update` or `:delete` check to the resource's
     // own `:manage`, so an excluded permission must not be reachable that way.
-    for (const excluded of cliKeyManagementPermissions()) {
+    for (const excluded of [
+      ...cliKeyManagementPermissions(),
+      ...CLI_KEY_NEVER_DEFAULT_PERMISSIONS,
+    ]) {
       expect(hasPermissionWithHierarchy(defaults, excluded)).toBe(false);
     }
   });
@@ -338,7 +342,7 @@ describe("the CLI login key default", () => {
 
   describe("when the login asked for management access", () => {
     /** @scenario The approval screen shows management access when the CLI asked for it */
-    it("adds exactly the permissions a plain login leaves out", () => {
+    it("adds organization and team management, and never organization deletion", () => {
       const plain = new Set<string>(defaultCliKeyPermissions());
       const withManagement = defaultCliKeyPermissions({ management: true });
 
@@ -346,10 +350,10 @@ describe("the CLI login key default", () => {
         cliKeyManagementPermissions().toSorted(),
       );
       expect(withManagement.filter((permission) => !plain.has(permission)).toSorted()).toEqual([
-        "organization:delete",
         "organization:manage",
         "team:manage",
       ]);
+      expect(withManagement).not.toContain("organization:delete");
     });
   });
 });

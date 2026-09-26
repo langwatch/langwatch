@@ -256,8 +256,10 @@ describe("given the CLI asked for management access", () => {
         { scopeType: "ORGANIZATION", scopeId: "org-1" },
       ]);
       expect(host.approvals[0]!.keySelection?.permissions).toEqual(
-        expect.arrayContaining(["team:manage", "organization:manage", "organization:delete"]),
+        expect.arrayContaining(["team:manage", "organization:manage"]),
       );
+      expect(host.approvals[0]!.keySelection?.permissions).not.toContain("organization:delete");
+      expect(request).not.toHaveTextContent("Delete the organization");
     });
   });
 

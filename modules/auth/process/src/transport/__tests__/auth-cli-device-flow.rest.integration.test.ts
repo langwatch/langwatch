@@ -208,9 +208,9 @@ describe("given a CLI starting a device login", () => {
       expect(world.validatedSelections.at(-1)?.permissions).toEqual([
         "traces:view",
         "organization:manage",
-        "organization:delete",
         "team:manage",
       ]);
+      expect(world.validatedSelections.at(-1)?.permissions).not.toContain("organization:delete");
     });
 
     describe("and the approver holds only some of the management permissions", () => {

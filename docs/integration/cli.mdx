@@ -87,7 +87,7 @@ The browser shows an "Approve" or "Send API key" button (depending on the chosen
 The AI-tools login mints a login key that inherits your own access. The authorize screen shows the scopes and permissions before you approve:
 
 - **Scopes**: an organization admin gets the whole organization by default; other members get their teams plus their personal workspace. You can narrow the selection to specific teams or projects.
-- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Management access stays off by default: the key cannot manage teams, manage the organization's settings, members and roles, or delete the organization.
+- **Permissions**: everything you can do day to day (traces, datasets, prompts, evaluations, the AI Gateway, model providers). Management access stays off by default: the key cannot manage teams, or manage the organization's settings, members and roles. It can never delete the organization.
 
 To manage those from the CLI, log in with `langwatch login --device --management`. The authorize screen then shows a management access request listing what it adds. It needs the organization as the key's scope, and the key gets only the management permissions you hold in the organization; if you hold none, the approval is refused. Any command refused on a login key for one of these permissions names this re-login command.
 

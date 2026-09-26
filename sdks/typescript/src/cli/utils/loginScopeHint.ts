@@ -16,7 +16,6 @@ import { loadConfig } from "./governance/config";
  */
 export const LOGIN_MANAGEMENT_PERMISSIONS: readonly string[] = [
   "organization:manage",
-  "organization:delete",
   "team:manage",
 ];
 
