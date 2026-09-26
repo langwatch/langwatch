@@ -356,6 +356,15 @@ export default defineConfig(async (): Promise<UserConfig> => {
         changeOrigin: true,
         secure: false,
       },
+      // The sandboxed chart frame (src/server/chartSandboxFrame.ts) is an
+      // API-owned document, not an SPA page: without this rule the iframe
+      // gets index.html, its module scripts are CORS-blocked (origin null),
+      // and every dashboard widget shows "The chart stopped responding".
+      "/sandbox": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
       // Exact-match only ("^...$") — a plain "/mcp" prefix also swallows the
       // /mcp/authorize frontend page route (src/pages/mcp/authorize.tsx),
       // sending it to the API server, which has no dev-mode page fallback.

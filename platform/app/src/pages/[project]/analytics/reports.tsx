@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { DashboardAutoRefreshMenu } from "~/components/analytics/DashboardAutoRefreshMenu";
 import {
   DashboardRefreshedAtContext,
@@ -20,6 +20,9 @@ import GraphsLayout from "~/components/GraphsLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useWidgetGranularity } from "~/features/analytics-query/hooks/useWidgetGranularity";
 import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
+import { DashboardLangyActionsMount } from "~/features/custom-chart-playground/renderReceipt/DashboardLangyActionsMount";
+import { useRegisterLangyPageContext } from "~/features/langy/LangyContext";
+import { dashboardContextChip } from "~/features/langy/logic/langyContextChips";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
 import { api } from "~/utils/api";
@@ -83,6 +86,22 @@ function ReportsContent() {
     (d) => d.id === activeDashboardId,
   );
   const dashboardTitle = currentDashboard?.name ?? "Reports";
+
+  // Tell Langy which dashboard is open (with its human name), so attaching the
+  // dashboard chip advertises the dashboard UI actions (CHIP_KIND_TO_MANIFEST).
+  const dashboardPageContext = useMemo(
+    () =>
+      activeDashboardId
+        ? [
+            dashboardContextChip({
+              dashboardId: activeDashboardId,
+              name: dashboardTitle,
+            }),
+          ]
+        : [],
+    [activeDashboardId, dashboardTitle],
+  );
+  useRegisterLangyPageContext(dashboardPageContext);
 
   // Graphs for the active dashboard
   const graphsQuery = api.graphs.getAll.useQuery(
@@ -186,102 +205,111 @@ function ReportsContent() {
     : `/${project?.slug}/analytics/custom`;
 
   return (
-    <GraphsLayout
-      title={dashboardTitle}
-      analyticsHeaderProps={{
-        isEditable: true,
-        onTitleSave: handleTitleSave,
-      }}
-      extraHeaderButtons={
-        <>
-          <DashboardAutoRefreshMenu
-            option={autoRefresh.option}
-            onChange={autoRefresh.setOption}
-          />
-          {project ? (
-            customChartPlaygroundEnabled ? (
-              <Button
-                colorPalette="orange"
-                size="sm"
-                onClick={() => setIsAddChartOpen(true)}
-              >
-                <Plus /> Add chart
-              </Button>
-            ) : (
-              <Link href={addChartUrl} asChild>
-                <Button colorPalette="orange" size="sm">
+    <>
+      {/* The one live UI action this page answers — read the render receipts the
+          mounted widgets published (see `DashboardWidgetFrame`) so an off-screen
+          agent can "see" what each card painted — registered while the page is
+          open and scoped to the open dashboard. */}
+      <DashboardLangyActionsMount
+        activeDashboardId={activeDashboardId ?? null}
+      />
+      <GraphsLayout
+        title={dashboardTitle}
+        analyticsHeaderProps={{
+          isEditable: true,
+          onTitleSave: handleTitleSave,
+        }}
+        extraHeaderButtons={
+          <>
+            <DashboardAutoRefreshMenu
+              option={autoRefresh.option}
+              onChange={autoRefresh.setOption}
+            />
+            {project ? (
+              customChartPlaygroundEnabled ? (
+                <Button
+                  colorPalette="orange"
+                  size="sm"
+                  onClick={() => setIsAddChartOpen(true)}
+                >
                   <Plus /> Add chart
                 </Button>
-              </Link>
-            )
-          ) : null}
-        </>
-      }
-    >
-      {/* The workbench builder's own save path is disabled while the
+              ) : (
+                <Link href={addChartUrl} asChild>
+                  <Button colorPalette="orange" size="sm">
+                    <Plus /> Add chart
+                  </Button>
+                </Link>
+              )
+            ) : null}
+          </>
+        }
+      >
+        {/* The workbench builder's own save path is disabled while the
           custom-chart-playground is enabled (see DashboardWidgetService /
           saved_workbench_charts_disabled_for_playground) — a member landing
           there would hit a Save button that always fails. This drawer is
           the one "create a new chart" path that still works, and it lands
           the new widget on this dashboard directly. */}
-      {project && customChartPlaygroundEnabled && (
-        <CreateDashboardWidgetDrawer
-          open={isAddChartOpen}
-          onClose={() => setIsAddChartOpen(false)}
-          projectId={projectId}
-          projectSlug={project.slug}
-          dashboardId={activeDashboardId ?? undefined}
-        />
-      )}
+        {project && customChartPlaygroundEnabled && (
+          <CreateDashboardWidgetDrawer
+            open={isAddChartOpen}
+            onClose={() => setIsAddChartOpen(false)}
+            projectId={projectId}
+            projectSlug={project.slug}
+            dashboardId={activeDashboardId ?? undefined}
+          />
+        )}
 
-      {/* Empty state */}
-      {hasNoGraphs && (
-        <Alert.Root
-          status="info"
-          borderStartWidth="4px"
-          borderStartColor="colorPalette.solid"
-          marginBottom={6}
-        >
-          <Alert.Indicator alignSelf="start" />
-          <VStack align="start">
-            <Alert.Title>Add your custom graphs here</Alert.Title>
-            <Alert.Description>
-              <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
-              </Text>
-            </Alert.Description>
-          </VStack>
-        </Alert.Root>
-      )}
+        {/* Empty state */}
+        {hasNoGraphs && (
+          <Alert.Root
+            status="info"
+            borderStartWidth="4px"
+            borderStartColor="colorPalette.solid"
+            marginBottom={6}
+          >
+            <Alert.Indicator alignSelf="start" />
+            <VStack align="start">
+              <Alert.Title>Add your custom graphs here</Alert.Title>
+              <Alert.Description>
+                <Text as="span">
+                  You haven{"'"}t set up any custom graphs yet. Click + Add
+                  chart to get started.
+                </Text>
+              </Alert.Description>
+            </VStack>
+          </Alert.Root>
+        )}
 
-      {/* Main content */}
-      <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
-        <HStack align="start" gap={6} width="full">
-          <Box flex={1}>
-            {graphsQuery.isLoading ? (
-              <Skeleton height="300px" />
-            ) : (
-              <ReportGrid
-                graphs={graphs}
-                projectSlug={project?.slug ?? ""}
-                projectId={projectId}
-                dashboardId={activeDashboardId ?? undefined}
-                onGraphDelete={handleGraphDelete}
-                onGraphGranularityChange={handleGraphGranularityChange}
-                onGraphsPlacementChange={handleGraphsPlacementChange}
-                deletingGraphId={
-                  deleteGraph.isPending
-                    ? (deleteGraph.variables?.id ?? null)
-                    : null
-                }
-              />
-            )}
-          </Box>
-          {showFilters ? <FilterSidebar /> : null}
-        </HStack>
-      </DashboardRefreshedAtContext.Provider>
-    </GraphsLayout>
+        {/* Main content */}
+        <DashboardRefreshedAtContext.Provider value={autoRefresh.refreshedAt}>
+          <HStack align="start" gap={6} width="full">
+            <Box flex={1}>
+              {graphsQuery.isLoading ? (
+                <Skeleton height="300px" />
+              ) : (
+                <ReportGrid
+                  graphs={graphs}
+                  projectSlug={project?.slug ?? ""}
+                  projectId={projectId}
+                  dashboardId={activeDashboardId ?? undefined}
+                  onGraphDelete={handleGraphDelete}
+                  onGraphGranularityChange={handleGraphGranularityChange}
+                  onGraphsPlacementChange={handleGraphsPlacementChange}
+                  deletingGraphId={
+                    deleteGraph.isPending
+                      ? (deleteGraph.variables?.id ?? null)
+                      : null
+                  }
+                />
+              )}
+            </Box>
+            {showFilters ? <FilterSidebar /> : null}
+          </HStack>
+        </DashboardRefreshedAtContext.Provider>
+      </GraphsLayout>
+    </>
   );
 }
 

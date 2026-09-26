@@ -56578,6 +56578,16 @@ langwatch dashboard-widget create \
 
 Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
 
+### See what it rendered
+
+When the user has that dashboard open in the app and the dashboard chip is attached, you can read what the widget actually painted:
+
+```bash
+langwatch ui call dashboard.getWidgetRender --payload '{"widgetId":"<id>"}'
+```
+
+It returns the widget's render status, any compile/runtime error text, and the rendered markup (inline SVG for a recharts chart) — so you can check for an empty chart, NaN/undefined labels, overflow, or an error panel before calling the work done. Omit `widgetId` to list the dashboard's sandboxed widget cards (the code-defined ones this recipe creates) without markup; classic chart cards do not run in a frame, publish no receipt, and are not listed. Receipts exist only while that tab is open; there is no away fallback.
+
 ## Managing saved widgets
 
 ```bash

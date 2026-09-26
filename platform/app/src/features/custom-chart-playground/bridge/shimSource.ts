@@ -29,6 +29,7 @@ import {
   CHART_FRAME_HEARTBEAT_INTERVAL_MS,
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
+  CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS,
 } from "./bridgeProtocol";
 
 export function buildShimScript(): string {
@@ -284,6 +285,72 @@ export function buildShimScript(): string {
     post({ type: "lw:error", source: "unhandledrejection", message: messageOf(event.reason) });
   });
 
+  // ---- Render receipt ----------------------------------------------------
+  // What the widget actually painted, reported to the parent so an off-screen
+  // agent can read the outcome of its own edit. \`renderStatus\` is set by the
+  // author runtime through window.__lwReportRender (mount -> "ok", failure ->
+  // "error"); the MutationObserver below re-sends it as the DOM changes, so a
+  // query result arriving after mount updates the receipt on its own.
+  // Everything here is guarded: the shim unit test evaluates this string with
+  // no #lw-root present, and a future non-DOM frame kind must still load it.
+  var renderStatus = { status: "ok", errorText: undefined };
+  var receiptTimer = null;
+
+  function emitReceipt() {
+    if (typeof document === "undefined" || !document) return;
+    var root = document.getElementById("lw-root");
+    if (!root) return;
+    var markup = root.outerHTML || "";
+    var isMarkupTruncated = false;
+    if (markup.length > ${CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS}) {
+      markup = markup.slice(0, ${CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS});
+      isMarkupTruncated = true;
+    }
+    var height = (document.documentElement && document.documentElement.scrollHeight) || 0;
+    post({
+      type: "lw:render-receipt",
+      status: renderStatus.status,
+      errorText: renderStatus.errorText,
+      markup: markup,
+      isMarkupTruncated: isMarkupTruncated,
+      height: height
+    });
+  }
+
+  // Debounced: a mount, and the flurry of mutations a chart library makes as
+  // it lays out, are one receipt, not fifty. Falls through to a direct emit
+  // where setTimeout is absent so no report is silently lost.
+  function scheduleReceipt() {
+    if (typeof setTimeout !== "function") { emitReceipt(); return; }
+    if (receiptTimer) clearTimeout(receiptTimer);
+    receiptTimer = setTimeout(function () {
+      receiptTimer = null;
+      emitReceipt();
+    }, 250);
+  }
+
+  // Host<->runtime plumbing, deliberately NOT a member of LW (see
+  // bridge/lwGlobalTypes.ts): the author runtime reports mount/errors through
+  // it, but widget code never calls it.
+  window.__lwReportRender = function (status, errorText) {
+    renderStatus = { status: status === "error" ? "error" : "ok", errorText: errorText };
+    scheduleReceipt();
+  };
+
+  function observeRenderReceipt() {
+    if (typeof document === "undefined" || !document) return;
+    if (typeof MutationObserver !== "function") return;
+    var root = document.getElementById("lw-root");
+    if (!root) return;
+    var observer = new MutationObserver(function () { scheduleReceipt(); });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true
+    });
+  }
+
   function onPortMessage(event) {
     var data = event.data || {};
     if (data.type === "lw:query-result") {
@@ -341,6 +408,9 @@ export function buildShimScript(): string {
       port.postMessage({ type: "lw:heartbeat" });
     }, ${CHART_FRAME_HEARTBEAT_INTERVAL_MS});
     resolveReady();
+    // Watch the widget root before author code runs, so the mutations its
+    // first mount makes (and every later data change) drive a receipt.
+    observeRenderReceipt();
     activateAuthor();
   });
 })();

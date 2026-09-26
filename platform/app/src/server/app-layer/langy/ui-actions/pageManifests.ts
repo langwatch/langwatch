@@ -5,6 +5,7 @@ import {
   type WorkbenchActionDefinition,
 } from "~/experiments-v3/actions/manifest";
 import { EXPLORER_ACTIONS } from "~/features/traces-v2/actions/manifest";
+import { DASHBOARD_ACTIONS } from "~/server/analytics/dashboardWidgetRenderActions";
 
 /**
  * The server's own registry of every page action an agent may dispatch.
@@ -13,9 +14,9 @@ import { EXPLORER_ACTIONS } from "~/features/traces-v2/actions/manifest";
  * a kind is only dispatchable when it appears here, and its payload is parsed
  * with the schema HERE before anything reaches the stream. The client-asserted
  * registration is never consulted for validation. A kind's domain prefix
- * (`workbench.`, `explorer.`) names the page family it belongs to, which is how the turn
- * context knows to advertise the channel when a matching context chip is
- * attached.
+ * (`workbench.`, `dashboard.`, `explorer.`) names the page family it belongs
+ * to, which is how the turn context knows to advertise the channel when a
+ * matching context chip is attached.
  *
  * The manifest modules themselves are framework-free on purpose (see
  * `experiments-v3/actions/manifest.ts` and
@@ -33,12 +34,14 @@ export const PAGE_ACTION_MANIFESTS: Record<
   Record<string, PageActionDefinition>
 > = {
   workbench: WORKBENCH_ACTIONS,
+  dashboard: DASHBOARD_ACTIONS,
   explorer: EXPLORER_ACTIONS,
 };
 
 /** Context-chip kinds that mean "the user is on a page with this manifest". */
 export const CHIP_KIND_TO_MANIFEST: Record<string, string> = {
   experiment: "workbench",
+  dashboard: "dashboard",
   // The Trace Explorer's view chip and its applied-search chip are both
   // `filter` chips, and its selection chip is a `selection` chip. The caller
   // route-gates all three to the traces page, so either one on a turn means

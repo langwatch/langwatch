@@ -193,13 +193,44 @@ export interface LwHeartbeatMessage {
   readonly type: "lw:heartbeat";
 }
 
+/**
+ * The frame's "render receipt": what the widget actually painted, posted so
+ * the host (and, through it, an off-screen agent that cannot see the tab) can
+ * read the outcome of its own edit — an empty chart, NaN labels, an error
+ * panel — rather than trusting that "it compiled" means "it looks right".
+ *
+ * Sent by the shim after author code mounts (debounced) and again on every
+ * DOM mutation under `#lw-root`, so the receipt follows data that arrives
+ * after mount (a query result landing seconds later re-sends it).
+ */
+export interface LwRenderReceiptMessage {
+  readonly type: "lw:render-receipt";
+  /**
+   * "ok" once author code mounted and painted; "error" for a compile error,
+   * a render throw, or a missing default export. An `LW.error()` call posts a
+   * separate `lw:error` log message and does NOT set this status.
+   */
+  readonly status: "ok" | "error";
+  readonly errorText?: string;
+  /**
+   * `outerHTML` of the frame's `#lw-root`, capped at
+   * {@link CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS}. Recharts renders inline
+   * SVG, so this markup IS the chart — the agent reads it to "see" the widget.
+   */
+  readonly markup: string;
+  readonly isMarkupTruncated: boolean;
+  /** `document.documentElement.scrollHeight` in px at capture time. */
+  readonly height: number;
+}
+
 export type FrameToParentMessage =
   | LwQueryMessage
   | LwSetHeightMessage
   | LwNavigateMessage
   | LwLogMessage
   | LwErrorMessage
-  | LwHeartbeatMessage;
+  | LwHeartbeatMessage
+  | LwRenderReceiptMessage;
 
 // ---------------------------------------------------------------------------
 // Shared limits
@@ -217,6 +248,13 @@ export const CHART_FRAME_MAX_HEIGHT_PX = 640;
  */
 export const CHART_FRAME_HEARTBEAT_INTERVAL_MS = 2000;
 export const CHART_FRAME_HEARTBEAT_TIMEOUT_MS = 10000;
+/**
+ * Upper bound on the receipt's `markup` string. A widget's rendered SVG is
+ * usually a few KB, but a pathological one (a huge table, a data-URI image)
+ * could post megabytes over the port on every mutation — the cap keeps one
+ * receipt bounded and its `isMarkupTruncated` flag tells the reader it was cut.
+ */
+export const CHART_FRAME_RECEIPT_MAX_MARKUP_CHARS = 60_000;
 
 /**
  * The one structural mapping from the server's result to the wire payload.
