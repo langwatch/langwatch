@@ -4,18 +4,7 @@ import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.servic
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-
-const parseGridFlag = (name: string, raw: string | undefined): number | undefined => {
-  if (raw === undefined) return undefined;
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) {
-    console.error(
-      chalk.red(`Error: ${name} must be a whole number`),
-    );
-    process.exit(1);
-  }
-  return value;
-};
+import { parseGridFlag } from "../../utils/parseGridFlag";
 
 /**
  * Returns the placed chart rather than printing it: the output port renders
