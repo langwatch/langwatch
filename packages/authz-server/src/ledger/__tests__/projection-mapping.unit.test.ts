@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  type GrantFact,
-} from "../facts";
+import { BindingMissingError } from "../../authz-grants.repository";
+import { type GrantFact } from "../facts";
 import {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
@@ -137,8 +136,8 @@ describe("compat binding mapping", () => {
           grant: fact({ roleKey }),
           organizationId: ORG,
         });
-        expect(row?.role).toBe(role);
-        expect(row?.customRoleId).toBeNull();
+        expect(row.role).toBe(role);
+        expect(row.customRoleId).toBeNull();
       }
     });
 
@@ -147,9 +146,9 @@ describe("compat binding mapping", () => {
         grant: fact(),
         organizationId: ORG,
       });
-      expect(row?.id).toBe("grant_abc");
-      expect(row?.userId).toBe("user_alice");
-      expect(row?.scopeType).toBe("TEAM");
+      expect(row.id).toBe("grant_abc");
+      expect(row.userId).toBe("user_alice");
+      expect(row.scopeType).toBe("TEAM");
     });
 
     it("splits custom role keys into CUSTOM plus the role id", () => {
@@ -157,10 +156,9 @@ describe("compat binding mapping", () => {
         grant: fact({ roleKey: "custom:role_sre" }),
         organizationId: ORG,
       });
-      expect(row?.role).toBe("CUSTOM");
-      expect(row?.customRoleId).toBe("role_sre");
+      expect(row.role).toBe("CUSTOM");
+      expect(row.customRoleId).toBe("role_sre");
     });
-
 
     it("writes an imported custom binding's own role, not CUSTOM", () => {
       // The legacy resolver falls back to this column whenever the custom
@@ -171,8 +169,8 @@ describe("compat binding mapping", () => {
         grant: fact({ roleKey: "custom:role_sre", legacyRole: "ADMIN" }),
         organizationId: ORG,
       });
-      expect(row?.role).toBe("ADMIN");
-      expect(row?.customRoleId).toBe("role_sre");
+      expect(row.role).toBe("ADMIN");
+      expect(row.customRoleId).toBe("role_sre");
     });
 
     it("sets exactly one principal column per principal type", () => {
@@ -180,30 +178,30 @@ describe("compat binding mapping", () => {
         grant: fact({ principal: { type: "group", id: "grp_1" } }),
         organizationId: ORG,
       });
-      expect(group?.groupId).toBe("grp_1");
-      expect(group?.userId).toBeNull();
-      expect(group?.apiKeyId).toBeNull();
+      expect(group.groupId).toBe("grp_1");
+      expect(group.userId).toBeNull();
+      expect(group.apiKeyId).toBeNull();
       const key = grantFactToCompatBinding({
         grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
-      expect(key?.apiKeyId).toBe("key_1");
-      expect(key?.groupId).toBeNull();
-      expect(key?.userId).toBeNull();
+      expect(key.apiKeyId).toBe("key_1");
+      expect(key.groupId).toBeNull();
+      expect(key.userId).toBeNull();
       // The default fixture is a user grant - the third case, and the one
       // that proves "exactly one" rather than "at least the expected one".
       const user = grantFactToCompatBinding({
         grant: fact(),
         organizationId: ORG,
       });
-      expect(user?.userId).toBe("user_alice");
-      expect(user?.groupId).toBeNull();
-      expect(user?.apiKeyId).toBeNull();
+      expect(user.userId).toBe("user_alice");
+      expect(user.groupId).toBeNull();
+      expect(user.apiKeyId).toBeNull();
     });
   });
 
   describe("when the grant is beyond the legacy tables' vocabulary", () => {
-    it("returns null for resource and platform scopes, collectives, and lite-member", () => {
+    it("throws for resource and platform scopes, collectives, and lite-member", () => {
       const beyond: Array<Partial<GrantFact>> = [
         {
           scope: { type: "RESOURCE", id: "trace_t1" },
@@ -214,14 +212,17 @@ describe("compat binding mapping", () => {
         { principal: { type: "organization", id: ORG } },
         { principal: { type: "team", id: "team_client_a" } },
         { roleKey: "lite-member" },
+        { roleKey: null },
+        { roleKey: "custom:" },
+        { principal: { type: "user", id: null } },
       ];
       for (const overrides of beyond) {
-        expect(
+        expect(() =>
           grantFactToCompatBinding({
             grant: fact(overrides),
             organizationId: ORG,
           }),
-        ).toBeNull();
+        ).toThrow(BindingMissingError);
       }
     });
   });

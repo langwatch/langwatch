@@ -17,10 +17,18 @@
 
 import chalk from "chalk";
 import { Command, Option } from "commander";
+import { setRequestedProject } from "../internal/credentialContext";
+import {
+  applyProjectOption,
+  PROJECT_FLAG_HELP,
+  projectSelectorOf,
+} from "./utils/projectOption";
+import { withQuotedNameHint } from "./commands/agents/quoted-name-hint.js";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
 } from "../internal/generated/redaction/sessionReport";
+import type { QuestionDraft } from "./commands/instant-evals/questionFlags";
 import { parsePromptSpec } from "./types";
 import {
   applyOutputContext,
@@ -33,6 +41,17 @@ import {
 } from "./utils/output";
 
 declare const __CLI_VERSION__: string;
+
+/** The `langwatch <tool>` commands that run a coding tool in its own terminal. */
+export const TOOL_WRAPPER_COMMANDS = [
+  "claude",
+  "codex",
+  "copilot",
+  "code",
+  "cursor",
+  "gemini",
+  "opencode",
+] as const;
 
 /**
  * Help for the repeatable `--param key=value` flag the run commands share.
@@ -198,6 +217,57 @@ const trackEvaluatorFlags = (
   };
 };
 
+/**
+ * Watches an instant-eval command's question flags and answers with what was
+ * written, in the order it was written.
+ *
+ * `--ask` opens a question; `--criteria`, `--score`, `--category`,
+ * `--threshold` and `--id` describe the one before them. Commander gives no
+ * order across different options, so the order has to be read off the option
+ * events as it parses, the same way `--required` follows its `--evaluator`
+ * above. A modifier written before any `--ask` describes the question given as
+ * the positional argument, so `run "annoyed" --threshold 0.8` reads the way it
+ * looks.
+ *
+ * Defined here rather than imported so the command tree keeps its own boot
+ * cost: the reading these drafts get lives in
+ * `cli/commands/instant-evals/questionFlags.ts`, which is loaded with the
+ * command.
+ */
+const trackQuestionFlags = (command: Command): (() => QuestionDraft[]) => {
+  let drafts: QuestionDraft[] = [];
+  const current = (): QuestionDraft => {
+    const last = drafts[drafts.length - 1];
+    if (last) return last;
+    const opened: QuestionDraft = { criteria: [], categories: [] };
+    drafts.push(opened);
+    return opened;
+  };
+  command.on("option:ask", (value: string) => {
+    drafts.push({ instructions: value, criteria: [], categories: [] });
+  });
+  command.on("option:criteria", (value: string) => {
+    current().criteria.push(value);
+  });
+  command.on("option:category", (value: string) => {
+    current().categories.push(value);
+  });
+  command.on("option:score", (value: string) => {
+    current().score = value;
+  });
+  command.on("option:threshold", (value: string) => {
+    current().threshold = value;
+  });
+  command.on("option:id", (value: string) => {
+    current().id = value;
+  });
+  return () => {
+    const read = drafts;
+    drafts = [];
+    return read;
+  };
+};
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -325,6 +395,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const requested = resolveActionOutputOptions(actionCommand);
     const effective = await assertFormatIsSupported(actionCommand, requested);
     await applyOutputContext(effective);
+    // The project the command line pointed this request at, published before
+    // the action runs so `resolveCredentials` reads it without the action
+    // having to accept the value and pass it on.
+    setRequestedProject(projectSelectorOf(actionCommand));
   });
 
   // Top-level commands
@@ -417,19 +491,26 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     });
 
   // AI Gateway governance — read identity, deep-link, request budget increase.
-  program
-    .command("whoami")
-    .description("Print the identity persisted by `langwatch login --device` (governance plane).")
-    .action(async () => {
+  // Speaks the output port: `-o json|yaml`, `--json <fields>` and `--jq` all
+  // project from the returned `data`. No bespoke boolean `--json` — that spelling
+  // is the port's own projection flag and a boolean would collide with it.
+  emitsResult(
+    program
+      .command("whoami")
+      .description(
+        "Print the identity persisted by `langwatch login --device` (governance plane).",
+      ),
+    async () => {
       try {
         const { whoamiCommand } = await import("./commands/whoami.js");
-        await whoamiCommand();
+        return await whoamiCommand();
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });
         process.exit(1);
       }
-    });
+    },
+  );
 
   // AI Gateway governance — wrapped tool runners.
   // Each `langwatch <tool>` exec's the underlying binary with the
@@ -620,6 +701,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+
+  // A wrapper renders no result of its own, in any format: it hands the
+  // terminal to the tool it runs. Registered as such so the auto-detected
+  // agent mode (a coding agent sets CLAUDECODE in its children) prints no
+  // note about a table under a wrapper started from inside one.
+  for (const tool of TOOL_WRAPPER_COMMANDS) {
+    const wrapper = program.commands.find((command) => command.name() === tool);
+    if (wrapper) rendersOwnResult(wrapper);
+  }
 
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.
@@ -893,11 +983,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       },
     );
 
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries run.
-  // Hidden: nobody types this, the install path writes it into the agent's
-  // settings. It reads its payload on stdin, writes nothing to stdout (a
-  // SessionStart hook's stdout is injected into the user's session context)
-  // and always exits zero, so a hook can never be why a session broke.
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and the
+  // Claude Code plugin's launcher run. Hidden: the install path writes it into
+  // the agent's settings and the plugin ships it in its launcher. It reads its
+  // payload on stdin, writes nothing to stdout (a SessionStart hook's stdout
+  // is injected into the user's session context) and always exits zero, so a
+  // hook can never be why a session broke.
+  //
+  // Unknown options and extra arguments are accepted and ignored, here and on
+  // `ingest guidance` below. That is the cross-version contract the plugin
+  // rests on: a plugin hooks.json from any version has to run with a CLI from
+  // any version, and a usage error over an argument this build does not know
+  // would be a non-zero exit with prose on stderr on every session start.
   //
   // Registered as rendering its own result because it renders NO result, in
   // any format. Left unregistered, the auto-detected agent mode a hook always
@@ -909,7 +1006,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("hook <tool>", { hidden: true })
       .description(
         "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       const { hookCommand } = await import("./commands/ingestion/hook.js");
@@ -952,13 +1051,17 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // `langwatch ingest guidance <tool>`: prints the declare-your-context
   // guidance as SessionStart additionalContext JSON. Hidden: nobody types
   // this, the session-hooks install writes it into claude's settings for
-  // installs without plugin support (the plugin carries its own copy).
+  // installs without plugin support, and the Claude Code plugin's launcher
+  // runs it on every session start. Same cross-version contract as `ingest
+  // hook` above: unknown arguments are ignored, the exit is always zero.
   rendersOwnResult(
     ingestCmd
       .command("guidance <tool>", { hidden: true })
       .description(
         "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
-      ),
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
   ).action(async (tool: string) => {
     try {
       if (tool.trim().toLowerCase().replace(/-/g, "_") !== "claude_code") return;
@@ -1354,6 +1457,29 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { statusCommand: impl } = await import("./commands/status.js");
     await impl(command.optsWithGlobals());
   });
+
+  // Doctor: the checkup of a self-hosted install, the same rows and the same
+  // usage report the Settings page shows, printed from a terminal.
+  emitsResult(
+    program
+      .command("doctor")
+      .description(
+        "Check whether a self-hosted install is correctly wired, and print what it sends to LangWatch",
+      )
+      .option(
+        "--run",
+        "Also run the checks that open a connection or spend money (reach the LangWatch hosts, storage write, SMTP, model provider, canaries)",
+      )
+      .option(
+        "--scenario-run-plan-id <id>",
+        "The run plan the scenario canary launches, with --run",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { run?: boolean; scenarioRunPlanId?: string }) => {
+      const { doctorCommand: impl } = await import("./commands/doctor.js");
+      return impl(options);
+    },
+  );
 
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
@@ -1923,10 +2049,28 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     agentCmd
       .command("list")
       .description("List all agents in the project")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
+      .option("-f, --format <format>", "Output format: table (default) or json", "table")
+      .option(
+        "--wait-online <agent>",
+        "Read the list again every few seconds until the agent with this name or id reports online, then print it",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait-online waits before failing",
+        "120",
+      )
+      .option(
+        "--all",
+        "List every row, including offline rows of a name and environment that a newer row replaced",
+      )
+      // No positional argument here, so a stray word is a name with a space
+      // passed bare after --wait-online: the refusal says to quote it.
+      .configureOutput({
+        outputError: (message, write) => write(withQuotedNameHint(message)),
+      }),
+    async (options: { waitOnline?: string; timeout?: string; all?: boolean }) => {
       const { listAgentsCommand: impl } = await import("./commands/agents/list.js");
-      return impl();
+      return impl(options);
     },
   );
 
@@ -2256,6 +2400,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--budget-window <w>", "Budget window for --budget-limit: day | week | month")
       .option("--budget-breach <action>", "block (default) or warn when the key's budget is hit")
       .option("--providers-allowed <ids>", "Comma-separated ModelProvider ids the key may dispatch to (default: every provider in scope)")
+      .option("--reveal-once", "Do not print the secret; print a one-time reveal id instead, which shows the secret once through the app to the person the key is for")
       .option("-f, --format <format>", "Output format: text (default) or json", "text"),
     async (options: {
       name: string;
@@ -2269,6 +2414,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       budgetWindow?: string;
       budgetBreach?: "block" | "warn";
       providersAllowed?: string;
+      revealOnce?: boolean;
     }) => {
       const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
       return impl(options);
@@ -2850,18 +2996,194 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // Instant Evals. One question, asked of every trace, conversation or model
+  // call in a window. The input is a LangWatchQL statement; `--target` writes
+  // one for the caller and the run hands it back so they can edit it.
+  const instantEvalCmd = program
+    .command("instant-eval")
+    .description(
+      "Ask one question of every trace, conversation or model call you have",
+    );
+
+  const INSTANT_EVAL_ASK_HELP =
+    "The question, in your own words. Repeat it to ask several questions of the same text: one classification answers them all, so three questions cost about what one does";
+  const INSTANT_EVAL_CRITERIA_HELP =
+    "For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the --ask it describes";
+  const INSTANT_EVAL_SCORE_HELP =
+    "Ask for a rating instead of a yes or no, on the whole-numbered scale given as min..max, for example 1..5";
+  const INSTANT_EVAL_CATEGORY_HELP =
+    "Ask which option fits, written name=what it means. Repeat it for each option, after the --ask it describes";
+  const INSTANT_EVAL_THRESHOLD_HELP =
+    "For a yes or no question: the probability at or above which the answer counts as yes. Without one the column carries the probability itself";
+  const INSTANT_EVAL_ID_HELP =
+    "What to call the question before it, which becomes its column and the name its judgements are filed under (default: q1, q2 and so on)";
+  const INSTANT_EVAL_QUESTIONS_FILE_HELP =
+    "Read the questions from a JSON or YAML file, which is how several questions each carry their own criteria, scale or options";
+  const INSTANT_EVAL_TARGET_HELP =
+    "What one judged row is: traces, threads or llm-spans (default: traces)";
+  const INSTANT_EVAL_FILTER_HELP =
+    'Narrow the rows with a trace filter, in the language the trace explorer\'s search bar speaks, for example "service:checkout AND cost:>0.01"';
+  const INSTANT_EVAL_LAST_HELP =
+    "How far back to look, as a number and a unit: 7d, 24h, 30m, 2w (default: 7d)";
+  const INSTANT_EVAL_SQL_HELP =
+    "Run a LangWatchQL statement of your own instead of a target. It must project TraceId and at least one eval function column";
+  const INSTANT_EVAL_LIMIT_HELP =
+    "Rows the run may judge (default: 1000). Ten thousand is allowed on every plan and a hundred thousand on a plan that lifts the cap";
+  // Hidden on `run`, where waiting is the default. `status` still offers it.
+  const INSTANT_EVAL_WAIT_HELP =
+    "Wait for the run to finish, up to 45 minutes or the number of minutes given, and exit non-zero when it failed";
+  const INSTANT_EVAL_START_HELP =
+    "Oldest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_END_HELP =
+    "Newest instant to judge (ISO-8601 or epoch ms)";
+  const INSTANT_EVAL_PARAM_HELP =
+    "Bind one of your statement's parameters, written key=value";
+
+  const instantEvalRunCmd = instantEvalCmd
+    .command("run [question]")
+    .description(
+      "Ask your question of every row it finds, and print the matches when it is done",
+    );
+  const readInstantEvalRunQuestions = trackQuestionFlags(instantEvalRunCmd);
+
+  rendersOwnResult(
+    instantEvalRunCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("--name <name>", "What to call the run. Yours to choose")
+      .option("--estimate", "Price the run and exit without starting it")
+      .option("--detach", "Create the run and return its id instead of waiting for it")
+      .option("--show <n>", "Rows to print when the run finishes (default 20, at most 25)")
+      // A run waits by default now, so --wait asks for what already happens.
+      // Kept and hidden so a line written against the old shape still runs.
+      .addOption(new Option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP).hideHelp())
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (question: string | undefined, _options: unknown, command: Command) => {
+    // Merged globals: a root-position `--output` only lands on the ROOT
+    // command, so the leaf's own opts would silently drop it. The question
+    // flags are dropped here because the tracker read them in the order they
+    // were written, which is what attaches a modifier to its own question.
+    const { ask: _ask, criteria: _criteria, category: _category, score: _score, threshold: _threshold, id: _id, ...rest } = command.optsWithGlobals();
+    const drafts = readInstantEvalRunQuestions();
+    const { runInstantEvalCommand: impl } = await import("./commands/instant-evals/run.js");
+    await impl(question, rest, drafts);
+  });
+
+  const instantEvalEstimateCmd = instantEvalCmd
+    .command("estimate [question]")
+    .description("Price a run without starting it");
+  const readInstantEvalEstimateQuestions = trackQuestionFlags(instantEvalEstimateCmd);
+
+  emitsResult(
+    instantEvalEstimateCmd
+      .option("--ask <question>", INSTANT_EVAL_ASK_HELP, collectParam)
+      .option("--criteria <text>", INSTANT_EVAL_CRITERIA_HELP, collectParam)
+      .option("--score <min..max>", INSTANT_EVAL_SCORE_HELP)
+      .option("--category <name=description>", INSTANT_EVAL_CATEGORY_HELP, collectParam)
+      .option("--threshold <probability>", INSTANT_EVAL_THRESHOLD_HELP)
+      .option("--id <name>", INSTANT_EVAL_ID_HELP)
+      .option("--questions-file <path>", INSTANT_EVAL_QUESTIONS_FILE_HELP)
+      .option("--target <target>", INSTANT_EVAL_TARGET_HELP)
+      .option("--filter <filter>", INSTANT_EVAL_FILTER_HELP)
+      .option("--last <window>", INSTANT_EVAL_LAST_HELP)
+      .option("--start <instant>", INSTANT_EVAL_START_HELP)
+      .option("--end <instant>", INSTANT_EVAL_END_HELP)
+      .option("--sql <statement>", INSTANT_EVAL_SQL_HELP)
+      .option("--sql-file <path>", "Read the statement from a file")
+      .option("--param <pair>", INSTANT_EVAL_PARAM_HELP, collectParam)
+      .option("--limit <n>", INSTANT_EVAL_LIMIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (question: string | undefined, _options: unknown, command: Command) => {
+      const { ask: _ask, criteria: _criteria, category: _category, score: _score, threshold: _threshold, id: _id, ...rest } = command.optsWithGlobals();
+      const drafts = readInstantEvalEstimateQuestions();
+      const { estimateInstantEvalCommand: impl } = await import("./commands/instant-evals/estimate.js");
+      return impl(question, rest, drafts);
+    },
+  );
+
+  rendersOwnResult(
+    instantEvalCmd
+      .command("status <id>")
+      .description("Read one run: where it is, what it matched, what it cost")
+      .option("--wait [minutes]", INSTANT_EVAL_WAIT_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+  ).action(async (id: string, _options: unknown, command: Command) => {
+    const { statusInstantEvalCommand: impl } = await import("./commands/instant-evals/status.js");
+    await impl(id, command.optsWithGlobals());
+  });
+
+  emitsResult(
+    instantEvalCmd
+      .command("list")
+      .description("List the project's runs, newest first")
+      .option("--limit <n>", "Runs to list, at most one hundred (default: 20)")
+      .option("--before <instant>", "List runs accepted before this instant (ISO-8601)")
+      .option("--before-id <id>", "The id of the last run of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { limit?: string; before?: string; beforeId?: string }) => {
+      const { listInstantEvalsCommand: impl } = await import("./commands/instant-evals/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("results <id>")
+      .description("Read a page of the run's judgements")
+      .option("--question <id>", "Only this question's judgements")
+      .option("--matched", "Only judgements that matched")
+      .option("--unmatched", "Only judgements that did not match")
+      .option("--status <status>", "Only judgements in this state: judged, skipped or failed")
+      .option("--limit <n>", "Judgements per page, at most one thousand (default: 100)")
+      .option("--cursor <cursor>", "The cursor the previous page answered with")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { question?: string; matched?: boolean; unmatched?: boolean; status?: string; limit?: string; cursor?: string }) => {
+      const { resultsInstantEvalCommand: impl } = await import("./commands/instant-evals/results.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("sample <id>")
+      .description("Read a few rows with the text that was judged beside the verdict")
+      .option("-n, --number <n>", "Rows to read, at most twenty five (default: 5)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { number?: string }) => {
+      const { sampleInstantEvalCommand: impl } = await import("./commands/instant-evals/sample.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    instantEvalCmd
+      .command("cancel <id>")
+      .description("Ask a run to stop before its next page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string) => {
+      const { cancelInstantEvalCommand: impl } = await import("./commands/instant-evals/cancel.js");
+      return impl(id);
+    },
+  );
+
   // Add trace command group
   const traceCmd = program
     .command("trace")
     .description("Search and inspect traces");
-
-  /**
-   * Help for `--project`, shared by every command that reads across projects.
-   * The default is the personal project, which is where these commands pointed
-   * before the flag existed, so an existing script keeps its meaning.
-   */
-  const PROJECT_FLAG_HELP =
-    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
   rendersOwnResult(
     traceCmd
@@ -2870,6 +3192,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option(
         "-q, --query <query>",
         "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+      )
+      .option(
+        "--filter <filter>",
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
       )
       .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
       .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
@@ -2941,6 +3267,126 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await impl(traceId, command.optsWithGlobals());
   });
 
+  emitsResult(
+    traceCmd
+      .command("facets [field]")
+      .description(
+        "Discover what the filter fields actually hold in this project. With no field, every facet and its top values; with a field, that field's values and counts",
+      )
+      .option("--prefix <prefix>", "Only values starting with this. Needs a field")
+      .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
+      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
+      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (field: string | undefined, options: Record<string, string>) => {
+      const { traceFacetsCommand: impl } = await import("./commands/traces/facets.js");
+      return impl(field, options);
+    },
+  );
+
+  emitsResult(
+    traceCmd
+      .command("fields")
+      .description(
+        "List every field a trace filter can name, with its value type and group",
+      )
+      .option("--syntax", "Print the filter language's syntax instead of the field list")
+      .option("--examples", "Print worked filter queries instead of the field list")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: Record<string, string>) => {
+      const { traceFieldsCommand: impl } = await import("./commands/traces/fields.js");
+      return impl(options);
+    },
+  );
+
+  // Add query command group — LangWatchQL analytics SQL, run as written.
+  //
+  // `run` is the DEFAULT subcommand, so `langwatch query "SELECT …"` reaches it
+  // with the statement as its argument while `langwatch query schema` still
+  // resolves to the sibling. Without the default, commander would read the
+  // statement as an unknown subcommand name.
+  const queryCmd = program
+    .command("query")
+    .description("Run LangWatchQL analytics SQL and discover what can be queried");
+
+  emitsResult(
+    queryCmd
+      .command("run [sql]", { isDefault: true })
+      .description("Run one LangWatchQL statement, exactly as written")
+      .option("--sql-file <path>", "Read the statement from a file instead of the argument")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
+      .option("--limit <n>", "Rows to keep from the result")
+      .option(
+        "--format <format>",
+        "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
+        "table",
+      )
+      .option(
+        "--page-by <mode>",
+        "keyset: walk every page by rebinding the statement's {after_ts} and {after_id} parameters, without rewriting the statement",
+      )
+      .option("--out <file>", "Write the result to a file instead of stdout")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP),
+    async (sql: string | undefined, options: Record<string, string>) => {
+      const { runQueryCommand: impl } = await import("./commands/query/run.js");
+      return impl(sql, options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("schema")
+      .description("List the analytics views and columns a statement can name")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { queryLwqlSchemaCommand: impl } = await import("./commands/query/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("reference")
+      .description(
+        "Describe both query languages: the analytics SQL, the trace filter, worked examples, and which one answers which question",
+      )
+      .option(
+        "--section <section>",
+        "Print one section only: lwql, trace-filter, examples or decisions",
+      )
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { section?: string; project?: string }) => {
+      const { queryReferenceCommand: impl } = await import("./commands/query/reference.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    queryCmd
+      .command("examples")
+      .description("Print worked queries in both languages, with their parameters")
+      .option("--tag <tag>", "Only examples carrying this tag or intent")
+      .option("--language <language>", "Only examples in this language: lwql or trace-filter")
+      .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { tag?: string; language?: string; project?: string }) => {
+      const { queryExamplesCommand: impl } = await import("./commands/query/examples.js");
+      return impl(options);
+    },
+  );
+
   // Add session command group
   const sessionCmd = program
     .command("session")
@@ -2979,8 +3425,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("get <id>")
-      .description("Get scenario details by ID")
+      .command("get <reference>")
+      .description("Get scenario details by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { getScenarioCommand: impl } = await import("./commands/scenarios/get.js");
@@ -3005,8 +3451,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   );
 
   const scenarioUpdateCmd = scenarioCmd
-    .command("update <id>")
-    .description("Update an existing scenario")
+    .command("update <reference>")
+    .description("Update an existing scenario, named by ID or name")
     .option("--name <name>", "New scenario name")
     .option("--situation <situation>", "New situation/context")
     .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
@@ -3037,8 +3483,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   rendersOwnResult(
     scenarioCmd
-      .command("run <id>")
-      .description("Run one scenario against one or more targets")
+      .command("run <reference>")
+      .description("Run one scenario, named by ID or name, against one or more targets")
       .option("--target <target>", TARGET_FLAG_HELP, collectParam)
       .option("--name <name>", RUN_NAME_FLAG_HELP)
       .option("--repeat <n>", REPEAT_FLAG_HELP)
@@ -3088,8 +3534,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioCmd
-      .command("delete <id>")
-      .description("Archive (soft-delete) a scenario")
+      .command("delete <reference>")
+      .description("Archive (soft-delete) a scenario, named by ID or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
@@ -3727,6 +4173,122 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  // Add dashboard-widget command group — custom-chart-playground widgets
+  const dashboardWidgetCmd = program
+    .command("dashboard-widget")
+    .description("Manage dashboard widgets");
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("schema")
+      .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { dashboardWidgetSchemaCommand: impl } = await import("./commands/dashboard-widgets/schema.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("list")
+      .description("List the project's dashboard widgets")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { project?: string }) => {
+      const { listDashboardWidgetsCommand: impl } = await import("./commands/dashboard-widgets/list.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("get <id>")
+      .description("Get a dashboard widget by ID — its React source and named queries")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("create")
+      .description("Save a dashboard widget from a React source file and its named LangWatchQL queries")
+      .requiredOption("--name <name>", "Widget name")
+      .option("--code <code>", "The widget's React source")
+      .option("--code-file <path>", "Read the widget's React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: {
+      name?: string;
+      code?: string;
+      codeFile?: string;
+      queriesFile?: string;
+      project?: string;
+    }) => {
+      const { createDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("update <id>")
+      .description("Update a dashboard widget's name or definition")
+      .option("--name <name>", "New widget name")
+      .option("--code <code>", "New React source")
+      .option("--code-file <path>", "Read the new React source from a file")
+      .option("--queries-file <path>", "JSON file: an array of { name, sql, parameters? }")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      id: string,
+      options: {
+        name?: string;
+        code?: string;
+        codeFile?: string;
+        queriesFile?: string;
+        project?: string;
+      },
+    ) => {
+      const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("delete <id>")
+      .description("Delete a dashboard widget")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (id: string, options: { project?: string }) => {
+      const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
+      return impl(id, options);
+    },
+  );
+
+  emitsResult(
+    dashboardWidgetCmd
+      .command("pin <widget>")
+      .description("Add a dashboard widget to a dashboard (widget and dashboard by id or name)")
+      .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
+      .option("--project <slug-or-id>", "Project to run against")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      widget: string,
+      options: { dashboard?: string; project?: string },
+    ) => {
+      const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
+      return impl(widget, options);
+    },
+  );
+
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")
@@ -3979,6 +4541,39 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+
+  // The guided onboarding state of the organization this project belongs to.
+  // Agent plumbing like `navigate`: Langy reads it to know which path it is
+  // guiding and marks a path done at the end of a guided setup, so the Home
+  // offer and the campaigns see it finish.
+  // See specs/features/onboarding/guided-onboarding-variant.feature.
+  const onboardingCmd = program
+    .command("onboarding")
+    .description("Read and update the guided onboarding of this organization");
+
+  emitsResult(
+    onboardingCmd
+      .command("state")
+      .description("Show the guided onboarding state: paths picked, current, done, provider, tour")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { onboardingStateCommand: impl } = await import("./commands/onboarding/state.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("complete-path <path>")
+      .description("Mark a guided onboarding path as done: llmops, coding, gateway or governance")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (path: string) => {
+      const { onboardingCompletePathCommand: impl } = await import(
+        "./commands/onboarding/complete-path.js"
+      );
+      return impl(path);
+    },
+  );
 
   // Drive the page the user has open with typed UI actions. Agent plumbing
   // like `navigate`: only works mid-turn, when the platform can reach the
@@ -5143,6 +5738,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // command. Registered on the built tree so buildProgram() stays a pure
   // factory: no module-level state, nothing leaks between daemon requests.
   registerOutputOptions(program);
+
+  // `--project` on every command that runs inside a project, added the same
+  // way and for the same reason: a family that adopts it one at a time is a
+  // family that forgets it, which is how the whole instant-eval family shipped
+  // with no way to name a project. The two exemption lists live with the
+  // helper (utils/projectOption.ts).
+  applyProjectOption(program);
 
   return program;
 }

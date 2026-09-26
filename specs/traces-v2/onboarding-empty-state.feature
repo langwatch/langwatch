@@ -51,6 +51,17 @@ Rule: Onboarding empty state
     Then the journey is hidden for this project (persisted in localStorage)
     And the real trace table is shown
 
+  # The project record is re-read on focus and on a route change, so on its
+  # own it learns of the first trace only when the reader leaves and comes
+  # back. While the flag is false the page polls the small first-trace read.
+  @integration
+  Scenario: The Trace Explorer leaves its empty state when the first trace arrives
+    Given the Observe page is open with the project's `firstMessage` flag false
+    When the project receives its first trace
+    Then the page re-reads the first-trace flag on its own, without a reload
+    And the trace results replace the empty state once the flag flips
+    And the shared project record is refreshed so the rest of the app follows
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JOURNEY STAGES (HERO COPY)

@@ -76,13 +76,26 @@ export interface OrganizationWithAdmins {
 }
 
 /**
+ * Which contract an organization's hosted usage is invoiced under.
+ *
+ * `cloud` is a SEAT_EVENT organization with an active GROWTH subscription, and
+ * is invoiced monthly. `connected` is a self-hosted customer with a
+ * `ConnectedBillingAccount` (ADR-141, section 7): it buys no Cloud plan, so it
+ * is not on SEAT_EVENT pricing at all, and its usage rides the quarterly
+ * subscription that account names.
+ */
+export type UsageBillingContract = "cloud" | "connected";
+
+/**
  * Organization data needed by billing usage reporting.
- * Only returned for SEAT_EVENT pricing orgs with active GROWTH subscriptions.
+ * Only returned for organizations that buy usage under one of the two
+ * contracts above.
  */
 export interface OrganizationForBilling {
   id: string;
   stripeCustomerId: string | null;
   subscriptions: { id: string }[];
+  contract: UsageBillingContract;
 }
 
 /**
@@ -198,8 +211,17 @@ export interface EnrichedAuditLog {
   args: unknown;
   user: { id: string; name: string | null; email: string | null } | null;
   project: { id: string; name: string } | null;
-  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
-  source: "platform" | "gateway";
+  /**
+   * Computed: gateway = a `gateway.` action, directory = a membership change
+   * the customer's identity provider authored, platform = otherwise.
+   *
+   * `directory` exists because a change nobody in the organization made needs
+   * an author before anybody goes looking for who made it (ADR-122). Such a
+   * row has a null `userId` — the actor is `system:scim` — so without this it
+   * reads as "User not found", which is the one reading that sends somebody
+   * hunting for a person who does not exist.
+   */
+  source: "platform" | "gateway" | "directory";
   /** Gateway resource kind — only set when source="gateway". */
   targetKind: string | null;
   /** Gateway resource id — only set when source="gateway". */
@@ -277,20 +299,6 @@ export interface MemberTeamBinding {
   role: TeamUserRole;
   customRoleId: string | null;
   customRoleName: string | null;
-}
-
-/**
- * Input for deleting a member from an organization.
- */
-export interface DeleteMemberInput {
-  organizationId: string;
-  userId: string;
-  /**
-   * Who removed them, when a person did. A service credential acts as
-   * nobody, so this is null there and the revocation is attributed to the
-   * organization service itself.
-   */
-  actingUserId?: string | null;
 }
 
 /**
@@ -470,8 +478,6 @@ export interface OrganizationRepository {
 
   /** Partial settings update; see {@link UpdateOrganizationSettingsInput}. */
   updateSettings(input: UpdateOrganizationSettingsInput): Promise<void>;
-
-  deleteMember(input: DeleteMemberInput): Promise<void>;
 
   setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
@@ -679,8 +685,6 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async updateSettings(
     _input: UpdateOrganizationSettingsInput,
   ): Promise<void> {}
-
-  async deleteMember(_input: DeleteMemberInput): Promise<void> {}
 
   async setMemberDisabled(_input: SetMemberDisabledInput): Promise<void> {}
 

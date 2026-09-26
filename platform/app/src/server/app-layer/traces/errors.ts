@@ -124,6 +124,33 @@ export class FilterParseError extends HandledError {
   }
 }
 
+/**
+ * The filter carries more AST nodes than the translator will compile: eleven
+ * or more bare words, or a long chain of terms. The caller can act on it in
+ * one move, quoting the sentence so it becomes a single phrase node, which is
+ * what the copy and the client's inline fix say. `customer` fault, 422.
+ */
+export class FilterTooComplexError extends HandledError {
+  declare readonly code: "filter_too_complex";
+
+  constructor({ maxNodes }: { readonly maxNodes: number }) {
+    super(
+      "filter_too_complex",
+      "Too many separate terms. Put the sentence in quotes to search it as one phrase.",
+      {
+        httpStatus: 422,
+        fault: "customer",
+        // Named consumer: an agent narrowing a filter needs the ceiling to
+        // know how far to cut. The number is not internal, the client checks
+        // the same one before sending.
+        meta: { maxNodes },
+        ...remediation("filter_too_complex"),
+      },
+    );
+    this.name = "FilterTooComplexError";
+  }
+}
+
 export class FilterFieldUnknownError extends HandledError {
   declare readonly code: "filter_field_unknown";
 

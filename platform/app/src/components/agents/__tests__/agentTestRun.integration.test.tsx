@@ -54,6 +54,12 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+// AgentCard reads the voice-agents flag unconditionally to gate Talk to it;
+// stub it so this suite (about Test agent, not voice) needs no trpc context.
+vi.mock("../voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => false,
+}));
+
 vi.mock("~/features/langy/components/LangyContextTarget", () => ({
   LangyContextTarget: ({ children }: { children: ReactNode }) => (
     <>{children}</>

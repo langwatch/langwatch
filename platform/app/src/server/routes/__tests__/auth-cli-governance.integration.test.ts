@@ -32,6 +32,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { app } from "../auth-cli";
@@ -87,6 +89,7 @@ describe("GET /api/auth/cli/governance/*", () => {
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       redis: redisConnection,
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: async ({ organizationId }) =>
           organizationId === ORG_C ? freePlan : enterprisePlan,
@@ -140,14 +143,12 @@ describe("GET /api/auth/cli/governance/*", () => {
       [ORG_B, USER_B],
       [ORG_C, USER_C],
     ] as const) {
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: orgId,
-          userId,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: orgId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: orgId,
+        userId,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: orgId,
       });
     }
 
@@ -225,6 +226,9 @@ describe("GET /api/auth/cli/governance/*", () => {
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
     });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: [ORG_A, ORG_B, ORG_C] } },
+    });
     await prisma.user.deleteMany({
       where: { id: { in: [USER_A, USER_B, USER_C] } },
     });
@@ -270,6 +274,7 @@ describe("GET /api/auth/cli/governance/*", () => {
 
   describe("GET /governance/status", () => {
     describe("when called with a valid Bearer token", () => {
+      /** @scenario "setupState returns boolean OR for nav-promotion signal" */
       it("returns the org's setup-state OR-of-flags shape", async () => {
         const res = await callGovernance("/status", `Bearer ${TOKEN_A}`);
         expect(res.status).toBe(200);
@@ -455,14 +460,12 @@ describe("GET /api/auth/cli/governance/*", () => {
           role: "ADMIN",
         },
       });
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: INGEST_KEY_ORG,
-          userId: INGEST_KEY_USER,
-          role: "ADMIN",
-          scopeType: "ORGANIZATION",
-          scopeId: INGEST_KEY_ORG,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: INGEST_KEY_ORG,
+        userId: INGEST_KEY_USER,
+        role: "ADMIN",
+        scopeType: "ORGANIZATION",
+        scopeId: INGEST_KEY_ORG,
       });
 
       if (!redisConnection) throw new Error("Redis unavailable");
@@ -480,26 +483,28 @@ describe("GET /api/auth/cli/governance/*", () => {
 
       // The mint path resolves the caller's personal workspace and refuses to
       // allocate one — create it first, as a real login would.
-      await new PersonalWorkspaceService(prisma).ensure({
+      const workspace = await new PersonalWorkspaceService(prisma).ensure({
         userId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
       });
 
       // Mint a live key via the service so we can verify it appears in the list
       const service = IngestionKeyService.create(prisma);
-      await service.ensureForPersonalProject({
-        userId: INGEST_KEY_USER,
+      await service.issueForProject({
+        callerUserId: INGEST_KEY_USER,
+        ownerUserId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
+        projectId: workspace.project.id,
         sourceType: "codex",
-        createdByDeviceLabel: null,
       });
 
       // Mint a second key then revoke it immediately — it must not appear
-      const revokedResult = await service.ensureForPersonalProject({
-        userId: INGEST_KEY_USER,
+      const revokedResult = await service.issueForProject({
+        callerUserId: INGEST_KEY_USER,
+        ownerUserId: INGEST_KEY_USER,
         organizationId: INGEST_KEY_ORG,
+        projectId: workspace.project.id,
         sourceType: "claude_code",
-        createdByDeviceLabel: null,
       });
       // Revoke by setting revokedAt directly to avoid needing full admin context
       await prisma.apiKey.updateMany({
@@ -517,6 +522,9 @@ describe("GET /api/auth/cli/governance/*", () => {
       }
       // RoleBindings reference ApiKeys (required relation), so they go first.
       await prisma.roleBinding.deleteMany({
+        where: { organizationId: INGEST_KEY_ORG },
+      });
+      await prisma.grant.deleteMany({
         where: { organizationId: INGEST_KEY_ORG },
       });
       await prisma.apiKey.deleteMany({

@@ -1,6 +1,6 @@
 image:
   repository: langwatch/clickhouse-serverless
-  tag: "0.3.0"  # x-release-please-version
+  tag: "0.4.0"  # x-release-please-version
   pullPolicy: IfNotPresent
 
 # Primary inputs — the image auto-tunes all ClickHouse parameters from these
@@ -210,6 +210,23 @@ serviceAccount:
 # Pod-level settings
 imagePullSecrets: []
 podAnnotations: {}
+
+# Generic extra volumes / mounts for the ClickHouse container. An umbrella chart
+# uses these to deliver additional server config (files under config.d / users.d)
+# without this subchart knowing what that config is. tpl-rendered, so values may
+# reference .Release.Name and other release context. Kept intentionally generic —
+# no consumer-specific names live here.
+extraVolumes: []
+extraVolumeMounts: []
+
+# LangWatchQL access-model delivery. When secretName is non-empty the StatefulSet
+# mounts that Secret's two rendered files into users.d / config.d on EVERY pod,
+# unconditionally (not through the operator-facing extraVolumes above, which Helm
+# would let an operator's own volume replace). The umbrella chart sets it to a
+# template string that resolves to <release>-lwql-clickhouse-access; empty here so
+# a standalone install of this subchart renders no LWQL mount.
+lwqlAccess:
+  secretName: ""
 
 # Scheduling
 scheduling:

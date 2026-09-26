@@ -1,14 +1,15 @@
 /**
  * The system-migrations composition root: the ONE place the generic runner
  * (@langwatch/system-migrations) meets Prisma, Redis, the authz collector
- * and the registered migrations. Worker boot calls `runSystemMigrationPass`
- * (via ./boot); the ops router reads the same composed state repository.
+ * and the registered migrations. The startup preflight calls
+ * `runSystemMigrationPass` via ./boot; the ops router reads the same state.
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
 import { auditLog } from "@ee/audit-log/auditLog";
 import { createLogger } from "@langwatch/observability";
 import {
+  groupByTenantSource,
   type MigrationPassSummary,
   type SystemMigration,
   SystemMigrationRunnerService,
@@ -24,16 +25,18 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
+import type { ProcessRole } from "../config";
 import {
   connectionGrandfatherMigration,
   identifierBackfillMigration,
-  identityNewbornReconciliation,
+  identityAddressLockReaper,
   identitySecretHealMigration,
 } from "../identity/runtime";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
 } from "./cohort";
+import { SystemMigrationRedriveService } from "./redrive";
 import { RedisMigrationLeaseRepository } from "./repositories/migration-lease.redis.repository";
 import { PrismaOrganizationTenantSource } from "./repositories/organization-tenant-source.prisma.repository";
 import { PrismaSystemMigrationEnrollmentRepository } from "./repositories/system-migration-enrollment.prisma.repository";
@@ -86,8 +89,10 @@ export const systemMigrationsService = new SystemMigrationsService({
       args: entry.args,
     }),
   runPass: () => runSystemMigrationPass(),
-  runTargetedPass: ({ organizationId, migrationName }) =>
-    runSystemMigrationTargetedPass({ organizationId, migrationName }),
+  runTargetedPass: (target) =>
+    "userId" in target
+      ? runSystemMigrationUserPass(target)
+      : runSystemMigrationTargetedPass(target),
   // ADR-110: one migration, and finishing it IS the switch. There is no
   // waiting stage to report, no rollback lever to register an effect for,
   // and so no dependency graph between migrations to guard.
@@ -133,9 +138,9 @@ export function registeredMigrations(): SystemMigration[] {
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
-    // D04 (ADR-117 §5): the organization's legacy SSO strings become
-    // connection history, proved by routing. Dark — the connection projection
-    // decides nothing until `SSOCONN_ROUTING` is flipped.
+    // D04 records the configured legacy route without treating the old domain
+    // string as ownership evidence. Existing sign-in remains compatible, but
+    // activation, linking, and new-person trust still require qualified proof.
     connectionGrandfatherMigration(),
   ];
 }
@@ -278,29 +283,9 @@ export async function migrationPassCohort(): Promise<
 }
 
 /**
- * The user-rooted pass's cohort. For a migration still paced by enrollment -
- * every user-rooted migration registered today - the ops page enrolls
- * ORGANIZATIONS, and a user is in the cohort when any organization they
- * belong to is enrolled for it. Self-hosted admits every user, as it admits
- * every organization. Enrollment is read once, fresh, at the start of each
- * pass; membership is answered per candidate user with two cheap indexed
- * reads rather than materializing every enrolled organization's member list
- * into memory (the runner visits each user once per pass). A user outside
- * every organization has nothing to enroll them on cloud and stays on the
- * legacy path until they join one; their sign-in is unaffected (the write
- * gate answers false; the D03 read fork falls back to legacy routing).
- *
- * A user-rooted migration declaring `enrolledAutomatically` admits every
- * user instead.
- *
- * Membership of a private-dataplane organization is NOT a reason to leave
- * somebody out, and used to be: a user tenant could not be placed at all, so
- * excluding them was the only way to avoid writing somewhere wrong. It can
- * be placed now - user data lands on the shared instance, whoever they
- * belong to, because what these events record is how a person signs in
- * rather than any organization's data. Excluding them would strand exactly
- * those people on the legacy path forever, which is the same reason the
- * organization cohort never excluded their organizations.
+ * Builds the user cohort once per pass. Automatic migrations admit every
+ * user. Paced migrations admit members of enrolled organizations, querying
+ * one user's memberships at a time to avoid a growing SQL `IN` list.
  */
 export async function userMigrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => Promise<boolean>
@@ -309,21 +294,20 @@ export async function userMigrationPassCohort(): Promise<
   const automatic = automaticallyEnrolledMigrationNames();
   const enrolledByMigration =
     await enrollmentRepository.findEnrolledOrganizationIdsByMigration();
-  const enrolledByMigrationList = new Map<string, string[]>();
-  for (const migration of registeredUserMigrations()) {
-    enrolledByMigrationList.set(migration.name, [
-      ...(enrolledByMigration.get(migration.name) ?? new Set<string>()),
-    ]);
-  }
   return async ({ tenantId, migrationName }) => {
     if (automatic.has(migrationName)) return true;
-    const organizationIds = enrolledByMigrationList.get(migrationName) ?? [];
-    if (organizationIds.length === 0) return false;
-    const enrolledMembership = await prisma.organizationUser.findFirst({
-      where: { userId: tenantId, organizationId: { in: organizationIds } },
-      select: { userId: true },
+    const enrolled = enrolledByMigration.get(migrationName);
+    if (!enrolled || enrolled.size === 0) return false;
+    // Read as a relation of the user, not as a top-level OrganizationUser
+    // query: that model is org-guarded (dbOrganizationIdProtection), and a
+    // userId-only predicate has no admitted shape there.
+    const user = await prisma.user.findUnique({
+      where: { id: tenantId },
+      select: { orgMemberships: { select: { organizationId: true } } },
     });
-    return enrolledMembership !== null;
+    return (user?.orgMemberships ?? []).some((membership) =>
+      enrolled.has(membership.organizationId),
+    );
   };
 }
 
@@ -336,6 +320,52 @@ function userMigrationsForThisInstallation(): SystemMigration[] {
   );
 }
 
+function organizationMigrationsForThisInstallation(): SystemMigration[] {
+  return registeredMigrations().filter((migration) =>
+    migrationRunsOnThisInstallation({
+      isSaaS: env.IS_SAAS === true,
+      runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+    }),
+  );
+}
+
+/**
+ * The names a pass on THIS installation could still move, both axes. The
+ * re-drive's gate asks the state table about exactly these: a row belonging
+ * to a migration this installation does not run is not work waiting, it is
+ * another deployment's row in a shared table, and sweeping for it would keep
+ * the gate permanently open.
+ */
+export function migrationNamesForThisInstallation(): string[] {
+  return [
+    ...organizationMigrationsForThisInstallation(),
+    ...userMigrationsForThisInstallation(),
+  ].map((migration) => migration.name);
+}
+
+/**
+ * The periodic re-drive (D2): a worker-only cadence over the pass above, so
+ * a tenant that parks an hour after boot heals itself instead of waiting for
+ * the next deploy or an operator's click. Composed here because this is the
+ * one place the runner meets Prisma, and gated on the state table so an
+ * installation with nothing parked or held pays one row read per tick.
+ */
+export function createSystemMigrationRedrive({
+  processRole,
+}: {
+  processRole: ProcessRole | undefined;
+}): SystemMigrationRedriveService {
+  return new SystemMigrationRedriveService({
+    processRole,
+    logger: createLogger("langwatch:system-migrations:redrive"),
+    hasTenantAwaitingRedrive: () =>
+      systemMigrationState.hasTenantAwaitingRedrive({
+        migrationNames: migrationNamesForThisInstallation(),
+      }),
+    runPass: () => runSystemMigrationPass(),
+  });
+}
+
 function mergeSummaries(
   a: MigrationPassSummary,
   b: MigrationPassSummary,
@@ -344,6 +374,7 @@ function mergeSummaries(
     tenantsSeen: a.tenantsSeen + b.tenantsSeen,
     finalized: a.finalized + b.finalized,
     held: a.held + b.held,
+    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
     parked: a.parked + b.parked,
     skipped: a.skipped + b.skipped,
     alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
@@ -372,6 +403,32 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
       );
     }
   }
+}
+
+/** One user's identity adoption, with the normal user cohort and lease.
+ * Unlike the operator's organization-shaped pass, this never scans peers. */
+export async function runSystemMigrationUserPass({
+  userId,
+  migrationName,
+  signal,
+}: {
+  userId: string;
+  migrationName: string;
+  signal?: AbortSignal;
+}): Promise<MigrationPassSummary> {
+  const runner = new SystemMigrationRunnerService({
+    state: systemMigrationState,
+    lease: new RedisMigrationLeaseRepository(tryGetApp()?.redis ?? null),
+    tenants: {
+      findTenantIdsAfter: async ({ cursor }) =>
+        cursor === null ? [userId] : [],
+    },
+    cohort: await userMigrationPassCohort(),
+    migrations: userMigrationsForThisInstallation().filter(
+      (migration) => migration.name === migrationName,
+    ),
+  });
+  return runner.runPass({ signal });
 }
 
 /**
@@ -438,7 +495,7 @@ export async function runSystemMigrationTargetedPass({
 /**
  * One full pass over every cohort organization, then over every cohort user.
  * Composed per call so the lease token, the Redis handle and the enrollment
- * read are all fresh - the ops "run a pass now" action and the worker boot
+ * read are all fresh - the ops "run a pass now" action and startup preflight
  * share this exact entry point. Self-hosted runs only the migrations whose
  * `runsAutomaticallyOnSelfHosted` declaration has been released: the others
  * are not driven for any tenant - never attempted, parked or reported -
@@ -449,24 +506,29 @@ export async function runSystemMigrationPass(args?: {
   /**
    * The process's Redis handle. Pass it when the App is still being composed
    * - `tryGetApp()` answers null until then, and a null handle makes the
-   * lease unacquirable, which would silently turn every boot pass into a
+   * lease unacquirable, which would silently turn every preflight pass into a
    * no-op. Callers that run after startup (the ops action) can omit it.
    */
   redis?: Redis | Cluster | null;
 }): Promise<MigrationPassSummary> {
   warnWhenRetiredCohortVariablesAreSet();
   const redis = args?.redis ?? tryGetApp()?.redis ?? null;
+  // Only the organizations with something left to do. One that has latched
+  // every migration in this list will never move again, and enumerating it
+  // costs a claim, a state read per migration and a release - per pass, per
+  // replica, forever. At fleet scale that is what ran the boot preflight past
+  // the startup probe's budget. The runner's terminal short-circuit still
+  // stands behind it: this decides who is worth visiting, never what the
+  // visit concludes.
+  const organizationMigrations = organizationMigrationsForThisInstallation();
   const runner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaOrganizationTenantSource(prisma),
+    tenants: new PrismaOrganizationTenantSource(prisma).pendingFor({
+      migrationNames: organizationMigrations.map((migration) => migration.name),
+    }),
     cohort: await migrationPassCohort(),
-    migrations: registeredMigrations().filter((migration) =>
-      migrationRunsOnThisInstallation({
-        isSaaS: env.IS_SAAS === true,
-        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
-      }),
-    ),
+    migrations: organizationMigrations,
   });
   // The USER-rooted leg (ADR-101 §6): the same lease, state table and
   // enrollment rows, driven over users. Both legs' cohorts resolve BEFORE
@@ -478,46 +540,73 @@ export async function runSystemMigrationPass(args?: {
     userMigrations.length === 0 ? null : await userMigrationPassCohort();
   const organizationSummary = await runner.runPass({ signal: args?.signal });
   if (userCohort === null) {
-    await sweepAbandonedNewborns();
+    await reapOrphanedAddressLocks();
     return organizationSummary;
   }
-  const userRunner = new SystemMigrationRunnerService({
-    state: systemMigrationState,
-    lease: new RedisMigrationLeaseRepository(redis),
-    tenants: new PrismaUserTenantSource(prisma),
-    cohort: userCohort,
+  // One runner per distinct tenant source. A migration that declares its own
+  // candidates is driven over those alone; every other user migration shares
+  // the walk over the whole `User` table. They cannot share one source: the
+  // narrowed set would silently become the others' cohort too, and a backfill
+  // that must reach every user would stop reaching most of them.
+  let summary = organizationSummary;
+  const everyUser = new PrismaUserTenantSource(prisma);
+  const userBuckets = groupByTenantSource({
     migrations: userMigrations,
+    everyTenant: everyUser,
   });
-  const summary = mergeSummaries(
-    organizationSummary,
-    await userRunner.runPass({ signal: args?.signal }),
-  );
-  await sweepAbandonedNewborns();
+  for (const { tenants, migrations } of userBuckets) {
+    const userRunner = new SystemMigrationRunnerService({
+      state: systemMigrationState,
+      lease: new RedisMigrationLeaseRepository(redis),
+      // Narrowed AFTER grouping, never before: the buckets are formed by
+      // comparing sources by identity, so handing `groupByTenantSource` a
+      // fresh narrowed object per migration would split one bucket into
+      // several. A bucket driven over every user is cut to the users with
+      // work left for exactly that bucket's migrations; a migration that
+      // declared its own candidates (the heal, which never finalizes anyone)
+      // keeps the set it declared, untouched.
+      tenants:
+        tenants === everyUser
+          ? everyUser.pendingFor({
+              migrationNames: migrations.map((migration) => migration.name),
+            })
+          : tenants,
+      cohort: userCohort,
+      migrations,
+    });
+    summary = mergeSummaries(
+      summary,
+      await userRunner.runPass({ signal: args?.signal }),
+    );
+  }
+  await reapOrphanedAddressLocks();
   return summary;
 }
 
 /**
- * The born-finalized entrance's reconciliation sweep (ADR-116 §3), on the
- * same cadence as the passes and never terminal — a required companion to the
- * entrance rather than optional hygiene.
+ * The address lock's reap (ADR-116 §6), on the same cadence as the passes and
+ * never terminal — a required companion to the lock rather than optional
+ * hygiene. A ceremony that claimed an address and then failed leaves a lock
+ * no live identifier backs, and without this nobody could take that address
+ * again.
  *
  * A LEG of the pass rather than a registered `SystemMigration`, because what
  * it hunts has no tenant a runner could visit. The runner drives the tenants
  * a source enumerates, and the user tenant source enumerates `User` rows; an
- * abandoned entrance is precisely a claim with no user row behind it, so a
+ * orphaned lock is precisely a claim no live identifier backs, so a
  * per-tenant migration would never reach one.
  *
- * Its failure is never the pass's: the sweep removes rows the pass did not
- * write, and a pass that reported nothing because a sweep threw would hide
- * the migration outcome an operator asked for.
+ * Its failure is never the pass's: the reap removes rows the pass did not
+ * write, and a pass that reported nothing because a reap threw would hide the
+ * migration outcome an operator asked for.
  */
-async function sweepAbandonedNewborns(): Promise<void> {
+async function reapOrphanedAddressLocks(): Promise<void> {
   try {
-    await identityNewbornReconciliation().runPass();
+    await identityAddressLockReaper().runPass();
   } catch (error) {
     logger.warn(
       { error },
-      "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+      "the address-lock reap failed; the locks stay and the next pass retries",
     );
   }
 }

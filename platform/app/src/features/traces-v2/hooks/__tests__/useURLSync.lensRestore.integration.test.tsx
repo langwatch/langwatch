@@ -36,20 +36,17 @@ const SHARED_LENS = { id: "custom-abc", name: "Shared", filterText: "" };
 let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
-vi.mock("../../stores/viewStore", () => ({
-  useViewStore: (sel: (s: unknown) => unknown) =>
+vi.mock("../../stores/viewSlice", () => ({
+  getPersistedActiveLensId: () => persistedLens,
+}));
+
+vi.mock("../../stores/explorerStore", () => ({
+  useExplorerStore: (sel: (s: unknown) => unknown) =>
     sel({
       activeLensId,
       allLenses,
       draftState: new Map(),
       selectLens: selectLensMock,
-    }),
-  getPersistedActiveLensId: () => persistedLens,
-}));
-
-vi.mock("../../stores/filterStore", () => ({
-  useFilterStore: (sel: (s: unknown) => unknown) =>
-    sel({
       queryText: "",
       timeRange: {
         from: 0,
@@ -57,8 +54,10 @@ vi.mock("../../stores/filterStore", () => ({
         label: "Last 30 days",
         presetId: "30d",
       },
+      evalRuns: {},
       applyQueryText: vi.fn(),
       setTimeRange: vi.fn(),
+      setEvalRuns: vi.fn(),
       resetPagination: vi.fn(),
     }),
 }));

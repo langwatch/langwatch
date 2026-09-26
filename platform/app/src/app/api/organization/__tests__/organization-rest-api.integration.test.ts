@@ -19,6 +19,7 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -32,6 +33,7 @@ describe("Feature: Organization REST API", () => {
 
   let seeded: ManagementTestOrg;
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -40,8 +42,10 @@ describe("Feature: Organization REST API", () => {
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -53,6 +57,7 @@ describe("Feature: Organization REST API", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["grant", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["organizationUser", { organizationId: seeded?.organization.id }],

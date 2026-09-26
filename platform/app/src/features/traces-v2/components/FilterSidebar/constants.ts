@@ -30,6 +30,7 @@ import {
   User,
   UserSquare,
   Users,
+  Wand2,
   Workflow,
 } from "lucide-react";
 import { FIELD_VALUES } from "~/server/app-layer/traces/query-language/metadata";
@@ -83,6 +84,24 @@ export const NORMAL_CASE_FIELDS = new Set([
 ]);
 
 /**
+ * Evaluator Verdict is a traffic light like Status, and must read as the
+ * SAME traffic light the evaluator drilldown already paints — green Passed,
+ * red Failed, yellow Errored (see `buildVerdictSpecs` in EvaluatorDrilldown).
+ * Without an entry here the field fell through to `hashColor`, which hashes
+ * the literal strings "pass"/"fail" into arbitrary palette slots: the two
+ * sections ended up showing the same words in opposite colours on the same
+ * screen. `skipped` / `unknown` are non-verdicts and stay neutral grey so
+ * they don't compete with the three that carry meaning.
+ */
+const EVALUATOR_VERDICT_COLORS: Record<string, Tokens["colors"]> = {
+  pass: "green.solid",
+  fail: "red.solid",
+  error: "yellow.solid",
+  skipped: "gray.solid",
+  unknown: "gray.solid",
+};
+
+/**
  * Status keeps a fixed traffic-light mapping. Origin derives its dot
  * colours from the shared `ORIGIN_DISPLAY` table — the same one the
  * Origin column badge consumes — so "evaluation" is always green,
@@ -91,6 +110,7 @@ export const NORMAL_CASE_FIELDS = new Set([
  */
 export const FACET_COLORS: Record<string, Record<string, Tokens["colors"]>> = {
   status: STATUS_COLORS,
+  evaluatorVerdict: EVALUATOR_VERDICT_COLORS,
   origin: Object.fromEntries(
     Object.entries(ORIGIN_DISPLAY).map(([value, { colorPalette }]) => [
       value,
@@ -133,6 +153,26 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
 };
 
 /**
+ * Display order for facets whose values have an inherent sequence, applied
+ * on top of the default count-sort. Deliberately NOT `FACET_DEFAULTS`: that
+ * map SEEDS values (it feeds `synthesizeDefaultDescriptors`, and its entries
+ * render as zero-count rows), so ordering a facet through it would also
+ * conjure rows for verdicts the project has never emitted — extra furniture
+ * in a section that is already dense. Ordering ranks what is present and
+ * introduces nothing.
+ *
+ * Evaluator Verdict is the only member today: left to count-sorting, Fail
+ * sat above Pass whenever failures outnumbered passes, so the same two rows
+ * swapped places between projects for no reason a reader could see. The
+ * order here is the drilldown's Passed / Failed / Errored, so the two
+ * surfaces read the same way down as well as in colour. Values outside the
+ * list (`skipped`, `unknown`) keep their count-sorted position behind these.
+ */
+export const FACET_VALUE_ORDER: Record<string, readonly string[]> = {
+  evaluatorVerdict: ["pass", "fail", "error"],
+};
+
+/**
  * Range keys that should appear in the sidebar immediately — even before
  * discover responds — as synthetic placeholder sections. Rendered with
  * a disabled state (min === max === 0, flagged synthetic) so users can
@@ -144,7 +184,15 @@ export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
  * Fields whose colour palette is curated. Other categoricals get hashed
  * colours rendered at reduced opacity to keep the sidebar visually calm.
  */
-export const VIBRANT_FIELDS = new Set(["status", "origin", "spanType"]);
+export const VIBRANT_FIELDS = new Set([
+  "status",
+  "origin",
+  "spanType",
+  // Curated traffic light — dimming it would leave pass and fail as two
+  // washed-out dots a reader has to squint at to tell apart, while the
+  // drilldown right above paints the same verdicts at full strength.
+  "evaluatorVerdict",
+]);
 
 export const FACET_ICONS: Record<string, LucideIcon> = {
   origin: Compass,
@@ -206,6 +254,7 @@ export const GROUP_ICONS: Record<string, LucideIcon> = {
   model: Sparkles,
   prompts: BookMarked,
   quality: CheckSquare,
+  instantEvals: Wand2,
   topics: Tag,
   cost: DollarSign,
   latency: Clock,
@@ -222,6 +271,7 @@ export interface FacetGroupDef {
     | "model"
     | "prompts"
     | "quality"
+    | "instantEvals"
     | "topics"
     | "cost"
     | "latency"
@@ -329,6 +379,16 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "annotation",
     ],
   },
+  // "Judge this now" — a question answered per row when the chip is applied,
+  // which is a different thing from the stored evaluator results in Quality:
+  // these have no facet to browse and they cost money to run. Named after the
+  // feature so the suggestion dropdown's header says what the four fields are
+  // instead of dropping them into the trailing "Other".
+  {
+    id: "instantEvals",
+    label: "Instant Evals",
+    keys: ["eval", "eval.trace", "eval.conversation", "eval.llm"],
+  },
   // "What is this trace about?" — the semantic-clustering axis.
   {
     id: "topics",
@@ -409,6 +469,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "cost",
       "model",
       "quality",
+      "instantEvals",
       "topics",
       "prompts",
       "custom",
@@ -421,6 +482,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "model",
       "prompts",
       "quality",
+      "instantEvals",
       "topics",
       "subjects",
       "cost",
@@ -443,6 +505,7 @@ export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
       "traces",
       "errors",
       "quality",
+      "instantEvals",
       "spans",
       "subjects",
       "topics",

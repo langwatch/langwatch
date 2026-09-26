@@ -5,14 +5,19 @@ import type {
   Prisma,
   PrismaClient,
   RoleBinding,
+  RoleBindingScopeType,
+  TeamUserRole,
 } from "~/generated/prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import {
+  liveGrants,
+  liveRoles,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 import type { ApiKeyRevocationCause } from "./revocation-cause";
@@ -46,13 +51,48 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}
 
   static create(prisma: ApiKeyPrismaDelegate): ApiKeyRepository {
     return new ApiKeyRepository(prisma);
+  }
+
+  private async withBindings(
+    organizationId: string,
+    keys: ApiKey[],
+    includeRoleNames = false,
+  ): Promise<ApiKeyWithBindings[]> {
+    if (keys.length === 0) return [];
+    const bindingsByKey = await this.accessListing.findApiKeyBindings({
+      organizationId,
+      apiKeyIds: keys.map((key) => key.id),
+    });
+    return keys.map((key) => ({
+      ...key,
+      roleBindings: (bindingsByKey.get(key.id) ?? []).map((row) => ({
+        id: row.id,
+        organizationId: row.organizationId,
+        userId: row.userId,
+        groupId: row.groupId,
+        apiKeyId: row.apiKeyId,
+        role: row.role,
+        customRoleId: row.customRoleId,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        ...(includeRoleNames
+          ? {
+              customRole: row.customRole
+                ? { id: row.customRole.id, name: row.customRole.name }
+                : null,
+            }
+          : {}),
+      })),
+    }));
   }
 
   async create({
@@ -68,6 +108,7 @@ export class ApiKeyRepository {
     ingestSourceType,
     ingestionTemplateId,
     createdByDeviceLabel,
+    parentApiKeyId,
     startsDisabled = false,
   }: {
     name: string;
@@ -82,6 +123,7 @@ export class ApiKeyRepository {
     ingestSourceType?: string | null;
     ingestionTemplateId?: string | null;
     createdByDeviceLabel?: string | null;
+    parentApiKeyId?: string | null;
     /**
      * Born revoked, to be activated once the key's grants are facts (see
      * {@link activate}). The row and its grants cannot share a transaction —
@@ -104,6 +146,7 @@ export class ApiKeyRepository {
         ingestSourceType: ingestSourceType ?? null,
         ingestionTemplateId: ingestionTemplateId ?? null,
         createdByDeviceLabel: createdByDeviceLabel ?? null,
+        parentApiKeyId: parentApiKeyId ?? null,
         ...(startsDisabled ? { revokedAt: new Date() } : {}),
       },
     });
@@ -122,35 +165,6 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Finds the live ingestion key for a (project, sourceType) pair: a non-revoked
-   * ApiKey carrying that ingestSourceType whose role binding is project-scoped to
-   * `projectId`. Used by the ingest-key service to rotate-in-place rather than
-   * accumulate keys.
-   */
-  async findIngestKey({
-    organizationId,
-    projectId,
-    sourceType,
-  }: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
-      where: {
-        organizationId,
-        ingestSourceType: sourceType,
-        revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
-      },
-      include: { roleBindings: true },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  /**
    * Lists every live ingestion key (`ingestSourceType IS NOT NULL`, not
    * revoked) whose role binding is project-scoped to `projectId`. Powers
    * the /me Trace Ingest installed-state lookup so a connected tile stays
@@ -163,18 +177,54 @@ export class ApiKeyRepository {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKeyWithBindings[]> {
-    return this.prisma.apiKey.findMany({
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
+        organizationId,
+        principalType: "API_KEY",
+        scopeType: "PROJECT",
+        scopeId: projectId,
+      },
+      select: { principalId: true },
+    });
+    const keyIds = grants.flatMap((grant) =>
+      grant.principalId ? [grant.principalId] : [],
+    );
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         ingestSourceType: { not: null },
         revokedAt: null,
-        roleBindings: {
-          some: { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
-        },
+        id: { in: keyIds },
       },
-      include: { roleBindings: true },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys);
+  }
+
+  /**
+   * Lists every live ingestion key one person owns in an organization,
+   * newest first. This is the set a session cascade, a source rotation and
+   * the devices tab read: it filters by the indexed `userId` and the callers
+   * match parent, source type or template in memory over a person's few live
+   * keys, which is why `parentApiKeyId` needs no index of its own.
+   */
+  async findIngestKeysForUser({
+    organizationId,
+    userId,
+  }: {
+    organizationId: string;
+    userId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    const keys = await this.prisma.apiKey.findMany({
+      where: {
+        organizationId,
+        userId,
+        ingestSourceType: { not: null },
+        revokedAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return this.withBindings(organizationId, keys);
   }
 
   async findByLookupId({
@@ -187,20 +237,60 @@ export class ApiKeyRepository {
     // We use findFirst rather than findUnique because Prisma's findUnique
     // does not accept related filters; lookupId is @unique so the result
     // is still unique.
-    return this.prisma.apiKey.findFirst({
+    const key = await this.prisma.apiKey.findFirst({
       where: {
         lookupId,
         OR: [{ userId: null }, { user: { deactivatedAt: null } }],
       },
-      include: { roleBindings: true },
+    });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
+  }
+
+  /**
+   * The live keys minted under one key, inside its organization.
+   *
+   * Bounded by `organizationId` so it goes through the ordinary tenancy
+   * guard rather than a cross-tenant hatch: a cascade always knows whose
+   * organization it is retiring keys in.
+   */
+  async findLiveChildren({
+    parentApiKeyId,
+    organizationId,
+  }: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string }>> {
+    return this.prisma.apiKey.findMany({
+      where: { organizationId, parentApiKeyId, revokedAt: null },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Whether one key is still usable, by id, without its bindings.
+   *
+   * The auth path asks this about a key's parent on every request that
+   * presents a session-minted key, so it reads the two columns that decide it
+   * and nothing else.
+   */
+  async findLivenessById({
+    id,
+  }: {
+    id: string;
+  }): Promise<{ revokedAt: Date | null; expiresAt: Date | null } | null> {
+    return this.prisma.apiKey.findUnique({
+      where: { id },
+      select: { revokedAt: true, expiresAt: true },
     });
   }
 
   async findById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findUnique({
+    const key = await this.prisma.apiKey.findUnique({
       where: { id },
-      include: { roleBindings: true },
     });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
   }
 
   /**
@@ -217,10 +307,11 @@ export class ApiKeyRepository {
     id: string;
     organizationId: string;
   }): Promise<ApiKeyWithBindings | null> {
-    return this.prisma.apiKey.findFirst({
+    const key = await this.prisma.apiKey.findFirst({
       where: { id, organizationId },
-      include: { roleBindings: true },
     });
+    if (!key) return null;
+    return (await this.withBindings(key.organizationId, [key]))[0] ?? null;
   }
 
   /**
@@ -238,7 +329,7 @@ export class ApiKeyRepository {
     organizationId: string;
   }): Promise<Array<{ id: string; permissions: Prisma.JsonValue }>> {
     if (ids.length === 0) return [];
-    return this.prisma.customRole.findMany({
+    return liveRoles(this.prisma).findMany({
       where: { id: { in: ids }, organizationId },
       select: { id: true, permissions: true },
     });
@@ -280,20 +371,16 @@ export class ApiKeyRepository {
     //
     // Hidden system keys (ephemeral per-Langy-session keys) are excluded so a
     // user's own key list isn't flooded with one row per chat session.
-    return this.prisma.apiKey.findMany({
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId }, { userId: null, ingestSourceType: null }],
       },
-      include: {
-        roleBindings: {
-          include: { customRole: { select: { id: true, name: true } } },
-        },
-      },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys, true);
   }
 
   async findAllByOrganization({
@@ -305,19 +392,15 @@ export class ApiKeyRepository {
     // per-Langy-session keys — there is one per chat session per user, which
     // would swamp the admin list. They remain auth-functional (verify/revoke go
     // by id, not this query).
-    return this.prisma.apiKey.findMany({
+    const keys = await this.prisma.apiKey.findMany({
       where: {
         organizationId,
         revokedAt: null,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
-      include: {
-        roleBindings: {
-          include: { customRole: { select: { id: true, name: true } } },
-        },
-      },
       orderBy: { createdAt: "desc" },
     });
+    return this.withBindings(organizationId, keys, true);
   }
 
   async update({
@@ -366,6 +449,11 @@ export class ApiKeyRepository {
    * matters, because the CLI re-mints a key the cap retired and leaves a key
    * a person revoked dead. Losing the race returns the row that stands, so
    * the key is dead either way and the first decision is the one recorded.
+   *
+   * The fence is SQL with the condition against the table. Through
+   * `updateMany` it sits in a subquery, and a statement that waited on the row
+   * lock re-checks only the outer id predicate against the committed row, so
+   * the later revoke would land anyway and its cause would be the one kept.
    */
   async revoke({
     id,
@@ -374,10 +462,16 @@ export class ApiKeyRepository {
     id: string;
     cause: ApiKeyRevocationCause;
   }): Promise<ApiKey> {
-    await this.prisma.apiKey.updateMany({
-      where: { id, revokedAt: null },
-      data: { revokedAt: new Date(), revocationCause: cause },
-    });
+    await this.prisma.$executeRaw`
+      -- @tenancy: addressed by the key's own id, which the caller resolved
+      -- inside its organization.
+      UPDATE "ApiKey"
+         SET "revokedAt" = now(),
+             "revocationCause" = ${cause},
+             "updatedAt" = now()
+       WHERE "id" = ${id}
+         AND "revokedAt" IS NULL
+    `;
     return this.prisma.apiKey.findUniqueOrThrow({ where: { id } });
   }
 
@@ -445,7 +539,7 @@ export class ApiKeyRepository {
     organizationId: string;
   }): Promise<{ userId: string } | null> {
     return this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
   }
@@ -480,15 +574,23 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<{ userId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
-      where: {
-        userId,
-        organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
-      },
-      select: { userId: true },
+    const member = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { userId: true, role: true },
     });
+    if (!member || member.role === "EXTERNAL") return null;
+    const binding = await liveGrants(this.prisma).findFirst({
+      where: {
+        principalType: "USER",
+        principalId: userId,
+        organizationId,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
+      },
+      select: { principalId: true },
+    });
+    return binding ? { userId: binding.principalId } : null;
   }
 
   async findOrgAdminApiKeyBinding({
@@ -498,15 +600,18 @@ export class ApiKeyRepository {
     apiKeyId: string;
     organizationId: string;
   }): Promise<{ apiKeyId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
+    const binding = await liveGrants(this.prisma).findFirst({
       where: {
-        apiKeyId,
+        principalType: "API_KEY",
+        principalId: apiKeyId,
         organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
       },
-      select: { apiKeyId: true },
+      select: { principalId: true },
     });
+    return binding ? { apiKeyId: binding.principalId } : null;
   }
 
   async findUserBindings({
@@ -516,9 +621,6 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }) {
-    // Through the per-organization fork (ADR-092, delivery-plan PR 3
-    // follow-up): a cut-over organization's key drawer is served from the
-    // ledger's own head.
     const rows = await this.accessListing.findUserBindings({
       organizationId,
       userId,
@@ -556,10 +658,16 @@ export class ApiKeyRepository {
     });
   }
 
-  async findCustomRolesByIds(ids: string[]) {
+  async findCustomRolesByIds({
+    ids,
+    organizationId,
+  }: {
+    ids: string[];
+    organizationId: string;
+  }) {
     if (ids.length === 0) return [];
-    return this.prisma.customRole.findMany({
-      where: { id: { in: ids } },
+    return liveRoles(this.prisma).findMany({
+      where: { organizationId, id: { in: ids } },
       select: { id: true, name: true, permissions: true },
     });
   }
@@ -574,7 +682,11 @@ export class ApiKeyRepository {
 
   async findProjectsInOrg({ organizationId }: { organizationId: string }) {
     return this.prisma.project.findMany({
-      where: { team: { organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: "internal_governance" },
+      },
       select: { id: true, name: true, teamId: true },
       orderBy: { name: "asc" },
     });

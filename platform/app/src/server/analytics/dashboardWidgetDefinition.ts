@@ -25,7 +25,7 @@
 
 import { z } from "zod";
 
-import { MAX_LWQL_LENGTH } from "./lwql/sqlText";
+import { MAX_LWQL_LENGTH } from "./lwql/limits";
 
 /** The version this build writes, and the only one it reads. */
 export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;

@@ -1,184 +1,235 @@
 import { createLogger } from "@langwatch/observability";
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import type { Cluster, Redis } from "ioredis";
+
 import { runSystemMigrationPass } from "./runtime";
 
 const logger = createLogger("langwatch:system-migrations:boot");
 
-/**
- * How long the loop waits between passes.
- *
- * Two constraints, and the larger one is not the obvious one. A pass cannot
- * observe its own events - it states facts and checks once (ADR-110), so a
- * tenant it just stated reads as held until the fold catches up - which
- * makes this gap the thing that decides whether the NEXT pass finalizes that
- * tenant or merely re-holds it. It must comfortably exceed a fold queue
- * round trip. It also keeps a loop over an installation with nothing to do
- * from becoming a hot spin against Postgres, ClickHouse and Redis, since
- * such a pass returns in milliseconds. Five seconds clears a queue round
- * trip with room to spare and is noise next to a pass's own work.
- */
+/** Long enough for events emitted by one pass to reach their projections. */
 const PASS_INTERVAL_MS = 5_000;
 
-/**
- * The backstop, not the mechanism. Convergence is bounded by the state
- * machine: a tenant moves pending -> migrated -> finalized, so it needs a
- * couple of passes per registered migration, and the loop stops on its own
- * the moment a whole pass moves nothing. A healthy installation is done in
- * single digits whatever its size, because one pass advances every tenant
- * that can advance, not one of them. Reaching this cap means a pass reported
- * progress over and over - a status oscillating between two non-terminal
- * states - which is a bug in a migration, not a big fleet. Twenty-five
- * leaves several times the headroom any real pipeline needs while keeping a
- * misbehaving migration from sweeping the fleet indefinitely.
- */
+/** A healthy monotonic migration pipeline converges in far fewer passes. */
 const MAX_PASSES = 25;
 
 /**
- * Drive migration passes in the background from worker boot until the fleet
- * stops moving, then stop.
+ * How many consecutive passes may find nothing of their own left to do while
+ * a peer still holds claims, before that counts as settled.
  *
- * One pass is never enough on its own: a pass cannot observe its own events,
- * so a tenant it adopts reads as held and only a LATER pass finalizes it.
- * Kicking exactly one and waiting for the next restart made convergence a
- * function of the deploy cadence, and on a self-hosted installation - where
- * the doctrine is that an operator never learns a migration happened - of an
- * operator clicking "run a pass" on the ops page until the counts settled.
- * So this loops.
+ * Without it a fleet booting together cannot start at all. Every replica runs
+ * this preflight, so on a rolling deploy a dozen of them sweep the same
+ * tenants at once, and each one reads the others' leases as `claimed`. None
+ * can reach `claimed === 0` while the others are still booting, and none of
+ * them finishes booting until it does — each waits for peers who are waiting
+ * for it. Observed on a deploy that widened one migration's cohort to every
+ * user: `advanced: 0` every pass, `claimed` climbing 100 → 1243, twenty-five
+ * passes, then a preflight failure and a crash loop.
  *
- * It stops on NO PROGRESS OVER A FLEET IT COULD ACTUALLY SEE, never on
- * "everything is terminal": a held tenant is re-proved every pass and may
- * legitimately never reach a terminal state, so waiting for terminal would
- * spin forever. `advanced` is the pass's count of state TRANSITIONS, and a
- * pass that made none over tenants it was able to claim is a pass whose
- * repeat would make none either - so the loop is done, and a tenant still
- * held is left held exactly as a single pass would have left it, for the next
- * boot or an operator to revisit. A pass that advanced nothing because every
- * tenant was claimed by another process proves nothing at all, and `converged`
- * is where that distinction lives.
- *
- * Everything the single-pass version guaranteed still holds: it never blocks
- * boot, never throws out of here, and tears down through `stop()` and the
- * AbortController - checked between passes and honoured by the sleep, so
- * shutdown never waits out an interval.
- *
- * Composed by the app layer (presets.ts) alongside the other worker-only
- * background loops, and torn down through the App's graceful closeables.
+ * Three passes rather than one, because a peer mid-tenant is a claim that
+ * clears on its own shortly; three in a row is a peer that is working
+ * through real volume, not a moment of overlap.
  */
-export function startSystemMigrations(args?: {
-  redis?: Redis | Cluster | null;
-}): { stop: () => Promise<void> } {
-  const controller = new AbortController();
-  const loop = driveUntilConverged({
-    signal: controller.signal,
-    redis: args?.redis,
-  }).catch((error) => {
-    // Belt and braces: `driveUntilConverged` already contains a failed pass.
-    // Nothing may escape into the boot path.
-    logger.error({ error }, "the system migration loop failed unexpectedly");
-  });
-  return {
-    stop: async () => {
-      controller.abort();
-      await loop;
-    },
-  };
+const MAX_CONTENDED_PASSES = 3;
+
+export class SystemMigrationPreflightError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "SystemMigrationPreflightError";
+  }
 }
 
-async function driveUntilConverged({
-  signal,
+/**
+ * Runs system-migration passes to quiescence before a serving process starts.
+ *
+ * One pass cannot observe events it just emitted. A later pass is therefore
+ * required to prove the resulting projections and finalize each tenant. The
+ * first no-progress pass proves quiescence after its queue effects drain.
+ * Held and parked tenants keep their migration gates closed, so they can stay
+ * on the legacy path without preventing the rest of the application starting.
+ * A tenant a PEER is still holding gets the same bargain after
+ * `MAX_CONTENDED_PASSES`, because every replica runs this preflight and
+ * waiting on each other is how a whole fleet fails to boot.
+ *
+ * Runner failures and failure to converge are startup failures. They reject
+ * this promise so the one-shot task exits non-zero and no runtime lane starts.
+ */
+export async function runSystemMigrationsToQuiescence({
   redis,
+  signal = new AbortController().signal,
+  awaitPassEffects,
 }: {
-  signal: AbortSignal;
   redis?: Redis | Cluster | null;
-}): Promise<void> {
+  signal?: AbortSignal;
+  awaitPassEffects?: () => Promise<void>;
+} = {}): Promise<MigrationPassSummary> {
+  let contendedPasses = 0;
+  let leaseGranted = false;
+
   for (let pass = 1; pass <= MAX_PASSES; pass++) {
-    if (signal.aborted) return;
-    const summary = await passOrNull({ signal, redis, pass });
-    if (summary === null) return;
-    // Checked before the stop decision as well as before the next pass: an
-    // aborted pass returns whatever it managed, and reading that as
-    // convergence would log a false "nothing left to do" at shutdown.
-    if (signal.aborted) return;
+    signal.throwIfAborted();
+    const summary = await runMigrationPass({ pass, redis, signal });
+    leaseGranted ||= claimWasGranted(summary);
+
+    signal.throwIfAborted();
+
+    await settlePassEffects({ pass, settle: awaitPassEffects });
+
     if (converged(summary)) {
       logger.info(
         { summary, passes: pass },
-        "system migrations converged; nothing advanced on the last pass",
+        "system migrations converged; startup may continue",
       );
-      return;
+      return summary;
     }
-    logger.info({ summary, pass }, continuingBecause(summary));
-    await sleep({ ms: PASS_INTERVAL_MS, signal });
+
+    contendedPasses = settledExceptForPeers({ summary, leaseGranted })
+      ? contendedPasses + 1
+      : 0;
+    if (contendedPasses >= MAX_CONTENDED_PASSES) {
+      logger.warn(
+        { summary, passes: pass },
+        "nothing left for this process to advance and a peer still holds claims; starting rather than waiting on a peer that is waiting on us",
+      );
+      return summary;
+    }
+
+    logger.info(
+      { summary, pass },
+      continuingBecause({ summary, leaseGranted }),
+    );
+
+    await waitForNextPass({ pass, signal });
   }
-  // Loud on purpose. Passes are supposed to run out of work.
-  logger.error(
-    { passes: MAX_PASSES },
-    "system migrations still reported progress after the maximum passes; stopping. A migration whose status keeps changing without settling is the likely cause",
-  );
+
+  const message = `System migration preflight did not converge after ${MAX_PASSES} passes`;
+  logger.error({ passes: MAX_PASSES }, message);
+  throw new SystemMigrationPreflightError(message);
 }
 
-/**
- * One pass, or null when it died.
- *
- * A pass that THROWS is the pass itself failing - the state table or the
- * tenant source is down, since per-tenant failures park inside it. Retrying
- * that on a five-second cadence would hammer whatever is already broken, so
- * null ends the loop and the next boot starts over, exactly as a single
- * failed pass used to.
- */
-async function passOrNull({
-  signal,
-  redis,
+async function runMigrationPass({
   pass,
+  redis,
+  signal,
 }: {
-  signal: AbortSignal;
-  redis?: Redis | Cluster | null;
   pass: number;
-}): Promise<MigrationPassSummary | null> {
+  redis?: Redis | Cluster | null;
+  signal: AbortSignal;
+}): Promise<MigrationPassSummary> {
   try {
     return await runSystemMigrationPass({ signal, redis });
   } catch (error) {
-    logger.error(
-      { error, pass },
-      "system migration pass failed; the loop stops and the next boot retries",
+    logger.error({ error, pass }, "system migration preflight pass failed");
+    throw new SystemMigrationPreflightError(
+      `System migration preflight failed on pass ${pass}`,
+      {
+        cause: error,
+      },
     );
-    return null;
   }
 }
 
-/** Why the loop is about to run another pass, in the log's words. */
-function continuingBecause(summary: MigrationPassSummary): string {
-  return summary.advanced === 0
-    ? "every organization was claimed by another process; the loop keeps going rather than reading that as convergence"
-    : "system migration pass advanced the fleet; another pass follows";
+async function settlePassEffects({
+  pass,
+  settle,
+}: {
+  pass: number;
+  settle?: () => Promise<void>;
+}): Promise<void> {
+  try {
+    await settle?.();
+  } catch (error) {
+    throw new SystemMigrationPreflightError(
+      `System migration queue failed to settle on pass ${pass}`,
+      { cause: error },
+    );
+  }
+}
+
+function continuingBecause({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): string {
+  if (summary.advanced > 0) {
+    return "system migration pass advanced the fleet; another pass follows";
+  }
+  if (summary.claimed === summary.tenantsSeen && !leaseGranted) {
+    return "every tenant was claimed by another process and no claim has been granted yet, which is also what an unreachable Redis looks like; this pass learned nothing, so the preflight keeps trying";
+  }
+  return "a peer holds some of the fleet; the preflight gives it a few passes before starting without those tenants";
+}
+
+function converged(summary: MigrationPassSummary): boolean {
+  if (summary.advanced > 0) return false;
+  return summary.claimed === 0;
 }
 
 /**
- * Whether a pass proves there is nothing left to do.
+ * This pass saw the fleet, moved nothing, and the only outcomes it could not
+ * read belong to a peer — the ordinary shape of several replicas booting at
+ * once.
  *
- * Nothing advanced is not enough on its own. `lease.acquire` fails safe to
- * false, on genuine contention AND on any Redis error, and a tenant it cannot
- * claim is counted in `claimed` and left entirely alone - so a pass that got
- * to look at nothing reports exactly what a converged fleet reports. Several
- * pods booting in the same second, or one Redis blip, is enough to produce
- * it; and if the pod actually holding those claims is then evicted mid-deploy,
- * every process that read its own shut-out as convergence has already stopped.
- * So a pass where EVERY tenant was claimed keeps the loop alive - still
- * bounded by MAX_PASSES, and the interval means the holder gets time to
- * finish and release.
+ * Being shut out of the WHOLE fleet counts only once Redis has been seen to
+ * grant this process a claim (`claimWasGranted`). `lease.acquire` fails safe
+ * to "held" on any Redis error, so total contention is also exactly what an
+ * unreachable Redis looks like, and a process that has never once been handed
+ * a tenant has no grounds to call anything settled. That used to be the same
+ * thing as "shut out of everything", because a pass enumerated every tenant
+ * in the installation and a peer could not plausibly hold all sixteen
+ * thousand. A pass now enumerates only the tenants with work left, which on a
+ * settled fleet is a handful, and a dozen replicas booting together can
+ * genuinely hold every one of them - so the evidence has to be named rather
+ * than inferred from the size of the shut-out. Seeing most of the fleet and
+ * being shut out of part of it is the same fact it always was: this process
+ * has finished its own work, and the tenants it could not claim are being
+ * driven by the peer holding them.
  *
- * `tenantsSeen === 0` is the opposite case and genuinely is convergence: an
- * installation with no tenants in the cohort has nothing to claim, and
- * `claimed === tenantsSeen` holds vacuously at zero. Testing it explicitly
- * keeps an empty fleet from looping to the cap on every boot.
+ * Starting is safe for those tenants either way. An unfinished tenant's
+ * migration gate stays closed and it is served on the legacy path, which is
+ * the same thing that happens to one held or parked — and if the peer
+ * holding the claims dies before finishing, the worker's re-drive cadence
+ * picks them up without another deploy.
  */
-function converged(summary: MigrationPassSummary): boolean {
-  if (summary.advanced > 0) return false;
-  if (summary.tenantsSeen === 0) return true;
-  return summary.claimed < summary.tenantsSeen;
+function settledExceptForPeers({
+  summary,
+  leaseGranted,
+}: {
+  summary: MigrationPassSummary;
+  leaseGranted: boolean;
+}): boolean {
+  if (summary.advanced > 0 || summary.claimed === 0) return false;
+  if (summary.claimed < summary.tenantsSeen) return true;
+  return leaseGranted;
 }
 
-/** Waits, or returns early the moment the signal aborts. */
+/**
+ * Did Redis hand THIS process a claim on this pass? A tenant the pass saw
+ * and did not count as claimed is one `lease.acquire` answered true for, and
+ * `acquire` fails safe to "held" on every Redis error - so a single such
+ * tenant is positive proof the lease store is reachable and answering.
+ *
+ * It is the fact the total-shut-out exclusion above was standing in for.
+ * A pass with nothing to enumerate proves nothing either way, which is why
+ * the test is `tenantsSeen > claimed` and not `claimed === 0`.
+ */
+function claimWasGranted(summary: MigrationPassSummary): boolean {
+  return summary.tenantsSeen > summary.claimed;
+}
+
+async function waitForNextPass({
+  pass,
+  signal,
+}: {
+  pass: number;
+  signal: AbortSignal;
+}): Promise<void> {
+  if (pass < MAX_PASSES) {
+    await sleep({ ms: PASS_INTERVAL_MS, signal });
+  }
+}
+
 function sleep({
   ms,
   signal,
@@ -186,16 +237,19 @@ function sleep({
   ms: number;
   signal: AbortSignal;
 }): Promise<void> {
-  if (signal.aborted) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const done = (): void => {
+  signal.throwIfAborted();
+
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = (): void => {
       clearTimeout(timer);
-      signal.removeEventListener("abort", done);
+      signal.removeEventListener("abort", onAbort);
+      reject(signal.reason);
+    };
+    const onElapsed = (): void => {
+      signal.removeEventListener("abort", onAbort);
       resolve();
     };
-    const timer = setTimeout(done, ms);
-    // Never let the gap between two passes alone hold the process open.
-    timer.unref?.();
-    signal.addEventListener("abort", done, { once: true });
+    const timer = setTimeout(onElapsed, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
   });
 }

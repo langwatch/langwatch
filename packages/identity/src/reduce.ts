@@ -6,7 +6,9 @@ import {
   type IdentifierFact,
   type IdentityFact,
   type IdentityHeads,
+  LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
+  LINK_REJECTED_EVENT_TYPE,
   PRIMARY_CHANGED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
 } from "./facts";
@@ -108,11 +110,14 @@ export function reduceIdentity({
         fact,
       });
     case LINK_PROPOSED_EVENT_TYPE:
+    case LINK_CONFIRMED_EVENT_TYPE:
+    case LINK_REJECTED_EVENT_TYPE:
       // A proposal changes no head, on purpose: it states that a link was NOT
       // made and needs a human. The identifier arrives only when someone
       // confirms it, through the ordinary attach ceremony — so a fold that
       // moved a head here would be the auto-link the proposal exists to
-      // refuse.
+      // refuse. The decision facts record the outcome on the proposal and move
+      // nothing for the same reason.
       return heads;
   }
 }

@@ -9,7 +9,6 @@
  * member_seat_limit_reached), and the invite link a provisioning run needs
  * when it has no email provider.
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -35,6 +34,8 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -42,7 +43,6 @@ import {
   seedManagementOrg,
   seedOrgMember,
 } from "~/test-utils/managementApiOrg";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import type * as EnvModule from "../../../../env.mjs";
 
 // Invite creation attempts email delivery; the suite is about the API, so the
@@ -73,6 +73,7 @@ describe("Feature: Organization members and invites REST API", () => {
   let mockGetActivePlan: ReturnType<typeof vi.fn>;
   let teamAId: string;
   let teamBId: string;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -90,22 +91,21 @@ describe("Feature: Organization members and invites REST API", () => {
     teamId: string;
     role: TeamUserRole;
   }) => {
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: seeded.organization.id,
-        userId,
-        role,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: seeded.organization.id,
+      userId,
+      role,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
     });
   };
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     mockGetActivePlan = vi.fn().mockResolvedValue(ENTERPRISE_TEST_PLAN);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
       }),
@@ -142,6 +142,7 @@ describe("Feature: Organization members and invites REST API", () => {
       await cleanupTestRows(prisma, [
         ["auditLog", { organizationId: seeded?.organization.id }],
         ["organizationInvite", { organizationId: seeded?.organization.id }],
+        ["grant", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["customRole", { organizationId: seeded?.organization.id }],
@@ -150,6 +151,7 @@ describe("Feature: Organization members and invites REST API", () => {
         ["organizationUser", { organizationId: seeded?.organization.id }],
         ...(lastAdminOrg
           ? ([
+              ["grant", { organizationId: lastAdminOrg.organization.id }],
               ["roleBinding", { organizationId: lastAdminOrg.organization.id }],
               ["apiKey", { organizationId: lastAdminOrg.organization.id }],
               [
@@ -529,15 +531,12 @@ describe("Feature: Organization members and invites REST API", () => {
         teamId: teamAId,
         role: TeamUserRole.MEMBER,
       });
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: seeded.organization.id,
-          userId: member.userId,
-          role: TeamUserRole.VIEWER,
-          scopeType: RoleBindingScopeType.PROJECT,
-          scopeId: project.id,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: seeded.organization.id,
+        userId: member.userId,
+        role: TeamUserRole.VIEWER,
+        scopeType: RoleBindingScopeType.PROJECT,
+        scopeId: project.id,
       });
 
       const response = await app.request(
@@ -628,13 +627,11 @@ describe("Feature: Organization members and invites REST API", () => {
 
     /** @scenario Creating invites assigns teams including a custom role */
     it("creates a batch with a custom-role team assignment and reports email delivery", async () => {
-      const customRole = await prisma.customRole.create({
-        data: {
-          organizationId: seeded.organization.id,
-          name: `Invite Role ${ns}`,
-          permissions: ["project:view", "traces:view"],
-          kind: "custom",
-        },
+      const customRole = await seedCustomRole(prisma, {
+        organizationId: seeded.organization.id,
+        name: `Invite Role ${ns}`,
+        permissions: ["project:view", "traces:view"],
+        kind: "custom",
       });
 
       const emails = [

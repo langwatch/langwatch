@@ -31,6 +31,18 @@ For the exact arithmetic per family, what is never billed, and how retries are d
 
 Each plan includes a base volume of events stored for a default window. For example, the **Growth** plan includes **200,000 events stored for 49 days.** If you need a longer retention window or a higher volume, you can [extend retention](#extending-retention) with an Enterprise plan.
 
+## Instant Evals
+
+Instant Evals are priced separately from events. A judged query or run is charged per input token sent to the judge, at **$0.0546 per million input tokens**. Output is free. Judging ten thousand conversations of average size costs about a quarter of a dollar.
+
+Input tokens are the text the judge reads plus the questions asked about it. One request carries every question about one text, so a statement with three eval columns costs about the same as one with a single column.
+
+`POST /api/v1/instant-evals/estimate` returns the price of a run before it starts, from the rows the statement matches and a sample of their size. See [Running an Instant Eval](/api-reference/instant-evals/running-an-instant-eval).
+
+Organizations without a paid plan have a **$1 free budget** for Instant Evals in total, across all their projects. Past it, a new run or a judged query is refused until the organization upgrades. Paid plans have no such limit and are billed monthly for what was judged.
+
+Every judged query and run is one spend event on the [billing events](/ai-gateway/billing-events) ledger, so a [gateway budget](/ai-gateway/budgets) set on a project or an organization caps Instant Evals the same way it caps gateway traffic.
+
 ## Custom data retention
 
 Retention controls how long your events are kept before they're automatically removed. Every plan keeps events for 49 days by default. Paid plans change the window in **Settings → Data Retention**, per organization, team or project:
@@ -72,7 +84,7 @@ Self-hosted deployments keep the same 49-day default. An Enterprise license open
   <Accordion title="What is the difference between a full member and a lite member?">
     Which seat someone occupies follows from what they can do. A **full member** can change things: build prompts, run experiments, edit datasets, configure the gateway. A **lite member** can only look at what the team produces. They open the projects they are invited to and read traces, analytics, evaluations, scenario runs, datasets, prompts and experiments, and they can leave annotations on what they read. They cannot see costs, and they cannot create, edit or delete anything else.
 
-    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/ai-governance/roles-and-permissions#seats) for the full breakdown.
+    Those are permissions rather than screens, so the same limits apply wherever they reach the data, including the API and the MCP server. Read-only reviewers, stakeholders watching dashboards, and anyone who comments but does not build are lite members. See [Seats](/platform/members-and-teams#lite-members) for the full breakdown.
   </Accordion>
 
   <Accordion title="What counts as a billable event?">

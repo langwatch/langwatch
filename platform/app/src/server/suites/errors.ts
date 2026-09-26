@@ -13,6 +13,10 @@ import {
 } from "@langwatch/handled-error";
 
 import type { AppErrorCode } from "~/features/errors/logic/codes";
+// This file is reachable from client-bundled code (via suite-evaluators), so
+// it must only import from the message module below, never server runtime
+// (prisma, feature-flag service) — see src/server/featureFlag/voiceAgents.message.ts.
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 
 /**
  * Base class for suite domain errors.
@@ -168,6 +172,16 @@ export class SuiteScopeNotAllowedError extends SuiteDomainError {
       },
     );
     this.name = "SuiteScopeNotAllowedError";
+  }
+}
+
+/** Thrown when a run targets a voice agent but the project's flag is off. */
+export class VoiceAgentsDisabledError extends SuiteDomainError {
+  declare readonly code: "voice_agents_disabled";
+
+  constructor(message = VOICE_AGENTS_DISABLED_MESSAGE) {
+    super(message, { code: "voice_agents_disabled", httpStatus: 403 });
+    this.name = "VoiceAgentsDisabledError";
   }
 }
 

@@ -1,3 +1,4 @@
+import { sourceOfDerivedAccountId } from "./auth0-upstream";
 import type { IdentifierArrivalState, IdentifierProvider } from "./vocabulary";
 import { isLiveIdentifierState } from "./vocabulary";
 
@@ -112,7 +113,11 @@ export function backfillParityDiffs({
 /**
  * The compensating half: identifiers adopted from an `Account` row that no
  * longer exists. Identifiers without an account (the email) are never the
- * backfill's to detach; tombstones are already detached.
+ * backfill's to detach; tombstones are already detached. A DERIVED
+ * identifier's liveness follows its SOURCE row — the broker account its
+ * subject was unfolded from — because no `Account` row of its own will ever
+ * exist to keep it alive, and the fact it states dies with the row that
+ * asserted it.
  */
 export function orphanedIdentifierRows({
   rows,
@@ -121,10 +126,12 @@ export function orphanedIdentifierRows({
   rows: BackfillIdentifierRow[];
   liveAccountIds: ReadonlySet<string>;
 }): BackfillIdentifierRow[] {
+  const liveness = (accountId: string): string =>
+    sourceOfDerivedAccountId(accountId) ?? accountId;
   return rows.filter(
     (row) =>
       row.accountId !== null &&
-      !liveAccountIds.has(row.accountId) &&
+      !liveAccountIds.has(liveness(row.accountId)) &&
       isLiveIdentifierState(row.state),
   );
 }

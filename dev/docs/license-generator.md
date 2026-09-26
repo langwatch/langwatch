@@ -24,18 +24,21 @@ That was removed because:
    nothing about the real customer experience.
 
 The replacement: a small CLI that signs a real license using the
-`LANGWATCH_LICENSE_PRIVATE_KEY` env var, writes it to the License table, and exits.
+`LANGWATCH_LICENSE_PRIVATE_KEY` env var, records it in the license registry
+(`IssuedLicense`, source `SCRIPT`), writes it to the organization's `license`
+column, and exits.
 Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 ## Pre-requisites
 
 - `LANGWATCH_LICENSE_PRIVATE_KEY` set in `platform/app/.env` (RSA private key, paired with
-  the public key compiled into the verifier at
-  `platform/app/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
-  it is **not** checked into the repo.
+  the public key the verifier reads from `platform/app/ee/licensing/constants.ts`,
+  overridable with `LANGWATCH_LICENSE_PUBLIC_KEY`). Ask the maintainer for the dev key.
+  It is **not** checked into the repo.
 - Postgres reachable via `DATABASE_URL`.
-- The target organization already exists (the script writes a `License` row
-  scoped to an existing `Organization.id`).
+- The target organization already exists (the script writes the license to
+  `Organization.license` of an existing `Organization.id`; there is no
+  `License` table).
 
 ## Usage
 
@@ -69,9 +72,11 @@ org's plan resolution returns the new plan on the next `getActivePlan()`
 call.
 
 If `LANGWATCH_LICENSE_PRIVATE_KEY` is not set in env, the script emits a
-warning, skips the license mint, and the org falls through to the FREE
-plan. **That is the no-bypass intent** — operators who don't set the
-env var get the gated behavior, not a silent Enterprise unlock.
+warning, skips the license mint, and the org keeps the unlicensed
+baseline `getActivePlan()` returns when `Organization.license` is empty.
+**That is the no-bypass intent:** operators who don't set the env var get
+whatever their deployment already gave them, not a silent Enterprise
+unlock.
 
 ## Programmatic API
 
@@ -110,11 +115,11 @@ unset, and is safe to call on every seed run.
   requires their plan tier, generate a matching license against a local
   org instead of toggling a bypass.
 
-## What about FREE-plan reproduction?
+## What about reproducing the unlicensed baseline?
 
-The FREE plan is the default — you don't need to generate a license. Just
-*don't* call the generator. `getActivePlan()` returns FREE when no `License`
-row exists for the org (or all rows are expired).
+It is the default, so there is nothing to generate. Just *don't* call the
+generator. `getActivePlan()` returns the unlicensed baseline when
+`Organization.license` is empty or the license has expired.
 
 ## Security notes
 
@@ -125,12 +130,13 @@ row exists for the org (or all rows are expired).
   unlock anything for other orgs on the same instance. So even if a dev
   generates a wide-window license for their dogfood org, the blast radius
   is one org on their local stack.
-- The verifier uses the *public* key compiled into `signing.ts`. It does
-  not touch `LANGWATCH_LICENSE_PRIVATE_KEY` at runtime — that variable is only read
-  by the generator script. Production deployments should not have
-  `LANGWATCH_LICENSE_PRIVATE_KEY` set in their environment.
-- The generator emits a `gateway.license.created` audit row for every
-  license written, so `License`-row creation is always traceable.
+- The verifier uses the *public* key in `constants.ts` and never reads
+  `LANGWATCH_LICENSE_PRIVATE_KEY`. That variable is read by this script, by the
+  purchase webhook and by the backoffice Licenses screen, all on LangWatch
+  Cloud. A self-hosted install must not have it set.
+- Every license the script mints is recorded in the license registry before
+  it is applied, so none exists that the registry does not know about. The
+  registry keeps a hash of the license token, never the license (ADR-141).
 
 ## What was removed
 

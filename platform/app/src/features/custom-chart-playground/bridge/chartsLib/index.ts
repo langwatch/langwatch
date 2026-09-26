@@ -2,13 +2,13 @@
  * `@langwatch/charts` — the chart component library a playground widget
  * imports. Bundled by `scripts/build-charts-lib.mjs` into
  * `bridge/chartsLibSource.ts`'s `buildChartsLibScript()`, injected into the
- * sandboxed frame as `window.LWCharts` (see `buildSrcdoc.ts`), and resolved
- * by `bridge/authorRuntime.ts`'s require shim for the `"@langwatch/charts"`
- * specifier.
+ * sandboxed frame as `window.LWCharts` (see `buildFrameHtml.ts`), and resolved
+ * by `bridge/authorRuntime.ts`'s import rewrite / the frame's import map for
+ * the `"@langwatch/charts"` specifier.
  *
  * Deliberately reads `window.React` / `window.Recharts` directly instead of
  * `import`-ing "react"/"recharts" as modules: the frame already loaded both
- * as CDN UMD globals (see `buildSrcdoc.ts`) before this script runs, and
+ * as CDN UMD globals (see `buildFrameHtml.ts`) before this script runs, and
  * every hook call here needs to land on that SAME React instance the
  * author's own component tree uses — a bundled second copy would violate
  * the rules of hooks the moment author code and this library render
@@ -248,7 +248,7 @@ function projectionIndex(
 // ---------------------------------------------------------------------------
 // React / Recharts locals — resolved lazily inside each component so the
 // module itself has no load-order dependency beyond React/Recharts having
-// already run (guaranteed by buildSrcdoc.ts's script order).
+// already run (guaranteed by buildFrameHtml.ts's script order).
 // ---------------------------------------------------------------------------
 
 function react() {

@@ -1,8 +1,9 @@
-import { Box, Container, Stack, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { Box, HStack, Link, Spacer, Stack, Text } from "@chakra-ui/react";
+import { type ReactNode, useLayoutEffect, useRef } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { MenuLink } from "~/components/MenuLink";
 import { ProductPageFrame } from "~/features/navigation/shell/ProductPageFrame";
+import NextLink from "~/utils/compat/next-link";
+import { usePathname } from "~/utils/compat/next-navigation";
 
 export interface SectionNavigationItem {
   label: string;
@@ -52,13 +53,36 @@ export function SectionNavigationLayout({
       {standDownRailInProductShell ? (
         <ProductPageFrame>{children}</ProductPageFrame>
       ) : (
-        <SectionNavigationFrame
-          sectionLabel={sectionLabel}
-          navigationItems={navigationItems}
-          sidebarFooter={sidebarFooter}
+        /* DashboardLayout gives the page no inset of its own, so the rail
+           path pads here — the same inset ProductPageFrame draws on the v2
+           path, and the only padding on either. The frame itself draws none:
+           mounted inside SettingsLayout it sits in a container that already
+           padded the page, and a second helping was the doubled gutter this
+           used to ship with.
+
+           THE WIDTH CAP STAYS ON THIS PATH. Removing the frame's nested
+           container took the 1600px with it, which on a wide display made
+           these pages full-bleed — a change to how every one of them reads,
+           made as a side effect of deleting a duplicated gutter. Inside
+           SettingsLayout the cap is the settings container's (1280px, which
+           is narrower anyway); here there is nothing else to draw it. */
+        <Box
+          padding={4}
+          maxW="1600px"
+          width="full"
+          height="full"
+          minHeight={0}
+          overflow="hidden"
+          data-testid="section-navigation-container"
         >
-          {children}
-        </SectionNavigationFrame>
+          <SectionNavigationFrame
+            sectionLabel={sectionLabel}
+            navigationItems={navigationItems}
+            sidebarFooter={sidebarFooter}
+          >
+            {children}
+          </SectionNavigationFrame>
+        </Box>
       )}
     </DashboardLayout>
   );
@@ -81,80 +105,137 @@ export function SectionNavigationFrame({
   navigationItems,
   sidebarFooter,
 }: SectionNavigationFrameProps) {
-  return (
-    <Box width="full" padding={4} data-testid="section-navigation-layout">
-      <Container
-        maxW="1600px"
-        paddingX={0}
-        data-testid="section-navigation-container"
-      >
-        <Stack
-          direction={{ base: "column", md: "row" }}
-          alignItems={{ base: "stretch", md: "start" }}
-          gap={{ base: 3, md: 6 }}
-          width="full"
-        >
-          <Box
-            as="nav"
-            aria-label={`${sectionLabel} navigation`}
-            width={{ base: "full", md: "220px" }}
-            minWidth={{ base: 0, md: "220px" }}
-            flexShrink={0}
-            borderRightWidth={{ base: 0, md: "1px" }}
-            borderRightColor="border.muted"
-            borderBottomWidth={{ base: "1px", md: 0 }}
-            borderBottomColor="border.muted"
-            paddingRight={{ base: 0, md: 4 }}
-            paddingBottom={{ base: 2, md: 0 }}
-          >
-            <Text
-              data-testid="section-navigation-title"
-              display={{ base: "none", md: "block" }}
-              fontSize="xs"
-              fontWeight="semibold"
-              color="fg.muted"
-              paddingX={3}
-              paddingTop={1}
-              paddingBottom={2}
-              textTransform="uppercase"
-              letterSpacing="wider"
-            >
-              {sectionLabel}
-            </Text>
-            <Stack
-              data-testid="section-navigation-links"
-              direction={{ base: "row", md: "column" }}
-              alignItems="stretch"
-              gap={1}
-              overflowX={{ base: "auto", md: "visible" }}
-              paddingBottom={{ base: 1, md: 0 }}
-            >
-              {navigationItems.map((item) => (
-                // Each link keeps its intrinsic width in the horizontal
-                // strip. Without it the links shrink to fit the viewport
-                // instead of overflowing, so the strip never scrolls and the
-                // labels are squeezed.
-                <Box key={`${item.href}:${item.label}`} flexShrink={0}>
-                  <MenuLink
-                    href={item.href}
-                    includePath={item.includePath}
-                    icon={item.icon}
-                    menuEnd={item.menuEnd}
-                    target={item.target}
-                  >
-                    {item.label}
-                  </MenuLink>
-                </Box>
-              ))}
-            </Stack>
-            {sidebarFooter}
-          </Box>
+  const pathname = usePathname();
+  const contentRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  }, [pathname]);
 
-          <Box flex={1} minWidth={0} data-testid="section-navigation-content">
-            {children}
-          </Box>
+  return (
+    <Stack
+      direction={{ base: "column", md: "row" }}
+      alignItems="stretch"
+      gap={{ base: 3, md: 6 }}
+      width="full"
+      height="full"
+      minHeight={0}
+      overflow="hidden"
+      data-testid="section-navigation-layout"
+    >
+      <Box
+        as="nav"
+        aria-label={`${sectionLabel} navigation`}
+        width={{ base: "full", md: "220px" }}
+        minWidth={{ base: 0, md: "220px" }}
+        flexShrink={0}
+        overflowY="auto"
+        borderRightWidth={{ base: 0, md: "1px" }}
+        borderRightColor="border.muted"
+        borderBottomWidth={{ base: "1px", md: 0 }}
+        borderBottomColor="border.muted"
+        paddingRight={{ base: 0, md: 4 }}
+        paddingBottom={{ base: 2, md: 0 }}
+      >
+        <Text
+          data-testid="section-navigation-title"
+          display={{ base: "none", md: "block" }}
+          fontSize="xs"
+          fontWeight="semibold"
+          color="fg.muted"
+          paddingX={3}
+          paddingTop={1}
+          paddingBottom={2}
+          textTransform="uppercase"
+          letterSpacing="wider"
+        >
+          {sectionLabel}
+        </Text>
+        <Stack
+          data-testid="section-navigation-links"
+          direction={{ base: "row", md: "column" }}
+          alignItems="stretch"
+          gap={1}
+          overflowX={{ base: "auto", md: "visible" }}
+          paddingBottom={{ base: 1, md: 0 }}
+        >
+          {navigationItems.map((item) => (
+            // Each link keeps its intrinsic width in the horizontal
+            // strip. Without it the links shrink to fit the viewport
+            // instead of overflowing, so the strip never scrolls and the
+            // labels are squeezed.
+            <Box key={`${item.href}:${item.label}`} flexShrink={0}>
+              <RailLink item={item} />
+            </Box>
+          ))}
         </Stack>
-      </Container>
-    </Box>
+        {sidebarFooter}
+      </Box>
+
+      <Box
+        ref={contentRef}
+        flex={1}
+        minWidth={0}
+        minHeight={0}
+        overflow="auto"
+        paddingBottom={16}
+        data-testid="section-navigation-content"
+      >
+        {children}
+      </Box>
+    </Stack>
+  );
+}
+
+/**
+ * One destination on the rail.
+ *
+ * Not MenuLink: the shared sidebar link paints its selection with a muted
+ * wash, which is right for a long menu and wrong here — the rail is the
+ * section's own tab row, and the current destination is the answer to
+ * "where am I", so it earns the brand accent rather than the wash. The
+ * selection rule is MenuLink's own (the exact path, or the path a section
+ * prefix covers), kept in step so a destination is current in exactly the
+ * places it always was.
+ *
+ * The strip below `md` and the column above it render this same link, so
+ * the treatment — rounded, quiet until hovered, accented when current — is
+ * written once and cannot drift between the two.
+ */
+function RailLink({ item }: { item: SectionNavigationItem }) {
+  const pathname = usePathname();
+  const selected =
+    pathname === item.href ||
+    (item.includePath ? !!pathname?.includes(item.includePath) : false);
+
+  return (
+    <Link
+      asChild
+      display="block"
+      width="full"
+      paddingX={3}
+      paddingY={1.5}
+      borderRadius="lg"
+      colorPalette="orange"
+      background={selected ? "colorPalette.subtle" : "transparent"}
+      color={selected ? "colorPalette.fg" : undefined}
+      // A muted hover over the accent would grey out the one answer the rail
+      // exists to give, so the current destination keeps its wash on hover.
+      _hover={{ background: selected ? "colorPalette.subtle" : "bg.muted" }}
+      transition="background 0.15s ease, color 0.15s ease"
+    >
+      <NextLink
+        href={item.href}
+        {...(item.target
+          ? { target: item.target, rel: "noopener noreferrer" }
+          : {})}
+      >
+        <HStack width="full" gap={2}>
+          {item.icon}
+          <Text>{item.label}</Text>
+          <Spacer />
+          {item.menuEnd}
+        </HStack>
+      </NextLink>
+    </Link>
   );
 }

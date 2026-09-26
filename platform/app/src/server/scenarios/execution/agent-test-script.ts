@@ -35,13 +35,19 @@ export class ScriptedUserAgent extends ScenarioRunner.UserSimulatorAgentAdapter 
 /**
  * The agents and the steps of an agent test run: the user says the message,
  * the agent under test answers, the run succeeds.
+ *
+ * When the target greets on connect (an inbound `callDirection`), the run opens
+ * with the agent's own turn so the greeting is captured before the written user
+ * line, giving `[agent(), user(msg), agent(), succeed()]`.
  */
 export function buildAgentTestRun({
   adapter,
   script,
+  doesAgentGreetFirst = false,
 }: {
   adapter: ScenarioRunner.AgentAdapter;
   script: ScriptedRun;
+  doesAgentGreetFirst?: boolean;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script: ScenarioRunner.ScriptStep[];
@@ -49,6 +55,7 @@ export function buildAgentTestRun({
   return {
     agents: [adapter, new ScriptedUserAgent()],
     script: [
+      ...(doesAgentGreetFirst ? [ScenarioRunner.agent()] : []),
       ScenarioRunner.user(script.userMessage),
       ScenarioRunner.agent(),
       ScenarioRunner.succeed("The agent answered"),

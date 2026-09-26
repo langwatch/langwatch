@@ -63,11 +63,22 @@
  * because hashing and verifying both read that same local pepper.
  */
 
+import { identifierDomain } from "@langwatch/identity";
+import {
+  computeIdentifierHash,
+  planIdentifiers,
+} from "@langwatch/identity-server";
 import { hash as hashPassword } from "bcrypt";
+import { randomBytes } from "crypto";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
-import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { PUBLIC_KEY } from "../ee/licensing/constants";
+import {
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  resolveSeedLicense,
+} from "../scripts/localDevLicense";
 import {
   PrismaClient,
   RoleBindingScopeType,
@@ -82,11 +93,118 @@ import { modelProviders } from "../src/server/modelProviders/registry";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { CUSTOM_ROLE_KIND } from "../src/server/role/role-kind";
 import { encrypt } from "../src/utils/encryption";
+import { seedGrantBinding, seedRoleProjection } from "./seed-authz";
 import { seedDemoPlatform } from "./seed-demo-platform";
 
 const prisma = new PrismaClient({
   adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
 });
+
+/**
+ * State the identifier projection rows the legacy rows imply, for every user
+ * who has none — the seed-time stand-in for the D01 backfill, over the SAME
+ * pure plan (`planIdentifiers`) and the same derived ids, so a real backfill
+ * pass later converges on these rows instead of fighting them.
+ *
+ * Without this, a seeded user exists to the sign-up door (which reads
+ * `User`) and not to the sign-in router (which reads `Identifier`), and the
+ * two doors send a person in a circle: "no account yet" → "already has one".
+ */
+async function backfillIdentifierRows(): Promise<void> {
+  const covered = new Set(
+    (
+      await prisma.identifier.findMany({
+        select: { userId: true },
+        distinct: ["userId"],
+      })
+    ).map((row) => row.userId),
+  );
+  const users = await prisma.user.findMany({
+    where: { email: { not: null } },
+    select: {
+      id: true,
+      email: true,
+      emailVerified: true,
+      createdAt: true,
+      userHashKey: true,
+      accounts: {
+        select: {
+          id: true,
+          provider: true,
+          issuer: true,
+          providerAccountId: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  let stated = 0;
+  for (const user of users) {
+    if (covered.has(user.id) || !user.email) continue;
+
+    // The per-user hash pepper is minted at user creation on the live path;
+    // a seeded or pre-pipeline user may predate it.
+    const userHashKey = user.userHashKey ?? randomBytes(32).toString("hex");
+    if (!user.userHashKey) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { userHashKey },
+      });
+    }
+
+    const planned = planIdentifiers({
+      user: {
+        id: user.id,
+        email: user.email,
+        emailVerified: user.emailVerified ?? false,
+        createdAtMs: user.createdAt.getTime(),
+        userHashKey,
+      },
+      accounts: user.accounts.map((account) => ({
+        id: account.id,
+        provider: account.provider,
+        issuer: account.issuer,
+        providerAccountId: account.providerAccountId,
+        createdAtMs: account.createdAt.getTime(),
+      })),
+    });
+
+    for (const plan of planned) {
+      await prisma.identifier.upsert({
+        where: { id: plan.identifierId },
+        create: {
+          id: plan.identifierId,
+          userId: user.id,
+          provider: plan.provider,
+          value: plan.value,
+          domain: identifierDomain(plan.value),
+          identifierHash: computeIdentifierHash({
+            userHashKey,
+            normalizedValue: plan.value,
+          }),
+          accountId: plan.accountId,
+          providerId: plan.providerId,
+          issuer: plan.issuer,
+          providerAccountId: plan.providerAccountId,
+          state: plan.expectedState,
+          connectionId: null,
+          verifiedAt:
+            plan.expectedState === "VERIFIED"
+              ? new Date(plan.occurredAtMs)
+              : null,
+          attachedAt: new Date(plan.occurredAtMs),
+          detachedAt: null,
+        },
+        update: {},
+      });
+      stated += 1;
+    }
+  }
+  if (stated > 0) {
+    console.log(`   stated ${stated} identifier rows for pre-pipeline users`);
+  }
+}
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -116,6 +234,11 @@ const PUBLIC_TOKEN_LOOKUP_ID = "LocalDevPublicIk";
 const PUBLIC_TOKEN_SECRET = "LocalDevPublicIngestionTokenSecretFixedValue0000";
 const PUBLIC_ACCESS_TOKEN = `${INGEST_KEY_PREFIX}${PUBLIC_TOKEN_LOOKUP_ID}_${PUBLIC_TOKEN_SECRET}`;
 const PUBLIC_TOKEN_ROLE_NAME = "local-dev-public-ingestion";
+const PUBLIC_TOKEN_ROLE_ID = "local-dev-public-ingestion-role";
+const ADMIN_ORGANIZATION_BINDING_ID = "local-dev-admin-organization-binding";
+const ADMIN_TEAM_BINDING_ID = "local-dev-admin-team-binding";
+const PRIVATE_TOKEN_BINDING_ID = "local-dev-private-token-binding";
+const PUBLIC_TOKEN_BINDING_ID = "local-dev-public-token-binding";
 
 const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 
@@ -148,15 +271,32 @@ async function main() {
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
     : process.env.HAVEN_SEED_PRESET === "demo";
 
+  // The license must verify against the key this app boots with, otherwise
+  // every settings page reports it as invalid. `resolveSeedLicense` keeps a
+  // license that already verifies (someone activated a real one) and only
+  // replaces what does not. The local-dev key verifies under the default key;
+  // the test-suite fixture is there for CI, which seeds under the test key.
+  const existingOrganization = await prisma.organization.findUnique({
+    where: { id: ORG_ID },
+    select: { license: true },
+  });
+  const license = resolveSeedLicense({
+    stored: existingOrganization?.license ?? null,
+    publicKey: PUBLIC_KEY,
+    candidates: [
+      LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+      TEST_SUITE_ENTERPRISE_LICENSE_KEY,
+    ],
+  });
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
     create: {
       id: ORG_ID,
       name: ORG_NAME,
       slug: ORG_SLUG,
-      license: ENTERPRISE_LICENSE_KEY,
+      license,
     },
-    update: { license: ENTERPRISE_LICENSE_KEY },
+    update: { license },
   });
 
   // Prompt tags are org-defined, and `production` is the one
@@ -250,6 +390,17 @@ async function main() {
     update: { issuer: "local:credential", password: hashedPassword },
   });
 
+  // The identifier projection's rows for every seeded-or-legacy user. The
+  // sign-in router answers "does this address have an account" from the
+  // projection, and the sign-up door answers it from `User` — a user this
+  // seed writes without identifier rows makes the two doors contradict each
+  // other about one address (sign-in: "no account yet"; sign-up: "already
+  // has one"). Production users get these rows from the birth path or the
+  // D01 backfill; a seed that bypasses both has to state the same rows, and
+  // it states them with the SAME derived ids the backfill would, so a later
+  // real backfill pass converges on them instead of duplicating.
+  await backfillIdentifierRows();
+
   await prisma.organizationUser.upsert({
     where: {
       userId_organizationId: {
@@ -266,29 +417,24 @@ async function main() {
     update: { role: "ADMIN" },
   });
 
-  // RoleBinding has no single compound @@unique Prisma can upsert against
-  // (see the model comment in schema.prisma), so dedupe by replace — the
-  // same pattern scripts/seed-local-admin.ts already established.
+  // Keep the compatibility rows aligned with the authoritative grants head.
+  // The helper refuses to recreate a grant that a previous run revoked.
   await prisma.roleBinding.deleteMany({
     where: { organizationId: organization.id, userId: user.id },
   });
-  await prisma.roleBinding.createMany({
-    data: [
-      {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organization.id,
-      },
-      {
-        organizationId: organization.id,
-        userId: user.id,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: team.id,
-      },
-    ],
+  await seedGrantBinding(prisma, {
+    id: ADMIN_ORGANIZATION_BINDING_ID,
+    organizationId: organization.id,
+    principal: { type: "user", id: user.id },
+    role: TeamUserRole.ADMIN,
+    scope: { type: RoleBindingScopeType.ORGANIZATION, id: organization.id },
+  });
+  await seedGrantBinding(prisma, {
+    id: ADMIN_TEAM_BINDING_ID,
+    organizationId: organization.id,
+    principal: { type: "user", id: user.id },
+    role: TeamUserRole.ADMIN,
+    scope: { type: RoleBindingScopeType.TEAM, id: team.id },
   });
 
   // Private access token: sk-lw- full-access personal access token, owned by
@@ -317,14 +463,12 @@ async function main() {
   await prisma.roleBinding.deleteMany({
     where: { apiKeyId: privateApiKey.id },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: organization.id,
-      apiKeyId: privateApiKey.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedGrantBinding(prisma, {
+    id: PRIVATE_TOKEN_BINDING_ID,
+    organizationId: organization.id,
+    principal: { type: "apiKey", id: privateApiKey.id },
+    role: TeamUserRole.ADMIN,
+    scope: { type: RoleBindingScopeType.ORGANIZATION, id: organization.id },
   });
 
   // Public access token: ik-lw- ingestion-only token, PROJECT-scoped, CUSTOM
@@ -338,6 +482,7 @@ async function main() {
       },
     },
     create: {
+      id: PUBLIC_TOKEN_ROLE_ID,
       organizationId: organization.id,
       name: PUBLIC_TOKEN_ROLE_NAME,
       description:
@@ -346,6 +491,16 @@ async function main() {
       kind: CUSTOM_ROLE_KIND.SYSTEM_API_KEY,
     },
     update: { permissions: ["traces:create"] },
+  });
+  const roleProjected = await seedRoleProjection({
+    prisma,
+    id: ingestionRole.id,
+    organizationId: organization.id,
+    name: PUBLIC_TOKEN_ROLE_NAME,
+    description:
+      "Restricted role for the static local-dev public ingestion token (traces:create only)",
+    permissions: ["traces:create"],
+    kind: "system_api_key",
   });
   const publicApiKey = await prisma.apiKey.upsert({
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
@@ -365,16 +520,16 @@ async function main() {
     },
   });
   await prisma.roleBinding.deleteMany({ where: { apiKeyId: publicApiKey.id } });
-  await prisma.roleBinding.create({
-    data: {
+  if (roleProjected) {
+    await seedGrantBinding(prisma, {
+      id: PUBLIC_TOKEN_BINDING_ID,
       organizationId: organization.id,
-      apiKeyId: publicApiKey.id,
+      principal: { type: "apiKey", id: publicApiKey.id },
       role: TeamUserRole.CUSTOM,
       customRoleId: ingestionRole.id,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: project.id,
-    },
-  });
+      scope: { type: RoleBindingScopeType.PROJECT, id: project.id },
+    });
+  }
 
   // Default-model config at the organization scope so prompt-create +
   // workflow runs in e2e tests resolve a model without requiring CI to also

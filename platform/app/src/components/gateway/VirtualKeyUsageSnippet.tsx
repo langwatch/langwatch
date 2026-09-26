@@ -125,8 +125,8 @@ import (
 \t"context"
 \t"fmt"
 
-\topenai "github.com/openai/openai-go"
-\t"github.com/openai/openai-go/option"
+\t"github.com/openai/openai-go/v3"
+\t"github.com/openai/openai-go/v3/option"
 )
 
 func main() {

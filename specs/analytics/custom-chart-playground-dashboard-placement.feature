@@ -2,7 +2,7 @@ Feature: Dashboard widgets placed on a dashboard
 
   A persisted dashboard widget is a `CustomGraph` row of kind
   `dashboard_srcdoc`, the same table a builder graph or a placed workbench
-  chart uses (see specs/analytics/lwql-saved-charts.feature for the workbench
+  chart uses (see specs/lwql/saved-charts.feature for the workbench
   precedent this mirrors). Placement was previously refused everywhere: the
   card-level procedures never admitted the kind, so a widget with a
   `dashboardId` still never appeared on the grid. This feature opens that

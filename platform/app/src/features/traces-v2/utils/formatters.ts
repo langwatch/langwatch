@@ -7,14 +7,6 @@ const MS_PER_WEEK = 7 * MS_PER_DAY;
 const MS_PER_MONTH = 30 * MS_PER_DAY;
 const MS_PER_YEAR = 365 * MS_PER_DAY;
 
-export function formatRelativeTime(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
-  if (diffMs < MS_PER_MINUTE) return "now";
-  if (diffMs < MS_PER_HOUR) return `${Math.floor(diffMs / MS_PER_MINUTE)}m`;
-  if (diffMs < MS_PER_DAY) return `${Math.floor(diffMs / MS_PER_HOUR)}h`;
-  return `${Math.floor(diffMs / MS_PER_DAY)}d`;
-}
-
 /**
  * Verbose natural-language relative time — "1 minute ago", "2 hours ago",
  * "3 weeks ago". Used by the SINCE column, which trades compactness for
@@ -148,11 +140,6 @@ export function formatAbsoluteTime(timestamp: number): string {
   )} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(
     d.getUTCSeconds(),
   )} UTC`;
-}
-
-export function formatDuration(ms: number): string {
-  if (ms < 1_000) return `${Math.round(ms)}ms`;
-  return `${(ms / 1_000).toFixed(1)}s`;
 }
 
 export function formatCost(cost: number, estimated?: boolean): string {

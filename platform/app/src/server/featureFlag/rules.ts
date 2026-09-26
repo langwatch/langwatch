@@ -11,14 +11,16 @@ import { z } from "zod";
  * through to the registry default.
  *
  * The shape is intentionally open-ended — today it carries `projectId`,
- * `organizationId` and `organizationCreatedAfter`, tomorrow it can grow
- * `userEmail`, `percentageRollout`, etc., without a schema migration.
+ * `organizationId`, `organizationCreatedAfter`, `percentageRollout` and
+ * `emailDomain`, tomorrow it can grow more without a schema migration.
  */
 
 const KNOWN_MATCH_KEYS = [
   "projectId",
   "organizationId",
   "organizationCreatedAfter",
+  "percentageRollout",
+  "emailDomain",
 ] as const;
 type KnownMatchKey = (typeof KNOWN_MATCH_KEYS)[number];
 
@@ -36,6 +38,22 @@ const featureFlagRuleMatchSchema = z
      * Date would round-trip as a string anyway.
      */
     organizationCreatedAfter: z.string().optional(),
+    /**
+     * A/B split: matches the share of callers, in percent, whose rollout
+     * bucket falls below this number. The bucket is a stable hash of the
+     * flag key and the read's `distinctId`, so one user keeps the same
+     * answer on every read of one flag while landing in different buckets
+     * for different flags. A read without a `distinctId` never matches.
+     */
+    percentageRollout: z.number().optional(),
+    /**
+     * Team QA in production: matches every signed-in user whose email is at
+     * one of these domains, and no one else. Written lowercase without the
+     * `@`, and compared exactly against the part after the last `@` of the
+     * read's `userEmail`, so a subdomain only matches when it is listed. A
+     * read without a user email never matches.
+     */
+    emailDomain: z.union([z.string(), z.array(z.string())]).optional(),
   })
   // Future-proof: keep unknown fields on the parsed object rather than
   // rejecting them, so a newer writer can ship a rule shape the running
@@ -89,7 +107,53 @@ export const featureFlagRulesWriteSchema = featureFlagRulesSchema
       message:
         "A new-users targeting rule needs a date the organization was created on or after",
     },
+  )
+  .refine(
+    (rules) =>
+      rules.every(
+        (rule) =>
+          rule.match.percentageRollout === undefined ||
+          (Number.isFinite(rule.match.percentageRollout) &&
+            rule.match.percentageRollout >= 0 &&
+            rule.match.percentageRollout <= 100),
+      ),
+    {
+      message: "A percentage rollout rule needs a percentage between 0 and 100",
+    },
+  )
+  .refine(
+    (rules) =>
+      rules.every((rule) => {
+        if (rule.match.emailDomain === undefined) return true;
+        const domains = emailDomainsOf(rule.match.emailDomain);
+        return domains.length > 0 && domains.every(isWritableEmailDomain);
+      }),
+    {
+      message:
+        "An email domain rule needs one or more lowercase domains without the @",
+    },
   );
+
+/** The domains an `emailDomain` condition names, one or several, as a list. */
+export function emailDomainsOf(
+  emailDomain: string | string[] | undefined,
+): string[] {
+  if (emailDomain === undefined) return [];
+  return Array.isArray(emailDomain) ? emailDomain : [emailDomain];
+}
+
+/**
+ * The stored form of one domain: lowercase, no padding, no `@`, no
+ * whitespace. The matcher would still read a padded or capitalised domain,
+ * but a canonical row is what the Ops UI reopens and the summary line names.
+ */
+function isWritableEmailDomain(domain: string): boolean {
+  return (
+    domain.length > 0 &&
+    domain === domain.trim().toLowerCase() &&
+    !/[@\s]/.test(domain)
+  );
+}
 
 export type FeatureFlagRuleMatch = z.infer<typeof featureFlagRuleMatchSchema>;
 export type FeatureFlagRule = z.infer<typeof featureFlagRuleSchema>;
@@ -106,6 +170,54 @@ export interface RuleEvaluationContext {
    * rule matches.
    */
   organizationCreatedAt?: Date | string | null;
+  /**
+   * Who is asking, for a percentage rollout: the user id on a frontend read.
+   * Absent means no percentage rule can match, so an organization-scoped or
+   * project-scoped read with no caller identity is never split.
+   */
+  distinctId?: string;
+  /**
+   * The flag being read, salted into the rollout bucket so one user is not
+   * in the same half of every experiment. Absent means no percentage rule
+   * can match.
+   */
+  flagKey?: string;
+  /**
+   * The signed-in user's email, for an email domain rule. Absent on every
+   * read without a session (a job, an API key, a sign-up), so no domain
+   * rule can match there.
+   */
+  userEmail?: string;
+}
+
+/** Buckets in a percentage rollout: a bucket is an integer in [0, 100). */
+const ROLLOUT_BUCKETS = 100;
+
+/**
+ * The stable bucket of one caller for one flag: fnv1a over
+ * `${flagKey}:${distinctId}`, reduced to [0, 100). Deterministic across
+ * processes and deploys, with no dependency on a crypto module, so the
+ * matcher stays synchronous and the same user reads the same answer from
+ * every pod.
+ */
+export function rolloutBucket({
+  flagKey,
+  distinctId,
+}: {
+  flagKey: string;
+  distinctId: string;
+}): number {
+  return fnv1a32(`${flagKey}:${distinctId}`) % ROLLOUT_BUCKETS;
+}
+
+/** 32-bit FNV-1a over the UTF-16 code units of `input`. */
+function fnv1a32(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
 }
 
 /**
@@ -194,38 +306,92 @@ export function resolveEffectiveForListing({
   return registryDefault;
 }
 
+/**
+ * Fail closed on unknown match keys: a newer writer might have added a
+ * condition this reader doesn't understand. Treating it as "no constraint"
+ * would silently turn that rule into a global match for every context.
+ */
+function hasOnlyKnownKeys(match: FeatureFlagRuleMatch): boolean {
+  return Object.keys(match).every((key) =>
+    KNOWN_MATCH_KEYS.includes(key as KnownMatchKey),
+  );
+}
+
 function matchesContext(
   match: FeatureFlagRuleMatch,
   ctx: RuleEvaluationContext,
 ): boolean {
-  // Fail closed on unknown match keys: a newer writer might have added
-  // a condition (e.g. percentageRollout) that this reader doesn't
-  // understand. Treating it as "no constraint" would silently turn
-  // that rule into a global match for every context.
-  for (const key of Object.keys(match)) {
-    if (!KNOWN_MATCH_KEYS.includes(key as KnownMatchKey)) return false;
-  }
+  if (!hasOnlyKnownKeys(match)) return false;
   // Every specified field must match the context. An entirely empty
   // match acts as a default-rule and matches every context.
-  if (match.projectId !== undefined && match.projectId !== ctx.projectId) {
-    return false;
-  }
-  if (
-    match.organizationId !== undefined &&
-    match.organizationId !== ctx.organizationId
-  ) {
-    return false;
-  }
-  if (
-    match.organizationCreatedAfter !== undefined &&
-    !isOrganizationNewerThan(
+  return CONDITIONS.every((holds) => holds(match, ctx));
+}
+
+type Condition = (
+  match: FeatureFlagRuleMatch,
+  ctx: RuleEvaluationContext,
+) => boolean;
+
+/** One entry per known match key: an unset key holds, a set key must match. */
+const CONDITIONS: readonly Condition[] = [
+  (match, ctx) =>
+    match.projectId === undefined || match.projectId === ctx.projectId,
+  (match, ctx) =>
+    match.organizationId === undefined ||
+    match.organizationId === ctx.organizationId,
+  (match, ctx) =>
+    match.organizationCreatedAfter === undefined ||
+    isOrganizationNewerThan(
       match.organizationCreatedAfter,
       ctx.organizationCreatedAt,
-    )
-  ) {
-    return false;
-  }
-  return true;
+    ),
+  (match, ctx) =>
+    match.percentageRollout === undefined ||
+    isInRollout(match.percentageRollout, ctx),
+  (match, ctx) =>
+    match.emailDomain === undefined ||
+    isEmailInDomain(match.emailDomain, ctx.userEmail),
+];
+
+/**
+ * Whether the read's user is at one of the rule's domains. The comparison is
+ * on the part after the last `@`, lowercased on both sides, and exact: a rule
+ * naming `acme.com` does not match `eu.acme.com` unless that is listed too.
+ * Fails closed on a read with no email and on an email with no `@`.
+ */
+function isEmailInDomain(
+  emailDomain: string | string[],
+  userEmail: string | undefined,
+): boolean {
+  if (!userEmail) return false;
+  const at = userEmail.lastIndexOf("@");
+  if (at < 0) return false;
+  const domain = userEmail
+    .slice(at + 1)
+    .trim()
+    .toLowerCase();
+  if (domain === "") return false;
+  return emailDomainsOf(emailDomain).some(
+    (candidate) => candidate.trim().toLowerCase() === domain,
+  );
+}
+
+/**
+ * Whether this read falls inside the rolled-out share. Fails closed on a
+ * read that carries no caller identity or no flag key, and on a percentage
+ * that cannot be read as a number, for the same reason the age rule does: a
+ * condition the matcher cannot evaluate must not become no condition.
+ */
+function isInRollout(
+  percentageRollout: number,
+  ctx: RuleEvaluationContext,
+): boolean {
+  if (!ctx.distinctId || !ctx.flagKey) return false;
+  if (!Number.isFinite(percentageRollout)) return false;
+  return (
+    rolloutBucket({ flagKey: ctx.flagKey, distinctId: ctx.distinctId }) <
+    percentageRollout
+  );
 }
 
 /**

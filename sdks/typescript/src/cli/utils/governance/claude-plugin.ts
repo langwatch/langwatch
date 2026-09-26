@@ -10,21 +10,28 @@
  *   - Invisibility. Nothing presents a raw hook entry as a LangWatch feature,
  *     so it reads as an unexplained command wired into every session. A plugin
  *     is listed by name, with everything it does inside it.
- *   - Version coupling. The entry names a subcommand of whatever `langwatch`
- *     happens to be on PATH, so a global CLI older than that subcommand answers
- *     every session stop with `error: unknown command 'hook'`. The plugin ships
- *     its own hook script and is versioned on its own.
+ *   - PATH coupling. The entry names `langwatch` and resolves it against the
+ *     PATH of whatever started Claude Code, which for a desktop app has no
+ *     version manager on it. The plugin's launcher runs the CLI through the
+ *     location the CLI recorded about itself first (cli-location.ts).
+ *
+ * The plugin carries no hook logic: its launcher runs `langwatch ingest hook`
+ * and `langwatch ingest guidance` from whatever CLI is installed, so a hook fix
+ * ships with the CLI and the plugin only changes when a plugin-shaped file
+ * does. The two commands accept arguments they do not know and always exit
+ * zero, which is what lets a plugin from any version run with a CLI from any
+ * version.
  *
  * What does NOT move here is the telemetry env block. Claude Code reads its
  * OTLP exporter configuration from `~/.claude/settings.json` and from nowhere
  * else, and a plugin cannot set a session's environment, so the env block stays
  * CLI-managed (see app-settings.ts) whichever seam carries the hooks.
  *
- * Shipping the hook inside the plugin only solves the drift it was built to
- * solve while the installed copy keeps up with what we publish, and Claude Code
- * will not see to that: it auto-updates its own marketplaces and leaves
- * third-party ones like ours switched off by default. So the plugin is also
- * updated from here, once a day, from whichever wrapped run comes first.
+ * The installed plugin still has to keep up with what we publish for the
+ * plugin-shaped changes (a new skill, a new hook event), and Claude Code will
+ * not see to that: it auto-updates its own marketplaces and leaves third-party
+ * ones like ours switched off by default. So the plugin is also updated from
+ * here, once a day, from whichever wrapped run comes first.
  *
  * Everything in this file is best-effort by construction. A `claude` too old to
  * take a plugin, a network that is down, a marketplace that will not clone: none

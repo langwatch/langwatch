@@ -9,8 +9,9 @@ import {
   type LwqlKeyMapRow,
   lwqlKeyMapTableQualifiedName,
   productionLangWatchQLNames,
-} from "~/server/analytics/lwql/productionProvisioning";
+} from "~/server/analytics/lwql/provisioning";
 import { parseConnectionUrl } from "~/server/clickhouse/goose";
+import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -37,12 +38,21 @@ export interface OrgAdminResolution {
   userId: string | null;
   organizationId: string | null;
   firstMessage: boolean;
+  /**
+   * Which onboarding the organization went through, so a milestone tracked
+   * against the admin can be split by variant. Null before the experiment.
+   */
+  onboardingVariant: OnboardingVariant | null;
+  /** When the organization was created, for milestones measured in days since signup. */
+  organizationCreatedAt: Date | null;
 }
 
 const NULL_RESOLUTION: OrgAdminResolution = {
   userId: null,
   organizationId: null,
   firstMessage: false,
+  onboardingVariant: null,
+  organizationCreatedAt: null,
 };
 
 export class ProjectNotFoundError extends Error {
@@ -67,6 +77,11 @@ export class PersonalWorkspaceBoundaryError extends Error {
 
 export class PersonalProjectProtectedError extends Error {
   name = "PersonalProjectProtectedError" as const;
+}
+
+/** Raised when a generic project route is aimed at the governance project. */
+export class GovernanceProjectProtectedError extends Error {
+  name = "GovernanceProjectProtectedError" as const;
 }
 
 /** The refusal a personal project gives to anything that would move it out. */
@@ -127,6 +142,51 @@ export function personalWorkspaceArchiveViolation(
   isProjectPersonal: boolean,
 ): string | null {
   return isProjectPersonal ? PERSONAL_PROJECT_ARCHIVE_REFUSAL : null;
+}
+
+/** The refusal the hidden governance project gives to a generic project route. */
+export const GOVERNANCE_PROJECT_ROUTE_REFUSAL =
+  "This project is an internal governance record, not a workspace. It cannot be renamed, moved, archived, or re-keyed through the projects API.";
+
+/**
+ * The one `Project.kind` value that generic project routes must refuse.
+ *
+ * Spelled here rather than imported from the governance service so this module
+ * — reached by ingest, the REST API and tRPC — carries no dependency on the
+ * enterprise tree. The two are pinned together by
+ * `governanceProjectKindGuard.unit.test.ts`.
+ */
+export const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
+
+/**
+ * Whether this project is the organization's hidden governance record, and the
+ * reason to refuse the operation if it is.
+ *
+ * The hiding invariant used to be enforced only on the LIST surface: the
+ * governance project is filtered out of the picker, `/api/v1/projects`, RBAC
+ * pickers and billing exports, but `PATCH /api/projects/:id` and the archive
+ * paths guarded personal projects and never looked at `kind` at all. So a
+ * project nobody can SEE was still reachable by id, and archiving it was one
+ * request away.
+ *
+ * That is worse than it sounds, because of which id it is: the governance
+ * project's id is the ClickHouse `TenantId` every governance row is keyed by.
+ * Archiving it makes `resolveGovProjectId` return null forever while the write
+ * path keeps landing rows under the same id — the cost screen goes blank and an
+ * erasure job walks zero tenants and reports success (ADR-128 §11).
+ * `GovernanceTenantHistory` makes that survivable; this guard makes it rare.
+ *
+ * A free function, and shared, for the reason the personal-workspace guards
+ * beside it are: the tRPC router writes Prisma directly and never passes
+ * through this service, and an invariant enforced twice is an invariant that
+ * eventually diverges.
+ */
+export function governanceProjectRouteViolation(
+  kind: string | null | undefined,
+): string | null {
+  return kind === INTERNAL_GOVERNANCE_PROJECT_KIND
+    ? GOVERNANCE_PROJECT_ROUTE_REFUSAL
+    : null;
 }
 
 /**
@@ -215,6 +275,28 @@ export class ProjectService {
     if (violation) {
       throw new PersonalWorkspaceBoundaryError(violation);
     }
+  }
+
+  /**
+   * Refuses a mutation aimed at the organization's hidden governance project.
+   *
+   * Read scoped to the organization, like the personal-workspace guards: an
+   * unscoped read would let a caller tell a governance project from an ordinary
+   * one in somebody else's organization by the refusal alone. A project this
+   * organization does not own falls through to the repository, which scopes its
+   * own write and reports it as not found.
+   */
+  private async assertNotGovernanceProject({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<void> {
+    const current = await this.repo.getWithTeam(id);
+    if (!current || current.team.organizationId !== organizationId) return;
+    const violation = governanceProjectRouteViolation(current.kind);
+    if (violation) throw new GovernanceProjectProtectedError(violation);
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
@@ -348,6 +430,8 @@ export class ProjectService {
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
+    await this.assertNotGovernanceProject({ id, organizationId });
+
     if (data.teamId) {
       const team = await this.repo.findActiveTeamInOrganization({
         teamId: data.teamId,
@@ -391,6 +475,8 @@ export class ProjectService {
     id: string;
     organizationId: string;
   }): Promise<Project> {
+    await this.assertNotGovernanceProject({ id, organizationId });
+
     // Scoped to this organization for the same reason the move guard is.
     const existing = await this.repo.getWithTeam(id);
     const archiveViolation =
@@ -514,6 +600,8 @@ export class ProjectService {
         userId: result.adminUserId,
         organizationId: result.organizationId,
         firstMessage: result.firstMessage,
+        onboardingVariant: result.onboardingVariant,
+        organizationCreatedAt: result.organizationCreatedAt,
       };
     } catch (error) {
       logger.error(

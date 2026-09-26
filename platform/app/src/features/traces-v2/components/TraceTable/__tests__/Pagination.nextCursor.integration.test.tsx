@@ -19,22 +19,36 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useFilterStore } from "../../../stores/filterStore";
-import { useViewStore } from "../../../stores/viewStore";
+import { explorerCountSummary } from "../../../hooks/explorerCountSummary";
+import { useExplorerStore } from "../../../stores/explorerStore";
 import { Pagination } from "../Pagination";
 
 const CURSOR_TO_PAGE_2 = { sortValue: 1_700_000_002_000, traceId: "trace-b" };
 const CURSOR_TO_PAGE_3 = { sortValue: 1_700_000_001_000, traceId: "trace-c" };
 const SESSION_CURSOR_TO_PAGE_2 = "session-cursor-2";
 
+// The total and its noun come from the page-wide count read; this suite is
+// about page reachability, so the read is a value it sets per case. The copy
+// is built by the same function the page uses, so the noun and the number
+// reach the line the way they do in the app.
+const mockCounts = {
+  totalHits: 500,
+  itemNoun: "traces",
+  instantEval: null,
+  summary: "500 traces",
+};
+vi.mock("../../../hooks/useExplorerCounts", () => ({
+  useExplorerCounts: () => mockCounts,
+}));
+
 function renderPagination({
   nextCursor,
   totalHits = 500,
   visibleCount = 50,
-  itemNoun,
+  itemNoun = "traces",
   maxPageSize,
 }: {
   nextCursor: { sortValue: number; traceId: string } | string | null;
@@ -43,13 +57,18 @@ function renderPagination({
   itemNoun?: string;
   maxPageSize?: number;
 }): void {
+  mockCounts.totalHits = totalHits;
+  mockCounts.itemNoun = itemNoun;
+  mockCounts.summary = explorerCountSummary({
+    totalHits,
+    itemNoun,
+    instantEval: null,
+  });
   render(
     <ChakraProvider value={defaultSystem}>
       <Pagination
-        totalHits={totalHits}
         nextCursor={nextCursor}
         visibleCount={visibleCount}
-        itemNoun={itemNoun}
         maxPageSize={maxPageSize}
       />
     </ChakraProvider>,
@@ -67,14 +86,14 @@ const clickPage = async (page: number) => {
 };
 
 const pagination = () => {
-  const { page, pageCursors } = useFilterStore.getState();
+  const { page, pageCursors } = useExplorerStore.getState();
   return { page, pageCursors };
 };
 
 beforeEach(() => {
-  useFilterStore.getState().clearAll();
-  useFilterStore.setState({ pageSize: 50 });
-  useViewStore.setState({ grouping: "flat" });
+  useExplorerStore.getState().clearAll();
+  useExplorerStore.setState({ pageSize: 50 });
+  useExplorerStore.setState({ grouping: "flat" });
 });
 afterEach(() => cleanup());
 
@@ -109,7 +128,7 @@ describe("trace table pagination", () => {
   describe("given a lens whose data source caps the page size below the shared preference", () => {
     /** @scenario A larger persisted page size clamps to the sessions cap */
     it("counts the range by the clamped size and offers no sizes beyond the cap", () => {
-      useFilterStore.setState({
+      useExplorerStore.setState({
         page: 2,
         pageSize: 250,
         pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
@@ -137,7 +156,7 @@ describe("trace table pagination", () => {
   describe("given the reader is already on the second batch", () => {
     describe("when the reader steps forward again", () => {
       it("files the new cursor under the third, without disturbing the second's", async () => {
-        useFilterStore.setState({
+        useExplorerStore.setState({
           page: 2,
           pageCursors: { 1: null, 2: CURSOR_TO_PAGE_2 },
         });
@@ -162,7 +181,7 @@ describe("trace table pagination", () => {
     it("greys out numbers past the window but keeps the cursor step open", () => {
       // Walked to the last page inside the window and beyond it: the batch on
       // screen carries the cursor into the next one.
-      useFilterStore.setState({
+      useExplorerStore.setState({
         page: 2200,
         pageCursors: { 1: null, 2200: CURSOR_TO_PAGE_2 },
       });
@@ -181,12 +200,12 @@ describe("trace table pagination", () => {
 
   describe("given the sessions lens, whose rows can only be reached in order", () => {
     beforeEach(() => {
-      useViewStore.setState({ grouping: "by-conversation" });
+      useExplorerStore.setState({ grouping: "by-conversation" });
     });
 
     /** @scenario "A page the data source cannot open is shown disabled" */
     it("offers the batches already walked and the next one, and refuses the rest", () => {
-      useFilterStore.setState({
+      useExplorerStore.setState({
         page: 2,
         pageCursors: { 1: null, 2: SESSION_CURSOR_TO_PAGE_2 },
       });
@@ -203,7 +222,7 @@ describe("trace table pagination", () => {
 
     /** @scenario "Next is unavailable once the data source has no further rows" */
     it("refuses the step forward once the server hands back no cursor", () => {
-      useFilterStore.setState({
+      useExplorerStore.setState({
         page: 2,
         pageCursors: { 1: null, 2: SESSION_CURSOR_TO_PAGE_2 },
       });

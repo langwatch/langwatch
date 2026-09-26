@@ -26,6 +26,17 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { type TracerProvider, trace } from "@opentelemetry/api";
+import { createCallLimitTimer } from "../voice/call-limit-timer";
+import {
+  type CallerVoiceConfig,
+  DEFAULT_CALLER_VOICE,
+} from "../voice/caller-voice.config";
+import { buildCallerVoiceSimulatorConfig } from "../voice/caller-voice.simulator";
+import { voiceTransportRegistry } from "../voice/voice-transport.registry";
+import {
+  agentGreetsFirst,
+  buildAgentGreetsFirstScript,
+} from "./agent-first-script";
 import { buildAgentTestRun } from "./agent-test-script";
 import { createChildProcessLogger } from "./child-logger";
 import { selectRoleModelParams } from "./job-model-params";
@@ -117,16 +128,107 @@ function readTelemetryEnv(): {
   return { langwatchEndpoint, langwatchApiKey };
 }
 
+type VoiceAdapterData = Extract<
+  ChildProcessJobData["adapterData"],
+  { type: "voice" }
+>;
+
+/** The single JSON line the child writes to stdout for the parent to parse. */
+type ChildOutputResult = {
+  success: boolean;
+  reasoning?: string;
+  error?: string;
+  agentInstance?: { hostname: string; label: string | null };
+  isCutAtLimit?: boolean;
+};
+
+/**
+ * Voice-only run setup: the caller metadata recorded on the run (AC20, AC24)
+ * and the whole-call limit timer that ends the call so the judge still runs on
+ * what was said (AC28). A non-voice run gets empty metadata and no timer.
+ */
+function buildVoiceRunSetup({
+  jobData,
+  adapter,
+}: {
+  jobData: ChildProcessJobData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): {
+  voiceMetadata: Record<string, unknown>;
+  callLimitTimer: ReturnType<typeof createCallLimitTimer> | null;
+} {
+  const { target, adapterData } = jobData;
+  if (target.type !== "voice" || adapterData.type !== "voice") {
+    return { voiceMetadata: {}, callLimitTimer: null };
+  }
+  const callerVoice: CallerVoiceConfig =
+    jobData.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const effectiveCaller = buildCallerVoiceSimulatorConfig(callerVoice);
+  const voiceMetadata = {
+    callerKind: "simulated" as const,
+    caller: {
+      voice: effectiveCaller.voice,
+      interruptProbability: callerVoice.interruptProbability,
+      effects: callerVoice.effects,
+    },
+  };
+  const callLimitTimer = createCallLimitTimer({
+    maxCallSeconds: adapterData.maxCallSeconds,
+    onLimit: () => endVoiceCallAtLimit({ adapterData, adapter }),
+  });
+  return { voiceMetadata, callLimitTimer };
+}
+
+function endVoiceCallAtLimit({
+  adapterData,
+  adapter,
+}: {
+  adapterData: VoiceAdapterData;
+  adapter: ScenarioRunner.AgentAdapter;
+}): void {
+  logger.warn("voice call reached the max duration; ending the call");
+  // End the transport gracefully so the drained transcript is judged. "Hang up
+  // now" is on the runner contract, not cast out of the adapter here.
+  void voiceTransportRegistry[adapterData.voiceTarget.transport]
+    .endCall(adapter)
+    .catch(() => {
+      // Cleanup failure must not mask the run result.
+    });
+}
+
+/** Assemble the child's stdout result from the run outcome and voice timer. */
+function buildOutputResult({
+  result,
+  callLimitTimer,
+  adapter,
+}: {
+  result: { success: boolean; reasoning?: string };
+  callLimitTimer: ReturnType<typeof createCallLimitTimer> | null;
+  adapter: ScenarioRunner.AgentAdapter;
+}): ChildOutputResult {
+  const outputResult: ChildOutputResult = { success: result.success };
+  if (result.reasoning) {
+    outputResult.reasoning = result.reasoning;
+  }
+  // The run was ended by LangWatch at the max call duration (AC28); the parent
+  // records the marker so the run header can show "Cut at the call limit".
+  if (callLimitTimer?.wasCut()) {
+    outputResult.isCutAtLimit = true;
+  }
+  // The connected agent instance that answered the run's turns, for the
+  // parent's record of which process served the run.
+  if (
+    adapter instanceof SerializedConnectedAgentAdapter &&
+    adapter.servedInstance
+  ) {
+    outputResult.agentInstance = adapter.servedInstance;
+  }
+  return outputResult;
+}
+
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
-  const {
-    context,
-    scenario,
-    parameters,
-    adapterData,
-    modelParams,
-    nlpServiceUrl,
-    target,
-  } = jobData;
+  const { context, scenario, parameters, modelParams, nlpServiceUrl, target } =
+    jobData;
 
   const { langwatchEndpoint, langwatchApiKey } = readTelemetryEnv();
 
@@ -136,7 +238,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // no need to duplicate it onto the job payload. The workflow/code
   // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = createAdapter({
-    adapterData,
+    adapterData: jobData.adapterData,
     modelParams,
     nlpServiceUrl,
     projectApiKey: langwatchApiKey,
@@ -147,44 +249,63 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   // Results are reported via LangWatch SDK automatically
   const verbose = process.env.SCENARIO_VERBOSE === "true";
 
-  const result = await ScenarioRunner.run(
-    {
-      id: scenario.id,
-      name: scenario.name,
-      description: scenario.situation,
-      setId: context.setId,
-      agents: cast.agents,
-      ...(cast.script ? { script: cast.script } : {}),
-      verbose,
-      // An http target's own spans land in the trace each turn propagates,
-      // so the judge fetches them back from the platform's trace API before
-      // any verdict. The wait budget comes from the prefetcher's per-project
-      // ingest-lag measurement.
-      ...buildRemoteTraceRunConfig({
-        targetType: target.type,
-        traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
-        langwatchEndpoint,
-        langwatchApiKey,
-      }),
-      ...(scenario.maxTurns != null && { maxTurns: scenario.maxTurns }),
-      ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
-      metadata: {
-        langwatch: {
-          targetReferenceId: target.referenceId,
+  // For a voice target, record the effective caller config on the run (AC20,
+  // AC24) and arm the whole-call timer that ends the call at the limit so the
+  // judge still runs on what was said (AC28).
+  const { voiceMetadata, callLimitTimer } = buildVoiceRunSetup({
+    jobData,
+    adapter,
+  });
+
+  // The timer must clear on a rejected run too, or it stays armed and can
+  // fire after this process has moved on to reporting the failure.
+  let result: Awaited<ReturnType<typeof ScenarioRunner.run>>;
+  try {
+    result = await ScenarioRunner.run(
+      {
+        id: scenario.id,
+        name: scenario.name,
+        description: scenario.situation,
+        setId: context.setId,
+        agents: cast.agents,
+        ...(cast.script ? { script: cast.script } : {}),
+        verbose,
+        // An http target's own spans land in the trace each turn propagates,
+        // so the judge fetches them back from the platform's trace API before
+        // any verdict. The wait budget comes from the prefetcher's per-project
+        // ingest-lag measurement.
+        ...buildRemoteTraceRunConfig({
           targetType: target.type,
+          traceWaitTimeoutMs: jobData.traceWaitTimeoutMs,
+          langwatchEndpoint,
+          langwatchApiKey,
+        }),
+        ...buildMaxTurnsRunConfig({
+          jobData,
+          scenarioMaxTurns: scenario.maxTurns,
+        }),
+        ...(scenario.minTurns != null && { minTurns: scenario.minTurns }),
+        metadata: {
+          langwatch: {
+            targetReferenceId: target.referenceId,
+            targetType: target.type,
+            ...voiceMetadata,
+          },
+          ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
         },
-        ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
       },
-    },
-    {
-      batchRunId: context.batchRunId,
-      runId: jobData.scenarioRunId,
-      langwatch: {
-        endpoint: langwatchEndpoint,
-        apiKey: langwatchApiKey,
+      {
+        batchRunId: context.batchRunId,
+        runId: jobData.scenarioRunId,
+        langwatch: {
+          endpoint: langwatchEndpoint,
+          apiKey: langwatchApiKey,
+        },
       },
-    },
-  );
+    );
+  } finally {
+    callLimitTimer?.clear();
+  }
 
   // A failed test is still a successful execution — results are reported via SDK.
   if (result.success) {
@@ -200,25 +321,7 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
 
   // Output JSON result to stdout for parent process to parse
   // Only stdout contains the JSON result; all other output goes to stderr
-  const outputResult: {
-    success: boolean;
-    reasoning?: string;
-    error?: string;
-    agentInstance?: { hostname: string; label: string | null };
-  } = {
-    success: result.success,
-  };
-  if (result.reasoning) {
-    outputResult.reasoning = result.reasoning;
-  }
-  // The connected agent instance that answered the run's turns, for the
-  // parent's record of which process served the run.
-  if (
-    adapter instanceof SerializedConnectedAgentAdapter &&
-    adapter.servedInstance
-  ) {
-    outputResult.agentInstance = adapter.servedInstance;
-  }
+  const outputResult = buildOutputResult({ result, callLimitTimer, adapter });
   // The result line is the last thing the child says. Exit once it is
   // written rather than wait for the event loop to drain: the run's adapters
   // and the SDK can leave handles open after the run, and a child that stays
@@ -226,6 +329,33 @@ async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   process.stdout.write(JSON.stringify(outputResult) + "\n", () => {
     process.exit(0);
   });
+}
+
+/**
+ * The `maxTurns` override to pass to `ScenarioRunner.run`, if any.
+ *
+ * An agent-first run (agent-first-script.ts) spends its first turn on the
+ * greeting and the caller's opening reply — a turn the judge is never asked
+ * about — so it needs one more turn than usual to keep the same judged-turn
+ * budget as every other run. Only the non-scripted (judge-driven) cast pays
+ * that cost: an agent test's script ends in `succeed()` and never consults
+ * `maxTurns` at all.
+ */
+function buildMaxTurnsRunConfig({
+  jobData,
+  scenarioMaxTurns,
+}: {
+  jobData: ChildProcessJobData;
+  scenarioMaxTurns: number | null | undefined;
+}): { maxTurns?: number } {
+  const bumpForGreeting =
+    !jobData.script && agentGreetsFirst(jobData.adapterData);
+  if (scenarioMaxTurns == null && !bumpForGreeting) return {};
+  return {
+    maxTurns:
+      (scenarioMaxTurns ?? ScenarioRunner.DEFAULT_MAX_TURNS) +
+      (bumpForGreeting ? 1 : 0),
+  };
 }
 
 /**
@@ -249,7 +379,11 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return buildAgentTestRun({ adapter, script: jobData.script });
+    return buildAgentTestRun({
+      adapter,
+      script: jobData.script,
+      doesAgentGreetFirst: agentGreetsFirst(jobData.adapterData),
+    });
   }
   const { nlpServiceUrl, scenario } = jobData;
   const roleModelParams = selectRoleModelParams(jobData);
@@ -261,15 +395,38 @@ function buildRunCast({
     litellmParams: roleModelParams.judge,
     nlpServiceUrl,
   });
+
+  // A voice target's user simulator speaks: the scenario's caller voice, its
+  // interrupt probability and audio effects ride on the simulator so the caller
+  // turns are voiced. The judge and adapter are unchanged from a text run.
+  const voiceSimConfig =
+    jobData.target.type === "voice"
+      ? buildCallerVoiceSimulatorConfig(
+          jobData.callerVoice ?? DEFAULT_CALLER_VOICE,
+        )
+      : null;
+
+  // An inbound phone agent that greets on connect opens the run with its own
+  // turn (so the greeting is captured first), then hands over to the
+  // simulator/judge loop; every other run keeps the default cast, which opens
+  // with the caller.
+  const agentGreetsFirstScript = buildAgentGreetsFirstScript(
+    jobData.adapterData,
+  );
+
   return {
     agents: [
       adapter,
-      ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+      ScenarioRunner.userSimulatorAgent({
+        model: simulatorModel,
+        ...(voiceSimConfig ?? {}),
+      }),
       ScenarioRunner.judgeAgent({
         criteria: scenario.criteria,
         model: judgeModel,
       }),
     ],
+    ...(agentGreetsFirstScript ? { script: agentGreetsFirstScript } : {}),
   };
 }
 

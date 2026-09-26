@@ -739,7 +739,7 @@ The UI calls the two surfaces **Agent Testing > Scenarios** (the test suites and
 
 ### The flow
 
-Steps 2 and 4 are questions **for the user**. Ask, wait for the answer, and do not guess.
+Steps 2 and 4 are questions **for the user**. Ask them in the same reply that reports the created scenario (its name, its id and, when the target rule below gives you one, the proposed target), so one answer starts the run. Wait for the answer and do not guess.
 
 #### 1. Create the scenario
 
@@ -758,6 +758,7 @@ langwatch scenario create "Angry refund request" \
 - Returns `{ id, name, situation, criteria, labels, platformUrl }`. Keep the `id`.
 - `langwatch scenario update <id>` **replaces** `--criteria` / `--labels` wholesale rather than merging. Pass the complete list you want to end up with.
 - `--field identifier=value` gives the scenario's value for a field its test suite declares (see [Fields and evaluators](#fields-and-evaluators-on-a-test-suite)). It repeats, and on `update` the flags together replace the values the scenario holds. A number field reads a number, a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does.
+- When the scenario reproduces a trace or a conversation the user pasted, `--situation` names the identifiers the run needs, the colleague, the order, the ticket, the account, as invented test data rather than the customer's. A situation that leaves a role unnamed ("a colleague") lets the simulated user make an address up, a different one on every run, and the run stops being reproducible. A `[REDACTED]` value is the same case: invent a stand-in instead of asking for the original. An identifier the agent looks up needs a record it can find, so read the agent's fixtures or test data first and add the record in the same change when it is missing; a lookup that always misses proves the miss rather than the behaviour under test. Run parameters still travel in `--param`, never in the situation.
 
 #### 2. ASK: run this one scenario, or the whole test suite?
 
@@ -806,7 +807,7 @@ One agent name with two environments is two rows, and they compare the same way:
 
 Show the names (with each agent's type) and let the user choose (**multiple choice**). Every scenario in the run executes against each target, so two targets double the conversations.
 
-Never invent a target and never quietly default to the first row.
+Never invent a target and never quietly default to the first row. When the scenario reproduces a trace and that trace's agent is connected and online, name it as the proposed target in the same reply that reports the created scenario; the user still confirms.
 
 #### 5. Run one scenario
 
@@ -821,7 +822,7 @@ langwatch scenario run <scenarioId> --target connected:support-agent@development
 Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, `http`, `code`, `workflow`.
 
 - For `connected`, `http`, `code` and `workflow` the `referenceId` is the **Agent id** from `agent list`, and the type must match that agent's own `type`. `http:` is **never a URL**: the URL, method and headers live in the agent's config. A `workflow:` target is likewise the Agent id.
-- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row.
+- A `connected` target also takes `<name>@<environment>`, which reads better in a script than an id: `connected:support-agent@production`. Both forms name the same row. A name with a space is quoted whole: `--target "connected:ACME checkout"`.
 - For `prompt` the `referenceId` is the prompt's **`id`** from `prompt list --format json`, not its handle and not its name.
 - `--target` repeats, once per target.
 - The run goes under the run plan named after the scenario and the target, and `--name "<text>"` names the plan yourself. The plan stays, so the same check runs again later with `langwatch run-plan run --name "<text>" …` or from the Results tab.
@@ -834,7 +835,7 @@ Targets are written `<type>:<referenceId>`. Valid types: `prompt`, `connected`, 
 #### 6. Run a test suite
 
 ```bash
-langwatch test-suite run <testSuiteId|name> --target http:<agentId> --format json
+langwatch test-suite run "<testSuiteId|name>" --target http:<agentId> --format json
 
 langwatch test-suite run "Refund regression" \
   --target http:<agentId> --target prompt:<promptId> \

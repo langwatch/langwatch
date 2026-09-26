@@ -1,10 +1,10 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { type AuthzPermission, permissionGrantTiers } from "@langwatch/authz";
 import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
@@ -130,24 +130,24 @@ export class RoleService {
     };
   }
 
-  /**
-   * A role is in use when anything still references it: the legacy
-   * `TeamUser.assignedRoleId` rows AND RoleBinding rows. Counting only the
-   * legacy side let a bound role reach the storage layer, where the delete
-   * died as an unnamed constraint failure instead of this refusal.
-   */
+  /** A role is in use when an active grant still references it. */
   private async assertRoleNotInUse(role: {
     id: string;
     organizationId: string;
-    assignedUsers: unknown[];
   }) {
-    const bindingCount = await this.repository.countRoleBindings({
-      roleId: role.id,
-      organizationId: role.organizationId,
-    });
-    if (role.assignedUsers.length > 0 || bindingCount > 0) {
+    const [userCount, bindingCount] = await Promise.all([
+      this.repository.countUserBindings({
+        roleId: role.id,
+        organizationId: role.organizationId,
+      }),
+      this.repository.countRoleBindings({
+        roleId: role.id,
+        organizationId: role.organizationId,
+      }),
+    ]);
+    if (bindingCount > 0) {
       throw new RoleInUseError({
-        userCount: role.assignedUsers.length,
+        userCount,
         bindingCount,
       });
     }
@@ -197,7 +197,7 @@ export class RoleService {
 
     const [stillPresent, userCount, bindingCount] = await Promise.all([
       this.repository.findCustomByIdInOrg({ roleId, organizationId }),
-      this.repository.countAssignedUsers(roleId),
+      this.repository.countUserBindings({ roleId, organizationId }),
       this.repository.countRoleBindings({ roleId, organizationId }),
     ]);
     if (!stillPresent) {
@@ -207,8 +207,8 @@ export class RoleService {
   }
 
   /**
-   * Org-scoped delete, keeping the RoleBinding-aware in-use check: deleting
-   * a role that anything still references would leave those grants dangling.
+   * Org-scoped delete, keeping the active Grant in-use check: deleting a role
+   * that anything still references would leave those grants dangling.
    */
   async deleteRoleForOrg({
     roleId,
@@ -219,7 +219,7 @@ export class RoleService {
     organizationId: string;
     actor: LedgerActor;
   }) {
-    const role = await this.repository.findByIdWithUsersInOrg({
+    const role = await this.repository.findCustomByIdInOrg({
       roleId,
       organizationId,
     });
@@ -294,7 +294,7 @@ export class RoleService {
   }
 
   async deleteRole({ roleId, actor }: { roleId: string; actor: LedgerActor }) {
-    const role = await this.repository.findByIdWithUsers(roleId);
+    const role = await this.repository.findById(roleId);
 
     if (!role || role.kind !== CUSTOM_ROLE_KIND.CUSTOM) {
       throw new RoleNotFoundError(roleId);
@@ -372,10 +372,6 @@ export class RoleService {
     });
     await this.repository.removeFromUser({ userId, teamId, actor });
     return { success: true };
-  }
-
-  async getRoleWithUsers(roleId: string) {
-    return this.repository.findByIdWithUsers(roleId);
   }
 
   async getTeamMembersWithUsers({
@@ -470,7 +466,9 @@ export class RoleService {
     for (const binding of belowOrgScope) {
       const permissions = permissionsByRoleId.get(binding.customRoleId) ?? [];
       const orgExclusive = permissions.find((permission) =>
-        isOrgExclusivePermission(permission as Permission),
+        permissionGrantTiers(permission as AuthzPermission).every(
+          (tier) => tier === "organization",
+        ),
       );
       if (orgExclusive) {
         throw new OrgExclusivePermissionScopeError(

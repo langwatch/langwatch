@@ -97,6 +97,18 @@ type CallExtra = Record<string, string | number>;
 const noopFoldStore = { store: async () => {}, get: async () => null };
 const noopAppendStore = { append: async () => {}, bulkAppend: async () => {} };
 
+/**
+ * Every span in this file carries an ordinary start and end time, so a map
+ * projection returning `null` means the storable-time gate refused the fixture
+ * — a broken fixture, not a cost disagreement.
+ */
+function mapped<Record>(record: Record | null): Record {
+  if (record === null) {
+    throw new Error("expected the span to map to a record");
+  }
+  return record;
+}
+
 /** The trace header, and the trace list's cost column. */
 function traceSummaryCost(extra: CallExtra = {}): number | null {
   return new TraceSummaryFoldProjection({
@@ -118,16 +130,20 @@ function traceAnalyticsCost(extra: CallExtra = {}): number | null {
 
 /** The per-minute rollup the analytics graphs read by default. */
 function analyticsRollupCost(extra: CallExtra = {}): number {
-  return new TraceAnalyticsRollupMapProjection({
-    store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent(extra)).costSum;
+  return mapped(
+    new TraceAnalyticsRollupMapProjection({
+      store: noopAppendStore as never,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  ).costSum;
 }
 
 /** `stored_spans.Cost`: the waterfall's per-span figure, and the CSV export's. */
 function storedSpanCost(extra: CallExtra = {}): number | null {
-  return new SpanStorageMapProjection({
-    store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent(extra)).cost;
+  return mapped(
+    new SpanStorageMapProjection({
+      store: noopAppendStore as never,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  ).cost;
 }
 
 /**
@@ -136,9 +152,11 @@ function storedSpanCost(extra: CallExtra = {}): number | null {
  * built from the normalized span rather than from the raw wire values.
  */
 function recomputedSummaryRowCost(extra: CallExtra = {}): number | null {
-  const attrs = new SpanStorageMapProjection({
-    store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent(extra)).spanAttributes;
+  const attrs = mapped(
+    new SpanStorageMapProjection({
+      store: noopAppendStore as never,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  ).spanAttributes;
   const attr = (key: string): string => String(attrs[key] ?? "");
 
   return mapSpanSummaryRow({
@@ -183,9 +201,11 @@ function recomputedSummaryRowCost(extra: CallExtra = {}): number | null {
  * entry, and the entries accumulate.
  */
 function terminalFooterCost(extra: CallExtra = {}): number {
-  const stored = new SpanStorageMapProjection({
-    store: noopAppendStore as never,
-  }).mapTraceSpanReceived(claudeCallEvent(extra));
+  const stored = mapped(
+    new SpanStorageMapProjection({
+      store: noopAppendStore as never,
+    }).mapTraceSpanReceived(claudeCallEvent(extra)),
+  );
   const span = mapNormalizedSpanToSpan(stored);
 
   const detail = {

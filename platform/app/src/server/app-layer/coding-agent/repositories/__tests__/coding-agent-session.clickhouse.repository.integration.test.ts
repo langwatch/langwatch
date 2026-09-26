@@ -69,6 +69,7 @@ function sessionRow(
     gitWorktree: "widgets-feat",
     title: "Add git context to the session row",
     titleSource: "",
+    auxiliary: false,
     modelCalls: 3,
     toolCalls: 5,
     subAgents: 1,
@@ -94,6 +95,30 @@ function sessionRow(
     cacheCreationTokens: 10,
     costUsd: 1.25,
     agentReportedCostUsd: 0,
+    usageByContext: [
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "main",
+        inputTokens: 40,
+        outputTokens: 20,
+        cacheReadTokens: 4_000_000_000,
+        cacheCreationTokens: 4,
+        costUsd: 0.5,
+      },
+      {
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "widgets",
+        branch: "feat/session-git-context",
+        inputTokens: 60,
+        outputTokens: 30,
+        cacheReadTokens: 5_000_000_000,
+        cacheCreationTokens: 6,
+        costUsd: 0.75,
+      },
+    ],
     modelCallMs: 5000,
     toolMs: 1234,
     ttftMsTotal: 300,
@@ -530,6 +555,51 @@ describe("coding_agent_sessions round-trip (migrations 00051-00054)", () => {
     expect(read!.gitBranches).toEqual([]);
     expect(read!.gitBranch).toBe("feat/one");
   });
+
+  /** @scenario The per-context usage round-trips through the session row */
+  it("writes what the session spent under each context and reads it back", async () => {
+    const row = sessionRow({ sessionId: `${tag}-usage-by-context` });
+    await sessions.upsert(row, 30);
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId: `${tag}-usage-by-context`,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual(row.usageByContext);
+  });
+
+  /** @scenario A session row from before the per-context usage column decodes with none */
+  it("decodes a row written before the per-context usage column with no record", async () => {
+    const sessionId = `${tag}-pre-usage-by-context`;
+    // A writer from before migration 00097 emits a JSONEachRow body with no
+    // UsageByContext field, so ClickHouse supplies the column's DEFAULT [].
+    await ch.insert({
+      table: "coding_agent_sessions",
+      values: [
+        {
+          TenantId: tenantId,
+          SessionId: sessionId,
+          StartedAt: new Date(baseMs),
+          Version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+          InputTokens: "100",
+        },
+      ],
+      format: "JSONEachRow",
+    });
+
+    const read = await sessions.findBySessionId({
+      tenantId,
+      sessionId,
+      window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
+    });
+
+    expect(read).not.toBeNull();
+    expect(read!.usageByContext).toEqual([]);
+    expect(read!.inputTokens).toBe(100);
+  });
 });
 
 describe("coding_agent_sessions by repository branch", () => {
@@ -568,6 +638,11 @@ describe("coding_agent_sessions by repository branch", () => {
     // the detail names it by.
     expect(found!.gitBranch).toBe("feat/second");
     expect(found!.title).toBe("Ship both branches");
+    // And the per-context record the split reads, selected with the row.
+    expect(found!.usageByContext.map((usage) => usage.branch)).toEqual([
+      "main",
+      "feat/session-git-context",
+    ]);
     // The whole set comes back too, which is what attribution runs the tenure
     // rule over: matched on a branch it left, the row would otherwise reach the
     // rollup knowing only a branch that pull request never had.
@@ -808,5 +883,147 @@ describe("session_metric_series converged totals (migration 00052)", () => {
       (t) => t.metricName === "claude_code.cost.usage",
     );
     expect(costAfterCorrection?.total).toBeCloseTo(1.1);
+  });
+  describe("codex helper threads", () => {
+    const window = { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 };
+    const listedIds = async () =>
+      (
+        await sessions.findManyRecent({
+          tenantId,
+          fromMs: window.fromMs,
+          toMs: window.toMs,
+          limit: 50,
+        })
+      ).map((row) => row.sessionId);
+
+    /** @scenario "An auxiliary session is not listed" */
+    it("lists the codex session and not the helper that titled it", async () => {
+      const user = `${tag}-codex-user`;
+      const helper = `${tag}-codex-title-helper`;
+      await sessions.upsert(
+        sessionRow({
+          sessionId: user,
+          agent: "codex",
+          title: "Reply hello",
+          titleSource: "name",
+          models: ["gpt-5.6-sol"],
+        }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: helper,
+          agent: "codex",
+          title: "",
+          titleSource: "",
+          models: ["gpt-5.6-luna"],
+          auxiliary: true,
+          startedAtMs: baseMs + 1_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(user);
+      expect(ids).not.toContain(helper);
+
+      // The helper keeps its row: a session read by id still answers.
+      const read = await sessions.findBySessionId({
+        tenantId,
+        sessionId: helper,
+        window,
+      });
+      expect(read?.auxiliary).toBe(true);
+    });
+
+    /** @scenario "A second session started seconds later is listed on its own" */
+    it("lists two user sessions started seconds apart", async () => {
+      const first = `${tag}-codex-first`;
+      const second = `${tag}-codex-second`;
+      await sessions.upsert(
+        sessionRow({ sessionId: first, agent: "codex", startedAtMs: baseMs }),
+        30,
+      );
+      await sessions.upsert(
+        sessionRow({
+          sessionId: second,
+          agent: "codex",
+          startedAtMs: baseMs + 3_000,
+        }),
+        30,
+      );
+
+      const ids = await listedIds();
+      expect(ids).toContain(first);
+      expect(ids).toContain(second);
+    });
+
+    /** @scenario "A session marked auxiliary after it was first stored drops out of the list" */
+    it("drops a session once a later version marks it auxiliary", async () => {
+      const sessionId = `${tag}-codex-marked-late`;
+      // The helper's log events fold before its stamped turn span arrives, so
+      // the first stored version is unmarked.
+      const unmarked = sessionRow({
+        sessionId,
+        agent: "codex",
+        modelCalls: 0,
+        auxiliary: false,
+      });
+      await sessions.upsert(unmarked, 30);
+      expect(await listedIds()).toContain(sessionId);
+
+      await sessions.upsert(
+        {
+          ...unmarked,
+          modelCalls: 1,
+          auxiliary: true,
+          lastEventOccurredAt: baseMs + 40,
+        },
+        30,
+      );
+      expect(await listedIds()).not.toContain(sessionId);
+    });
+
+    /** @scenario "A run of helper threads does not shorten the list" */
+    it("fills the page with visible sessions when helpers are the most recent", async () => {
+      // Its own window, so only these rows answer: the page is the assertion.
+      const pageWindow = { fromMs: baseMs + 15_000, toMs: baseMs + 30_000 };
+      const limit = 3;
+      const visible = [0, 1, 2].map((i) => `${tag}-codex-page-user-${i}`);
+      const helpers = [0, 1, 2, 3].map((i) => `${tag}-codex-page-helper-${i}`);
+
+      for (const [i, sessionId] of visible.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            startedAtMs: baseMs + 20_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+      // Started after every visible session, so an unfiltered page of
+      // `limit * LIST_READ_DEDUP_OVERFETCH` rows is mostly helper threads.
+      for (const [i, sessionId] of helpers.entries()) {
+        await sessions.upsert(
+          sessionRow({
+            sessionId,
+            agent: "codex",
+            auxiliary: true,
+            startedAtMs: baseMs + 25_000 + i * 1_000,
+          }),
+          30,
+        );
+      }
+
+      const page = await sessions.findManyRecent({
+        tenantId,
+        fromMs: pageWindow.fromMs,
+        toMs: pageWindow.toMs,
+        limit,
+      });
+
+      expect(page.map((row) => row.sessionId).sort()).toEqual(visible.sort());
+    });
   });
 });

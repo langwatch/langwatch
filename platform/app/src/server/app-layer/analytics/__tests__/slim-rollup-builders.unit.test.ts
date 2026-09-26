@@ -169,6 +169,40 @@ describe("buildSlimTimeseriesQuery", () => {
     expect(sql).toContain("quantileExact(0.95)(ta.TotalDurationMs)");
   });
 
+  describe("when the query leaves out trace origins", () => {
+    /** @scenario Leaving out an origin keeps the rest of the count intact */
+    it("adds a NOT IN on the origin column after the filters", () => {
+      const { sql, params } = buildSlimTimeseriesQuery({
+        projectId: "tenant-slim",
+        ...baseDates,
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        timeScale: "full",
+        filters: { "metadata.user_id": ["alice"] },
+        excludeOrigins: ["langy"],
+      });
+
+      expect(sql).toContain(
+        "ta.Origin NOT IN ({slim_excludeOrigins:Array(String)})",
+      );
+      expect(params.slim_excludeOrigins).toEqual(["langy"]);
+      expect(sql.indexOf("ta.UserId IN")).toBeLessThan(
+        sql.indexOf("ta.Origin NOT IN"),
+      );
+    });
+
+    it("adds nothing when the exclusion is empty", () => {
+      const { sql } = buildSlimTimeseriesQuery({
+        projectId: "tenant-slim",
+        ...baseDates,
+        series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+        timeScale: "full",
+        excludeOrigins: [],
+      });
+
+      expect(sql).not.toContain("ta.Origin NOT IN");
+    });
+  });
+
   describe("when grouped by metadata.model", () => {
     // Model group-bys need per-SPAN attribution (the legacy builder's
     // span-model partition join) so buckets sum exactly to the ungrouped

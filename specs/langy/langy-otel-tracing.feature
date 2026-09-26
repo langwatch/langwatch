@@ -274,6 +274,16 @@ Feature: Langy agent activity is traced into the user's project
     And the model call the gateway served for the turn appears inside that trace
     And no separate gateway-origin trace duplicates the turn's model call
 
+  # The gateway's span is the first piece of a turn to reach the project: the
+  # worker spans and the langy.turn root land when the turn ends. A trace
+  # that folds as the gateway's first marks a fresh project as integrated
+  # before the root can rank it as Langy's.
+  @unit
+  Scenario: A Langy turn's model call is Langy's from its first span
+    When the gateway serves a model call for a Langy turn
+    Then the span it records in my project names Langy as its origin
+    And the trace reads as Langy's before the turn's other spans arrive
+
   @unit
   Scenario: Gateway traffic outside a Langy turn keeps its own trace
     Given I call the AI gateway directly with my own key, outside any Langy turn

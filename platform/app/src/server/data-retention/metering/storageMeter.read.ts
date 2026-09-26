@@ -1,6 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 

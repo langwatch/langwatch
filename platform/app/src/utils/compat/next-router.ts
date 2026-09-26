@@ -29,6 +29,7 @@ const ROUTE_PATTERNS = [
   "/auth/signin",
   "/auth/signup",
   "/auth/error",
+  "/auth/sso-test-complete",
   "/admin",
   "/authorize",
   "/invite/accept",
@@ -76,6 +77,10 @@ const ROUTE_PATTERNS = [
   "/governance/people",
   "/governance/costs",
   "/governance/billed",
+  "/governance/insights",
+  "/governance/analytics",
+  "/governance/signals",
+  "/governance/agents",
   // Retired addresses — kept so each redirect route resolves to a known
   // pattern while it forwards to its new home (inventory / people).
   "/governance/catalog/:id",

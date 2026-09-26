@@ -254,6 +254,27 @@ spec:
             - name: secrets
               mountPath: /mnt/secrets
               readOnly: true
+            {{- if .Values.lwqlAccess.secretName }}
+            # LangWatchQL access model — mounted unconditionally on EVERY pod, on
+            # its own value (not extraVolumeMounts, which an operator's list could
+            # replace). Nested single-file subPath mounts, so they coexist with
+            # the files ch-config renders into users.d / config.d at startup.
+            - name: lwql-access
+              mountPath: /etc/clickhouse-server/users.d/lwql-access.yaml
+              subPath: lwql-access.yaml
+              readOnly: true
+            - name: lwql-access
+              mountPath: /etc/clickhouse-server/config.d/lwql-named-collection.yaml
+              subPath: lwql-named-collection.yaml
+              readOnly: true
+            {{- end }}
+            {{- /* Generic passthrough for operator-supplied mounts (e.g. an
+                   umbrella chart delivering extra server config into config.d /
+                   users.d). tpl-rendered so values may reference .Release.Name.
+                   Nothing here is specific to any one consumer. */}}
+            {{- with .Values.extraVolumeMounts }}
+            {{- tpl (toYaml .) $ | nindent 12 }}
+            {{- end }}
 
       volumes:
         - name: config-d
@@ -282,6 +303,21 @@ spec:
               - key: {{ include "clickhouse-serverless.clusterSecretKey" . }}
                 path: cluster-secret
               {{- end }}
+        {{- if .Values.lwqlAccess.secretName }}
+        # LWQL access Secret (see volumeMounts above). optional:false: on a first
+        # install the render Job has not written it yet, so the pod waits in
+        # ContainerCreating rather than booting with no access model — the
+        # required-mount retry the install race relies on. tpl-rendered so the
+        # umbrella can pass a helper-derived name.
+        - name: lwql-access
+          secret:
+            secretName: {{ tpl .Values.lwqlAccess.secretName $ }}
+            optional: false
+        {{- end }}
+        {{- /* Generic passthrough (see extraVolumeMounts above). */}}
+        {{- with .Values.extraVolumes }}
+        {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
 
   volumeClaimTemplates:
     - metadata:

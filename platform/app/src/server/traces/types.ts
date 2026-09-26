@@ -60,6 +60,23 @@ export interface GetAllTracesForProjectOptions {
    * Opaque to callers — produced by `compileProjection`.
    */
   projection?: ProjectionPlan;
+  /**
+   * One more WHERE condition over the `ts` alias of `trace_summaries`, already
+   * parameterized — what `translateFilterToClickHouse` returns for a trace
+   * filter string.
+   *
+   * AND-ed with the legacy `filters` map, the free-text `query` and the
+   * explicit `traceIds`, so a caller can narrow with the filter language
+   * without giving up anything it was already sending.
+   *
+   * Compiled SQL rather than the filter string, and deliberately: the string is
+   * a query language with a parser, a semantic check and a field registry, and
+   * translating it here would put all three behind a datastore boundary where a
+   * rejection can only surface as a 500. The REST boundary translates and turns
+   * a refusal into a 422 naming the field; this layer receives a condition it
+   * can only append.
+   */
+  filterWhere?: { sql: string; params: Record<string, unknown> };
 }
 
 /**

@@ -23,6 +23,7 @@ import { updateLangwatchClaudePlugin } from "./claude-plugin";
 import { getCliBootstrap } from "./cli-api";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import type { GovernanceConfig } from "./config";
+import { recordCliLocation } from "./cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "./config";
 import {
 	copilotGatewayModelPreflight,
@@ -35,6 +36,12 @@ import {
 	SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
+import {
+	aliasShellFor,
+	infoRunKind,
+	runInfoRun,
+	toolNotFoundMessage,
+} from "./wrapper-info-run";
 import { resolveWrapperMode } from "./wrapper-mode";
 import {
 	parseProjectScopeFlags,
@@ -347,6 +354,16 @@ export async function withTelemetrySetupSpinner<T>({
  * code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
+	// A help or version run starts no session: it goes to the tool before
+	// anything below reads the config, signs in, mints a key or writes wiring.
+	const infoRun = infoRunKind(args);
+	if (infoRun) return runInfoRun({ tool, args, kind: infoRun });
+
+	// Before the config is read, so every save below carries it. The Claude
+	// Code plugin's hooks run the CLI through this record when PATH cannot
+	// resolve it, which is the case for a Claude Code started from a desktop
+	// app.
+	recordCliLocation();
 	let cfg = loadConfig();
 	if (!isLoggedIn(cfg)) {
 		if (!shouldAutoLogin()) {
@@ -712,14 +729,9 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// so a user's rc can't clobber the gateway / OTLP wiring. Args ride
 	// positional params ("$@") and are never re-quoted. `tool` is whitelisted
 	// (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
-	const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
-	const aliasShell =
-		process.platform !== "win32" &&
-		(shellName === "zsh" || shellName === "bash")
-			? process.env.SHELL!
-			: null;
+	const aliasShell = aliasShellFor();
 
-	const notFoundMessage = `${tool} not found in PATH - install it first (https://docs.langwatch.ai/ai-gateway/governance/admin-setup#cli-device-flow-rest-api)`;
+	const notFoundMessage = toolNotFoundMessage(tool);
 
 	// Stamp the session start so the codex rollout harvest only reads rollout
 	// files this run produced (codex names them by start time + mtime).

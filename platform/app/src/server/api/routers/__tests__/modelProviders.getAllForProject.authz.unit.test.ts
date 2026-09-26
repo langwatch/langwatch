@@ -6,8 +6,11 @@ import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
 import { modelProviderRouter } from "../modelProviders";
 
+// Reapply this suite's repository mock when the unit pool reuses modules.
+vi.hoisted(() => vi.resetModules());
+
 // ---------------------------------------------------------------------------
-// This suite runs the REAL rbac middleware (no rbac mock): tenancy denial
+// This suite runs the real authz middleware: tenancy denial
 // must come from `checkProjectPermission("project:view")` itself, not from
 // a mocked stand-in. Only the prisma query boundary is simulated, with an
 // in-memory fixture filtered the same way the real where-clauses select.
@@ -87,7 +90,7 @@ const roleBindings = [
 function fixturePrisma(): PrismaClient {
   return {
     project: {
-      // Serves both the rbac lookup (selects `team`) and, for the
+      // Serves both the authz lookup (selects `team`) and, for the
       // authorized control, the service's full-row fetch (`createdAt`).
       findUnique: vi.fn(({ where }: any) => {
         const project = projects[where.id];
@@ -113,26 +116,40 @@ function fixturePrisma(): PrismaClient {
     groupMembership: {
       findMany: vi.fn(() => Promise.resolve([])),
     },
-    roleBinding: {
-      findMany: vi.fn(({ where }: any) =>
-        Promise.resolve(
-          roleBindings.filter(
-            (b) =>
-              b.organizationId === where.organizationId &&
-              where.scopeId.in.includes(b.scopeId) &&
-              // Mirrors the direct-binding predicate: the bound user must
-              // currently be a member of the queried organization.
-              where.OR.some(
-                (clause: any) =>
-                  clause.userId === b.userId &&
-                  organizationUsers.some(
-                    (m) =>
-                      m.userId === b.userId &&
-                      m.organizationId === where.organizationId,
-                  ),
-              ),
+    grant: {
+      findMany: vi.fn(
+        ({
+          where,
+        }: {
+          where: { organizationId: string; principalId: string };
+        }) =>
+          Promise.resolve(
+            roleBindings
+              .filter(
+                (binding) =>
+                  binding.organizationId === where.organizationId &&
+                  binding.userId === where.principalId,
+              )
+              .map((binding) => ({
+                id: `grant-${binding.userId}-${binding.scopeId}`,
+                organizationId: binding.organizationId,
+                principalType: "USER",
+                principalId: binding.userId,
+                roleKey: binding.role.toLowerCase(),
+                legacyRole: null,
+                source: "grants-service",
+                scopeType: binding.scopeType,
+                scopeId: binding.scopeId,
+                token: null,
+                permission: null,
+                resourceKind: null,
+                projectId: null,
+                createdByUserId: null,
+                expiresAt: null,
+                maxViews: null,
+                occurredAt: new Date("2025-01-01T00:00:00.000Z"),
+              })),
           ),
-        ),
       ),
     },
     teamUser: {
@@ -143,6 +160,11 @@ function fixturePrisma(): PrismaClient {
 
 function callerForUser(userId: string) {
   const ctx = createInnerTRPCContext({
+    // Not a suite about the second-factor gate. Without this the gate runs
+    // inside the permission middleware, reads the scope's owner from a Prisma
+    // double that has only this router's models, and fails there instead of
+    // here — and only where the deployment switches it on.
+    mfaGate: { offered: () => false },
     session: { user: { id: userId }, expires: "1" },
     req: undefined,
     res: undefined,

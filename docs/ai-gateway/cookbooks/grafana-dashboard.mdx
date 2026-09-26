@@ -308,7 +308,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
     {
       "type": "timeseries",
       "title": "Goroutines per pod",
-      "description": "Monotonic climb = goroutine leak. See Production runbook Recipe 2.",
+      "description": "Monotonic climb = goroutine leak. See the AI Gateway troubleshooting page.",
       "datasource": "$datasource",
       "gridPos": { "x": 16, "y": 63, "w": 8, "h": 7 },
       "targets": [{
@@ -325,7 +325,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
     {
       "type": "timeseries",
       "title": "Draining pods",
-      "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see Production runbook Recipe 7).",
+      "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see the AI Gateway troubleshooting page).",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 71, "w": 12, "h": 7 },
       "targets": [{

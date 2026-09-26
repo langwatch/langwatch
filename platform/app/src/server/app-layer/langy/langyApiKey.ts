@@ -1,9 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import {
+  batchProjectPermissions,
+  type Permission,
+} from "~/server/app-layer/authz/permission-adapters";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
 import { langyCandidatePermissions } from "./langyPermissionPolicy";
@@ -140,14 +144,7 @@ export async function revokeLangySessionApiKey({
       id: true,
       name: true,
       revokedAt: true,
-      // The PROJECT-scoped binding the session key is minted with is the
-      // tenant anchor: a match proves this key belongs to the calling turn's
-      // project, not some other tenant's.
-      roleBindings: {
-        where: { scopeType: "PROJECT", scopeId: projectId },
-        select: { id: true },
-        take: 1,
-      },
+      organizationId: true,
     },
   });
   if (!key) return "not_found";
@@ -163,7 +160,18 @@ export async function revokeLangySessionApiKey({
 
   // Tenant scope: the key exists and is a session key, but it is not this
   // project's. Report not-found so a cross-tenant id is never confirmed.
-  if (key.roleBindings.length === 0) {
+  const bindings = await new GrantsAccessListingRepository(
+    prisma,
+  ).findBindingRows({
+    organizationId: key.organizationId,
+    where: {
+      principalType: "API_KEY",
+      principalId: apiKeyId,
+      scopeType: "PROJECT",
+      scopeId: projectId,
+    },
+  });
+  if (bindings.length === 0) {
     logger.warn(
       { apiKeyId, projectId },
       "refusing to revoke a langy session key that is not scoped to this project",

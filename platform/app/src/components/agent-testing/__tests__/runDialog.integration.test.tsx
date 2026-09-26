@@ -161,6 +161,12 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Voice surfaces are flag-gated (release_voice_agents_enabled); this suite is
+// not about that gate, so stub the flag on to keep prior behavior.
+vi.mock("~/components/agents/voice/useVoiceAgentsEnabled", () => ({
+  useVoiceAgentsEnabled: () => true,
+}));
+
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
@@ -185,6 +191,13 @@ const OFFLINE_AGENT = {
   name: "staging-agent",
   type: "http" as const,
   config: {},
+};
+/** A saved voice agent, the only target that offers "Call it myself". */
+const VOICE_AGENT = {
+  id: "agent_voice",
+  name: "support-line",
+  type: "voice" as const,
+  config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
 };
 /** A connected agent whose own function declares two parameters. */
 const CONNECTED_AGENT = {
@@ -994,6 +1007,43 @@ describe("<RunDialog/>", () => {
     expect(run).not.toHaveAttribute("aria-haspopup");
     // The count reads on Run alone: the footer states it nowhere else.
     expect(screen.getAllByText(/2 scenarios/)).toHaveLength(1);
+  });
+
+  // --- The "Call it myself" action ---
+
+  describe("when the target is a voice agent", () => {
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("offers Call it myself when exactly one scenario is in scope", () => {
+      mockAgentsGetAll.mockReturnValue({ data: [VOICE_AGENT] });
+      renderDialog(
+        suiteSubject({
+          scenarioIds: ["case_1"],
+          initialTarget: { type: "voice", id: "agent_voice" },
+        }),
+      );
+
+      expect(
+        screen.getByTestId("run-dialog-call-it-myself"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("hides Call it myself when more than one scenario is in scope", () => {
+      mockAgentsGetAll.mockReturnValue({ data: [VOICE_AGENT] });
+      // A voice target is still selected, so the action would show if it were
+      // gated on the target alone; it is gated on the single scenario the call
+      // is scored under (#8019 AC9), which a two-scenario scope lacks.
+      renderDialog(
+        suiteSubject({
+          scenarioIds: ["case_1", "case_2"],
+          initialTarget: { type: "voice", id: "agent_voice" },
+        }),
+      );
+
+      expect(
+        screen.queryByTestId("run-dialog-call-it-myself"),
+      ).not.toBeInTheDocument();
+    });
   });
 
   /** @scenario "Confirming a run remembers the target for next time" */

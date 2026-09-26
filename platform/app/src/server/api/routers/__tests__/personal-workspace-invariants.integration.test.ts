@@ -49,6 +49,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
+import { hasProjectPermission } from "~/server/app-layer/authz/permission-adapters";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
@@ -61,7 +65,6 @@ import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
-import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
@@ -172,23 +175,19 @@ async function createFixture(): Promise<void> {
   // The owner administers both the organization and the shared team, which
   // is what makes these mutations reach their guards at all: every one of
   // them is behind a permission this user holds.
-  await prisma.roleBinding.create({
-    data: {
-      userId: ownerUserId,
-      organizationId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    userId: ownerUserId,
+    organizationId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
-  await prisma.roleBinding.create({
-    data: {
-      userId: ownerUserId,
-      organizationId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: sharedTeamId,
-    },
+  await seedRoleBinding(prisma, {
+    userId: ownerUserId,
+    organizationId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.TEAM,
+    scopeId: sharedTeamId,
   });
   await prisma.teamUser.create({
     data: {
@@ -247,6 +246,7 @@ async function deleteFixture({
   if (organizationId) {
     await deleteTeamOwnedRows(organizationId);
     await cleanupTestRows(prisma, [
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["organizationUser", { organizationId }],
       ["team", { organizationId }],
@@ -612,7 +612,9 @@ function creatingASecondProjectInThePersonalTeam() {
   // guard removed.
   beforeEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue({
           ...FREE_PLAN,
@@ -819,14 +821,12 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     // Admin of the team the organization shares, which is the binding the
     // downgrade is supposed to correct. The fixture owner is an admin of it too,
     // so correcting this one does not strand the team without an admin.
-    await prisma.roleBinding.create({
-      data: {
-        userId: seatUserId,
-        organizationId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: sharedTeamId,
-      },
+    await seedRoleBinding(prisma, {
+      userId: seatUserId,
+      organizationId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: sharedTeamId,
     });
 
     const workspace = await workspaceService.ensure({
@@ -849,7 +849,9 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
   // behind, and a mutation that quietly no-opped would satisfy all of them.
   beforeEach(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: vi.fn().mockResolvedValue({
           ...FREE_PLAN,
@@ -880,6 +882,17 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     await prisma.organizationUser.update({
       where: { userId_organizationId: { userId: seatUserId, organizationId } },
       data: { role: OrganizationUserRole.MEMBER },
+    });
+    await prisma.grant.updateMany({
+      where: {
+        organizationId,
+        principalType: "USER",
+        principalId: seatUserId,
+        scopeType: "TEAM",
+        scopeId: sharedTeamId,
+        revokedAt: null,
+      },
+      data: { roleKey: "admin", legacyRole: TeamUserRole.ADMIN },
     });
     await prisma.roleBinding.updateMany({
       where: {
@@ -971,6 +984,21 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
     ).resolves.toBe(false);
   });
 
+  /** @scenario Personal context remains usable when its base key is withheld */
+  it("returns personal context with a blank base key when manage is ceilinged", async () => {
+    await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
+
+    const seatCaller = appRouter.createCaller(
+      createInnerTRPCContext(rbacCtxForSeatUser()),
+    );
+    const context = await seatCaller.user.personalContext({
+      organizationId,
+    });
+
+    expect(context.workspace.project.id).toBe(seatPersonalProjectId);
+    expect(context.workspace.project.apiKey).toBe("");
+  });
+
   /** @scenario Giving a Lite Member their full access back restores writing in their own workspace */
   it("lets them write again once they are a member, with nothing to repair", async () => {
     await setSeatUserOrganizationRole(OrganizationUserRole.EXTERNAL);
@@ -1002,16 +1030,23 @@ function movingAMemberWithAPersonalWorkspaceToALiteSeat() {
 
   /** @scenario A personal workspace is not listed among the access an admin manages */
   it("keeps every member's workspace out of the organization-wide list", async () => {
+    // The population first, or the two exclusions below prove nothing: an
+    // empty answer excludes every workspace too, and a fixture that stopped
+    // minting these bindings would read as the guard holding. Both workspaces
+    // hold a binding, and the listing returns a workspace it is meant to.
+    await expect(teamBindingRoles(seatPersonalTeamId)).resolves.toEqual([
+      TeamUserRole.ADMIN,
+    ]);
+    expect(await ownerBindingsOnPersonalTeam()).not.toHaveLength(0);
+
     const bindings = await callerAsOwner().roleBinding.listForOrg({
       organizationId,
     });
+    const scopeIds = bindings.map((binding) => binding.scopeId);
 
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      seatPersonalTeamId,
-    );
-    expect(bindings.map((binding) => binding.scopeId)).not.toContain(
-      personalTeamId,
-    );
+    expect(scopeIds).toContain(sharedTeamId);
+    expect(scopeIds).not.toContain(seatPersonalTeamId);
+    expect(scopeIds).not.toContain(personalTeamId);
   });
 }
 

@@ -92,12 +92,19 @@ export interface DeregisterFrame {
 /** Everything the SDK sends. */
 export type ClientFrame = RegisterFrame | AckFrame | ResultFrame | DeregisterFrame;
 
+/** Who can target the agent: everyone, the owner of the registering key, or the project through this machine. */
+export type RegisteredAgentScope =
+  | { kind: "shared" }
+  | { kind: "owner" }
+  | { kind: "host"; hostLabel: string };
+
 export interface RegisteredAgent {
   name: string;
   environment: string;
   id: string;
   url: string;
   parameterNotes: string[];
+  scope: RegisteredAgentScope;
 }
 
 export interface RegisteredFrame {
@@ -159,6 +166,14 @@ const isMessageList = (value: unknown): value is AgentMessage[] =>
 const isStringList = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(isString);
 
+/** A platform that predates the scope field registers everything as shared. */
+const readScope = (value: unknown): RegisteredAgentScope => {
+  if (!isRecord(value)) return { kind: "shared" };
+  if (value.kind === "owner") return { kind: "owner" };
+  if (value.kind === "host" && isString(value.hostLabel)) return { kind: "host", hostLabel: value.hostLabel };
+  return { kind: "shared" };
+};
+
 const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null => {
   if (!Array.isArray(frame.agents) || !isString(frame.instanceId)) return null;
   const agents: RegisteredAgent[] = [];
@@ -172,6 +187,7 @@ const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null 
       id,
       url: isString(entry.url) ? entry.url : "",
       parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
+      scope: readScope(entry.scope),
     });
   }
   return {

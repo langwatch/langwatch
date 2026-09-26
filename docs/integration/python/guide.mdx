@@ -8,7 +8,7 @@ keywords: LangWatch, Python, SDK, integration, guide, setup, tracing, spans, tra
 import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
 
 <Tip>
-  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/code-prompts#instrument-my-code) into your coding agent and it will set this up for you automatically.
+  **Quick setup?** Instead of following these steps manually, [copy a prompt](/skills/directory) into your coding agent and it will set this up for you automatically.
 </Tip>
 
 <div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
@@ -42,6 +42,15 @@ First, ensure you have the SDK installed:
 ```bash
 pip install langwatch
 ```
+
+The SDK supports Python 3.10 through 3.14.
+
+<Note>
+  On an interpreter outside that range pip does not fail. It installs the
+  newest release that accepts your Python, which can be years old. If
+  `langwatch.setup` is missing after installing, run `pip show langwatch` and
+  compare the version against [PyPI](https://pypi.org/project/langwatch/).
+</Note>
 
 Initialize LangWatch early in your application, typically where you configure services:
 

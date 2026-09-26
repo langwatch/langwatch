@@ -258,6 +258,16 @@ Feature: Media rendering across trace surfaces
     Then the probe answers, matching what the file route already allows
     And a viewer holding neither trace nor scenario access is refused
 
+  @integration
+  Scenario: A probe is refused when the object's own permission is missing
+    Given a viewer who holds datasets:view on the project and nothing else
+    When the viewer probes a stored object kept as trace media
+    Then the probe is refused, naming the permission the object asks for
+    And the same viewer's probe of a dataset attachment answers
+    # The probe describes a read, so it can never be wider than the read. The
+    # first gate accepts any of the three media permissions because the object
+    # is not known yet; the second gate asks for the one its purpose names.
+
   # ===========================================================================
   # URL trust
   # ===========================================================================

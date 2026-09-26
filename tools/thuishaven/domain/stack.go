@@ -89,6 +89,12 @@ type Stack struct {
 	// in to running DLP: nothing is emitted, so .env governs the check — for the
 	// rare case of exercising DLP locally against real credentials.
 	DisableGoogleDLP bool `json:"disableGoogleDlp,omitempty"`
+	// PublicURL is the external origin a tunnel (tailscale serve, cloudflared)
+	// presents to browsers. When set, OverlayEnv carries it in BASE_HOST and
+	// NEXTAUTH_URL instead of the local app URL, so sign-in from the tunnel
+	// origin passes better-auth's trusted-origin check. Every other URL stays
+	// local — only the two better-auth-facing lines change.
+	PublicURL string `json:"publicUrl,omitempty"`
 	// IsBaseline marks this stack as the shared default other worktrees fall back to
 	// for services they do not run themselves (see Service.IsFallback).
 	IsBaseline bool `json:"baseline,omitempty"`

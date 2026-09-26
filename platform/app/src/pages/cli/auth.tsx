@@ -31,6 +31,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz";
 import {
   CheckCircle2,
   CircleAlert,
@@ -48,7 +49,6 @@ import {
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import type { TeamUserRole } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getTeamRolePermissions } from "~/server/api/rbac";
 import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
 import {
   computePermissionsFromSelections,
@@ -101,6 +101,14 @@ type ActionState =
   | { kind: "submitting" }
   | {
       kind: "success";
+      /**
+       * The organization the approval actually went out for, captured before
+       * the request rather than read back off `selectedOrgId`. The picker
+       * stays interactive while the request is in flight, so a selection
+       * changed in that window would otherwise rename the card and re-point
+       * the first-trace watcher at an organization nobody approved.
+       */
+      organizationId: string;
       organizationName: string;
       credentialType: CredentialType;
       projectName?: string;
@@ -460,8 +468,9 @@ export default function CliAuthPage() {
       organizationId: selectedOrgId,
       orgProjects: offeredProjects.map((p) => ({ id: p.id, teamId: p.teamId })),
       isServiceKey: false,
-      getTeamRolePermissions: (role) =>
-        getTeamRolePermissions(role as TeamUserRole),
+      getTeamRolePermissions: (role) => [
+        ...builtinRolePermissions(roleKeyForTeamRole(role as TeamUserRole)),
+      ],
     });
   }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
 
@@ -546,6 +555,7 @@ export default function CliAuthPage() {
 
   const handleApprove = async () => {
     if (!selectedOrgId || !userCode) return;
+    const approvedOrgId = selectedOrgId;
     if (requiresProject && !selectedProjectId) return;
     if (isDeviceSessionSelectionIncomplete) return;
     // Same binding as the render gates, restated on the action itself: the
@@ -559,7 +569,7 @@ export default function CliAuthPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_code: userCode,
-          organization_id: selectedOrgId,
+          organization_id: approvedOrgId,
           ...(requiresProject && selectedProjectId
             ? { project_id: selectedProjectId }
             : {}),
@@ -592,13 +602,14 @@ export default function CliAuthPage() {
         return;
       }
       const orgName =
-        organizations?.find((o) => o.id === selectedOrgId)?.name ??
+        organizations?.find((o) => o.id === approvedOrgId)?.name ??
         "your organization";
       const projectName = requiresProject
         ? offeredProjects.find((p) => p.id === selectedProjectId)?.name
         : undefined;
       setAction({
         kind: "success",
+        organizationId: approvedOrgId,
         organizationName: orgName,
         credentialType,
         projectName,
@@ -1011,7 +1022,7 @@ export default function CliAuthPage() {
                     <strong>{action.organizationName}</strong>. You can close
                     this tab and return to your terminal.
                   </StatusCard>
-                  <FirstTraceRedirect />
+                  <FirstTraceRedirect organizationId={action.organizationId} />
                 </>
               )}
             </>

@@ -52,14 +52,25 @@ func RenderAll(log *zap.Logger, input *config.Input, computed *config.Computed, 
 		{"password", func() error { return renderDefaultPassword(input, usersD) }},
 		{"logging", func() error { return renderLogging(input, configD) }},
 		{"network", func() error { return renderNetwork(computed, configD) }},
-		{"custom_settings", func() error { return renderCustomSettings(configD) }},
+		{"custom-settings-prefixes", func() error { return renderCustomSettingsPrefixes(configD) }},
+		{"access-management", func() error { return renderAccessManagement(usersD) }},
+		{"access-control", func() error { return renderAccessControl(input, configD) }},
 	} {
 		if err := s.fn(); err != nil {
 			return fmt.Errorf("%s: %w", s.name, err)
 		}
 	}
 
-	// Replicated mode: render zookeeper client, macros, and remote_servers.
+	// Replicated mode: zookeeper client, macros and remote_servers for the
+	// ReplicatedMergeTree engine. The server writes NO keeper-backed access or
+	// named-collection store: the app owns the LangWatchQL access model, and on
+	// chart-managed ClickHouse (which this replicated topology is) the chart
+	// DELIVERS it as rendered users.d/config.d files mounted on every pod, not
+	// via SQL DDL — DDL is the bring-your-own path only (issue #8258). Either
+	// way the renderer never has to accept SQL-created entities into a replicated
+	// directory. That deletes the AC8 defect class outright — no
+	// `user_directories` merge hazard, no startup-fatal keeper-backed
+	// named-collection dependency — instead of patching it.
 	if input.Replicated {
 		if err := renderKeeper(input, configD); err != nil {
 			return fmt.Errorf("keeper: %w", err)

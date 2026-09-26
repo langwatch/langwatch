@@ -62,7 +62,7 @@ EOF
 }
 
 run_doctor() {
-  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" run "$DOCTOR" "$@"
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR" "$@"
 }
 
 # @scenario "A fully wired setup passes every check"
@@ -117,7 +117,7 @@ run_doctor() {
   chmod +x "$OUTSIDE_DIR/langwatch"
 
   PATH="$OUTSIDE_DIR:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
-    run "$DOCTOR"
+    LANGY_AGENT_PORT="$AGENT_PORT" run "$DOCTOR"
   rm -rf "$OUTSIDE_DIR"
 
   [ "$status" -ne 0 ]
@@ -161,7 +161,7 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), H).serve_forever()
     sleep 0.1
   done
 
-  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
+  PATH="$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://127.0.0.1:${REJECT_PORT}/v1/models" \
     run "$DOCTOR"
   [ "$status" -eq 0 ]
@@ -180,7 +180,7 @@ cat >/dev/null
 printf '000'
 STUB
   chmod +x "$TEST_DIR/curlstub/curl"
-  PATH="$TEST_DIR/curlstub:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" \
+  PATH="$TEST_DIR/curlstub:$TEST_DIR/inside-bin:$TEST_DIR/bin:$PATH" PORT="$BASE_PORT" LANGY_AGENT_PORT="$AGENT_PORT" \
     LANGY_DOCTOR_OPENAI_URL="http://localhost:${REJECT_PORT}@attacker.example/v1/models" \
     run "$DOCTOR"
   [[ "$output" == *"ignoring non-loopback endpoint override"* ]]

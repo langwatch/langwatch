@@ -82,7 +82,7 @@ function createTRPCLinks() {
 
   // Inner HTTP layer: skipBatch context flag picks unbatched httpLink, else
   // batched httpBatchLink. Same as before.
-  const httpRouting = splitLink({
+  const batchRouting = splitLink({
     condition(op) {
       return op.context.skipBatch === true;
     },
@@ -95,6 +95,34 @@ function createTRPCLinks() {
       maxURLLength: 4000,
       transformer: superjson,
     }),
+  });
+
+  // A write that records an answer somebody gave on their way somewhere else
+  // opts in with `trpc: { context: { keepalive: true } }`.
+  //
+  // The browser cancels every request still in flight when a document goes
+  // away, and the whole point of these writes is that they are sent moments
+  // before one does: "Not now" on a dialog the person then navigates out of,
+  // for instance. Cancelled, the server is never told and the answer is lost,
+  // which the person sees as the dialog coming back over the next page.
+  // `keepalive` is the platform's own answer to that — the same guarantee
+  // `sendBeacon` gives, with a real response and the batching left off so one
+  // answer cannot be held up behind an unrelated call. Bodies are capped at
+  // 64 KB across all keepalive requests in flight, so this is for answers,
+  // never for payloads.
+  const keepaliveRouting = httpLink({
+    url: `${getBaseUrl()}/api/trpc`,
+    transformer: superjson,
+    fetch: (input, init) =>
+      fetch(input, { ...(init as RequestInit), keepalive: true }),
+  });
+
+  const httpRouting = splitLink({
+    condition(op) {
+      return op.context.keepalive === true;
+    },
+    true: keepaliveRouting,
+    false: batchRouting,
   });
 
   // Mid layer: callers opt in to the WS transport per-call by setting

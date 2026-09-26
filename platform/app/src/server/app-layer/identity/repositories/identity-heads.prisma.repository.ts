@@ -25,6 +25,14 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     return user?.userHashKey ?? null;
   }
 
+  async hasFolded({ userId }: { userId: string }): Promise<boolean> {
+    const cursor = await this.prisma.identityProjectionCursor.findUnique({
+      where: { userId },
+      select: { userId: true },
+    });
+    return cursor !== null;
+  }
+
   async findHeads({ userId }: { userId: string }): Promise<IdentityHeads> {
     const rows = await this.prisma.identifier.findMany({ where: { userId } });
     return {

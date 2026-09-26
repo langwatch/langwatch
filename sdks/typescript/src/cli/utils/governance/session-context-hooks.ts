@@ -51,7 +51,8 @@ const OWNED_COMMAND_PREFIX = "langwatch ingest hook";
 /**
  * The guidance hook that injects the declare-your-context text as
  * SessionStart additionalContext, for a claude without plugin support (the
- * plugin carries its own copy). Installed and removed with the session hooks.
+ * plugin's launcher runs the same command). Installed and removed with the
+ * session hooks.
  */
 const GUIDANCE_COMMAND_PREFIX = "langwatch ingest guidance";
 
