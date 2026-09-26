@@ -142,6 +142,30 @@ describe("classifyLangyCanaryOutcome", () => {
     });
   });
 
+  describe("given a run whose turn waits on the user", () => {
+    describe("when the canary runs", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("is healthy and logs the question it asked", async () => {
+        const outcome = await runLangyCanary({
+          startTurn: vi.fn(async () => STARTED),
+          awaitSettlement: vi.fn(async () => ({
+            succeeded: true as const,
+            outcome: "awaiting_user" as const,
+            text: "Which project?",
+            error: null,
+          })),
+          now: () => 0,
+        });
+
+        expect(outcome).toMatchObject({ healthy: true, ...STARTED });
+        expect(logger.info).toHaveBeenCalledWith(
+          expect.objectContaining({ question: "Which project?" }),
+          expect.any(String),
+        );
+      });
+    });
+  });
+
   describe("given no settlement arrived before the budget ran out", () => {
     describe("when the missing settlement is classified", () => {
       /** @scenario "A turn that never settled is timeout" */

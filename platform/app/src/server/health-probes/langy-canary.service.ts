@@ -28,12 +28,13 @@
  * fit inside one request. The monitor's own confirmation retry covers the
  * noise a single LLM turn carries.
  *
- * On a timeout, or a turn waiting on the user, the in-flight turn is left
- * alone: the worker finishes or fails
+ * On a timeout the in-flight turn is left alone: the worker finishes or fails
  * it on its own schedule and the fold records whichever it was. Because that
  * turn outlives the answer, the caller's single-flight slot is held for one
  * further budget rather than released with the response, so a monitor that
  * retries faster than the documented interval cannot stack turns on top of it.
+ * A turn waiting on the user is also left alone, but its slot is released at
+ * once: the check is healthy, and the wait ends on its own expiry.
  *
  * @see specs/langy/langy-health-canary.feature
  */
@@ -183,6 +184,16 @@ export async function runLangyCanary(
       deps.awaitSettlement({ ...started, signal: budget.signal }),
       aborted,
     ]);
+    if (
+      settlement !== null &&
+      "outcome" in settlement &&
+      settlement.outcome === "awaiting_user"
+    ) {
+      logger.info(
+        { ...started, question: settlement.text },
+        "Langy canary turn is waiting on the user",
+      );
+    }
     return {
       ...classifyLangyCanaryOutcome(
         settlement !== null && "aborted" in settlement ? null : settlement,
@@ -221,8 +232,9 @@ export async function runLangyCanary(
  * running. Holding it bounds that to one turn per two budgets per caller.
  * At the documented poll interval the reservation has always lapsed, so a
  * correctly configured monitor never meets it, and a `429` fails its check
- * either way. Every other outcome releases at once — the turn is over, so
- * there is nothing left to protect.
+ * either way. Every other outcome releases at once. For most the turn is over;
+ * a healthy turn left waiting on the user is not, but a healthy check has no
+ * reason to be retried early.
  */
 export function createSingleFlightLangyCanary(
   run: (deps: LangyCanaryDeps) => Promise<LangyCanaryOutcome>,
