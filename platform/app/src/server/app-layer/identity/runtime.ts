@@ -36,7 +36,6 @@ import {
 import { IdentitySsoConnectionGrandfatherMigration } from "@ee/sso/connection-grandfather.migration";
 import { LegacySsoDomainRoutingRepository } from "@ee/sso/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "@ee/sso/legacy-sso-organization.prisma.repository";
-import { microsoftProfileRekey } from "@ee/sso/microsoft-account-rekey";
 import { AdminEmailPlatformOperators } from "@ee/sso/platform-operators";
 import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { PrismaSsoAccountFactsRepository } from "@ee/sso/sso-account-facts.prisma.repository";
@@ -1439,16 +1438,6 @@ export function sessionMinter(): BetterAuthSessionMinter {
 
 /** Request-scoped SSO origin resolution reads the selected connection fresh. */
 let registeredIssuersInstance: RegisteredIssuers | null = null;
-
-/**
- * The Microsoft sign-in step that moves a pre-3.17 Azure AD account onto the
- * key better-auth 1.7 looks it up by (see `@ee/sso/microsoft-account-rekey`).
- */
-export function microsoftAccountRekey(): (
-  profile: Record<string, unknown>,
-) => Promise<void> {
-  return microsoftProfileRekey({ prisma });
-}
 
 export function ssoRegisteredIssuers(): RegisteredIssuers {
   registeredIssuersInstance ??= new RegisteredIssuers({

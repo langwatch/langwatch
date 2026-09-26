@@ -1,8 +1,8 @@
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
-
 import { env } from "~/env.mjs";
+import { microsoftAccountRekey } from "~/server/app-layer/identity/microsoft-account-rekey.runtime";
 import {
   addressRoutesToConnection,
   BACKUP_CODE_COUNT,
@@ -16,7 +16,6 @@ import {
   identityStorageAdapter,
   lastWayInGuard,
   mfaCeremonies,
-  microsoftAccountRekey,
   PASSWORD_HASH_ROUNDS,
   passkeySignUp,
   passwordResetSessionBridge,
