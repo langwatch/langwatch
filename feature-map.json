@@ -91,34 +91,6 @@
           "description": "Query traces two ways: LangWatchQL analytics SQL for counts, rates and joins, and the trace filter language for finding traces",
           "surfaces": {
             "code": {
-              "sdk": { "typescript": "langwatch.query" },
-              "cli": ["query run", "query schema"],
-              "hints": {
-                "query run": "langwatch query \"SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day ORDER BY day\" -f json",
-                "query schema": "langwatch query schema -f json"
-              },
-              "skill": null,
-              "docs": null
-            },
-            "platform": {
-              "ui": "/experiments/workbench",
-              "mcp": ["run_query", "discover_schema"],
-              "skill": null,
-              "docs": null
-            },
-            "api": "/api/v1/query",
-            "docs": null
-          },
-          "sync": "code-to-platform",
-          "produces": [],
-          "consumes": ["traces"]
-        },
-        {
-          "id": "observability.custom-query",
-          "name": "Custom Query",
-          "description": "Query traces two ways: LangWatchQL analytics SQL for counts, rates and joins, and the trace filter language for finding traces",
-          "surfaces": {
-            "code": {
               "sdk": {
                 "typescript": "langwatch.query"
               },
