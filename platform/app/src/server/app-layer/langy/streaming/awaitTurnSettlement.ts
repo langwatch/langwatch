@@ -51,7 +51,7 @@ export type TurnSettlement =
 
 /**
  * The turn is not over but is waiting on the user (a question or permission
- * card). Only returned to a caller that opted in with `settleOnUserWait`.
+ * card). Only returned to a caller that opted in with `shouldSettleOnUserWait`.
  * `text` is the question prose, empty for a permission card.
  */
 export type AwaitingUserSettlement = {
@@ -179,7 +179,7 @@ function userWaitFromEvents(
  * has not landed yet — so it means "not settled yet", not "gone". Every other
  * error propagates.
  *
- * With `settleOnUserWait`, a user wait for the turn is returned only after the
+ * With `shouldSettleOnUserWait`, a user wait for the turn is returned only after the
  * whole pass found no terminal event, so a real reply always wins.
  */
 async function readSettlementFromFold({
@@ -188,14 +188,14 @@ async function readSettlementFromFold({
   turnId,
   userId,
   signal,
-  settleOnUserWait,
+  shouldSettleOnUserWait,
 }: {
   projectId: string;
   conversationId: string;
   turnId: string;
   userId: string;
   signal: AbortSignal;
-  settleOnUserWait: boolean;
+  shouldSettleOnUserWait: boolean;
 }): Promise<TurnSettlement | AwaitingUserSettlement | null> {
   let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
   let userWait: AwaitingUserSettlement | null = null;
@@ -214,7 +214,7 @@ async function readSettlementFromFold({
     if (!events) return null;
     const settlement = settlementFromEvents(events.events, turnId);
     if (settlement) return settlement;
-    if (settleOnUserWait) {
+    if (shouldSettleOnUserWait) {
       userWait ??= userWaitFromEvents(events.events, turnId);
     }
     if (!events.truncated) return userWait;
@@ -329,7 +329,7 @@ interface AwaitTurnSettlementOptions {
   userId: string;
   signal: AbortSignal;
   pollIntervalMs?: number;
-  settleOnUserWait?: boolean;
+  shouldSettleOnUserWait?: boolean;
 }
 
 /**
@@ -338,17 +338,17 @@ interface AwaitTurnSettlementOptions {
  * into the signal (`AbortSignal.any([clientSignal, AbortSignal.timeout(...)])`).
  * Returns null when the signal aborted before settlement.
  *
- * `settleOnUserWait` also settles once the turn waits on the user (a question
+ * `shouldSettleOnUserWait` also settles once the turn waits on the user (a question
  * or permission card), which otherwise keeps it open until the wait expires.
  *
  * `pollIntervalMs` overrides the no-Redis fallback cadence — a test seam, so
  * suites never sleep real wall-clock time.
  */
 export async function awaitTurnSettlement(
-  options: AwaitTurnSettlementOptions & { settleOnUserWait: true },
+  options: AwaitTurnSettlementOptions & { shouldSettleOnUserWait: true },
 ): Promise<TurnSettlement | AwaitingUserSettlement | null>;
 export async function awaitTurnSettlement(
-  options: AwaitTurnSettlementOptions & { settleOnUserWait?: false },
+  options: AwaitTurnSettlementOptions & { shouldSettleOnUserWait?: false },
 ): Promise<TurnSettlement | null>;
 export async function awaitTurnSettlement({
   projectId,
@@ -357,7 +357,7 @@ export async function awaitTurnSettlement({
   userId,
   signal,
   pollIntervalMs = FALLBACK_POLL_MS,
-  settleOnUserWait = false,
+  shouldSettleOnUserWait = false,
 }: AwaitTurnSettlementOptions): Promise<
   TurnSettlement | AwaitingUserSettlement | null
 > {
@@ -373,7 +373,7 @@ export async function awaitTurnSettlement({
         turnId,
         userId,
         signal,
-        settleOnUserWait,
+        shouldSettleOnUserWait,
       });
       if (settlement) return settlement;
 

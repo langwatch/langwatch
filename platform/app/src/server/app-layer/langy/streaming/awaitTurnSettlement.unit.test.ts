@@ -197,7 +197,7 @@ describe("awaitTurnSettlement (user wait)", () => {
           ...ARGS,
           signal: AbortSignal.timeout(5_000),
           pollIntervalMs: 5,
-          settleOnUserWait: true,
+          shouldSettleOnUserWait: true,
         });
 
         expect(settlement).toEqual({
@@ -229,15 +229,20 @@ describe("awaitTurnSettlement (user wait)", () => {
     describe("when the caller opted in to settling on a user wait", () => {
       /** @scenario "A reply in the fold wins over a user wait" */
       it("settles as the completed reply, even when the reply is on a later page", async () => {
+        const laterPageReply = {
+          events: [{ ...settledFold.events[0]!, id: "evt-2", createdAt: 2 }],
+          cursor: { acceptedAt: 2, eventId: "evt-2" },
+          truncated: false,
+        };
         mockGetEventsAfter
           .mockResolvedValueOnce({ ...waitingFold, truncated: true })
-          .mockResolvedValue(settledFold);
+          .mockResolvedValue(laterPageReply);
 
         const settlement = await awaitTurnSettlement({
           ...ARGS,
           signal: AbortSignal.timeout(5_000),
           pollIntervalMs: 5,
-          settleOnUserWait: true,
+          shouldSettleOnUserWait: true,
         });
 
         expect(settlement).toEqual({
@@ -246,6 +251,10 @@ describe("awaitTurnSettlement (user wait)", () => {
           text: "from the fold",
           error: null,
         });
+        expect(mockGetEventsAfter).toHaveBeenNthCalledWith(
+          2,
+          expect.objectContaining({ after: waitingFold.cursor }),
+        );
       });
     });
   });

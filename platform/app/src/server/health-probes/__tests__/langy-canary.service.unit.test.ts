@@ -564,7 +564,7 @@ describe("buildProductionLangyCanaryDeps", () => {
           turnId: "turn-1",
           userId: "user-1",
           signal,
-          settleOnUserWait: true,
+          shouldSettleOnUserWait: true,
         });
       });
     });
@@ -590,7 +590,7 @@ describe("buildProductionLangyCanaryDeps", () => {
         });
 
         expect(awaitTurnSettlement).toHaveBeenCalledWith(
-          expect.objectContaining({ settleOnUserWait: true }),
+          expect.objectContaining({ shouldSettleOnUserWait: true }),
         );
         expect(classifyLangyCanaryOutcome(settlement)).toEqual({
           healthy: true,

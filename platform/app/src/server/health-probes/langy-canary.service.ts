@@ -302,7 +302,7 @@ export function buildProductionLangyCanaryDeps({
         turnId,
         userId: session.user.id,
         signal,
-        settleOnUserWait: true,
+        shouldSettleOnUserWait: true,
       }),
     now: () => Date.now(),
   };

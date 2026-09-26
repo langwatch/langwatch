@@ -80,7 +80,7 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Given a turn that answered the greeting with a question card and now waits on the user
     When the outcome is classified
     Then it is healthy
-    And the production deps ask the settlement wait to settle on a user wait
+    And the check answers as soon as the question card is up, without waiting for the user
 
   @unit
   Scenario: A turn that never settled is timeout
