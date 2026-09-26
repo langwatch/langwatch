@@ -42,12 +42,17 @@ export abstract class BaseEventSourcingError extends Error {
   readonly context: Record<string, unknown>;
   readonly cause?: unknown;
 
-  constructor(
-    message: string,
-    category: ErrorCategory,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
+  constructor({
+    message,
+    category,
+    context = {},
+    cause,
+  }: {
+    message: string;
+    category: ErrorCategory;
+    context?: Record<string, unknown>;
+    cause?: unknown;
+  }) {
     super(message);
     this.name = "EventSourcingError";
     this.category = category;
@@ -78,7 +83,7 @@ export abstract class BaseEventSourcingError extends Error {
  */
 export abstract class CriticalError extends BaseEventSourcingError {
   constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
-    super(message, ErrorCategory.CRITICAL, context, cause);
+    super({ message, category: ErrorCategory.CRITICAL, context, cause });
   }
 }
 
@@ -87,7 +92,7 @@ export abstract class CriticalError extends BaseEventSourcingError {
  */
 export abstract class RecoverableError extends BaseEventSourcingError {
   constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
-    super(message, ErrorCategory.RECOVERABLE, context, cause);
+    super({ message, category: ErrorCategory.RECOVERABLE, context, cause });
   }
 }
 
@@ -96,7 +101,7 @@ export abstract class RecoverableError extends BaseEventSourcingError {
  */
 export abstract class NonCriticalError extends BaseEventSourcingError {
   constructor(message: string, context: Record<string, unknown> = {}, cause?: unknown) {
-    super(message, ErrorCategory.NON_CRITICAL, context, cause);
+    super({ message, category: ErrorCategory.NON_CRITICAL, context, cause });
   }
 }
 
@@ -254,16 +259,7 @@ export class StoreError extends BaseEventSourcingError {
     context: Record<string, unknown> = {},
     cause?: unknown,
   ) {
-    super(
-      message,
-      category,
-      {
-        ...context,
-        operation,
-        store,
-      },
-      cause,
-    );
+    super({ message, category, context: { ...context, operation, store }, cause });
     this.operation = operation;
     this.store = store;
   }
@@ -277,22 +273,20 @@ export class QueueError extends RecoverableError {
   readonly queueName: string;
   readonly operation: string;
 
-  constructor(
-    queueName: string,
-    operation: string,
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
-    super(
-      message,
-      {
-        ...context,
-        queueName,
-        operation,
-      },
-      cause,
-    );
+  constructor({
+    queueName,
+    operation,
+    message,
+    context = {},
+    cause,
+  }: {
+    queueName: string;
+    operation: string;
+    message: string;
+    context?: Record<string, unknown>;
+    cause?: unknown;
+  }) {
+    super(message, { ...context, queueName, operation }, cause);
     this.queueName = queueName;
     this.operation = operation;
   }
@@ -306,22 +300,20 @@ export class HandlerError extends NonCriticalError {
   readonly handlerName: string;
   readonly eventId: string;
 
-  constructor(
-    handlerName: string,
-    eventId: string,
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
-    super(
-      message,
-      {
-        ...context,
-        handlerName,
-        eventId,
-      },
-      cause,
-    );
+  constructor({
+    handlerName,
+    eventId,
+    message,
+    context = {},
+    cause,
+  }: {
+    handlerName: string;
+    eventId: string;
+    message: string;
+    context?: Record<string, unknown>;
+    cause?: unknown;
+  }) {
+    super(message, { ...context, handlerName, eventId }, cause);
     this.handlerName = handlerName;
     this.eventId = eventId;
   }
@@ -335,22 +327,20 @@ export class ProjectionError extends NonCriticalError {
   readonly projectionName: string;
   readonly eventId: string;
 
-  constructor(
-    projectionName: string,
-    eventId: string,
-    message: string,
-    context: Record<string, unknown> = {},
-    cause?: unknown,
-  ) {
-    super(
-      message,
-      {
-        ...context,
-        projectionName,
-        eventId,
-      },
-      cause,
-    );
+  constructor({
+    projectionName,
+    eventId,
+    message,
+    context = {},
+    cause,
+  }: {
+    projectionName: string;
+    eventId: string;
+    message: string;
+    context?: Record<string, unknown>;
+    cause?: unknown;
+  }) {
+    super(message, { ...context, projectionName, eventId }, cause);
     this.projectionName = projectionName;
     this.eventId = eventId;
   }
@@ -360,12 +350,17 @@ export class ProjectionError extends NonCriticalError {
  * Handle error by category; uses error's own category if BaseEventSourcingError.
  * @throws {Error} If category is CRITICAL
  */
-export function handleError(
-  error: unknown,
-  category: ErrorCategory,
-  logger?: ReturnType<typeof createLogger>,
-  context?: Record<string, unknown>,
-): void {
+export function handleError({
+  error,
+  category,
+  logger,
+  context,
+}: {
+  error: unknown;
+  category: ErrorCategory;
+  logger?: ReturnType<typeof createLogger>;
+  context?: Record<string, unknown>;
+}): void {
   // If error is a BaseEventSourcingError, use its category and merge contexts
   if (error instanceof BaseEventSourcingError) {
     const errorCategory = error.category;

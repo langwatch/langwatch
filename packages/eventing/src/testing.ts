@@ -3,7 +3,6 @@ export {
   createMockEventStore,
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
-  createMockLogger,
   createMockMapProjectionDefinition,
   createMockQueueManager,
   createTestEvent,

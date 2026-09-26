@@ -1,4 +1,3 @@
-import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { AbstractEventStore } from "./abstractEventStore.ts";
@@ -53,12 +52,7 @@ export class EventStoreMemory<
    * Seeds the event store with events for a given aggregate.
    * Useful in tests.
    */
-  async seed(
-    _aggregateId: string,
-    events: EventType[],
-    _tenantId: string,
-    _aggregateType: AggregateType,
-  ): Promise<void> {
+  async seed({ events }: { events: EventType[] }): Promise<void> {
     const records = events.map((event) => eventToRecord(event));
     await this.repository.insertEventRecords(records);
   }

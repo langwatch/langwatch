@@ -47,11 +47,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      const result = await service.getProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).not.toBeNull();
       expect(foldStore.get).toHaveBeenCalledWith(
@@ -74,7 +74,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName("nonexistent" as any, TEST_CONSTANTS.AGGREGATE_ID, context),
+        service.getProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
 
@@ -88,7 +92,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context),
+        service.getProjectionByName({
+          projectionName: "projection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        }),
       ).rejects.toThrow(/projection/i);
     });
   });
@@ -116,11 +124,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      const result = await service.hasProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.hasProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).toBe(true);
     });
@@ -142,11 +150,11 @@ describe("EventSourcingService - Projection Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      const result = await service.hasProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
+      const result = await service.hasProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         context,
-      );
+      });
 
       expect(result).toBe(false);
     });
@@ -162,7 +170,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.hasProjectionByName("nonexistent" as any, TEST_CONSTANTS.AGGREGATE_ID, context),
+        service.hasProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
 
@@ -176,7 +188,11 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       await expect(
-        service.hasProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context),
+        service.hasProjectionByName({
+          projectionName: "projection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        }),
       ).rejects.toThrow(/projection/i);
     });
   });

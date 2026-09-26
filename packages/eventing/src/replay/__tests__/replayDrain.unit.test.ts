@@ -1,4 +1,4 @@
-import type IORedis from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { waitForActiveJobs } from "../replayDrain.ts";
@@ -19,7 +19,7 @@ describe("replay drain", () => {
         ["{event-sourcing/jobs}:gq:group:project-1/state/conversationState/conversation-1:active"],
       ])
       .mockResolvedValueOnce(["0", []]);
-    const redis = { scan } as unknown as IORedis;
+    const redis = redisDouble({ scan });
 
     const drained = waitForActiveJobs({
       redis,

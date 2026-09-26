@@ -23,7 +23,7 @@ export type TenantId = z.infer<typeof TenantIdSchema>;
  * @param value - The string to convert to TenantId
  * @throws {SecurityError} If the value is invalid
  */
-export function createTenantId(value: string): TenantId {
+export function createTenantId(value: unknown): TenantId {
   try {
     return TenantIdSchema.parse(value);
   } catch (error) {

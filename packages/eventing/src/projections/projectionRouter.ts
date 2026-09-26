@@ -878,10 +878,15 @@ export class ProjectionRouter<
           );
         } catch (error) {
           const category = categorizeError(error);
-          handleError(error, category, this.logger, {
-            projectionName,
-            aggregateId: String(event.aggregateId),
-            tenantId: context.tenantId,
+          handleError({
+            error,
+            category,
+            logger: this.logger,
+            context: {
+              projectionName,
+              aggregateId: String(event.aggregateId),
+              tenantId: context.tenantId,
+            },
           });
           errors.push(toError(error));
         }
@@ -1147,11 +1152,16 @@ export class ProjectionRouter<
       await this.executeInlineMapProjection({ name, openMap, event });
       return [];
     } catch (error) {
-      handleError(error, categorizeError(error), this.logger, {
-        handlerName: name,
-        eventType: event.type,
-        aggregateId: String(event.aggregateId),
-        tenantId: event.tenantId,
+      handleError({
+        error,
+        category: categorizeError(error),
+        logger: this.logger,
+        context: {
+          handlerName: name,
+          eventType: event.type,
+          aggregateId: String(event.aggregateId),
+          tenantId: event.tenantId,
+        },
       });
       return [toError(error)];
     }
@@ -2094,12 +2104,17 @@ export class ProjectionRouter<
   /**
    * Gets a fold projection by name for a given aggregate.
    */
-  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<ProjectionTypes[ProjectionName] | null> {
+  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
 
     const fold = this.foldProjections.get(projectionName);
@@ -2135,18 +2150,23 @@ export class ProjectionRouter<
   /**
    * Checks if a fold projection exists for a given aggregate.
    */
-  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<boolean> {
-    const projection = await this.getProjectionByName(
+  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<boolean> {
+    const projection = await this.getProjectionByName({
       projectionName,
       aggregateId,
       context,
       options,
-    );
+    });
     return projection !== null;
   }
 

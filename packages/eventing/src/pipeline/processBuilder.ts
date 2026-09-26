@@ -19,7 +19,7 @@ type EventData<E extends Event, Type extends string> =
   Extract<E, { type: Type }> extends Event<infer Data> ? Data : never;
 
 type OutboxOptions = NonNullable<
-  ProcessManagerConfig<any, Record<string, IntentSpec<any>>>["outbox"]
+  ProcessManagerConfig<unknown, Record<string, IntentSpec>>["outbox"]
 >;
 
 export interface ProcessManagerInitialStage<E extends Event> {
@@ -115,13 +115,15 @@ export type ProcessManagerBuildableStage =
   | ProcessManagerHandledStage<any, any, any>
   | ProcessManagerScheduledHandledStage<any, any, any>;
 
+type ErasedEventHandler = EventHandler<unknown, unknown, Record<string, IntentSpec>>;
+
 class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
   private hasState = false;
-  private readonly intents: Record<string, IntentSpec<any>> = {};
-  private readonly handlers: Record<string, EventHandler<any, any, any>> = {};
-  private readonly signals: Record<string, SignalSpec<any, any, any>> = {};
-  private wakeHandler: WakeHandler<any, any> | undefined;
+  private readonly intents: Record<string, IntentSpec> = {};
+  private readonly handlers: Record<string, ErasedEventHandler> = {};
+  private readonly signals: Record<string, SignalSpec> = {};
+  private wakeHandler: WakeHandler<unknown, Record<string, IntentSpec>> | undefined;
   private outboxOptions: OutboxOptions | undefined;
   private scheduleOptions: { everyMs: number } | undefined;
   private transientOption = false;
@@ -148,7 +150,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  on(eventType: string, handle: EventHandler<any, any, any>): this {
+  on(eventType: string, handle: ErasedEventHandler): this {
     if (this.handlers[eventType]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -160,7 +162,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  onSignal(name: string, schema: ZodTypeAny, handle: SignalHandler<any, any, any>): this {
+  onSignal(name: string, schema: ZodTypeAny, handle: SignalSpec["handle"]): this {
     if (this.signals[name]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -172,7 +174,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  onWake(handle: WakeHandler<any, any>): this {
+  onWake(handle: WakeHandler<unknown, Record<string, IntentSpec>>): this {
     if (this.wakeHandler) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

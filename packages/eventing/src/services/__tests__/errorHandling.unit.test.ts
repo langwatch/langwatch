@@ -160,13 +160,21 @@ describe("Error classes", () => {
 
   describe("QueueError", () => {
     it("has correct name and RECOVERABLE category", () => {
-      const err = new QueueError("events", "enqueue", "redis down");
+      const err = new QueueError({
+        queueName: "events",
+        operation: "enqueue",
+        message: "redis down",
+      });
       expect(err.name).toBe("QueueError");
       expect(err.category).toBe(ErrorCategory.RECOVERABLE);
     });
 
     it("getLogContext() includes queueName and operation", () => {
-      const ctx = new QueueError("events", "enqueue", "fail").getLogContext();
+      const ctx = new QueueError({
+        queueName: "events",
+        operation: "enqueue",
+        message: "fail",
+      }).getLogContext();
       expect(ctx).toMatchObject({
         errorName: "QueueError",
         queueName: "events",
@@ -177,13 +185,17 @@ describe("Error classes", () => {
 
   describe("HandlerError", () => {
     it("has correct name and NON_CRITICAL category", () => {
-      const err = new HandlerError("myHandler", "evt-1", "oops");
+      const err = new HandlerError({ handlerName: "myHandler", eventId: "evt-1", message: "oops" });
       expect(err.name).toBe("HandlerError");
       expect(err.category).toBe(ErrorCategory.NON_CRITICAL);
     });
 
     it("getLogContext() includes handlerName and eventId", () => {
-      const ctx = new HandlerError("h", "e-1", "fail").getLogContext();
+      const ctx = new HandlerError({
+        handlerName: "h",
+        eventId: "e-1",
+        message: "fail",
+      }).getLogContext();
       expect(ctx).toMatchObject({
         errorName: "HandlerError",
         handlerName: "h",
@@ -194,13 +206,21 @@ describe("Error classes", () => {
 
   describe("ProjectionError", () => {
     it("has correct name and NON_CRITICAL category", () => {
-      const err = new ProjectionError("proj", "evt-1", "oops");
+      const err = new ProjectionError({
+        projectionName: "proj",
+        eventId: "evt-1",
+        message: "oops",
+      });
       expect(err.name).toBe("ProjectionError");
       expect(err.category).toBe(ErrorCategory.NON_CRITICAL);
     });
 
     it("getLogContext() includes projectionName and eventId", () => {
-      const ctx = new ProjectionError("proj", "e-1", "fail").getLogContext();
+      const ctx = new ProjectionError({
+        projectionName: "proj",
+        eventId: "e-1",
+        message: "fail",
+      }).getLogContext();
       expect(ctx).toMatchObject({
         errorName: "ProjectionError",
         projectionName: "proj",
@@ -214,13 +234,15 @@ describe("handleError", () => {
   describe("when given a BaseEventSourcingError", () => {
     it("throws when category is CRITICAL", () => {
       const err = new SecurityError("op", "breach");
-      expect(() => handleError(err, ErrorCategory.NON_CRITICAL)).toThrow(err);
+      expect(() => handleError({ error: err, category: ErrorCategory.NON_CRITICAL })).toThrow(err);
     });
 
     it("logs error and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
-      const err = new HandlerError("h", "e-1", "minor issue");
-      expect(() => handleError(err, ErrorCategory.CRITICAL, logger as any)).not.toThrow();
+      const err = new HandlerError({ handlerName: "h", eventId: "e-1", message: "minor issue" });
+      expect(() =>
+        handleError({ error: err, category: ErrorCategory.CRITICAL, logger: logger as any }),
+      ).not.toThrow();
       expect(logger.error).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ errorName: "HandlerError" }),
@@ -229,14 +251,20 @@ describe("handleError", () => {
     });
 
     it("does not throw or crash when NON_CRITICAL without logger", () => {
-      const err = new HandlerError("h", "e-1", "minor");
-      expect(() => handleError(err, ErrorCategory.CRITICAL)).not.toThrow();
+      const err = new HandlerError({ handlerName: "h", eventId: "e-1", message: "minor" });
+      expect(() => handleError({ error: err, category: ErrorCategory.CRITICAL })).not.toThrow();
     });
 
     it("logs warning and does not throw when RECOVERABLE with logger", () => {
       const logger = createMockLogger();
-      const err = new QueueError("q", "enqueue", "redis timeout");
-      expect(() => handleError(err, ErrorCategory.CRITICAL, logger as any)).not.toThrow();
+      const err = new QueueError({
+        queueName: "q",
+        operation: "enqueue",
+        message: "redis timeout",
+      });
+      expect(() =>
+        handleError({ error: err, category: ErrorCategory.CRITICAL, logger: logger as any }),
+      ).not.toThrow();
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ errorName: "QueueError" }),
@@ -245,15 +273,18 @@ describe("handleError", () => {
     });
 
     it("does not throw or crash when RECOVERABLE without logger", () => {
-      const err = new QueueError("q", "enqueue", "timeout");
-      expect(() => handleError(err, ErrorCategory.CRITICAL)).not.toThrow();
+      const err = new QueueError({ queueName: "q", operation: "enqueue", message: "timeout" });
+      expect(() => handleError({ error: err, category: ErrorCategory.CRITICAL })).not.toThrow();
     });
 
     it("merges additional context with error context", () => {
       const logger = createMockLogger();
-      const err = new HandlerError("h", "e-1", "oops");
-      handleError(err, ErrorCategory.NON_CRITICAL, logger as any, {
-        extra: "data",
+      const err = new HandlerError({ handlerName: "h", eventId: "e-1", message: "oops" });
+      handleError({
+        error: err,
+        category: ErrorCategory.NON_CRITICAL,
+        logger: logger as any,
+        context: { extra: "data" },
       });
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -271,13 +302,15 @@ describe("handleError", () => {
   describe("when given a plain Error", () => {
     it("throws when category is CRITICAL", () => {
       const err = new Error("boom");
-      expect(() => handleError(err, ErrorCategory.CRITICAL)).toThrow(err);
+      expect(() => handleError({ error: err, category: ErrorCategory.CRITICAL })).toThrow(err);
     });
 
     it("logs error and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
       const err = new Error("oops");
-      expect(() => handleError(err, ErrorCategory.NON_CRITICAL, logger as any)).not.toThrow();
+      expect(() =>
+        handleError({ error: err, category: ErrorCategory.NON_CRITICAL, logger: logger as any }),
+      ).not.toThrow();
       expect(logger.error).toHaveBeenCalledOnce();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ error: "oops", err }),
@@ -288,7 +321,9 @@ describe("handleError", () => {
     it("logs warning and does not throw when RECOVERABLE with logger", () => {
       const logger = createMockLogger();
       const err = new Error("transient");
-      expect(() => handleError(err, ErrorCategory.RECOVERABLE, logger as any)).not.toThrow();
+      expect(() =>
+        handleError({ error: err, category: ErrorCategory.RECOVERABLE, logger: logger as any }),
+      ).not.toThrow();
       expect(logger.warn).toHaveBeenCalledOnce();
       expect(logger.warn).toHaveBeenCalledWith(
         expect.objectContaining({ error: "transient", err }),
@@ -301,7 +336,11 @@ describe("handleError", () => {
     it("logs and does not throw when NON_CRITICAL with logger", () => {
       const logger = createMockLogger();
       expect(() =>
-        handleError("string error", ErrorCategory.NON_CRITICAL, logger as any),
+        handleError({
+          error: "string error",
+          category: ErrorCategory.NON_CRITICAL,
+          logger: logger as any,
+        }),
       ).not.toThrow();
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({ error: "string error" }),
@@ -321,15 +360,21 @@ describe("categorizeError", () => {
   });
 
   it("returns RECOVERABLE for QueueError", () => {
-    expect(categorizeError(new QueueError("q", "op", "msg"))).toBe(ErrorCategory.RECOVERABLE);
+    expect(
+      categorizeError(new QueueError({ queueName: "q", operation: "op", message: "msg" })),
+    ).toBe(ErrorCategory.RECOVERABLE);
   });
 
   it("returns NON_CRITICAL for HandlerError", () => {
-    expect(categorizeError(new HandlerError("h", "e", "msg"))).toBe(ErrorCategory.NON_CRITICAL);
+    expect(
+      categorizeError(new HandlerError({ handlerName: "h", eventId: "e", message: "msg" })),
+    ).toBe(ErrorCategory.NON_CRITICAL);
   });
 
   it("returns NON_CRITICAL for ProjectionError", () => {
-    expect(categorizeError(new ProjectionError("p", "e", "msg"))).toBe(ErrorCategory.NON_CRITICAL);
+    expect(
+      categorizeError(new ProjectionError({ projectionName: "p", eventId: "e", message: "msg" })),
+    ).toBe(ErrorCategory.NON_CRITICAL);
   });
 
   it("returns RECOVERABLE for plain Error", () => {

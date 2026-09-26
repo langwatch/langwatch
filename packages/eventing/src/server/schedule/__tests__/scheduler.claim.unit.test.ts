@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import { PrismaScheduledJobStore } from "../../adapters/postgres/prisma-scheduled-job-store.ts";
@@ -16,9 +16,7 @@ describe("PrismaScheduledJobStore.claim (lease)", () => {
     describe("when leasing the slot", () => {
       it("runs a raw conditional UPDATE that only moves nextRunAt to the lease and reports the lease won", async () => {
         const executeRaw = vi.fn().mockResolvedValue(1);
-        const prisma = {
-          $executeRaw: executeRaw,
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ $executeRaw: executeRaw });
         const repo = new PrismaScheduledJobStore(prisma);
 
         const expected = new Date("2026-07-06T09:00:00.000Z"); // the WHERE guard
@@ -53,9 +51,7 @@ describe("PrismaScheduledJobStore.claim (lease)", () => {
     describe("when leasing the slot", () => {
       it("reports the lease lost (zero rows matched the guard)", async () => {
         const executeRaw = vi.fn().mockResolvedValue(0);
-        const prisma = {
-          $executeRaw: executeRaw,
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ $executeRaw: executeRaw });
         const repo = new PrismaScheduledJobStore(prisma);
 
         const won = await repo.claim({
@@ -77,9 +73,7 @@ describe("PrismaScheduledJobStore.settleClaim", () => {
     describe("when settling the claim", () => {
       it("runs a raw conditional UPDATE carrying the lease guard, the advance, the delivered slot and cleared retry state", async () => {
         const executeRaw = vi.fn().mockResolvedValue(1);
-        const prisma = {
-          $executeRaw: executeRaw,
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ $executeRaw: executeRaw });
         const repo = new PrismaScheduledJobStore(prisma);
 
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
@@ -113,9 +107,7 @@ describe("PrismaScheduledJobStore.settleClaim", () => {
     describe("when settling with a null lastSlot", () => {
       it("binds a null lastSlot (NULL::timestamp) rather than a timestamp literal", async () => {
         const executeRaw = vi.fn().mockResolvedValue(1);
-        const prisma = {
-          $executeRaw: executeRaw,
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ $executeRaw: executeRaw });
         const repo = new PrismaScheduledJobStore(prisma);
 
         const leaseUntil = new Date("2026-07-13T09:10:00.000Z");
@@ -149,9 +141,7 @@ describe("PrismaScheduledJobStore.settleClaim", () => {
     describe("when settling the claim", () => {
       it("reports the settle lost (zero rows matched the lease guard)", async () => {
         const executeRaw = vi.fn().mockResolvedValue(0);
-        const prisma = {
-          $executeRaw: executeRaw,
-        } as unknown as PrismaClient;
+        const prisma = prismaDouble({ $executeRaw: executeRaw });
         const repo = new PrismaScheduledJobStore(prisma);
 
         const settled = await repo.settleClaim({

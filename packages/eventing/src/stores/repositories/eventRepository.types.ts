@@ -39,12 +39,12 @@ export interface EventRepository {
    * Retrieves event records; occurredAtFromMs is partition-pruning only, must not
    * change result set for correctly-classified aggregates.
    */
-  getEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]>;
+  getEventRecords(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]>;
 
   /**
    * Retrieves event records up to a specific event; occurredAtFromMs prunes
@@ -79,13 +79,13 @@ export interface EventRepository {
    * Counts event records that come before a given event.
    * Returns raw count without validation.
    */
-  countEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number>;
+  countEventRecords(request: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number>;
 
   /**
    * Inserts event records into storage.

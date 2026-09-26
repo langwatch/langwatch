@@ -168,12 +168,17 @@ export class EventingClickHouseEventRepository implements EventRepository {
     return record;
   }
 
-  async getEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]> {
+  async getEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    occurredAtFromMs,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
     try {
       const client = await this.getClient(tenantId);
       // When a lower bound is supplied, add a predicate on EventOccurredAt so
@@ -395,13 +400,19 @@ export class EventingClickHouseEventRepository implements EventRepository {
     };
   }
 
-  async countEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number> {
+  async countEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    beforeTimestamp,
+    beforeEventId,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number> {
     try {
       const client = await this.getClient(tenantId);
       const result = await client.query({

@@ -552,25 +552,35 @@ export class EventSourcingService<
   /**
    * Gets a specific fold projection by name for a given aggregate.
    */
-  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<ProjectionTypes[ProjectionName] | null> {
-    return this.router.getProjectionByName(projectionName, aggregateId, context, options);
+  async getProjectionByName<ProjectionName extends keyof ProjectionTypes & string>({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<ProjectionTypes[ProjectionName] | null> {
+    return this.router.getProjectionByName({ projectionName, aggregateId, context, options });
   }
 
   /**
    * Checks if a specific fold projection exists for a given aggregate.
    */
-  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>(
-    projectionName: ProjectionName,
-    aggregateId: string,
-    context: EventStoreReadContext<EventType>,
-    options?: { key?: string },
-  ): Promise<boolean> {
-    return this.router.hasProjectionByName(projectionName, aggregateId, context, options);
+  async hasProjectionByName<ProjectionName extends keyof ProjectionTypes & string>({
+    projectionName,
+    aggregateId,
+    context,
+    options,
+  }: {
+    projectionName: ProjectionName;
+    aggregateId: string;
+    context: EventStoreReadContext<EventType>;
+    options?: { key?: string };
+  }): Promise<boolean> {
+    return this.router.hasProjectionByName({ projectionName, aggregateId, context, options });
   }
 
   /**

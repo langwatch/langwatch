@@ -111,7 +111,11 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
+      await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        context: context1,
+      });
 
       expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -185,7 +189,11 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context);
+      await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        context,
+      });
 
       expect(foldStore.get).toHaveBeenCalledWith(
         TEST_CONSTANTS.AGGREGATE_ID,
@@ -324,8 +332,16 @@ describe("EventSourcingService - Security Flows", () => {
         foldProjections: [sealFoldProjection(foldDef)],
       });
 
-      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context1);
-      await service.getProjectionByName("projection", TEST_CONSTANTS.AGGREGATE_ID, context2);
+      await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        context: context1,
+      });
+      await service.getProjectionByName({
+        projectionName: "projection",
+        aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        context: context2,
+      });
 
       // Verify different tenantIds are passed to fold store
       expect(foldStore.get).toHaveBeenCalledWith(

@@ -212,12 +212,12 @@ export abstract class AbstractEventStore<
       },
       async () => {
         try {
-          const records = await this.repository.getEventRecords(
-            context.tenantId,
+          const records = await this.repository.getEventRecords({
+            tenantId: context.tenantId,
             aggregateType,
             aggregateId,
             occurredAtFromMs,
-          );
+          });
 
           const events = records.map((record) => recordToEvent<EventType>(record, aggregateId));
 
@@ -429,13 +429,13 @@ export abstract class AbstractEventStore<
       },
       async () => {
         try {
-          return await this.repository.countEventRecords(
-            context.tenantId,
+          return await this.repository.countEventRecords({
+            tenantId: context.tenantId,
             aggregateType,
             aggregateId,
             beforeTimestamp,
             beforeEventId,
-          );
+          });
         } catch (error) {
           this.logError(
             `${this.constructor.name}.countEventsBefore`,

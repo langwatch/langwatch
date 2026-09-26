@@ -1,3 +1,4 @@
+import { createTestLogger, type TestLogLines } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
@@ -5,11 +6,9 @@ import { sealMapProjection } from "../../projections/sealedProjection.ts";
 import type { EventSubscriberDefinition } from "../../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import { EventSourcingService } from "../eventSourcingService.ts";
-import {
-  createMockEventStore,
-  createMockLogger,
-  createMockMapProjectionDefinition,
-} from "./testHelpers.ts";
+import { createMockEventStore, createMockMapProjectionDefinition } from "./testHelpers.ts";
+
+const warningsIn = (lines: TestLogLines) => lines.filter((line) => line.level === 40);
 
 describe("EventSourcingService runtime warning policy", () => {
   const projectionSubscriber: SubscriberDispatchDefinition<Event> = {
@@ -26,7 +25,7 @@ describe("EventSourcingService runtime warning policy", () => {
     warnWhenProjectionsRunInline?: boolean;
     eventSubscriberOnly?: boolean;
   }) {
-    const logger = createMockLogger();
+    const { logger, lines } = createTestLogger();
     new EventSourcingService<Event>({
       pipelineName: "test-pipeline",
       aggregateType: "trace",
@@ -39,22 +38,22 @@ describe("EventSourcingService runtime warning policy", () => {
       subscribers: options?.eventSubscriberOnly ? [eventSubscriber] : undefined,
       warnWhenProjectionsRunInline: options?.warnWhenProjectionsRunInline,
     });
-    return logger;
+    return lines;
   }
 
   it("does not infer a production warning without injected runtime policy", () => {
-    expect(createService().warn).not.toHaveBeenCalled();
+    expect(warningsIn(createService())).toHaveLength(0);
   });
 
   it("warns when process composition enables the inline-projection guard", () => {
-    expect(createService({ warnWhenProjectionsRunInline: true }).warn).toHaveBeenCalledOnce();
+    expect(warningsIn(createService({ warnWhenProjectionsRunInline: true }))).toHaveLength(1);
   });
 
   it.each([
     ["fold", { foldSubscribers: [{ foldName: "test-fold", definition: projectionSubscriber }] }],
     ["map", { mapSubscribers: [{ mapName: "test-map", definition: projectionSubscriber }] }],
   ] as const)("warns for a %s subscriber without a shared queue", (_kind, subscribers) => {
-    const logger = createMockLogger();
+    const { logger, lines } = createTestLogger();
 
     expect(
       () =>
@@ -68,15 +67,17 @@ describe("EventSourcingService runtime warning policy", () => {
           ...subscribers,
         }),
     ).toThrow("not found");
-    expect(logger.warn).toHaveBeenCalledOnce();
+    expect(warningsIn(lines)).toHaveLength(1);
   });
 
   it("warns for an event-only subscriber without a shared queue", () => {
     expect(
-      createService({
-        warnWhenProjectionsRunInline: true,
-        eventSubscriberOnly: true,
-      }).warn,
-    ).toHaveBeenCalledOnce();
+      warningsIn(
+        createService({
+          warnWhenProjectionsRunInline: true,
+          eventSubscriberOnly: true,
+        }),
+      ),
+    ).toHaveLength(1);
   });
 });

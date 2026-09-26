@@ -336,7 +336,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       await expect(
-        service.getProjectionByName("nonexistent" as any, TEST_CONSTANTS.AGGREGATE_ID, context),
+        service.getProjectionByName({
+          projectionName: "nonexistent" as any,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        }),
       ).rejects.toThrow(/nonexistent/);
     });
   });

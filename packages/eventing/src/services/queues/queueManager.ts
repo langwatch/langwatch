@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
@@ -198,7 +198,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
 export class QueueManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
   private readonly pipelineName: string;
-  private readonly logger = createLogger("langwatch:event-sourcing:queue-manager");
+  private readonly logger: Logger;
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
   private readonly killSwitch?: KillSwitch;
@@ -224,13 +224,16 @@ export class QueueManager<EventType extends Event = Event> {
     globalQueue,
     globalJobRegistry,
     killSwitch,
+    logger = createLogger("langwatch:event-sourcing:queue-manager"),
   }: {
     aggregateType: AggregateType;
     pipelineName: string;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
     killSwitch?: KillSwitch;
+    logger?: Logger;
   }) {
+    this.logger = logger;
     this.aggregateType = aggregateType;
     this.pipelineName = pipelineName;
     this.globalQueue = globalQueue;

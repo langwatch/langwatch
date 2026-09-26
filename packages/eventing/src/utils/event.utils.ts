@@ -169,13 +169,19 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
 }
 
 /** Creates a projection representing the current state of an aggregate. */
-function createProjection<Data = unknown>(
-  id: string,
-  aggregateId: string,
-  tenantId: TenantId,
-  data: Data,
-  version: string,
-): Projection<Data> {
+function createProjection<Data = unknown>({
+  id,
+  aggregateId,
+  tenantId,
+  data,
+  version,
+}: {
+  id: string;
+  aggregateId: string;
+  tenantId: TenantId;
+  data: Data;
+  version: string;
+}): Projection<Data> {
   return {
     id,
     aggregateId,

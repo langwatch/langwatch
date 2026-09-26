@@ -1,4 +1,3 @@
-import type { Logger } from "@langwatch/observability";
 import { type Mock, vi } from "vitest";
 import { z } from "zod";
 
@@ -162,23 +161,6 @@ export function createMockMapProjectionDefinition<TEvent extends Event = Event>(
     store,
     options: overrides?.options,
   };
-}
-
-/**
- * Creates a mock Logger.
- */
-export function createMockLogger(): Logger {
-  return {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    fatal: vi.fn(),
-    trace: vi.fn(),
-    child: vi.fn().mockReturnThis(),
-    level: "info",
-    silent: false,
-  } as unknown as Logger;
 }
 
 // Counter for generating unique event IDs in tests

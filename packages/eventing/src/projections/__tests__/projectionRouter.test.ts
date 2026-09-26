@@ -805,12 +805,12 @@ describe("ProjectionRouter", () => {
         router.registerFoldProjection(fold);
 
         const customKey = "tenant-1:2025-01-01";
-        await router.getProjectionByName(
-          "myProjection",
-          TEST_CONSTANTS.AGGREGATE_ID,
-          { tenantId },
-          { key: customKey },
-        );
+        await router.getProjectionByName({
+          projectionName: "myProjection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context: { tenantId },
+          options: { key: customKey },
+        });
 
         expect(store.get).toHaveBeenCalledWith(
           customKey,
@@ -845,8 +845,12 @@ describe("ProjectionRouter", () => {
 
         router.registerFoldProjection(fold);
 
-        await router.getProjectionByName("myProjection", TEST_CONSTANTS.AGGREGATE_ID, {
-          tenantId,
+        await router.getProjectionByName({
+          projectionName: "myProjection",
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+          context: {
+            tenantId,
+          },
         });
 
         expect(store.get).toHaveBeenCalledWith(

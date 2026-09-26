@@ -1,10 +1,11 @@
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import type { Event } from "../../../domain/types.ts";
 import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
@@ -350,20 +351,15 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
 
   function buildManager() {
     const globalJobRegistry = new Map<string, JobRegistryEntry>();
+    const { logger, lines } = createTestLogger();
     const manager = new QueueManager({
       aggregateType,
       pipelineName: "test-pipeline",
       globalQueue: createMockSharedQueue(),
       globalJobRegistry,
+      logger,
     });
-    return { manager, globalJobRegistry };
-  }
-
-  function loggerInfoSpyOf(manager: QueueManager) {
-    return vi.spyOn(
-      (manager as unknown as { logger: { info: (...a: any[]) => void } }).logger,
-      "info",
-    );
+    return { manager, globalJobRegistry, lines };
   }
 
   describe("given a command that opts into coalescing", () => {
@@ -423,8 +419,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
     describe("when the command queue is initialized", () => {
       /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -438,10 +433,10 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).toHaveBeenCalledWith(
-          { pipeline: "test-pipeline", command: "cold" },
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "cold",
+        });
       });
     });
   });
@@ -449,8 +444,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
   describe("given a serialized producer that DOES coalesce", () => {
     describe("when the command queue is initialized", () => {
       it("does not emit the un-coalesced visibility record", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -464,7 +458,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
       });
     });
   });
@@ -476,8 +470,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
     describe("when the group key comes from the command class", () => {
       /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -490,18 +483,17 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).toHaveBeenCalledWith(
-          { pipeline: "test-pipeline", command: "sharded" },
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "sharded",
+        });
       });
     });
 
     describe("when the group key comes from the registration options", () => {
       /** @scenario 'an un-coalesced producer that declares its grouping is visible, not silent' */
       it("emits a record naming the producer and its pipeline", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -517,10 +509,10 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).toHaveBeenCalledWith(
-          { pipeline: "test-pipeline", command: "sharded" },
-          UNCOALESCED_PRODUCER_MESSAGE,
-        );
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toMatchObject({
+          pipeline: "test-pipeline",
+          command: "sharded",
+        });
       });
     });
   });
@@ -528,8 +520,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
   describe("given a group-keyed producer that DOES coalesce", () => {
     describe("when the command queue is initialized", () => {
       it("does not emit the un-coalesced visibility record", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -543,7 +534,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
       });
     });
   });
@@ -551,8 +542,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
   describe("given a producer keyed only by its own aggregate", () => {
     describe("when the command queue is initialized", () => {
       it("stays silent — one aggregate per job is not a funnel", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -565,7 +555,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
       });
     });
   });
@@ -597,8 +587,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
       });
 
       it("does not emit the un-coalesced visibility record", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -615,14 +604,13 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
       });
 
       // recordSpan's own shape: sharded onto a group key, and folding only the
       // payloads it can weigh honestly.
       it("stays silent for a group-keyed producer too", () => {
-        const { manager } = buildManager();
-        const infoSpy = loggerInfoSpyOf(manager);
+        const { manager, lines } = buildManager();
 
         manager.initializeCommandQueues(
           [
@@ -636,7 +624,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(infoSpy).not.toHaveBeenCalledWith(expect.anything(), UNCOALESCED_PRODUCER_MESSAGE);
+        expect(lines.findLine("info", UNCOALESCED_PRODUCER_MESSAGE)).toBeUndefined();
       });
     });
   });

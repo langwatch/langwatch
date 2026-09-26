@@ -31,12 +31,17 @@ export function doneMarkerKey(projectionName: string, aggregateKey: string): str
  * (`EventTimestamp ASC, EventId ASC`). Returns true when the event is at or
  * before the cutoff (replay handles it).
  */
-export function isAtOrBeforeCutoff(
-  eventTimestamp: number,
-  eventId: string,
-  cutoffTimestamp: number,
-  cutoffEventId: string,
-): boolean {
+export function isAtOrBeforeCutoff({
+  eventTimestamp,
+  eventId,
+  cutoffTimestamp,
+  cutoffEventId,
+}: {
+  eventTimestamp: number;
+  eventId: string;
+  cutoffTimestamp: number;
+  cutoffEventId: string;
+}): boolean {
   if (eventTimestamp < cutoffTimestamp) return true;
   if (eventTimestamp > cutoffTimestamp) return false;
   return eventId <= cutoffEventId;
@@ -62,5 +67,5 @@ export function isAtOrBeforeCutoffMarker(
     return false; // Corrupted marker
   }
 
-  return isAtOrBeforeCutoff(eventTimestamp, eventId, cutoffTimestamp, cutoffEventId);
+  return isAtOrBeforeCutoff({ eventTimestamp, eventId, cutoffTimestamp, cutoffEventId });
 }

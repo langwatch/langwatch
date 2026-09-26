@@ -78,37 +78,37 @@ describe("createTenantId", () => {
   describe("when value is not a string", () => {
     it("throws error for null", () => {
       expect(() => {
-        createTenantId(null as unknown as string);
+        createTenantId(null);
       }).toThrow(SecurityError);
     });
 
     it("throws error for undefined", () => {
       expect(() => {
-        createTenantId(undefined as unknown as string);
+        createTenantId(undefined);
       }).toThrow(SecurityError);
     });
 
     it("throws error for number", () => {
       expect(() => {
-        createTenantId(123 as unknown as string);
+        createTenantId(123);
       }).toThrow(SecurityError);
     });
 
     it("throws error for boolean", () => {
       expect(() => {
-        createTenantId(true as unknown as string);
+        createTenantId(true);
       }).toThrow(SecurityError);
     });
 
     it("throws error for object", () => {
       expect(() => {
-        createTenantId({ id: "test" } as unknown as string);
+        createTenantId({ id: "test" });
       }).toThrow(SecurityError);
     });
 
     it("throws error for array", () => {
       expect(() => {
-        createTenantId(["tenant"] as unknown as string);
+        createTenantId(["tenant"]);
       }).toThrow(SecurityError);
     });
   });

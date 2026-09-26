@@ -51,12 +51,17 @@ export class EventRepositoryMemory implements EventRepository {
     return { ...record };
   }
 
-  async getEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    occurredAtFromMs?: number,
-  ): Promise<EventRecord[]> {
+  async getEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    occurredAtFromMs,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    occurredAtFromMs?: number;
+  }): Promise<EventRecord[]> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
     // Mirror the ClickHouse lower-bound semantics so tests exercise the same
@@ -189,13 +194,19 @@ export class EventRepositoryMemory implements EventRepository {
     return sorted.slice(0, limit).map((record) => ({ ...record }));
   }
 
-  async countEventRecords(
-    tenantId: string,
-    aggregateType: string,
-    aggregateId: string,
-    beforeTimestamp: number,
-    beforeEventId: string,
-  ): Promise<number> {
+  async countEventRecords({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    beforeTimestamp,
+    beforeEventId,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    beforeTimestamp: number;
+    beforeEventId: string;
+  }): Promise<number> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
 

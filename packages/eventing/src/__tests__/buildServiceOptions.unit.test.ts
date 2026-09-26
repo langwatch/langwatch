@@ -82,19 +82,17 @@ describe("AbstractFoldProjection and AbstractMapProjection getter preservation",
   });
 
   describe("when class instance is spread into a plain object", () => {
-    it("eventTypes getter is lost on fold projection", () => {
+    it("eventTypes getter is not an own property of a fold projection", () => {
       const fold = new TestFoldProjection();
-      const spread = { ...fold };
 
-      // This is the bug: spreading loses the prototype getter
-      expect((spread as any).eventTypes).toBeUndefined();
+      // A spread copies own enumerable properties only, so it drops the prototype getter
+      expect(Object.keys(fold)).not.toContain("eventTypes");
     });
 
-    it("eventTypes getter is lost on map projection", () => {
+    it("eventTypes getter is not an own property of a map projection", () => {
       const map = new TestMapProjection();
-      const spread = { ...map };
 
-      expect((spread as any).eventTypes).toBeUndefined();
+      expect(Object.keys(map)).not.toContain("eventTypes");
     });
   });
 });
