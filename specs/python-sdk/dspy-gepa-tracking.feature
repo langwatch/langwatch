@@ -74,8 +74,52 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
   Scenario: A step that could not be sent goes out with the next one
     Given the platform answers 502 to the step post
     When log_step is called and the post fails after its retries
-    Then the step stays in the buffer
+    Then the evaluation the step reports is not failed by it
+    And the step stays in the buffer
     And the next log_step that gets through posts both steps
+
+  @unit
+  Scenario: A network failure is retried and buffered like a server error
+    Given the connection to the platform times out or is refused
+    When log_step is called and the post fails after its retries
+    Then the evaluation the step reports is not failed by it
+    And the step stays in the buffer
+
+  @unit
+  Scenario: A client error is a real answer, not a blip
+    Given the platform answers 422 to the step post
+    When log_step is called
+    Then the post is not retried
+    And the evaluation the step reports is not failed by it
+    And the step stays in the buffer
+
+  @unit
+  Scenario: The buffer is bounded while the platform is down
+    Given the platform keeps answering 502
+    When more steps than the buffer bound are logged
+    Then the oldest steps are dropped, keeping the newest
+    And a warning says how many were dropped
+
+  @unit
+  Scenario: A buffer that outgrew one request is posted in several
+    Given steps buffered during an outage whose bodies together exceed the platform's request limit
+    When the next log_step gets through
+    Then the steps go out oldest first, in as many posts as fit the limit
+    And no post is over the limit
+    And the buffer is empty
+
+  @unit
+  Scenario: Steps leave the buffer only once their post is accepted
+    Given buffered steps that need two posts
+    When the first post is accepted and the second fails after its retries
+    Then only the steps of the failed post stay in the buffer
+
+  @unit
+  Scenario: A step no request can carry is dropped rather than blocking the rest
+    Given a step whose body alone is over the platform's request limit
+    When log_step is called
+    Then the step is dropped with a warning naming it
+    And the steps logged after it are still posted
 
   @unit
   Scenario: The steps a failed post left behind are sent when the run ends
