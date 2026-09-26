@@ -136,6 +136,8 @@ export interface AutomationApi {
   }): Promise<void>;
   /** An operator's run-now: one extra send, the cadence unchanged. */
   requestReportRun(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** An operator's release of a run held past staleness; only the run it names is released. */
+  clearReportRun(input: { projectId: string; triggerId: string; requestId: string }): Promise<void>;
   invalidate(projectId: string): Promise<void>;
   assertTraceConditionPresent(filters: Record<string, unknown> | undefined): void;
   assertConditionSurvivesEdit(input: {

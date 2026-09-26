@@ -26,14 +26,21 @@ export const reportScheduleStatusSchema = z.object({
 });
 export type ReportSchedule = z.infer<typeof reportScheduleStatusSchema>;
 
+/** A run (scheduled or run-now) whose dispatch is neither sent nor finally failed. */
+export const reportRunInFlightSchema = z.object({
+  requestId: z.string(),
+  slot: z.date(),
+  since: z.date(),
+});
+export type ReportRunInFlight = z.infer<typeof reportRunInFlightSchema>;
+
 /** One report's schedule as the operator scheduler lists it, across projects. */
 export const operatorReportScheduleSchema = z.object({
   ...reportScheduleStatusSchema.shape,
   projectId: z.string(),
   cron: z.string(),
   timezone: z.string(),
-  /** The slot of a run-now whose dispatch has not yet been sent or finally failed. */
-  runningSlot: z.date().nullable(),
+  running: reportRunInFlightSchema.nullable(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

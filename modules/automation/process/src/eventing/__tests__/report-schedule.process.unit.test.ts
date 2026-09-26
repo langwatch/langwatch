@@ -173,7 +173,11 @@ describe("report schedule process", () => {
         );
 
         expect(second.intents).toEqual([]);
-        expect(second.state.pendingRun).toEqual({ requestId: "request-1", slot: MONDAY_0800 });
+        expect(second.state.pendingRun).toEqual({
+          requestId: "request-1",
+          slot: MONDAY_0800,
+          since: MONDAY_0800,
+        });
         expect(second.nextWakeAt).toBe(MONDAY_0900);
       });
     });
@@ -197,7 +201,7 @@ describe("report schedule process", () => {
           context(MONDAY_0800 + 3),
         );
 
-        expect(stray.state.pendingRun).toEqual({ requestId: "request-1", slot: MONDAY_0800 });
+        expect(stray.state.pendingRun?.requestId).toBe("request-1");
         expect(settled.state.pendingRun).toBeNull();
         expect(settled.nextWakeAt).toBe(MONDAY_0900);
         expect(next.intents?.map(({ messageKey }) => messageKey)).toEqual(["run:request-2"]);
@@ -206,13 +210,61 @@ describe("report schedule process", () => {
 
     describe("when the next scheduled slot fires first", () => {
       /** @scenario "A scheduled send supersedes a run-now that never settled" */
-      it("sends the slot and accepts run-now again", () => {
+      it("sends the slot, which becomes the run in flight in the run-now's place", () => {
         const wake = reportScheduleWake(requested().state, context(MONDAY_0900));
 
         expect(wake.intents?.map(({ messageKey }) => messageKey)).toEqual([
           `report:${MONDAY_0900}`,
         ]);
-        expect(wake.state.pendingRun).toBeNull();
+        expect(wake.intents?.[0]?.payload).toMatchObject({ requestId: `slot:${MONDAY_0900}` });
+        expect(wake.state.pendingRun?.requestId).toBe(`slot:${MONDAY_0900}`);
+      });
+    });
+  });
+
+  describe("given a scheduled send that has not settled", () => {
+    const woken = () => reportScheduleWake(configuredAt(MONDAY_0800).state, context(MONDAY_0900));
+
+    describe("when a run-now is requested", () => {
+      /** @scenario "A run-now asked for during a scheduled send sends nothing" */
+      it("dispatches nothing until the slot's send settles", () => {
+        const during = reportRunRequested(
+          woken().state,
+          { triggerId: "trigger-1", requestId: "request-1" },
+          context(MONDAY_0900 + 5),
+        );
+        const settled = reportRunSettled(
+          during.state,
+          { triggerId: "trigger-1", requestId: `slot:${MONDAY_0900}`, outcome: "sent" },
+          context(MONDAY_0900 + 6),
+        );
+        const after = reportRunRequested(
+          settled.state,
+          { triggerId: "trigger-1", requestId: "request-2" },
+          context(MONDAY_0900 + 7),
+        );
+
+        expect(during.intents).toEqual([]);
+        expect(after.intents?.map(({ messageKey }) => messageKey)).toEqual(["run:request-2"]);
+      });
+    });
+
+    describe("when an operator clears it", () => {
+      /** @scenario "An operator's clear releases only the run it names" */
+      it("releases the named run and ignores a clear for an older one", () => {
+        const stale = reportRunSettled(
+          woken().state,
+          { triggerId: "trigger-1", requestId: "request-0", outcome: "cleared" },
+          context(MONDAY_0900 + 1),
+        );
+        const cleared = reportRunSettled(
+          stale.state,
+          { triggerId: "trigger-1", requestId: `slot:${MONDAY_0900}`, outcome: "cleared" },
+          context(MONDAY_0900 + 2),
+        );
+
+        expect(stale.state.pendingRun?.requestId).toBe(`slot:${MONDAY_0900}`);
+        expect(cleared.state.pendingRun).toBeNull();
       });
     });
   });
@@ -260,7 +312,7 @@ describe("report schedule process", () => {
       expect(runs.settled).toEqual(["request-1:failed"]);
     });
 
-    it("never settles a scheduled slot's dispatch, since no run-now waits on it", async () => {
+    it("never settles a dispatch queued before runs were tracked", async () => {
       const runs = new RecordingRuns();
 
       await automationProcessDefinition({

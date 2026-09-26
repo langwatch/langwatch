@@ -438,7 +438,7 @@ export interface OpsAppDependencies {
   /** The report schedules the operator scheduler lists and controls. */
   automations: Pick<
     AutomationApi,
-    "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun"
+    "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun" | "clearReportRun"
   >;
 }
 

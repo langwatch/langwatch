@@ -816,6 +816,15 @@ export class AutomationApp implements AutomationApi {
     return this.#reportSchedules.requestRun(input);
   }
 
+  /** An operator's release of a stale run; a run started since is left alone. */
+  clearReportRun(input: {
+    projectId: string;
+    triggerId: string;
+    requestId: string;
+  }): Promise<void> {
+    return this.#reportSchedules.settleRun({ ...input, outcome: "cleared" });
+  }
+
   /** Flushes the project's dispatch cache. */
   invalidate(projectId: string): Promise<void> {
     return this.#automation.invalidate(projectId);

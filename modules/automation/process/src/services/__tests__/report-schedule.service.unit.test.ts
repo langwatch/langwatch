@@ -244,12 +244,12 @@ describe("ReportScheduleService", () => {
       );
 
       expect(
-        schedules.map(({ triggerId, cron, active, nextRunAt, runningSlot }) => ({
+        schedules.map(({ triggerId, cron, active, nextRunAt, running }) => ({
           triggerId,
           cron,
           active,
           nextRunAt,
-          runningSlot,
+          running,
         })),
       ).toEqual([
         {
@@ -257,14 +257,14 @@ describe("ReportScheduleService", () => {
           cron: "0 9 * * *",
           active: false,
           nextRunAt: null,
-          runningSlot: null,
+          running: null,
         },
         {
           triggerId: "paused",
           cron: "0 9 * * *",
           active: false,
           nextRunAt: null,
-          runningSlot: null,
+          running: null,
         },
       ]);
     });
@@ -295,8 +295,12 @@ describe("ReportScheduleService", () => {
       });
       const [settled] = await service.findAllAcrossProjects();
 
-      expect(running?.runningSlot).toEqual(new Date("2026-01-01T08:00:00Z"));
-      expect(settled?.runningSlot).toBeNull();
+      expect(running?.running).toEqual({
+        requestId,
+        slot: new Date("2026-01-01T08:00:00Z"),
+        since: new Date("2026-01-01T08:00:00Z"),
+      });
+      expect(settled?.running).toBeNull();
     });
   });
 

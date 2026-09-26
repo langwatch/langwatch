@@ -114,7 +114,21 @@ Feature: Automation ownership
     Given a run-now whose settlement was never recorded
     When the report's next scheduled slot fires
     Then the slot is sent
-    And run-now is accepted again
+    And the slot's send becomes the run in flight in the run-now's place
+
+  @unit
+  Scenario: A run-now asked for during a scheduled send sends nothing
+    Given a report whose scheduled send has been neither sent nor finally failed
+    When a run-now is asked for
+    Then nothing more is dispatched
+    And a run-now asked for once the send settles is dispatched
+
+  @unit
+  Scenario: An operator's clear releases only the run it names
+    Given a report with a run in flight
+    When an operator clears that run
+    Then the report accepts its next run
+    But a clear naming an earlier run releases nothing
 
   @unit
   Scenario: The operator scheduler lists paused reports and leaves deleted ones out

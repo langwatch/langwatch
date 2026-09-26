@@ -1,17 +1,17 @@
 import type { AutomationApi, OperatorReportSchedule } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
-import type {
-  OpsScheduledJob,
-  SchedulerAuditEntryView,
-  SchedulerControlAction,
-} from "@langwatch/ops-contract";
 import {
   ScheduleInactiveError,
   ScheduleNotFoundError,
   ScheduleRunInProgressError,
   ScheduleSlotNotStaleError,
+  SLOT_STALE_AFTER_MS,
+  type OpsScheduledJob,
+  type SchedulerAuditEntryView,
+  type SchedulerControlAction,
 } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant } from "@langwatch/time";
 
 import type { SchedulerAuditRepository } from "../repositories/ops-audit.repository.ts";
 
@@ -22,7 +22,7 @@ const REPORT_TARGET_TYPE = "reportTrigger";
 
 type ReportSchedules = Pick<
   AutomationApi,
-  "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun"
+  "findAllReportSchedules" | "setReportScheduleActive" | "requestReportRun" | "clearReportRun"
 >;
 
 /** The operator view over automation's report schedules; every control is an automation command. */
@@ -99,19 +99,32 @@ export class SchedulerOpsService {
     return this.readBack(scheduleId);
   }
 
-  /** A report schedule holds no slot lease (its sends retry in the outbox), so none is stale. */
+  /** Releases only a run held past the staleness threshold, never a live one. */
   async clearStuckSlot({
     scheduleId,
+    actorUserId,
+    now = nowInstant().epochMilliseconds,
   }: {
     scheduleId: string;
     actorUserId: string;
+    now?: number;
   }): Promise<OpsScheduledJob> {
-    await this.getSchedule(scheduleId);
+    const row = await this.getSchedule(scheduleId);
+    if (!row.running || now - row.running.since.getTime() < SLOT_STALE_AFTER_MS) {
+      return this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
+    }
 
-    return this.refuse({ error: new ScheduleSlotNotStaleError(), scheduleId });
+    await this.schedules.clearReportRun({
+      projectId: row.projectId,
+      triggerId: row.triggerId,
+      requestId: row.running.requestId,
+    });
+    await this.record({ actorUserId, action: "ops.scheduler.clear_slot", row });
+
+    return this.readBack(scheduleId);
   }
 
-  /** Asks automation for one extra send; refused while a previous run-now is still in flight. */
+  /** Asks automation for one extra send; refused while any run is still in flight. */
   async runNow({
     scheduleId,
     actorUserId,
@@ -123,7 +136,7 @@ export class SchedulerOpsService {
     if (!row.active) {
       this.refuse({ error: new ScheduleInactiveError(), scheduleId });
     }
-    if (row.runningSlot) {
+    if (row.running) {
       this.refuse({ error: new ScheduleRunInProgressError(), scheduleId });
     }
 
@@ -243,9 +256,10 @@ function toOpsScheduledJob({
     lastSlot: row.lastRunAt ? row.lastRunAt.toISOString() : null,
     active: row.active,
     createdAt: row.createdAt.toISOString(),
-    currentSlot: row.runningSlot ? row.runningSlot.toISOString() : null,
+    currentSlot: row.running ? row.running.slot.toISOString() : null,
     attempts: 0,
     lastError: null,
-    updatedAt: row.updatedAt.toISOString(),
+    // Main's row was last touched when its slot was claimed, which the page's staleness reads.
+    updatedAt: (row.running?.since ?? row.updatedAt).toISOString(),
   };
 }

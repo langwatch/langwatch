@@ -1,6 +1,7 @@
 /** Derives overdue status (ADR-091); most important fact—calendar loop behind/stopped.
  * Page previously just rendered nextRunAt text. */
 
+import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import { toEpochMs } from "@langwatch/time";
 
 export interface SchedulerJobLike {
@@ -67,6 +68,19 @@ export function canRunNow({
 }): boolean {
   if (projectName === null) return false;
   return status !== "paused" && status !== "running" && status !== "retrying";
+}
+
+/** Whether a slot has been held long enough that clearing it is a repair. */
+export function isSlotStale({
+  job,
+  now,
+}: {
+  job: SchedulerJobLike & { updatedAt?: string };
+  now: number;
+}): boolean {
+  if (!job.currentSlot) return false;
+  const heldSince = job.updatedAt ?? job.currentSlot;
+  return now - toEpochMs(heldSince) >= SLOT_STALE_AFTER_MS;
 }
 
 /** Action-needed rows first, then by firing time (sooner-first matches operator reading). */

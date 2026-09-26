@@ -92,7 +92,7 @@ export class ReportScheduleService implements ReportRunSettlement {
     });
   }
 
-  /** Records how a run-now's dispatch ended, so the schedule accepts the next one. */
+  /** Records how a run ended, so the schedule accepts the next one. */
   async settleRun(input: {
     projectId: string;
     triggerId: string;
@@ -228,15 +228,18 @@ function toOperatorSchedules({
 }): OperatorReportSchedule[] {
   if (instance?.state.cron && instance.state.timezone) {
     const running = instance.state.pendingRun;
+    const at = (epochMs: number) => toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
     return [
       {
         ...toReportSchedule({ triggerId: trigger.id, instance }),
         projectId,
         cron: instance.state.cron,
         timezone: instance.state.timezone,
-        runningSlot: running ? toDate(Temporal.Instant.fromEpochMilliseconds(running.slot)) : null,
+        running: running
+          ? { requestId: running.requestId, slot: at(running.slot), since: at(running.since) }
+          : null,
         createdAt: trigger.createdAt,
-        updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(instance.updatedAt)),
+        updatedAt: at(instance.updatedAt),
       },
     ];
   }
@@ -251,7 +254,7 @@ function toOperatorSchedules({
       nextRunAt: null,
       lastRunAt: trigger.lastRunAt,
       active: false,
-      runningSlot: null,
+      running: null,
       createdAt: trigger.createdAt,
       updatedAt: trigger.updatedAt,
     },

@@ -1,3 +1,4 @@
+import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -5,6 +6,7 @@ import {
   compareForAttention,
   deriveLoopHealth,
   deriveStatus,
+  isSlotStale,
   latenessMs,
   needsAttention,
   type SchedulerJobLike,
@@ -228,6 +230,80 @@ describe("deriveLoopHealth", () => {
 
       expect(health.healthy).toBe(true);
       expect(health.lastFiredAt).toBeNull();
+    });
+  });
+});
+
+describe("isSlotStale", () => {
+  describe("given a slot claimed moments ago", () => {
+    it("keeps clearing unavailable for a fresh claim", () => {
+      // This gate guards the one control that can admit a second worker to a
+      // slot; offering it against a healthy run is the failure mode.
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: at(-1_000) }), updatedAt: at(-1_000) },
+          now: NOW,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given a slot held past the threshold", () => {
+    it("marks a held slot as stale", () => {
+      const held = at(-SLOT_STALE_AFTER_MS - 1_000);
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: held }), updatedAt: held },
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a slot held for exactly the threshold", () => {
+    it("marks it stale, so the boundary is inclusive", () => {
+      const held = at(-SLOT_STALE_AFTER_MS);
+      expect(
+        isSlotStale({
+          job: { ...job({ currentSlot: held }), updatedAt: held },
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given a slot with no updatedAt to read", () => {
+    it("falls back to the slot instant rather than never offering the repair", () => {
+      // The fallback is what keeps a wedged row repairable when the row has
+      // told us nothing since the claim.
+      expect(
+        isSlotStale({
+          job: job({ currentSlot: at(-SLOT_STALE_AFTER_MS - 1_000) }),
+          now: NOW,
+        }),
+      ).toBe(true);
+    });
+  });
+
+  describe("given an updatedAt newer than the slot instant", () => {
+    it("measures from updatedAt, so a live worker is not raced", () => {
+      // The worker touched the row recently — bumping attempts, recording an
+      // error — so the slot is old but the worker is not gone.
+      expect(
+        isSlotStale({
+          job: {
+            ...job({ currentSlot: at(-SLOT_STALE_AFTER_MS - 60_000) }),
+            updatedAt: at(-1_000),
+          },
+          now: NOW,
+        }),
+      ).toBe(false);
+    });
+  });
+
+  describe("given no slot in flight", () => {
+    it("keeps slot clearing unavailable", () => {
+      expect(isSlotStale({ job: job({ currentSlot: null }), now: NOW })).toBe(false);
     });
   });
 });

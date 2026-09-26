@@ -93,6 +93,27 @@ Feature: Operator control over the scheduler
 
   # ── Clearing a stuck slot ─────────────────────────────────────────────
 
+  @unit
+  Scenario: Clearing is offered only once a slot is genuinely stale
+    Given a schedule whose slot was claimed moments ago
+    When the row's actions are opened
+    Then clearing the slot is not offered
+
+  @unit
+  Scenario: Clearing a stale slot lets the schedule be claimed again
+    Given a schedule whose slot has been held past the staleness threshold
+    When the operator clears it
+    Then the slot is released
+    And the schedule accepts its next run
+
+  @unimplemented
+  Scenario: Clearing states the risk it carries
+    Given a schedule whose slot has been held past the staleness threshold
+    When the operator opens the clear confirmation
+    Then it states that a still-live original worker could result in the slot being worked twice
+
+  # ── Running now ───────────────────────────────────────────────────────
+
   @unimplemented
   Scenario: The confirmation names the tenant, not its identifier
     Given a schedule belonging to a project

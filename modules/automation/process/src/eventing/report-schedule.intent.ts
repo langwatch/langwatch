@@ -22,7 +22,7 @@ export interface ReportDispatcher {
   dispatch(input: { projectId: string; triggerId: string; slot: number }): Promise<void>;
 }
 
-/** Tells the report's schedule that a run-now's dispatch has ended; late-bound to the pipeline. */
+/** Tells the report's schedule that a run's dispatch has ended; late-bound to the pipeline. */
 export interface ReportRunSettlement {
   settleRun(input: {
     projectId: string;
@@ -57,7 +57,7 @@ async function settle({
   } catch (error) {
     logger.error(
       { projectId, triggerId, requestId, outcome, error },
-      "Report run-now ended but recording it failed; run-now stays refused until the next scheduled send",
+      "Report run ended but recording it failed; run-now stays refused until the next scheduled send or an operator clears it",
     );
   }
 }

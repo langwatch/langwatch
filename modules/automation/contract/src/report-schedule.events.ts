@@ -36,8 +36,8 @@ export const reportRunRequestedEventDataSchema = z.object({
 });
 export type ReportRunRequestedEventData = z.infer<typeof reportRunRequestedEventDataSchema>;
 
-/** How a run-now's dispatch ended: sent, or failed on its final attempt. */
-export const reportRunOutcomeSchema = z.enum(["sent", "failed"]);
+/** How a run ended: sent, failed on its final attempt, or released by an operator as stale. */
+export const reportRunOutcomeSchema = z.enum(["sent", "failed", "cleared"]);
 export type ReportRunOutcome = z.infer<typeof reportRunOutcomeSchema>;
 
 export const reportRunSettledEventDataSchema = z.object({

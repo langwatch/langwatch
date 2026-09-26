@@ -25,8 +25,8 @@ export type ReportScheduleState = {
   active: boolean;
   lastSlot: number | null;
   lastRunRequestId: string | null;
-  /** A run-now whose dispatch is neither sent nor finally failed; absent on pre-guard instances. */
-  pendingRun?: { requestId: string; slot: number } | null;
+  /** A run whose dispatch is neither sent nor finally failed; absent on pre-guard instances. */
+  pendingRun?: { requestId: string; slot: number; since: number } | null;
 };
 
 export const INITIAL_REPORT_SCHEDULE_STATE: ReportScheduleState = {
@@ -123,7 +123,7 @@ export const reportRunRequested: Handler<ReportRunRequestedEventData> = (state, 
       ...state,
       lastSlot: context.at,
       lastRunRequestId: data.requestId,
-      pendingRun: { requestId: data.requestId, slot: context.at },
+      pendingRun: { requestId: data.requestId, slot: context.at, since: after },
     },
     after,
     intents: [
@@ -136,14 +136,14 @@ export const reportRunRequested: Handler<ReportRunRequestedEventData> = (state, 
   });
 };
 
-/** The run-now's dispatch was sent or finally failed, so another may be asked for. */
+/** The run was sent, finally failed or cleared by an operator, so another may start. */
 export const reportRunSettled: Handler<ReportRunSettledEventData> = (state, data, context) =>
   settle({
     state: state.pendingRun?.requestId === data.requestId ? { ...state, pendingRun: null } : state,
     after: Math.max(context.at, context.now),
   });
 
-/** A down fleet fires the missed slot once; a scheduled send supersedes an unsettled run-now. */
+/** A down fleet fires the missed slot once; the slot's send supersedes any unsettled run. */
 export const reportScheduleWake: WakeHandler<ReportScheduleState, ReportScheduleIntents> = (
   state,
   context,
@@ -151,13 +151,20 @@ export const reportScheduleWake: WakeHandler<ReportScheduleState, ReportSchedule
   if (!state.active || !state.cron) {
     return { state, nextWakeAt: null, intents: [] };
   }
+  const after = Math.max(context.at, context.now);
+  const requestId = `slot:${context.at}`;
   return settle({
-    state: { ...state, lastSlot: context.at, pendingRun: null },
-    after: Math.max(context.at, context.now),
+    state: {
+      ...state,
+      lastSlot: context.at,
+      pendingRun: { requestId, slot: context.at, since: after },
+    },
+    after,
     intents: [
       context.intents.dispatchReport(`report:${context.at}`, {
         triggerId: state.triggerId,
         slot: context.at,
+        requestId,
       }),
     ],
   });

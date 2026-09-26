@@ -54,7 +54,7 @@ Feature: Platform administration package boundary
 
   @unit
   Scenario: Scheduler controls refuse what a report schedule cannot do
-    Given a report schedule, which never holds a slot lease
+    Given a report schedule with no run in flight
     When an operator asks to clear its stuck slot
     Then the service refuses with its stable scheduler error
     And no audit entry is written for the refused control

@@ -1,6 +1,10 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, OperatorReportSchedule } from "@langwatch/automation-contract";
-import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
+import {
+  SLOT_STALE_AFTER_MS,
+  type SchedulerAuditEntryView,
+  type SchedulerControlAction,
+} from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
@@ -18,11 +22,13 @@ const schedule = (over: Partial<OperatorReportSchedule> = {}): OperatorReportSch
   nextRunAt: at(600_000),
   lastRunAt: at(-600_000),
   active: true,
-  runningSlot: null,
+  running: null,
   createdAt: at(-86_400_000),
   updatedAt: at(-1_000),
   ...over,
 });
+
+const heldFor = (ms: number) => ({ requestId: "run_1", slot: at(-60_000), since: at(-ms) });
 
 type AuditEntry = {
   actorUserId: string;
@@ -55,6 +61,9 @@ function makeService(rows: OperatorReportSchedule[]) {
     },
     requestReportRun: async ({ projectId, triggerId }) => {
       commands.push(`run:${projectId}/${triggerId}`);
+    },
+    clearReportRun: async ({ projectId, triggerId, requestId }) => {
+      commands.push(`clear:${projectId}/${triggerId}/${requestId}`);
     },
   });
   const projects = createApiFixture<ProjectApi>({
@@ -168,27 +177,75 @@ describe("SchedulerOpsService", () => {
     });
   });
 
-  describe("given a schedule with a run-now still in flight", () => {
+  describe("given a schedule with a run still in flight", () => {
     describe("when the operator lists it", () => {
-      it("shows the run's slot as the one in flight", async () => {
-        const { service } = makeService([schedule({ runningSlot: at(-1_000) })]);
+      it("shows the run's slot as held since the run started", async () => {
+        const { service } = makeService([schedule({ running: heldFor(1_000) })]);
 
         const [job] = await service.listScheduledJobs({ limit: 10 });
 
-        expect(job?.currentSlot).toBe(at(-1_000).toISOString());
+        expect([job?.currentSlot, job?.updatedAt]).toEqual([
+          at(-60_000).toISOString(),
+          at(-1_000).toISOString(),
+        ]);
       });
     });
 
     describe("when an operator runs it now", () => {
       /** @scenario "A schedule that is already running refuses to run again" */
       it("refuses, naming the run in progress, and asks for no run", async () => {
-        const { service, audit, commands } = makeService([schedule({ runningSlot: at(-1_000) })]);
+        const { service, audit, commands } = makeService([schedule({ running: heldFor(1_000) })]);
 
         expect(
           await codeOf(() => service.runNow({ scheduleId: "report_1", actorUserId: "u1" })),
         ).toBe("schedule_run_in_progress");
         expect(commands).toEqual([]);
         expect(audit.entries).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a run held for less than the staleness threshold", () => {
+    describe("when an operator tries to clear it", () => {
+      /** @scenario "Clearing is offered only once a slot is genuinely stale" */
+      it("refuses, so a live run is never released, and records nothing", async () => {
+        const { service, audit, commands } = makeService([
+          schedule({ running: heldFor(SLOT_STALE_AFTER_MS - 1_000) }),
+        ]);
+
+        expect(
+          await codeOf(() =>
+            service.clearStuckSlot({
+              scheduleId: "report_1",
+              actorUserId: "u1",
+              now: NOW.getTime(),
+            }),
+          ),
+        ).toBe("schedule_slot_not_stale");
+        expect(commands).toEqual([]);
+        expect(audit.entries).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a run held past the staleness threshold", () => {
+    describe("when an operator clears it", () => {
+      /** @scenario "Clearing a stale slot lets the schedule be claimed again" */
+      it("releases exactly that run and records the control", async () => {
+        const { service, audit, commands } = makeService([
+          schedule({ running: heldFor(SLOT_STALE_AFTER_MS) }),
+        ]);
+
+        await service.clearStuckSlot({
+          scheduleId: "report_1",
+          actorUserId: "u1",
+          now: NOW.getTime(),
+        });
+
+        expect(commands).toEqual(["clear:project_acme/report_1/run_1"]);
+        expect(audit.entries.map(({ action, actorUserId }) => [action, actorUserId])).toEqual([
+          ["ops.scheduler.clear_slot", "u1"],
+        ]);
       });
     });
   });
@@ -225,7 +282,7 @@ describe("SchedulerOpsService", () => {
 
     describe("when an operator tries to clear its slot", () => {
       /** @scenario "Scheduler controls refuse what a report schedule cannot do" */
-      it("refuses with its stable code, since no slot is ever held, and records nothing", async () => {
+      it("refuses with its stable code, since no run is held, and records nothing", async () => {
         const { service, audit, commands } = makeService([schedule()]);
 
         expect(
