@@ -17,10 +17,11 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
     const context = React.useContext(DrawerOffsetContext);
     return (
       <Portal disabled={!portalled} container={portalRef}>
-        <ChakraDrawer.Positioner padding={offset}>
+        <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
           <ChakraDrawer.Content
             ref={ref}
             margin={2}
+            pointerEvents="auto"
             borderRadius="lg"
             background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 80%), transparent)"
             backdropFilter="var(--lw-backdrop-blur, blur(25px))"
@@ -51,8 +52,17 @@ export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
   size?: AppDrawerSize;
 }
 
+/** Non-modal by default so nested drawers and portalled popovers stay operable. */
 export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
-  return <ChakraDrawer.Root size={size as ChakraDrawer.RootProps["size"]} {...props} />;
+  return (
+    <ChakraDrawer.Root
+      modal={false}
+      closeOnInteractOutside={false}
+      preventScroll={false}
+      size={size as ChakraDrawer.RootProps["size"]}
+      {...props}
+    />
+  );
 };
 
 export const Drawer = {
