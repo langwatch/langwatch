@@ -99,6 +99,12 @@ export abstract class GovernanceHostApi {
   /** Fails closed the same way. */
   abstract isFeatureEnabled(flag: string): boolean;
 
+  /** On, off, or `undefined` while the flag has not answered yet. */
+  abstract featureFlag(flag: string): boolean | undefined;
+
+  /** Whether the session's grants have arrived, so a "no" is a real no. */
+  abstract isSettled(): boolean;
+
   abstract plan(): GovernancePlan;
 
   /** What kind of deployment this is, for copy that differs on self-hosted. */

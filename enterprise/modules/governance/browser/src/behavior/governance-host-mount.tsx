@@ -73,6 +73,14 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     return this.inputs.session.isFeatureEnabled(flag);
   }
 
+  featureFlag(flag: string): boolean | undefined {
+    return this.inputs.session.featureFlag(flag);
+  }
+
+  isSettled(): boolean {
+    return this.inputs.session.isSettled();
+  }
+
   plan() {
     return this.inputs.plan;
   }

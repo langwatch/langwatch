@@ -77,6 +77,10 @@ export type FakeGovernanceHostOptions = {
    * the flag itself is what a test is about.
    */
   enabledFlags?: readonly string[] | "all";
+  /** `false` while the flags have not answered: every flag reads `undefined`. */
+  flagsAnswered?: boolean;
+  /** `false` while the session's grants are still loading. */
+  sessionSettled?: boolean;
   /** `null` means the scope has not resolved, which several screens gate on. */
   organization?: GovernanceOrganization | null;
   organizations?: readonly GovernanceOrganization[];
@@ -178,8 +182,17 @@ export class FakeGovernanceHost extends GovernanceHostApi {
   }
 
   isFeatureEnabled(flag: string): boolean {
+    return this.featureFlag(flag) === true;
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    if (this.options.flagsAnswered === false) return void 0;
     const flags = this.options.enabledFlags ?? "all";
     return flags === "all" || flags.includes(flag);
+  }
+
+  isSettled(): boolean {
+    return this.options.sessionSettled ?? true;
   }
 
   plan(): GovernancePlan {

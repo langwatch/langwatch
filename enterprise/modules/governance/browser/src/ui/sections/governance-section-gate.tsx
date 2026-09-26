@@ -3,6 +3,7 @@
 import type { ComponentType } from "react";
 
 import { useGovernanceHost } from "../../model/governance-host.ts";
+import { LoadingScreen } from "../elements/loading-screen.tsx";
 import { NotFoundScene } from "../elements/not-found-scene.tsx";
 import { PermissionRequiredNotice } from "../elements/permission-required-notice.tsx";
 import GovernanceLayout from "./governance-layout.tsx";
@@ -18,15 +19,19 @@ type GovernanceSectionGate = {
   permission?: string;
 };
 
-/** Main's page guards, in main's order: section flag, release flag, then the grant. */
+/** Main's page guards, in main's order: section flag, release flag, then the grant; loading until all answer. */
 export function withGovernanceSection<P extends object>(
   Page: ComponentType<P>,
   { releaseFlag, permission = GOVERNANCE_VIEW }: GovernanceSectionGate = {},
 ): ComponentType<P> {
   const Gated = (props: P) => {
     const host = useGovernanceHost();
-    if (!host.isFeatureEnabled(GOVERNANCE_SECTION_FLAG)) return <NotFoundScene />;
-    if (releaseFlag !== void 0 && !host.isFeatureEnabled(releaseFlag)) return <NotFoundScene />;
+    const flags =
+      releaseFlag === void 0 ? [GOVERNANCE_SECTION_FLAG] : [GOVERNANCE_SECTION_FLAG, releaseFlag];
+    const answers = flags.map((flag) => host.featureFlag(flag));
+    if (answers.some((answer) => answer === void 0)) return <LoadingScreen />;
+    if (answers.some((answer) => answer === false)) return <NotFoundScene />;
+    if (!host.isSettled()) return <LoadingScreen />;
     if (!host.hasPermission(permission)) {
       return (
         <GovernanceLayout>

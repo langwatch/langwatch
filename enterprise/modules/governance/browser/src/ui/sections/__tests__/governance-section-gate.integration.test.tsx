@@ -40,10 +40,15 @@ vi.mock("../../../behavior/governance-api.ts", () => {
   return { api, governanceApi: api };
 });
 
+vi.mock("../../elements/loading-screen.tsx", () => ({
+  LoadingScreen: () => <div>Loading governance</div>,
+}));
+
 import AgentsScreen from "../governance/agents.tsx";
 import AnalyticsScreen from "../governance/analytics.tsx";
 import AnomalyRulesScreen from "../governance/governance-anomaly-rules.screen.tsx";
 import BilledScreen from "../governance/governance-billed.screen.tsx";
+import CostsScreen from "../governance/governance-costs.screen.tsx";
 import OverviewScreen from "../governance/governance-overview.screen.tsx";
 import InsightsScreen from "../governance/insights.tsx";
 import SignalsScreen from "../governance/signals.tsx";
@@ -54,13 +59,24 @@ const ALL_FLAGS = [SECTION_FLAG, BILLED_COST_FLAG];
 const VIEWER = ["organization:view", "governance:view"];
 const ORG_ADMIN = [...builtinRolePermissions("org-admin"), ...builtinRolePermissions("admin")];
 const NOT_FOUND = "This page is not here";
+const LOADING = "Loading governance";
 
 function renderGated(
   page: ReactElement,
-  { flags = ALL_FLAGS, permissions = VIEWER }: { flags?: string[]; permissions?: string[] } = {},
+  {
+    flags = ALL_FLAGS,
+    permissions = VIEWER,
+    flagsAnswered = true,
+    sessionSettled = true,
+  }: {
+    flags?: string[];
+    permissions?: string[];
+    flagsAnswered?: boolean;
+    sessionSettled?: boolean;
+  } = {},
 ) {
   return renderWithGovernanceHost(page, {
-    host: fakeGovernanceHost({ enabledFlags: flags, permissions }),
+    host: fakeGovernanceHost({ enabledFlags: flags, permissions, flagsAnswered, sessionSettled }),
   });
 }
 
@@ -151,5 +167,47 @@ describe("the Billed address", () => {
 
     expect(screen.getByText(NOT_FOUND)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Billed" })).toBeNull();
+  });
+});
+
+describe("before the flags and the session have answered", () => {
+  describe("when the flags are still loading", () => {
+    it("shows the loading screen and reads nothing", () => {
+      renderGated(<AgentsScreen />, { flagsAnswered: false });
+
+      expect(screen.getByText(LOADING)).toBeInTheDocument();
+      expect(screen.queryByText(NOT_FOUND)).toBeNull();
+      expect(harness.requested).toEqual([]);
+    });
+  });
+
+  describe("when the flags are on but the session is still loading", () => {
+    it("shows the loading screen rather than the permission notice, and reads nothing", () => {
+      renderGated(<CostsScreen />, { permissions: [], sessionSettled: false });
+
+      expect(screen.getByText(LOADING)).toBeInTheDocument();
+      expect(screen.queryByText(/Missing permission/)).toBeNull();
+      expect(harness.requested).toEqual([]);
+    });
+  });
+
+  describe("when the flags have settled off", () => {
+    it("shows the not-found scene on the costs page and reads nothing", () => {
+      renderGated(<CostsScreen />, { flags: [SECTION_FLAG] });
+
+      expect(screen.getByText(NOT_FOUND)).toBeInTheDocument();
+      expect(screen.queryByText(LOADING)).toBeNull();
+      expect(harness.requested).toEqual([]);
+    });
+  });
+
+  describe("when the flags have settled on and the costs grant is missing", () => {
+    it("names governanceCost:view and reads nothing", () => {
+      renderGated(<CostsScreen />);
+
+      expect(screen.getByText(/Missing permission: governanceCost:view/)).toBeInTheDocument();
+      expect(screen.queryByText(LOADING)).toBeNull();
+      expect(harness.requested).toEqual([]);
+    });
   });
 });
