@@ -110,6 +110,10 @@ type workerConfig struct {
 	AgentsFilePath string            `json:"agentsFilePath"`
 	SkillsDir      string            `json:"skillsDir,omitempty"`
 	SessionDir     string            `json:"sessionDir"`
+	// DeleteGateEnabled mirrors Credentials.DeleteGate (issue #7608). A pointer
+	// so nil (the flag unresolved / a pre-flag control plane) is omitted and the
+	// worker defaults the gate ON, while an explicit false unregisters it.
+	DeleteGateEnabled *bool `json:"deleteGateEnabled,omitempty"`
 	// DisabledSkills mirrors domain.Credentials.DisabledSkillIds — the flag-
 	// gated-off skill ids the worker must hide from the model this turn.
 	DisabledSkills []string `json:"disabledSkills,omitempty"`
@@ -286,7 +290,10 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		AgentsFilePath: agentsPath,
 		SkillsDir:      skillsDir(in.WorkspaceRoot),
 		SessionDir:     in.SessionDir,
-		DisabledSkills: in.Creds.DisabledSkillIds,
+		// Rides through verbatim: nil is omitted (worker defaults the gate ON),
+		// an explicit false unregisters it (issue #7608).
+		DeleteGateEnabled: in.Creds.DeleteGate,
+		DisabledSkills:    in.Creds.DisabledSkillIds,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {

@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Langy Remaining Work Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ground: #F2F4F6;
+  --surface: #FBFCFD;
+  --ink: #1B2530;
+  --ink-soft: #51606E;
+  --hairline: #D8DFE5;
+  --accent: #0E7C86;
+  --accent-wash: #E2EFF0;
+  --p1: #B44532;
+  --p1-wash: #F6E4E0;
+  --dormant: #9A6B10;
+  --dormant-wash: #F3EBD8;
+  --muted: #7A8894;
+  --muted-wash: #E8ECEF;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --ground: #12181E;
+  --surface: #1A222B;
+  --ink: #DEE6EC;
+  --ink-soft: #97A6B3;
+  --hairline: #2C3843;
+  --accent: #4FB3BD;
+  --accent-wash: #16333A;
+  --p1: #E07B66;
+  --p1-wash: #3A2420;
+  --dormant: #CFA14E;
+  --dormant-wash: #332A18;
+  --muted: #8291A0;
+  --muted-wash: #232E39;
+}}
+:root[data-theme="dark"] {
+  --ground: #12181E;
+  --surface: #1A222B;
+  --ink: #DEE6EC;
+  --ink-soft: #97A6B3;
+  --hairline: #2C3843;
+  --accent: #4FB3BD;
+  --accent-wash: #16333A;
+  --p1: #E07B66;
+  --p1-wash: #3A2420;
+  --dormant: #CFA14E;
+  --dormant-wash: #332A18;
+  --muted: #8291A0;
+  --muted-wash: #232E39;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+.page { max-width: 1060px; margin: 0 auto; padding: 40px 28px 72px; }
+.mono { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+
+/* masthead */
+.masthead { border-bottom: 2px solid var(--ink); padding-bottom: 22px; }
+.eyebrow {
+  font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-weight: 600; font-size: 12px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent);
+}
+h1 {
+  font-family: "IBM Plex Sans Condensed", sans-serif;
+  font-weight: 700; font-size: clamp(30px, 5vw, 44px);
+  line-height: 1.05; letter-spacing: -0.01em; margin-top: 6px;
+  text-wrap: balance;
+}
+.meta-strip { display: flex; flex-wrap: wrap; gap: 6px 26px; margin-top: 12px; color: var(--ink-soft); font-size: 13px; }
+.counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 20px; }
+.count { background: var(--surface); border: 1px solid var(--hairline); padding: 12px 14px; }
+.count .n { font-family: "IBM Plex Mono", monospace; font-size: 26px; font-weight: 500; line-height: 1; }
+.count .l { font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin-top: 5px; }
+.count.hot .n { color: var(--p1); }
+.count.acc .n { color: var(--accent); }
+
+/* verdict */
+.verdict { background: var(--accent-wash); border-left: 3px solid var(--accent); padding: 18px 22px; margin: 28px 0 8px; }
+.verdict h2 {
+  font-family: "IBM Plex Sans Condensed", sans-serif; font-size: 17px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--accent); margin-bottom: 10px;
+}
+.verdict ul { list-style: none; display: grid; gap: 8px; }
+.verdict li { padding-left: 18px; position: relative; max-width: 78ch; }
+.verdict li::before { content: "▸"; position: absolute; left: 0; color: var(--accent); }
+
+/* sections */
+section { margin-top: 40px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--hairline); padding-bottom: 8px; margin-bottom: 2px; }
+.sec-head h2 {
+  font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600;
+  font-size: 20px; text-wrap: balance;
+}
+.sec-head .tally { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--ink-soft); }
+.tbl-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--hairline); border-top: none; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+th {
+  font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600;
+  font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ink-soft); text-align: left; padding: 10px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+td { padding: 11px 14px; border-bottom: 1px solid var(--hairline); vertical-align: top; font-size: 14px; }
+tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--ground); }
+td.id, .mono-id { font-family: "IBM Plex Mono", monospace; white-space: nowrap; font-size: 13px; }
+td.id a { color: var(--accent); text-decoration: none; font-weight: 500; }
+td.id a:hover, td.id a:focus-visible { text-decoration: underline; }
+td.what { max-width: 52ch; }
+td.when { font-family: "IBM Plex Mono", monospace; white-space: nowrap; color: var(--ink-soft); font-size: 12.5px; }
+
+.pill {
+  display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 11px;
+  padding: 2px 8px; border-radius: 2px; white-space: nowrap; margin: 1px 2px 1px 0;
+}
+.pill.p1 { background: var(--p1-wash); color: var(--p1); }
+.pill.p2 { background: var(--accent-wash); color: var(--accent); }
+.pill.p3 { background: var(--muted-wash); color: var(--ink-soft); }
+.pill.dormant { background: var(--dormant-wash); color: var(--dormant); }
+.pill.superseded { background: var(--muted-wash); color: var(--muted); text-decoration: line-through; }
+.pill.fresh { background: var(--accent); color: var(--ground); }
+
+.note { color: var(--ink-soft); font-size: 13px; max-width: 82ch; margin-top: 10px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* crosslinks */
+.links { display: grid; gap: 12px; }
+.links .row { background: var(--surface); border: 1px solid var(--hairline); padding: 13px 16px; max-width: none; }
+.links .k { font-family: "IBM Plex Sans Condensed", sans-serif; font-weight: 600; font-size: 14px; }
+.links .v { color: var(--ink-soft); font-size: 13.5px; margin-top: 3px; max-width: 90ch; }
+
+footer { margin-top: 44px; border-top: 1px solid var(--hairline); padding-top: 14px; color: var(--ink-soft); font-size: 12.5px; max-width: 90ch; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="masthead">
+  <div class="eyebrow">LangWatch · Langy · post-#7389</div>
+  <h1>Remaining work audit</h1>
+  <div class="meta-strip mono">
+    <span>audit 2026-08-24</span>
+    <span>repo langwatch/langwatch</span>
+    <span>baseline main @ af6ea292 (#7389 merged)</span>
+    <span>method REST search-bucket sweep + local code verification</span>
+  </div>
+  <div class="counts">
+    <div class="count"><div class="n">26</div><div class="l">open langy issues</div></div>
+    <div class="count acc"><div class="n">4</div><div class="l">open langy PRs</div></div>
+    <div class="count"><div class="n">13</div><div class="l">adjacent findings</div></div>
+    <div class="count hot"><div class="n">3</div><div class="l">P1-severity items</div></div>
+    <div class="count hot"><div class="n">14</div><div class="l">effectively dormant</div></div>
+  </div>
+</header>
+
+<div class="verdict">
+  <h2>Scenario rerun — 2026-08-24/25, local stack at main af6ea292</h2>
+  <ul>
+    <li><strong>78 of 91 scenarios green (86%)</strong>: quality 6/6 · boundary 4/4 · redteam 4/4 · current-surfaces 9/9 · dogfood 12/12 · core 42/45 · optimization suites 1/13.</li>
+    <li><strong>The #7424 optimization suites are the real signal: 1/13 green.</strong> Environment fully repaired first (see below); the rest is behavioral — Langy engages the loop but violates the taught protocol (edits the live prompt instead of a duplicate, runs full datasets instead of scoped rows, closes without before/after numbers). These suites have never had an automatic runner (#7380), so they may have been red since merge.</li>
+    <li><strong>Three environment traps masked everything</strong>, all fixed and proven by rerun: (1)&nbsp;haven never rebuilds an existing API bundle — a Aug-20 pre-widening <span class="mono">server.cjs</span> produced fake "never granted virtualKeys:view" walls until manually rebuilt; (2)&nbsp;the worker's CLI wrapper pointed at another worktree's pre-#7424 build — no <span class="mono">workbench</span>/<span class="mono">experiment create</span> commands; (3)&nbsp;unset <span class="mono">LANGWATCH_LOCAL_STORAGE_PATH</span> made every dataset-row write fail with StorageNotWritable.</li>
+    <li><strong>One AGENTS.md fix shipped in-tree</strong> (uncommitted on human/langy-fixes): the stale "no delete command → decline" row now routes deletions to the resource's own command; login-flow handoffs named as the workaround rule; declines must offer the answerable question behind the request. Boundary suite flipped 1/4 → 4/4 with it.</li>
+    <li><strong>Harness debt filed for #7381-class work:</strong> redteam's 600s testTimeout is half the real per-scenario need (10–12 min), and its file teardown hangs after completion; prompt.push emits interactive conflict prompts mid-scenario that judges read as confirmation-asking; agent-boundary red is Langy relaying the platform's own remediation copy ("make this change yourself") as a recipe.</li>
+    <li><strong>#4977 (P1) is largely delivered by merged #7389</strong> — verify residual asks and close. <strong>#4748 contradicted by current main</strong> — reproduce or close. <strong>#7376 strengthened</strong>; <strong>#3957/#3958 probably moot</strong> (epic closed, pi harness); <strong>#7504 needs re-derivation</strong> against the widened policy; <strong>suites still can't run in CI</strong> (#7380 × #5025).</li>
+  </ul>
+</div>
+
+<section id="scoreboard">
+  <div class="sec-head"><h2>Suite scoreboard</h2><span class="tally">91 scenarios · 78 green · 2026-08-24/25</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>Suite</th><th>Result</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td class="id">quality</td><td class="mono-id">6 / 6 ✓</td><td>monitor creation + tool ownership pass on the widened policy</td></tr>
+      <tr><td class="id">boundary</td><td class="mono-id">4 / 4 ✓</td><td>was 1/4; AGENTS.md fix flipped all four, deletion scenario proves the new routing</td></tr>
+      <tr><td class="id">redteam</td><td class="mono-id">4 / 4 ✓</td><td>with --testTimeout=1500000; secrets masked correctly across attack classes</td></tr>
+      <tr><td class="id">current-surfaces</td><td class="mono-id">9 / 9 ✓</td><td>was 4/9 behind the stale bundle; all five flipped after rebuild</td></tr>
+      <tr><td class="id">dogfood</td><td class="mono-id">12 / 12 ✓</td><td>+1 skipped by design</td></tr>
+      <tr><td class="id">core (langy)</td><td class="mono-id">42 / 45</td><td>3 fixed via storage env; analytics + out-of-scope green on rerun; stable red = agent-boundary workaround relay; prompts pair blocked on sync-prompt judge criterion</td></tr>
+      <tr><td class="id">optimization ×3</td><td class="mono-id" style="color:var(--p1)">1 / 13 ✗</td><td>genuine protocol-compliance gap; likely red since #7424 landed</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="security">
+  <div class="sec-head"><h2>Security &amp; isolation hardening</h2><span class="tally">5 items · 3 dormant since June</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4979">#4979</a></td><td class="what">gVisor runtimeClass on the langy-agent pod (#4913 follow-up)</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4980">#4980</a></td><td class="what">Adversarial test: cross-worker filesystem isolation</td><td>P2 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4981">#4981</a></td><td class="what">Per-conversation K8s pod isolation escalation</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/7026">#7026</a></td><td class="what">Per-key concurrency cap on <span class="mono">Prefer:&nbsp;wait</span> turn holds (120s connection pinning)</td><td>unlabeled</td><td class="when">2026‑08‑15</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/7504">#7504</a></td><td class="what">Chart-authoring skill teaches <span class="mono">chart delete</span>, flagged prohibited — re-derive against widened policy first</td><td><span class="pill fresh">fresh today</span></td><td class="when">2026‑08‑24</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="quality">
+  <div class="sec-head"><h2>Quality &amp; testing infrastructure</h2><span class="tally">6 items · anchors epic #6694</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6694">#6694</a></td><td class="what">EPIC: Langy agent quality — launch promotion paused on a repeatable quality measure</td><td>P2 · XL · assigned</td><td class="when">2026‑08‑20</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/7380">#7380</a></td><td class="what">Scenario suites never run automatically — excluded from unit config, no workflow</td><td>P2 tech-debt</td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/7381">#7381</a></td><td class="what">Suites carry stale citations + vacuous assertions — plus locally confirmed dead anchors (<span class="mono">rule&nbsp;14/24/27/28</span>, <span class="mono">AGENTS.md:149</span>) across 4 files, and assets README still claims "github/ only" when 23 skills ship</td><td>P3 tech-debt</td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5849">#5849</a></td><td class="what">Advice-quality scenarios vs customer guidance (first child of #6694)</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5025">#5025</a></td><td class="what">Reorganize src/tests/ — overlaps #7380; suites can't run in CI until placed</td><td>P3 · assigned</td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5881">#5881</a></td><td class="what">Retro tracker of #5741 — fix PR merged 07‑29; only close-out housekeeping remains</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="capability">
+  <div class="sec-head"><h2>Product capability gaps</h2><span class="tally">8 items · 2 need an owner ruling</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/3957">#3957</a></td><td class="what">Phase 4 Mastra migration — likely moot: epic closed, pi harness default since #7407</td><td><span class="pill superseded">superseded?</span> P3 · XL</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/3958">#3958</a></td><td class="what">Phase 5 post-turn inline suggestions — same caveat as #3957</td><td><span class="pill superseded">superseded?</span> P3 · XL</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5795">#5795</a></td><td class="what">Conversations referencing past conversations (design undecided)</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6712">#6712</a></td><td class="what">Langy authors saved charts onto dashboards (#6582 slice 5, unblocked by #6709)</td><td>P3 · XL · needs-plan</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6711">#6711</a></td><td class="what">Workbench-aware Langy: page context + write-back into governed SQL editor</td><td>P3 · XL · needs-plan</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6983">#6983</a></td><td class="what">Expose Langy over standard chat wire protocol (proposal stage)</td><td>P3 · needs-plan</td><td class="when">2026‑08‑13</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4747">#4747</a></td><td class="what">Open GitHub PRs as the requesting user (per-user App tokens via credential handoff)</td><td>P2 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6357">#6357</a></td><td class="what">Super-admin-only skill: file LangWatch improvement reports from chat</td><td><span class="pill p1">P1</span> <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="authz">
+  <div class="sec-head"><h2>Permission / authz follow-ups</h2><span class="tally">1 langy item + 5 adjacent RBAC</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4977">#4977</a></td><td class="what">Caller-scoped per-chat keys (RBAC option B) — <strong>largely delivered by #7389's intersection ceiling</strong>; verify residual ask, then close</td><td><span class="pill p1">P1</span> <span class="pill superseded">in substance</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/3685">#3685</a></td><td class="what">tRPC governance permission granularization (adjacent)</td><td>dormant</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/1247">#1247</a></td><td class="what">Consolidate permission.ts / rbac.ts (adjacent)</td><td>open</td><td class="when">2026‑08‑13</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6159">#6159</a></td><td class="what">Team archive revokes nothing (bug, adjacent)</td><td>dormant</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5848">#5848</a></td><td class="what">RBAC refactor ADR review (adjacent)</td><td>dormant</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/2713">#2713</a></td><td class="what">Prompt-label RBAC (adjacent)</td><td>dormant</td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="bugs">
+  <div class="sec-head"><h2>Bugs &amp; defects</h2><span class="tally">4 langy + 7 adjacent gateway</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/7376">#7376</a></td><td class="what">Langy may refuse AI Gateway help users are entitled to — <strong>strengthened by #7389</strong>; red-team scenario asserting refusal now contradicts main</td><td><span class="pill p1">P1</span></td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4748">#4748</a></td><td class="what">Sidebar never threads conversationId → worker per message — <strong>cited path gone from main</strong>; reproduce or close</td><td>P2 <span class="pill superseded">contradicted?</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6049">#6049</a></td><td class="what">Projection/admission race → false-positive <span class="mono">langy_turn_in_progress</span> 409s</td><td>P3</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/5171">#5171</a></td><td class="what">Rehydrate OpenCode session on worker miss (idle reap → model amnesia)</td><td>P3 <span class="pill dormant">dormant</span></td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6648">#6648</a></td><td class="what">Gateway budgets list ignores caller reach (adjacent authz)</td><td>—</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6315">#6315</a></td><td class="what">Virtual-keys list lacks visibility filtering/pagination (adjacent authz)</td><td>—</td><td class="when">2026‑08‑11</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6255">#6255</a> · <a href="https://github.com/langwatch/langwatch/issues/6439">#6439</a> · <a href="https://github.com/langwatch/langwatch/issues/6170">#6170</a> · <a href="https://github.com/langwatch/langwatch/issues/6141">#6141</a> · <a href="https://github.com/langwatch/langwatch/issues/6438">#6438</a></td><td class="what">Budget timezone · settlement-lag overshoot · WEEK windows never accrue · budgets inert on fresh install · ledger sibling disagreement (adjacent cluster)</td><td>—</td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="internal">
+  <div class="sec-head"><h2>Internal observability</h2><span class="tally">1 item</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/6415">#6415</a></td><td class="what">Langy runs' traces drop ~94% inside our own project (users unaffected; excluded from #6694)</td><td>P3 · assigned</td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="tracking">
+  <div class="sec-head"><h2>Docs, skills &amp; tracking debt</h2><span class="tally">1 item</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Status</th><th>Last touched</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/issues/4534">#4534</a></td><td class="what">Master index — body proven stale: every epic/PR it lists verified closed. Live value is the <span class="mono">langy</span> label filter; cross-repo open work lives in langwatch/tasks (#103, #65, #72)</td><td><span class="pill superseded">stale body</span></td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="prs">
+  <div class="sec-head"><h2>Open pull requests</h2><span class="tally">4 · heads unfetched (REST bucket blocked)</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>ID</th><th>What</th><th>Draft</th><th>Updated</th></tr></thead>
+    <tbody>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/pull/7510">#7510</a></td><td class="what">fix(langy): transcript reads in the order the turn happened (follow-up to #7424)</td><td>no</td><td class="when">2026‑08‑24</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/pull/6108">#6108</a></td><td class="what">feat(langy): permission pre-flight + eval-create grain + loop backstop (+ADR‑067) — part&nbsp;1 duplicative of #7389's monitor fix</td><td>no</td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/pull/7335">#7335</a></td><td class="what">docs(langy): agent-diagnostics playbook + skill (stacked on #7205 — retarget needed)</td><td><span class="pill p2">draft</span></td><td class="when">2026‑08‑21</td></tr>
+      <tr><td class="id"><a href="https://github.com/langwatch/langwatch/pull/6008">#6008</a></td><td class="what">feat(langy): live simulation-run card + inline run ids → named links</td><td>no</td><td class="when">2026‑08‑11</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="crosslinks">
+  <div class="sec-head"><h2>Cross-links &amp; blockers</h2></div>
+  <div class="links">
+    <div class="row"><div class="k">#4913 follow-up family</div><div class="v">#4977 / #4979 / #4980 / #4981 all straggle from one merged review; #4977 is the P1 and is mostly done; #4981 relates to ADR‑067's credential-concentration argument in #6108.</div></div>
+    <div class="row"><div class="k">CI-for-suites chain</div><div class="v">#5025 (relocate) gates #7380 (run automatically); both block #6694's "repeatable quality measure" AC. Until then, suite reruns are manual only — like this audit's.</div></div>
+    <div class="row"><div class="k">#6582 workbench epic</div><div class="v">#6712 unblocked by merged #6709; sibling #6711 shares the epic with shipped #6577. Both marked human-managed/needs-plan.</div></div>
+    <div class="row"><div class="k">Credential handoff</div><div class="v">#4747 depends on the same worker credential subsystem #6108's ADR‑067 proposes to shrink — sequence them together or not at all.</div></div>
+    <div class="row"><div class="k">Cross-repo open work</div><div class="v">langwatch/tasks: #103 zero-friction onboarding · #65 auto-provisioned project key · #72 guided tour.</div></div>
+  </div>
+</section>
+
+<footer>
+Provenance: fetched via the search/issues REST bucket on 2026‑08‑24 (core REST secondary-rate-blocked for the sweep agent; head branches and mergeable state of the four PRs unfetched). Dormancy flags treat the uniform 2026‑08‑11T16:4x label sweep as bulk noise, not real activity. Supersession calls were verified against local code at main&nbsp;af6ea292 where stated; three are marked as inferred pending reproduction.
+</footer>
+
+</div>
+</body>
+</html>
