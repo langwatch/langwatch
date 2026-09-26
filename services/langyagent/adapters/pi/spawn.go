@@ -293,7 +293,7 @@ func (a *Agent) Provision(in ProvisionInput) error {
 		// Rides through verbatim: nil is omitted (worker defaults the gate ON),
 		// an explicit false unregisters it (issue #7608).
 		DeleteGateEnabled: in.Creds.DeleteGate,
-		DisabledSkills: in.Creds.DisabledSkillIds,
+		DisabledSkills:    in.Creds.DisabledSkillIds,
 	}
 	configBytes, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
