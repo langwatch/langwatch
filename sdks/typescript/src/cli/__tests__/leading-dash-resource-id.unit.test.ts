@@ -121,7 +121,7 @@ describe("a dashboard-widget id starting with '-'", () => {
     });
   });
 
-  describe("a normal id (no leading dash)", () => {
+  describe("given a normal id with no leading dash", () => {
     it("still works via the positional, unchanged", async () => {
       const { getDashboardWidgetCommand } = await import("../commands/dashboard-widgets/get.js");
       await parse(["dashboard-widget", "get", "widget-123"]);

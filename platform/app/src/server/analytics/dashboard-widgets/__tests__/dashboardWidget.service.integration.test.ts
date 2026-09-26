@@ -283,7 +283,7 @@ describe("dashboard widget service (integration)", () => {
             projectId: project.id,
             input: { dashboardId: dashboard.id, gridColumn: 6, colSpan: 4 },
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "validation_error" });
 
         const read = await service.getById({
           id: widget.id,

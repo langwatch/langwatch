@@ -193,7 +193,7 @@ export class DashboardWidgetsApiService {
   /**
    * Places a widget on a dashboard at the grid position supplied — or, when
    * no grid row is given, at the next row free on that dashboard. The twin
-   * of `ChartsApiService.place`, unlike {@link assignToDashboard} (which
+   * of `ChartsApiService.place`, unlike {@link assignDashboard} (which
    * always auto-places and keeps the widget's existing size).
    */
   async place(

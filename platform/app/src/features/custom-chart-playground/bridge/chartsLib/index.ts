@@ -108,6 +108,11 @@ function formatDuration(ms: number | null | undefined): string {
   return `${((ms as number) / 60000).toFixed(1)}m`;
 }
 
+/**
+ * Renders a metric value for display, applying the optional {@link MetricFormat}
+ * (currency, percent, duration, …). Strings pass through unchanged and a missing
+ * number renders as an en dash, so a card never shows a bare `null`/`NaN`.
+ */
 export function formatValue(
   value: number | string | null | undefined,
   format?: MetricFormat,
