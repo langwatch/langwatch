@@ -25,12 +25,18 @@ import type { Project } from "~/generated/prisma/client";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { createProjectService } from "~/server/api/v1/project-service";
 import { V1_API_VERSION } from "~/server/api/v1/version";
-import { instantEvalsEnabled } from "~/server/app-layer/instant-evals/access";
+import {
+  instantEvalsEnabled,
+  instantEvalsReleased,
+} from "~/server/app-layer/instant-evals/access";
 import {
   getInstantEvalRunService,
   type InstantEvalRunService,
 } from "~/server/app-layer/instant-evals/run";
-import { InstantEvalNotEnabledError } from "~/server/app-layer/instant-evals/run/errors";
+import {
+  InstantEvalClassifierNotConfiguredError,
+  InstantEvalNotEnabledError,
+} from "~/server/app-layer/instant-evals/run/errors";
 import { prisma } from "~/server/db";
 import type { Protections } from "~/server/traces/protections";
 import {
@@ -94,6 +100,11 @@ const requireInstantEvals: MiddlewareHandler = async (c, next) => {
     );
   }
   if (!(await instantEvalsEnabled({ prisma, projectId: project.id }))) {
+    // Released but refused means the deployment has no judge for this
+    // organization, which the operator fixes, not LangWatch.
+    if (await instantEvalsReleased({ prisma, projectId: project.id })) {
+      throw new InstantEvalClassifierNotConfiguredError();
+    }
     throw new InstantEvalNotEnabledError();
   }
   await next();

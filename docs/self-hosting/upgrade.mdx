@@ -210,6 +210,24 @@ docker compose up -d
 
 ## Breaking Changes
 
+### 3.16 or 3.17 to 3.18: Sign-in and SSO
+
+The upgrade keeps existing accounts working with no manual step, apart from the cases below. Checked on a Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO:
+
+- Password users sign in with their existing password on the new email-first sign-in page.
+- SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
+- Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
+- Browser sessions and API keys keep working.
+- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+
+The first start waits for these migrations before it serves traffic, so give `helm upgrade` a timeout that covers them, for example `--timeout 45m`. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+
+**Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
+
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+
+**Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
+
 ### Dataset Object Storage (Helm)
 
 Datasets moved from PostgreSQL to object storage, with a one-time automatic migration on upgrade. Helm deployments running more than one worker replica with the default local storage must either scale workers to 1 or configure S3-compatible storage before upgrading.

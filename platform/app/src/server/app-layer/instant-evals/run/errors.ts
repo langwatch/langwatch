@@ -37,6 +37,29 @@ export class InstantEvalNotEnabledError extends HandledError {
   }
 }
 
+/**
+ * The project is released for Instant Evals, but the deployment has no
+ * classifier that can judge for its organization: no judge key of its own,
+ * and no hosted judging switched on through Connect. The install's operator
+ * can act on it, which is why it is not folded into `instant_eval_not_enabled`.
+ */
+export class InstantEvalClassifierNotConfiguredError extends HandledError {
+  declare readonly code: "instant_eval_classifier_not_configured";
+
+  constructor() {
+    super(
+      "instant_eval_classifier_not_configured",
+      "Instant Evals are turned on for this project, but this installation has nothing to judge with yet.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("instant_eval_classifier_not_configured"),
+      },
+    );
+    this.name = "InstantEvalClassifierNotConfiguredError";
+  }
+}
+
 /** No run of this project has that id. */
 export class InstantEvalRunNotFoundError extends HandledError {
   declare readonly code: "instant_eval_not_found";

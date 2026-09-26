@@ -6,7 +6,6 @@ import {
 } from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
-import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
 import { env } from "~/env.mjs";
@@ -17,6 +16,7 @@ import { passkeySignUpRegistration } from "../passkey-signup";
 import { passkeyRelyingParty } from "../passkeyRelyingParty";
 import type { ConfirmSignUpAddressContext } from "../sign-up-confirmation";
 import { signUpConfirmation } from "../sign-up-confirmation";
+import { resilientGenericOAuth } from "./resilient-generic-oauth";
 
 const logger = createLogger("langwatch:better-auth:plugins");
 
@@ -111,8 +111,10 @@ export function plugins({
   const passkeysEnabled = deploymentOffersPasskeys();
 
   return [
+    // A provider whose identity provider is unreachable at startup is left
+    // out and retried, rather than failing the auth context and the process.
     ...(genericOAuthConfigs.length > 0
-      ? [genericOAuth({ config: genericOAuthConfigs })]
+      ? [resilientGenericOAuth({ config: genericOAuthConfigs })]
       : []),
     ...(mfaEnrollmentOpen
       ? [

@@ -133,6 +133,36 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then nothing is confirmed
     And the screen says to return to the window the request came from
 
+  # The account's own address runs the same ceremony. An account that exists
+  # and is unconfirmed (a password sign-up from an older release, or one made
+  # on an installation that could not send email) cannot use a sign-up link:
+  # that link refuses an address that already holds an account, because a
+  # mailed link alone must never confirm an account somebody else may have
+  # created. Confirming it marks the account's address as confirmed, which is
+  # what single sign-on reads before it links a sign-in to the account.
+  @integration
+  Scenario: An existing unconfirmed account confirms its own address from Settings
+    Given "sam" has an account whose own address was never confirmed
+    When "sam" asks from Settings for the link to be sent again
+    And "sam" opens the emailed link in the window that asked
+    Then the address is confirmed
+    And the account's address reads as confirmed everywhere, including to single sign-on
+
+  @integration
+  Scenario: The own address link opened without the window that asked confirms nothing
+    Given "sam" has an account whose own address was never confirmed
+    And a confirmation link for it went out from Settings
+    When the link is used without the proof the asking window kept
+    Then nothing is confirmed
+    And the account's address still reads as not confirmed
+
+  @unit
+  Scenario: The own address confirmation only ever goes to the session's own address
+    Given "sam" is signed in
+    When "sam" asks for the own address confirmation
+    Then the link goes to the address "sam" is signed in as
+    And no sign-up link is sent
+
   # Attaching is not claiming. An unverified identifier blocks nobody, so
   # refusing here would buy no protection and would answer "does an account
   # exist for this address" to anybody holding an account. The check belongs

@@ -64,6 +64,13 @@ Feature: Dashboard widgets placed on a dashboard
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
 
+  @integration
+  Scenario: A new widget previews against the dashboard's period
+    Given a dashboard whose period selector shows the last 30 days
+    When a member opens "Add chart" to draft a widget
+    Then the draft's queries run against that same period, not a fixed last 24 hours
+    And the preview shows the rows the widget will show once it is placed
+
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial
   # definition updates that do not blank the half the caller omitted.

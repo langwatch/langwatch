@@ -1,3 +1,4 @@
+import { microsoftProfileRekey } from "@ee/sso/microsoft-account-rekey";
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
@@ -30,6 +31,7 @@ import {
   ssoRegisteredIssuers,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
+import { prisma } from "~/server/db";
 
 import { databaseHooks } from "./config/database-hooks";
 import { emailAndPassword } from "./config/email-and-password";
@@ -181,7 +183,9 @@ export const auth = betterAuth({
   rateLimit: rateLimit({ hasSecondaryStorage: !!store }),
 
   secondaryStorage: store,
-  socialProviders: buildSocialProviders(env),
+  socialProviders: buildSocialProviders(env, {
+    onMicrosoftProfile: microsoftProfileRekey({ prisma }),
+  }),
 
   plugins: plugins({
     backupCodeCount: BACKUP_CODE_COUNT,

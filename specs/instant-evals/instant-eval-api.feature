@@ -252,6 +252,16 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
     When a run is requested
     Then the response is 403 with code instant_eval_not_enabled
 
+  # A self-hosted install with the flag on and no JEV_API_KEY, and no hosted
+  # judging through Connect, used to be told to ask LangWatch for the flag.
+  @integration
+  Scenario: A released project on a deployment with no judge is told what to configure
+    Given a project whose Instant Evals flag is on
+    And a deployment with no classifier that can judge for the project's organization
+    When a run is requested
+    Then the response is 403 with code instant_eval_classifier_not_configured
+    And the run service is never reached
+
   @unit
   Scenario: A deployment with no query identity answers as not enabled
     Given a project with a query key

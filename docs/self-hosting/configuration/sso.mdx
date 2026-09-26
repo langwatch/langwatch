@@ -347,7 +347,7 @@ For on-premises deployments with SSO, map email domains to organizations:
 -- Connect to PostgreSQL and run:
 UPDATE "Organization"
 SET "ssoProvider" = 'okta',
-    "ssoEmailDomain" = 'yourcompany.com'
+    "ssoDomain" = 'yourcompany.com'
 WHERE "id" = 'your-org-id';
 ```
 
@@ -355,16 +355,13 @@ This ensures users with `@yourcompany.com` emails are automatically associated w
 
 ## Migrating from Email/Password to SSO
 
-1. Enable SSO by setting the provider configuration above
-2. Flag existing email/password users for SSO migration:
+An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
 
-```sql
-UPDATE "User"
-SET "pendingSsoSetup" = true
-WHERE "email" LIKE '%@yourcompany.com';
-```
+1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
+2. Enable SSO by setting the provider configuration above.
+3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
 
-3. When flagged users next sign in via SSO, their accounts are automatically linked
+Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
 
 <Note>
 Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.

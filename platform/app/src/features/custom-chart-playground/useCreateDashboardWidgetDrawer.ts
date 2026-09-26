@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { usePeriodSelector } from "~/components/PeriodSelector";
 import { toaster } from "~/components/ui/toaster";
 import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
 import { api } from "~/utils/api";
@@ -35,11 +36,25 @@ export function useCreateDashboardWidgetDrawer({
     STARTER_WIDGET_QUERIES,
   );
 
+  // The draft previews against the dashboard's own period, the window the
+  // widget runs in once placed (as DashboardWidgetFrame reads it), so the
+  // preview and the saved card agree on what the query returns. Epoch
+  // milliseconds keep the dependency stable across renders.
+  const { period } = usePeriodSelector();
+  const timeWindow = useMemo(
+    () => ({
+      start: period.startDate.getTime(),
+      end: period.endDate.getTime(),
+    }),
+    [period.startDate, period.endDate],
+  );
+
   const preview = useWidgetPreview({
     code: draftCode,
     queries: draftQueries,
     projectId,
     projectSlug,
+    timeWindow,
   });
 
   // A fresh starter draft every time the drawer opens — otherwise a second
