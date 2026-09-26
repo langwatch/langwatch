@@ -15255,6 +15255,9 @@ importers:
       '@langwatch/enterprise-billing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/billing/process
+      '@langwatch/enterprise-gateway-process':
+        specifier: workspace:*
+        version: link:../../enterprise/modules/enterprise-gateway/process
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/governance/process
