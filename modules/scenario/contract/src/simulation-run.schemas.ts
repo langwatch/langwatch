@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 import { scenarioLegacyErrorBodySchema } from "./scenario-rest.schemas.ts";
 
@@ -18,6 +19,18 @@ export const scenarioRunRestResponseSchema = z.object({
       reasoning: z.string().nullable().optional(),
       metCriteria: z.array(z.string()).optional(),
       unmetCriteria: z.array(z.string()).optional(),
+      inconclusiveCriteria: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Criteria the judge could not check because the evidence was missing. Each is also in `unmetCriteria`.",
+        ),
+      criteria: z
+        .array(scenarioCriterionResultSchema)
+        .optional()
+        .describe(
+          "Each criterion with its status (`passed`, `failed` or `inconclusive`) and the judge's reasoning for it, in the order the scenario declares them. Runs from SDKs before per-criterion verdicts carry an empty reasoning.",
+        ),
       error: z.string().nullable().optional(),
       evaluations: z
         .array(scenarioEvaluationResultSchema)

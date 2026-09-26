@@ -1,14 +1,17 @@
 /**
- * What the judge decided about one run: verdict line, passed/failed criteria, evaluators that
- * ran, and the judge's overall note. No status pill, success rate, criteria count or duration —
- * the chip strip at the top of the drawer already reads all four.
+ * What the judge decided about one run: verdict line, each criterion with its status and
+ * reasoning, evaluators that ran, and the judge's overall note. No status pill, success rate,
+ * criteria count or duration: the chip strip at the top of the drawer already reads all four.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import {
+  resolveCriterionResults,
   ScenarioRunStatus,
   resolveScenarioError,
+  type ScenarioCriterionResult,
+  type ScenarioCriterionStatus,
   extractScenarioErrorDetail,
   scenarioErrorTitle,
 } from "@langwatch/scenario-contract";
@@ -44,19 +47,25 @@ const VERDICT_WORD: Partial<Record<ScenarioRunStatus, "PASSED" | "FAILED">> = {
   [ScenarioRunStatus.FAILED]: "FAILED",
 };
 
-/**
- * The criteria of a run split into passed and failed, each list held in the order the
- * scenario declares them.
- */
-function orderCriteria(criteria: readonly string[], declaredCriteria: readonly string[]): string[] {
+/** The criteria of one status, held in the order the scenario declares them. */
+function criteriaWithStatus({
+  criteria,
+  status,
+  declaredCriteria,
+}: {
+  criteria: readonly ScenarioCriterionResult[];
+  status: ScenarioCriterionStatus;
+  declaredCriteria: readonly string[];
+}): ScenarioCriterionResult[] {
   const rankOf = (criterion: string) => {
     const at = declaredCriteria.indexOf(criterion);
     return at === -1 ? declaredCriteria.length : at;
   };
-  return [...criteria]
-    .map((criterion, at) => ({ criterion, at, rank: rankOf(criterion) }))
+  return criteria
+    .map((result, at) => ({ result, at, rank: rankOf(result.criterion) }))
+    .filter((entry) => entry.result.status === status)
     .toSorted((left, right) => left.rank - right.rank || left.at - right.at)
-    .map((entry) => entry.criterion);
+    .map((entry) => entry.result);
 }
 
 /** How tall the heading reads: the box both the icon and the capitals fill. */
@@ -170,15 +179,15 @@ function VerdictStatusLine({
 }
 
 /**
- * How a criterion row reads: passed, failed, or inconclusive when the judge
- * could not decide it (most often because the trace evidence never arrived).
+ * How a criterion row reads: passed, failed, or inconclusive when the test
+ * could not check it (the evidence to decide was missing).
  */
-type CriterionTone = "passed" | "failed" | "inconclusive";
+type CriterionTone = ScenarioCriterionStatus;
 
 const CRITERION_ROW_COLOR: Record<CriterionTone, string> = {
   passed: "green.fg",
   failed: "red.fg",
-  inconclusive: FG_MUTED,
+  inconclusive: PASS_RATE_AMBER_COLOR,
 };
 
 function CriterionIcon({ tone }: { tone: CriterionTone }) {
@@ -192,18 +201,42 @@ function CriterionIcon({ tone }: { tone: CriterionTone }) {
   }
 }
 
-/** One criterion row: the tone's icon and the plain criterion string. */
-function CriterionRow({ criterion, tone }: { criterion: string; tone: CriterionTone }) {
+/**
+ * One criterion row: the tone's icon, the criterion, the requirement the judge
+ * checked when it restated the criterion, and the judge's reasoning for it.
+ */
+function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
+  const tone = result.status;
+  const requirement = result.requirement?.trim();
+  const showsRequirement = !!requirement && requirement !== result.criterion.trim();
+  const reasoning = result.reasoning.trim();
   return (
-    <HStack align="start" gap={2}>
+    <HStack align="start" gap={2} data-testid={`run-verdict-criterion-${tone}`}>
       <Box marginTop="1px" flexShrink={0} color={CRITERION_ROW_COLOR[tone]}>
         <CriterionIcon tone={tone} />
       </Box>
-      <Box minWidth={0}>
+      <VStack align="stretch" gap={0.5} minWidth={0}>
         <Text fontSize="12px" fontWeight="medium">
-          {criterion}
+          {result.criterion}
         </Text>
-      </Box>
+        {showsRequirement ? (
+          <Text fontSize="11px" color="fg.subtle" data-testid="run-verdict-criterion-requirement">
+            Checked as: {requirement}
+          </Text>
+        ) : null}
+        {reasoning ? (
+          <Text
+            fontSize="11.5px"
+            color={FG_MUTED}
+            lineHeight="short"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            data-testid="run-verdict-criterion-reasoning"
+          >
+            {reasoning}
+          </Text>
+        ) : null}
+      </VStack>
     </HStack>
   );
 }
@@ -215,23 +248,28 @@ function CriterionRow({ criterion, tone }: { criterion: string; tone: CriterionT
 function CriteriaSection({
   heading,
   headingColor,
+  description,
   criteria,
-  tone,
   testId,
 }: {
   heading: string;
   headingColor: string;
-  criteria: readonly string[];
-  tone: CriterionTone;
+  description?: string;
+  criteria: readonly ScenarioCriterionResult[];
   testId: string;
 }) {
   if (criteria.length === 0) return null;
   return (
     <VStack align="stretch" gap={2} data-testid={testId}>
       <PanelHeading color={headingColor}>{heading}</PanelHeading>
+      {description ? (
+        <Text fontSize="11.5px" color={FG_MUTED} marginTop={-1}>
+          {description}
+        </Text>
+      ) : null}
       <VStack align="stretch" gap={2.5}>
-        {criteria.map((criterion, at) => (
-          <CriterionRow key={`${criterion}-${at}`} criterion={criterion} tone={tone} />
+        {criteria.map((result, at) => (
+          <CriterionRow key={`${result.criterion}-${at}`} result={result} />
         ))}
       </VStack>
     </VStack>
@@ -600,6 +638,7 @@ export function RunVerdictPanel({
   metCriteria,
   unmetCriteria,
   inconclusiveCriteria = [],
+  criteria,
   declaredCriteria,
   reasoning,
   error,
@@ -617,6 +656,8 @@ export function RunVerdictPanel({
    * "the agent did not do it".
    */
   inconclusiveCriteria?: readonly string[];
+  /** Each criterion with its status and reasoning; derived from the lists when absent. */
+  criteria?: readonly ScenarioCriterionResult[];
   /** The criteria the scenario declares, in its own order. */
   declaredCriteria: readonly string[];
   /** What the judge said about the run as a whole, if anything. */
@@ -628,15 +669,25 @@ export function RunVerdictPanel({
 }) {
   const reasoningIsError = isErrorPayload(reasoning);
   const showsReasoning = !!reasoning && !(!!error && restatesFailure(reasoning));
-  const inconclusive = new Set(inconclusiveCriteria);
   const showsFailurePanel = reasoningIsError && !!reasoning;
   const showsJudgeReasoning = !showsFailurePanel && showsReasoning;
-  const orderedMet = orderCriteria(metCriteria, declaredCriteria);
-  const orderedFailed = orderCriteria(
-    unmetCriteria.filter((criterion) => !inconclusive.has(criterion)),
+  const results = resolveCriterionResults({
+    criteria,
+    metCriteria,
+    unmetCriteria,
+    inconclusiveCriteria,
+  });
+  const orderedMet = criteriaWithStatus({ criteria: results, status: "passed", declaredCriteria });
+  const orderedFailed = criteriaWithStatus({
+    criteria: results,
+    status: "failed",
     declaredCriteria,
-  );
-  const orderedInconclusive = orderCriteria(inconclusiveCriteria, declaredCriteria);
+  });
+  const orderedInconclusive = criteriaWithStatus({
+    criteria: results,
+    status: "inconclusive",
+    declaredCriteria,
+  });
   const hasAnyCriteria = orderedMet.length + orderedFailed.length + orderedInconclusive.length > 0;
   const failedEvaluatorName = failedRequiredEvaluatorName(evaluations);
 
@@ -655,21 +706,19 @@ export function RunVerdictPanel({
           heading="Failed criteria"
           headingColor={FAILED_COLOR}
           criteria={orderedFailed}
-          tone="failed"
           testId="run-verdict-failed-criteria"
         />
         <CriteriaSection
-          heading="Inconclusive criteria"
-          headingColor={FG_MUTED}
+          heading="Could not check"
+          headingColor={PASS_RATE_AMBER_COLOR}
+          description="The test did not have the evidence to decide these. They still fail the run."
           criteria={orderedInconclusive}
-          tone="inconclusive"
           testId="run-verdict-inconclusive-criteria"
         />
         <CriteriaSection
           heading="Passed criteria"
           headingColor={PASSED_COLOR}
           criteria={orderedMet}
-          tone="passed"
           testId="run-verdict-passed-criteria"
         />
         {!hasAnyCriteria && !error ? (

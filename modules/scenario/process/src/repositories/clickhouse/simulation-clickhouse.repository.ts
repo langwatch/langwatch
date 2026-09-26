@@ -17,6 +17,7 @@ import {
 } from "@langwatch/scenario-contract";
 
 import { SimulationRepository } from "../simulation.repository.ts";
+import { CRITERIA_COLUMNS_SQL, CRITERIA_LIST_COLUMNS_SQL } from "./simulation-criteria.mapper.ts";
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
@@ -103,6 +104,7 @@ const RUN_COLUMNS = `
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, InconclusiveCriteria, Error,
   ${EVALUATION_COLUMNS_SQL},
+  ${CRITERIA_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -130,6 +132,7 @@ const LIST_COLUMNS = `
   MetCriteria, UnmetCriteria, InconclusiveCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
   ${EVALUATION_LIST_COLUMNS_SQL},
+  ${CRITERIA_LIST_COLUMNS_SQL},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,

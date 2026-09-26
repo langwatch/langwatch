@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { scenarioCriterionResultSchema } from "./scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "./scenario-evaluation-result.ts";
 
 /** Values written by the Simulation event pipeline. */
@@ -34,6 +35,8 @@ export const simulationEventResultsSchema = z.object({
   unmetCriteria: z.array(z.string()).default([]),
   /** Criteria the judge could not decide; each is also in `unmetCriteria`. */
   inconclusiveCriteria: z.array(z.string()).optional(),
+  /** Each criterion with its own status and reasoning; absent on older SDKs. */
+  criteria: z.array(scenarioCriterionResultSchema).optional(),
   error: z.string().optional(),
   /** Code-triggered runs send their evaluations with the finished event. */
   evaluations: z.array(scenarioEvaluationResultSchema).optional(),
