@@ -126,6 +126,22 @@ describe("classifyLangyCanaryOutcome", () => {
     });
   });
 
+  describe("given a turn that answered with a question card and waits on the user", () => {
+    describe("when the settlement is classified", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("is healthy", () => {
+        expect(
+          classifyLangyCanaryOutcome({
+            succeeded: true,
+            outcome: "awaiting_user",
+            text: "What would you like to do?",
+            error: null,
+          }),
+        ).toEqual({ healthy: true });
+      });
+    });
+  });
+
   describe("given no settlement arrived before the budget ran out", () => {
     describe("when the missing settlement is classified", () => {
       /** @scenario "A turn that never settled is timeout" */
@@ -524,6 +540,36 @@ describe("buildProductionLangyCanaryDeps", () => {
           turnId: "turn-1",
           userId: "user-1",
           signal,
+          settleOnUserWait: true,
+        });
+      });
+    });
+
+    describe("when the production deps await a turn that waits on the user", () => {
+      /** @scenario "A turn that asks the user a question is healthy" */
+      it("settles on the user wait and reports healthy", async () => {
+        const waiting = {
+          succeeded: true as const,
+          outcome: "awaiting_user" as const,
+          text: "Which project?",
+          error: null,
+        };
+        awaitTurnSettlement.mockResolvedValue(waiting);
+        const deps = buildProductionLangyCanaryDeps({
+          projectId: "proj-1",
+          session,
+        });
+
+        const settlement = await deps.awaitSettlement({
+          ...STARTED,
+          signal: new AbortController().signal,
+        });
+
+        expect(awaitTurnSettlement).toHaveBeenCalledWith(
+          expect.objectContaining({ settleOnUserWait: true }),
+        );
+        expect(classifyLangyCanaryOutcome(settlement)).toEqual({
+          healthy: true,
         });
       });
     });

@@ -4,7 +4,9 @@
  * Sends one real user turn ("Hi Langy.") through the same in-process turn
  * service the browser and the key-authed API use, holds until the turn settles
  * on the durable fold, and says what broke: healthy, or one of exactly three
- * named reasons — `timeout`, `turn_failed`, `empty_reply`.
+ * named reasons — `timeout`, `turn_failed`, `empty_reply`. A turn that
+ * answers with a question card is healthy: the wait settles on the card
+ * instead of holding until someone answers it.
  *
  * The moving parts are separated so the interesting logic is testable with no
  * worker and no real waiting:
@@ -26,7 +28,8 @@
  * fit inside one request. The monitor's own confirmation retry covers the
  * noise a single LLM turn carries.
  *
- * On a timeout the in-flight turn is left alone: the worker finishes or fails
+ * On a timeout, or a turn waiting on the user, the in-flight turn is left
+ * alone: the worker finishes or fails
  * it on its own schedule and the fold records whichever it was. Because that
  * turn outlives the answer, the caller's single-flight slot is held for one
  * further budget rather than released with the response, so a monitor that
@@ -40,6 +43,7 @@ import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import {
+  type AwaitingUserSettlement,
   awaitTurnSettlement,
   type TurnSettlement,
 } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
@@ -91,7 +95,7 @@ export interface LangyCanaryDeps {
    */
   awaitSettlement: (
     options: StartedTurn & { signal: AbortSignal },
-  ) => Promise<TurnSettlement | null>;
+  ) => Promise<TurnSettlement | AwaitingUserSettlement | null>;
   /** The clock, `Date.now` in production. */
   now: () => number;
   /** Overrides {@link LANGY_CANARY_BUDGET_MS}; a test seam. */
@@ -105,12 +109,15 @@ export interface LangyCanaryDeps {
  * that did not succeed, or succeeded as `stopped` (nobody stops a canary turn,
  * so a stop is the worker giving up), is `turn_failed`. A completed turn whose
  * text is empty or whitespace is `empty_reply` — an empty answer is the one
- * failure a status code alone would hide.
+ * failure a status code alone would hide. A turn waiting on the user
+ * (`awaiting_user`) is healthy: Langy started, reasoned and answered with a
+ * card.
  */
 export function classifyLangyCanaryOutcome(
-  settlement: TurnSettlement | null,
+  settlement: TurnSettlement | AwaitingUserSettlement | null,
 ): LangyCanaryVerdict {
   if (!settlement) return { healthy: false, reason: "timeout" };
+  if (settlement.outcome === "awaiting_user") return { healthy: true };
   if (!settlement.succeeded || settlement.outcome !== "completed") {
     return { healthy: false, reason: "turn_failed" };
   }
@@ -287,6 +294,7 @@ export function buildProductionLangyCanaryDeps({
         turnId,
         userId: session.user.id,
         signal,
+        settleOnUserWait: true,
       }),
     now: () => Date.now(),
   };

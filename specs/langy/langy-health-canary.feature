@@ -10,7 +10,9 @@ Feature: A Langy health check that sends a real greeting and says what broke
   Three unhealthy reasons exist, and only three: `timeout` (the turn did not
   settle inside the budget), `turn_failed` (the turn settled as failed or
   stopped), and `empty_reply` (the turn completed but carried no text). A
-  failed, stopped or empty turn is never mistaken for a healthy one.
+  failed, stopped or empty turn is never mistaken for a healthy one. A turn
+  that answers the greeting with a question card is healthy: the check stops
+  waiting once the card is up instead of holding until someone answers it.
 
   The check mints a fresh idempotency key per run. Langy dedupes a repeated
   key per caller by replaying the first turn's outcome, so a monitor sending
@@ -40,6 +42,7 @@ Feature: A Langy health check that sends a real greeting and says what broke
   # Bindings:
   #   platform/app/src/server/health-probes/langy-canary.service.ts
   #   platform/app/src/server/health-probes/__tests__/langy-canary.service.unit.test.ts
+  #   platform/app/src/server/app-layer/langy/streaming/awaitTurnSettlement.unit.test.ts
   #   platform/app/src/server/app-layer/langy/langyApiKeyAuthorization.ts
   #   platform/app/src/server/routes/health-checks.ts
   #   platform/app/src/server/routes/__tests__/langy-canary.integration.test.ts
@@ -71,6 +74,13 @@ Feature: A Langy health check that sends a real greeting and says what broke
     Given a turn that settled as completed with a reply of only whitespace
     When the outcome is classified
     Then it is unhealthy with reason "empty_reply"
+
+  @unit
+  Scenario: A turn that asks the user a question is healthy
+    Given a turn that answered the greeting with a question card and now waits on the user
+    When the outcome is classified
+    Then it is healthy
+    And the production deps ask the settlement wait to settle on a user wait
 
   @unit
   Scenario: A turn that never settled is timeout
@@ -132,6 +142,28 @@ Feature: A Langy health check that sends a real greeting and says what broke
     And the turn is attributed to that session
     When the production deps await settlement
     Then the fold is followed as that session's user
+
+  # ---------------------------------------------------------------------------
+  # Settlement wait — a turn waiting on the user
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A user wait settles the wait only when the caller opts in
+    Given a turn whose fold records a question wait and no reply
+    When the settlement wait opted in to settling on a user wait
+    Then it settles as "awaiting_user" carrying the question text
+
+  @unit
+  Scenario: A user wait keeps a caller that did not opt in waiting
+    Given a turn whose fold records a question wait and no reply
+    When the settlement wait did not opt in
+    Then it keeps waiting until its signal aborts
+
+  @unit
+  Scenario: A reply in the fold wins over a user wait
+    Given a turn whose fold records both a question wait and a completed reply
+    When the settlement wait opted in to settling on a user wait
+    Then it settles as the completed reply
 
   # ---------------------------------------------------------------------------
   # Single flight — one check per caller at a time

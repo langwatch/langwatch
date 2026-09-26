@@ -144,3 +144,109 @@ describe("awaitTurnSettlement (buffered path)", () => {
     expect(mockDisconnect).toHaveBeenCalled();
   });
 });
+
+describe("awaitTurnSettlement (user wait)", () => {
+  const userWaitEvent = {
+    id: "evt-wait",
+    createdAt: 1,
+    occurredAt: 1,
+    type: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
+    data: {
+      conversationId: "conv-1",
+      turnId: "turn-1",
+      waitId: "wait-1",
+      kind: "question",
+      expiresAt: 600_000,
+      questions: [
+        { question: "What would you like to do?", options: [] },
+        { question: "Which project?", options: [] },
+      ],
+    },
+  };
+  const otherTurnWaitEvent = {
+    ...userWaitEvent,
+    id: "evt-wait-other",
+    data: { ...userWaitEvent.data, turnId: "turn-0", waitId: "wait-0" },
+  };
+  const waitingFold = {
+    events: [otherTurnWaitEvent, userWaitEvent],
+    cursor: { acceptedAt: 1, eventId: "evt-wait" },
+    truncated: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDuplicate.mockReturnValue({ disconnect: mockDisconnect });
+    mockReadTail.mockResolvedValue({ reads: [], lastId: "0" });
+    mockFollow.mockImplementation(async function* (opts: {
+      signal: AbortSignal;
+    }) {
+      await new Promise((resolve) =>
+        opts.signal.addEventListener("abort", resolve, { once: true }),
+      );
+    });
+  });
+
+  describe("given a turn whose fold records a question wait and no reply", () => {
+    describe("when the caller opted in to settling on a user wait", () => {
+      /** @scenario "A user wait settles the wait only when the caller opts in" */
+      it("settles as awaiting_user carrying the question text", async () => {
+        mockGetEventsAfter.mockResolvedValue(waitingFold);
+
+        const settlement = await awaitTurnSettlement({
+          ...ARGS,
+          signal: AbortSignal.timeout(5_000),
+          pollIntervalMs: 5,
+          settleOnUserWait: true,
+        });
+
+        expect(settlement).toEqual({
+          succeeded: true,
+          outcome: "awaiting_user",
+          text: "What would you like to do?\nWhich project?",
+          error: null,
+        });
+      });
+    });
+
+    describe("when the caller did not opt in", () => {
+      /** @scenario "A user wait keeps a caller that did not opt in waiting" */
+      it("keeps waiting until its signal aborts", async () => {
+        mockGetEventsAfter.mockResolvedValue(waitingFold);
+
+        const settlement = await awaitTurnSettlement({
+          ...ARGS,
+          signal: AbortSignal.timeout(50),
+          pollIntervalMs: 5,
+        });
+
+        expect(settlement).toBeNull();
+      });
+    });
+  });
+
+  describe("given a turn whose fold records both a question wait and a completed reply", () => {
+    describe("when the caller opted in to settling on a user wait", () => {
+      /** @scenario "A reply in the fold wins over a user wait" */
+      it("settles as the completed reply, even when the reply is on a later page", async () => {
+        mockGetEventsAfter
+          .mockResolvedValueOnce({ ...waitingFold, truncated: true })
+          .mockResolvedValue(settledFold);
+
+        const settlement = await awaitTurnSettlement({
+          ...ARGS,
+          signal: AbortSignal.timeout(5_000),
+          pollIntervalMs: 5,
+          settleOnUserWait: true,
+        });
+
+        expect(settlement).toEqual({
+          succeeded: true,
+          outcome: "completed",
+          text: "from the fold",
+          error: null,
+        });
+      });
+    });
+  });
+});
