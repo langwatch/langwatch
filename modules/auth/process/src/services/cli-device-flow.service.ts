@@ -908,31 +908,47 @@ async function keySelectionFieldsFor({
     );
   }
 
+  const [keySelection] = await findDefaultKeySelections({ flow, person, organizationId });
+  if (!keySelection || !teamManagement) return keySelection ? { keySelection } : {};
+
+  if (!keySelection.bindings.some((binding) => binding.scopeType === "ORGANIZATION")) {
+    throw refused(
+      "team_management_needs_organization",
+      "Team management applies to the whole organization. Select the organization as the key's access, or run `langwatch login --device` without --manage-teams.",
+      400,
+    );
+  }
+
+  return {
+    keySelection: {
+      ...keySelection,
+      permissions: withTeamManagement(keySelection.permissions, true).toSorted(),
+    },
+  };
+}
+
+/** The key a CLI login gets when the approval names none; empty when it cannot be resolved. */
+async function findDefaultKeySelections({
+  flow,
+  person,
+  organizationId,
+}: {
+  flow: CliDeviceFlowCollaborators;
+  person: CliBrowserSession;
+  organizationId: string;
+}): Promise<CliKeySelection[]> {
   try {
     const keySelection = await flow
       .apiKeys()
       .findDefaultCliSelection({ userId: person.id, organizationId });
-    if (!keySelection) return {};
-
-    const organizationWide = keySelection.bindings.some(
-      (binding) => binding.scopeType === "ORGANIZATION",
-    );
-    return {
-      keySelection:
-        teamManagement && organizationWide
-          ? {
-              ...keySelection,
-              permissions: withTeamManagement(keySelection.permissions, true).toSorted(),
-            }
-          : keySelection,
-    };
+    return keySelection ? [keySelection] : [];
   } catch (err) {
     logger.warn(
       { err, userId: person.id, organizationId },
       "[auth-cli] could not resolve the default key selection; device session proceeds without a scoped key",
     );
 
-    return {};
+    return [];
   }
 }
 

@@ -357,6 +357,21 @@ export class PrismaProjectRepository
     organizationId: string;
     data: UpdateProjectInput;
   }): Promise<Project> {
+    for (let attempt = 1; attempt < TEAM_MOVE_ATTEMPTS; attempt++) {
+      try {
+        return await this.updateOnce(input);
+      } catch (error) {
+        if (!isRecordNotFound(error)) throw error;
+      }
+    }
+    return this.updateOnce(input);
+  }
+
+  private async updateOnce(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
     const where = {
       id: input.id,
       archivedAt: null,
@@ -371,14 +386,13 @@ export class PrismaProjectRepository
       );
     }
 
-    // The gateway resolves a key's team budgets from the team of the project
-    // it traces to, and caches the result. A team move appends to the change
-    // feed it long-polls, in the same write, so the gateway re-resolves the
-    // keys tracing to this project instead of enforcing the old team's
-    // budgets until the cache expires.
+    // The gateway caches a key's team budgets by the team of its project. A
+    // team move appends to the change feed it long-polls, in the same write,
+    // and only while the project is still on the team read above, so a
+    // concurrent move re-reads instead of recording a stale origin.
     return this.mapProjectRequired(
       await this.prisma.project.update({
-        where,
+        where: { ...where, teamId: movedFrom },
         data: {
           ...input.data,
           gatewayChangeEvents: {
@@ -670,4 +684,12 @@ export class PrismaProjectRepository
       traceSharingEnabled: row.traceSharingEnabled,
     });
   }
+}
+
+/** How many times an update re-reads the team when a concurrent move changed it underneath. */
+const TEAM_MOVE_ATTEMPTS = 3;
+
+/** Prisma P2025: the conditional move found the project on another team than the one it read. */
+function isRecordNotFound(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
 }

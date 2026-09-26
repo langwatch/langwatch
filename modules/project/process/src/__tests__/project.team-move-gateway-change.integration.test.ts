@@ -132,6 +132,64 @@ describe.skipIf(!DB_URL)("given a project in one of two teams of an organization
     });
   });
 
+  describe("when another move lands between reading the project's team and writing the move", () => {
+    it("re-reads the team and records the move from where the project really was", async () => {
+      const growthTeamId = (
+        await prisma.team.create({
+          data: {
+            name: "Growth",
+            slug: `--test-team-${testNamespace}-${nanoid(6)}`,
+            organizationId,
+          },
+        })
+      ).id;
+      let interleaved = false;
+      const racingPrisma = new Proxy(prisma, {
+        get(target, property, receiver) {
+          if (property !== "project") return Reflect.get(target, property, receiver);
+          return new Proxy(target.project, {
+            get(projectTarget, projectProperty, projectReceiver) {
+              if (projectProperty !== "findFirst" || interleaved) {
+                return Reflect.get(projectTarget, projectProperty, projectReceiver);
+              }
+              return async (args: Parameters<typeof projectTarget.findFirst>[0]) => {
+                const read = await projectTarget.findFirst(args);
+                interleaved = true;
+                await target.project.update({
+                  where: { id: projectId },
+                  data: { teamId: growthTeamId },
+                });
+                return read;
+              };
+            },
+          });
+        },
+      });
+      const racingProjects = ProjectService.create({
+        repository: PrismaProjectRepository.create({ prisma: racingPrisma }),
+        credentials,
+        organizations,
+      });
+
+      const moved = await racingProjects.update({
+        id: projectId,
+        organizationId,
+        data: { teamId: paymentsTeamId },
+      });
+
+      expect(moved.teamId).toBe(paymentsTeamId);
+      await expect(changeEvents()).resolves.toEqual([
+        {
+          kind: "BUDGET_UPDATED",
+          projectId,
+          payload: {
+            projectTeamMoved: { fromTeamId: growthTeamId, toTeamId: paymentsTeamId },
+          },
+        },
+      ]);
+    });
+  });
+
   describe("when the project is renamed", () => {
     /** @scenario An update that keeps the team records no gateway change */
     it("records no gateway change", async () => {

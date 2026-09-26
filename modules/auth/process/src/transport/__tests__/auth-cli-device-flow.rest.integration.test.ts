@@ -249,6 +249,49 @@ describe("given a CLI starting a device login", () => {
           error: "team_management_needs_organization",
         });
       });
+
+      describe("when the approval names no selection and the default key reaches no organization", () => {
+        it("refuses rather than minting a key without team management", async () => {
+          const world = deviceFlowWorld({
+            defaultSelection: {
+              bindings: [{ scopeType: "TEAM", scopeId: "team-1" }],
+              permissions: ["traces:view"],
+            },
+          });
+          const api = mount(world);
+          const grant = await startWithTeamManagement(api);
+
+          const refused = await api.post("/api/auth/cli/approve", {
+            user_code: grant.user_code,
+            organization_id: ORGANIZATION_ID,
+          });
+
+          expect(refused.status).toBe(400);
+          await expect(refused.json()).resolves.toMatchObject({
+            error: "team_management_needs_organization",
+          });
+        });
+      });
+    });
+
+    describe("and the approval names no selection", () => {
+      it("adds team:manage to an organization-wide default key", async () => {
+        const world = deviceFlowWorld({
+          defaultSelection: {
+            bindings: [{ scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }],
+            permissions: ["traces:view"],
+          },
+        });
+        const api = mount(world);
+        const grant = await startWithTeamManagement(api);
+
+        const approved = await api.post("/api/auth/cli/approve", {
+          user_code: grant.user_code,
+          organization_id: ORGANIZATION_ID,
+        });
+
+        expect(approved.status).toBe(200);
+      });
     });
   });
 
@@ -670,6 +713,11 @@ function deviceFlowWorld(
     validateSelectionError?: () => Error;
     /** The approver holds no team management in the organization. */
     cannotManageTeams?: boolean;
+    /** The key an approval that names no selection gets. */
+    defaultSelection?: {
+      bindings: { scopeType: string; scopeId: string }[];
+      permissions: string[];
+    };
     signedIn?: boolean;
     publicBaseUrl?: string | undefined;
   } = {},
@@ -751,7 +799,8 @@ function deviceFlowWorld(
 
           return Promise.resolve(input.selection);
         },
-        findDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
+        findDefaultCliSelection: () =>
+          Promise.resolve(overrides.defaultSelection ?? { bindings: [], permissions: [] }),
         revokeCliLoginKeyForLogout: (input: { apiKeyId: string; userId: string }) => {
           world.revokedForLogout.push({ apiKeyId: input.apiKeyId, userId: input.userId });
 
