@@ -26,10 +26,10 @@ import {
   type TraceSpanPiiRedaction,
   type TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
-import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
-import type { TraceAnalyticsData } from "../eventing/trace-derived.projection.ts";
-import { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
-import type { TraceAnalyticsRollupRow } from "../eventing/trace-rollup.projection.ts";
+import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
+import type { TraceAnalyticsData } from "./trace-derived.projection.ts";
+import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
+import type { TraceAnalyticsRollupRow } from "./trace-rollup.projection.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {
@@ -192,47 +192,41 @@ class ProducerOnlyContentDrop implements TraceSpanContentDrop {
   }
 }
 
-export class TraceProcessingProducerAdapter {
-  static create(): TraceProcessingProducerAdapter {
-    return new TraceProcessingProducerAdapter();
-  }
-
-  /**
-   * Builds the trace-processing definition for a process that only sends commands on it.
-   * `processName` names the refusal, so a stand-in reached by accident names which process.
-   */
-  static createTraceProcessingProducerPipeline(input: {
-    processName: string;
-  }): ReturnType<ReturnType<EventingTracePipelineAdapter["build"]>["build"]> {
-    const { processName } = input;
-    return EventingTracePipelineAdapter.create({
-      spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(processName, "span"),
-      summaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(processName, "trace summary"),
-      derivedStore: new ProducerOnlyFoldStore<TraceAnalyticsData>(processName, "trace analytics"),
-      rollupStore: new ProducerOnlyAppendStore<TraceAnalyticsRollupRow>(
-        processName,
-        "trace analytics rollup",
-      ),
-      canonicalisation: new ProducerOnlyCanonicalisation(processName),
-      ioExtraction: new ProducerOnlyIoExtraction(processName),
-      mediaReferences: new ProducerOnlyMediaReferences(processName),
-      modelCosts: new ProducerOnlyModelCosts(processName),
-      spanNormalization: new ProducerOnlySpanNormalization(processName),
-      // The identity, and it is never reached: preparation only runs on the fold
-      // path, and this registration folds nothing.
-      prepareEventForProjection: (event: TraceProcessingEvent) => event,
-      recordSpanCommand: EventingRecordSpanAdapter.create({
-        piiRedaction: new ProducerOnlyPiiRedaction(processName),
-        costEnrichment: new ProducerOnlyCostEnrichment(processName),
-        tokenEstimation: new ProducerOnlyTokenEstimation(processName),
-        contentDrop: new ProducerOnlyContentDrop(processName),
-      }),
-      // No subscribers: they are consumer-side, and this registration drains
-      // nothing. The command routing triple is derived from the pipeline and
-      // command names the definition above already declares, which is what the
-      // worker routes on.
-    })
-      .build()
-      .build();
-  }
+/**
+ * Builds the trace-processing definition for a process that only sends commands on it.
+ * `processName` names the refusal, so a stand-in reached by accident names which process.
+ */
+export function createTraceProcessingProducerPipeline(input: {
+  processName: string;
+}): ReturnType<ReturnType<EventingTracePipelineAdapter["build"]>["build"]> {
+  const { processName } = input;
+  return EventingTracePipelineAdapter.create({
+    spanStore: new ProducerOnlyAppendStore<NormalizedSpan>(processName, "span"),
+    summaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(processName, "trace summary"),
+    derivedStore: new ProducerOnlyFoldStore<TraceAnalyticsData>(processName, "trace analytics"),
+    rollupStore: new ProducerOnlyAppendStore<TraceAnalyticsRollupRow>(
+      processName,
+      "trace analytics rollup",
+    ),
+    canonicalisation: new ProducerOnlyCanonicalisation(processName),
+    ioExtraction: new ProducerOnlyIoExtraction(processName),
+    mediaReferences: new ProducerOnlyMediaReferences(processName),
+    modelCosts: new ProducerOnlyModelCosts(processName),
+    spanNormalization: new ProducerOnlySpanNormalization(processName),
+    // The identity, and it is never reached: preparation only runs on the fold
+    // path, and this registration folds nothing.
+    prepareEventForProjection: (event: TraceProcessingEvent) => event,
+    recordSpanCommand: EventingRecordSpanAdapter.create({
+      piiRedaction: new ProducerOnlyPiiRedaction(processName),
+      costEnrichment: new ProducerOnlyCostEnrichment(processName),
+      tokenEstimation: new ProducerOnlyTokenEstimation(processName),
+      contentDrop: new ProducerOnlyContentDrop(processName),
+    }),
+    // No subscribers: they are consumer-side, and this registration drains
+    // nothing. The command routing triple is derived from the pipeline and
+    // command names the definition above already declares, which is what the
+    // worker routes on.
+  })
+    .build()
+    .build();
 }

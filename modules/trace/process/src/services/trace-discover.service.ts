@@ -19,11 +19,11 @@ import type {
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
-} from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
+} from "#rules/trace-facet-registry.rules";
 
-import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import {
   discoverCacheKey,
@@ -158,7 +158,7 @@ function partitionFacetRegistry({
     return slot;
   };
 
-  for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
+  for (const def of FACET_REGISTRY) {
     const isGroupableCategorical =
       def.kind === "categorical" &&
       isExpressionCategorical(def) &&
@@ -386,7 +386,7 @@ export class TraceDiscoverService {
 
     // Assemble in registry order so the sidebar's group ordering is preserved.
     const facets: FacetDescriptor[] = [];
-    for (const def of ClickHouseFacetRegistryAdapter.FACET_REGISTRY) {
+    for (const def of FACET_REGISTRY) {
       const descriptor = await this.descriptors.buildDescriptor({
         def,
         params,
@@ -416,7 +416,7 @@ export class TraceDiscoverService {
             tenantId: params.tenantId,
             timeRange: params.timeRange,
             table: slot.table,
-            timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[slot.table],
+            timeColumn: TABLE_TIME_COLUMNS[slot.table],
             categoricalSpecs: slot.categoricals.map((d) => ({
               key: d.key,
               expression: d.expression,
@@ -488,7 +488,7 @@ export class TraceDiscoverService {
     filters: FacetFilters,
     wrap: TaskTimer,
   ): Promise<Outcome>[] {
-    return ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
+    return FACET_REGISTRY.filter(
       (def): def is RangeFacetDef => def.kind === "range" && def.isDiscrete === true,
     ).map((def) =>
       wrap(
@@ -498,7 +498,7 @@ export class TraceDiscoverService {
             tenantId: params.tenantId,
             timeRange: params.timeRange,
             table: def.table,
-            timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+            timeColumn: TABLE_TIME_COLUMNS[def.table],
             column: def.expression,
             limit: DISCRETE_VALUE_LIMIT,
             ...(filters.of(def) ? { filterWhere: filters.of(def) } : {}),

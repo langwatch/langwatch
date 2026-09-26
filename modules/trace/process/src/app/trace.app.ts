@@ -152,7 +152,6 @@ import {
 import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
-import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
@@ -161,6 +160,11 @@ import type { TraceExistenceRepository } from "../repositories/trace-existence.r
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import {
+  enrichSingleSpanWithClaudeLogContent,
+  isCodingAgentShapedSpan,
+  mapSummaryRowsToClaudeRefs,
+} from "../rules/claude-code-log-enrichment.rules.ts";
 import {
   createFacetFilterResolver,
   type FacetFilterResolver,
@@ -180,6 +184,7 @@ import {
 } from "../rules/trace-llm-messages.rules.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
+import { traceMatchesQuery } from "../rules/trace-query-evaluation.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
 import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
@@ -1155,7 +1160,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     evaluations: TraceQueryEvaluationRun[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return ClickhouseTraceQueryEvaluationRepository.matches(input.query, {
+    return traceMatchesQuery(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,
@@ -1268,12 +1273,17 @@ export class TraceApp implements TraceApi, CollectorApp {
   // an application importing its own transport would invert the layout.
 
   /** The trace-log read the coding-agent join issues for itself. */
-  getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<TraceLogRecordReadRow[]> {
+  getLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<TraceLogRecordReadRow[]> {
     return this.readTraceLogRecords({
       projectId: tenantId,
       traceId,
@@ -1284,7 +1294,7 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   /** The canonicaliser the coding-agent join runs over joined span content. */
   isCodingAgentShapedSpan(span: Span): boolean {
-    return ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan(span);
+    return isCodingAgentShapedSpan(span);
   }
 
   enrichSpansFromCodingAgentLogs(input: {
@@ -1293,15 +1303,16 @@ export class TraceApp implements TraceApi, CollectorApp {
     spans: Span[];
     occurredAtMs?: number;
   }): Promise<Span[]> {
-    return ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
+    return ClaudeCodeLogEnrichmentService.create({
       logRecords: this.#dependencies.traces.logRecords,
+      logger,
+      traceCanonicalisation: this.#dependencies.traces.canonicalisation,
+      codingAgents: this.#dependencies.codingAgents,
+    }).enrichCodingAgentSpansFromLogs({
       tenantId: input.projectId,
       traceId: input.traceId,
       spans: input.spans,
       ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-      logger,
-      traceCanonicalisation: this.#dependencies.traces.canonicalisation,
-      codingAgents: this.#dependencies.codingAgents,
     });
   }
 
@@ -1310,10 +1321,10 @@ export class TraceApp implements TraceApi, CollectorApp {
     modelCallRefs: unknown;
     logRows: TraceLogRecordReadRow[];
   }): Span {
-    return ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
+    return enrichSingleSpanWithClaudeLogContent({
       span: input.span,
       modelCallRefs: input.modelCallRefs as Parameters<
-        typeof ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent
+        typeof enrichSingleSpanWithClaudeLogContent
       >[0]["modelCallRefs"],
       logRows: input.logRows,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
@@ -1322,7 +1333,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown {
-    return ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs(rows);
+    return mapSummaryRowsToClaudeRefs(rows);
   }
 
   codingAgentLogContentKeys(eventName: string): readonly {
@@ -2112,7 +2123,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     if (!ingest) {
       throw new TraceIngestionUnavailableError();
     }
-    await TraceMetadataWriteService.updateTraceMetadata({ ingest, ...input });
+    await TraceMetadataWriteService.create({ ingest }).updateTraceMetadata(input);
   }
 
   /** Port of main's REST transcript route: the key's protections, the trace, its transcript. */

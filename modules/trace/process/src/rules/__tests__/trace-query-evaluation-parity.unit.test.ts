@@ -8,17 +8,17 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import {
-  ClickHouseFacetRegistryAdapter,
   type ExpressionCategoricalDef,
   type RangeFacetDef,
-} from "../clickhouse.trace-facet-registry.repository.ts";
-import { ClickhouseTraceQueryEvaluationRepository } from "../clickhouse.trace-query-evaluation.repository.ts";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
+  FACET_REGISTRY,
+} from "../trace-facet-registry.rules.ts";
+import { traceMatchesQuery, traceQueryFieldNeeds } from "../trace-query-evaluation.rules.ts";
 
 const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
-  ClickhouseTraceQueryEvaluationRepository.matches(queryText, trace);
-const queryNeeds = (queryText: string) => ClickhouseTraceQueryEvaluationRepository.needs(queryText);
+  traceMatchesQuery(queryText, trace);
+const queryNeeds = (queryText: string) => traceQueryFieldNeeds(queryText);
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 
@@ -658,7 +658,7 @@ const hasExpression = (d: unknown): d is ExpressionFacet =>
   typeof d === "object" && d !== null && "expression" in d;
 
 /** The facets `build-handlers` auto-derives BOTH sides from (SQL + read). */
-const autoDerived = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
+const autoDerived = FACET_REGISTRY.filter(
   (d): d is ExpressionFacet => hasExpression(d) && d.read != null,
 );
 

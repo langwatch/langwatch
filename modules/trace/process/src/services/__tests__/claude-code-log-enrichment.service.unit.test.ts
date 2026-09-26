@@ -13,6 +13,7 @@ import {
  * Tests Claude Code log enrichment: joins llm_request spans (tokens + request_id) with
  * message content from OTLP log records. Tests gate, join, and best-effort degradation.
  */
+import { enrichSingleSpanWithClaudeLogContent } from "../../rules/claude-code-log-enrichment.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
 import { LogRecordStorageService } from "../trace-log-record-read.service.ts";
 
@@ -89,17 +90,18 @@ function logStore(
 }
 
 function enrich({ spans, logRecords }: { spans: Span[]; logRecords: LogRecordStorageService }) {
-  return ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
+  return ClaudeCodeLogEnrichmentService.create({
     logRecords,
+    traceCanonicalisation,
+  }).enrichCodingAgentSpansFromLogs({
     tenantId: PROJECT_ID,
     traceId: TRACE_ID,
     spans,
     occurredAtMs: 1_700_000_000_000,
-    traceCanonicalisation,
   });
 }
 
-describe("ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs", () => {
+describe("enrichCodingAgentSpansFromLogs", () => {
   describe("given spans that carry a request_id and their content logs", () => {
     it("joins the prompt and the response onto the span", async () => {
       const getLogs = vi.fn().mockResolvedValue(LIGHT_LOGS);
@@ -221,7 +223,7 @@ const TOOL_LOGS: StoredLogRecordRow[] = [
   }),
 ];
 
-describe("ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs — tool and interaction spans", () => {
+describe("enrichCodingAgentSpansFromLogs — tool and interaction spans", () => {
   describe("given a tool span with tool_use_id and its tool logs", () => {
     it("reads the log store (widened gate) and joins tool input + outcome", async () => {
       const getLogs = vi.fn().mockResolvedValue(TOOL_LOGS);
@@ -309,10 +311,10 @@ describe("ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs — tool
   });
 });
 
-describe("ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent", () => {
+describe("enrichSingleSpanWithClaudeLogContent", () => {
   describe("given a tool span (exact join, no sibling refs needed)", () => {
     it("joins tool input and outcome from the trace logs", () => {
-      const enriched = ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
+      const enriched = enrichSingleSpanWithClaudeLogContent({
         span: toolSpan(),
         modelCallRefs: [],
         logRows: TOOL_LOGS,
@@ -353,7 +355,7 @@ describe("ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent", 
         body("second turn prompt", 200),
       ];
 
-      const enriched = ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
+      const enriched = enrichSingleSpanWithClaudeLogContent({
         span: secondCallSpan,
         modelCallRefs: [
           { spanId: "span-1", requestId: "req_first", querySource: REPL },
@@ -377,7 +379,7 @@ describe("ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent", 
         span_id: "span-2",
       } as Span;
 
-      const enriched = ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
+      const enriched = enrichSingleSpanWithClaudeLogContent({
         span: secondCallSpan,
         modelCallRefs: [],
         logRows: LIGHT_LOGS,

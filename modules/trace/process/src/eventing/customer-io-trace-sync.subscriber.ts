@@ -4,7 +4,7 @@ import { nowInstant, Temporal } from "@langwatch/time";
 import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 
 import type { TraceProjectMetadata } from "../app/trace.members.ts";
-import { ProjectMetadataSync } from "./project-metadata.subscriber.ts";
+import { isRealFirstIngest } from "./project-metadata.subscriber.ts";
 
 const logger = createLogger("langwatch:trace-processing:customer-io-trace-sync");
 
@@ -96,7 +96,7 @@ export function createCustomerIoTraceSyncHandler(
   return async (_event, context) => {
     const { tenantId, state: foldState } = context;
 
-    if (!ProjectMetadataSync.isRealFirstIngest(foldState)) return;
+    if (!isRealFirstIngest(foldState)) return;
 
     try {
       await syncTrace(deps, tenantId, foldState);

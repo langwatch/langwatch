@@ -16,7 +16,6 @@ export {
 } from "./eventing/origin-guarded.subscriber.ts";
 export type { TraceClickHouseClient } from "./repositories/trace-clickhouse-client.repository.ts";
 export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
-export { ClickhouseTraceQueryEvaluationRepository } from "./repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
@@ -43,7 +42,7 @@ export type {
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
-  CustomEvaluationSync,
+  createCustomEvaluationSyncHandler,
 } from "./eventing/custom-evaluation-sync.subscriber.ts";
 export {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
@@ -53,7 +52,7 @@ export {
 } from "./eventing/experiment-metrics-sync.subscriber.ts";
 export {
   PROJECT_METADATA_WINDOW_MS,
-  ProjectMetadataSync,
+  createProjectMetadataHandler,
 } from "./eventing/project-metadata.subscriber.ts";
 export {
   CIO_TRACE_SYNC_DEBOUNCE_MS,
@@ -82,7 +81,7 @@ export {
 export {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
-  TrackedEventSync,
+  createTrackedEventSyncHandler,
 } from "./eventing/tracked-event-sync.subscriber.ts";
 export type {
   TraceClickHouseResolver,

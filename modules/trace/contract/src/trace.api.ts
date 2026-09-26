@@ -312,12 +312,12 @@ export interface TraceApi extends TraceOtlpIngestApi {
     category: "input" | "output" | "both";
   }[];
   buildCodingAgentTranscript(input: { spans: SpanDetail[]; logs: TraceLogRecordDto[] }): unknown;
-  getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<
+  getLogsByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<
     readonly {
       spanId: string;
       timeUnixMs: number;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceFacetSpanNameRepository } from "../clickhouse.trace-facet-span-name.repository.ts";
 
 const spanNameFacet = ClickHouseTraceFacetSpanNameRepository.create().getSpanNameFacet();
@@ -16,10 +16,8 @@ describe("ClickHouseTraceFacetSpanNameRepository.getSpanNameFacet", () => {
     expect(spanNameFacet.expression).toBe("SpanName");
   });
 
-  it("registers the spanName key into ClickHouseFacetRegistryAdapter.FACET_REGISTRY exactly once", () => {
-    const matches = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
-      (d) => d.key === "spanName",
-    );
+  it("registers the spanName key into FACET_REGISTRY exactly once", () => {
+    const matches = FACET_REGISTRY.filter((d) => d.key === "spanName");
     expect(matches).toHaveLength(1);
     expect(matches[0]).toBe(spanNameFacet);
   });

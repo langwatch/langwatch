@@ -19,10 +19,10 @@ import type {
   ExpressionCategoricalDef,
   FacetDefinition,
   RangeFacetDef,
-} from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
+} from "#rules/trace-facet-registry.rules";
 
-import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import { scopeTraceFilterToTable } from "../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -152,7 +152,7 @@ export class TraceFacetDescriptorService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+        timeColumn: TABLE_TIME_COLUMNS[def.table],
         facetExpression: def.expression,
         limit,
         offset: 0,
@@ -207,7 +207,7 @@ export class TraceFacetDescriptorService {
       tenantId: params.tenantId,
       timeRange: params.timeRange,
       table: def.table,
-      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+      timeColumn: TABLE_TIME_COLUMNS[def.table],
       column: def.expression,
       ...(filterWhere ? { filterWhere } : {}),
     });

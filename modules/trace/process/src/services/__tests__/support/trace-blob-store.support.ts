@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 
+import { S3TraceLegacySpoolChannel } from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { BlobNotFoundError, TraceBlobStoreService } from "../../trace-blob-store.service.ts";
 
 type EventLogRead = Parameters<TraceBlobStoreService["getFromEventLog"]>[0];
@@ -9,9 +10,11 @@ export function blobStoreReading(
   read: (request: EventLogRead) => Promise<string>,
 ): TraceBlobStoreService {
   const store = TraceBlobStoreService.create({
-    resolveS3Client: async () => {
-      throw new Error("spool storage is not part of this test");
-    },
+    legacySpool: S3TraceLegacySpoolChannel.create({
+      resolveS3Client: async () => {
+        throw new Error("spool storage is not part of this test");
+      },
+    }),
   });
   vi.spyOn(store, "getFromEventLog").mockImplementation(read);
   return store;
@@ -31,9 +34,11 @@ export function blobStoreResolving(values: Record<string, string>): TraceBlobSto
 /** A real blob store with no ClickHouse client, as such a deployment runs; its read is spied. */
 export function blobStoreWithoutClickHouse(): TraceBlobStoreService {
   const store = TraceBlobStoreService.create({
-    resolveS3Client: async () => {
-      throw new Error("spool storage is not part of this test");
-    },
+    legacySpool: S3TraceLegacySpoolChannel.create({
+      resolveS3Client: async () => {
+        throw new Error("spool storage is not part of this test");
+      },
+    }),
   });
   vi.spyOn(store, "getFromEventLog");
   return store;

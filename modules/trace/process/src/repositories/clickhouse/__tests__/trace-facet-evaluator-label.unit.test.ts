@@ -1,7 +1,7 @@
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
@@ -20,10 +20,8 @@ const translate = (query: string) =>
  * the Label column. The drilldown's clickable label rows depend on this. */
 describe("evaluatorLabel facet", () => {
   describe("when registered", () => {
-    it("lives in ClickHouseFacetRegistryAdapter.FACET_REGISTRY as an evaluation_runs categorical on Label", () => {
-      const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
-        (d) => d.key === "evaluatorLabel",
-      );
+    it("lives in FACET_REGISTRY as an evaluation_runs categorical on Label", () => {
+      const def = FACET_REGISTRY.find((d) => d.key === "evaluatorLabel");
       expect(def).toBeDefined();
       expect(def).toMatchObject({
         kind: "categorical",

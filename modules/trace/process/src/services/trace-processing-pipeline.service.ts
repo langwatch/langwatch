@@ -24,23 +24,24 @@ import type {
 } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
-import { CustomEvaluationSync } from "../eventing/custom-evaluation-sync.subscriber.ts";
+import { createCustomEvaluationSyncHandler } from "../eventing/custom-evaluation-sync.subscriber.ts";
 import { createDeferredOriginHandler } from "../eventing/deferred-origin.process.ts";
 import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "../eventing/experiment-metrics-sync.subscriber.ts";
 import { passesTraceOriginGuards } from "../eventing/origin-guarded.subscriber.ts";
-import { ProjectMetadataSync } from "../eventing/project-metadata.subscriber.ts";
+import { createProjectMetadataHandler } from "../eventing/project-metadata.subscriber.ts";
 import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
 import { createSimulationMetricsSyncHandler } from "../eventing/simulation-metrics-sync.subscriber.ts";
 import { SpanStorageStore } from "../eventing/span-storage.store.ts";
 import { TraceAnalyticsStore } from "../eventing/trace-derived.store.ts";
+import { createTraceProcessingProducerPipeline } from "../eventing/trace-processing-producer.pipeline.ts";
 import { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
 import { buildTraceProcessingConsumer } from "../eventing/trace-processing.pipeline.ts";
 import { TraceAnalyticsRollupStore } from "../eventing/trace-rollup.store.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
 import {
-  TrackedEventSync,
   type TrackedEventSyncSubscriberDeps,
+  createTrackedEventSyncHandler,
 } from "../eventing/tracked-event-sync.subscriber.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
@@ -51,7 +52,6 @@ import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.
 import { TraceIoExtractionAdapter } from "./trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceAdapter } from "./trace-media-reference.service.ts";
 import type { TraceProcessingCommandsService } from "./trace-processing-commands.service.ts";
-import { TraceProcessingProducerAdapter } from "./trace-processing-producer.service.ts";
 import { TraceSpanNormalizationAdapter } from "./trace-span-normalization-adapter.service.ts";
 
 export interface TraceProcessingPeers {
@@ -99,7 +99,7 @@ export class TraceProcessingPipelineService {
 
   build(setup: { participation: EventingParticipation }): TraceProcessingPipelineDefinition {
     if (setup.participation !== "consume") {
-      return TraceProcessingProducerAdapter.createTraceProcessingProducerPipeline({
+      return createTraceProcessingProducerPipeline({
         processName: this.input.processName,
       });
     }
@@ -184,15 +184,15 @@ export class TraceProcessingPipelineService {
         evaluation: { send: (data) => peers.evaluations.queueTraceEvaluation(data) },
         metrics: OtelTraceEvaluationLoopMetricsAdapter.create(),
       }),
-      customEvaluationSync: CustomEvaluationSync.createCustomEvaluationSyncHandler({
+      customEvaluationSync: createCustomEvaluationSyncHandler({
         reportEvaluation: (data) => peers.evaluations.reportEvaluation(data),
         deriveEvaluatorId: (name) => peers.evaluations.deriveEvaluatorId(name),
       }),
-      trackedEventSync: TrackedEventSync.createTrackedEventSyncHandler({
+      trackedEventSync: createTrackedEventSyncHandler({
         recordTrackedEvent: this.input.recordTrackedEvent,
       }),
       traceUpdateBroadcast: refusing("the trace live-update broadcast"),
-      projectMetadata: ProjectMetadataSync.createProjectMetadataHandler({
+      projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
         recordProductEvent: () => {

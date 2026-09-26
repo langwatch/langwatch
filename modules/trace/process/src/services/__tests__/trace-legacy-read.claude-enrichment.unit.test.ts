@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { TraceLogRecordReader } from "../claude-code-log-enrichment.service.ts";
+import type { TraceLogRecordReader } from "../../rules/claude-code-log-enrichment.rules.ts";
 
 const {
   mockGetTracesWithSpans,

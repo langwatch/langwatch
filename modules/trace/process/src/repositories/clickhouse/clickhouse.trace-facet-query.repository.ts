@@ -3,7 +3,7 @@
  * One source of truth — every facet builder consumes these.
  */
 
-import type { FacetQueryContext } from "./clickhouse.trace-facet-registry.repository.ts";
+import type { FacetQueryContext } from "../../rules/trace-facet-registry.rules.ts";
 
 /**
  * Per-query memory settings for high-cardinality key-discovery facets.

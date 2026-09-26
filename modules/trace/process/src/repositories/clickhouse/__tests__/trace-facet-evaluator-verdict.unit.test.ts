@@ -1,15 +1,13 @@
 import { FIELD_VALUES } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 
 /** Regression contract: the verdict facet expression must route Status='error'
  * rows to a dedicated 'error' value (precedence over Passed), so the sidebar's
  * erroredCount filter (countIf(Status='error')) works correctly. */
 describe("evaluatorVerdict facet", () => {
-  const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
-    (d) => d.key === "evaluatorVerdict",
-  );
+  const def = FACET_REGISTRY.find((d) => d.key === "evaluatorVerdict");
 
   describe("when mapping evaluation rows to verdict values", () => {
     it("routes Status='error' to 'error' before consulting Passed", () => {

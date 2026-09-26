@@ -15,8 +15,8 @@ import type {
 } from "@langwatch/trace-contract";
 import { TraceAttributeValuesWithheldError } from "@langwatch/trace-contract";
 
-import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../rules/trace-facet-registry.rules.ts";
 import {
   facetValuesCacheKey,
   type FacetValuesParams,
@@ -119,9 +119,7 @@ export class TraceFacetValuesService {
     const normalized = trimmed.startsWith(TRACE_ATTRIBUTE_PREFIX)
       ? `${TRACE_ATTRIBUTE_PREFIX_LEGACY}${trimmed.slice(TRACE_ATTRIBUTE_PREFIX.length)}`
       : trimmed;
-    const drillableKeys = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
-      (d) => d.kind !== "range",
-    ).map((d) => d.key);
+    const drillableKeys = FACET_REGISTRY.filter((d) => d.kind !== "range").map((d) => d.key);
 
     for (const prefix of STORE_ATTRIBUTE_PREFIXES) {
       if (!normalized.startsWith(prefix)) continue;
@@ -250,9 +248,7 @@ export class TraceFacetValuesService {
       );
     }
 
-    const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
-      (d) => d.key === params.facetKey,
-    );
+    const def = FACET_REGISTRY.find((d) => d.key === params.facetKey);
     if (!def) {
       throw new Error(`Unknown facet: ${params.facetKey}`);
     }
@@ -267,7 +263,7 @@ export class TraceFacetValuesService {
         tenantId: params.tenantId,
         timeRange: params.timeRange,
         table: def.table,
-        timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+        timeColumn: TABLE_TIME_COLUMNS[def.table],
         facetExpression: def.expression,
         limit: params.limit,
         offset: params.offset,

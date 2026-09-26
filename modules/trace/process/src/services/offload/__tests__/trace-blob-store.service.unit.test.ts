@@ -9,11 +9,14 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sd
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import {
+  type S3ClientResolver,
+  S3TraceLegacySpoolChannel,
+} from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";
 import {
   TraceBlobStoreService,
   MAX_SPOOL_BYTES,
-  type S3ClientResolver,
   SpoolDestinationUnsupportedError,
   type SpoolStorage,
 } from "../../trace-blob-store.service.ts";
@@ -148,7 +151,7 @@ describe("putSpool — given each supported storage destination", () => {
       async ({ destination, expectedUri }) => {
         const objectStore = fakeObjectStore();
         const store = TraceBlobStoreService.create({
-          resolveS3Client: forbiddenS3Resolver,
+          legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
           spoolStorage: spoolStorageFor(objectStore, destination),
         });
 
@@ -168,7 +171,7 @@ describe("putSpool — given a span payload body", () => {
     it("returns a reference carrying no storage location", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
 
@@ -185,7 +188,7 @@ describe("putSpool — given a span payload body", () => {
     it("issues exactly ONE write", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
@@ -204,7 +207,7 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
     it("reduces the id to one path component so nothing can escape the prefix", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
@@ -236,7 +239,7 @@ describe("putSpool — given an OTLP id containing a path separator", () => {
     it("derives the same location on read and delete", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
       const coords = { projectId: "orgA", traceId: "../../etc", spanId: "a/b" };
@@ -257,7 +260,7 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
     it("refuses rather than writing an object no lifecycle rule will reap", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
           objectStoreFor: () => objectStore,
           resolveDestination: async () => AZURE_DESTINATION,
@@ -282,7 +285,7 @@ describe("putSpool — given Azure storage whose orphan retention is unconfirmed
 
     it("names the policy to create and the setting to flip", async () => {
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
           objectStoreFor: () => fakeObjectStore(),
           resolveDestination: async () => AZURE_DESTINATION,
@@ -313,7 +316,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
    * manufacture orphans when the gate is toggled during rollback. */
   function storeAfterFlip(objectStore: ReturnType<typeof fakeObjectStore>) {
     return TraceBlobStoreService.create({
-      resolveS3Client: forbiddenS3Resolver,
+      legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
       spoolStorage: {
         objectStoreFor: () => objectStore,
         resolveDestination: async () => AZURE_DESTINATION,
@@ -327,7 +330,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
       const objectStore = fakeObjectStore();
       const body = Buffer.from("the full oversized payload", "utf-8");
       const spoolRef = await TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       }).putSpool({ ...spoolCoords, body });
 
@@ -344,7 +347,7 @@ describe("given Azure retention was confirmed at write time and is unconfirmed n
     it("still removes the object", async () => {
       const objectStore = fakeObjectStore();
       const spoolRef = await TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       }).putSpool({
         ...spoolCoords,
@@ -366,7 +369,7 @@ describe("putSpool — given S3 storage with retention unconfirmed", () => {
     it("still writes, because the flag scopes to Azure only", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: {
           objectStoreFor: () => objectStore,
           resolveDestination: async () => S3_DESTINATION,
@@ -392,7 +395,7 @@ describe("putSpool — given the project's storage is the local filesystem", () 
     it("refuses rather than writing an object nothing will ever reap", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, FILE_DESTINATION),
       });
 
@@ -413,7 +416,9 @@ describe("putSpool — given the project's storage is the local filesystem", () 
 describe("putSpool — given no spool storage is configured", () => {
   describe("when putSpool is called", () => {
     it("throws rather than falling back to a hardcoded backend", async () => {
-      const store = TraceBlobStoreService.create({ resolveS3Client: forbiddenS3Resolver });
+      const store = TraceBlobStoreService.create({
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
+      });
 
       await expect(
         store.putSpool({
@@ -430,7 +435,7 @@ describe("getSpool — given a spool object written by putSpool", () => {
     it("returns the exact bytes that were put", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
       const originalBody = Buffer.from("exact span body bytes", "utf-8");
@@ -451,7 +456,7 @@ describe("getSpool — given a reference naming another tenant's object", () => 
     it("reads the location derived from the command, ignoring the reference", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
       const victimBytes = Buffer.from("another tenant's payload", "utf-8");
@@ -489,7 +494,7 @@ describe("getSpool — given a v1-shaped reference naming another tenant", () =>
         Buffer.from("another tenant's payload", "utf-8"),
       );
       const store = TraceBlobStoreService.create({
-        resolveS3Client: resolverFor(fake),
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
         spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
       });
 
@@ -510,7 +515,7 @@ describe("getSpool — given a v1 reference written before this deployment", () 
 
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: resolverFor(fake),
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
 
@@ -542,9 +547,11 @@ describe("getSpool — given a v1 object larger than the read cap", () => {
         })),
       };
       const store = TraceBlobStoreService.create({
-        resolveS3Client: async () => ({
-          s3Client: oversizedS3 as never,
-          s3Bucket: "test-bucket",
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: async () => ({
+            s3Client: oversizedS3 as never,
+            s3Bucket: "test-bucket",
+          }),
         }),
         spoolStorage: spoolStorageFor(fakeObjectStore(), S3_DESTINATION),
       });
@@ -576,7 +583,7 @@ describe("getSpool — given an object larger than the read cap", () => {
         ),
       );
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
@@ -592,7 +599,7 @@ describe("getSpool — given the object is missing", () => {
     it("throws rather than returning an empty span", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
@@ -608,7 +615,7 @@ describe("deleteSpool — given an existing spool object", () => {
     it("deletes the object it wrote", async () => {
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
       const spoolRef = await store.putSpool({
@@ -634,7 +641,7 @@ describe("deleteSpool — given a v1 reference", () => {
       fake.objects.set(`test-bucket/${legacyKey}`, Buffer.from("old"));
       const objectStore = fakeObjectStore();
       const store = TraceBlobStoreService.create({
-        resolveS3Client: resolverFor(fake),
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: resolverFor(fake) }),
         spoolStorage: spoolStorageFor(objectStore, AZURE_DESTINATION),
       });
 
@@ -652,7 +659,7 @@ describe("deleteSpool — given the storage backend rejects the delete", () => {
       const objectStore = fakeObjectStore();
       objectStore.delete.mockRejectedValueOnce(new Error("AccessDenied"));
       const store = TraceBlobStoreService.create({
-        resolveS3Client: forbiddenS3Resolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: forbiddenS3Resolver }),
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 

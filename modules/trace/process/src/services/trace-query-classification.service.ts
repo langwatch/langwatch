@@ -1,7 +1,7 @@
 import type { TraceQueryClassification } from "@langwatch/trace-contract";
 
 import { type TraceQueryClassifier } from "../app/trace.members.ts";
-import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
+import { traceQueryFieldNeeds } from "../rules/trace-query-evaluation.rules.ts";
 
 export class TraceQueryClassificationService implements TraceQueryClassifier {
   private constructor() {}
@@ -11,7 +11,7 @@ export class TraceQueryClassificationService implements TraceQueryClassifier {
   }
 
   classify(query: string): TraceQueryClassification {
-    const needs = ClickhouseTraceQueryEvaluationRepository.needs(query);
+    const needs = traceQueryFieldNeeds(query);
 
     return {
       evaluations: needs.has("evaluations"),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { FacetQueryContext } from "../../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceFacetEvaluatorRepository } from "../clickhouse.trace-facet-evaluator.repository.ts";
-import type { FacetQueryContext } from "../clickhouse.trace-facet-registry.repository.ts";
 
 const traceFacetEvaluatorRepository = ClickHouseTraceFacetEvaluatorRepository.create();
 

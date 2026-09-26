@@ -31,20 +31,22 @@ function splitMetadata(metadata: TraceMetadataUpdate): {
 }
 
 export class TraceMetadataWriteService {
-  static create(): TraceMetadataWriteService {
-    return new TraceMetadataWriteService();
+  readonly #ingest: TraceSpanIngest;
+
+  /** `ingest` is where the synthetic amendment span is recorded. */
+  static create({ ingest }: { ingest: TraceSpanIngest }): TraceMetadataWriteService {
+    return new TraceMetadataWriteService(ingest);
   }
 
-  private constructor() {}
+  private constructor(ingest: TraceSpanIngest) {
+    this.#ingest = ingest;
+  }
 
-  static async updateTraceMetadata({
-    ingest,
+  async updateTraceMetadata({
     projectId,
     traceId,
     metadata,
   }: {
-    /** Where the synthetic amendment span is recorded. */
-    ingest: TraceSpanIngest;
     projectId: string;
     traceId: string;
     metadata: TraceMetadataUpdate;
@@ -59,7 +61,7 @@ export class TraceMetadataWriteService {
     const nowNano = String(now * 1_000_000);
     const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 
-    await ingest.recordSpan({
+    await this.#ingest.recordSpan({
       tenantId: projectId,
       span: {
         traceId,

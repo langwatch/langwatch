@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   internalTraceFullReadProtections,
-  TraceFullProtectionMapper,
-} from "../trace-full-protection.mapper.ts";
+  applyTraceFullReadProtections,
+} from "../trace-full-protection.rules.ts";
 
 const trace = (): TraceFullRecord => ({
   trace_id: "trace-1",
@@ -41,13 +41,13 @@ const trace = (): TraceFullRecord => ({
 
 describe("Trace full-record protections", () => {
   it("keeps the explicit internal policy all-visible", () => {
-    expect(TraceFullProtectionMapper.apply(trace(), internalTraceFullReadProtections)).toEqual(
+    expect(applyTraceFullReadProtections(trace(), internalTraceFullReadProtections)).toEqual(
       trace(),
     );
   });
 
   it("keeps shape while redacting hidden capture and costs for a future actor-aware adapter", () => {
-    const protectedTrace = TraceFullProtectionMapper.apply(trace(), {
+    const protectedTrace = applyTraceFullReadProtections(trace(), {
       canSeeCapturedInput: false,
       canSeeCapturedOutput: false,
       canSeeCosts: false,

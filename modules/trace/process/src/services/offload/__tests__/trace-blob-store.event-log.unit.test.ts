@@ -18,12 +18,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
+import {
+  type S3ClientResolver,
+  S3TraceLegacySpoolChannel,
+} from "../../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { IO_PREVIEW_BYTES } from "../../../rules/trace-projection-lean.rules.ts";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
   TraceBlobStoreService,
-  type S3ClientResolver,
 } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
@@ -120,7 +123,9 @@ describe("given an event_log row stored under tenantA with a known EventPayload"
       sqlCaptures = mock.sqlCaptures;
 
       blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(mock.client) as never,
       });
     });
@@ -181,7 +186,9 @@ describe("given a KSUID EventId (the time is embedded in the id)", () => {
         rows: [{ EventPayload: eventPayload }],
       });
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -219,7 +226,9 @@ describe("given a non-KSUID EventId (legacy / unparseable id)", () => {
         rows: [{ EventPayload: eventPayload }],
       });
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -249,7 +258,9 @@ describe("given an event_log row under tenantA when tenantB attempts to read it"
       const { client } = makeMockChClient({ rows: [] });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -278,7 +289,9 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -310,7 +323,9 @@ describe("given a valid event_log row whose EventPayload does not contain the re
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -337,7 +352,9 @@ describe("given a transient spool ref", () => {
       const sendMock = vi.fn().mockRejectedValue(new Error("S3 DELETE failed"));
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: sendMock }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: sendMock }),
+        }),
       });
 
       const spoolRef = `trace-blobs/spool/proj/trace-001/span-001`;
@@ -369,7 +386,9 @@ describe("given an event_log row whose EventPayload is a log record (full body a
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -391,7 +410,9 @@ describe("given an event_log row whose EventPayload is a log record (full body a
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -417,7 +438,9 @@ describe("given an S3 GetObject that returns a response with no Body", () => {
     it("throws an explicit 'no body' error rather than returning an empty buffer", async () => {
       const sendMock = vi.fn().mockResolvedValue({ Body: undefined });
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: sendMock }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: sendMock }),
+        }),
       });
 
       await expect(
@@ -489,7 +512,9 @@ describe("given a SpanReceivedEvent written through eventToRecord (real write pa
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -537,7 +562,7 @@ describe("given a deployment with no object storage (resolveS3Client throws)", (
       };
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: noStorageResolver,
+        legacySpool: S3TraceLegacySpoolChannel.create({ resolveS3Client: noStorageResolver }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -623,7 +648,9 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -650,7 +677,9 @@ describe("given a real OTLP EventPayload whose span carries mixed-type sibling a
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 
@@ -731,7 +760,9 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
       });
 
       const blobStore = TraceBlobStoreService.create({
-        resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: makeS3Resolver({ send: vi.fn() }),
+        }),
         resolveClickHouseClient: makeChResolver(client) as never,
       });
 

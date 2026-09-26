@@ -8,12 +8,12 @@ import { createLogger } from "@langwatch/observability";
 import type { Protections, Trace, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 
-import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
 import {
-  ClaudeCodeLogEnrichmentService,
   CODING_AGENT_ORIGIN,
   type TraceLogRecordReader,
-} from "./claude-code-log-enrichment.service.ts";
+} from "../rules/claude-code-log-enrichment.rules.ts";
+import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
+import { ClaudeCodeLogEnrichmentService } from "./claude-code-log-enrichment.service.ts";
 import type { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 
 export class TraceReadEnrichmentService {
@@ -165,14 +165,15 @@ export class TraceReadEnrichmentService {
       return trace;
     }
 
-    const spans = await ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
+    const spans = await ClaudeCodeLogEnrichmentService.create({
       logRecords: this.logRecordStorageService(),
+      logger: this.logger,
+      traceCanonicalisation: this.traceCanonicalisation,
+    }).enrichCodingAgentSpansFromLogs({
       tenantId: projectId,
       traceId: trace.trace_id,
       spans: trace.spans,
       occurredAtMs: trace.timestamps.started_at,
-      logger: this.logger,
-      traceCanonicalisation: this.traceCanonicalisation,
     });
 
     return spans === trace.spans ? trace : { ...trace, spans };

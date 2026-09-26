@@ -1,14 +1,14 @@
 import { EVENT_METRICS_PREFIX } from "@langwatch/trace-contract";
 
-import {
-  ClickHouseTraceFacetQueryRepository,
-  KEY_DISCOVERY_SETTINGS,
-} from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
-} from "./clickhouse.trace-facet-registry.repository.ts";
+} from "../../rules/trace-facet-registry.rules.ts";
+import {
+  ClickHouseTraceFacetQueryRepository,
+  KEY_DISCOVERY_SETTINGS,
+} from "./clickhouse.trace-facet-query.repository.ts";
 
 /** Per-event cap on (metric key, value) buckets returned to the sidebar. */
 const METRIC_VALUES_TOP_N = 10;

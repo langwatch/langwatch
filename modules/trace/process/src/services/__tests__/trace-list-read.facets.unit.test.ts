@@ -14,9 +14,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { createFacetFilterResolver } from "../../rules/trace-facet-filter.rules.ts";
+import { FACET_REGISTRY } from "../../rules/trace-facet-registry.rules.ts";
 import {
   explorerOriginExclusion,
   HIDDEN_ORIGINS_PARAM,
@@ -189,7 +189,7 @@ describe("the sidebar's facet counts", () => {
 
       const summaries = calls.batched.filter((c) => c.table === "trace_summaries");
       expect(summaries).toHaveLength(2);
-      const batchedKeys = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
+      const batchedKeys = FACET_REGISTRY.filter(
         (def) =>
           def.table === "trace_summaries" &&
           def.key !== "origin" &&

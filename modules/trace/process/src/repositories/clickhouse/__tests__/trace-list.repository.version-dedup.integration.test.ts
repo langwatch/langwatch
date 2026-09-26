@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * @integration
  * Verifies that filters encounter stale trace versions before version dedup collapses them.
  */
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
@@ -81,9 +81,7 @@ describe.skipIf(!clickHouseConfigured)(
     const timeRange = { from: base - 60_000, to: base + 60_000 };
 
     const annotationFacetExpression = (() => {
-      const def = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find(
-        (facet) => facet.key === "annotation",
-      );
+      const def = FACET_REGISTRY.find((facet) => facet.key === "annotation");
       if (!def || !("expression" in def)) {
         throw new Error("the annotation facet no longer carries an expression");
       }

@@ -1,8 +1,8 @@
-import { Readable } from "node:stream";
+import type { Readable } from "node:stream";
 
-import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { Logger } from "@langwatch/observability";
 
+import type { TraceLegacySpool } from "../channels/trace-legacy-spool.channel.ts";
 import {
   eventLogOccurredAtWindow,
   eventLogRowSchema,
@@ -31,11 +31,6 @@ interface BlobStoreClickHouseClient {
 type ClickHouseClientResolver = (tenantId: string) => Promise<BlobStoreClickHouseClient>;
 import type { StoredObjectStorageDestination as ProjectStorageDestination } from "@langwatch/stored-object-contract";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
-
-export interface S3ClientResolution {
-  s3Client: S3Client;
-  s3Bucket: string;
-}
 
 /**
  * Cap on a spool object read. The spool holds one over-threshold command and the attribute cap
@@ -70,9 +65,6 @@ export interface SpoolStorage {
    */
   azureRetentionConfirmed: boolean;
 }
-
-/** Resolves the per-organization S3 client + bucket for a project. */
-export type S3ClientResolver = (projectId: string) => Promise<S3ClientResolution>;
 
 /**
  * Thrown by `TraceBlobStoreService.getFromEventLog` when the requested row is not found or
@@ -168,7 +160,7 @@ function assertDestinationCanHostSpool({
  */
 export class TraceBlobStoreService {
   static create(options: {
-    resolveS3Client: S3ClientResolver;
+    legacySpool: TraceLegacySpool;
     resolveClickHouseClient?: ClickHouseClientResolver;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
@@ -177,27 +169,27 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * `resolveS3Client` reads back v1 spool refs only, new writes going through the object store.
+   * `legacySpool` reads back v1 spool refs only, new writes going through the object store.
    * `resolveClickHouseClient` is the per-tenant client event_log reads need; without it those
    * reads throw. `spoolStorage` backs spool writes, and `logger` surfaces a refused delete.
    */
-  private readonly resolveS3Client: S3ClientResolver;
+  private readonly legacySpool: TraceLegacySpool;
   private readonly resolveClickHouseClient?: ClickHouseClientResolver;
   private readonly spoolStorage?: SpoolStorage;
   private readonly logger?: Logger;
 
   private constructor({
-    resolveS3Client,
+    legacySpool,
     resolveClickHouseClient,
     spoolStorage,
     logger,
   }: {
-    resolveS3Client: S3ClientResolver;
+    legacySpool: TraceLegacySpool;
     resolveClickHouseClient?: ClickHouseClientResolver;
     spoolStorage?: SpoolStorage;
     logger?: Logger;
   }) {
-    this.resolveS3Client = resolveS3Client;
+    this.legacySpool = legacySpool;
     this.resolveClickHouseClient = resolveClickHouseClient;
     this.spoolStorage = spoolStorage;
     this.logger = logger;
@@ -355,22 +347,13 @@ export class TraceBlobStoreService {
    * commands queued across the deploy still resolve. See {@link isLegacySpoolRef}.
    */
   private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
-    const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-    const { Body } = await s3Client.send(new GetObjectCommand({ Bucket: s3Bucket, Key: spoolRef }));
-    if (!Body) {
-      throw new Error(
-        `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
-      );
-    }
-    if (!(Body instanceof Readable)) {
-      throw new Error(`Spool object returned a non-streaming body from S3 (key=${spoolRef})`);
-    }
+    const body = await this.legacySpool.openRead({ projectId, key: spoolRef });
 
     // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
     // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
     // entirely — and a v1 reference points at an object written before this
     // deploy, which is exactly the input the cap exists to distrust.
-    return TraceStreamBufferService.streamToBuffer(Body, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(body, MAX_SPOOL_BYTES);
   }
 
   /**
@@ -431,8 +414,7 @@ export class TraceBlobStoreService {
           return;
         }
 
-        const { s3Client, s3Bucket } = await this.resolveS3Client(projectId);
-        await s3Client.send(new DeleteObjectCommand({ Bucket: s3Bucket, Key: spoolRef }));
+        await this.legacySpool.delete({ projectId, key: spoolRef });
 
         return;
       }

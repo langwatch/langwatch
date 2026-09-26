@@ -28,6 +28,7 @@ import { describe, expect, it } from "vitest";
 import { composeTraceAppDependencies } from "../../app/trace-read.composition.ts";
 import { TraceApp } from "../../app/trace.app.ts";
 import type { TraceProcessingCommands } from "../../app/trace.members.ts";
+import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { MemoryTraceSpanDedupRepository } from "../../repositories/memory/memory.trace-span-dedup.repository.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import { TraceBlobStoreService } from "../../services/trace-blob-store.service.ts";
@@ -166,7 +167,9 @@ function deployment(access: CollectorAccess = {}) {
       storedObjects: createApiFixture<StoredObjectApi>(),
       canonicalisation,
       blobStore: TraceBlobStoreService.create({
-        resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
+        legacySpool: S3TraceLegacySpoolChannel.create({
+          resolveS3Client: () => Promise.reject(new Error("no object store in this test")),
+        }),
         resolveClickHouseClient: () => Promise.reject(new Error("no ClickHouse in this test")),
       }),
       dedup: MemoryTraceSpanDedupRepository.create(),

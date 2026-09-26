@@ -15,12 +15,12 @@ import {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import {
   andFilterConditions,
   findHiddenOriginConditions,
   type TraceFilterWhere,
 } from "../../../rules/trace-filter-hidden-origins.rules.ts";
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { TraceListClickHouseRepository } from "../trace-list.repository.ts";
 import {
@@ -81,7 +81,7 @@ async function insertTraces(rows: ReturnType<typeof traceRow>[]): Promise<void> 
 }
 
 function facetExpression(key: string): string {
-  const facet = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.find((entry) => entry.key === key);
+  const facet = FACET_REGISTRY.find((entry) => entry.key === key);
   if (!facet || !("expression" in facet)) throw new Error(`the ${key} facet carries no expression`);
   return facet.expression;
 }

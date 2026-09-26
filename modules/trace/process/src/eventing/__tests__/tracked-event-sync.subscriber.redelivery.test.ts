@@ -7,8 +7,8 @@ import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  TrackedEventSync,
   type TrackedEventSyncSubscriberDeps,
+  createTrackedEventSyncHandler,
 } from "../tracked-event-sync.subscriber.ts";
 import {
   createContext,
@@ -115,12 +115,12 @@ afterEach(() => {
 describe("given one span carrying live feedback", () => {
   describe("when the same span_received event is handled twice", () => {
     let sink: ReturnType<typeof makeTrackedEventSink>;
-    let handler: ReturnType<typeof TrackedEventSync.createTrackedEventSyncHandler>;
+    let handler: ReturnType<typeof createTrackedEventSyncHandler>;
     let event: ReturnType<typeof createSpanReceivedEvent>;
 
     beforeEach(() => {
       sink = makeTrackedEventSink();
-      handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+      handler = createTrackedEventSyncHandler(sink.deps);
       event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
     });
 
@@ -154,7 +154,7 @@ describe("given one span carrying live feedback", () => {
   describe("when the redelivery arrives after the staleness threshold", () => {
     it("records nothing further", async () => {
       const sink = makeTrackedEventSink();
-      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+      const handler = createTrackedEventSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
 
       await handler(event, createContext(createFoldState()));
@@ -168,12 +168,12 @@ describe("given one span carrying live feedback", () => {
 
 describe("given two feedback events of the same type on one span", () => {
   let sink: ReturnType<typeof makeTrackedEventSink>;
-  let handler: ReturnType<typeof TrackedEventSync.createTrackedEventSyncHandler>;
+  let handler: ReturnType<typeof createTrackedEventSyncHandler>;
   let event: ReturnType<typeof createSpanReceivedEvent>;
 
   beforeEach(() => {
     sink = makeTrackedEventSink();
-    handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+    handler = createTrackedEventSyncHandler(sink.deps);
     event = createSpanReceivedEvent(
       feedbackSpan([thumbsUp, { ...thumbsUp, metrics: { vote: -1 } }]),
     );
@@ -202,7 +202,7 @@ describe("given a span whose feedback sits behind an unrelated span event", () =
    */
   it("mints a stable identity across deliveries", async () => {
     const sink = makeTrackedEventSink();
-    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+    const handler = createTrackedEventSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
       spanWithEvents([
         // The evaluation channel really does carry a JSON blob, so the two

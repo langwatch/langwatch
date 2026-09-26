@@ -1,12 +1,12 @@
-import {
-  ClickHouseTraceFacetQueryRepository,
-  KEY_DISCOVERY_SETTINGS,
-} from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
   FacetQueryContext,
-} from "./clickhouse.trace-facet-registry.repository.ts";
+} from "../../rules/trace-facet-registry.rules.ts";
+import {
+  ClickHouseTraceFacetQueryRepository,
+  KEY_DISCOVERY_SETTINGS,
+} from "./clickhouse.trace-facet-query.repository.ts";
 
 export class ClickHouseTraceFacetSpanAttributeKeysRepository {
   private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}

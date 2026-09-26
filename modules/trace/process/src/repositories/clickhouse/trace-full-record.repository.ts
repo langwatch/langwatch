@@ -11,16 +11,26 @@ import {
 
 import type { TraceFullIo } from "../../app/trace.members.ts";
 import {
+  applyTraceFullReadProtections,
   internalTraceFullReadProtections,
-  TraceFullProtectionMapper,
-} from "../../repositories/clickhouse/trace-full-protection.mapper.ts";
+} from "../../rules/trace-full-protection.rules.ts";
+import {
+  type StoredSpanRow,
+  collectDroppedCategories,
+  deserializeStoredAttributes,
+  deserializeStoredValue,
+  extractFullRecordEvents,
+  mapNormalizedSpanToFullRecordSpan,
+  mapStoredSpanRow,
+  mapTraceMetadata,
+  withoutEventReferences,
+} from "../../rules/trace-full-record.rules.ts";
 import type {
   TraceClickHouseClient,
   TraceClickHouse,
 } from "../trace-clickhouse-client.repository.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
-import { type StoredSpanRow, TraceFullRecordMapper } from "./trace-full-record.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const MAX_SPANS = 10_000;
@@ -76,15 +86,11 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
 
     const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
     const resolved = await this.resolveAll(input.tenantId, rows);
-    const normalized = resolved.map(({ row, attributes }) =>
-      TraceFullRecordMapper.mapStoredSpanRow(row, attributes),
-    );
-    const spans = normalized.map((span) =>
-      TraceFullRecordMapper.mapNormalizedSpanToFullRecordSpan(span),
-    );
+    const normalized = resolved.map(({ row, attributes }) => mapStoredSpanRow(row, attributes));
+    const spans = normalized.map((span) => mapNormalizedSpanToFullRecordSpan(span));
     const fullIo = resolved.some(({ recalled }) => recalled) ? this.io.recompute(normalized) : null;
-    const droppedCategories = TraceFullRecordMapper.collectDroppedCategories(normalized);
-    const events = TraceFullRecordMapper.extractFullRecordEvents({
+    const droppedCategories = collectDroppedCategories(normalized);
+    const events = extractFullRecordEvents({
       spans,
       projectId: input.tenantId,
       traceId: summary.TraceId,
@@ -93,7 +99,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     const record: TraceFullRecord = {
       trace_id: summary.TraceId,
       project_id: input.tenantId,
-      metadata: TraceFullRecordMapper.mapTraceMetadata(summary.Attributes),
+      metadata: mapTraceMetadata(summary.Attributes),
       timestamps: {
         started_at: summary.OccurredAtMs,
         inserted_at: summary.CreatedAtMs,
@@ -119,7 +125,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
       ...(droppedCategories.length > 0 ? { privacy: { droppedCategories } } : {}),
     };
     return traceFullRecordSchema.parse(
-      TraceFullProtectionMapper.apply(record, internalTraceFullReadProtections),
+      applyTraceFullReadProtections(record, internalTraceFullReadProtections),
     );
   }
 
@@ -230,7 +236,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   > {
     const plans = rows.map((row) => ({
       row,
-      original: TraceFullRecordMapper.deserializeStoredAttributes(row.SpanAttributes),
+      original: deserializeStoredAttributes(row.SpanAttributes),
     }));
     const reads = new Map<string, PayloadReference>();
     for (const plan of plans) {
@@ -256,14 +262,14 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     );
 
     return plans.map(({ row, original }) => {
-      const attributes = TraceFullRecordMapper.withoutEventReferences(original);
+      const attributes = withoutEventReferences(original);
       let recalled = false;
       for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
         const value = values.get(
           ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
         );
         if (value !== null && value !== void 0) {
-          attributes[reference.attrKey] = TraceFullRecordMapper.deserializeStoredValue(value);
+          attributes[reference.attrKey] = deserializeStoredValue(value);
           recalled = true;
         }
       }

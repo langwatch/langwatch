@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceFacetSpanStatusRepository } from "../clickhouse.trace-facet-span-status.repository.ts";
 
 const spanStatusFacet = ClickHouseTraceFacetSpanStatusRepository.create().getSpanStatusFacet();
@@ -48,10 +48,8 @@ describe("ClickHouseTraceFacetSpanStatusRepository.getSpanStatusFacet", () => {
     });
   });
 
-  it("registers the spanStatus key into ClickHouseFacetRegistryAdapter.FACET_REGISTRY exactly once", () => {
-    const matches = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
-      (d) => d.key === "spanStatus",
-    );
+  it("registers the spanStatus key into FACET_REGISTRY exactly once", () => {
+    const matches = FACET_REGISTRY.filter((d) => d.key === "spanStatus");
     expect(matches).toHaveLength(1);
     expect(matches[0]).toBe(spanStatusFacet);
   });

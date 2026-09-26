@@ -7,7 +7,7 @@
 import { FilterParseError, type LangWatchQLTraceFilter } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import {
   ClickHouseTraceQueryLangWatchQLRepository,
   LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS,
@@ -158,7 +158,7 @@ describe("given a filter compiled against the LangWatchQL trace view", () => {
 
 describe("the LangWatchQL trace filter dialect, given the facet registry", () => {
   const facets = new Map(
-    ClickHouseFacetRegistryAdapter.FACET_REGISTRY.flatMap((facet) =>
+    FACET_REGISTRY.flatMap((facet) =>
       "expression" in facet ? [[facet.key, facet.expression] as const] : [],
     ),
   );
@@ -174,7 +174,7 @@ describe("the LangWatchQL trace filter dialect, given the facet registry", () =>
     });
 
     it("names a facet that exists", () => {
-      const keys = new Set(ClickHouseFacetRegistryAdapter.FACET_REGISTRY.map((facet) => facet.key));
+      const keys = new Set(FACET_REGISTRY.map((facet) => facet.key));
       const unknown = Object.entries(LANGWATCH_QL_TRACE_FILTER_EXPRESSIONS).filter(
         ([, field]) => field.facetKey !== undefined && !keys.has(field.facetKey),
       );

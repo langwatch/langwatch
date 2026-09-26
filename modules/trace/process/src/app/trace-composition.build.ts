@@ -8,6 +8,7 @@ import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import { TraceCapabilityUnavailableError, type TraceSummaryData } from "@langwatch/trace-contract";
 
+import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
 import { MemberTraceClickHouseClientRepository } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
@@ -70,7 +71,9 @@ export function buildTraceCollaborators(input: {
       // this process composes no such client. `resolveOffloadedTraces`
       // swallows the refusal per field, so such a value keeps its preview
       // rather than failing the whole read.
-      resolveS3Client: () => Promise.reject(refuse("a v1 spool object read")),
+      legacySpool: traceLegacySpoolChannels.live.create({
+        resolveS3Client: () => Promise.reject(refuse("a v1 spool object read")),
+      }),
       resolveClickHouseClient,
       logger: members.logger,
     }),

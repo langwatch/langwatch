@@ -1,7 +1,15 @@
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { type StoredSpanRow, TraceFullRecordMapper } from "../trace-full-record.mapper.ts";
+import {
+  type StoredSpanRow,
+  collectDroppedCategories,
+  deserializeStoredAttributes,
+  extractFullRecordEvents,
+  mapNormalizedSpanToFullRecordSpan,
+  mapStoredSpanRow,
+  mapTraceMetadata,
+} from "../trace-full-record.rules.ts";
 
 const row = (): StoredSpanRow => ({
   SpanId: "span-1",
@@ -35,7 +43,7 @@ const row = (): StoredSpanRow => ({
 
 describe("Trace full-record mapper", () => {
   it("keeps stored JSON/boolean/number values and maps the legacy span fields", () => {
-    const attributes = TraceFullRecordMapper.deserializeStoredAttributes({
+    const attributes = deserializeStoredAttributes({
       "langwatch.span.type": "llm",
       "langwatch.input": "hello",
       "langwatch.output": '{"answer":"world"}',
@@ -48,8 +56,8 @@ describe("Trace full-record mapper", () => {
       "event.details.source": "human",
       "langwatch.privacy.dropped": "input, tools",
     });
-    const normalized = TraceFullRecordMapper.mapStoredSpanRow(row(), attributes);
-    const span = TraceFullRecordMapper.mapNormalizedSpanToFullRecordSpan(normalized);
+    const normalized = mapStoredSpanRow(row(), attributes);
+    const span = mapNormalizedSpanToFullRecordSpan(normalized);
 
     expect(span).toMatchObject({
       type: "llm",
@@ -65,25 +73,22 @@ describe("Trace full-record mapper", () => {
       },
       timestamps: { started_at: 10, first_token_at: null, finished_at: 20 },
     });
-    expect(TraceFullRecordMapper.collectDroppedCategories([normalized])).toEqual([
-      "input",
-      "tools",
-    ]);
+    expect(collectDroppedCategories([normalized])).toEqual(["input", "tools"]);
   });
 
   it("derives only canonical event.* spans with stable identity and span timestamps", () => {
-    const normalized = TraceFullRecordMapper.mapStoredSpanRow(
+    const normalized = mapStoredSpanRow(
       row(),
-      TraceFullRecordMapper.deserializeStoredAttributes({
+      deserializeStoredAttributes({
         "event.type": "feedback",
         "event.metrics.score": "0.7",
         "event.details.comment": "good",
       }),
     );
-    const span = TraceFullRecordMapper.mapNormalizedSpanToFullRecordSpan(normalized);
+    const span = mapNormalizedSpanToFullRecordSpan(normalized);
 
     expect(
-      TraceFullRecordMapper.extractFullRecordEvents({
+      extractFullRecordEvents({
         spans: [span],
         projectId: "project-1",
         traceId: "trace-1",
@@ -103,7 +108,7 @@ describe("Trace full-record mapper", () => {
 
   it("maps legacy summary metadata aliases without exposing fold bookkeeping", () => {
     expect(
-      TraceFullRecordMapper.mapTraceMetadata({
+      mapTraceMetadata({
         "gen_ai.conversation.id": "thread-1",
         "langwatch.customer_id": "customer-1",
         "metadata.model": "model-1",
@@ -122,10 +127,10 @@ describe("Trace full-record mapper", () => {
   });
 
   it("uses status-code error semantics rather than the status message alone", () => {
-    const normalized = TraceFullRecordMapper.mapStoredSpanRow(
+    const normalized = mapStoredSpanRow(
       { ...row(), StatusCode: NormalizedStatusCode.OK, StatusMessage: "not an error" },
-      TraceFullRecordMapper.deserializeStoredAttributes({}),
+      deserializeStoredAttributes({}),
     );
-    expect(TraceFullRecordMapper.mapNormalizedSpanToFullRecordSpan(normalized).error).toBeNull();
+    expect(mapNormalizedSpanToFullRecordSpan(normalized).error).toBeNull();
   });
 });

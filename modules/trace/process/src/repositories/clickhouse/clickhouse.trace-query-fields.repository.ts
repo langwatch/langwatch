@@ -1,11 +1,11 @@
 import type { CategoricalRead, FieldDef, FieldNeeds, RangeRead } from "@langwatch/trace-contract";
 import { UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { ClickHouseFacetRegistryAdapter } from "./clickhouse.trace-facet-registry.repository.ts";
+import { FACET_REGISTRY, TABLE_TIME_COLUMNS } from "../../rules/trace-facet-registry.rules.ts";
 import {
   type ExpressionCategoricalDef,
   type RangeFacetDef,
-} from "./clickhouse.trace-facet-registry.repository.ts";
+} from "../../rules/trace-facet-registry.rules.ts";
 import { ClickHouseTraceQueryCustomFieldsAdapter } from "./clickhouse.trace-query-custom-fields.repository.ts";
 import { INSTANT_EVAL_FIELD_DEFS } from "./clickhouse.trace-query-instant-eval-fields.repository.ts";
 import { META_FIELD_DEFS } from "./clickhouse.trace-query-meta-fields.repository.ts";
@@ -15,7 +15,7 @@ import { ClickHouseTraceQueryTranslatorsRepository } from "./clickhouse.trace-qu
 // Registry lookup — single-sources SQL expressions from the facet registry.
 // ---------------------------------------------------------------------------
 
-const FACET_BY_KEY = new Map(ClickHouseFacetRegistryAdapter.FACET_REGISTRY.map((d) => [d.key, d]));
+const FACET_BY_KEY = new Map(FACET_REGISTRY.map((d) => [d.key, d]));
 
 // ---------------------------------------------------------------------------
 // Cross-table in-memory reads (item 4: iterate the referenced collection)
@@ -82,10 +82,7 @@ export class ClickHouseTraceQueryFieldsRepository {
 
   expressionFacet(key: string): ExpressionCategoricalDef | RangeFacetDef {
     const def = FACET_BY_KEY.get(key);
-    if (!def)
-      throw new Error(
-        `facet '${key}' is missing from ClickHouseFacetRegistryAdapter.FACET_REGISTRY`,
-      );
+    if (!def) throw new Error(`facet '${key}' is missing from FACET_REGISTRY`);
     if (!("expression" in def)) {
       throw new Error(`facet '${key}' has no expression to derive a handler from`);
     }
@@ -122,7 +119,7 @@ export class ClickHouseTraceQueryFieldsRepository {
     }
     return this.translators.crossTableCategorical({
       table: def.table,
-      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+      timeColumn: TABLE_TIME_COLUMNS[def.table],
       expression: def.expression,
       read,
       needs,
@@ -137,7 +134,7 @@ export class ClickHouseTraceQueryFieldsRepository {
     }
     return this.translators.crossTableRange({
       table: def.table,
-      timeColumn: ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS[def.table],
+      timeColumn: TABLE_TIME_COLUMNS[def.table],
       expression: def.expression,
       read,
       needs,

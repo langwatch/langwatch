@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { FACET_REGISTRY } from "../../../rules/trace-facet-registry.rules.ts";
 import { KEY_DISCOVERY_SETTINGS } from "../clickhouse.trace-facet-query.repository.ts";
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 import {
   ClickHouseTraceFacetSpanAttributeKeysRepository,
   SPAN_ATTRIBUTE_KEYS_FACET,
@@ -25,10 +25,8 @@ describe("SPAN_ATTRIBUTE_KEYS_FACET registration", () => {
     expect(SPAN_ATTRIBUTE_KEYS_FACET.key).toBe("spanAttributeKeys");
   });
 
-  it("registers exactly once into ClickHouseFacetRegistryAdapter.FACET_REGISTRY", () => {
-    const matches = ClickHouseFacetRegistryAdapter.FACET_REGISTRY.filter(
-      (d) => d.key === "spanAttributeKeys",
-    );
+  it("registers exactly once into FACET_REGISTRY", () => {
+    const matches = FACET_REGISTRY.filter((d) => d.key === "spanAttributeKeys");
     expect(matches).toHaveLength(1);
     expect(matches[0]).toBe(SPAN_ATTRIBUTE_KEYS_FACET);
   });

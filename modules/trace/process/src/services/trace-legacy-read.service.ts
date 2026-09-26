@@ -19,8 +19,8 @@ import { getLangWatchTracer } from "langwatch";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
+import { type TraceLogRecordReader } from "../rules/claude-code-log-enrichment.rules.ts";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
-import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import type { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service.ts";

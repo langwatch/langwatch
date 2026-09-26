@@ -21,7 +21,8 @@ import type { TraceProcessingPipelineDefinition } from "../app/trace.members.ts"
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
-  CustomEvaluationSync,
+  customEvaluationSyncDedupId,
+  hasSyncableEvaluations,
 } from "./custom-evaluation-sync.subscriber.ts";
 import {
   DEFERRED_ORIGIN_INITIAL_STATE,
@@ -38,7 +39,11 @@ import {
   hasExperimentCostMetrics,
 } from "./experiment-metrics-sync.subscriber.ts";
 import type { TraceSummarySubscriber } from "./origin-guarded.subscriber.ts";
-import { PROJECT_METADATA_WINDOW_MS, ProjectMetadataSync } from "./project-metadata.subscriber.ts";
+import {
+  PROJECT_METADATA_WINDOW_MS,
+  isRealFirstIngest,
+  projectMetadataGroupKey,
+} from "./project-metadata.subscriber.ts";
 import {
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
@@ -50,7 +55,8 @@ import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "./trace-update-broadcast.subsc
 import {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
-  TrackedEventSync,
+  hasSyncableFeedback,
+  trackedEventSyncDedupId,
 } from "./tracked-event-sync.subscriber.ts";
 
 type SummaryHandler = (
@@ -101,19 +107,19 @@ export function buildTraceProcessingConsumer(
     .withProjectionSubscriber("customEvaluationSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: (event) => CustomEvaluationSync.hasSyncableEvaluations(event),
+      when: (event) => hasSyncableEvaluations(event),
       delay: CUSTOM_EVAL_SYNC_DELAY_MS,
       ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-      dedupId: (event) => CustomEvaluationSync.customEvaluationSyncDedupId(event),
+      dedupId: (event) => customEvaluationSyncDedupId(event),
       handler: (event, context) => reactions.customEvaluationSync(event, context),
     })
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: (event) => TrackedEventSync.hasSyncableFeedback(event),
+      when: (event) => hasSyncableFeedback(event),
       delay: TRACKED_EVENT_SYNC_DELAY_MS,
       ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
-      dedupId: (event) => TrackedEventSync.trackedEventSyncDedupId(event),
+      dedupId: (event) => trackedEventSyncDedupId(event),
       handler: (event, context) => reactions.trackedEventSync(event, context),
     })
     .withProjectionSubscriber("traceUpdateBroadcast", {
@@ -129,8 +135,8 @@ export function buildTraceProcessingConsumer(
     .withProjectionSubscriber("projectMetadata", {
       fold: "traceSummary",
       runIn: ["worker"],
-      when: (_event, context) => ProjectMetadataSync.isRealFirstIngest(context.state),
-      groupKeyFn: (event) => ProjectMetadataSync.projectMetadataGroupKey(event),
+      when: (_event, context) => isRealFirstIngest(context.state),
+      groupKeyFn: (event) => projectMetadataGroupKey(event),
       ...throttledWindow<TraceProcessingEvent>({
         makeId: (event) => event.tenantId,
         windowMs: PROJECT_METADATA_WINDOW_MS,

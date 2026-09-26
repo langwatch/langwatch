@@ -12,7 +12,7 @@
     "./src/index.ts",
     "./src/testing.ts",
     "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts",
-    "src/services/trace-processing-producer.service.ts",
+    "src/eventing/trace-processing-producer.pipeline.ts",
     "./src/transport/api-trpc/trace-read-mappers.api.ts",
     "./src/transport/api-trpc/trace-view-gates.api.ts",
     "./src/transport/tracked-event.rest.ts",

@@ -1,9 +1,9 @@
-import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
-} from "./clickhouse.trace-facet-registry.repository.ts";
+} from "../../rules/trace-facet-registry.rules.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 
 /**
  * Cap on distinct label values surfaced per evaluator in drilldown.

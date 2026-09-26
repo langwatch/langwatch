@@ -1,4 +1,4 @@
-import type { ExpressionCategoricalDef } from "./clickhouse.trace-facet-registry.repository.ts";
+import type { ExpressionCategoricalDef } from "../../rules/trace-facet-registry.rules.ts";
 
 const SPAN_NAME_FACET: ExpressionCategoricalDef = {
   key: "spanName",

@@ -6,7 +6,7 @@ import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CustomEvaluationSync } from "../custom-evaluation-sync.subscriber.ts";
+import { createCustomEvaluationSyncHandler } from "../custom-evaluation-sync.subscriber.ts";
 import {
   createContext,
   createFoldState,
@@ -54,12 +54,12 @@ afterEach(() => {
 describe("given one span carrying an SDK evaluation", () => {
   describe("when the same span_received event is handled twice", () => {
     let sink: ReturnType<typeof makeEvaluationSink>;
-    let handler: ReturnType<typeof CustomEvaluationSync.createCustomEvaluationSyncHandler>;
+    let handler: ReturnType<typeof createCustomEvaluationSyncHandler>;
     let event: ReturnType<typeof createSpanReceivedEvent>;
 
     beforeEach(() => {
       sink = makeEvaluationSink();
-      handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
+      handler = createCustomEvaluationSyncHandler(sink.deps);
       event = createSpanReceivedEvent(span);
     });
 
@@ -99,7 +99,7 @@ describe("given one span carrying an SDK evaluation", () => {
   describe("when the evaluation names its own evaluation_id", () => {
     it("uses that id on every delivery, so the SDK's own key wins", async () => {
       const sink = makeEvaluationSink();
-      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
+      const handler = createCustomEvaluationSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(
         createOtlpSpan([
           {
@@ -124,7 +124,7 @@ describe("given one span carrying an SDK evaluation", () => {
      */
     it("reports nothing further", async () => {
       const sink = makeEvaluationSink();
-      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
+      const handler = createCustomEvaluationSyncHandler(sink.deps);
       const event = createSpanReceivedEvent(span);
 
       await handler(event, createContext(createFoldState()));
@@ -139,7 +139,7 @@ describe("given one span carrying an SDK evaluation", () => {
 describe("given two different evaluations on one span", () => {
   it("keeps them apart, so idempotency is not collapsing real facts", async () => {
     const sink = makeEvaluationSink();
-    const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
+    const handler = createCustomEvaluationSyncHandler(sink.deps);
     const event = createSpanReceivedEvent(
       createOtlpSpan([
         { name: "langwatch.evaluation.custom", payload: { name: "toxicity", score: 0.1 } },
