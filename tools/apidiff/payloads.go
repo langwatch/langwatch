@@ -246,11 +246,15 @@ func ValidationBody(schema map[string]any) any {
 // is skipped rather than probed with a trace id.
 type SymbolTable struct {
 	byParam map[string][]string
+	// pinned holds the id a curated create minted for its own resource. It
+	// outranks whatever a later list read captured into the same bucket, so
+	// the item routes are asked about the entity the run created.
+	pinned map[string]string
 }
 
 // NewSymbolTable returns an empty table.
 func NewSymbolTable() *SymbolTable {
-	return &SymbolTable{byParam: map[string][]string{}}
+	return &SymbolTable{byParam: map[string][]string{}, pinned: map[string]string{}}
 }
 
 // Capture walks a decoded response body in sorted-key order (deterministic:
@@ -297,14 +301,26 @@ func (table *SymbolTable) file(bucket, id string) {
 	table.byParam[bucket] = append(table.byParam[bucket], id)
 }
 
+// latest returns the most recently captured ID in one bucket.
+func (table *SymbolTable) latest(bucket string) (string, bool) {
+	if pinned, ok := table.pinned[bucket]; ok {
+		return pinned, true
+	}
+	values := table.byParam[bucket]
+	if len(values) == 0 {
+		return "", false
+	}
+	return values[len(values)-1], true
+}
+
 // Lookup returns the most recently captured ID that can satisfy the named
 // parameter of an operation at operationPath. A bare {id}/{idOrSlug}/{slug}
 // resolves through the resource its own path names, never through whatever
 // was captured last.
 func (table *SymbolTable) Lookup(paramName, operationPath string) (string, bool) {
 	for _, bucket := range lookupBuckets(paramName, operationPath) {
-		if values := table.byParam[bucket]; len(values) > 0 {
-			return values[len(values)-1], true
+		if value, ok := table.latest(bucket); ok {
+			return value, true
 		}
 	}
 	return "", false
@@ -423,14 +439,40 @@ var SeededConstants = map[string]string{
 	// and PUT /api/prompts/{id}/tags/{tag} name a caller-chosen tag; PUT/GET/DELETE
 	// /api/agent-cache/{name} names a caller-chosen cache entry; the "repository"
 	// query param on GET /api/coding-agent/pull-request-usage names an owner/repo
-	// slug; the "from" query param on GET /api/webhooks/v1/events is a cursor
-	// timestamp, reusing the same fixed instant every synthesized payload uses.
+	// slug; "from"/"to" bound a time window in epoch milliseconds (2026-01-01
+	// and a day later) on every route that takes one.
 	"provider":   "openai",
 	"tag":        "apidiff-tag",
-	"name":       "apidiff-agent-cache-entry",
+	"name":       "APIDIFF_AGENT_CACHE_ENTRY",
 	"repository": "apidiff/apidiff",
-	"from":       synthDateTime,
+	"from":       synthFromMillis,
+	"to":         synthToMillis,
+	// More client-picked values: a pull request number, a scenario set name,
+	// the first version of anything versioned, the evaluator a route runs,
+	// and the seeded personal access token's own lookup id.
+	"pullrequest":   "1",
+	"scenariosetid": "apidiff-scenario-set",
+	"version":       "1",
+	"evaluator":     "langevals",
+	"subpath":       "exact_match",
+	"lookupid":      "LocalDevPrivate1",
+	"userid":        fixtureDoomedUserID,
+	// A scenario run's ids are the caller's own (the SDK names them in the
+	// events it posts), and the platform-health and admin routes take a name.
+	"scenariorunid": "apidiff-scenario-run",
+	"batchrunid":    "apidiff-batch-run",
+	"check":         "collector",
+	"resource":      "user",
+	"sessionid":     "apidiff-session",
+	// A stored object is delivered to a permission-named audience; a dataset
+	// import is read under datasets:view.
+	"audience": "datasets:view",
 }
+
+const (
+	synthFromMillis = "1767225600000"
+	synthToMillis   = "1767312000000"
+)
 
 // ResolveParam picks a value for a path or required query parameter: spec
 // examples/defaults first, then seeded constants matched by name, then the

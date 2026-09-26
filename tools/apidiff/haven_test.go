@@ -512,7 +512,7 @@ func TestAMonolithBasesFailureTailReadsTheAppLane(t *testing.T) {
 					logCmd = spec
 				}
 			}
-			if got := argv(logCmd); got != "haven logs backend --agent --stack apidiff-20260909t2230-branch" {
+			if got := argv(logCmd); got != "haven logs api --agent --stack apidiff-20260909t2230-branch" {
 				t.Errorf("logs command = %q, want the backend lane", got)
 			}
 		})

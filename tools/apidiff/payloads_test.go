@@ -243,9 +243,9 @@ func TestResolveParamClientChosenSlugs(t *testing.T) {
 	}{
 		{"provider", "/api/model-providers/{provider}", "openai"},
 		{"tag", "/api/prompts/tags/{tag}", "apidiff-tag"},
-		{"name", "/api/agent-cache/{name}", "apidiff-agent-cache-entry"},
+		{"name", "/api/agent-cache/{name}", "APIDIFF_AGENT_CACHE_ENTRY"},
 		{"repository", "/api/coding-agent/pull-request-usage", "apidiff/apidiff"},
-		{"from", "/api/webhooks/v1/events", synthDateTime},
+		{"from", "/api/webhooks/v1/events", synthFromMillis},
 	}
 	for _, testCase := range cases {
 		param := Param{Name: testCase.param, In: "query", Required: true}

@@ -39,7 +39,17 @@ const (
 	// fixed here rather than generated: two runs against a kept database must
 	// insert the same row, not a second one.
 	fixtureDoomedUserEmail = "apidiff-user-doomed@apidiff.invalid"
+
+	// The fixture workflow (fixture-seeding.go): no REST route creates one.
+	fixtureWorkflowID        = "apidiff-workflow"
+	fixtureWorkflowVersionID = "apidiff-workflow-version"
 )
+
+// forcedFeatureFlags are switched on for both instances, so the routes they
+// gate are compared rather than refused alike. release_custom_chart_playground
+// is left off: it turns the saved-chart routes off (the two are mutually
+// exclusive per project), and those carry more of the surface.
+var forcedFeatureFlags = "release_lwql_workbench,release_instant_evals,release_langy_enabled"
 
 // provisioningSQL inserts the permission-probe fixtures: organization 2 with
 // its team and project C, project B in the seeded organization, and the two
@@ -70,5 +80,6 @@ INSERT INTO "User" ("id", "name", "email") VALUES
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "OrganizationUser" ("userId", "organizationId", "role") VALUES
   ('` + fixtureDoomedUserID + `', '` + seededOrganizationID + `', 'MEMBER')
-ON CONFLICT ("userId", "organizationId") DO NOTHING;`
+ON CONFLICT ("userId", "organizationId") DO NOTHING;
+` + fixtureWorkflowSQL()
 }

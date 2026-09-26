@@ -88,8 +88,11 @@ func havenOnPath() bool {
 // instance-admin operations comparable rather than symmetrically unauthorized.
 func havenEnv(inherit []string, slug string) []string {
 	return havenrun.Env(inherit, slug, havenrun.EnvOptions{
-		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY"},
-		Extra:            []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey},
+		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY", "FEATURE_FLAG_FORCE_ENABLE"},
+		Extra: []string{
+			"LANGWATCH_INSTANCE_ADMIN_API_KEY=" + throwawayInstanceAdminKey,
+			"FEATURE_FLAG_FORCE_ENABLE=" + forcedFeatureFlags,
+		},
 	})
 }
 

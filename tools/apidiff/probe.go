@@ -52,6 +52,7 @@ type Transcript struct {
 	RequestPathA string     `json:"requestPathA"`
 	RequestPathB string     `json:"requestPathB"`
 	RequestBody  any        `json:"requestBody,omitempty"`
+	RequestBodyB any        `json:"requestBodyB,omitempty"`
 	A            SideResult `json:"a"`
 	B            SideResult `json:"b"`
 }
@@ -133,12 +134,13 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		ownerIDs: map[string]*sideIDs{}, statusDiffs: map[string]bool{},
 	}
 
-	selected := SelectOperations(operations, options.Filter)
+	selected := probeOrder(SelectOperations(operations, options.Filter))
 
 	// Read every credential before anything has had a chance to destroy one,
 	// so the closing read has something to be compared against.
 	canaries := engine.credentialCanaries(operations)
 	credentialsBefore := engine.readCanaries(canaries)
+	engine.seedFixtures()
 
 	findings := make([]Finding, 0)
 	probed := 0
@@ -332,20 +334,26 @@ func (engine *probeEngine) progress(format string, args ...any) {
 	}
 }
 
-// probeCase is one request to execute against both sides.
+// probeCase is one request to execute against both sides. A curated case
+// carries each side's own body, filled from that side's own ids.
 type probeCase struct {
-	name string
-	body any
+	name     string
+	body     any
+	bodyB    any
+	perSide  bool
+	captures string
 }
 
 func (engine *probeEngine) probeOperation(operation Operation) []Finding {
-	headers := authHeaders(operation, engine.options.Schemes, engine.options.Keys)
+	headers := userBoundHeaders(operation, authHeaders(operation, engine.options.Schemes, engine.options.Keys), engine.options.Keys)
 
-	deleteOp := operation.Method == http.MethodDelete
-	paramsA, unresolvedA := resolveParams(operation, engine.symbolsA, deleteOp)
-	paramsB, unresolvedB := resolveParams(operation, engine.symbolsB, deleteOp)
-	if unresolvedA != "" || unresolvedB != "" {
-		return []Finding{unresolvedFinding(operation, unresolvedA, unresolvedB)}
+	paramsA, paramsB, unresolved := engine.resolveBothSides(operation)
+	if unresolved != nil {
+		return []Finding{*unresolved}
+	}
+	cases, refused := engine.casesFor(operation)
+	if refused != "" {
+		return []Finding{skippedFinding(operation, refused)}
 	}
 
 	if blocked, ok := engine.guardSelfDestruction(operation, paramsA, paramsB); ok {
@@ -364,7 +372,7 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 	}
 	findings := make([]Finding, 0)
 	missingReported := false
-	for _, probeCase := range operationCases(operation) {
+	for _, probeCase := range cases {
 		transcript := engine.runCase(operation, probeCase, target)
 		engine.transcripts = append(engine.transcripts, transcript)
 		engine.captureFrom(operation, probeCase, transcript)
@@ -401,8 +409,16 @@ func (engine *probeEngine) guardSelfDestruction(operation Operation, sides ...re
 // captureFrom files everything one probe case taught the engine: each side's
 // IDs into its own symbol table, the owner-visible IDs, and any create.
 func (engine *probeEngine) captureFrom(operation Operation, probeCase probeCase, transcript Transcript) {
-	engine.symbolsA.Capture(operation.Path, decodedBody(transcript.A.Body))
-	engine.symbolsB.Capture(operation.Path, decodedBody(transcript.B.Body))
+	capturePath := operation.Path
+	if probeCase.captures != "" {
+		capturePath = probeCase.captures
+	}
+	captureSucceeded(engine.symbolsA, capturePath, transcript.A)
+	captureSucceeded(engine.symbolsB, capturePath, transcript.B)
+	if probeCase.perSide {
+		pinCreated(engine.symbolsA, capturePath, transcript.A)
+		pinCreated(engine.symbolsB, capturePath, transcript.B)
+	}
 	engine.recordOwnerIDs(operation, probeCase, transcript)
 	engine.captureMutation(operation, probeCase, transcript)
 }
@@ -429,7 +445,7 @@ func (engine *probeEngine) compareCase(operation Operation, probeCase probeCase,
 func unresolvedFinding(operation Operation, unresolvedA, unresolvedB string) Finding {
 	switch {
 	case unresolvedA != "" && unresolvedB != "":
-		return skippedFinding(operation, "unresolvable parameter: "+unresolvedA)
+		return skippedFinding(operation, unresolvableReason(unresolvedA, operation.Path))
 	case unresolvedA != "":
 		return skippedFinding(operation, "parameter "+unresolvedA+" resolvable on the base only; probing both sides would compare different requests")
 	default:
@@ -551,6 +567,9 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 		RequestPathB: target.pathB,
 		RequestBody:  probeCase.body,
 	}
+	if probeCase.perSide {
+		transcript.RequestBodyB = probeCase.bodyB
+	}
 	request := probeRequest{
 		method:  operation.Method,
 		headers: target.headers,
@@ -560,6 +579,9 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	request.path = target.pathA
 	request.query = target.queryA
 	transcript.A = engine.execute(request)
+	if probeCase.perSide {
+		request.body = probeCase.bodyB
+	}
 	request.baseURL = engine.options.B
 	request.path = target.pathB
 	request.query = target.queryB

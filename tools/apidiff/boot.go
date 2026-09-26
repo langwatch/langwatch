@@ -242,6 +242,7 @@ var managedEnvKeys = []string{
 	"API_TOKEN_JWT_SECRET", "LANGWATCH_NLP_SERVICE", "LANGWATCH_ENDPOINT",
 	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
 	"LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", "LW_VIRTUAL_KEY_PEPPER",
+	"FEATURE_FLAG_FORCE_ENABLE", "LANGWATCH_LOCAL_STORAGE_PATH",
 }
 
 // instanceEnvSpec carries the per-instance values instanceEnv composes.
@@ -253,6 +254,7 @@ type instanceEnvSpec struct {
 	chDatabase   string
 	redisURL     string
 	redisDBIndex string
+	storagePath  string // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
 }
 
 // instanceEnv composes one instance's process environment: user env
@@ -281,12 +283,16 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 		"NEXTAUTH_SECRET="+throwawayNextAuthSecret,
 		"API_KEY_PEPPER="+throwawayCredentialsSecret,
 		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
+		"FEATURE_FLAG_FORCE_ENABLE="+forcedFeatureFlags,
 		"LW_GATEWAY_INTERNAL_SECRET="+throwawayGatewayInternalSecret,
 		"LW_GATEWAY_JWT_SECRET="+throwawayGatewayJWTSecret,
 		"LW_VIRTUAL_KEY_PEPPER="+throwawayVirtualKeyPepper,
 		"BASE_HOST="+base,
 		"NEXTAUTH_URL="+base,
 	)
+	if spec.storagePath != "" {
+		env = append(env, "LANGWATCH_LOCAL_STORAGE_PATH="+spec.storagePath)
+	}
 	env = append(env, spec.extraEnv...)
 	return append(env, spec.portEnv...)
 }
@@ -657,6 +663,8 @@ func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error
 		func() error { return state.provision(ctx, booted.B) },
 		func() error { return state.startAPI(ctx, &booted.A) },
 		func() error { return state.startAPI(ctx, &booted.B) },
+		func() error { return state.startWorker(ctx, &booted.A) },
+		func() error { return state.startWorker(ctx, &booted.B) },
 	}
 	for _, stage := range stages {
 		if err := stage(); err != nil {
@@ -1171,6 +1179,10 @@ func (state *bootState) envFor(instance Instance) ([]string, error) {
 		redisIndex = state.infra.mainRedis
 	}
 	baseURL := fmt.Sprintf("http://127.0.0.1:%d", instance.Port)
+	storagePath := filepath.Join(state.workRoot, "storage", instance.Name)
+	if err := os.MkdirAll(storagePath, 0o700); err != nil {
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
+	}
 	return instanceEnv(os.Environ(), instanceEnvSpec{
 		port:         instance.Port,
 		portEnv:      instance.Profile.portEnv(instance.Port),
@@ -1179,6 +1191,7 @@ func (state *bootState) envFor(instance Instance) ([]string, error) {
 		chDatabase:   chDatabase,
 		redisURL:     state.infra.redisServer,
 		redisDBIndex: strconv.Itoa(redisIndex),
+		storagePath:  storagePath,
 	}), nil
 }
 
@@ -1204,36 +1217,75 @@ func (state *bootState) verifyMigrationTarget(ctx context.Context, instance Inst
 
 // startAPI spawns the API process for one instance and waits for health.
 func (state *bootState) startAPI(ctx context.Context, instance *Instance) error {
-	logPath := filepath.Join(state.workRoot, "logs", instance.Name+".log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	command, logPath, err := state.spawn(ctx, instanceProcess{instance: *instance, argv: instance.Profile.startArgv, logName: instance.Name})
 	if err != nil {
 		return err
 	}
-	// Setpgid puts the pnpm wrapper and its tsx child in one process group so
-	// teardown can kill both — killing the parent alone orphans the server.
-	env, err := state.envFor(*instance)
-	if err != nil {
-		logFile.Close()
-		return err
-	}
-	// #nosec G204 -- the executable is the allowlisted constant "pnpm" and
-	// startArgv comes from the two package-level bootProfile constants.
-	command := exec.CommandContext(ctx, "pnpm", instance.Profile.startArgv...)
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Dir = instance.Dir
-	command.Env = env
-	command.Stdout = logFile
-	command.Stderr = logFile
-	if err := command.Start(); err != nil {
-		logFile.Close()
-		return fmt.Errorf("start %s: %w", instance.Name, err)
-	}
-	state.processes = append(state.processes, command)
 	state.logf("start %s on :%d (pid %d, log %s); waiting for health", instance.Name, instance.Port, command.Process.Pid, logPath)
 	if err := state.waitHealthy(ctx, instance.URL, instance.Profile.healthPath); err != nil {
 		return fmt.Errorf("health %s: %w (see %s)", instance.Name, err, logPath)
 	}
 	return nil
+}
+
+// startWorker spawns the instance's worker beside its API. Neither API
+// process projects what it ingests, so without one a trace, a scenario run or
+// a facet posted to either side never becomes readable, and every read of it
+// compares two empty answers. The worker's metrics port is allocated, since a
+// fixed default would collide with any other worker on this machine.
+func (state *bootState) startWorker(ctx context.Context, instance *Instance) error {
+	port, err := freePort()
+	if err != nil {
+		return err
+	}
+	command, logPath, err := state.spawn(ctx, instanceProcess{
+		instance: *instance, argv: instance.Profile.workerArgv, logName: instance.Name + "-worker",
+		extraEnv: []string{fmt.Sprintf("WORKER_METRICS_PORT=%d", port)},
+	})
+	if err != nil {
+		return err
+	}
+	state.logf("start %s worker (pid %d, log %s)", instance.Name, command.Process.Pid, logPath)
+	return nil
+}
+
+// instanceProcess is one process an instance runs on its composed env.
+type instanceProcess struct {
+	instance Instance
+	argv     []string
+	logName  string
+	extraEnv []string
+}
+
+// spawn starts one instance process, logging to logs/<logName>.log.
+func (state *bootState) spawn(ctx context.Context, process instanceProcess) (*exec.Cmd, string, error) {
+	logPath := filepath.Join(state.workRoot, "logs", process.logName+".log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, "", err
+	}
+	env, err := state.envFor(process.instance)
+	if err != nil {
+		logFile.Close()
+		return nil, "", err
+	}
+	// Setpgid puts the pnpm wrapper and its tsx child in one process group so
+	// teardown can kill both — killing the parent alone orphans the server.
+	// #nosec G204 -- the executable is the allowlisted constant "pnpm" and
+	// argv comes from the two package-level bootProfile constants.
+	command := exec.CommandContext(ctx, "pnpm", process.argv...)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Dir = process.instance.Dir
+	env = append(env, process.extraEnv...)
+	command.Env = env
+	command.Stdout = logFile
+	command.Stderr = logFile
+	if err := command.Start(); err != nil {
+		logFile.Close()
+		return nil, "", fmt.Errorf("start %s: %w", process.logName, err)
+	}
+	state.processes = append(state.processes, command)
+	return command, logPath, nil
 }
 
 // waitHealthy polls the health endpoint until it answers or the boot timeout
