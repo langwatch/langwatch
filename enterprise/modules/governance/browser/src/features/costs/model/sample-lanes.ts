@@ -5,8 +5,8 @@ import {
   type GovernanceCostSummary,
 } from "@langwatch/enterprise-governance-contract";
 
-import { type SpenderRow } from "../ui/blocks/cost-spender-panel.tsx";
 import { sampleSeatPools } from "./sample-series.ts";
+import { type SpenderRow } from "./spender-row.ts";
 
 /**
  * The invented halves of the two surfaces on this page that are not panels:

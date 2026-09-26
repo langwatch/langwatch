@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { type Instant, Temporal } from "@langwatch/time";
 
+import { isIsoDay, SHORT_MONTHS } from "./iso-day.ts";
 import { type DailyBucket } from "./sample-series.ts";
 import { frameSpanDays, type TimeFrame, type TimeInterval } from "./time-controls.ts";
 
@@ -44,12 +46,18 @@ export const ALL_DEPARTMENTS = "__all__";
 export const READ_WINDOW_DAY_CEILING = 365;
 
 /** The window to request for a frame, clamped to what the reads will answer. */
-export function windowDaysForFrame({ frame, now }: { frame: TimeFrame; now?: Date }): number {
+export function windowDaysForFrame({ frame, now }: { frame: TimeFrame; now?: Instant }): number {
   return Math.min(READ_WINDOW_DAY_CEILING, frameSpanDays({ frame, now }));
 }
 
 /** Whether the frame asks for more history than the reads can answer. */
-export function frameExceedsReadCeiling({ frame, now }: { frame: TimeFrame; now?: Date }): boolean {
+export function frameExceedsReadCeiling({
+  frame,
+  now,
+}: {
+  frame: TimeFrame;
+  now?: Instant;
+}): boolean {
   return frameSpanDays({ frame, now }) > READ_WINDOW_DAY_CEILING;
 }
 
@@ -62,12 +70,12 @@ export function frameExceedsReadCeiling({ frame, now }: { frame: TimeFrame; now?
  * zone would move a day across a bucket boundary for anyone west of Greenwich.
  */
 export function bucketStartOf(day: string, interval: TimeInterval): string {
-  const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return day;
-  const year = date.getUTCFullYear();
+  const iso = day.slice(0, 10);
+  if (!isIsoDay(iso)) return day;
+  const date = Temporal.PlainDate.from(iso);
+  const year = date.year;
   if (interval === "year") return `${year}-01-01`;
-  const month =
-    interval === "quarter" ? Math.floor(date.getUTCMonth() / 3) * 3 : date.getUTCMonth();
+  const month = interval === "quarter" ? Math.floor((date.month - 1) / 3) * 3 : date.month - 1;
   return `${year}-${String(month + 1).padStart(2, "0")}-01`;
 }
 
@@ -133,18 +141,14 @@ export function aggregateLine(
  */
 export function formatBucketTick(bucketStart: string | number, interval: TimeInterval): string {
   const iso = String(bucketStart).slice(0, 10);
-  const parsed = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(parsed.getTime())) return String(bucketStart);
-  const year = parsed.getUTCFullYear();
+  if (!isIsoDay(iso)) return String(bucketStart);
+  const parsed = Temporal.PlainDate.from(iso);
+  const year = parsed.year;
   if (interval === "year") return String(year);
   if (interval === "quarter") {
-    return `Q${Math.floor(parsed.getUTCMonth() / 3) + 1} ${year}`;
+    return `Q${Math.floor((parsed.month - 1) / 3) + 1} ${year}`;
   }
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+  return `${SHORT_MONTHS[parsed.month - 1]} ${year}`;
 }
 
 /**

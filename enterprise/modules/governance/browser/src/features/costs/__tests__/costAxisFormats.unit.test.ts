@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { fmtCount, fmtWhole } from "../ui/blocks/cost-charts.tsx";
+import { fmtCount, fmtWhole } from "../model/cost-figure-format.ts";
 
 /**
  * How a chart axis writes a number, and why two of them differ.

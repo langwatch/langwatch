@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { type ReactElement } from "react";
+import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,7 +8,7 @@ import {
   WITHHELD_EMPTY_BAR_LABEL,
   type WithheldMarks,
   withheldBarShape,
-} from "../ui/blocks/cost-charts.tsx";
+} from "../ui/blocks/withheld-bar-shape.tsx";
 
 /**
  * @vitest-environment jsdom
@@ -42,7 +42,16 @@ const marks = (over: Partial<WithheldMarks> = {}): WithheldMarks => ({
   ...over,
 });
 
-const propsOf = (element: ReactElement | null) => (element?.props ?? {}) as Record<string, unknown>;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+const propsOf = (element: ReactElement | null): Record<string, unknown> => {
+  const props: unknown = element?.props;
+  return isRecord(props) ? props : {};
+};
+const childrenOf = (element: ReactElement | null): ReactElement[] => {
+  const children = propsOf(element).children;
+  return Array.isArray(children) ? children.filter((child) => isValidElement(child)) : [];
+};
 
 describe("the shape of a bar whose period is short", () => {
   describe("when the period has no figure at all", () => {
@@ -58,9 +67,7 @@ describe("the shape of a bar whose period is short", () => {
         "aria-label": WITHHELD_EMPTY_BAR_LABEL,
       });
       // The cue is a dash, not a colour: it has to survive greyscale.
-      const rect = (propsOf(drawn).children as ReactElement[]).find(
-        (child) => child.type === "rect",
-      );
+      const rect = childrenOf(drawn).find((child) => child.type === "rect");
       expect(rect).toBeDefined();
       expect(propsOf(rect!)).toMatchObject({
         x: 40,
@@ -93,9 +100,7 @@ describe("the shape of a bar whose period is short", () => {
       });
       // The bar inside is recharts' own rectangle, so it still answers to
       // the click that opens a period — restyled, not replaced.
-      const bar = (propsOf(drawn).children as ReactElement[]).find(
-        (child) => typeof child.type !== "string",
-      );
+      const bar = childrenOf(drawn).find((child) => typeof child.type !== "string");
       expect(propsOf(bar!)).toMatchObject({
         height: 80,
         strokeDasharray: expect.stringMatching(/\d/),

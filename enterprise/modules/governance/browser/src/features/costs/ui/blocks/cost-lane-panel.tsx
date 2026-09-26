@@ -109,6 +109,7 @@ export function CostLanePanel({
   // own line rather than being folded into a dollar figure nobody was charged
   // (ADR-128 §3).
   const otherCurrencies = (currencyTotals ?? []).filter((total) => total.currencyCode !== "USD");
+  const footNote = cellsWithoutAmount > 0 ? laneWithheldTotalNote() : belowTotalNote;
   return (
     <Box
       data-testid={testId}
@@ -175,16 +176,11 @@ export function CostLanePanel({
             figure beside it is not the whole figure — and a caveat on a number
             that only appears when the reader goes looking for it is a caveat
             that will be missed by exactly the reader who needed it. */}
-        {cellsWithoutAmount > 0 ? (
+        {/* A withheld total outranks the lane's own caveat (the metered lane's
+            count of requests with no dollar amount), which leaves the figure standing. */}
+        {footNote ? (
           <Text fontSize="xs" color="fg.subtle" marginTop="auto" data-testid={`${testId}-note`}>
-            {laneWithheldTotalNote()}
-          </Text>
-        ) : belowTotalNote ? (
-          // A stated figure with a caveat beside it — the metered lane's count
-          // of requests carrying no dollar amount. Not a withheld total: the
-          // figure above it stands.
-          <Text fontSize="xs" color="fg.subtle" marginTop="auto" data-testid={`${testId}-note`}>
-            {belowTotalNote}
+            {footNote}
           </Text>
         ) : null}
       </VStack>

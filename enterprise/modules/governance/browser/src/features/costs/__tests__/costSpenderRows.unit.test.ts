@@ -2,11 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  NOT_NAMED_LABEL,
-  type SpenderRow,
-  spenderDisplayRows,
-} from "../ui/blocks/cost-spender-panel.tsx";
+import { type SpenderRow } from "../model/spender-row.ts";
+import { NOT_NAMED_LABEL, spenderDisplayRows } from "../ui/blocks/cost-spender-panel.tsx";
 
 /**
  * The display logic behind the billed-spend-by-person panel.

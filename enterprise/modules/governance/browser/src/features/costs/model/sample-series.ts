@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { nowInstant, Temporal } from "@langwatch/time";
+
+import { firstOfMonthAfter, isIsoDay, utcToday } from "./iso-day.ts";
 
 /**
  * Placeholder series for the Costs panels whose backing data does not exist
@@ -133,12 +136,9 @@ export const SAMPLE_SEAT_POOLS = [
  */
 export function recentMonths(count: number): string[] {
   const out: string[] = [];
-  const today = new Date();
-  const year = today.getUTCFullYear();
-  const month = today.getUTCMonth();
+  const today = utcToday(nowInstant());
   for (let i = count - 1; i >= 0; i--) {
-    const start = new Date(Date.UTC(year, month - i, 1));
-    out.push(start.toISOString().slice(0, 10));
+    out.push(firstOfMonthAfter(today, -i));
   }
   return out;
 }
@@ -200,15 +200,10 @@ export function sampleLine(
 
 /** The `count` months after `day`, as ISO first-of-month days. */
 export function monthsAfter(day: string, count: number): string[] {
-  const start = new Date(`${day}T00:00:00Z`);
-  if (Number.isNaN(start.getTime())) return [];
+  if (!isIsoDay(day)) return [];
   const out: string[] = [];
   for (let i = 1; i <= count; i++) {
-    out.push(
-      new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + i, 1))
-        .toISOString()
-        .slice(0, 10),
-    );
+    out.push(firstOfMonthAfter(day, i));
   }
   return out;
 }
@@ -365,11 +360,9 @@ export function sampleSeatPools(
   day: string,
   pools: readonly string[] = SAMPLE_SEAT_POOLS,
 ): SampleSeatPool[] {
-  const date = new Date(`${day}T00:00:00Z`);
-  const monthsSinceRenewal = Number.isNaN(date.getTime()) ? 0 : date.getUTCMonth();
-  const renewals = Number.isNaN(date.getTime())
-    ? 0
-    : date.getUTCFullYear() - SEAT_CONTRACT_EPOCH_YEAR;
+  const date = isIsoDay(day) ? Temporal.PlainDate.from(day) : undefined;
+  const monthsSinceRenewal = date ? date.month - 1 : 0;
+  const renewals = date ? date.year - SEAT_CONTRACT_EPOCH_YEAR : 0;
 
   return pools.map((skuPartNumber, index) => {
     const random = seededRandom(hashLabel(skuPartNumber));

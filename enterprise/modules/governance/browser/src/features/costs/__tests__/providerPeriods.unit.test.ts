@@ -3,15 +3,14 @@
 import { describe, expect, it } from "vitest";
 
 import { aggregateBuckets } from "../model/costs-window.ts";
+import { costTotalBuckets, providerSplitBuckets } from "../model/provider-day-buckets.ts";
 import {
-  costTotalBuckets,
   partialProviderNotes,
   providerDayBuckets,
   providerPeriods,
-  providerSplitBuckets,
   rowIsShort,
   type WithheldBucket,
-} from "../ui/sections/cost-provider-day-panel.tsx";
+} from "../model/provider-periods.ts";
 
 /**
  * @vitest-environment jsdom

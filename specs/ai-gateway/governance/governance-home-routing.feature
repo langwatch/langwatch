@@ -532,3 +532,11 @@ Feature: Governance home — route, nav promotion, persona detection
       for the organization
     When the admin cold-loads "/governance/billed"
     Then the not-found scene is shown instead of an unfinished page
+
+  @bdd @ui @governance-home @billed-cost-flag @integration
+  Scenario: A reader without governanceCost:view is told which grant Costs needs
+    Given "release_ui_governance_billed_cost_enabled" is enabled for the organization
+    And the reader does not hold governanceCost:view
+    When the reader opens "/governance/costs"
+    Then the page names the governanceCost:view grant
+    And no cost read is issued

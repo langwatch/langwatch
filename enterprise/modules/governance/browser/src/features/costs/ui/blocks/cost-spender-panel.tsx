@@ -3,7 +3,8 @@
 import { Alert, Badge, Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 
-import { fmtMoney } from "./cost-charts.tsx";
+import { fmtMoney } from "../../model/cost-figure-format.ts";
+import { type SpenderRow } from "../../model/spender-row.ts";
 
 /**
  * Provider-reported cost grouped by the provider's user id (ADR-129).
@@ -12,17 +13,6 @@ import { fmtMoney } from "./cost-charts.tsx";
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
-
-/** One row of the tRPC spender DTO, as the panel receives it. */
-export interface SpenderRow {
-  provider: string;
-  rawActorId: string;
-  /** Null only on the not-named bucket row. */
-  label: string | null;
-  agentId: string;
-  amountUsd: number | null;
-  cellsWithoutAmount: number;
-}
 
 /** The copy for the bucket row — the screen's words, never a DTO invention. */
 export const NOT_NAMED_LABEL = "Unattributed spend";

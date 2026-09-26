@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type {
+  GovernanceCostDayRecords,
+  GovernanceCostProviderDayRow,
+} from "@langwatch/enterprise-governance-contract";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CostProviderDayPanel } from "../ui/sections/cost-provider-day-panel.tsx";
-
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
  * @vitest-environment jsdom
@@ -31,7 +33,7 @@ import { CostProviderDayPanel } from "../ui/sections/cost-provider-day-panel.tsx
  */
 
 const harness: {
-  periodRecords: { records: { label: string; amountUsd: number | null }[] } | undefined;
+  periodRecords: GovernanceCostDayRecords | undefined;
   periodRecordsFails: boolean;
 } = { periodRecords: undefined, periodRecordsFails: false };
 
@@ -64,7 +66,7 @@ vi.mock("../../../behavior/governance-api.ts", () => ({
   },
 }));
 
-const ROWS = [
+const ROWS: GovernanceCostProviderDayRow[] = [
   {
     day: "2026-01-15",
     provider: "anthropic_admin",
@@ -74,10 +76,10 @@ const ROWS = [
   },
 ];
 
-const renderPanel = (rows: unknown[] = ROWS) =>
+const renderPanel = (rows: readonly GovernanceCostProviderDayRow[] = ROWS) =>
   render(
     <ChakraProvider value={defaultSystem}>
-      <CostProviderDayPanel organizationId="org-1" rows={rows as never} interval="month" />
+      <CostProviderDayPanel organizationId="org-1" rows={rows} interval="month" />
     </ChakraProvider>,
   );
 
@@ -88,7 +90,7 @@ const renderPanel = (rows: unknown[] = ROWS) =>
  * `<g class="recharts-bar">`, and hangs the click handler on the rectangle.
  */
 const openFirstPeriod = () => {
-  const bar = document.querySelector(".recharts-bar .recharts-rectangle") as Element | null;
+  const bar = document.querySelector(".recharts-bar .recharts-rectangle");
   if (!bar) throw new Error("no bar was drawn, so no period can be opened");
   fireEvent.click(bar);
 };
@@ -137,6 +139,7 @@ describe("the records behind one period", () => {
       // charge made the period short, and a note over the whole list would
       // leave them guessing between the rows under it.
       harness.periodRecords = {
+        unavailableReason: null,
         records: [
           {
             label: "claude-sonnet-5",
@@ -145,7 +148,7 @@ describe("the records behind one period", () => {
             currenciesWithoutUsdAmount: ["EUR"],
           },
         ],
-      } as never;
+      };
       renderPanel();
       openFirstPeriod();
 

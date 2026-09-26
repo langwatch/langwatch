@@ -5,17 +5,12 @@ import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  CostStackedBars,
-  WITHHELD_BAR_LABEL,
-  WITHHELD_EMPTY_BAR_LABEL,
-} from "../ui/blocks/cost-charts.tsx";
-import {
-  CostProviderDayPanel,
-  costTotalBuckets,
-  PartialSpendNote,
-  partialProviderNotes,
-} from "../ui/sections/cost-provider-day-panel.tsx";
+import { costTotalBuckets } from "../model/provider-day-buckets.ts";
+import { partialProviderNotes } from "../model/provider-periods.ts";
+import { CostStackedBars } from "../ui/blocks/cost-stacked-bars.tsx";
+import { PartialSpendNote } from "../ui/blocks/partial-spend-note.tsx";
+import { WITHHELD_BAR_LABEL, WITHHELD_EMPTY_BAR_LABEL } from "../ui/blocks/withheld-bar-shape.tsx";
+import { CostProviderDayPanel } from "../ui/sections/cost-provider-day-panel.tsx";
 
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 

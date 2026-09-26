@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { type Instant, nowInstant } from "@langwatch/time";
+
 /**
  * The two time chips every governance page carries, and the one rule between
  * them.
@@ -70,12 +72,12 @@ const INTERVAL_DAYS: Record<TimeInterval, number> = {
 export function isIntervalCoarserThanFrame({
   interval,
   frame,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   interval: TimeInterval;
   frame: TimeFrame;
   /** Injected so the year-to-date case is testable on a fixed day. */
-  now?: Date;
+  now?: Instant;
 }): boolean {
   return INTERVAL_DAYS[interval] > frameSpanDays({ frame, now });
 }
@@ -83,17 +85,15 @@ export function isIntervalCoarserThanFrame({
 /** How many days the frame actually covers today. */
 export function frameSpanDays({
   frame,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   frame: TimeFrame;
-  now?: Date;
+  now?: Instant;
 }): number {
   if (frame !== "year_to_date") {
     return TIME_FRAMES.find((option) => option.value === frame)?.approximateDays ?? 365;
   }
-  const startOfYear = Date.UTC(now.getUTCFullYear(), 0, 1);
-  const elapsedMs = now.getTime() - startOfYear;
-  return Math.max(1, Math.floor(elapsedMs / 86_400_000) + 1);
+  return Math.max(1, now.toZonedDateTimeISO("UTC").dayOfYear);
 }
 
 /**
@@ -107,11 +107,11 @@ export function frameSpanDays({
 export function coerceInterval({
   interval,
   frame,
-  now = new Date(),
+  now = nowInstant(),
 }: {
   interval: TimeInterval;
   frame: TimeFrame;
-  now?: Date;
+  now?: Instant;
 }): TimeInterval {
   if (!isIntervalCoarserThanFrame({ interval, frame, now })) return interval;
   const widestThatFits = [...TIME_INTERVALS]

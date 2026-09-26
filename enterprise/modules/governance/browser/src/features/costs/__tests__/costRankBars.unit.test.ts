@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { rankBarGeometry } from "../ui/blocks/cost-charts.tsx";
+import { rankBarGeometry } from "../model/rank-bars.ts";
 
 /**
  * The geometry behind the ranked cost bars.
