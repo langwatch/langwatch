@@ -606,7 +606,8 @@ export function HomePageBanners({
             It bleeds past its own box on purpose. The hero is not an object on
             the home, it is where the home is lit from. */}
         {/* Both bleed layers sit at zIndex -1: they light the page from
-            behind, so neighbours the bleed reaches never paint under them. */}
+            behind, so neighbours the bleed reaches never paint under them.
+            They stay visible only inside HomePage's zIndex={1} Container. */}
         <Box
           aria-hidden
           position="absolute"

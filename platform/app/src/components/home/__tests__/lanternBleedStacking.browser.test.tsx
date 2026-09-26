@@ -11,7 +11,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@paper-design/shaders-react", () => ({
@@ -39,12 +38,6 @@ vi.mock("~/features/langy/stores/langyStore", () => ({
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
-}));
-
-vi.mock("~/components/ui/link", () => ({
-  Link: ({ children, ...rest }: { children: React.ReactNode }) => (
-    <a {...(rest as Record<string, unknown>)}>{children}</a>
-  ),
 }));
 
 import { HomeCard } from "../HomeCard";
@@ -85,20 +78,18 @@ function mount(mode: "light" | "dark") {
  * The bleed layers opt out of hit-testing, which also hides them from
  * elementFromPoint. Opting them back in lets the probe report paint order.
  */
-function makeBleedHitTestable(container: HTMLElement) {
-  const layers = container.querySelectorAll<HTMLElement>(
-    "[aria-hidden='true']",
-  );
+function makeHitTestable(layers: HTMLElement[]) {
   for (const layer of layers) layer.style.pointerEvents = "auto";
-  return layers.length;
 }
 
-function topmostAt(element: HTMLElement, { x, y }: { x: number; y: number }) {
+function pointIn(element: HTMLElement, { x, y }: { x: number; y: number }) {
   const box = element.getBoundingClientRect();
-  return document.elementFromPoint(
-    box.left + box.width * x,
-    box.top + box.height * y,
-  );
+  return { x: box.left + box.width * x, y: box.top + box.height * y };
+}
+
+function covers(element: HTMLElement, { x, y }: { x: number; y: number }) {
+  const box = element.getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
 }
 
 describe("the Langy home's lit block", () => {
@@ -108,19 +99,30 @@ describe("the Langy home's lit block", () => {
   });
 
   for (const mode of ["light", "dark"] as const) {
-    describe(`in ${mode} mode`, () => {
+    describe(`given the home renders in ${mode} mode`, () => {
       /** @scenario "The block's light stays behind the cards around it" */
       it("paints the card above it over the block's light", () => {
         const { container } = mount(mode);
-        expect(makeBleedHitTestable(container)).toBeGreaterThan(0);
-
         const card = screen.getByTestId("card-above");
-        for (const point of [
+        const hidden = Array.from(
+          container.querySelectorAll<HTMLElement>("[aria-hidden='true']"),
+        );
+
+        for (const probe of [
           { x: 0.5, y: 0.5 },
           { x: 0.5, y: 0.9 },
           { x: 0.1, y: 0.9 },
         ]) {
-          const hit = topmostAt(card, point);
+          const point = pointIn(card, probe);
+          const light = hidden.filter(
+            (layer) =>
+              getComputedStyle(layer).display !== "none" &&
+              covers(layer, point),
+          );
+          expect(light.length).toBeGreaterThan(0);
+          makeHitTestable(light);
+
+          const hit = document.elementFromPoint(point.x, point.y);
           expect(hit).not.toBeNull();
           expect(card.contains(hit)).toBe(true);
         }

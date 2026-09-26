@@ -77,6 +77,8 @@ export function HomePage() {
       <Box width="full" position="relative" overflowX="clip">
         {/* A reading measure, not a dashboard sprawl: the briefing sheet is
             the page, so the column narrows to keep its lines composed. */}
+        {/* zIndex={1} is load-bearing: it is the stacking context the
+            lantern's zIndex -1 light sits in, above the layout's page fill. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
             <HStack width="full" align="center" gap={2}>
