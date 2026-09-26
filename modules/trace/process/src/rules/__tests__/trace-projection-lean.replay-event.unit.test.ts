@@ -3,7 +3,7 @@ import { rowToEvent } from "@langwatch/eventing/server";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
+import { leanReplayEvent } from "../trace-projection-lean.rules.ts";
 
 function makeRow(overrides: Partial<ClickHouseEventRow>): ClickHouseEventRow {
   return {
@@ -38,7 +38,7 @@ describe("rowToEvent", () => {
             },
           }),
         }),
-        TraceProjectionLeanEventingAdapter.leanReplayEvent,
+        leanReplayEvent,
       );
 
       const attrs = (event.data as any)?.span?.attributes ?? [];
@@ -50,10 +50,7 @@ describe("rowToEvent", () => {
 
   describe("when a row has no occurred-at value", () => {
     it("falls back to the event timestamp", () => {
-      const event = rowToEvent(
-        makeRow({ EventOccurredAt: 0 }),
-        TraceProjectionLeanEventingAdapter.leanReplayEvent,
-      );
+      const event = rowToEvent(makeRow({ EventOccurredAt: 0 }), leanReplayEvent);
       expect(event.occurredAt).toBe(1_700_000_000_000);
     });
   });

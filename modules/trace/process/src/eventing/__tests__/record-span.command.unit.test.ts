@@ -17,7 +17,7 @@ import {
   type TraceSpanSpool,
   type TraceSpanSpoolIdentity,
 } from "../../app/trace.members.ts";
-import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
+import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
   readonly redact = vi.fn(async (_input: Parameters<TraceSpanPiiRedaction["redact"]>[0]) => {});

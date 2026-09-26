@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
+import { IO_PREVIEW_BYTES } from "../../../rules/trace-projection-lean.rules.ts";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,

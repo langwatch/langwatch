@@ -3,7 +3,6 @@ import type { Trace, Protections } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyRead } from "../../../app/trace.members.ts";
-import { TraceViewerProtectionService } from "../../trace-viewer-protection.service.ts";
 import { TraceViewerReadService } from "../../trace-viewer.service.ts";
 
 const protections: Protections = {
@@ -28,11 +27,7 @@ describe("TraceViewerReadService", () => {
     const getTracesWithSpans = vi.fn(async () => [trace]);
     const read = createApiFixture<TraceLegacyRead>({ getTracesWithSpans });
     const resolve = vi.fn(async () => protections);
-    const viewerProtections = Object.create(
-      TraceViewerProtectionService.prototype,
-    ) as TraceViewerProtectionService;
-    Object.defineProperty(viewerProtections, "resolve", { value: resolve });
-    const service = TraceViewerReadService.create({ read, protections: viewerProtections });
+    const service = TraceViewerReadService.create({ read, protections: { resolve } });
 
     await expect(
       service.readForViewer({
@@ -47,12 +42,11 @@ describe("TraceViewerReadService", () => {
       userId: "user-1",
       publiclyShared: false,
     });
-    expect(getTracesWithSpans).toHaveBeenCalledWith(
-      "project-1",
-      ["trace-1"],
+    expect(getTracesWithSpans).toHaveBeenCalledWith({
+      projectId: "project-1",
+      traceIds: ["trace-1"],
       protections,
-      undefined,
-      { full: true },
-    );
+      opts: { full: true },
+    });
   });
 });

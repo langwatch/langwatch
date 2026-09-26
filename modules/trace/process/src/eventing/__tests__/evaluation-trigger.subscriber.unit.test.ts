@@ -24,9 +24,9 @@ import {
   type TraceEvaluationLoopBlockReason,
   type TraceEvaluationMonitor,
 } from "../../app/trace.members.ts";
-import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
 import { TraceAttributeAccumulationService } from "../../services/trace-attribute-accumulation.service.ts";
 import { TraceOriginService } from "../../services/trace-origin.service.ts";
+import { needsOriginResolution } from "../deferred-origin.process.ts";
 import {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
@@ -880,7 +880,7 @@ describe("createEvaluationTriggerSubscriber — the folded depth, as the project
     const attributes = foldedAfter({ "langwatch.reserved.causality_depth": 1 });
     expect(attributes["langwatch.origin"]).toBeUndefined();
     expect(
-      TraceDeferredOriginEventingAdapter.needsOriginResolution({
+      needsOriginResolution({
         event: spanEvent({ attributes: [] }),
         foldState: foldState({ attributes }),
       }),

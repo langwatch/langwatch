@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 import {
-  TraceProjectionLeanService,
+  buildStructuredIoPreview,
   IO_PREVIEW_BYTES,
-} from "../projection/trace-projection-lean.service.ts";
+} from "../../rules/trace-projection-lean.rules.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 
 const service = TraceIOExtractionService.create(TraceCanonicalisationService.create());
@@ -834,10 +834,7 @@ describe("TraceIOExtractionService", () => {
       { role: "user", content: [{ type: "input_text", text: "hi" }] },
     ]);
     // Exactly what ingest stores inline after leanForProjection (ADR-022).
-    const leanedInput = TraceProjectionLeanService.buildStructuredIoPreview(
-      fullInput,
-      IO_PREVIEW_BYTES,
-    )!;
+    const leanedInput = buildStructuredIoPreview(fullInput, IO_PREVIEW_BYTES)!;
 
     const makeTurnSpans = () => [
       createTestSpan({

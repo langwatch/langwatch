@@ -12,10 +12,10 @@ import {
   type OtlpSpan,
 } from "@langwatch/trace-contract";
 
-import type { TraceEdgeMediaTelemetry, TraceMediaStore } from "../../app/trace.members.ts";
-import type { ExtractedRef } from "../../rules/content-part-extraction.rules.ts";
-import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
-import { type ExtractionBudget } from "../trace-value-media-extraction.service.ts";
+import type { TraceEdgeMediaTelemetry, TraceMediaStore } from "../app/trace.members.ts";
+import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
+import { TraceValueMediaExtractionService } from "./trace-value-media-extraction.service.ts";
+import { type ExtractionBudget } from "./trace-value-media-extraction.service.ts";
 
 /** Purpose tag for stored objects extracted from trace span content. */
 export const TRACE_MEDIA_PURPOSE = "trace_content";

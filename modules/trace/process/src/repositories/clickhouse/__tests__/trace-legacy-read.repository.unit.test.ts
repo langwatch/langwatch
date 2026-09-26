@@ -1046,7 +1046,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.findTracesWithSpans("proj_123", traceIds, protections);
+        const traces = await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds,
+          protections,
+        });
 
         expect(traces).not.toBeNull();
         expect(traces!.map((t) => t.trace_id).toSorted()).toEqual(traceIds);
@@ -1086,7 +1090,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.findTracesWithSpans("proj_123", traceIds, protections);
+        const traces = await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds,
+          protections,
+        });
 
         expect(traces).toHaveLength(30);
         // call 0 = resolve, 1 = OOM full summary, 2 = summary batch1,
@@ -1106,7 +1114,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         });
 
         await expect(
-          service.findTracesWithSpans("proj_123", ["trace-0"], protections),
+          service.findTracesWithSpans({
+            projectId: "proj_123",
+            traceIds: ["trace-0"],
+            protections,
+          }),
         ).rejects.toThrow(/Failed to fetch traces with spans/i);
         // The resolve fails open (call 1), then the summary's non-OOM error
         // propagates without per-batch retries (call 2) — no retry loop.
@@ -1131,9 +1143,14 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findTracesWithSpans("proj_123", ["trace-0"], protections, {
-          from: 1_000_000,
-          to: 2_000_000,
+        await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+          occurredAt: {
+            from: 1_000_000,
+            to: 2_000_000,
+          },
         });
 
         const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
@@ -1170,7 +1187,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+        });
 
         const resolveCall = mockClickHouseQuery.mock.calls[0]![0];
         expect(resolveCall.query).toContain("min(OccurredAt)");
@@ -1203,7 +1224,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
+        await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+        });
 
         const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         // No OccurredAt predicate inlined at all, and no window params.
@@ -1229,7 +1254,11 @@ describe("TraceLegacyReadClickHouseRepository", () => {
           traceCanonicalisation,
         });
 
-        const traces = await service.findTracesWithSpans("proj_123", ["trace-0"], protections);
+        const traces = await service.findTracesWithSpans({
+          projectId: "proj_123",
+          traceIds: ["trace-0"],
+          protections,
+        });
 
         // The read still succeeds; the summary just stays unbounded (the
         // pre-optimization behaviour) rather than propagating the resolve error.

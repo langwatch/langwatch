@@ -21,10 +21,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "#rules/trace-payload-cap.rules";
 
 import {
-  TraceProjectionLeanService,
+  buildStructuredIoPreview,
+  leanForProjection,
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
-} from "../trace-projection-lean.service.ts";
+} from "../trace-projection-lean.rules.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -157,7 +158,7 @@ function makeAnnotationAddedEvent(): Event {
 }
 
 /** Extract span attributes as a Record from a SpanReceived event returned by
- * TraceProjectionLeanService.leanForProjection. */
+ * leanForProjection. */
 function extractSpanAttributes(event: Event): Record<string, string> {
   const data = event.data as {
     span: {
@@ -174,7 +175,7 @@ function extractSpanAttributes(event: Event): Record<string, string> {
 }
 
 /** Extract log body from a LogRecordReceived event returned by
- * TraceProjectionLeanService.leanForProjection. */
+ * leanForProjection. */
 function extractLogBody(event: Event): string {
   const data = event.data as { body: string };
   return data.body;
@@ -185,11 +186,11 @@ function extractLogBody(event: Event): string {
 // ---------------------------------------------------------------------------
 
 /**
- * @scenario TraceProjectionLeanService.leanForProjection is the single source
+ * @scenario leanForProjection is the single source
  * of truth for the lean shape
  */
 describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     let attrs: Record<string, string>;
 
     beforeEach(() => {
@@ -197,7 +198,7 @@ describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
         attributes: { "langwatch.output": LARGE_VALUE },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       attrs = extractSpanAttributes(leaned);
     });
 
@@ -218,13 +219,13 @@ describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
 });
 
 describe("given a SpanReceived event with a 10 KB langwatch.output (under IO_PREVIEW_BYTES)", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("returns the event unchanged (no preview truncation, no eventref attached)", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.output": SMALL_VALUE },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       expect(attrs["langwatch.output"]).toBe(SMALL_VALUE);
@@ -234,13 +235,13 @@ describe("given a SpanReceived event with a 10 KB langwatch.output (under IO_PRE
 });
 
 describe("given a SpanReceived event with no IO attrs", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("returns the event unchanged", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "custom.attr": "some value" },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       expect(attrs["custom.attr"]).toBe("some value");
@@ -252,11 +253,11 @@ describe("given a SpanReceived event with no IO attrs", () => {
 });
 
 describe("given a LogRecordReceived event with a 100 KB body", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("truncates the body to ≤ IO_PREVIEW_BYTES + 4 bytes and attaches eventref.body", () => {
       const event = makeLogRecordReceivedEvent({ body: LARGE_VALUE });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const body = extractLogBody(leaned);
       const data = leaned.data as { attributes?: Record<string, string> };
 
@@ -272,11 +273,11 @@ describe("given a LogRecordReceived event with a 100 KB body", () => {
 });
 
 describe("given a TraceAnnotationAdded event (non-IO event type)", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("returns the event unchanged (pass-through)", () => {
       const event = makeAnnotationAddedEvent();
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       expect(leaned).toEqual(event);
     });
@@ -284,7 +285,7 @@ describe("given a TraceAnnotationAdded event (non-IO event type)", () => {
 });
 
 describe("given a SpanReceived event with both langwatch.input and langwatch.output exceeding IO_PREVIEW_BYTES", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("leans each IO attr independently and attaches a separate eventref for each", () => {
       const event = makeSpanReceivedEvent({
         attributes: {
@@ -293,7 +294,7 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
         },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       // Both previews are within budget
@@ -322,7 +323,7 @@ describe("given a SpanReceived event with both langwatch.input and langwatch.out
 });
 
 describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PREVIEW_BYTES", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("leans gen_ai.input.messages the same way as langwatch.input and attaches its eventref", () => {
       // Verify that gen_ai.input.messages is in IO_ATTR_KEYS
       expect(IO_ATTR_KEYS.has("gen_ai.input.messages")).toBe(true);
@@ -331,7 +332,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
         attributes: { "gen_ai.input.messages": LARGE_VALUE },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
@@ -365,7 +366,7 @@ function chatPayloadWithHugeDeveloperPrompt(): string {
 }
 
 describe("given a gen_ai.input.messages chat payload whose developer prompt alone exceeds the budget", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     /** @scenario The preview of an over-budget chat payload stays structured and extractable */
     it("keeps the preview VALID JSON with the developer role and the last user message intact", () => {
       const event = makeSpanReceivedEvent({
@@ -374,7 +375,7 @@ describe("given a gen_ai.input.messages chat payload whose developer prompt alon
         },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
       const preview = attrs["gen_ai.input.messages"]!;
 
@@ -396,7 +397,7 @@ describe("given a gen_ai.input.messages chat payload whose developer prompt alon
   });
 });
 
-describe("TraceProjectionLeanService.buildStructuredIoPreview", () => {
+describe("buildStructuredIoPreview", () => {
   describe("when the payload is a chat array larger than the budget only because of one long message", () => {
     it("clamps the long content and keeps every message", () => {
       const payload = JSON.stringify([
@@ -404,10 +405,7 @@ describe("TraceProjectionLeanService.buildStructuredIoPreview", () => {
         { role: "user", content: "hi" },
       ]);
 
-      const preview = TraceProjectionLeanService.buildStructuredIoPreview(
-        payload,
-        IO_PREVIEW_BYTES,
-      );
+      const preview = buildStructuredIoPreview(payload, IO_PREVIEW_BYTES);
 
       expect(preview).not.toBeNull();
       const messages = JSON.parse(preview!) as { role: string }[];
@@ -427,7 +425,7 @@ describe("TraceProjectionLeanService.buildStructuredIoPreview", () => {
         { role: "user", content: "what do you mean?" },
       ]);
 
-      const preview = TraceProjectionLeanService.buildStructuredIoPreview(payload, 32 * 1024);
+      const preview = buildStructuredIoPreview(payload, 32 * 1024);
 
       expect(preview).not.toBeNull();
       expect(Buffer.byteLength(preview!, "utf-8")).toBeLessThanOrEqual(32 * 1024);
@@ -447,9 +445,7 @@ describe("TraceProjectionLeanService.buildStructuredIoPreview", () => {
 
   describe("when the value is not JSON", () => {
     it("reports null so the caller falls back to the byte cut", () => {
-      expect(
-        TraceProjectionLeanService.buildStructuredIoPreview("plain prose ".repeat(10), 1024),
-      ).toBeNull();
+      expect(buildStructuredIoPreview("plain prose ".repeat(10), 1024)).toBeNull();
     });
   });
 });
@@ -468,13 +464,13 @@ const NON_IO_OVER_256KB = "z".repeat(300 * 1024);
  * @scenario non-IO stringValue over 256 KB is capped in the lean output (spool-path fix)
  */
 describe("given a SpanReceived event with a non-IO attribute (langwatch.params) whose stringValue exceeds 256 KB", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("caps the langwatch.params value in the leaned event to a placeholder", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.params": NON_IO_OVER_256KB },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       // The capped value must be a truncation placeholder, far shorter than the original
@@ -496,9 +492,9 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
       const originalValue = originalData.span.attributes.find((a) => a.key === "langwatch.params")
         ?.value.stringValue;
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
-      // Original must be completely unmodified after TraceProjectionLeanService.leanForProjection
+      // Original must be completely unmodified after leanForProjection
       const valueAfter = originalData.span.attributes.find((a) => a.key === "langwatch.params")
         ?.value.stringValue;
       expect(valueAfter).toBe(originalValue);
@@ -510,7 +506,7 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
         attributes: { "langwatch.params": NON_IO_OVER_256KB },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       const eventrefKeys = Object.keys(attrs).filter((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
@@ -523,7 +519,7 @@ describe("given a SpanReceived event with a non-IO attribute (langwatch.params) 
  * @scenario >256KB blob nested inside arrayValue of a NON-IO attribute is capped (spool-path fix)
  */
 describe("given a SpanReceived event with a >256KB blob nested inside an arrayValue of a non-IO attribute", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("caps the nested blob in the lean output", () => {
       const event = makeSpanReceivedEventWithRawAttrs({
         attributes: [
@@ -538,7 +534,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
         ],
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const leanedData = leaned.data as {
         span: {
           attributes: {
@@ -583,7 +579,7 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
         (a) => a.key === "langwatch.params",
       )?.value.arrayValue?.values[0]?.stringValue;
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
       const valueAfter = originalData.span.attributes.find((a) => a.key === "langwatch.params")
         ?.value.arrayValue?.values[0]?.stringValue;
@@ -600,13 +596,13 @@ describe("given a SpanReceived event with a >256KB blob nested inside an arrayVa
  *           must not break IO preview path.
  */
 describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PREVIEW_BYTES (regression guard for new capping)", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("still previews gen_ai.input.messages to ≤ IO_PREVIEW_BYTES and attaches eventref", () => {
       const event = makeSpanReceivedEvent({
         attributes: { "gen_ai.input.messages": NON_IO_OVER_256KB },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const attrs = extractSpanAttributes(leaned);
 
       expect(Buffer.byteLength(attrs["gen_ai.input.messages"] ?? "", "utf-8")).toBeLessThanOrEqual(
@@ -631,7 +627,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
         (a) => a.key === "gen_ai.input.messages",
       )?.value.stringValue;
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
       const valueAfter = originalData.span.attributes.find((a) => a.key === "gen_ai.input.messages")
         ?.value.stringValue;
@@ -645,7 +641,7 @@ describe("given a SpanReceived event with gen_ai.input.messages exceeding IO_PRE
  * @scenario sub-threshold event — no-op, no allocations (hot-path guard)
  */
 describe("given a SpanReceived event where all attributes are under both thresholds", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("returns the same event reference (no-op, no extra allocation)", () => {
       const event = makeSpanReceivedEvent({
         attributes: {
@@ -654,7 +650,7 @@ describe("given a SpanReceived event where all attributes are under both thresho
         },
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       // No IO oversize, no non-IO oversize → same object reference returned
       expect(leaned).toBe(event);
@@ -761,11 +757,11 @@ function makeSpanReceivedEventWithOversizedResourceAttr(): Event {
  *   never fired, letting the oversized blob flow into the projection queue.
  */
 describe("given a SpanReceived event with a >256KB value only in span.events[0].attributes (not at span top-level, not IO)", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("caps the event-attribute value in the lean output (returns a capped placeholder)", () => {
       const event = makeSpanReceivedEventWithOversizedEventAttr();
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       const leanedData = leaned.data as {
         span: {
@@ -794,7 +790,7 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
         (a) => a.key === "exception.message",
       )?.value.stringValue;
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
       const valueAfter = originalData.span.events[0]?.attributes.find(
         (a) => a.key === "exception.message",
@@ -806,7 +802,7 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
     it("does not attach an eventref for the event attribute (cap, not IO preview)", () => {
       const event = makeSpanReceivedEventWithOversizedEventAttr();
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
       const leanedData = leaned.data as {
         span: {
           attributes: { key: string; value: { stringValue?: string } }[];
@@ -826,11 +822,11 @@ describe("given a SpanReceived event with a >256KB value only in span.events[0].
  *   at span top-level, no large IO attr.
  */
 describe("given a SpanReceived event with a >256KB value only in resource.attributes (not at span top-level, not IO)", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("caps the resource-attribute value in the lean output (returns a capped placeholder)", () => {
       const event = makeSpanReceivedEventWithOversizedResourceAttr();
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       const leanedData = leaned.data as {
         resource: {
@@ -854,7 +850,7 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
       const originalValue = originalData.resource?.attributes.find((a) => a.key === "service.name")
         ?.value.stringValue;
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
       const valueAfter = originalData.resource?.attributes.find((a) => a.key === "service.name")
         ?.value.stringValue;
@@ -873,7 +869,7 @@ describe("given a SpanReceived event with a >256KB value only in resource.attrib
  * small structured attr is a no-op.
  */
 describe("given a span with a small structured non-IO attribute", () => {
-  describe("when TraceProjectionLeanService.leanForProjection is applied to an event with a small kvlistValue non-IO attr", () => {
+  describe("when leanForProjection is applied to an event with a small kvlistValue non-IO attr", () => {
     it("returns the same event reference without cloning", () => {
       const event = makeSpanReceivedEventWithRawAttrs({
         attributes: [
@@ -891,13 +887,13 @@ describe("given a span with a small structured non-IO attribute", () => {
         ],
       });
 
-      const result = TraceProjectionLeanService.leanForProjection(event);
+      const result = leanForProjection(event);
 
       expect(result).toBe(event);
     });
   });
 
-  describe("when TraceProjectionLeanService.leanForProjection is applied to an event with a small arrayValue non-IO attr", () => {
+  describe("when leanForProjection is applied to an event with a small arrayValue non-IO attr", () => {
     it("returns the same event reference without cloning", () => {
       const event = makeSpanReceivedEventWithRawAttrs({
         attributes: [
@@ -912,13 +908,13 @@ describe("given a span with a small structured non-IO attribute", () => {
         ],
       });
 
-      const result = TraceProjectionLeanService.leanForProjection(event);
+      const result = leanForProjection(event);
 
       expect(result).toBe(event);
     });
   });
 
-  describe("when TraceProjectionLeanService.leanForProjection is applied to an event with a nested >256KB value inside kvlistValue", () => {
+  describe("when leanForProjection is applied to an event with a nested >256KB value inside kvlistValue", () => {
     it("caps the nested blob (hasOversizedAttribute flags the oversized nested value)", () => {
       const event = makeSpanReceivedEventWithRawAttrs({
         attributes: [
@@ -933,7 +929,7 @@ describe("given a span with a small structured non-IO attribute", () => {
         ],
       });
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       // Must NOT return same reference — a clone is required for the oversized nested value
       expect(leaned).not.toBe(event);

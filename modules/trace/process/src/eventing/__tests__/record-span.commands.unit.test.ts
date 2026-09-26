@@ -15,7 +15,7 @@ import type {
 import {
   EventingRecordSpanAdapter,
   type RecordSpanCommandOptions,
-} from "../eventing.record-span.service.ts";
+} from "../record-span.commands.ts";
 
 function createSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
   return {

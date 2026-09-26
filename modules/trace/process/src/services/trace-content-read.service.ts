@@ -36,9 +36,14 @@ export class TraceContentReadService extends TraceContentReadContract {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace | undefined> {
-    return this.read.findById(input.projectId, input.traceId, input.protections, {
-      full: true,
-      ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
+    return this.read.findById({
+      projectId: input.projectId,
+      traceId: input.traceId,
+      protections: input.protections,
+      opts: {
+        full: true,
+        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
+      },
     });
   }
 
@@ -49,16 +54,16 @@ export class TraceContentReadService extends TraceContentReadContract {
     occurredAt?: { from: number; to: number };
     withEditOverlay?: boolean;
   }): Promise<Trace[]> {
-    return this.read.getTracesWithSpans(
-      input.projectId,
-      input.traceIds,
-      input.protections,
-      input.occurredAt,
-      {
+    return this.read.getTracesWithSpans({
+      projectId: input.projectId,
+      traceIds: input.traceIds,
+      protections: input.protections,
+      occurredAt: input.occurredAt,
+      opts: {
         full: true,
         ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
       },
-    );
+    });
   }
 
   readTracesWithSpansPreview(input: {
@@ -67,13 +72,13 @@ export class TraceContentReadService extends TraceContentReadContract {
     protections: unknown;
     withEditOverlay?: boolean;
   }): Promise<Trace[]> {
-    return this.read.getTracesWithSpans(
-      input.projectId,
-      input.traceIds,
-      input.protections,
-      void 0,
-      input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {},
-    );
+    return this.read.getTracesWithSpans({
+      projectId: input.projectId,
+      traceIds: input.traceIds,
+      protections: input.protections,
+      occurredAt: void 0,
+      opts: input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {},
+    });
   }
 
   async readOrderedSpansForTrace(input: {
@@ -97,8 +102,13 @@ export class TraceContentReadService extends TraceContentReadContract {
     threadId: string;
     protections: unknown;
   }): Promise<Trace[]> {
-    return this.read.getTracesByThreadId(input.projectId, input.threadId, input.protections, {
-      full: true,
+    return this.read.getTracesByThreadId({
+      projectId: input.projectId,
+      threadId: input.threadId,
+      protections: input.protections,
+      opts: {
+        full: true,
+      },
     });
   }
 
@@ -109,16 +119,16 @@ export class TraceContentReadService extends TraceContentReadContract {
     withEditOverlay?: boolean;
     maxTraces?: number;
   }): Promise<Trace[]> {
-    return this.read.getTracesWithSpansByThreadIds(
-      input.projectId,
-      input.threadIds,
-      input.protections,
-      {
+    return this.read.getTracesWithSpansByThreadIds({
+      projectId: input.projectId,
+      threadIds: input.threadIds,
+      protections: input.protections,
+      opts: {
         full: true,
         ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
         ...(input.maxTraces !== undefined ? { maxTraces: input.maxTraces } : {}),
       },
-    );
+    });
   }
 
   async readSampleTraces(input: {

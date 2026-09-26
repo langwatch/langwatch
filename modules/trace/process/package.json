@@ -28,21 +28,9 @@
       "types": "./dist/repositories/prisma/prisma.trace-edit-overlay.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
     },
-    "./composition/trace-processing-producer": {
-      "types": "./dist/adapters/trace-processing-producer.adapter.d.ts",
-      "default": "./src/adapters/trace-processing-producer.adapter.ts"
-    },
     "./api-trpc/trace-read-mappers": {
       "types": "./dist/transport/api-trpc/trace-read-mappers.api.d.ts",
       "default": "./src/transport/api-trpc/trace-read-mappers.api.ts"
-    },
-    "./api-trpc/traces-v2": {
-      "types": "./dist/transport/api-trpc/traces-v2.api.d.ts",
-      "default": "./src/transport/api-trpc/traces-v2.api.ts"
-    },
-    "./api-trpc/shared-trace": {
-      "types": "./dist/transport/api-trpc/shared-trace.api.d.ts",
-      "default": "./src/transport/api-trpc/shared-trace.api.ts"
     },
     "./api-trpc/trace-view-gates": {
       "types": "./dist/transport/api-trpc/trace-view-gates.api.d.ts",

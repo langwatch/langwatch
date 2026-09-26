@@ -37,7 +37,7 @@ import type {
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
-import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
+import type { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
 
 /** Queues an online-evaluator run for an ingested trace; Evaluation owns its delay and dedup. */
 export interface TraceEvaluationDispatch {
@@ -68,11 +68,13 @@ export interface TraceEventDerivation {
   derive(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]>;
 }
 
+export type TraceFullIoRecord = {
+  input: { type: string; value: TraceRecordValue } | null;
+  output: { type: string; value: TraceRecordValue } | null;
+};
+
 export interface TraceFullIo {
-  recompute(spans: NormalizedSpan[]): {
-    input: { type: string; value: TraceRecordValue } | null;
-    output: { type: string; value: TraceRecordValue } | null;
-  };
+  recompute(spans: NormalizedSpan[]): TraceFullIoRecord;
 }
 
 export type TraceIoSide = "input" | "output";
@@ -94,12 +96,12 @@ export interface TraceIoExtraction {
  * deliberately unknown; transports never inspect them. */
 export interface TraceLegacyRead {
   /** One trace with its spans, or undefined when the project holds no such trace. */
-  findById(
-    projectId: string,
-    traceId: string,
-    protections: unknown,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace | undefined>;
+  findById(params: {
+    projectId: string;
+    traceId: string;
+    protections: unknown;
+    opts?: { full?: boolean; withEditOverlay?: boolean };
+  }): Promise<Trace | undefined>;
 
   /** The project's list/search read, keyset-paged by `scrollId`. */
   getAllTracesForProject(
@@ -120,29 +122,29 @@ export interface TraceLegacyRead {
    * dropping it turns a bounded read into a scan of every partition, cold
    * storage included.
    */
-  getTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: unknown,
-    occurredAt?: { from: number; to: number },
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace[]>;
+  getTracesWithSpans(params: {
+    projectId: string;
+    traceIds: string[];
+    protections: unknown;
+    occurredAt?: { from: number; to: number };
+    opts?: { full?: boolean; withEditOverlay?: boolean };
+  }): Promise<Trace[]>;
 
   /** Every trace in one conversation. */
-  getTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: unknown,
-    opts?: { full?: boolean },
-  ): Promise<Trace[]>;
+  getTracesByThreadId(params: {
+    projectId: string;
+    threadId: string;
+    protections: unknown;
+    opts?: { full?: boolean };
+  }): Promise<Trace[]>;
 
   /** Every trace in each of several conversations. */
-  getTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: unknown,
-    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number },
-  ): Promise<Trace[]>;
+  getTracesWithSpansByThreadIds(params: {
+    projectId: string;
+    threadIds: string[];
+    protections: unknown;
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number };
+  }): Promise<Trace[]>;
 
   /** The evaluator verdicts on a page of traces, keyed by trace id. */
   getEvaluationsMultiple(
@@ -300,12 +302,12 @@ export interface TraceSpanIngest {
 }
 
 export interface TraceSpanNormalization {
-  normalizeSpanReceived(
-    tenantId: string,
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    instrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan;
+  normalizeSpanReceived(params: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan;
 
   enrichRagContextIds(span: NormalizedSpan): void;
 }

@@ -18,17 +18,17 @@ import {
   OCCURRED_AT,
   TENANT_ID,
   TRACE_ID,
-} from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
-import { ModelCatalogTraceModelCostAdapter } from "../../model-catalog.trace-model-cost.service.ts";
-import { SpanCostService } from "../../span-cost.service.ts";
-import { TraceCanonicalisationService } from "../../trace-canonicalisation.service.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
-import { TraceMediaReferenceAdapter } from "../../trace-media-reference.service.ts";
+} from "../../eventing/__tests__/trace-subscriber.fixtures.ts";
 import {
-  TraceProjectionLeanService,
+  leanForProjection,
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
-} from "../trace-projection-lean.service.ts";
+} from "../../rules/trace-projection-lean.rules.ts";
+import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.service.ts";
+import { SpanCostService } from "../span-cost.service.ts";
+import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
+import { TraceMediaReferenceAdapter } from "../trace-media-reference.service.ts";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested
@@ -264,7 +264,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: overBudget } },
       ]);
 
-      const attrs = attributeStrings(TraceProjectionLeanService.leanForProjection(event));
+      const attrs = attributeStrings(leanForProjection(event));
 
       // The byte cut backs off to a codepoint boundary and then appends the
       // ellipsis, so a preview is at most the budget plus that character.
@@ -282,7 +282,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: overBudget } },
       ]);
 
-      TraceProjectionLeanService.leanForProjection(event);
+      leanForProjection(event);
 
       expect(event.data.span.attributes[0]!.value.stringValue).toBe(overBudget);
       expect(event.data.span.attributes).toHaveLength(1);
@@ -296,7 +296,7 @@ describe("given the lean projection payload transform", () => {
         { key: "langwatch.input", value: { stringValue: "small" } },
       ]);
 
-      expect(TraceProjectionLeanService.leanForProjection(event)).toBe(event);
+      expect(leanForProjection(event)).toBe(event);
     });
   });
 
@@ -328,7 +328,7 @@ describe("given the lean projection payload transform", () => {
         metadata: {},
       };
 
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
+      const leaned = leanForProjection(event);
 
       expect(Buffer.byteLength(leaned.data.body, "utf8")).toBe(IO_PREVIEW_BYTES + 3);
       expect(leaned.data.attributes["langwatch.reserved.eventref.body"]).toBe(

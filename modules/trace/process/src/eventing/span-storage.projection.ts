@@ -74,12 +74,12 @@ export class SpanStorageMapProjection
       return null;
     }
 
-    const span = this.spanNormalization.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const span = this.spanNormalization.normalizeSpanReceived({
+      tenantId: event.tenantId,
+      span: event.data.span,
+      resource: event.data.resource,
+      instrumentationScope: event.data.instrumentationScope,
+    });
     this.spanNormalization.enrichRagContextIds(span);
     // Compute the per-span cost the same way the trace-summary fold does (same
     // SpanCostService, run on the same normalized span the fold sees) so the

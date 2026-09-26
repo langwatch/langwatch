@@ -37,12 +37,12 @@ import {
 
 import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
 import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
-import type { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
 } from "../services/trace-io-accumulation.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
+import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-summary-fold");
 
@@ -250,12 +250,12 @@ export class TraceSummaryFoldProjection
       return state;
     }
 
-    const normalizedSpan = this.runtime.spanNormalization.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const normalizedSpan = this.runtime.spanNormalization.normalizeSpanReceived({
+      tenantId: event.tenantId,
+      span: event.data.span,
+      resource: event.data.resource,
+      instrumentationScope: event.data.instrumentationScope,
+    });
     this.runtime.spanNormalization.enrichRagContextIds(normalizedSpan);
 
     return {

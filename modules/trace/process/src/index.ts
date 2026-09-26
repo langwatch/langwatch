@@ -17,7 +17,7 @@ export {
 export type { TraceClickHouseClient } from "./repositories/trace-clickhouse-client.repository.ts";
 export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
 export { ClickhouseTraceQueryEvaluationRepository } from "./repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
-export { EventingRecordSpanAdapter } from "./services/eventing.record-span.service.ts";
+export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
 export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
@@ -27,7 +27,7 @@ export { traceRepositories } from "./repositories/trace-repositories.registry.ts
 export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
-} from "./services/eventing.trace-pipeline.service.ts";
+} from "./eventing/trace-processing-projections.pipeline.ts";
 export type {
   TraceSpanTokenEstimation,
   TraceSpoolLegacyObject,
@@ -40,7 +40,6 @@ export type {
   TraceEvaluationLoopBlockReason,
   TraceEvaluationDispatch,
 } from "./app/trace.members.ts";
-export { TraceDeferredOriginEventingAdapter } from "./services/eventing.deferred-origin.service.ts";
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
@@ -120,7 +119,6 @@ export { TraceAnalyticsRollupStore } from "./eventing/trace-rollup.store.ts";
 export { TraceSummaryStore } from "./eventing/trace-summary.store.ts";
 export { SpanCostService } from "./services/span-cost.service.ts";
 export { resolveSpanCommandShardCount } from "./rules/trace-span-command-shard.rules.ts";
-export { TraceProjectionLeanService } from "./services/projection/trace-projection-lean.service.ts";
 export { TraceIoExtractionAdapter } from "./services/trace-io-extraction-adapter.service.ts";
 export { TraceSpanNormalizationAdapter } from "./services/trace-span-normalization-adapter.service.ts";
 export { TraceMediaReferenceAdapter } from "./services/trace-media-reference.service.ts";

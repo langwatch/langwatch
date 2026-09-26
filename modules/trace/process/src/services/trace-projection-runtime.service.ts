@@ -5,15 +5,15 @@ import {
   type TraceMediaReferenceResolver,
   type TraceModelCost,
   type TraceSpanNormalization,
-} from "../../app/trace.members.ts";
-import { SpanCostService } from "../span-cost.service.ts";
-import { SpanStatusService } from "../span-status.service.ts";
-import { SpanTimingService } from "../span-timing.service.ts";
-import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
-import { TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
-import { TraceNameResolutionService } from "../trace-name-resolution.service.ts";
-import { TraceOriginService } from "../trace-origin.service.ts";
-import { TracePromptAccumulationService } from "../trace-prompt-accumulation.service.ts";
+} from "../app/trace.members.ts";
+import { SpanCostService } from "./span-cost.service.ts";
+import { SpanStatusService } from "./span-status.service.ts";
+import { SpanTimingService } from "./span-timing.service.ts";
+import { TraceAttributeAccumulationService } from "./trace-attribute-accumulation.service.ts";
+import { TraceIOAccumulationService } from "./trace-io-accumulation.service.ts";
+import { TraceNameResolutionService } from "./trace-name-resolution.service.ts";
+import { TraceOriginService } from "./trace-origin.service.ts";
+import { TracePromptAccumulationService } from "./trace-prompt-accumulation.service.ts";
 
 /**
  * The deterministic collaborators shared by Trace's three event projections.

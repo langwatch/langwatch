@@ -2,12 +2,12 @@ import type { ProcessHandlerContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DeferredOriginPayload } from "../../app/trace.members.ts";
-import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
 import {
   DEFERRED_ORIGIN_INITIAL_STATE,
   type DeferredOriginIntents,
   onOriginResolvedDisarm,
   onSpanReceivedArmOrigin,
+  createDeferredOriginHandler,
 } from "../deferred-origin.process.ts";
 
 const NOW = 1_700_000_000_000;
@@ -53,13 +53,12 @@ describe("the deferredOriginResolution process manager", () => {
   });
 });
 
-describe("TraceDeferredOriginEventingAdapter.createDeferredOriginHandler()", () => {
+describe("createDeferredOriginHandler()", () => {
   describe("when called", () => {
     /** @scenario 'Deferred check treats still-empty origin as "application"' */
     it("dispatches resolveOrigin command unconditionally", async () => {
       const resolveOriginFn = vi.fn().mockResolvedValue(undefined);
-      const handler =
-        TraceDeferredOriginEventingAdapter.createDeferredOriginHandler(resolveOriginFn);
+      const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",
         tenantId: "tenant-1",
@@ -85,8 +84,7 @@ describe("TraceDeferredOriginEventingAdapter.createDeferredOriginHandler()", () 
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
       const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
-      const handler =
-        TraceDeferredOriginEventingAdapter.createDeferredOriginHandler(resolveOriginFn);
+      const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",
         tenantId: "tenant-1",

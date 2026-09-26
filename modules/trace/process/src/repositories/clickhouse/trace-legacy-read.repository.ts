@@ -754,13 +754,19 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @param occurredAt approximate time range bounding the partition scan.
    * @param opts.resolveBlobs resolves offloaded IO.
    */
-  async findTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: Protections,
-    occurredAt?: OccurredAtRange,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]> {
+  async findTracesWithSpans({
+    projectId,
+    traceIds,
+    protections,
+    occurredAt,
+    opts,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    protections: Protections;
+    occurredAt?: OccurredAtRange;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpans",
       {
@@ -890,12 +896,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  async findTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]> {
+  async findTracesByThreadId({
+    projectId,
+    threadId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesByThreadId",
       {
@@ -935,13 +946,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // Fetch full traces with spans. Forward resolveBlobs so the
           // thread-detail read can resolve full IO (#4991); customer thread
           // views with no resolver wired stay on the preview.
-          const traces = await this.findTracesWithSpans(
+          const traces = await this.findTracesWithSpans({
             projectId,
             traceIds,
             protections,
-            undefined,
-            { resolveBlobs: opts?.resolveBlobs },
-          );
+            opts: { resolveBlobs: opts?.resolveBlobs },
+          });
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -970,12 +980,17 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
    * @param opts.maxTraces traces the read may return across every thread asked
    *   for; a ceiling below what they hold drops the rest without a word.
    */
-  async findTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean; maxTraces?: number },
-  ): Promise<Trace[]> {
+  async findTracesWithSpansByThreadIds({
+    projectId,
+    threadIds,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean; maxTraces?: number };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceLegacyReadClickHouseRepository.getTracesWithSpansByThreadIds",
       {
@@ -1025,13 +1040,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           // Forward resolveBlobs so the eval path reads full thread IO; customer thread
           // views pass nothing and stay on the preview.
-          const traces = await this.findTracesWithSpans(
+          const traces = await this.findTracesWithSpans({
             projectId,
             traceIds,
             protections,
-            undefined,
-            { resolveBlobs: opts?.resolveBlobs },
-          );
+            opts: { resolveBlobs: opts?.resolveBlobs },
+          });
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -1233,7 +1247,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return includeSpans ? enriched : enriched.map((trace) => ({ ...trace, spans: [] }));
   }
 
-  /** Projection JOINs: attach child collections the legacy read does not carry, scoped to this page. */
+  /**
+   * Projection JOINs: attach child collections the legacy read does not carry, scoped to
+   * this page.
+   */
   private async attachProjectionCollections({
     projection,
     groups,
@@ -2955,7 +2972,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     });
   }
 
-  /** On OOM, re-reads in fixed-size batches under a span budget; see {@link MAX_SPANS_PER_JOINED_FALLBACK}. */
+  /**
+   * On OOM, re-reads in fixed-size batches under a span budget; see
+   * {@link MAX_SPANS_PER_JOINED_FALLBACK}.
+   */
   private async readJoinedTracesInBatches({
     clickHouseClient,
     projectId,

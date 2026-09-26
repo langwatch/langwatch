@@ -41,12 +41,12 @@ import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
  * hand in. The storage service still satisfies it, its row being this one plus a traceId.
  */
 export type TraceLogRecordReader = Readonly<{
-  getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<
+  getLogsByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<
     {
       spanId: string;
       timeUnixMs: number;
@@ -377,7 +377,7 @@ export class ClaudeCodeLogEnrichmentService {
     }
 
     try {
-      const logRows = await logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs);
+      const logRows = await logRecords.getLogsByTraceId({ tenantId, traceId, occurredAtMs });
 
       return ClaudeCodeLogEnrichmentService.enrichSpansWithClaudeLogContent({
         spans,

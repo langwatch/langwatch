@@ -177,8 +177,13 @@ describe("TraceApp", () => {
           protections: PROTECTIONS,
         });
 
-        expect(tryGetById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
-          full: true,
+        expect(tryGetById).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          protections: PROTECTIONS,
+          opts: {
+            full: true,
+          },
         });
       });
     });
@@ -193,7 +198,7 @@ describe("TraceApp", () => {
           protections: PROTECTIONS,
         });
 
-        expect(tryGetById.mock.calls[0]?.[3]).not.toHaveProperty("withEditOverlay");
+        expect(tryGetById.mock.calls[0]?.[0].opts).not.toHaveProperty("withEditOverlay");
       });
     });
 
@@ -208,9 +213,14 @@ describe("TraceApp", () => {
           withEditOverlay: true,
         });
 
-        expect(tryGetById).toHaveBeenCalledWith("project-1", "trace-1", PROTECTIONS, {
-          full: true,
-          withEditOverlay: true,
+        expect(tryGetById).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceId: "trace-1",
+          protections: PROTECTIONS,
+          opts: {
+            full: true,
+            withEditOverlay: true,
+          },
         });
       });
     });
@@ -376,13 +386,13 @@ describe("TraceApp", () => {
           pageSize: 10,
         });
         expect(getAllTracesForProject.mock.calls[0]?.[2]).toBeUndefined();
-        expect(getTracesWithSpans).toHaveBeenCalledWith(
-          "project-1",
-          ["trace-1", "trace-2"],
-          PROTECTIONS,
-          { from: 1_000, to: 2_000 },
-          { full: true },
-        );
+        expect(getTracesWithSpans).toHaveBeenCalledWith({
+          projectId: "project-1",
+          traceIds: ["trace-1", "trace-2"],
+          protections: PROTECTIONS,
+          occurredAt: { from: 1_000, to: 2_000 },
+          opts: { full: true },
+        });
       });
     });
 

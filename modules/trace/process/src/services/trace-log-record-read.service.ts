@@ -42,14 +42,19 @@ export class LogRecordStorageService {
    * is an optional partition-pruning hint on the `TimeUnixMs` partition key. Powers the logs-read
    * API and the read-path Claude Code content enrichment.
    */
-  async getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async getLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     const [legacy, canonical] = await Promise.all([
-      this.repository.findLogsByTraceId(tenantId, traceId, occurredAtMs, limit),
+      this.repository.findLogsByTraceId({ tenantId, traceId, occurredAtMs, limit }),
       this.canonical.getLogsByTraceId({
         tenantId,
         traceId,

@@ -25,12 +25,17 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
 
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async findLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit: number = TRACE_LOG_READ_CAP,
-  ): Promise<StoredLogRecordRow[]> {
+  async findLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit = TRACE_LOG_READ_CAP,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
       "LogRecordStorageClickHouseRepository.getLogsByTraceId",

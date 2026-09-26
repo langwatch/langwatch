@@ -16,10 +16,7 @@ import {
 import type { SpanReceivedEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  IO_PREVIEW_BYTES,
-  TraceProjectionLeanService,
-} from "../../services/projection/trace-projection-lean.service.ts";
+import { IO_PREVIEW_BYTES, leanForProjection } from "../../rules/trace-projection-lean.rules.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./trace-summary-test.fixtures.ts";
@@ -124,7 +121,7 @@ describe("given a trace whose span carries a 1 MB output value", () => {
       let state = projection.init();
       for (const event of [rootEvent, childEvent]) {
         // The dispatch interposition: what the projection queue actually sees.
-        const leaned = TraceProjectionLeanService.leanForProjection(event) as SpanReceivedEvent;
+        const leaned = leanForProjection(event) as SpanReceivedEvent;
         state = projection.handleTraceSpanReceived(leaned, state);
       }
       await store.store(state, {

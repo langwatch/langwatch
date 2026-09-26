@@ -158,13 +158,12 @@ describe("trace read bounds", () => {
         protections: PROTECTIONS,
       });
 
-      expect(getTracesWithSpans).toHaveBeenCalledWith(
-        "project-1",
-        ids(2000),
-        PROTECTIONS,
-        undefined,
-        { full: true },
-      );
+      expect(getTracesWithSpans).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceIds: ids(2000),
+        protections: PROTECTIONS,
+        opts: { full: true },
+      });
     });
 
     it("refuses thread ids above the tier the same way", async () => {
@@ -192,12 +191,12 @@ describe("trace read bounds", () => {
         maxTraces: threadIds.length * 1_000,
       });
 
-      expect(getTracesWithSpansByThreadIds).toHaveBeenCalledWith(
-        "project-1",
+      expect(getTracesWithSpansByThreadIds).toHaveBeenCalledWith({
+        projectId: "project-1",
         threadIds,
-        PROTECTIONS,
-        { full: true, maxTraces: 200_000 },
-      );
+        protections: PROTECTIONS,
+        opts: { full: true, maxTraces: 200_000 },
+      });
     });
 
     it("refuses the evaluations-multiple read above the tier", async () => {

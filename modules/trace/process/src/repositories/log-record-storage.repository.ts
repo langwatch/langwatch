@@ -24,12 +24,17 @@ export abstract class LogRecordStorageRepository {
    * {@link TRACE_LOG_READ_CAP} unless narrowed. Optional occurredAtMs hint enables
    * partition pruning on TimeUnixMs.
    */
-  abstract findLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<StoredLogRecordRow[]>;
+  abstract findLogsByTraceId({
+    tenantId,
+    traceId,
+    occurredAtMs,
+    limit,
+  }: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]>;
   /**
    * Dedup and time-order rows read from both log stores during canonical cutover.
    * Attribute keys are sorted before serializing to ensure consistent identity.
@@ -58,12 +63,12 @@ export abstract class LogRecordStorageRepository {
 }
 
 export class NullLogRecordStorageRepository implements LogRecordStorageRepository {
-  async findLogsByTraceId(
-    _tenantId: string,
-    _traceId: string,
-    _occurredAtMs?: number,
-    _limit?: number,
-  ): Promise<StoredLogRecordRow[]> {
+  async findLogsByTraceId(_params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<StoredLogRecordRow[]> {
     return [];
   }
 }

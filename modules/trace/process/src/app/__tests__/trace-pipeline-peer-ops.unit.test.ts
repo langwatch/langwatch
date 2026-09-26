@@ -2,8 +2,8 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AssignTopicCommandData, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { EventingTraceTopicAssignment } from "../../eventing/trace-topic-assignment.commands.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
-import { EventingTraceTopicAssignment } from "../../services/eventing.trace-topic-assignment.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../services/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../services/span-cost.service.ts";

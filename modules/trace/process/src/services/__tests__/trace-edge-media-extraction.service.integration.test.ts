@@ -4,7 +4,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStore } from "../../../app/trace.members.ts";
+import type { TraceMediaStore } from "../../app/trace.members.ts";
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature

@@ -26,10 +26,10 @@ import {
   type TraceSpanPiiRedaction,
   type TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
+import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
 import type { TraceAnalyticsData } from "../eventing/trace-derived.projection.ts";
+import { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
 import type { TraceAnalyticsRollupRow } from "../eventing/trace-rollup.projection.ts";
-import { EventingRecordSpanAdapter } from "./eventing.record-span.service.ts";
-import { EventingTracePipelineAdapter } from "./eventing.trace-pipeline.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

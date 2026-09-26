@@ -25,13 +25,16 @@ import type {
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import { createCodingAgentSpanFactsDispatchSubscriber } from "../eventing/coding-agent-span-facts-dispatch.subscriber.ts";
 import { CustomEvaluationSync } from "../eventing/custom-evaluation-sync.subscriber.ts";
+import { createDeferredOriginHandler } from "../eventing/deferred-origin.process.ts";
 import { createEvaluationTriggerSubscriber } from "../eventing/evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "../eventing/experiment-metrics-sync.subscriber.ts";
 import { passesTraceOriginGuards } from "../eventing/origin-guarded.subscriber.ts";
 import { ProjectMetadataSync } from "../eventing/project-metadata.subscriber.ts";
+import { EventingRecordSpanAdapter } from "../eventing/record-span.commands.ts";
 import { createSimulationMetricsSyncHandler } from "../eventing/simulation-metrics-sync.subscriber.ts";
 import { SpanStorageStore } from "../eventing/span-storage.store.ts";
 import { TraceAnalyticsStore } from "../eventing/trace-derived.store.ts";
+import { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
 import { buildTraceProcessingConsumer } from "../eventing/trace-processing.pipeline.ts";
 import { TraceAnalyticsRollupStore } from "../eventing/trace-rollup.store.ts";
 import { TraceSummaryStore } from "../eventing/trace-summary.store.ts";
@@ -40,12 +43,9 @@ import {
   type TrackedEventSyncSubscriberDeps,
 } from "../eventing/tracked-event-sync.subscriber.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.service.ts";
-import { EventingRecordSpanAdapter } from "./eventing.record-span.service.ts";
-import { EventingTracePipelineAdapter } from "./eventing.trace-pipeline.service.ts";
+import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
 import { ModelCatalogTraceModelCostAdapter } from "./model-catalog.trace-model-cost.service.ts";
 import { OtelTraceEvaluationLoopMetricsAdapter } from "./otel.trace-evaluation-loop-metrics.service.ts";
-import { TraceProjectionLeanService } from "./projection/trace-projection-lean.service.ts";
 import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
 import { OtlpSpanTokenEstimationService } from "./span-token-estimation.service.ts";
 import { TraceIoExtractionAdapter } from "./trace-io-extraction-adapter.service.ts";
@@ -136,7 +136,7 @@ export class TraceProcessingPipelineService {
       mediaReferences: TraceMediaReferenceAdapter.create(),
       modelCosts: ModelCatalogTraceModelCostAdapter.create(),
       spanNormalization: TraceSpanNormalizationAdapter.create(canonicalisation),
-      prepareEventForProjection: (event) => TraceProjectionLeanService.leanForProjection(event),
+      prepareEventForProjection: (event) => leanForProjection(event),
       recordSpanCommand: EventingRecordSpanAdapter.create({
         piiRedaction: {
           redact: (input) => peers.dataPrivacy.redactSpan(input),
@@ -171,9 +171,7 @@ export class TraceProcessingPipelineService {
     const { peers, commands } = this.input;
     const normalization = TraceSpanNormalizationAdapter.create(this.input.canonicalisation);
     const refusing = (capability: string) => () => Promise.reject(this.#refuse(capability));
-    const resolveOrigin = TraceDeferredOriginEventingAdapter.createDeferredOriginHandler((data) =>
-      commands.resolveOrigin(data),
-    );
+    const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
       resolveDeferredOrigin: async ({ tenantId, traceId }) => {
         const summary = await this.input.findSummary({ projectId: tenantId, traceId });
@@ -225,12 +223,12 @@ export class TraceProcessingPipelineService {
         }),
       codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
         normalize: (event) =>
-          normalization.normalizeSpanReceived(
-            String(event.tenantId),
-            event.data.span,
-            event.data.resource,
-            event.data.instrumentationScope,
-          ),
+          normalization.normalizeSpanReceived({
+            tenantId: String(event.tenantId),
+            span: event.data.span,
+            resource: event.data.resource,
+            instrumentationScope: event.data.instrumentationScope,
+          }),
         contributeReceivedSpan: (input) => peers.codingAgents.contributeReceivedSpan(input),
       }),
       spanStorageBroadcast: refusing("the span storage broadcast"),

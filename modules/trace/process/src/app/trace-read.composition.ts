@@ -19,6 +19,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { type TraceAppDependencies } from "../app/trace.app.ts";
+import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import {
@@ -29,7 +30,6 @@ import {
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { EventingTraceTopicAssignment } from "../services/eventing.trace-topic-assignment.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../services/model-catalog.trace-model-cost.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../services/span-cost.service.ts";
@@ -59,7 +59,11 @@ import { TraceViewerReadService } from "../services/trace-viewer.service.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { traceRefusalProxy } from "./trace-composition.build.ts";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
-import { type TraceFullIo, type TraceProcessingCommands } from "./trace.members.ts";
+import {
+  type TraceFullIo,
+  type TraceFullIoRecord,
+  type TraceProcessingCommands,
+} from "./trace.members.ts";
 
 export type TraceReaderCompositionOptions = {
   /** The rows the registry chose for this process, one tier over both stores. */
@@ -177,12 +181,12 @@ export function composeTraceAppDependencies(
               userId: void 0,
               publiclyShared: false,
             });
-            const trace = await read.findById(
+            const trace = await read.findById({
               projectId,
               traceId,
-              { ...resolved, canSeeCosts: true },
-              { full: true },
-            );
+              protections: { ...resolved, canSeeCosts: true },
+              opts: { full: true },
+            });
             if (!trace) {
               throw new TraceNotFoundError(traceId);
             }
@@ -364,7 +368,7 @@ export class TraceReadFullIo implements TraceFullIo {
     this.#extraction = extraction;
   }
 
-  recompute(spans: NormalizedSpan[]) {
+  recompute(spans: NormalizedSpan[]): TraceFullIoRecord {
     const input = this.#extraction.extractFirstInput(spans);
     const output = this.#extraction.extractLastOutput(spans);
     return {

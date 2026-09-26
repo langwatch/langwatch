@@ -47,7 +47,12 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         label: "safe",
       });
 
-      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
+      const normalized = service.normalizeSpanReceived({
+        tenantId: "tenant-1",
+        span: otlpSpan,
+        resource: null,
+        instrumentationScope: null,
+      });
 
       expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_NAME]).toBe("toxicity");
       expect(normalized.spanAttributes[ATTR_KEYS.GEN_AI_EVALUATION_SCORE_VALUE]).toBe(0.95);
@@ -59,7 +64,12 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         score: 1,
       });
 
-      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
+      const normalized = service.normalizeSpanReceived({
+        tenantId: "tenant-1",
+        span: otlpSpan,
+        resource: null,
+        instrumentationScope: null,
+      });
 
       expect(normalized.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_EVALUATIONS]).toBeUndefined();
     });
@@ -70,7 +80,12 @@ describe("SpanNormalizationPipelineService — SDK evaluation events", () => {
         score: 1,
       });
 
-      const normalized = service.normalizeSpanReceived("tenant-1", otlpSpan, null, null);
+      const normalized = service.normalizeSpanReceived({
+        tenantId: "tenant-1",
+        span: otlpSpan,
+        resource: null,
+        instrumentationScope: null,
+      });
 
       const evalEvents = normalized.events.filter(
         (e: { name: string }) => e.name === "langwatch.evaluation.custom",

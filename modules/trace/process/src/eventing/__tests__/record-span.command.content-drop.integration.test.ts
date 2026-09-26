@@ -25,10 +25,10 @@ import {
   type TraceSpanPiiRedaction,
   type TraceSpanTokenEstimation,
 } from "../../app/trace.members.ts";
-import { createTestRuntime } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
-import { TraceSummaryFoldProjection } from "../../eventing/trace-summary.projection.ts";
-import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
-import { TraceCanonicalisationService } from "../trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { EventingRecordSpanAdapter } from "../record-span.commands.ts";
+import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
+import { createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
 function policy({
   input = "capture" as Disposition,

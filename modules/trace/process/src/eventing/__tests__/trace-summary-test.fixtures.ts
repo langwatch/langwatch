@@ -12,10 +12,10 @@ import type {
 } from "@langwatch/trace-contract";
 
 import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.trace-model-cost.service.ts";
-import { TraceProjectionRuntimeService } from "../../services/projection/trace-projection-runtime.service.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import { TraceIoExtractionAdapter } from "../../services/trace-io-extraction-adapter.service.ts";
 import { TraceMediaReferenceAdapter } from "../../services/trace-media-reference.service.ts";
+import { TraceProjectionRuntimeService } from "../../services/trace-projection-runtime.service.ts";
 import { TraceSpanNormalizationAdapter } from "../../services/trace-span-normalization-adapter.service.ts";
 
 /**

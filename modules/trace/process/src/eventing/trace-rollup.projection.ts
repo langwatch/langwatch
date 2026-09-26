@@ -116,12 +116,12 @@ export class TraceAnalyticsRollupMapProjection
     // so the rollup contribution matches the trace total to the cent. Reusing
     // the pipeline service guarantees we never drift from the canonical
     // SpanAttributes shape the fold reads.
-    const span = this.spanNormalization.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const span = this.spanNormalization.normalizeSpanReceived({
+      tenantId: event.tenantId,
+      span: event.data.span,
+      resource: event.data.resource,
+      instrumentationScope: event.data.instrumentationScope,
+    });
     this.spanNormalization.enrichRagContextIds(span);
 
     const isRoot = span.parentSpanId === null;

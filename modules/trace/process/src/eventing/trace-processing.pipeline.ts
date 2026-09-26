@@ -18,7 +18,6 @@ import {
 
 import type { TraceApp } from "../app/trace.app.ts";
 import type { TraceProcessingPipelineDefinition } from "../app/trace.members.ts";
-import type { EventingTracePipelineAdapter } from "../services/eventing.trace-pipeline.service.ts";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
@@ -46,6 +45,7 @@ import {
   hasSimulationMetrics,
 } from "./simulation-metrics-sync.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
+import type { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
 import { TRACE_UPDATE_BROADCAST_WINDOW_MS } from "./trace-update-broadcast.subscriber.ts";
 import {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,

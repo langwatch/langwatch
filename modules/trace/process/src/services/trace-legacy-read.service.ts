@@ -129,12 +129,17 @@ export class TraceLegacyReadService {
     );
   }
 
-  async findById(
-    projectId: string,
-    traceId: string,
-    protections: Protections,
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace | undefined> {
+  async findById({
+    projectId,
+    traceId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    traceId: string;
+    protections: Protections;
+    opts?: { full?: boolean; withEditOverlay?: boolean };
+  }): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.findById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
@@ -147,13 +152,12 @@ export class TraceLegacyReadService {
             withEditOverlay: opts?.withEditOverlay,
           });
 
-        const traces = await this.clickHouseService.findTracesWithSpans(
+        const traces = await this.clickHouseService.findTracesWithSpans({
           projectId,
-          [traceId],
+          traceIds: [traceId],
           protections,
-          undefined,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
         if (traces[0]) {
           return finish(traces[0]);
         }
@@ -186,13 +190,12 @@ export class TraceLegacyReadService {
           }
 
           span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
-          const resolved = await this.clickHouseService.findTracesWithSpans(
+          const resolved = await this.clickHouseService.findTracesWithSpans({
             projectId,
-            [candidates[0]!],
+            traceIds: [candidates[0]!],
             protections,
-            undefined,
-            { resolveBlobs: opts?.full },
-          );
+            opts: { resolveBlobs: opts?.full },
+          });
 
           return resolved[0] ? finish(resolved[0]) : undefined;
         }
@@ -203,26 +206,32 @@ export class TraceLegacyReadService {
   }
 
   /** @param occurredAt bounds the partition scan. */
-  async getTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: Protections,
-    occurredAt?: { from: number; to: number },
-    opts?: { full?: boolean; withEditOverlay?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesWithSpans({
+    projectId,
+    traceIds,
+    protections,
+    occurredAt,
+    opts,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    protections: Protections;
+    occurredAt?: { from: number; to: number };
+    opts?: { full?: boolean; withEditOverlay?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const traces = await this.clickHouseService.findTracesWithSpans(
+        const traces = await this.clickHouseService.findTracesWithSpans({
           projectId,
           traceIds,
           protections,
           occurredAt,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
         const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) {
           return enriched;
@@ -233,22 +242,27 @@ export class TraceLegacyReadService {
     );
   }
 
-  async getTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: Protections,
-    opts?: { full?: boolean },
-  ): Promise<Trace[]> {
+  async getTracesByThreadId({
+    projectId,
+    threadId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadId: string;
+    protections: Protections;
+    opts?: { full?: boolean };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
       async () => {
-        const traces = await this.clickHouseService.findTracesByThreadId(
+        const traces = await this.clickHouseService.findTracesByThreadId({
           projectId,
           threadId,
           protections,
-          { resolveBlobs: opts?.full },
-        );
+          opts: { resolveBlobs: opts?.full },
+        });
 
         return this.enrichment.enrichCodingAgentTraces(projectId, traces);
       },
@@ -348,12 +362,17 @@ export class TraceLegacyReadService {
     );
   }
 
-  async getTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: Protections,
-    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number },
-  ): Promise<Trace[]> {
+  async getTracesWithSpansByThreadIds({
+    projectId,
+    threadIds,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    protections: Protections;
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number };
+  }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
       {
@@ -363,15 +382,15 @@ export class TraceLegacyReadService {
         },
       },
       async () => {
-        const traces = await this.clickHouseService.findTracesWithSpansByThreadIds(
+        const traces = await this.clickHouseService.findTracesWithSpansByThreadIds({
           projectId,
           threadIds,
           protections,
-          {
+          opts: {
             resolveBlobs: opts?.full,
             ...(opts?.maxTraces === undefined ? {} : { maxTraces: opts.maxTraces }),
           },
-        );
+        });
         const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);
         if (!opts?.withEditOverlay) {
           return enriched;

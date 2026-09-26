@@ -37,12 +37,17 @@ export class SpanNormalizationPipelineService implements TraceSpanNormalization 
 
   private constructor(private readonly traceCanonicalisation: TraceCanonicalisationService) {}
 
-  normalizeSpanReceived(
-    tenantId: string,
-    otlpSpan: OtlpSpan,
-    otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan {
+  normalizeSpanReceived({
+    tenantId,
+    span: otlpSpan,
+    resource: otlpResource,
+    instrumentationScope: otlpInstrumentationScope,
+  }: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan {
     return this.tracer.withActiveSpan(
       "SpanNormalizationPipelineService.normalizeSpanReceived",
       {

@@ -5,10 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Offload pipeline wiring test: leanForProjection, eventref resolution, and
  * output recomputation with in-process stubs (no external services).
  */
-import {
-  TraceProjectionLeanService,
-  IO_PREVIEW_BYTES,
-} from "../../projection/trace-projection-lean.service.ts";
+import { leanForProjection, IO_PREVIEW_BYTES } from "../../../rules/trace-projection-lean.rules.ts";
 import {
   TraceOffloadResolutionService,
   type WarnLogger,
@@ -147,7 +144,7 @@ function extractSpanAttrs(event: Event): Record<string, string> {
 
 /**
  * Builds a NormalizedSpan from a span attributes map, simulating what the
- * projection receives from the command worker after TraceProjectionLeanService.leanForProjection.
+ * projection receives from the command worker after leanForProjection.
  */
 function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedSpan {
   return {
@@ -187,11 +184,11 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: ONE_MB_OUTPUT });
-    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
+    const leanEvent = leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
   });
 
-  describe("when TraceProjectionLeanService.leanForProjection is applied (simulating dispatch interposition)", () => {
+  describe("when leanForProjection is applied (simulating dispatch interposition)", () => {
     /** @scenario "event_log carries the full event content; projection queue carries the lean shape" */
     it("the lean event carries a preview within the IO_PREVIEW_BYTES budget for langwatch.output", () => {
       const previewValue = leanAttrs["langwatch.output"] ?? "";
@@ -284,15 +281,15 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: SMALL_OUTPUT });
-    // TraceProjectionLeanService.leanForProjection is a no-op for sub-threshold values
-    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
+    // leanForProjection is a no-op for sub-threshold values
+    const leanEvent = leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
   });
 
-  describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
+  describe("when leanForProjection is applied", () => {
     it("the event is returned unchanged (same object reference)", () => {
       const fullEvent = makeSpanReceivedEvent({ output: SMALL_OUTPUT });
-      const result = TraceProjectionLeanService.leanForProjection(fullEvent);
+      const result = leanForProjection(fullEvent);
       expect(result).toBe(fullEvent);
     });
 
@@ -343,7 +340,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
 
   beforeEach(() => {
     const fullEvent = makeSpanReceivedEvent({ output: ONE_MB_OUTPUT });
-    const leanEvent = TraceProjectionLeanService.leanForProjection(fullEvent);
+    const leanEvent = leanForProjection(fullEvent);
     leanAttrs = extractSpanAttrs(leanEvent);
     previewValue = leanAttrs["langwatch.output"] ?? "";
   });

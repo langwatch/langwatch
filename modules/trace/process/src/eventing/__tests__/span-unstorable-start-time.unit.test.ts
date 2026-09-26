@@ -75,12 +75,12 @@ describe("given a span whose start time cannot be stored", () => {
 
       let thrown: unknown;
       try {
-        normalization.normalizeSpanReceived(
-          event.tenantId,
-          event.data.span,
-          event.data.resource,
-          event.data.instrumentationScope,
-        );
+        normalization.normalizeSpanReceived({
+          tenantId: event.tenantId,
+          span: event.data.span,
+          resource: event.data.resource,
+          instrumentationScope: event.data.instrumentationScope,
+        });
       } catch (error) {
         thrown = error;
       }

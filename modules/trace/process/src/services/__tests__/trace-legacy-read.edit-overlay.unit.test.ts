@@ -101,8 +101,13 @@ describe("TraceService withEditOverlay", () => {
         new Map([["trace-1", traceOutputPatch("the corrected answer")]]),
       );
 
-      const result = await makeService().findById(PROJECT_ID, "trace-1", protections, {
-        withEditOverlay: true,
+      const result = await makeService().findById({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        protections,
+        opts: {
+          withEditOverlay: true,
+        },
       });
 
       expect(result?.output?.value).toBe("the corrected answer");
@@ -117,7 +122,11 @@ describe("TraceService withEditOverlay", () => {
         new Map([["trace-1", traceOutputPatch("a correction this reader never asked for")]]),
       );
 
-      const result = await makeService().findById(PROJECT_ID, "trace-1", protections);
+      const result = await makeService().findById({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        protections,
+      });
 
       expect(result?.output?.value).toBe("captured output");
       expect(mockGetPatchesByTraceIds).not.toHaveBeenCalled();
@@ -135,12 +144,12 @@ describe("TraceService withEditOverlay", () => {
         ]),
       );
 
-      const traces = await makeService().getTracesWithSpansByThreadIds(
-        PROJECT_ID,
-        ["thread-1"],
+      const traces = await makeService().getTracesWithSpansByThreadIds({
+        projectId: PROJECT_ID,
+        threadIds: ["thread-1"],
         protections,
-        { full: true, withEditOverlay: true },
-      );
+        opts: { full: true, withEditOverlay: true },
+      });
 
       expect(traces.map((t) => t.output?.value)).toEqual(["first correction", "second correction"]);
     });
@@ -154,13 +163,12 @@ describe("TraceService withEditOverlay", () => {
         new Map([["trace-1", traceOutputPatch("the reviewer's correction")]]),
       );
 
-      const traces = await makeService().getTracesWithSpans(
-        PROJECT_ID,
-        ["trace-1"],
+      const traces = await makeService().getTracesWithSpans({
+        projectId: PROJECT_ID,
+        traceIds: ["trace-1"],
         protections,
-        undefined,
-        { full: true, withEditOverlay: true },
-      );
+        opts: { full: true, withEditOverlay: true },
+      });
 
       expect(traces[0]?.output?.value).toBe("the reviewer's correction");
     });

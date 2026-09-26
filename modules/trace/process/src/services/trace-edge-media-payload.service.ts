@@ -1,11 +1,11 @@
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 
-import { TraceIngressPayload } from "../trace-ingestion.service.ts";
 import {
   TraceEdgeMediaExtractionService,
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
 } from "./trace-edge-media-extraction.service.ts";
+import { TraceIngressPayload } from "./trace-ingestion.service.ts";
 
 // Extraction runs FIRST, which is why `next` is a member here rather than an
 // ordering a composition root remembers: externalizing the heavy part usually

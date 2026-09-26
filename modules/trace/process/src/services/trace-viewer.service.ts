@@ -9,7 +9,7 @@ import type { TraceViewerProtectionService } from "./trace-viewer-protection.ser
 
 export type TraceViewerServiceOptions = Readonly<{
   read: TraceLegacyRead;
-  protections: TraceViewerProtectionService;
+  protections: Pick<TraceViewerProtectionService, "resolve">;
 }>;
 
 /**
@@ -33,12 +33,11 @@ export class TraceViewerReadService extends TraceViewerService {
       publiclyShared: false,
     });
 
-    return this.options.read.getTracesWithSpans(
-      input.projectId,
-      [...input.traceIds],
+    return this.options.read.getTracesWithSpans({
+      projectId: input.projectId,
+      traceIds: [...input.traceIds],
       protections,
-      void 0,
-      { full: true },
-    );
+      opts: { full: true },
+    });
   }
 }

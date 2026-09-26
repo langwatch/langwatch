@@ -31,28 +31,25 @@ import {
   type TraceModelCost,
   type TraceSpanNormalization,
 } from "../app/trace.members.ts";
-import { SpanStorageMapProjection } from "../eventing/span-storage.projection.ts";
-import {
-  type TraceAnalyticsData,
-  TraceAnalyticsFoldProjection,
-} from "../eventing/trace-derived.projection.ts";
-import {
-  type TraceAnalyticsRollupRow,
-  TraceAnalyticsRollupMapProjection,
-} from "../eventing/trace-rollup.projection.ts";
-import { TraceSummaryFoldProjection } from "../eventing/trace-summary.projection.ts";
 import {
   clampSpanShardCount,
   spanCommandGroupKey,
 } from "../rules/trace-span-command-shard.rules.ts";
+import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
+import { EventingRecordSpanAdapter, RECORD_SPAN_DEDUPLICATION } from "./record-span.commands.ts";
+import { SpanStorageMapProjection } from "./span-storage.projection.ts";
 import {
-  EventingRecordSpanAdapter,
-  RECORD_SPAN_DEDUPLICATION,
-} from "./eventing.record-span.service.ts";
-import { EventingTraceOriginAdapter } from "./eventing.trace-origin.service.ts";
-import { EventingTraceProcessingAdapter } from "./eventing.trace-processing.service.ts";
-import { EventingTraceTopicAdapter } from "./eventing.trace-topic-assignment.service.ts";
-import { TraceProjectionRuntimeService } from "./projection/trace-projection-runtime.service.ts";
+  type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
+} from "./trace-derived.projection.ts";
+import { EventingTraceOriginAdapter } from "./trace-origin.commands.ts";
+import { EventingTraceProcessingAdapter } from "./trace-processing.commands.ts";
+import {
+  type TraceAnalyticsRollupRow,
+  TraceAnalyticsRollupMapProjection,
+} from "./trace-rollup.projection.ts";
+import { TraceSummaryFoldProjection } from "./trace-summary.projection.ts";
+import { EventingTraceTopicAdapter } from "./trace-topic-assignment.commands.ts";
 
 /** Trace pipeline name; shared by both full and producer-only registration shapes. */
 export const TRACE_PROCESSING_PIPELINE_NAME = "trace_processing";

@@ -25,13 +25,18 @@ export class TraceSpanNormalizationAdapter implements TraceSpanNormalization {
     return new TraceSpanNormalizationAdapter(canonicalisation);
   }
 
-  normalizeSpanReceived(
-    tenantId: string,
-    span: OtlpSpan,
-    resource: OtlpResource | null,
-    instrumentationScope: OtlpInstrumentationScope | null,
-  ): NormalizedSpan {
-    return this.service.normalizeSpanReceived(tenantId, span, resource, instrumentationScope);
+  normalizeSpanReceived({
+    tenantId,
+    span,
+    resource,
+    instrumentationScope,
+  }: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+  }): NormalizedSpan {
+    return this.service.normalizeSpanReceived({ tenantId, span, resource, instrumentationScope });
   }
 
   enrichRagContextIds(span: NormalizedSpan): void {

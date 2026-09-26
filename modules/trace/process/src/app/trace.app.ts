@@ -179,16 +179,13 @@ import {
   extractLlmMessagesForTrace,
 } from "../rules/trace-llm-messages.rules.ts";
 import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import { IO_PREVIEW_BYTES, utf8Preview } from "../rules/trace-projection-lean.rules.ts";
 import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-readable-span.rules.ts";
 import { traceToConversationTurn } from "../rules/trace-thread-conversation.rules.ts";
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { LegacyFilterMatchingService } from "../services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
-import {
-  IO_PREVIEW_BYTES,
-  TraceProjectionLeanService,
-} from "../services/projection/trace-projection-lean.service.ts";
 import type { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
@@ -395,12 +392,12 @@ export type TraceSummaryReader = Readonly<{
 
 /** The trace's log records, as the storage read answers them. */
 export type TraceLogRecordReader = Readonly<{
-  getLogsByTraceId(
-    tenantId: string,
-    traceId: string,
-    occurredAtMs?: number,
-    limit?: number,
-  ): Promise<TraceLogRecordReadRow[]>;
+  getLogsByTraceId(params: {
+    tenantId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    limit?: number;
+  }): Promise<TraceLogRecordReadRow[]>;
 }>;
 
 /** The stored reviewer corrections, as this feature reads and writes them. */
@@ -1115,7 +1112,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       input,
     );
     const preview = (value: string | null): string | null =>
-      value === null ? null : TraceProjectionLeanService.utf8Preview(value, IO_PREVIEW_BYTES);
+      value === null ? null : utf8Preview(value, IO_PREVIEW_BYTES);
     const previewInput = preview(io.input);
     const previewOutput = preview(io.output);
     return {
@@ -1297,7 +1294,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     occurredAtMs?: number;
   }): Promise<Span[]> {
     return ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
-      logRecords: this,
+      logRecords: this.#dependencies.traces.logRecords,
       tenantId: input.projectId,
       traceId: input.traceId,
       spans: input.spans,
@@ -2021,12 +2018,12 @@ export class TraceApp implements TraceApi, CollectorApp {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<TraceLogRecordReadRow[]> {
-    return this.#dependencies.traces.logRecords.getLogsByTraceId(
-      input.projectId,
-      input.traceId,
-      input.occurredAtMs,
-      input.limit,
-    );
+    return this.#dependencies.traces.logRecords.getLogsByTraceId({
+      tenantId: input.projectId,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      limit: input.limit,
+    });
   }
 
   // -------------------------------------------------------------------------

@@ -13,8 +13,11 @@ import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server"
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceProjectionLeanEventingAdapter } from "../eventing.trace-projection-lean.service.ts";
-import { makeFakeClickHouse, type FakeEventLogRow as Row } from "./fixtures/fake-event-log.ts";
+import {
+  makeFakeClickHouse,
+  type FakeEventLogRow as Row,
+} from "../../services/__tests__/fixtures/fake-event-log.ts";
+import { leanReplayEvent } from "../trace-projection-lean.rules.ts";
 
 interface CounterState {
   count: number;
@@ -149,7 +152,7 @@ describe("replayStateProjection", () => {
           if (tenantId) resolvedTenants.push(tenantId);
           return client;
         },
-        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
+        lean: leanReplayEvent,
       }),
       accumulatorOpts: {},
     };
@@ -229,7 +232,7 @@ describe("replayStateProjection", () => {
         redis,
         eventSource: new EventingClickHouseReplayEventSource({
           resolveClient: async () => client,
-          lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
+          lean: leanReplayEvent,
         }),
         accumulatorOpts: {},
       },
@@ -271,7 +274,7 @@ describe("replayStateProjection", () => {
       redis: forbiddenRedis,
       eventSource: new EventingClickHouseReplayEventSource({
         resolveClient: async () => client,
-        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
+        lean: leanReplayEvent,
       }),
       accumulatorOpts: {},
     };
@@ -304,7 +307,7 @@ describe("the fold/map engine with state projections", () => {
         resolveClient: async () => {
           throw new Error("should not resolve — guard must fire first");
         },
-        lean: TraceProjectionLeanEventingAdapter.leanReplayEvent,
+        lean: leanReplayEvent,
       }),
       accumulatorOpts: {},
     };

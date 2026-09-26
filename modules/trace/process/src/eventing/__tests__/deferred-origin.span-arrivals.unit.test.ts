@@ -8,7 +8,7 @@ import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-co
 import { TOPIC_ASSIGNED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceDeferredOriginEventingAdapter } from "../eventing.deferred-origin.service.ts";
+import { needsOriginResolution } from "../deferred-origin.process.ts";
 
 function createEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
@@ -31,11 +31,11 @@ function createFoldState(): TraceSummaryData {
   return { traceId: "trace-1", attributes: {} } as TraceSummaryData;
 }
 
-describe("TraceDeferredOriginEventingAdapter.needsOriginResolution()", () => {
+describe("needsOriginResolution()", () => {
   describe("when the event is a re-emitted topic assignment", () => {
     it("returns false even with no origin on the fold state", () => {
       expect(
-        TraceDeferredOriginEventingAdapter.needsOriginResolution({
+        needsOriginResolution({
           event: createEvent({ type: TOPIC_ASSIGNED_EVENT_TYPE }),
           foldState: createFoldState(),
         }),
@@ -46,7 +46,7 @@ describe("TraceDeferredOriginEventingAdapter.needsOriginResolution()", () => {
   describe("when the event is a span arrival with no origin", () => {
     it("returns true", () => {
       expect(
-        TraceDeferredOriginEventingAdapter.needsOriginResolution({
+        needsOriginResolution({
           event: createEvent(),
           foldState: createFoldState(),
         }),

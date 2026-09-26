@@ -118,7 +118,7 @@ async function readTraces(traceIds: string[]) {
     resolveClickHouseClient: testResolveClickHouseClient,
     traceCanonicalisation,
   });
-  await service.findTracesWithSpans("proj-1", traceIds, protections);
+  await service.findTracesWithSpans({ projectId: "proj-1", traceIds, protections });
   const spanCall = mockClickHouseQuery.mock.calls.find(([args]) =>
     String(args.query).includes("FROM stored_spans AS t"),
   );

@@ -45,27 +45,43 @@ export abstract class TraceLegacyReadRepository {
 
   abstract findTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult>;
 
-  abstract findTracesByThreadId(
-    projectId: string,
-    threadId: string,
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]>;
+  abstract findTracesByThreadId({
+    projectId,
+    threadId,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadId: string;
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]>;
 
-  abstract findTracesWithSpans(
-    projectId: string,
-    traceIds: string[],
-    protections: Protections,
-    occurredAt?: TraceOccurredAtRange,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]>;
+  abstract findTracesWithSpans({
+    projectId,
+    traceIds,
+    protections,
+    occurredAt,
+    opts,
+  }: {
+    projectId: string;
+    traceIds: string[];
+    protections: Protections;
+    occurredAt?: TraceOccurredAtRange;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]>;
 
-  abstract findTracesWithSpansByThreadIds(
-    projectId: string,
-    threadIds: string[],
-    protections: Protections,
-    opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[]>;
+  abstract findTracesWithSpansByThreadIds({
+    projectId,
+    threadIds,
+    protections,
+    opts,
+  }: {
+    projectId: string;
+    threadIds: string[];
+    protections: Protections;
+    opts?: { resolveBlobs?: boolean };
+  }): Promise<Trace[]>;
 
   abstract resolveTraceIdByPrefix(params: {
     projectId: string;
