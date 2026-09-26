@@ -370,7 +370,7 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		engine.captureFrom(operation, probeCase, transcript)
 
 		if !operation.InA || !operation.InB {
-			if !missingReported {
+			if !missingReported && !RetiredRestOperation(operation.Path) {
 				missingReported = true
 				findings = append(findings, missingOperationFinding(operation, probeCase.name, transcript))
 			}

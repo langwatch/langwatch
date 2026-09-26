@@ -32,6 +32,14 @@ type RestParity struct {
 	Missing     []RestGap  `json:"missingOnBranch"`
 	Extra       []RestGap  `json:"extraOnBranch"`
 	Changed     []RestDiff `json:"changed"`
+	Retired     []RestGap  `json:"ruledRetired"`
+}
+
+// RetiredRestOperation is a main path ruled out of the branch: main's root
+// page is not an API, and ADR-158's amendment removes the dataset
+// direct-upload byte routes rather than refusing them.
+func RetiredRestOperation(path string) bool {
+	return path == "/" || path == "/api/dataset/direct-upload" || strings.HasPrefix(path, "/api/dataset/direct-upload/")
 }
 
 // DiffRest compares two served documents operation by operation, ignoring
@@ -96,7 +104,11 @@ func (collector *restCollector) add(change ClassifiedChange) {
 	gap := RestGap{Method: method, Path: change.Path, OperationID: operationIDOf(change), Module: collector.moduleOf(method, change.Path)}
 	switch change.Kind {
 	case "removed":
-		if !collector.paired["added"][pairing] {
+		switch {
+		case collector.paired["added"][pairing]:
+		case RetiredRestOperation(change.Path):
+			collector.parity.Retired = append(collector.parity.Retired, gap)
+		default:
 			collector.parity.Missing = append(collector.parity.Missing, gap)
 		}
 	case "added":

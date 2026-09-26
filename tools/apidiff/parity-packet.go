@@ -208,13 +208,8 @@ func writeSection(output *strings.Builder, title string, lines []string) {
 }
 
 func writeRestSections(output *strings.Builder, rest RestParity, module string) {
-	missing := []string{}
-	for _, gap := range rest.Missing {
-		if gap.Module == module {
-			missing = append(missing, fmt.Sprintf("- `%s %s` %s\n", gap.Method, gap.Path, gap.OperationID))
-		}
-	}
-	writeSection(output, "Missing REST operations", missing)
+	writeSection(output, "Missing REST operations", restGapLines(rest.Missing, module))
+	writeSection(output, "Ruled retired REST operations, not defects", restGapLines(rest.Retired, module))
 	breaking := []string{}
 	for index := range rest.Changed {
 		if diff := rest.Changed[index]; diff.Module == module && diff.Breaking {
@@ -225,6 +220,16 @@ func writeRestSections(output *strings.Builder, rest RestParity, module string) 
 	if statuses := notComparedStatuses(rest, module); statuses > 0 {
 		fmt.Fprintf(output, "Documented error statuses differ on %d operations; parity there is not required, so they are not listed.\n", statuses)
 	}
+}
+
+func restGapLines(gaps []RestGap, module string) []string {
+	lines := []string{}
+	for _, gap := range gaps {
+		if gap.Module == module {
+			lines = append(lines, fmt.Sprintf("- `%s %s` %s\n", gap.Method, gap.Path, gap.OperationID))
+		}
+	}
+	return lines
 }
 
 // notComparedStatuses counts the module's operations whose documented error

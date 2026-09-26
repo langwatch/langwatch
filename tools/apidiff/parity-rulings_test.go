@@ -165,3 +165,25 @@ func TestARetiredProcedureIsNotMissing(t *testing.T) {
 		t.Errorf("retired = %+v, want publicEnv", parity.Retired)
 	}
 }
+
+func TestRetiredRestOperationsAreNotMissing(t *testing.T) {
+	ok := `{"200": {"description": "ok"}}`
+	base := restDocument(`{
+	  "/": {"get": {"operationId": "getIndex", "responses": ` + ok + `}},
+	  "/api/dataset/direct-upload/{datasetId}/finalize": {"post": {"operationId": "finalize", "responses": ` + ok + `}},
+	  "/api/gone": {"get": {"operationId": "gone", "responses": ` + ok + `}}
+	}`)
+	parity, err := DiffRest(base, restDocument(`{}`), func(string, string) string { return "things" })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parity.Missing) != 1 || parity.Missing[0].Path != "/api/gone" {
+		t.Fatalf("missing = %+v, want only /api/gone", parity.Missing)
+	}
+	if len(parity.Retired) != 2 {
+		t.Errorf("retired = %+v, want / and the direct-upload finalize route", parity.Retired)
+	}
+	if !RetiredRestOperation("/api/dataset/direct-upload") || RetiredRestOperation("/api/dataset/imports") {
+		t.Error("the direct-upload family alone is retired")
+	}
+}
