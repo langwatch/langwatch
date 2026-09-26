@@ -8,7 +8,7 @@ import {
   type GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
 } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 
 export class GovernanceSignalService {
   private constructor(
@@ -18,7 +18,7 @@ export class GovernanceSignalService {
 
   static create(
     port: GovernanceSignalChannel,
-    diagnostics: GovernanceDiagnosticsSink = new NullGovernanceDiagnosticsAdapter(),
+    diagnostics: GovernanceDiagnosticsSink = silentGovernanceDiagnostics,
   ): GovernanceSignalService {
     return new GovernanceSignalService(port, diagnostics);
   }

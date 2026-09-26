@@ -60,11 +60,11 @@ type ConversationRouting = {
 const CONVERSATION_ROUTING = new Map<string, ConversationRouting>([
   [
     "databricks_genie",
-    { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapperService.tryToTraceRequest },
+    { profile: GENIE_ROUTING_PROFILE, map: GenieTraceMapperService.toTraceRequest },
   ],
   [
     "copilot_studio_dataverse",
-    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapperService.tryToTraceRequest },
+    { profile: COPILOT_ROUTING_PROFILE, map: CopilotStudioTraceMapperService.toTraceRequest },
   ],
 ]);
 
@@ -541,8 +541,8 @@ export class IngestionPullWorkerService {
   }
 
   /**
-   * Main `pullerWorker.ts:1145-1201` (ADR-088): a dropped price widens the source's unpriced
-   * window; a complete re-read reaching back across its start clears it. A truncated one never does.
+   * ADR-088: a dropped price widens the source's unpriced window; a complete re-read
+   * reaching back across its start clears it. A truncated one never does.
    */
   private async recordUnpricedUsageWindow({
     source,

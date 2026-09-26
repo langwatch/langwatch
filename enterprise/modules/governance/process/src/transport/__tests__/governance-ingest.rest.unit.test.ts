@@ -9,8 +9,8 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
 import { describe, expect, it, vi } from "vitest";
 
 import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
+import type { GovernanceIngestRateLimiter } from "../../app/governance.members.ts";
 import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
-import type { GovernanceIngestRateLimiter } from "../../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,

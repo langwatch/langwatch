@@ -21,6 +21,7 @@ import {
 } from "@langwatch/coding-agent-browser-kit";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Switch } from "@langwatch/design-system/switch";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Bot, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -31,7 +32,7 @@ import {
 } from "../../../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
-import { type AiToolEntry, type AiToolTileType } from "../../model/ai-tool-tile.ts";
+import type { AiToolTileType } from "../../model/ai-tool-tile.ts";
 import {
   isToolPresetAsset,
   TOOL_KINDS,
@@ -128,7 +129,7 @@ function blankForm(type: AiToolTileType): FormState {
 }
 
 function formFromEntry(entry: AiToolEntry): FormState {
-  const cfg = entry.config as unknown as Record<string, unknown>;
+  const cfg = entry.config;
   const baseStr = (key: string): string => {
     const v = cfg[key];
     return typeof v === "string" ? v : "";

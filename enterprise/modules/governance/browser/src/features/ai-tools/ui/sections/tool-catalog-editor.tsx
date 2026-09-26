@@ -25,6 +25,7 @@ import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -34,11 +35,6 @@ import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
-import type {
-  AiToolEntry,
-  CodingAssistantConfig,
-  ExternalToolConfig,
-} from "../../model/ai-tool-tile.ts";
 import { TileIcon } from "../elements/tile-icon.tsx";
 import { useAiToolCatalog } from "./use-ai-tool-catalog.ts";
 
@@ -79,10 +75,6 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
    */
   const catalog = useAiToolCatalog({ organizationId });
   const { entries, isLoading, pendingDelete, setPendingDelete } = catalog;
-  // Only for the `setData` write below, which needs the router's own payload
-  // type. Reading `data` or `isLoading` off it again would be the second copy
-  // the hook exists to prevent.
-  const adminListQuery = catalog.query;
 
   const departmentsQuery = api.departments.list.useQuery(
     { organizationId },
@@ -181,10 +173,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
       return updated ?? e;
     });
 
-    utils.aiTools.adminList.setData(
-      { organizationId },
-      next as unknown as typeof adminListQuery.data,
-    );
+    utils.aiTools.adminList.setData({ organizationId }, next);
 
     reorderMutation.mutate(
       {
@@ -193,10 +182,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
       },
       {
         onError: () => {
-          utils.aiTools.adminList.setData(
-            { organizationId },
-            previous as unknown as typeof adminListQuery.data,
-          );
+          utils.aiTools.adminList.setData({ organizationId }, previous);
         },
       },
     );
@@ -492,9 +478,8 @@ function scopeChipsFor(
  */
 export function cliPathsLine(entry: AiToolEntry): string | null {
   if (entry.type !== "coding_assistant") return null;
-  const config = entry.config as CodingAssistantConfig;
-  const gateway = config.allowVk !== false;
-  const direct = config.allowOtelDirect !== false;
+  const gateway = entry.config.allowVk !== false;
+  const direct = entry.config.allowOtelDirect !== false;
   if (gateway && direct) return "CLI paths: gateway · direct";
   if (gateway) return "CLI paths: gateway only";
   if (direct) return "CLI paths: direct only";
@@ -504,7 +489,8 @@ export function cliPathsLine(entry: AiToolEntry): string | null {
 /** The one line under the scope chips that says what the tile points at. */
 function detailLine(entry: AiToolEntry): string | null {
   if (entry.type === "external_tool") {
-    return (entry.config as ExternalToolConfig).linkUrl || null;
+    const { linkUrl } = entry.config;
+    return typeof linkUrl === "string" && linkUrl !== "" ? linkUrl : null;
   }
   return cliPathsLine(entry);
 }

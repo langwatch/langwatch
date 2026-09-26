@@ -21,7 +21,7 @@ import {
   type GovernanceHttpClient,
   type GovernanceHttpResponse,
 } from "../../app/governance.members.ts";
-import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
+import { AnthropicAdminPullerService } from "../anthropic-admin-puller.service.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 
@@ -51,8 +51,8 @@ const pulledUsageRecords = PulledUsageRecordService.create(
 const buildPulledUsageRecord = ({ ...input }: Parameters<typeof pulledUsageRecords.findBuilt>[0]) =>
   pulledUsageRecords.findBuilt(input);
 
-function makePuller(): AnthropicAdminPullerAdapter {
-  return AnthropicAdminPullerAdapter.create(new TestHttp());
+function makePuller(): AnthropicAdminPullerService {
+  return AnthropicAdminPullerService.create(new TestHttp());
 }
 
 const SOURCE = {
@@ -605,7 +605,7 @@ describe("the Anthropic Admin puller", () => {
      * claims another, so the run exhausts MAX_PAGES_PER_RUN and returns with
      * the token still in hand.
      */
-    async function midWindowCursor(puller: AnthropicAdminPullerAdapter) {
+    async function midWindowCursor(puller: AnthropicAdminPullerService) {
       fetchMock.mockResolvedValue(
         jsonResponse({ ...USAGE_PAGE, has_more: true, next_page: "page_2" }),
       );
@@ -1427,7 +1427,7 @@ describe("given an Anthropic cost source that has already read up to a day", () 
     config,
     bucketStart,
   }: {
-    puller: AnthropicAdminPullerAdapter;
+    puller: AnthropicAdminPullerService;
     config: ReturnType<typeof costConfig>;
     bucketStart: string;
   }) {

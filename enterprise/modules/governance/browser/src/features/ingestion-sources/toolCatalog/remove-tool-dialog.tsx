@@ -10,8 +10,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
-
-import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 
 /** Removing a tool is permanent, so it asks first and names the reversible alternative. */
 export function RemoveToolDialog({

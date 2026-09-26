@@ -175,12 +175,21 @@ import { governanceListingChannels } from "../channels/governance-listing-channe
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
+import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts";
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
 import { GovernanceCostRollupFoldProjection } from "../eventing/governance-cost-rollup.projection.ts";
 import { GovernanceCostRollupStore } from "../eventing/governance-cost-rollup.store.ts";
+import {
+  IngestionPullEventingAdapter,
+  type IngestionPullDefinition,
+} from "../eventing/ingestion-pull.pipeline.ts";
 import { IngestionPullProcess } from "../eventing/ingestion-pull.process.ts";
+import {
+  PulledUsageEventingAdapter,
+  type PulledUsageDefinition,
+} from "../eventing/pulled-usage.pipeline.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
 import { nextIngestionPullRunAt } from "../rules/ingestion-pull-schedule.rules.ts";
@@ -193,7 +202,7 @@ import { ModelProviderAiToolCatalogService } from "../services/ai-tool-provider-
 import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.service.ts";
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
-import { AnthropicAdminPullerAdapter } from "../services/anthropic-admin-puller.service.ts";
+import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
@@ -219,7 +228,6 @@ import { GovernanceCostBreakdownService } from "../services/governance-cost-brea
 import { GovernanceCostNoticesService } from "../services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../services/governance-cost-summary.service.ts";
 import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
-import type { GovernanceIngestRateLimiter } from "../services/governance-ingest-rate-limit.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
@@ -234,10 +242,6 @@ import { DefaultGovernanceSetupStateService } from "../services/governance-setup
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
-import {
-  IngestionPullEventingAdapter,
-  type IngestionPullDefinition,
-} from "../services/ingestion-pull-eventing.service.ts";
 import { IngestionPullLifecycleService } from "../services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullListingService } from "../services/ingestion-pull-listing.service.ts";
 import { IngestionPullLogService } from "../services/ingestion-pull-log.service.ts";
@@ -253,7 +257,7 @@ import {
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
 import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
-import { OpenAiAdminPullerAdapter } from "../services/openai-admin-puller.service.ts";
+import { OpenAiAdminPullerService } from "../services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerService } from "../services/openai-compliance-puller.service.ts";
 import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
 import { OrganizationSupportContactService } from "../services/organization-support-contact.service.ts";
@@ -264,10 +268,6 @@ import { PersonalIngestionKeyService } from "../services/personal-ingestion-key.
 import { PersonalUsageDashboardService } from "../services/personal-usage-dashboard.service.ts";
 import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
-import {
-  PulledUsageEventingAdapter,
-  type PulledUsageDefinition,
-} from "../services/pulled-usage-eventing.service.ts";
 import { PulledUsagePricingService } from "../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../services/puller-registry.service.ts";
@@ -275,11 +275,11 @@ import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.serv
 import { ProjectQuarantineTenantResolverService } from "../services/quarantine-tenant.service.ts";
 import { S3PollingPullerService } from "../services/s3-puller.service.ts";
 import { SourceCredentialAccessService } from "../services/source-credential-access.service.ts";
-import { ssrfSafeFetch } from "../services/ssrf-safe-fetch.ts";
 import { SuppressionSnapshotService } from "../services/suppression-snapshot.service.ts";
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
+  GovernanceIngestRateLimiter,
   PulledUsageDispatcher,
   GovernanceProjectDirectory,
 } from "./governance.members.ts";
@@ -1047,9 +1047,9 @@ export class GovernanceApp implements GovernanceRestApi {
     pullers.register(HttpCopilotStudioChannel.create({ http }));
     pullers.register(HttpCopilotStudioDataverseChannel.create(http));
     pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
-    pullers.register(OpenAiAdminPullerAdapter.create(http));
+    pullers.register(OpenAiAdminPullerService.create(http));
     pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
-    pullers.register(AnthropicAdminPullerAdapter.create(http));
+    pullers.register(AnthropicAdminPullerService.create(http));
     pullers.register(DatabricksGeniePullerService.create(http));
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,

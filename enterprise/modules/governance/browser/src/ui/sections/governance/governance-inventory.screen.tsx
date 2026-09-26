@@ -30,6 +30,7 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Switch } from "@langwatch/design-system/switch";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -42,7 +43,6 @@ import {
 } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
-import type { AiToolEntry } from "../../../features/ai-tools/model/ai-tool-tile.ts";
 import { AiToolEntryDrawer } from "../../../features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx";
 import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/use-ai-tool-catalog.ts";
 import { DashboardSelect } from "../../../features/ingestion-sources/dashboard-select.tsx";

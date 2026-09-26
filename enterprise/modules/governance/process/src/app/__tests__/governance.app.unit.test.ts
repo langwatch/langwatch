@@ -134,12 +134,12 @@ describe("GovernanceApp ingestion templates", () => {
   describe("given a caller who names only their project", () => {
     it("resolves the organization from the project rather than taking one", async () => {
       const { app, getOrganizationId, repositories } = await buildApp();
-      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
+      const findUserVisible = vi.spyOn(repositories.ingestionTemplates, "findUserVisible");
 
       await app.listIngestionTemplatesForMember({ projectId: PROJECT_ID });
 
       expect(getOrganizationId).toHaveBeenCalledWith(PROJECT_ID);
-      expect(listUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
+      expect(findUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
     });
 
     it("resolves it the same way for every template operation", async () => {

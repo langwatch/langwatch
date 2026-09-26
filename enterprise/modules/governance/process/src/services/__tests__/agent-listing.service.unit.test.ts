@@ -21,6 +21,7 @@ import {
   readBotRows,
 } from "../../channels/http/http.copilot-bots.channel.ts";
 import { HttpGenieSpacesChannel } from "../../channels/http/http.genie-spaces.channel.ts";
+import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
 import {
   agentsListed,
   agentsRefused,
@@ -28,12 +29,11 @@ import {
   refusalFromThrown,
 } from "../../rules/agent-listing.rules.ts";
 import { genieSpacesAsAgents } from "../../rules/genie-spaces.rules.ts";
-import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
-vi.mock("../ssrf-safe-fetch.ts", () => ({
+vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
-const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
+const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const testHttp: GovernanceHttpClient = {

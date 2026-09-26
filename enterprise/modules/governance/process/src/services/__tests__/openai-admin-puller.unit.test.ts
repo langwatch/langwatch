@@ -36,7 +36,7 @@ import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contra
 import type * as observabilityModule from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
-import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.service.ts";
+import { OpenAiAdminPullerService } from "../openai-admin-puller.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 
 class StubHttp implements GovernanceHttpClient {
@@ -57,8 +57,8 @@ class TestRate {
   }
 }
 
-function makePuller(): OpenAiAdminPullerAdapter {
-  return OpenAiAdminPullerAdapter.create(new StubHttp());
+function makePuller(): OpenAiAdminPullerService {
+  return OpenAiAdminPullerService.create(new StubHttp());
 }
 
 const usageRecords = PulledUsageRecordService.create(

@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
@@ -42,13 +42,13 @@ class RecordedClickHouseResolver implements GovernanceClickHouseResolver {
 }
 
 function activityMonitor(options: {
-  prisma: object;
+  prisma: Parameters<typeof prismaDouble>[0];
   rowsForQuery: (query: ClickHouseQuery) => unknown;
 }) {
   const clickhouse = new RecordedClickHouseClient(options.rowsForQuery);
   const resolver = new RecordedClickHouseResolver(clickhouse);
   const service = PrismaActivityMonitorRepository.create({
-    prisma: options.prisma as unknown as PrismaClient,
+    prisma: prismaDouble(options.prisma),
     clickhouse: resolver,
   });
 

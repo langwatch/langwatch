@@ -24,11 +24,11 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
 import {
   DatabricksGeniePullerService,
   PAID_GENIE_BILL_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
-import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
 function requestBody(init: RequestInit | undefined): string {
   const body = init?.body;
@@ -37,8 +37,8 @@ function requestBody(init: RequestInit | undefined): string {
   return body;
 }
 
-vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
-const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
+vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({ ssrfSafeFetch: vi.fn() }));
+const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const testHttp: GovernanceHttpClient = {

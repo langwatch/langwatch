@@ -206,10 +206,7 @@ export const spendSpikeThresholdConfigSchema = z
 export type SpendSpikeThresholdConfig = z.infer<typeof spendSpikeThresholdConfigSchema>;
 export type SpendSpikeThresholdConfigParsed = SpendSpikeThresholdConfig;
 
-export function validateThresholdConfig(input: {
-  ruleType: string;
-  config: unknown;
-}): SpendSpikeThresholdConfig | null {
+export function assertThresholdConfig(input: { ruleType: string; config: unknown }): void {
   if (!ALLOWED_RULE_TYPES.includes(input.ruleType as AllowedRuleType)) {
     throw unsupportedGovernanceValue({
       field: "ruleType",
@@ -217,10 +214,9 @@ export function validateThresholdConfig(input: {
       allowed: ALLOWED_RULE_TYPES,
     });
   }
-  if (!SUPPORTED_RULE_TYPES.includes(input.ruleType as SupportedRuleType)) {
-    return null;
+  if (SUPPORTED_RULE_TYPES.includes(input.ruleType as SupportedRuleType)) {
+    spendSpikeThresholdConfigSchema.parse(input.config);
   }
-  return spendSpikeThresholdConfigSchema.parse(input.config);
 }
 
 export function safeParseSpendSpikeThresholdConfig(

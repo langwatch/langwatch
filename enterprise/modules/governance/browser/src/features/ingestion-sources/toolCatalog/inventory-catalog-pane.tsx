@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { useMemo } from "react";
 
-import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
 import type { useAiToolCatalog } from "../../ai-tools/ui/sections/use-ai-tool-catalog.ts";
 import { ToolCardMenu } from "./tool-card-menu";
 import type { ToolCard } from "./tool-cards";

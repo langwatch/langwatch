@@ -46,11 +46,11 @@ class MemoryIngestionTemplateRepository extends IngestionTemplateRepository {
     template: template(),
   };
 
-  async listUserVisible(): Promise<IngestionTemplate[]> {
+  async findUserVisible(): Promise<IngestionTemplate[]> {
     return [template()];
   }
 
-  async listAdminVisible(): Promise<IngestionTemplate[]> {
+  async findAdminVisible(): Promise<IngestionTemplate[]> {
     return [template()];
   }
 

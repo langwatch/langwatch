@@ -43,13 +43,13 @@ export class MemoryIngestionTemplateRepository extends IngestionTemplateReposito
     return new MemoryIngestionTemplateRepository(store);
   }
 
-  async listUserVisible(organizationId: string): Promise<IngestionTemplate[]> {
+  async findUserVisible(organizationId: string): Promise<IngestionTemplate[]> {
     return this.visibleTo(organizationId)
       .filter((template) => template.enabled)
       .toSorted(byPlatformThenDisplayName);
   }
 
-  async listAdminVisible(organizationId: string): Promise<IngestionTemplate[]> {
+  async findAdminVisible(organizationId: string): Promise<IngestionTemplate[]> {
     return this.visibleTo(organizationId).toSorted(byPlatformThenDisplayName);
   }
 

@@ -4,7 +4,6 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 
-import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
@@ -17,8 +16,9 @@ import type {
   PulledUsageEntitlements,
   PulledUsageRateInput,
 } from "../../app/governance.members.ts";
+import { silentIngestionPullDiagnostics } from "../../app/governance.members.ts";
+import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
-import { NullIngestionPullDiagnosticsAdapter } from "../../services/ingestion-pull-diagnostics.service.ts";
 import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
@@ -158,7 +158,7 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
   const registry = PullerRegistryService.create();
   registry.register(doubles.adapter);
   const pricing = PulledUsagePricingService.create(new TestRate());
-  const diagnostics = new NullIngestionPullDiagnosticsAdapter();
+  const diagnostics = silentIngestionPullDiagnostics;
   const projects = new CompleteTestProjectService();
   projects.ensureInternal = async () => {
     const project = await doubles.ensureProject();

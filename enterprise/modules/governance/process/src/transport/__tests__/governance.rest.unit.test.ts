@@ -220,12 +220,12 @@ describe("the governance REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the application", async () => {
       const { hono, repositories } = await buildApi();
-      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
+      const findUserVisible = vi.spyOn(repositories.ingestionTemplates, "findUserVisible");
 
       const response = await hono.request("/api/governance/ingestion-templates");
 
       expect(response.status).toBe(401);
-      expect(listUserVisible).not.toHaveBeenCalled();
+      expect(findUserVisible).not.toHaveBeenCalled();
     });
 
     it("refuses a credential it does not recognise", async () => {
@@ -242,17 +242,17 @@ describe("the governance REST family", () => {
   describe("given a legacy project key, which is bound to a project and not to a person", () => {
     it("still serves the member-facing template list", async () => {
       const { asProjectKey, repositories } = await buildApi();
-      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
+      const findUserVisible = vi.spyOn(repositories.ingestionTemplates, "findUserVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates");
 
       expect(response.status).toBe(200);
-      expect(listUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
+      expect(findUserVisible).toHaveBeenCalledWith(ORGANIZATION_ID);
     });
 
     it("refuses the admin list as user_token_required and reads nothing", async () => {
       const { asProjectKey, repositories } = await buildApi();
-      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
+      const findAdminVisible = vi.spyOn(repositories.ingestionTemplates, "findAdminVisible");
 
       const response = await asProjectKey("/api/governance/ingestion-templates/admin");
 
@@ -261,7 +261,7 @@ describe("the governance REST family", () => {
         error: "user_token_required",
         message: expect.any(String),
       });
-      expect(listAdminVisible).not.toHaveBeenCalled();
+      expect(findAdminVisible).not.toHaveBeenCalled();
     });
 
     it("refuses creating an organization template and writes nothing", async () => {
@@ -286,7 +286,7 @@ describe("the governance REST family", () => {
   describe("given a credential whose ceiling does not carry the route's permission", () => {
     it("refuses the manage routes and leaves the view routes reachable", async () => {
       const { asUser, refusals, repositories } = await buildApi({ grants: ["aiTools:view"] });
-      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
+      const findAdminVisible = vi.spyOn(repositories.ingestionTemplates, "findAdminVisible");
 
       const view = await asUser("/api/governance/ingestion-templates");
       const admin = await asUser("/api/governance/ingestion-templates/admin");
@@ -294,7 +294,7 @@ describe("the governance REST family", () => {
       expect(view.status).toBe(200);
       expect(admin.status).toBe(403);
       expect(refusals).toEqual(["aiTools:manage"]);
-      expect(listAdminVisible).not.toHaveBeenCalled();
+      expect(findAdminVisible).not.toHaveBeenCalled();
     });
   });
 
@@ -306,8 +306,8 @@ describe("the governance REST family", () => {
         callerUserId: "seed",
         surface: "hono",
       });
-      const listUserVisible = vi.spyOn(repositories.ingestionTemplates, "listUserVisible");
-      const listAdminVisible = vi.spyOn(repositories.ingestionTemplates, "listAdminVisible");
+      const findUserVisible = vi.spyOn(repositories.ingestionTemplates, "findUserVisible");
+      const findAdminVisible = vi.spyOn(repositories.ingestionTemplates, "findAdminVisible");
 
       const member = await asUser("/api/governance/ingestion-templates");
       await expect(member.json()).resolves.toEqual({
@@ -331,8 +331,8 @@ describe("the governance REST family", () => {
       const admin = await asUser("/api/governance/ingestion-templates/admin");
       const adminBody = (await admin.json()) as { data: { ottl_rules: string }[] };
       expect(adminBody.data[0]?.ottl_rules).toContain('set(attributes["x"]');
-      expect(listUserVisible).toHaveBeenCalledOnce();
-      expect(listAdminVisible).toHaveBeenCalledOnce();
+      expect(findUserVisible).toHaveBeenCalledOnce();
+      expect(findAdminVisible).toHaveBeenCalledOnce();
     });
   });
 

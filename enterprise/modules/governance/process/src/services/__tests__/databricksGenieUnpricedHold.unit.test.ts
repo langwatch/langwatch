@@ -18,14 +18,14 @@ import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { SsrfSafeResponse } from "../../channels/http/http.governance-http.channel.ts";
 import {
   DatabricksGeniePullerService,
   WAREHOUSE_COST_UNREADABLE,
 } from "../databricks-genie-puller.service.ts";
-import type { SsrfSafeResponse } from "../ssrf-safe-fetch.ts";
 
-vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
-const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
+vi.mock("../../channels/http/http.governance-http.channel.ts", () => ({ ssrfSafeFetch: vi.fn() }));
+const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const WORKSPACE_URL = "https://adb-1.azuredatabricks.net";

@@ -2,11 +2,11 @@
 
 import { describe, expect, it } from "vitest";
 
+import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process.ts";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
-} from "../../services/governance-events.service.ts";
-import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process.ts";
+} from "../governance-events.pipeline.ts";
 
 const lifecycle = (action: "created" | "rotated" | "disabled" | "enabled" | "revoked") => ({
   tenantId: "proj_1",

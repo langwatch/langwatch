@@ -6,11 +6,7 @@ import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type ZodRawShape, z } from "zod";
 
-type ToolCallback = (
-  // The MCP SDK passes parsed input as the first arg; we don't currently
-  // need the second `extra` parameter.
-  args: any,
-) => Promise<{ content: { type: "text"; text: string }[] }>;
+type ToolResult = Promise<{ content: { type: "text"; text: string }[] }>;
 
 /**
  * Structural shape we use from the McpServer instance returned by
@@ -18,7 +14,12 @@ type ToolCallback = (
  * `.d.ts` so callers can pass the same value verbatim without an `as` cast.
  */
 type McpServerLike = {
-  tool(name: string, description: string, inputSchema: ZodRawShape, cb: ToolCallback): unknown;
+  tool<Shape extends ZodRawShape>(
+    name: string,
+    description: string,
+    inputSchema: Shape,
+    cb: (args: z.infer<z.ZodObject<Shape>>) => ToolResult,
+  ): unknown;
 };
 
 /**

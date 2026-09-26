@@ -105,7 +105,7 @@ export const GENIE_ROUTING_PROFILE: ConversationRoutingProfile = {
  * Databricks Genie conversations mapped to traces.
  *
  * The sibling of {@link CopilotStudioTraceMapperService} and the same shape: one job
- * with many steps, of which exactly one — `tryToTraceRequest` — is anybody
+ * with many steps, of which exactly one — `toTraceRequest` — is anybody
  * else's business. `flattenThoughts` used to be exported alongside it with no
  * caller anywhere.
  */
@@ -243,7 +243,7 @@ function mapMessage(event: NormalizedPullEvent, origin: GenieRoutingOrigin): Otl
  * Without this line an Anthropic Admin source that acquired a destination
  * would have its billing rows rendered as messages someone said.
  */
-export function tryToTraceRequest({
+export function toTraceRequest({
   events,
   origin,
 }: {
@@ -268,5 +268,5 @@ const GenieTraceMapperService = {
   isSettledForRouting,
   frameOf,
   mapMessage,
-  tryToTraceRequest,
+  toTraceRequest,
 };

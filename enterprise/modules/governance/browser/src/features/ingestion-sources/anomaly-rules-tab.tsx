@@ -797,7 +797,7 @@ function RuleComposer({
                 />
                 <datalist id="rule-type-suggestions">
                   {RULE_TYPE_SUGGESTIONS.map((s) => (
-                    <option key={s} value={s} />
+                    <option key={s} value={s} aria-label={s} />
                   ))}
                 </datalist>
                 <Text fontSize="xs" color="fg.muted">

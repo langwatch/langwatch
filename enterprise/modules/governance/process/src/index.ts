@@ -26,7 +26,7 @@ export type { GovernanceAppDependencies, GovernanceBespokeMembers } from "./app/
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
-export { GovernanceEventsAdapter } from "./services/governance-events.service.ts";
+export { GovernanceEventsAdapter } from "./eventing/governance-events.pipeline.ts";
 export type * from "./app/governance.members.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
 export type * from "./repositories/anomaly-rule.repository.ts";

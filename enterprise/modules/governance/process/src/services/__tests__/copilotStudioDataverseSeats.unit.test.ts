@@ -142,7 +142,7 @@ beforeEach(() => {
     }),
   }));
 
-  vi.doMock("../ssrf-safe-fetch.ts", () => ({
+  vi.doMock("../../channels/http/http.governance-http.channel.ts", () => ({
     RedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
       capturedCalls.push({ url, init });
@@ -209,7 +209,7 @@ async function runPull({
 }) {
   const { HttpCopilotStudioDataverseChannel } =
     await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
-  const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
+  const { ssrfSafeFetch } = await import("../../channels/http/http.governance-http.channel.ts");
   const http: GovernanceHttpClient = {
     async fetch(url, init) {
       const response = await ssrfSafeFetch(url, init);

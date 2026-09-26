@@ -1,3 +1,4 @@
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/governance-api.ts";
@@ -5,7 +6,6 @@ import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
-import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
 
 /** Shared hook for AI tool registry; used by catalog editor and Inventory pane. */
 export function useAiToolCatalog({
@@ -66,7 +66,7 @@ export function useAiToolCatalog({
      * or not. The router's payload is the service DTO, which carries the
      * extra audit columns the tile type does not name.
      */
-    entries: (adminListQuery.data ?? []) as unknown as AiToolEntry[],
+    entries: adminListQuery.data ?? [],
     /**
      * Whether the read has actually answered. `entries` defaults to an
      * empty array so a renderer never has to guard — but a caller counting

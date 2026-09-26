@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -46,24 +46,24 @@ function transactionalPrisma(
   const auditCreate = vi.fn(async () => undefined);
   const findFirst = vi.fn(async () => options.existing ?? null);
 
-  const transaction = {
+  const transaction = prismaDouble({
     ingestionTemplate: {
       create: templateCreate,
       update: templateUpdate,
       findFirst,
     },
     auditLog: { create: auditCreate },
-  };
+  });
 
   return {
     templateCreate,
     templateUpdate,
     auditCreate,
     findFirst,
-    database: {
+    database: prismaDouble({
       ingestionTemplate: { findFirst },
-      $transaction: async <T>(run: (client: typeof transaction) => Promise<T>) => run(transaction),
-    },
+      $transaction: async (run) => run(transaction),
+    }),
   };
 }
 
@@ -89,11 +89,11 @@ describe("PrismaIngestionTemplateRepository", () => {
         updatedById: null,
       },
     ]);
-    const repository = PrismaIngestionTemplateRepository.create({
-      ingestionTemplate: { findMany },
-    } as unknown as PrismaClient);
+    const repository = PrismaIngestionTemplateRepository.create(
+      prismaDouble({ ingestionTemplate: { findMany } }),
+    );
 
-    const rows = await repository.listUserVisible("organization-1");
+    const rows = await repository.findUserVisible("organization-1");
 
     expect(rows).toEqual([
       {
@@ -121,9 +121,7 @@ describe("PrismaIngestionTemplateRepository", () => {
     /** @scenario "Ingestion template authoring is tenant safe and auditable" */
     it("writes the row and its audit entry in one transaction", async () => {
       const prisma = transactionalPrisma();
-      const repository = PrismaIngestionTemplateRepository.create(
-        prisma.database as unknown as PrismaClient,
-      );
+      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
 
       await repository.createWithAudit({
         template: {
@@ -146,9 +144,7 @@ describe("PrismaIngestionTemplateRepository", () => {
 
     it("records which surface the write came from, and never publishes the row", async () => {
       const prisma = transactionalPrisma();
-      const repository = PrismaIngestionTemplateRepository.create(
-        prisma.database as unknown as PrismaClient,
-      );
+      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
 
       await repository.createWithAudit({
         template: {
@@ -189,9 +185,7 @@ describe("PrismaIngestionTemplateRepository", () => {
      */
     it("stamps the archival and takes the row out of the listings", async () => {
       const prisma = transactionalPrisma({ existing: storedRow() });
-      const repository = PrismaIngestionTemplateRepository.create(
-        prisma.database as unknown as PrismaClient,
-      );
+      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
       const archivedAt = Temporal.Instant.from("2026-08-25T00:00:00.000Z");
 
       const result = await repository.archiveWithAudit({
@@ -219,9 +213,7 @@ describe("PrismaIngestionTemplateRepository", () => {
       const prisma = transactionalPrisma({
         existing: storedRow({ organizationId: null, platformPublished: true }),
       });
-      const repository = PrismaIngestionTemplateRepository.create(
-        prisma.database as unknown as PrismaClient,
-      );
+      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
 
       const result = await repository.archiveWithAudit({
         id: "template-1",
@@ -238,9 +230,7 @@ describe("PrismaIngestionTemplateRepository", () => {
 
     it("reports a row this organization cannot reach as absent", async () => {
       const prisma = transactionalPrisma({ existing: null });
-      const repository = PrismaIngestionTemplateRepository.create(
-        prisma.database as unknown as PrismaClient,
-      );
+      const repository = PrismaIngestionTemplateRepository.create(prisma.database);
 
       const result = await repository.archiveWithAudit({
         id: "template-of-another-org",

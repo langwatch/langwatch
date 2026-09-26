@@ -239,13 +239,13 @@ interface ParsedCursor extends Pick<
   requestStart: string;
 }
 
-export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdminPullConfig> {
+export class AnthropicAdminPullerService implements PullerAdapter<AnthropicAdminPullConfig> {
   readonly id: string = ANTHROPIC_ADMIN_ADAPTER_ID;
 
   private constructor(private readonly http: GovernanceHttpClient) {}
 
-  static create(http: GovernanceHttpClient): AnthropicAdminPullerAdapter {
-    return new AnthropicAdminPullerAdapter(http);
+  static create(http: GovernanceHttpClient): AnthropicAdminPullerService {
+    return new AnthropicAdminPullerService(http);
   }
 
   validateConfig(config: unknown): AnthropicAdminPullConfig {
@@ -261,7 +261,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     // actually emitted, so a cut-off run records how far it really got —
     // that record is what lets a later identity mismatch resume near the
     // token instead of re-reading the window (see `cursorSchema`).
-    const cursor = AnthropicAdminPullerAdapter.parseCursor({ cursor: options.cursor, config });
+    const cursor = AnthropicAdminPullerService.parseCursor({ cursor: options.cursor, config });
     /**
      * The instant this run ASKS from, which on a cost source is a few days
      * behind the position on record so a late restatement is picked up.
@@ -276,7 +276,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
      * the saved cursor may never drop below, and NOT what this run asks from.
      */
     const positionOnRecord = cursor.startingAt;
-    const query = AnthropicAdminPullerAdapter.queryIdentity(config);
+    const query = AnthropicAdminPullerService.queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
     /**
@@ -296,14 +296,14 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     let newestEmitted = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
-      if (AnthropicAdminPullerAdapter.hasSpentDeadline(options.deadlineMs)) {
+      if (AnthropicAdminPullerService.hasSpentDeadline(options.deadlineMs)) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window. It is still a
         // window left half-read, and saying nothing reads as complete.
         return {
           events,
-          cursor: AnthropicAdminPullerAdapter.encodeCursor({
-            startingAt: AnthropicAdminPullerAdapter.unfinishedWindowStart({
+          cursor: AnthropicAdminPullerService.encodeCursor({
+            startingAt: AnthropicAdminPullerService.unfinishedWindowStart({
               page,
               requestStart,
               positionOnRecord,
@@ -330,7 +330,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       }
       events.push(...read.events);
       watermark = read.watermark ?? watermark;
-      newestEmitted = AnthropicAdminPullerAdapter.laterInstant(newestEmitted, read.watermark);
+      newestEmitted = AnthropicAdminPullerService.laterInstant(newestEmitted, read.watermark);
 
       if (read.nextPage === null) {
         // Drained. The next run starts from the newest bucket this run
@@ -339,7 +339,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         // `startingAt` itself is now the resume point.
         return {
           events,
-          cursor: AnthropicAdminPullerAdapter.encodeCursor({
+          cursor: AnthropicAdminPullerService.encodeCursor({
             // Floored at the position on record. Without this floor a run that
             // looked back and found nothing newer saves the day it looked back TO,
             // and the source walks three days backwards on every run until it
@@ -348,7 +348,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
             // workspace somebody deleted all produce exactly that page. This is the
             // floor the sibling connection already applies at its own drain.
             startingAt:
-              AnthropicAdminPullerAdapter.laterInstant(newestEmitted, positionOnRecord) ??
+              AnthropicAdminPullerService.laterInstant(newestEmitted, positionOnRecord) ??
               positionOnRecord,
             page: null,
             query,
@@ -368,7 +368,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       events,
       // As above: the start this run asked with, not the position on record,
       // so the unfinished window resumes where its page token points.
-      cursor: AnthropicAdminPullerAdapter.encodeCursor({
+      cursor: AnthropicAdminPullerService.encodeCursor({
         startingAt: requestStart,
         page,
         query,
@@ -441,12 +441,12 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     const events = parsed.data.flatMap((bucket) => this.bucketEvents({ bucket, config }));
     // Same class of refusal as the `has_more` check above: not a window to
     // retry, a shape whose rows we cannot store without losing one of them.
-    AnthropicAdminPullerAdapter.assertRowsAreDistinguishable({ events, report: config.report });
+    AnthropicAdminPullerService.assertRowsAreDistinguishable({ events, report: config.report });
     return {
       ok: true,
       events,
       nextPage: parsed.next_page,
-      watermark: AnthropicAdminPullerAdapter.newestBucketStart(parsed.data),
+      watermark: AnthropicAdminPullerService.newestBucketStart(parsed.data),
     };
   }
 
@@ -466,7 +466,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       throw new Error("anthropic admin puller requires an admin API key in credentials.token");
     }
 
-    const url = AnthropicAdminPullerAdapter.reportUrl({ config, startingAt, page });
+    const url = AnthropicAdminPullerService.reportUrl({ config, startingAt, page });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
@@ -513,7 +513,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       });
     }
     if (!response.ok) {
-      throw await AnthropicAdminPullerAdapter.fetchPageError(response, config.report);
+      throw await AnthropicAdminPullerService.fetchPageError(response, config.report);
     }
     return response.json();
   }
@@ -589,7 +589,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
           dimensions,
           model: AdminUsageReportAdapter.dimension(result.model),
           tokensCacheRead: result.cache_read_input_tokens,
-          tokensCacheWrite: AnthropicAdminPullerAdapter.cacheWriteTokens(result),
+          tokensCacheWrite: AnthropicAdminPullerService.cacheWriteTokens(result),
         },
       },
     };
@@ -629,7 +629,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       );
       return null;
     }
-    const amountUsd = AnthropicAdminPullerAdapter.centsToUsd(result.amount);
+    const amountUsd = AnthropicAdminPullerService.centsToUsd(result.amount);
     if (amountUsd === null) {
       // Same reasoning as the non-USD skip above: one permanently malformed
       // row must cost one row, not the whole source. No raw amount in the
@@ -701,7 +701,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     if (cursor) {
       try {
         const parsed = cursorSchema.parse(JSON.parse(cursor));
-        if (parsed.query === AnthropicAdminPullerAdapter.queryIdentity(config)) {
+        if (parsed.query === AnthropicAdminPullerService.queryIdentity(config)) {
           return {
             startingAt: parsed.startingAt,
             // Mid-window, with a page token in hand, the ask must stay exactly
@@ -709,7 +709,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
             // Only a drained cursor gets the look-back.
             requestStart:
               config.report === "cost" && parsed.page === null
-                ? AnthropicAdminPullerAdapter.costRequestStart({
+                ? AnthropicAdminPullerService.costRequestStart({
                     stored: parsed.startingAt,
                     config,
                   })
@@ -722,7 +722,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         // null): this change itself widened the group_by set and fixed the
         // cents→USD conversion, so everything those cursors certify was
         // written by the old code.
-        return AnthropicAdminPullerAdapter.staleCursorRestart({ parsed, config });
+        return AnthropicAdminPullerService.staleCursorRestart({ parsed, config });
       } catch {
         logger.warn(
           { cursor },
@@ -730,7 +730,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
         );
       }
     }
-    const fresh = config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
+    const fresh = config.startingAt ?? AnthropicAdminPullerService.defaultStartingAt(config.report);
     // No look-back on a first run: there is nothing behind the configured start
     // to look back at, and the floor would return this same instant anyway.
     return { startingAt: fresh, requestStart: fresh, page: null, watermark: null };
@@ -769,7 +769,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       const usageRestart =
         resumeFrom ??
         config.startingAt ??
-        AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
+        AnthropicAdminPullerService.defaultStartingAt(config.report);
       return {
         startingAt: usageRestart,
         requestStart: usageRestart,
@@ -782,7 +782,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       "anthropic admin cost cursor was minted under a different query or repair window; discarding it and re-reading from the start",
     );
     const configuredStart =
-      config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt(config.report);
+      config.startingAt ?? AnthropicAdminPullerService.defaultStartingAt(config.report);
     // The EARLIER of the stored watermark and the configured start: the
     // rewind must never move the watermark FORWARD. A source that fell
     // behind (paused, erroring) holds a watermark older than the default
@@ -945,7 +945,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    * the last one written survives.
    */
   private static amountSignature(event: NormalizedPullEvent): string {
-    const hint = AnthropicAdminPullerAdapter.emittedHint(event);
+    const hint = AnthropicAdminPullerService.emittedHint(event);
     return JSON.stringify([
       event.cost_usd,
       event.tokens_input,
@@ -991,17 +991,17 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     events: NormalizedPullEvent[];
     report: AnthropicAdminPullConfig["report"];
   }): void {
-    const colliding = AnthropicAdminPullerAdapter.collidingRowsByKey(events);
+    const colliding = AnthropicAdminPullerService.collidingRowsByKey(events);
     if (colliding.size === 0) return;
     const dimensionNames = Object.keys(
-      AnthropicAdminPullerAdapter.emittedHint(events[0]!)?.dimensions ?? {},
+      AnthropicAdminPullerService.emittedHint(events[0]!)?.dimensions ?? {},
     );
     // Per key, never across keys: rows under two different keys differ in the
     // dimensions BY DESIGN, and naming those would report the key as its own
     // explanation.
     const differingNames = new Set<string>();
     for (const rows of colliding.values()) {
-      for (const name of AnthropicAdminPullerAdapter.differingFieldNames(rows))
+      for (const name of AnthropicAdminPullerService.differingFieldNames(rows))
         differingNames.add(name);
     }
     const differingClause =
@@ -1029,7 +1029,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
       const group = rowsByKey.get(key);
       if (group) group.push(event);
       else rowsByKey.set(key, [event]);
-      const amount = AnthropicAdminPullerAdapter.amountSignature(event);
+      const amount = AnthropicAdminPullerService.amountSignature(event);
       const seen = amountByKey.get(key);
       if (seen === undefined) amountByKey.set(key, amount);
       else if (seen !== amount) collidingKeys.add(key);
@@ -1059,7 +1059,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     if (Number.isNaN(storedMs)) return stored;
 
     const configuredStart =
-      config.startingAt ?? AnthropicAdminPullerAdapter.defaultStartingAt("cost");
+      config.startingAt ?? AnthropicAdminPullerService.defaultStartingAt("cost");
     const floorMs = toEpochMs(configuredStart);
     const lookedBackMs = storedMs - COST_RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
     const notBeforeConfigured = Number.isNaN(floorMs)
@@ -1085,7 +1085,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
    */
   private static differingFieldNames(events: NormalizedPullEvent[]): string[] {
     const rows = events
-      .map((event) => AnthropicAdminPullerAdapter.parsedRawPayload(event))
+      .map((event) => AnthropicAdminPullerService.parsedRawPayload(event))
       .filter((row): row is Record<string, unknown> => row !== null);
     const first = rows[0];
     if (first === undefined) return [];

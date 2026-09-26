@@ -10,7 +10,7 @@ import {
   unsupportedValue,
   type UpdateAnomalyRuleInput,
   validateDestinationConfig,
-  validateThresholdConfig,
+  assertThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
@@ -92,7 +92,7 @@ export class AnomalyRuleService {
     // `ValidationError` on an unknown ruleType — both reach the admin as
     // `validation_error`. Spec:
     // specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature.
-    validateThresholdConfig({
+    assertThresholdConfig({
       ruleType: input.ruleType,
       config: input.thresholdConfig ?? {},
     });
@@ -198,7 +198,7 @@ export class AnomalyRuleService {
     existing: AnomalyRule;
   }): AnomalyRuleChanges {
     if (input.thresholdConfig !== undefined) {
-      validateThresholdConfig({
+      assertThresholdConfig({
         ruleType: input.ruleType ?? existing.ruleType,
         config: input.thresholdConfig,
       });
@@ -207,7 +207,7 @@ export class AnomalyRuleService {
     }
 
     if (input.ruleType !== undefined && input.ruleType !== existing.ruleType) {
-      validateThresholdConfig({ ruleType: input.ruleType, config: existing.thresholdConfig });
+      assertThresholdConfig({ ruleType: input.ruleType, config: existing.thresholdConfig });
     }
 
     return {};

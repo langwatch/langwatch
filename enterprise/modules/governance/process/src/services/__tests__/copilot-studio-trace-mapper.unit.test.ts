@@ -148,7 +148,7 @@ function copilotEvent(
 }
 
 function spansOf(events: NormalizedPullEvent[]) {
-  const request = CopilotStudioTraceMapperService.tryToTraceRequest({ events, origin: ORIGIN });
+  const request = CopilotStudioTraceMapperService.toTraceRequest({ events, origin: ORIGIN });
   return request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
 }
 
@@ -264,7 +264,7 @@ describe("given two sources reading the same environment", () => {
     const other = { ...ORIGIN, ingestionSourceId: "source-2" };
     const mine = spansOf([copilotEvent(transcriptRow({ activities: CHAT }))]);
     const theirs =
-      CopilotStudioTraceMapperService.tryToTraceRequest({
+      CopilotStudioTraceMapperService.toTraceRequest({
         events: [copilotEvent(transcriptRow({ activities: CHAT }))],
         origin: other,
       })?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
@@ -1056,7 +1056,7 @@ describe("given events that are not Copilot conversations", () => {
       action: "anthropic_admin_usage_report",
     };
     expect(
-      CopilotStudioTraceMapperService.tryToTraceRequest({ events: [foreign], origin: ORIGIN }),
+      CopilotStudioTraceMapperService.toTraceRequest({ events: [foreign], origin: ORIGIN }),
     ).toBeNull();
   });
 
