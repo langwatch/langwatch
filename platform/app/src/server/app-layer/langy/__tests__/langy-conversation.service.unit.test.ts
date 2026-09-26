@@ -89,13 +89,13 @@ const row = (o: Partial<Row> = {}): Row => ({
 });
 
 describe("LangyConversationService", () => {
-  describe("given a conversation whose create was just dispatched (projection lagging)", () => {
-    // The dispatch window: the send is admitted (a turn receipt exists,
-    // written in the admission transaction) before the projection row lands.
-    // A read in that window waits it out instead of reporting "not found",
-    // the answer the panel would render moments before the turn is accepted.
-    /** @scenario "A read in the dispatch window waits for the projection row" */
-    it("getById waits out the projection lag and returns the row", async () => {
+  describe("given a conversation whose create was just dispatched, with NO event reader", () => {
+    // Without a reader nothing can establish the caller's visibility, so
+    // every miss is bounded by the short grace — enough to ride out a
+    // projection landing a few beats late, never the full window. (The full
+    // budget is reserved for evidence from the event log; see the reader
+    // suite below.)
+    it("getById rides out a projection landing within the grace", async () => {
       vi.useFakeTimers();
       try {
         const findVisibleById = vi
@@ -103,10 +103,7 @@ describe("LangyConversationService", () => {
           .mockResolvedValueOnce(null)
           .mockResolvedValueOnce(null)
           .mockResolvedValue(row());
-        const repo = makeRepo({
-          findVisibleById,
-          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
-        });
+        const repo = makeRepo({ findVisibleById });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
           id: "c1",
@@ -127,10 +124,7 @@ describe("LangyConversationService", () => {
       vi.useFakeTimers();
       try {
         const findVisibleById = vi.fn().mockResolvedValue(null);
-        const repo = makeRepo({
-          findVisibleById,
-          hasAdmittedTurn: vi.fn().mockResolvedValue(false),
-        });
+        const repo = makeRepo({ findVisibleById });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
           id: "c-unknown",
@@ -150,26 +144,20 @@ describe("LangyConversationService", () => {
       }
     });
 
-    // The other half of the same race: the receipt is written by the very
-    // send being waited on, so a read that arrived before IT landed found no
-    // evidence, took the fast path, and reported "not found" without ever
-    // retrying.
-    it("waits when the receipt itself has not landed yet either", async () => {
+    it("a pending handoff cannot extend the wait — it never proves the CALLER may see the row", async () => {
       vi.useFakeTimers();
       try {
-        const findVisibleById = vi
-          .fn()
-          .mockResolvedValueOnce(null)
-          .mockResolvedValueOnce(null)
-          .mockResolvedValue(row());
+        // The old heuristic stretched any miss on the handoff's existence.
+        // That proved a dispatch was in flight for someone — not that this
+        // caller would ever see the row — and it made the window a timing
+        // signal for foreign ids. Visibility evidence comes from the event
+        // log alone; without a reader, the short grace is all there is.
+        const findVisibleById = vi.fn().mockResolvedValue(null);
         const repo = makeRepo({
           findVisibleById,
-          // Nothing to see on the first probe: the send is younger than
-          // this read by a few milliseconds.
-          hasAdmittedTurn: vi
+          findPendingHandoff: vi
             .fn()
-            .mockResolvedValueOnce(false)
-            .mockResolvedValue(true),
+            .mockResolvedValue({ token: "t", turnId: "turn-1" }),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -177,9 +165,13 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        await vi.advanceTimersByTimeAsync(5_000);
-        const detail = await pending;
-        expect(detail.id).toBe("c1");
+        const outcome = expect(pending).rejects.toThrow(
+          LangyConversationNotFoundError,
+        );
+        await vi.advanceTimersByTimeAsync(10_000);
+        await outcome;
+        expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+        expect(repo.findPendingHandoff).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
       }
@@ -190,7 +182,6 @@ describe("LangyConversationService", () => {
       try {
         const repo = makeRepo({
           findVisibleById: vi.fn().mockResolvedValue(null),
-          hasAdmittedTurn: vi.fn().mockResolvedValue(true),
         });
         const svc = new LangyConversationService(repo, makeCommands());
         const pending = svc.getById({
@@ -206,6 +197,413 @@ describe("LangyConversationService", () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe("given an event reader, the dispatch window is decided from the log", () => {
+    // The pending-handoff heuristic could never cover the window: the handoff
+    // is a column on the very projection row the loop is waiting for, so a
+    // missing row implied missing evidence and the loop gave up at the grace
+    // — 1.2s — while the fold routinely takes longer. The event log is the
+    // record the projection is folded FROM, so it can say "this row is
+    // coming, and this caller will see it" the moment the create's append
+    // lands.
+    const spineEvent = (o: {
+      id: string;
+      type: string;
+      data: Record<string, unknown>;
+    }) => ({
+      id: o.id,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: 100,
+      occurredAt: 90,
+      type: o.type,
+      version: "2026-07-12",
+      data: o.data,
+    });
+    const startedBy = (userId: string) =>
+      spineEvent({
+        id: "e-started",
+        type: "lw.langy_conversation.conversation_started",
+        data: { conversationId: "c1", userId },
+      });
+    const firstMessageBy = (userId: string) =>
+      spineEvent({
+        id: "e-msg",
+        type: "lw.langy_conversation.message_recorded",
+        data: {
+          conversationId: "c1",
+          userId,
+          messageId: "m1",
+          role: "user",
+          parts: [],
+        },
+      });
+    const sharedWord = (isShared: boolean) =>
+      spineEvent({
+        id: `e-meta-${isShared}`,
+        type: "lw.langy_conversation.conversation_metadata_updated",
+        data: { conversationId: "c1", isShared },
+      });
+    const archived = () =>
+      spineEvent({
+        id: "e-archived",
+        type: "lw.langy_conversation.conversation_archived",
+        data: { conversationId: "c1" },
+      });
+    const readerOf = (events: unknown[]) => ({
+      getEventsOccurredSince: vi.fn(async () => events as never),
+    });
+
+    describe("when the caller owns the aggregate and only the projection lags", () => {
+      it("waits out the FULL budget and returns the row the moment it lands", async () => {
+        vi.useFakeTimers();
+        try {
+          // The row lands on the 9th read — well past the old heuristic's
+          // 3-attempt grace, inside the 12-attempt budget. This is the bug:
+          // the loop used to give up at 1.2s and call the conversation
+          // nonexistent moments before its first turn was accepted.
+          const findVisibleById = vi.fn().mockResolvedValue(row());
+          for (let i = 0; i < 8; i++) {
+            findVisibleById.mockResolvedValueOnce(null);
+          }
+          const repo = makeRepo({
+            findVisibleById,
+            findPendingHandoff: vi.fn().mockResolvedValue(null),
+          });
+          const reader = readerOf([startedBy("alice")]);
+          const svc = new LangyConversationService(
+            repo,
+            makeCommands(),
+            undefined,
+            reader,
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          const detail = await pending;
+          expect(detail.id).toBe("c1");
+          expect(findVisibleById.mock.calls.length).toBeGreaterThanOrEqual(9);
+          // The log said "wait" once and is not re-read every beat after.
+          expect(reader.getEventsOccurredSince).toHaveBeenCalledTimes(1);
+          // A healthy reader IS the evidence; the legacy heuristic stays out.
+          expect(repo.findPendingHandoff).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("reads only the recent tail, never the aggregate's whole history", async () => {
+        // An unbounded read (occurredAtFromMs 0) let a long FOREIGN
+        // conversation transfer its entire history — more work, and more
+        // time, than an absent id, which is the timing oracle this method
+        // must not emit (CWE-208). The evidence a create-in-flight can give
+        // is seconds old, so the read is bounded to the recent past.
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-05-01T00:00:00.000Z"));
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(row());
+          findVisibleById.mockResolvedValueOnce(null);
+          const reader = readerOf([startedBy("alice")]);
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            reader,
+          );
+
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          await pending;
+
+          const occurredAtFromMs = reader.getEventsOccurredSince.mock
+            .calls[0]?.[3] as number;
+          expect(occurredAtFromMs).toBeGreaterThan(0);
+          // Recent: within a few minutes of now, not the epoch.
+          expect(Date.now() - occurredAtFromMs).toBeLessThanOrEqual(
+            10 * 60 * 1000,
+          );
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("still gives up honestly at the end of the budget", async () => {
+        vi.useFakeTimers();
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(null);
+          const repo = makeRepo({ findVisibleById });
+          const svc = new LangyConversationService(
+            repo,
+            makeCommands(),
+            undefined,
+            readerOf([startedBy("alice")]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(20_000);
+          await outcome;
+          // Full budget spent: one read per attempt, not a grace exit.
+          expect(findVisibleById.mock.calls.length).toBeGreaterThan(5);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the conversation was created lazily, owned by its first message", () => {
+      it("waits out the lag for that owner — the fold's own ownership rule", async () => {
+        vi.useFakeTimers();
+        try {
+          // A lazily created conversation's log can lead with the recorded
+          // message; the fold sets the owner from it first-writer-wins, so
+          // the evidence must too, or the owner's first read gives up at the
+          // grace and 404s a conversation whose row IS coming.
+          const findVisibleById = vi.fn().mockResolvedValue(row());
+          for (let i = 0; i < 8; i++) {
+            findVisibleById.mockResolvedValueOnce(null);
+          }
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            readerOf([firstMessageBy("alice")]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          const detail = await pending;
+          expect(detail.id).toBe("c1");
+          expect(findVisibleById.mock.calls.length).toBeGreaterThanOrEqual(9);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the log has nothing under the id", () => {
+      it("gives up at the grace, exactly like an unknown id always has", async () => {
+        vi.useFakeTimers();
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(null);
+          const repo = makeRepo({ findVisibleById });
+          const reader = readerOf([]);
+          const svc = new LangyConversationService(
+            repo,
+            makeCommands(),
+            undefined,
+            reader,
+          );
+          const pending = svc.getById({
+            id: "c-unknown",
+            projectId: "p1",
+            userId: "alice",
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+          expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+          // Re-asked every beat, not once up front: the append itself can be
+          // a few milliseconds younger than this read.
+          expect(
+            reader.getEventsOccurredSince.mock.calls.length,
+          ).toBeGreaterThan(1);
+          // A healthy reader IS the evidence; the legacy heuristic stays out.
+          expect(repo.findPendingHandoff).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the aggregate belongs to someone else, unshared", () => {
+      it("gives up at the SAME grace — timing never becomes an existence oracle", async () => {
+        vi.useFakeTimers();
+        try {
+          const foreign = vi.fn().mockResolvedValue(null);
+          const absent = vi.fn().mockResolvedValue(null);
+          const foreignSvc = new LangyConversationService(
+            makeRepo({ findVisibleById: foreign }),
+            makeCommands(),
+            undefined,
+            readerOf([startedBy("bob")]),
+          );
+          const absentSvc = new LangyConversationService(
+            makeRepo({ findVisibleById: absent }),
+            makeCommands(),
+            undefined,
+            readerOf([]),
+          );
+
+          const foreignRead = expect(
+            foreignSvc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
+          ).rejects.toThrow(LangyConversationNotFoundError);
+          const absentRead = expect(
+            absentSvc.getById({ id: "c1", projectId: "p1", userId: "alice" }),
+          ).rejects.toThrow(LangyConversationNotFoundError);
+          await vi.advanceTimersByTimeAsync(10_000);
+          await foreignRead;
+          await absentRead;
+
+          // "Not yours" and "not anywhere" answer on the same clock.
+          expect(foreign.mock.calls.length).toBe(absent.mock.calls.length);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the aggregate was archived", () => {
+      it("does not wait out the budget even for its owner — the row is never coming back", async () => {
+        vi.useFakeTimers();
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(null);
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            readerOf([startedBy("alice"), archived()]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+          expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the aggregate is shared, per its latest metadata word", () => {
+      it("lets a non-owner wait out the lag and read the row that lands", async () => {
+        vi.useFakeTimers();
+        try {
+          const findVisibleById = vi
+            .fn()
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue(row({ userId: "bob", isShared: true }));
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            readerOf([startedBy("bob"), sharedWord(true)]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          await vi.advanceTimersByTimeAsync(10_000);
+          const detail = await pending;
+          expect(detail.id).toBe("c1");
+          expect(detail.isOwn).toBe(false);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("the last word wins: shared-then-unshared reads as not visible", async () => {
+        vi.useFakeTimers();
+        try {
+          const findVisibleById = vi.fn().mockResolvedValue(null);
+          const svc = new LangyConversationService(
+            makeRepo({ findVisibleById }),
+            makeCommands(),
+            undefined,
+            readerOf([startedBy("bob"), sharedWord(true), sharedWord(false)]),
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+          expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+    });
+
+    describe("when the log read itself fails", () => {
+      it("gives up at the grace — an outage can establish nothing, and nothing else may extend the wait", async () => {
+        vi.useFakeTimers();
+        try {
+          // Failing toward the short grace keeps the window from becoming a
+          // timing signal: a pending handoff would prove a dispatch is in
+          // flight for SOMEONE, not that THIS caller may see it, and
+          // stretching a foreign miss on it would say the id exists. The
+          // client absorbs the cost — an unconfirmed conversation's poll
+          // re-asks an early 404 until the projection lands.
+          const findVisibleById = vi.fn().mockResolvedValue(null);
+          const repo = makeRepo({
+            findVisibleById,
+            findPendingHandoff: vi
+              .fn()
+              .mockResolvedValue({ token: "t", turnId: "turn-1" }),
+          });
+          const svc = new LangyConversationService(
+            repo,
+            makeCommands(),
+            undefined,
+            {
+              getEventsOccurredSince: vi.fn(async () => {
+                throw new Error("clickhouse unavailable");
+              }),
+            },
+          );
+          const pending = svc.getById({
+            id: "c1",
+            projectId: "p1",
+            userId: "alice",
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+          expect(findVisibleById.mock.calls.length).toBeLessThanOrEqual(5);
+          // The heuristic that once stood in here is deliberately dead: it
+          // cannot establish visibility, so it may not extend the window.
+          expect(repo.findPendingHandoff).not.toHaveBeenCalled();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
     });
   });
 
@@ -864,6 +1262,89 @@ describe("LangyConversationService", () => {
     });
   });
 
+  describe("when the durable result path cross-checks a turn (turnExists)", () => {
+    const acceptedTurn = (turnId: string) => ({
+      id: `e-${turnId}`,
+      aggregateId: "c1",
+      aggregateType: "langy_conversation",
+      tenantId: "p1",
+      createdAt: 100,
+      occurredAt: 90,
+      type: "lw.langy_conversation.agent_turn_accepted",
+      version: "2026-07-10",
+      data: { conversationId: "c1", turnId },
+    });
+    const triple = { projectId: "p1", conversationId: "c1", turnId: "turn-7" };
+
+    it("a projected turn is definitive — the event log is never consulted", async () => {
+      const reader = {
+        getEventsOccurredSince: vi.fn(async () => [] as never),
+      };
+      const svc = new LangyConversationService(
+        makeRepo({ turnExists: vi.fn(async () => true) }),
+        makeCommands(),
+        undefined,
+        reader,
+      );
+      expect(await svc.turnExists(triple)).toBe(true);
+      expect(reader.getEventsOccurredSince).not.toHaveBeenCalled();
+    });
+
+    describe("when the turn projection has not landed yet", () => {
+      it("finds the acceptance event and says yes — a finished answer is never discarded for projection lag", async () => {
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          {
+            getEventsOccurredSince: vi.fn(
+              async () => [acceptedTurn("turn-7")] as never,
+            ),
+          },
+        );
+        expect(await svc.turnExists(triple)).toBe(true);
+      });
+
+      it("says no when the log has no acceptance for that turnId", async () => {
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          {
+            getEventsOccurredSince: vi.fn(
+              async () => [acceptedTurn("turn-other")] as never,
+            ),
+          },
+        );
+        expect(await svc.turnExists(triple)).toBe(false);
+      });
+
+      it("says no without a reader, exactly as before", async () => {
+        const svc = new LangyConversationService(makeRepo(), makeCommands());
+        expect(await svc.turnExists(triple)).toBe(false);
+      });
+
+      it("lets a reader failure propagate — 'cannot verify' must not read as 'verified absent'", async () => {
+        // The route turns false into a 404 the posting manager treats as
+        // terminal; a dropped final is the one outcome this check exists to
+        // prevent. A thrown error becomes a retryable 5xx instead.
+        const svc = new LangyConversationService(
+          makeRepo(),
+          makeCommands(),
+          undefined,
+          {
+            getEventsOccurredSince: vi.fn(async () => {
+              throw new Error("clickhouse unavailable");
+            }),
+          },
+        );
+        await expect(svc.turnExists(triple)).rejects.toThrow(
+          "clickhouse unavailable",
+        );
+      });
+    });
+  });
+
   describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
     // Fixtures only need to satisfy the reader port structurally.
     const makeEvents = (events: unknown[]) => ({
@@ -898,23 +1379,34 @@ describe("LangyConversationService", () => {
     });
 
     describe("when the conversation is not visible to the caller", () => {
-      it("throws not-found and never touches the event log", async () => {
-        const events = makeEvents([]);
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands(),
-          undefined,
-          events,
-        );
-        await expect(
-          svc.getEventsAfter({
+      it("throws not-found and never serves a tail", async () => {
+        vi.useFakeTimers();
+        try {
+          // The visibility gate MAY read the log for dispatch-lag evidence
+          // (owner, shared, archived — server-side, discarded), but no event
+          // may ever reach the caller: the read throws before the tail is
+          // assembled.
+          const events = makeEvents([]);
+          const svc = new LangyConversationService(
+            makeRepo(),
+            makeCommands(),
+            undefined,
+            events,
+          );
+          const pending = svc.getEventsAfter({
             projectId: "p1",
             conversationId: "c1",
             userId: "alice",
             after: { acceptedAt: 0, eventId: "" },
-          }),
-        ).rejects.toThrow(LangyConversationNotFoundError);
-        expect(events.getEventsOccurredSince).not.toHaveBeenCalled();
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
 
@@ -1279,20 +1771,28 @@ describe("LangyConversationService", () => {
 
     describe("when the conversation is not visible to the caller", () => {
       it("reports not-found rather than the cards", async () => {
-        const svc = new LangyConversationService(
-          makeRepo(),
-          makeCommands(),
-          undefined,
-          { getEventsOccurredSince: vi.fn(async () => [] as never) },
-        );
+        vi.useFakeTimers();
+        try {
+          const svc = new LangyConversationService(
+            makeRepo(),
+            makeCommands(),
+            undefined,
+            { getEventsOccurredSince: vi.fn(async () => [] as never) },
+          );
 
-        await expect(
-          svc.getLocalRecord({
+          const pending = svc.getLocalRecord({
             projectId: "p1",
             conversationId: "c1",
             userId: "alice",
-          }),
-        ).rejects.toThrow(LangyConversationNotFoundError);
+          });
+          const outcome = expect(pending).rejects.toThrow(
+            LangyConversationNotFoundError,
+          );
+          await vi.advanceTimersByTimeAsync(10_000);
+          await outcome;
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
 
