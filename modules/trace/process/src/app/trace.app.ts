@@ -202,7 +202,6 @@ import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
-import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -234,7 +233,6 @@ import {
  * server file may import one.
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
 import type {
@@ -250,7 +248,6 @@ import {
   traceReadMapperPorts,
 } from "../transport/api-trpc/trace-read-mapper-ports.ts";
 import type {
-  TraceLegacyCredential,
   TraceLegacyReads,
   TraceLegacySearchFields,
   TraceLegacyShare,
@@ -561,15 +558,9 @@ export interface TraceAppDependencies {
    */
   exportBounds: TraceExportBounds | null;
   /**
-   * The door the deprecated `/api/trace/*` family resolves its project
-   * credential through. Optional because a REST-less process never reaches
-   * it; `credential` raises by name rather than admitting an absent caller.
-   */
-  legacyCredential?: TraceLegacyCredentialService;
-  /**
    * The door `POST /api/collector` and the OTLP receiver resolve their
-   * project credential through — optional for the same reason as
-   * `legacyCredential`: absent members raise by name, never admit a caller.
+   * project credential through. Optional because a REST-less process never
+   * reaches it: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
   /**
@@ -2271,24 +2262,6 @@ export class TraceApp implements TraceApi, CollectorApp {
   // operations-only proxy — every member below is a METHOD because a
   // property member throws where the proxy reads it.
 
-  /**
-   * The project credential that family resolves for itself. Raises rather
-   * than refusing when the door was never composed: a mis-wired process
-   * should not hide that behind a caller-facing 401.
-   */
-  credential(input: {
-    request: Request;
-    permission: "traces:view" | "traces:share";
-  }): Promise<TraceLegacyCredential> {
-    if (!this.#dependencies.legacyCredential) {
-      throw new Error(
-        "The deprecated trace family asked for a credential, and this process composed Trace without the API-key directory it resolves through",
-      );
-    }
-
-    return this.#dependencies.legacyCredential.resolve(input);
-  }
-
   /** The four reads those addresses answer from: the application itself. */
   traces(): TraceLegacyReads {
     return this;
@@ -2297,23 +2270,6 @@ export class TraceApp implements TraceApi, CollectorApp {
   /** The public-link ledger its share pair writes to. */
   shares(): TraceLegacyShare {
     return this.#dependencies.share;
-  }
-
-  /**
-   * The API KEY caller's read-time redactions for one project - the same
-   * resolution the v1 family uses, so the two answer one caller alike.
-   */
-  getProtections(
-    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
-  ): Promise<Protections> {
-    const { credential } = input;
-    const scoped = credential.kind === "legacyProjectKey" ? null : credential;
-
-    return this.resolveApiKeyProtections({
-      projectId: input.projectId,
-      apiKeyId: scoped?.apiKeyId ?? null,
-      userId: scoped?.userId ?? null,
-    });
   }
 
   /** The body `POST /api/trace/search` accepts, parsed strictly. */

@@ -43,7 +43,6 @@ import {
   type CodingAgentIngestFilter,
 } from "../services/trace-ingestion.service.ts";
 import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
-import { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
 import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/trace-list-read.service.ts";
 import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
@@ -255,10 +254,6 @@ export function composeTraceAppDependencies(
     shareReadLimiter: options.shareReadLimiter,
     ...(options.apiKeys
       ? {
-          legacyCredential: TraceLegacyCredentialService.create({
-            apiKeys: options.apiKeys,
-            authz: options.protections.authz,
-          }),
           ingestCredential: TraceIngestCredentialService.create({
             apiKeys: options.apiKeys,
             authz: options.ingestAuthz ?? options.protections.authz,

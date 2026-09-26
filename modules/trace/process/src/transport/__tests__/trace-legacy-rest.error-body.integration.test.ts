@@ -28,11 +28,6 @@ const runtime = createRestRuntime({
 
 function buildApi(findTrace: () => Promise<never>) {
   const members: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
-    credential: async () => ({
-      project,
-      credential: { kind: "legacyProjectKey" },
-      markUsed: () => undefined,
-    }),
     traces: () => ({
       findTrace,
       readEvaluations: vi.fn(),
@@ -40,7 +35,6 @@ function buildApi(findTrace: () => Promise<never>) {
       readThreadTraces: vi.fn(),
     }),
     shares: () => ({ createShare: vi.fn(), unshare: vi.fn() }),
-    getProtections: async () => ({}),
     resolveApiKeyProtections: async () => ({}),
     searchBodySchema: {} as TraceLegacyRestMembers<
       TraceLegacySearchFields,

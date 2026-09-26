@@ -121,12 +121,17 @@ export type TraceSearchBody = ProjectionRequest &
   }>;
 
 /**
- * The `:id` segment of the deprecated `/api/trace/:id` and `/api/thread/:id`
- * reads — separate from {@link traceIdParamsSchema} because the superseded
- * family spells the parameter `id`, and it must match the path exactly.
+ * The `:id` segment of the deprecated `/api/trace/:id` reads — separate from
+ * {@link traceIdParamsSchema} because the superseded family spells the
+ * parameter `id`, and it must match the path exactly.
  */
 export const traceLegacyIdParamsSchema = z.object({
-  id: z.string().min(1).describe("The trace ID, or the thread ID on the thread read."),
+  id: z.string().min(1).describe("The trace ID."),
+});
+
+/** The `:threadId` segment of the deprecated `/api/thread/:threadId` read. */
+export const traceLegacyThreadParamsSchema = z.object({
+  threadId: z.string().min(1).describe("The thread ID."),
 });
 
 /** `GET /api/trace/:id` in json format: the trace, its evaluations, the span tree as text. */

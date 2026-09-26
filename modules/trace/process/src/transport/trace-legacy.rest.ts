@@ -1,17 +1,5 @@
-import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestCredentialPrincipal,
-} from "@langwatch/api/rest";
-import type { HandledError } from "@langwatch/handled-error";
+import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import {
-  ingestDoorRefusalBody,
-  ingestDoorRefusalStatus,
-  isIngestDoorRefusal,
-} from "@langwatch/otlp";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
 import {
@@ -20,6 +8,7 @@ import {
   traceLegacyReadResponseSchema,
   traceLegacySearchResponseSchema,
   traceLegacyShareResponseSchema,
+  traceLegacyThreadParamsSchema,
   traceLegacyUnshareResponseSchema,
   type Evaluation,
   type Span,
@@ -42,8 +31,8 @@ import { traceLegacySearchBodySchema } from "#rules/trace-legacy-search-body.rul
 import { tracesRestCredential } from "./traces.rest.ts";
 /**
  * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
- * The first four answer behind the project door; the hidden thread read still
- * resolves its own credential. Literal paths (no versioning) that released SDKs dial.
+ * All five answer behind the project door. Literal paths (no versioning)
+ * that released SDKs dial.
  */
 
 const PRODUCES_JSON = "application/json";
@@ -61,24 +50,6 @@ const payloadTooLarge = (): Error =>
 
 /** Search filters can name many ids; the bulk cap is the ceiling they get. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
-
-/** A resolved project credential; a refusal is thrown, and this family renders it. */
-export type TraceLegacyCredential = Readonly<{
-  project: Readonly<{ id: string }>;
-  /** What the redactions are resolved FOR: the key, never its holder. */
-  credential: RestCredentialPrincipal;
-  markUsed: () => void;
-}>;
-
-/**
- * How this process turns a request plus one permission ceiling into a
- * project credential. The permission travels with the request since reads
- * ask for `traces:view`, the share pair for `traces:share` (a PUBLIC link).
- */
-export type TraceLegacyCredentialResolver = (input: {
-  request: Request;
-  permission: "traces:view" | "traces:share";
-}) => Promise<TraceLegacyCredential>;
 
 /** The trace reads these five routes answer from. */
 export interface TraceLegacyReads {
@@ -112,19 +83,10 @@ export interface TraceLegacyShare {
 
 /** What the legacy trace family needs from the process. */
 export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
-  credential: TraceLegacyCredentialResolver;
   /** The reads. Resolved per request, never constructed at mount. */
   traces(): TraceLegacyReads;
   /** The share ledger, resolved the same way. */
   shares(): TraceLegacyShare;
-  /**
-   * The API KEY caller's read-time redactions for one project. Same
-   * resolution as v1: a key resolves content categories like a caller with
-   * no session, but costs are visible (a project key has full access).
-   */
-  getProtections(
-    input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
-  ): Promise<unknown>;
   /** The same redactions, for the key the project door resolved. */
   resolveApiKeyProtections(
     input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
@@ -169,30 +131,6 @@ function answer(
 
 type LegacyApp = TraceLegacyRestMembers<TraceLegacySearchFields, unknown>;
 
-/** Answers the read for a resolved credential, or the refusal in this family's own body. */
-async function authorised(
-  input: Readonly<{
-    app: LegacyApp;
-    request: Request;
-    permission: "traces:view" | "traces:share";
-  }>,
-  read: (auth: TraceLegacyCredential) => Promise<LegacyAnswer>,
-): Promise<LegacyAnswer> {
-  let auth: TraceLegacyCredential;
-  try {
-    auth = await input.app.credential({ request: input.request, permission: input.permission });
-  } catch (error) {
-    if (!isIngestDoorRefusal(error)) throw error;
-    return refusalAnswer(error);
-  }
-
-  return read(auth);
-}
-
-function refusalAnswer(refusal: HandledError): LegacyAnswer {
-  return answer(ingestDoorRefusalBody(refusal), ingestDoorRefusalStatus(refusal));
-}
-
 /** The two headers a superseded route names its replacement with. */
 function supersededBy(successor: string): Readonly<Record<string, string>> {
   return { Deprecation: "true", Link: `<${successor}>; rel="successor-version"` };
@@ -227,10 +165,6 @@ function legacySearchTraces(
   return enrichedTraces;
 }
 
-const READ_REASON =
-  "Trace API key resolved in-handler, so the refusal carries this family's own sentence; " +
-  "the route itself is gated on traces:view";
-
 /** The project the door resolved, and the key it resolved it from. */
 type LegacyDoor = Readonly<{
   projectId: string;
@@ -246,7 +180,7 @@ function protectionsFor({ app, door }: { app: LegacyApp; door: LegacyDoor }): Pr
 }
 
 const LEGACY_PROTOCOL_REASON =
-  "Released SDKs parse this deprecated family's own statuses and bodies, credential refusals included";
+  "Released SDKs parse this deprecated family's own statuses and bodies";
 
 /** `readLegacyTrace`: one legacy route's read, behind the project door. */
 async function readLegacyTrace({
@@ -419,26 +353,24 @@ async function searchLegacyTraces({
   );
 }
 
-/** `readLegacyThread`: one legacy route's read, for a resolved credential. */
+/** `readLegacyThread`: the thread's traces, behind the project door. */
 async function readLegacyThread({
   app,
   input,
-  auth: { project, credential, markUsed },
+  door,
 }: {
   app: LegacyApp;
-  input: z.infer<typeof traceLegacyIdParamsSchema>;
-  auth: TraceLegacyCredential;
+  input: z.infer<typeof traceLegacyThreadParamsSchema>;
+  door: LegacyDoor;
 }): Promise<LegacyAnswer> {
-  const protections = await app.getProtections({ projectId: project.id, credential });
+  const protections = await protectionsFor({ app, door });
   // Thread-detail read consumes conversation content — `readThreadTraces`
   // resolves full IO (#4991), which is what this handler asked for itself.
   const traces = await app.traces().readThreadTraces({
-    projectId: project.id,
-    threadId: input.id,
+    projectId: door.projectId,
+    threadId: input.threadId,
     protections,
   });
-
-  markUsed();
 
   return answer({ traces }, 200);
 }
@@ -537,17 +469,14 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   )
 
   // ── the deprecated thread read ────────────────────────────────────────────
-  .get("/api/thread/:id", "getLegacyThread")
-  .withParams(traceLegacyIdParamsSchema)
-  .withAccess(publicRoute({ reason: READ_REASON }))
+  .get("/api/thread/:threadId", "getLegacyThread")
+  .withParams(traceLegacyThreadParamsSchema)
+  .withPermission("traces:view")
+  .withMiddleware(tracesRestCredential)
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })
   .withDocs({ hide: true })
-  .handle(async ({ app, input, request, response }) =>
-    response.write(
-      await authorised({ app, request, permission: "traces:view" }, (auth) =>
-        readLegacyThread({ app, input, auth }),
-      ),
-    ),
+  .handle(async ({ app, input, scope, response }, caller) =>
+    response.write(await readLegacyThread({ app, input, door: { projectId: scope.id, caller } })),
   )
 
   .build();

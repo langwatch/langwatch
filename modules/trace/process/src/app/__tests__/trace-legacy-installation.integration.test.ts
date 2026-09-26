@@ -5,7 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * Legacy `/api/trace/*` routes mounted over real application. Tests that
  * all required members are read and refusals answer correctly.
  */
-import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -19,7 +19,6 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceLegacyCredentialService } from "../../services/trace-legacy-credential.service.ts";
 import { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
@@ -55,10 +54,6 @@ function bootTraceApp(options: {
   resolveToken: (token: string) => ResolvedApiKeyCredential | null;
 }) {
   const findById = vi.fn(async () => void 0);
-  const apiKeys = createApiFixture<ApiKeyApi>({
-    findResolvedToken: vi.fn(async ({ token }: { token: string }) => options.resolveToken(token)),
-    markUsed: vi.fn(),
-  });
   const authz = createApiFixture<AuthzApi>({
     hasApiKeyPermission: vi.fn(async () => true),
   });
@@ -120,7 +115,6 @@ function bootTraceApp(options: {
     requestBounds: createTraceTestRequestBounds(),
     exportBounds: null,
     protections,
-    legacyCredential: TraceLegacyCredentialService.create({ apiKeys, authz }),
   });
 
   // The project door as the process opens it: absent and unresolvable keys are its refusals.
@@ -145,7 +139,7 @@ function bootTraceApp(options: {
     facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
   });
 
-  return { family, findById, apiKeys };
+  return { family, findById };
 }
 
 describe("given the deprecated trace family installed on the trace application", () => {
@@ -159,6 +153,18 @@ describe("given the deprecated trace family installed on the trace application",
       expect(response.status).toBe(401);
       expect(await response.json()).toMatchObject({ code: "missing_credentials" });
       expect(findById).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a caller asks for a thread with no credential", () => {
+    /** @scenario "An anonymous legacy trace read is refused rather than failing" */
+    it("answers the project door's missing-credentials refusal", async () => {
+      const { family } = bootTraceApp({ resolveToken: () => null });
+
+      const response = await family.request("/api/thread/thread-1");
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "missing_credentials" });
     });
   });
 
