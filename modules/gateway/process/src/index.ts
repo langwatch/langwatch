@@ -190,7 +190,6 @@ export type {
   ElevenLabsConversationReader,
   ElevenLabsConversationReport,
   ElevenLabsCredentialReader,
-  RealtimeSessionPollerHandle,
 } from "./services/gateway-realtime-session-reconciliation.service.ts";
 export type {
   GatewayGovernanceSignals,

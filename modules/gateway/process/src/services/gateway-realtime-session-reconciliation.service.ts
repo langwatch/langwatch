@@ -74,10 +74,6 @@ export interface RealtimeSessionReconciliationConfig {
   vendorCallTimeoutMs: number;
 }
 
-export interface RealtimeSessionPollerHandle {
-  stop(): void;
-}
-
 export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationConfig = {
   tickIntervalMs: 60 * 1000,
   pollAfterMs: 2 * 60 * 1000,
@@ -85,7 +81,7 @@ export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationC
   vendorCallTimeoutMs: 10_000,
 };
 
-/** A process-owned worker contribution. Creating it does not start a timer. */
+/** One reconciliation tick, `poll`; the schedule that runs it is not this class's. */
 export class GatewayRealtimeSessionReconciliationService {
   private readonly repository: RealtimeSessionReconciliationRepository;
   private readonly credentials: ElevenLabsCredentialReader;
@@ -161,51 +157,6 @@ export class GatewayRealtimeSessionReconciliationService {
     }
 
     return { examined: sessions.length, confirmed, expired };
-  }
-
-  start(): RealtimeSessionPollerHandle {
-    let stopped = false;
-    let running = false;
-
-    const tick = async () => {
-      if (stopped) {
-        return;
-      }
-
-      if (running) {
-        this.logger.warn(
-          {},
-          "the previous realtime reconciliation tick is still running; skipping this one",
-        );
-
-        return;
-      }
-
-      running = true;
-      try {
-        const result = await this.poll();
-        if (result.examined > 0 || result.expired > 0) {
-          this.logger.info(result, "realtime voice session reconciliation tick");
-        }
-      } catch (error) {
-        this.logger.error(
-          { error },
-          "realtime voice session reconciliation tick failed (will retry)",
-        );
-      } finally {
-        running = false;
-      }
-    };
-
-    const timer = setInterval(() => void tick(), this.config.tickIntervalMs);
-    void tick();
-
-    return {
-      stop() {
-        stopped = true;
-        clearInterval(timer);
-      },
-    };
   }
 
   private async reconcile(session: GatewayRealtimeSessionRecord): Promise<boolean> {

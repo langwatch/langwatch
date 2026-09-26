@@ -19,14 +19,6 @@
       "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
       "types": "./dist/ui/sections/media-part.d.ts",
       "default": "./src/ui/sections/media-part.tsx"
-    },
-    "./surfaces/parameter-line-field": {
-      "types": "./dist/ui/sections/agent-testing/run/parameter-line-field.d.ts",
-      "default": "./src/ui/sections/agent-testing/run/parameter-line-field.tsx"
-    },
-    "./surfaces/parameter-suggestions": {
-      "types": "./dist/ui/sections/agent-testing/run/parameter-suggestions.d.ts",
-      "default": "./src/ui/sections/agent-testing/run/parameter-suggestions.ts"
     }
   },
   "scripts": {

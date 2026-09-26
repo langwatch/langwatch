@@ -24,9 +24,14 @@ const session = {
   vendorConversationId: "conversation-1",
 };
 
+/** A session as the sweep lists it, which may carry no recorded conversation. */
+type ListedSession = Omit<typeof session, "vendorConversationId"> & {
+  vendorConversationId: string | null;
+};
+
 function buildWorker(options?: {
   conversation?: ElevenLabsConversationReader;
-  sessions?: (typeof session)[];
+  sessions?: ListedSession[];
   credentials?: ElevenLabsCredentialReader;
 }) {
   const repository = {
@@ -118,6 +123,27 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
     expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
   });
 
+  it("counts each outcome of one tick and keeps a failed session open for the next", async () => {
+    const unrecorded = { ...session, id: "session-2", vendorConversationId: null };
+    const failing = { ...session, id: "session-3", vendorConversationId: "conversation-3" };
+    const { worker, repository } = buildWorker({
+      sessions: [session, unrecorded, failing],
+      conversation: {
+        readConversation: vi.fn(async ({ conversationId }: { conversationId: string }) => {
+          if (conversationId === "conversation-3") throw new Error("vendor timed out");
+          return {
+            report: { status: "done", metadata: { call_duration_secs: 3 } },
+            notFound: false,
+          };
+        }),
+      },
+    });
+
+    await expect(worker.poll()).resolves.toEqual({ examined: 3, confirmed: 1, expired: 2 });
+    expect(repository.confirmSession).toHaveBeenCalledTimes(1);
+    expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
+  });
+
   it("leaves a session open when its voice provider has no API key", async () => {
     const { worker, repository, conversations } = buildWorker({
       credentials: {
@@ -128,13 +154,5 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
     await expect(worker.poll()).resolves.toMatchObject({ examined: 1, confirmed: 0 });
     expect(conversations.readConversation).not.toHaveBeenCalled();
     expect(repository.confirmSession).not.toHaveBeenCalled();
-  });
-
-  it("does not poll before start is called", async () => {
-    const { worker, repository } = buildWorker();
-
-    expect(repository.expireStaleSessions).not.toHaveBeenCalled();
-    const handle = worker.start();
-    handle.stop();
   });
 });

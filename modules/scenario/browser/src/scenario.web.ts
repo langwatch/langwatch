@@ -50,8 +50,14 @@ export const scenarioWeb = defineWebModule("scenario")
       }),
     },
   })
-  /** The Talk to it call panel over scenario's own voice doors, lent to agent (§3.4 rule 7). */
+  /** The Talk to it call panel and the parameter line, lent to agent (§3.4 rule 7). */
   .withCapabilities({
+    parameterLineField: {
+      load: async () => ({
+        default: (await import("./ui/sections/agent-testing/run/lent-parameter-line-field.tsx"))
+          .LentParameterLineField,
+      }),
+    },
     talkToItPanel: {
       load: async () => ({
         default: (await import("./features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx"))

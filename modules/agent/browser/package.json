@@ -30,7 +30,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/scenario-browser": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",

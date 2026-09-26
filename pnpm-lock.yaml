@@ -3686,9 +3686,6 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/scenario-browser':
-        specifier: workspace:*
-        version: link:../../scenario/browser
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -14678,6 +14675,9 @@ importers:
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../react-rum
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../modules/scenario/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time

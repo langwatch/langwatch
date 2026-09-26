@@ -4,6 +4,7 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ComponentType, ReactNode } from "react";
 
@@ -17,6 +18,15 @@ export type UiAuthenticationOverviewCardProps = {
   organizationId: string;
   /** `organization:manage`: groups and member provenance are its reads. */
   canReadMembership: boolean;
+};
+
+/** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
+export type UiParameterLineFieldProps = {
+  definitions: readonly ScenarioParameterDefinition[];
+  value: string;
+  onChange: (line: string) => void;
+  ariaLabel: string;
+  testId: string;
 };
 
 /** What a screen hands scenario's lent Talk-to-it panel. */
@@ -178,6 +188,7 @@ export type UiDeclaredCapabilities = {
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
+  parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;

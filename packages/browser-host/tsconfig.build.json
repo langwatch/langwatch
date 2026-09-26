@@ -80,6 +80,9 @@
       "path": "../react-rum/tsconfig.build.json"
     },
     {
+      "path": "../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
       "path": "../time/tsconfig.build.json"
     }
   ]

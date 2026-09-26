@@ -183,6 +183,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",

@@ -5,19 +5,15 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { explainAnyError } from "@langwatch/error-presentation/presentation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { ParameterLineField } from "@langwatch/scenario-browser/surfaces/parameter-line-field";
-import { parameterPlaceholder } from "@langwatch/scenario-browser/surfaces/parameter-suggestions";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Play } from "lucide-react";
 import { useState } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { ParameterLineField } from "../../behavior/lent-parameter-line-field.tsx";
 import { toLineRunParameters } from "../../model/parameter-line.ts";
 import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
 import { FieldLabel } from "../elements/field-label.tsx";
-
-/** The declared-parameter shape `parameterPlaceholder` and `ParameterLineField` take. */
-type DeclaredParameter = Parameters<typeof parameterPlaceholder>[0][number];
 
 /** The message the panel sends when nothing else is typed. */
 export const AGENT_TEST_DEFAULT_MESSAGE = "ping";
@@ -171,10 +167,6 @@ function ParameterLine({
   onChange: (line: string) => void;
 }) {
   if (definitions.length === 0) return null;
-  const declared: DeclaredParameter[] = definitions.map((definition) => ({
-    ...definition,
-    source: "agent",
-  }));
   return (
     <Box data-testid="agent-test-parameters-block">
       <FieldLabel>
@@ -189,10 +181,9 @@ function ParameterLine({
       </FieldLabel>
       <ParameterLineField
         ariaLabel="Parameters"
-        placeholder={parameterPlaceholder(declared)}
         value={value}
         onChange={onChange}
-        definitions={declared}
+        definitions={definitions}
         testId="agent-test-parameters"
       />
     </Box>
