@@ -83,6 +83,13 @@ export const FRONTEND_FEATURE_FLAGS = [
   // Gates the custom-chart-playground page outside local development; the
   // page falls back to NODE_ENV === "development" so dev stays unaffected.
   "release_custom_chart_playground",
+  // The LangWatchQL surface flag (LWQL_FLAG in
+  // ~/server/analytics/lwql/access.ts). Exposed to the frontend so the
+  // Analytics v2 page can gate its display on the same flag that gates the
+  // workbench and the analytics.lwql endpoints. Read-only here — the REST
+  // and tRPC boundaries still enforce it server-side, so listing it cannot
+  // let the browser open the surface, only mirror whether it is open.
+  "release_lwql_workbench",
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
@@ -136,3 +143,12 @@ export const FRONTEND_FEATURE_FLAGS = [
  * Use this type for type-safe flag references.
  */
 export type FrontendFeatureFlag = (typeof FRONTEND_FEATURE_FLAGS)[number];
+
+/**
+ * The LangWatchQL surface flag. Mirrors `LWQL_FLAG` in
+ * `~/server/analytics/lwql/access.ts` — kept as a client-safe constant here
+ * so the frontend can reference it without importing the server access
+ * module (which would pull the flag service and Prisma into the client
+ * bundle). Listed in `FRONTEND_FEATURE_FLAGS` above.
+ */
+export const LWQL_WORKBENCH_FRONTEND_FLAG = "release_lwql_workbench" as const;
