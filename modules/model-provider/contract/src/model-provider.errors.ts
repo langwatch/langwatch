@@ -179,6 +179,19 @@ export class ModelProviderNotFoundError extends HandledError {
   }
 }
 
+/** A provider row that stores no custom keys, asked for them by a peer that needs one. */
+export class ModelProviderCustomKeysMissingError extends HandledError {
+  declare readonly code: "model_provider_custom_keys_missing";
+
+  constructor() {
+    super("model_provider_custom_keys_missing", "This model provider has no stored credentials", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "ModelProviderCustomKeysMissingError";
+  }
+}
+
 export class ModelProviderInvalidError extends HandledError {
   declare readonly code: "model_provider_invalid";
 

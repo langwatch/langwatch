@@ -2,10 +2,10 @@ import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import type { ElevenLabsConversationChannel } from "../../channels/elevenlabs-conversation.channel.ts";
 import {
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
-  type ElevenLabsConversationReader,
   type ElevenLabsCredentialReader,
   type RealtimeSessionReconciliationRepository,
 } from "../../services/gateway-realtime-session-reconciliation.service.ts";
@@ -30,7 +30,7 @@ type ListedSession = Omit<typeof session, "vendorConversationId"> & {
 };
 
 function buildWorker(options?: {
-  conversation?: ElevenLabsConversationReader;
+  conversation?: ElevenLabsConversationChannel;
   sessions?: ListedSession[];
   credentials?: ElevenLabsCredentialReader;
 }) {
@@ -40,11 +40,12 @@ function buildWorker(options?: {
     releaseMissingVendorConversation: vi.fn().mockResolvedValue(void 0),
     confirmSession: vi.fn().mockResolvedValue(void 0),
   } satisfies RealtimeSessionReconciliationRepository;
-  const conversations: ElevenLabsConversationReader = options?.conversation ?? {
-    readConversation: vi.fn().mockResolvedValue({
-      report: { status: "done", metadata: { call_duration_secs: 4.2 } },
-      notFound: false,
-    }),
+  const readConversation = vi.fn().mockResolvedValue({
+    report: { status: "done", metadata: { call_duration_secs: 4.2 } },
+    notFound: false,
+  });
+  const conversations: ElevenLabsConversationChannel = options?.conversation ?? {
+    readConversation,
   };
   const worker = GatewayRealtimeSessionReconciliationService.create({
     repository,
@@ -60,13 +61,13 @@ function buildWorker(options?: {
     clock: { now: () => nowInstant() },
   });
 
-  return { worker, repository, conversations };
+  return { worker, repository, readConversation };
 }
 
 describe("GatewayRealtimeSessionReconciliationService", () => {
   /** @scenario Reconciliation confirms a completed ElevenLabs conversation */
   it("expires stale sessions, reads eligible sessions exactly, and confirms rounded duration", async () => {
-    const { worker, repository, conversations } = buildWorker();
+    const { worker, repository, readConversation } = buildWorker();
     const now = Temporal.Instant.from("2026-08-25T12:00:00.000Z");
 
     await expect(worker.poll(now)).resolves.toEqual({
@@ -78,7 +79,7 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
       mintedBefore: Temporal.Instant.from("2026-08-25T11:58:00.000Z"),
       limit: 25,
     });
-    expect(conversations.readConversation).toHaveBeenCalledWith({
+    expect(readConversation).toHaveBeenCalledWith({
       apiKey: "key",
       baseUrl: "https://api.elevenlabs.io",
       conversationId: "conversation-1",
@@ -145,14 +146,14 @@ describe("GatewayRealtimeSessionReconciliationService", () => {
   });
 
   it("leaves a session open when its voice provider has no API key", async () => {
-    const { worker, repository, conversations } = buildWorker({
+    const { worker, repository, readConversation } = buildWorker({
       credentials: {
         getApiCredential: vi.fn().mockRejectedValue(new GatewayVoiceKeyMissingError()),
       },
     });
 
     await expect(worker.poll()).resolves.toMatchObject({ examined: 1, confirmed: 0 });
-    expect(conversations.readConversation).not.toHaveBeenCalled();
+    expect(readConversation).not.toHaveBeenCalled();
     expect(repository.confirmSession).not.toHaveBeenCalled();
   });
 });

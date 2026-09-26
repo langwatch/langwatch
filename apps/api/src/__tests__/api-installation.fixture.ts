@@ -1,23 +1,15 @@
-/**
- * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
- * @vitest-environment node
- * @see specs/platform/process-installation.feature
- */
+/** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
 import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import {
-  createBlobMaintenancePipeline,
-  createProcessManagerMaintenancePipeline,
-  type BlobCleanupDeps,
-  type ProcessRetentionSweepDeps,
-} from "@langwatch/eventing/server";
+import { EventSourcing } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
   storesBackedMembers,
   withMemoryRepositories,
+  type ExposedSurface,
   type InstallableServerFeature,
+  type TransportPeers,
 } from "@langwatch/kernel";
 import { processConfig } from "@langwatch/process-server";
 import {
@@ -33,11 +25,9 @@ import {
   SecretsResolver,
   type SecretHandle,
 } from "@langwatch/secrets";
-import { Task } from "@langwatch/task";
 import { createTestLogger } from "@langwatch/test-harness";
-import { describe, expect, it } from "vitest";
 
-const ROLE = "tasks";
+const ROLE = "api";
 /** Every value is harmless and invented: nothing here is read from `.env`. */
 const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
   NODE_ENV: "test",
@@ -52,8 +42,10 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
   return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
 }
 
-async function bootTasks() {
-  const owners = processConfig(serverModules);
+export async function bootApi({
+  surface,
+}: { surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown> } = {}) {
+  const owners = processConfig(serverModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -68,13 +60,7 @@ async function bootTasks() {
   const eventing = new EventSourcing({
     enabled: false,
     participation: "produce",
-    processStore: InMemoryProcessStore.createForTesting(),
-    maintenance: () => [
-      createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
-      createProcessManagerMaintenancePipeline({
-        retentionSweep: unreachable<ProcessRetentionSweepDeps>("process retention sweep"),
-      }),
-    ],
+    processManagerMode: "producer-only",
   });
   const stores: Partial<ProcessMembers> = {
     logger: createTestLogger().logger,
@@ -94,6 +80,7 @@ async function bootTasks() {
   const runtime = await bootInstalledProcess({
     role: ROLE,
     modules: serverModules.map(overMemory),
+    ...(surface ? { surface } : {}),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -108,7 +95,7 @@ async function bootTasks() {
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
-        processName: "langwatch-tasks",
+        processName: "langwatch-api",
         dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
@@ -128,30 +115,3 @@ async function bootTasks() {
   });
   return { runtime, eventing };
 }
-
-const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
-
-describe("the tasks process installation", () => {
-  /** @scenario "Every installed module boots in the tasks role over memory stores" */
-  it("boots every installed module and lists every task the modules declared", async () => {
-    const { runtime } = await bootTasks();
-
-    try {
-      const names = runtime.tasks(isTask).map((task) => task.name);
-      expect(names).toEqual([
-        "backfill-annotations-to-clickhouse",
-        "slack-alert",
-        "report-schedule-backfill",
-        "stripe-prices-sync",
-        "dataset-content-backfill",
-        "model-registry-sync",
-        "process-manager-purge",
-        "stalled-runs-backfill",
-        "seed-demo",
-        "topic-clustering-run",
-      ]);
-    } finally {
-      await runtime.stop();
-    }
-  });
-});

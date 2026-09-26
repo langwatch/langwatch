@@ -82,12 +82,13 @@ import {
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
 import { gatewayInternalSecret, Secret, virtualKeyPepper } from "@langwatch/secrets";
-import { toDate, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
@@ -100,6 +101,7 @@ import {
 } from "@langwatch/webhook-contract";
 import type { z } from "zod";
 
+import { elevenLabsConversationChannels } from "../channels/elevenlabs-conversation-channels.registry.ts";
 import { GatewaySpendProducerAdapter } from "../eventing/gateway-spend-producer.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import { EventingGatewaySpendAdapter } from "../eventing/gateway-spend.adapter.ts";
@@ -111,6 +113,7 @@ import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.rep
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
@@ -124,10 +127,7 @@ import { BudgetOverviewService } from "../services/gateway-budget-overview.servi
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
 import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
-import {
-  GatewayElevenLabsWebhookService,
-  type ElevenLabsWebhookCollaborators,
-} from "../services/gateway-elevenlabs-webhook.service.ts";
+import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-webhook.service.ts";
 /**
  * The gateway feature's application: the one typed thing every door is given. A caller arrives
  * as {@link GatewayActor}, an argument rather than read from session/request, so one check
@@ -146,6 +146,11 @@ import type {
   GatewaySpendCommandSender,
 } from "../services/gateway-internal-protocol.service.ts";
 import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+} from "../services/gateway-realtime-session-reconciliation.service.ts";
+import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
@@ -350,8 +355,6 @@ export type GatewayRestInfrastructure = Readonly<{
         encryption: GatewayAgentCacheEncryption;
       }>
     | undefined;
-  /** Absent where this process mounts no ElevenLabs callback family. */
-  elevenLabsWebhook?: ElevenLabsWebhookCollaborators | undefined;
 }>;
 
 export interface GatewayAppDependencies extends GatewayRestInfrastructure {
@@ -568,6 +571,14 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
 
 export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastructure;
 
+/** The brokered-voice services, each derived from this module's own stores and peers. */
+type GatewayVoiceServices = Readonly<{
+  webhook: GatewayElevenLabsWebhookService;
+  elevenLabsCredential: GatewayElevenLabsCredentialService;
+  twilioCredential: TwilioCredentialService;
+  reconciliation: GatewayRealtimeSessionReconciliationService;
+}>;
+
 /** A grouped spend command record, as the queue takes it; anything else is a composition bug. */
 function spendCommandRecord(command: string, payload: unknown): Record<string, unknown> {
   if (typeof payload === "object" && payload !== null && !Array.isArray(payload)) {
@@ -621,7 +632,6 @@ type GatewaySetup = FeatureSetup<
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
       publicBaseUrl?: string | undefined;
-      elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
       gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
     }>,
   GatewayServerConfig
@@ -634,7 +644,6 @@ export type GatewayInternalProtocolCollaborators = Readonly<{
   evaluatorRunner?: EvaluatorRunner | undefined;
   refreshCodex?: GatewayCodexRefresh | undefined;
   spend?: GatewayInternalSpendPipeline | undefined;
-  realtimeSessions?: GatewayRealtimeSessionCollaborators | undefined;
 }>;
 
 export class GatewayApp implements GatewayApi {
@@ -696,7 +705,6 @@ export class GatewayApp implements GatewayApi {
     "prisma",
     "clickhouse",
     "encryption",
-    "elevenLabsWebhook",
     "gatewayInternalProtocol",
     "publicBaseUrl",
   ] as const;
@@ -758,6 +766,24 @@ export class GatewayApp implements GatewayApi {
         })
       : void 0;
     const spendCommands: Record<string, GatewaySpendCommandSender | undefined> = {};
+    const spend = internalCollaborators.spend ?? {
+      commands: spendCommands,
+      rating: ModelCatalogGatewaySpendRatingService.create(),
+    };
+    const realtimeSessions: GatewayRealtimeSessionCollaborators = {
+      sessions: PrismaGatewayRealtimeSessionRepository.create({ database: setup.members.prisma }),
+      spendRating: spend.rating,
+      // The senders `connectSpend` fills once the pipeline registers, read at call time.
+      spendConfirmation: {
+        confirmSpend: async (data) => {
+          const sender = spend.commands.confirmSpend;
+          if (!sender) throw new Error("gateway_spend registered no confirmSpend sender here");
+          await sender.send(data);
+        },
+      },
+    };
+    const voiceCredentials = { modelProviders: setup.dependencies.modelProviders };
+    const elevenLabsCredential = GatewayElevenLabsCredentialService.create(voiceCredentials);
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,
       projects: setup.dependencies.projects,
@@ -768,20 +794,27 @@ export class GatewayApp implements GatewayApi {
       budgetSpend: controlPlane.budgetSpend,
       refreshCodex: internalCollaborators.refreshCodex,
       guardrails,
-      spend: internalCollaborators.spend ?? {
-        commands: spendCommands,
-        rating: ModelCatalogGatewaySpendRatingService.create(),
-      },
-      realtimeSessions:
-        internalCollaborators.realtimeSessions ?? setup.members.elevenLabsWebhook?.sessions,
+      spend,
+      realtimeSessions,
     });
 
     return new GatewayApp({
-      members: {
-        ...controlPlane,
-        ...(setup.members.elevenLabsWebhook
-          ? { elevenLabsWebhook: setup.members.elevenLabsWebhook }
-          : {}),
+      members: controlPlane,
+      voice: {
+        webhook: GatewayElevenLabsWebhookService.create({
+          credentials: voiceCredentials,
+          sessions: realtimeSessions,
+        }),
+        elevenLabsCredential,
+        twilioCredential: TwilioCredentialService.create(voiceCredentials),
+        reconciliation: GatewayRealtimeSessionReconciliationService.create({
+          repository: GatewayRealtimeSessionSweepService.create(realtimeSessions),
+          credentials: elevenLabsCredential,
+          conversations: elevenLabsConversationChannels.live.create(),
+          logger: createLogger("langwatch:gateway:realtime-session-reconciliation"),
+          config: realtimeSessionReconciliationConfig,
+          clock: { now: () => nowInstant() },
+        }),
       },
       internalProtocol,
       internalDoor: GatewayInternalIdentityService.create({ secret: secrets.internalSecret }),
@@ -818,9 +851,7 @@ export class GatewayApp implements GatewayApi {
   #coreDependencies: GatewayAppDependencies | undefined;
   #agentCache: GatewayAgentCacheService | undefined;
   #connectManagedKeys: ConnectManagedKeyService | undefined;
-  #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
-  #elevenLabsCredential: GatewayElevenLabsCredentialService | undefined;
-  #twilioCredential: TwilioCredentialService | undefined;
+  #voice: GatewayVoiceServices;
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendScope: PrismaGatewaySpendScopeRepository | undefined;
@@ -836,6 +867,7 @@ export class GatewayApp implements GatewayApi {
 
   private constructor({
     members,
+    voice,
     internalProtocol,
     internalDoor,
     spendPipeline,
@@ -850,6 +882,7 @@ export class GatewayApp implements GatewayApi {
     oneTimeReveals,
   }: {
     members: GatewayInfrastructure;
+    voice: GatewayVoiceServices;
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
     spendPipeline?: GatewaySpendPipelineParts;
@@ -874,15 +907,7 @@ export class GatewayApp implements GatewayApi {
     this.#agentCache = members.agentCache
       ? GatewayAgentCacheService.create(members.agentCache)
       : void 0;
-    this.#elevenLabsWebhook = members.elevenLabsWebhook
-      ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
-      : void 0;
-    this.#elevenLabsCredential = members.elevenLabsWebhook
-      ? GatewayElevenLabsCredentialService.create(members.elevenLabsWebhook.credentials)
-      : void 0;
-    this.#twilioCredential = members.elevenLabsWebhook
-      ? TwilioCredentialService.create(members.elevenLabsWebhook.credentials)
-      : void 0;
+    this.#voice = voice;
   }
 
   /** gateway_spend as this role registers it: the worker folds the ledger, the api only sends. */
@@ -1072,26 +1097,22 @@ export class GatewayApp implements GatewayApi {
     rawBody: string;
     signature: string | undefined;
   }): Promise<GatewayElevenLabsWebhookAnswer> {
-    const service = this.#elevenLabsWebhook;
-    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
-
-    return service.receive(input);
+    return this.#voice.webhook.receive(input);
   }
 
   getElevenLabsApiCredential(input: {
     modelProviderId: string;
   }): Promise<GatewayElevenLabsApiCredential> {
-    const service = this.#elevenLabsCredential;
-    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
-
-    return service.getApiCredential(input);
+    return this.#voice.elevenLabsCredential.getApiCredential(input);
   }
 
   getTwilioCredential(input: { modelProviderId: string }): Promise<GatewayTwilioCredential> {
-    const service = this.#twilioCredential;
-    if (!service) throw new Error("The ElevenLabs family was mounted without its members");
+    return this.#voice.twilioCredential.getCredential(input);
+  }
 
-    return service.getCredential(input);
+  /** One voice reconciliation tick, what the reconcile process manager's intent runs. */
+  reconcileRealtimeSessions(): Promise<{ examined: number; confirmed: number; expired: number }> {
+    return this.#voice.reconciliation.poll();
   }
 
   // ── The billing reconciliation family (ADR-072) ─────────────────────────

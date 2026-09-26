@@ -1,23 +1,11 @@
 import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Instant } from "@langwatch/time";
-import { z } from "zod";
 
-export const elevenLabsConversationReportSchema = z
-  .object({
-    status: z.string().optional(),
-    metadata: z
-      .object({
-        call_duration_secs: z.number().optional(),
-        cost: z.number().optional(),
-        cost_fiat: z.unknown().optional(),
-      })
-      .passthrough()
-      .optional(),
-  })
-  .passthrough();
-
-export type ElevenLabsConversationReport = z.infer<typeof elevenLabsConversationReportSchema>;
+import type {
+  ElevenLabsConversationChannel,
+  ElevenLabsConversationReport,
+} from "../channels/elevenlabs-conversation.channel.ts";
 
 export interface RealtimeSessionReconciliationLogger {
   warn(context: Record<string, unknown>, message: string): void;
@@ -58,15 +46,6 @@ export interface ElevenLabsCredentialReader {
   }): Promise<{ apiKey: string; baseUrl: string }>;
 }
 
-export interface ElevenLabsConversationReader {
-  readConversation: (input: {
-    apiKey: string;
-    baseUrl: string;
-    conversationId: string;
-    timeoutMs: number;
-  }) => Promise<{ report?: ElevenLabsConversationReport; notFound: boolean }>;
-}
-
 export interface RealtimeSessionReconciliationConfig {
   tickIntervalMs: number;
   pollAfterMs: number;
@@ -85,7 +64,7 @@ export const realtimeSessionReconciliationConfig: RealtimeSessionReconciliationC
 export class GatewayRealtimeSessionReconciliationService {
   private readonly repository: RealtimeSessionReconciliationRepository;
   private readonly credentials: ElevenLabsCredentialReader;
-  private readonly conversations: ElevenLabsConversationReader;
+  private readonly conversations: ElevenLabsConversationChannel;
   private readonly logger: RealtimeSessionReconciliationLogger;
   private readonly config: RealtimeSessionReconciliationConfig;
   private readonly clock: RealtimeSessionReconciliationClock;
@@ -100,7 +79,7 @@ export class GatewayRealtimeSessionReconciliationService {
   }: {
     repository: RealtimeSessionReconciliationRepository;
     credentials: ElevenLabsCredentialReader;
-    conversations: ElevenLabsConversationReader;
+    conversations: ElevenLabsConversationChannel;
     logger: RealtimeSessionReconciliationLogger;
     config: RealtimeSessionReconciliationConfig;
     clock: RealtimeSessionReconciliationClock;
@@ -116,7 +95,7 @@ export class GatewayRealtimeSessionReconciliationService {
   static create(options: {
     repository: RealtimeSessionReconciliationRepository;
     credentials: ElevenLabsCredentialReader;
-    conversations: ElevenLabsConversationReader;
+    conversations: ElevenLabsConversationChannel;
     logger: RealtimeSessionReconciliationLogger;
     config: RealtimeSessionReconciliationConfig;
     clock: RealtimeSessionReconciliationClock;

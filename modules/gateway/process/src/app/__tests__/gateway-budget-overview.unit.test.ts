@@ -92,7 +92,6 @@ async function gatewayAppStub(): Promise<GatewayApp> {
         gatewayBudget: { findMany: gatewayBudgetFindMany },
       }),
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
-      elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
     },

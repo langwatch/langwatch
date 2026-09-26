@@ -1,15 +1,8 @@
 /**
  * The feature declaration, and what another package composes from this
- * feature: the advisory dedupe window a spend graph debits through, and the
- * poller that settles brokered voice sessions the vendor never reported.
+ * feature: the advisory dedupe window a spend graph debits through.
  */
-export {
-  gatewayServer,
-  createGatewayBudgetChangeDedupe,
-  createGatewayRealtimeSessionReconciliation,
-  type ElevenLabsConversationSource,
-  type GatewayRealtimeSessionReconciliationSubstrates,
-} from "./gateway.server.ts";
+export { gatewayServer, createGatewayBudgetChangeDedupe } from "./gateway.server.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
@@ -182,15 +175,15 @@ export {
   type GatewayJwtSubject,
 } from "./services/gateway-jwt.service.ts";
 export {
-  elevenLabsConversationReportSchema,
   GatewayRealtimeSessionReconciliationService,
   realtimeSessionReconciliationConfig,
 } from "./services/gateway-realtime-session-reconciliation.service.ts";
-export type {
-  ElevenLabsConversationReader,
-  ElevenLabsConversationReport,
-  ElevenLabsCredentialReader,
-} from "./services/gateway-realtime-session-reconciliation.service.ts";
+export type { ElevenLabsCredentialReader } from "./services/gateway-realtime-session-reconciliation.service.ts";
+export {
+  elevenLabsConversationReportSchema,
+  type ElevenLabsConversationChannel,
+  type ElevenLabsConversationReport,
+} from "./channels/elevenlabs-conversation.channel.ts";
 export type {
   GatewayGovernanceSignals,
   GatewayVirtualKeyLifecycleSignal,

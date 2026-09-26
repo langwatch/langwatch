@@ -7977,6 +7977,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../packages/egress
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract

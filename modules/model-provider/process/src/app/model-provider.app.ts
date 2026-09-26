@@ -62,6 +62,7 @@ import {
   type ModelProviderServerConfig,
   type PlatformProviderEntry,
   type ModelProviderUsageCount,
+  type ModelProviderCustomKeys,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -605,6 +606,10 @@ export class ModelProviderApp implements ModelProviderApi {
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {
     return this.#modelProviders.countUsage(input);
+  }
+
+  getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    return this.#modelProviders.getCustomKeys(input);
   }
 
   async platformProviderChain(): Promise<PlatformProviderEntry[]> {

@@ -1207,6 +1207,10 @@ const presentations = {
     describe: () =>
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
+  model_provider_custom_keys_missing: {
+    title: "This provider has no credentials saved",
+    describe: () => "Add the provider's API key in Model Providers settings, then try again.",
+  },
   missing_provider: {
     // fault: customer — a configuration choice they can change, so the copy
     // names it rather than apologising.

@@ -95,6 +95,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  getCustomKeys(): Promise<never> {
+    return Promise.reject(new Error("Not used by Coding Agent tests."));
+  }
+
   constructor(
     private readonly estimate: (input: ModelCostEstimateInput) => number = () => 0,
   ) {}

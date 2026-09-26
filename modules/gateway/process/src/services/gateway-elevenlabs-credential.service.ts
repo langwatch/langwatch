@@ -1,15 +1,18 @@
 /**
  * Reads the stored ElevenLabs credential for one provider row. Two callers need it with no session
  * to authorize with — the HMAC-authenticated webhook route and the background reconciler — so the
- * authz-context-taking model provider service does not fit. Nothing here throws.
+ * row and its decrypted keys come from model-provider's own `getCustomKeys`.
  */
 
 import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
-import { isElevenLabsHost } from "@langwatch/model-provider-contract";
+import {
+  isElevenLabsHost,
+  type ModelProviderApi,
+  type ModelProviderCustomKeys,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
-import type { GatewayElevenLabsCredentialRepository } from "../repositories/gateway-elevenlabs-credential.repository.ts";
+import { isMissingProviderKeys } from "../rules/gateway-voice-credential.rules.ts";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");
 
@@ -29,13 +32,9 @@ export interface ElevenLabsApiCredential {
   baseUrl: string;
 }
 
-/**
- * What the two reads reach outside themselves: the provider rows, and the
- * Model Provider feature's own credential reader, which owns the cipher.
- */
+/** The one model-provider operation both voice credential reads stand on. */
 export type ElevenLabsCredentialCollaborators = {
-  providers: GatewayElevenLabsCredentialRepository;
-  credentials: GatewayModelProviderCredentials;
+  modelProviders: Pick<ModelProviderApi, "getCustomKeys">;
 };
 
 export class GatewayElevenLabsCredentialService {
@@ -52,16 +51,18 @@ export class GatewayElevenLabsCredentialService {
     keys: Record<string, unknown>;
     organizationId: string;
   } | null> {
-    const collaborators = this.collaborators;
-    const provider = await collaborators.providers.findProviderRow({ modelProviderId });
-    if (provider?.provider !== "elevenlabs") {
+    let provider: ModelProviderCustomKeys;
+    try {
+      provider = await this.collaborators.modelProviders.getCustomKeys({ modelProviderId });
+    } catch (error) {
+      if (isMissingProviderKeys(error)) return null;
+      throw error;
+    }
+    if (provider.provider !== "elevenlabs") {
       return null;
     }
 
-    return {
-      keys: collaborators.credentials.readCustomKeys(provider.customKeys),
-      organizationId: provider.organizationId,
-    };
+    return { keys: provider.customKeys, organizationId: provider.organizationId };
   }
 
   /**

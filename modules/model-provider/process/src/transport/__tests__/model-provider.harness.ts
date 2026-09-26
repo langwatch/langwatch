@@ -170,6 +170,7 @@ function forwarded(app: ModelProviderApp): ModelProviderApi {
     countEnabledInScopes: (...args) => app.countEnabledInScopes(...args),
     countInOrganization: (...args) => app.countInOrganization(...args),
     findEnabledProviderKeysInScopes: (...args) => app.findEnabledProviderKeysInScopes(...args),
+    getCustomKeys: (...args) => app.getCustomKeys(...args),
     platformProviderChain: (...args) => app.platformProviderChain(...args),
     listForProject: (...args) => app.listForProject(...args),
     findAllAccessibleForProject: (...args) => app.findAllAccessibleForProject(...args),

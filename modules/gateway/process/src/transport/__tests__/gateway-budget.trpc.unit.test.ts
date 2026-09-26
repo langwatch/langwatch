@@ -192,7 +192,6 @@ async function callerFor(budgets: Record<string, unknown>[]) {
     members: {
       prisma: fakePrisma(budgets),
       clickhouse: fakeClickHouse(),
-      elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
     },

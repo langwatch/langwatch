@@ -97,7 +97,6 @@ export async function runModuleTask({
           database: () => members.read("prisma"),
         }),
       )
-      .withMember("elevenLabsWebhook", () => void 0)
       .withMember("queue", () => void 0)
       .withMember("content", () => void 0)
       .withMember("gatewayInternalProtocol", () => ({}))

@@ -9,6 +9,7 @@ import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
+import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-session.pipeline.ts";
 import { gatewaySpendEventing } from "../../eventing/gateway-spend.pipeline.ts";
 import { gatewayServer } from "../../gateway.server.ts";
 import {
@@ -84,7 +85,6 @@ async function installGateway() {
       members: {
         prisma: relationalWithoutStore(),
         clickhouse: analyticalWithoutStore(),
-        elevenLabsWebhook: undefined,
         gatewayInternalProtocol: {},
         encryption: createApiFixture<Encryption>(),
       },
@@ -196,10 +196,34 @@ describe("gateway app installation", () => {
         const produced = gatewaySpendEventing.build({ ...setup, participation: "produce" });
         const consumed = gatewaySpendEventing.build({ ...setup, participation: "consume" });
 
-        expect(gatewayServer.eventing?.pipeline).toBe("gateway_spend_processing");
+        expect(gatewayServer.eventing?.pipeline).toContain("gateway_spend_processing");
         expect(produced.metadata.name).toBe("gateway_spend_processing");
         expect(consumed.metadata.name).toBe("gateway_spend_processing");
         expect([...consumed.foldProjections.keys()]).toHaveLength(1);
+      } finally {
+        await resources.close();
+      }
+    });
+
+    it("builds the voice reconciler as a process manager scheduled once a minute", async () => {
+      const { state, resources } = await installGateway();
+
+      try {
+        const app = state.provided;
+        if (!(app instanceof GatewayApp)) {
+          throw new Error("Gateway installation did not provide GatewayApp");
+        }
+        const maintenance = gatewayRealtimeSessionEventing.build({
+          repositories: undefined,
+          app,
+          processStore: createApiFixture<ProcessStore>(),
+          participation: "consume",
+        });
+
+        expect(gatewayServer.eventing?.pipeline).toContain("gateway_realtime_session_maintenance");
+        expect(
+          maintenance.processManagers.get("gatewayRealtimeSessionReconcile")?.config.schedule,
+        ).toEqual({ everyMs: 60_000 });
       } finally {
         await resources.close();
       }

@@ -42,7 +42,6 @@ function gatewayApp({
     members: {
       prisma: createApiFixture<PrismaClient>({}),
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
-      elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
       publicBaseUrl: "https://app.acme.example",

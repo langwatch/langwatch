@@ -40,10 +40,6 @@
       "types": "./dist/repositories/prisma/prisma.virtual-key.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.virtual-key.repository.ts"
     },
-    "./composition/gateway-elevenlabs-credentials": {
-      "types": "./dist/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.d.ts",
-      "default": "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts"
-    },
     "./composition/gateway-guardrails": {
       "types": "./dist/repositories/prisma/prisma.gateway-guardrail.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts"
@@ -95,6 +91,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

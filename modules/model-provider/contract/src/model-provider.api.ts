@@ -174,6 +174,10 @@ export interface ModelProviderUsageCount {
   readonly firstModelProviderAt?: number;
 }
 
+/** One provider row's custom keys, decrypted, with the row facts a keyless caller scopes by. */
+export type ModelProviderCustomKeys = Pick<ModelProvider, "id" | "provider" | "organizationId"> &
+  Readonly<{ customKeys: Record<string, unknown> }>;
+
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -325,6 +329,12 @@ export interface ModelProviderApi {
     modelProviderIds: readonly string[];
   }): Promise<number>;
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount>;
+  /**
+   * One row's decrypted custom keys, for a peer with no session to authorize with (the gateway's
+   * signed webhook and voice reconciler). Throws `ModelProviderNotFoundError` for an unknown id
+   * and `ModelProviderCustomKeysMissingError` for a row that stores none.
+   */
+  getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

@@ -5,8 +5,13 @@
  */
 import { createHmac } from "crypto";
 
+import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
 import { createApp } from "@langwatch/kernel";
+import {
+  ModelProviderNotFoundError,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -20,13 +25,9 @@ import { resolvedSecrets } from "@langwatch/process-stores";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type {
-  GatewayModelProviderCredentials,
-  GatewaySpendConfirmation,
-} from "../../app/gateway.members.ts";
+import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { gatewayServer } from "../../gateway.server.ts";
-import { PrismaGatewayElevenLabsCredentialRepository } from "../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
@@ -59,7 +60,7 @@ function database(): PrismaClient {
 }
 
 /** Recorded so a confirmation can be asserted without the whole spend spine. */
-const sentConfirmations: ConfirmSpendCommandData[] = [];
+const sentConfirmations: unknown[] = [];
 
 class RecordingSpendConfirmation implements GatewaySpendConfirmation {
   async confirmSpend(data: ConfirmSpendCommandData): Promise<void> {
@@ -68,15 +69,21 @@ class RecordingSpendConfirmation implements GatewaySpendConfirmation {
 }
 
 /**
- * The cipher belongs to the Model Provider feature, and what this route reads
- * back is the plaintext key map. The row below stores that map as plain JSON,
- * so the port here is the identity the encryption would have undone.
+ * Model-provider's decrypted-keys read. The row below stores its key map as
+ * plain JSON, so this answers what the cipher would have undone.
  */
-class PlainCustomKeys implements GatewayModelProviderCredentials {
-  readCustomKeys(stored: unknown): Record<string, unknown> {
-    return typeof stored === "string" ? JSON.parse(stored) : {};
-  }
-}
+const modelProviders = createApiFixture<ModelProviderApi>({
+  getCustomKeys: async ({ modelProviderId }) => {
+    const row = await database().modelProvider.findUnique({ where: { id: modelProviderId } });
+    if (!row) throw new ModelProviderNotFoundError();
+    return {
+      id: row.id,
+      provider: row.provider,
+      organizationId: row.organizationId,
+      customKeys: typeof row.customKeys === "string" ? JSON.parse(row.customKeys) : {},
+    };
+  },
+});
 
 let sessions: GatewayRealtimeSessionCollaborators | undefined;
 
@@ -129,18 +136,18 @@ async function mountWebhook(): Promise<MountableRestApp> {
     .withRelational(database())
     .withAnalytical(peer("analytical store"))
     .withSecrets(resolvedSecrets({}))
-    .withMember("elevenLabsWebhook", {
-      credentials: {
-        providers: PrismaGatewayElevenLabsCredentialRepository.create({
-          get database() {
-            return database();
+    .withMember("gatewayInternalProtocol", {
+      spend: {
+        commands: {
+          confirmSpend: {
+            send: async (payload: unknown) => {
+              sentConfirmations.push(payload);
+            },
           },
-        }),
-        credentials: new PlainCustomKeys(),
+        },
+        rating: ModelCatalogGatewaySpendRatingService.create(),
       },
-      sessions: sessionCollaborators(),
     })
-    .withMember("gatewayInternalProtocol", {})
     .withEncryption({ encrypt: (value) => value, decrypt: (value) => value })
     .withMember("publicBaseUrl", "http://langwatch.test")
     .provide({
@@ -152,7 +159,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       monitor: peer("monitor"),
       organization: peer("organization"),
       "feature-flag": peer("feature flag"),
-      "model-provider": peer("model provider"),
+      "model-provider": modelProviders,
       trace: peer("trace"),
       secret: peer("secret"),
     })
@@ -325,7 +332,7 @@ describe.skipIf(!databaseUrl)("given an ElevenLabs credential with a stored webh
 
       expect(response.status).toBe(200);
       expect(sentConfirmations).toHaveLength(1);
-      expect(sentConfirmations[0]?.usage).toMatchObject({ audio_ms: 3000 });
+      expect(sentConfirmations[0]).toMatchObject({ usage: { audio_ms: 3000 } });
       expect(await statusOf(sessionId)).toBe("CLOSED");
     });
   });

@@ -15,7 +15,6 @@
     "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
     "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
     "./src/repositories/prisma/prisma.virtual-key.repository.ts",
-    "./src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts",
     "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
     "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
     "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",

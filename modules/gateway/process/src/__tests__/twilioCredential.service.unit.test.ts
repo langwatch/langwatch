@@ -3,41 +3,27 @@
  * @see specs/features/agents/voice-phone.feature
  * `getCredential` reads a Twilio row's three keys, or refuses with `voice_key_missing`.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
+import {
+  ModelProviderCustomKeysMissingError,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  GatewayElevenLabsCredentialRepository,
-  type GatewayElevenLabsProviderRow,
-} from "../repositories/gateway-elevenlabs-credential.repository.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
 
-class FixedProviderRows extends GatewayElevenLabsCredentialRepository {
-  constructor(private readonly row: GatewayElevenLabsProviderRow | null) {
-    super();
-  }
-
-  async findProviderRow(): Promise<GatewayElevenLabsProviderRow | null> {
-    return this.row;
-  }
-}
-
 function serviceOver(input: { provider: string; keys: Record<string, unknown> }) {
-  const reads: unknown[] = [];
-  const service = TwilioCredentialService.create({
-    providers: new FixedProviderRows({
-      provider: input.provider,
-      organizationId: "org_1",
-      customKeys: "cipher",
+  return TwilioCredentialService.create({
+    modelProviders: createApiFixture<ModelProviderApi>({
+      getCustomKeys: async ({ modelProviderId }) => ({
+        id: modelProviderId,
+        provider: input.provider,
+        organizationId: "org_1",
+        customKeys: input.keys,
+      }),
     }),
-    credentials: {
-      readCustomKeys: (stored) => {
-        reads.push(stored);
-        return input.keys;
-      },
-    },
   });
-  return { service, reads };
 }
 
 async function codeOf(promise: Promise<unknown>): Promise<string | undefined> {
@@ -54,7 +40,7 @@ const ALL_KEYS = {
 describe("getCredential", () => {
   describe("when the row is a Twilio row with all three keys", () => {
     it("returns the account SID, auth token and from-number", async () => {
-      const { service } = serviceOver({ provider: "twilio", keys: ALL_KEYS });
+      const service = serviceOver({ provider: "twilio", keys: ALL_KEYS });
 
       const result = await service.getCredential({ modelProviderId: "prov_1" });
 
@@ -68,7 +54,7 @@ describe("getCredential", () => {
 
   describe("when a required key is missing", () => {
     it("refuses with voice_key_missing rather than a half-formed credential", async () => {
-      const { service } = serviceOver({
+      const service = serviceOver({
         provider: "twilio",
         keys: { TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok-secret" },
       });
@@ -80,13 +66,28 @@ describe("getCredential", () => {
   });
 
   describe("when the row is not a Twilio row", () => {
-    it("refuses without reading any key", async () => {
-      const { service, reads } = serviceOver({ provider: "openai", keys: ALL_KEYS });
+    it("refuses with voice_key_missing", async () => {
+      const service = serviceOver({ provider: "openai", keys: ALL_KEYS });
 
       expect(await codeOf(service.getCredential({ modelProviderId: "prov_1" }))).toBe(
         "voice_key_missing",
       );
-      expect(reads).toEqual([]);
+    });
+  });
+
+  describe("when the provider row stores no keys", () => {
+    it("refuses with voice_key_missing", async () => {
+      const service = TwilioCredentialService.create({
+        modelProviders: createApiFixture<ModelProviderApi>({
+          getCustomKeys: async () => {
+            throw new ModelProviderCustomKeysMissingError();
+          },
+        }),
+      });
+
+      expect(await codeOf(service.getCredential({ modelProviderId: "prov_1" }))).toBe(
+        "voice_key_missing",
+      );
     });
   });
 });

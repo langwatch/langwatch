@@ -1,6 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
+  ModelProviderCustomKeysMissingError,
   ModelProviderInvalidError,
   translateInputSchema,
   type ModelCost,
@@ -36,6 +37,7 @@ import {
   type ModelProviderWriteInput,
   type TranslateInput,
   type TranslateOutput,
+  type ModelProviderCustomKeys,
   type ModelProviderUsageCount,
 } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -195,6 +197,17 @@ export class ModelProviderService {
     scopes: readonly { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
   }): Promise<string[]> {
     return this.options.repository.findEnabledProviderKeysInScopes(input);
+  }
+
+  async getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys> {
+    const row = await this.options.repository.getById({ id: input.modelProviderId });
+    if (!row.customKeys) throw new ModelProviderCustomKeysMissingError();
+    return {
+      id: row.id,
+      provider: row.provider,
+      organizationId: row.organizationId,
+      customKeys: row.customKeys,
+    };
   }
 
   countUsage(input: { organizationIds: readonly string[] }): Promise<ModelProviderUsageCount> {

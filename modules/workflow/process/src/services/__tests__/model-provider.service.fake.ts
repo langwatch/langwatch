@@ -21,6 +21,10 @@ export class TestModelProviderService implements ModelProviderApi {
     return Promise.resolve([]);
   }
 
+  getCustomKeys(): Promise<never> {
+    return Promise.reject(new Error("Not used by Workflow tests."));
+  }
+
   constructor(private readonly providers: Record<string, ModelProviderSummary> = {}) {}
 
   listForProject(): Promise<ModelProviderSummary[]> {

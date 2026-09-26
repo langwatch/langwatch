@@ -141,7 +141,6 @@ async function gatewayAppStub(): Promise<GatewayApp> {
     members: {
       prisma: fakePrisma(),
       clickhouse: fakeClickHouse(),
-      elevenLabsWebhook: void 0,
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
     },

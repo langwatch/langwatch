@@ -110,7 +110,6 @@ async function bootWorker() {
         adminEmails: config.process.adminEmails,
         processName: "langwatch-worker",
         dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
-        elevenLabsWebhook: void 0,
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,
@@ -170,6 +169,22 @@ describe("the worker process installation", () => {
         ),
       );
       expect(schedules).not.toEqual([]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker starts the voice reconciler when it boots" */
+  it("hosts the voice reconciler as a scheduled process manager", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const maintenance = eventing.definitions.find(
+        (definition) => definition.metadata.name === "gateway_realtime_session_maintenance",
+      );
+      expect(
+        maintenance?.processManagers.get("gatewayRealtimeSessionReconcile")?.config.schedule,
+      ).toEqual({ everyMs: 60_000 });
     } finally {
       await runtime.stop();
     }

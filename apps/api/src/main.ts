@@ -48,7 +48,6 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
         database: () => members.read("prisma"),
       }),
     )
-    .withMember("elevenLabsWebhook", () => void 0)
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.
     .withMember("queue", () => void 0)
