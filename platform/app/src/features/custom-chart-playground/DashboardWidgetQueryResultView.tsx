@@ -4,7 +4,7 @@
  * the Queries tab's own standalone Run button (`useDashboardWidgetExecutor`).
  */
 
-import { Box, Table, Text } from "@chakra-ui/react";
+import { Box, HStack, Table, Text } from "@chakra-ui/react";
 
 import { formatNumber } from "~/utils/formatNumber";
 
@@ -16,6 +16,35 @@ const MAX_PREVIEW_ROWS = 20;
 function elapsedMsOf(run: QueryLastRun): number | undefined {
   const value = run.result?.statistics.elapsedMs;
   return typeof value === "number" ? value : undefined;
+}
+
+/**
+ * "Partial result" truncation is the one diagnostic that says the answer
+ * might be wrong by omission, so it gets a banner, not a suffix folded into
+ * the row-count line.
+ */
+function TruncationBanner() {
+  return (
+    <HStack
+      gap={2}
+      align="flex-start"
+      role="status"
+      background="orange.subtle"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      paddingX={2}
+      paddingY={1}
+      marginBottom={1}
+    >
+      <Text fontSize="11px" fontWeight="700" color="orange.fg" flexShrink={0}>
+        Partial result
+      </Text>
+      <Text fontSize="11px" color="fg.muted">
+        The rest did not fit — aggregate or narrow the query to see it.
+      </Text>
+    </HStack>
+  );
 }
 
 interface DashboardWidgetQueryResultViewProps {
@@ -56,6 +85,7 @@ export function DashboardWidgetQueryResultView({
 
   return (
     <Box>
+      {result.truncated && <TruncationBanner />}
       <Text fontSize="11px" color="fg.muted" marginBottom={1}>
         {formatNumber(result.rows.length)} row
         {result.rows.length === 1 ? "" : "s"}

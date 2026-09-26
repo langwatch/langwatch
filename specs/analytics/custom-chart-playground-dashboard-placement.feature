@@ -85,3 +85,15 @@ Feature: Dashboard widgets placed on a dashboard
     Given a saved widget with both author code and named queries
     When only the code is updated, or only the queries
     Then the side that was not sent is kept, not blanked, and the update is not silently dropped
+
+  @integration
+  Scenario: A widget is placed at an explicit grid position
+    Given an unplaced widget and a dashboard in the same project
+    When it is placed at a named grid column and row
+    Then it is saved at exactly that position, not the next free row
+
+  @integration
+  Scenario: Unplacing a widget clears its grid position
+    Given a widget placed on a dashboard
+    When it is unplaced
+    Then its dashboard and grid fields are reset, and unplacing it again is a no-op, not an error

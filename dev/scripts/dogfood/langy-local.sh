@@ -23,7 +23,11 @@ ROOT="$(cd -P "$(dirname "$0")/../../.." && pwd -P)"
 ENV_FILE="$ROOT/platform/app/.env"
 APP_PORT="${PORT:-5560}"
 GATEWAY_PORT=$((APP_PORT + 3))
-AGENT_PORT="${LANGY_AGENT_PORT:-8080}"
+# The port slot the app leaves free for langyagent when nothing pins an
+# address: PORT, NLP at PORT+1, the gateway at PORT+3 — matching
+# dev/scripts/lib/plan-langy-lane.sh's LANGY_PORT_OFFSET, so this doctor
+# checks the same port `pnpm dev` would actually have started langyagent on.
+LANGY_PORT_OFFSET=4
 FIX=false
 [[ "${1:-}" == "--fix" ]] && FIX=true
 
@@ -37,6 +41,25 @@ hint() { printf '      %s\n' "$1"; }
 # the key is absent OR set to nothing, so presence checks require a real value.
 env_value() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | head -1 | sed -E "s/^$1=//; s/\"//g"; }
 
+# resolved_env prints a variable's value: the calling shell's own export wins
+# (matching how the app itself would see an already-exported override), else
+# whatever platform/app/.env pins.
+resolved_env() {
+  local var="$1"
+  if [[ -n "${!var:-}" ]]; then printf '%s' "${!var}"; else env_value "$var"; fi
+}
+
+# AGENT_PORT is the port langyagent actually listens on: read out of
+# LANGY_AGENT_URL (env or .env) when it names one, else the same PORT+4 slot
+# `pnpm dev` derives when nothing pins an address — never a hard-coded guess
+# that drifts from whatever the app was actually configured to dial.
+LANGY_AGENT_URL_RESOLVED="$(resolved_env LANGY_AGENT_URL)"
+if [[ "$LANGY_AGENT_URL_RESOLVED" =~ ^https?://(localhost|127\.0\.0\.1):([0-9]+) ]]; then
+  AGENT_PORT="${BASH_REMATCH[2]}"
+else
+  AGENT_PORT=$((APP_PORT + LANGY_PORT_OFFSET))
+fi
+
 # listening prefers lsof; a machine without it falls back to a bash /dev/tcp
 # connect probe so a missing utility never reads as three dead services.
 if command -v lsof >/dev/null 2>&1; then
@@ -49,6 +72,14 @@ echo "Langy local dogfood doctor ($ENV_FILE)"
 
 # --- env block -------------------------------------------------------------
 echo "env:"
+# OPENCODE_AGENT_URL is not a variable the app reads — only LANGY_AGENT_URL
+# is. Someone who set the former (an easy mix-up with the opencode-flavored
+# naming elsewhere) gets a distant "langyagent not listening" instead of the
+# actual cause, so name it here while the fix is one line away.
+if [[ -z "$LANGY_AGENT_URL_RESOLVED" && -n "$(resolved_env OPENCODE_AGENT_URL)" ]]; then
+  warn "OPENCODE_AGENT_URL is set but the app reads LANGY_AGENT_URL, not that — it is ignored"
+  hint "rename it to LANGY_AGENT_URL in platform/app/.env (or your shell env)"
+fi
 missing_env=()
 for key in LANGY_AGENT_URL LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
   if [[ -n "$(env_value "$key")" ]]; then ok "$key"; else bad "$key missing"; missing_env+=("$key"); fi
