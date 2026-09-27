@@ -135,15 +135,11 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     return this.#flags.resolveExperimentCatalogue(target);
   }
 
-  setUserExperimentEnrolment(
-    input: UserExperimentEnrolmentInput,
-  ): Promise<void> {
+  setUserExperimentEnrolment(input: UserExperimentEnrolmentInput): Promise<void> {
     return this.#flags.setUserExperimentEnrolment(input);
   }
 
-  setExperimentTenantPolicy(
-    input: ExperimentTenantPolicyInput,
-  ): Promise<void> {
+  setExperimentTenantPolicy(input: ExperimentTenantPolicyInput): Promise<void> {
     return this.#flags.setExperimentTenantPolicy(input);
   }
 

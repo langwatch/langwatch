@@ -138,7 +138,6 @@ export class ConnectedTargetService {
   }
 }
 
-
 /**
  * One target with its `<name>@<environment>` reference replaced by an agent
  * id. Every other target, and every reference that names no agent, is

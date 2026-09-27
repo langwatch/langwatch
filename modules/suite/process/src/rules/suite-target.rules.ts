@@ -1,10 +1,10 @@
 import { isConnectedAgentStale } from "@langwatch/agent-contract";
-import type { TimeInput } from "@langwatch/time";
 import {
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
 } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
+import type { TimeInput } from "@langwatch/time";
 
 /** A suite id, when the caller did not supply one. */
 export function defaultSuiteId(): string {

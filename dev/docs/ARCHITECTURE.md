@@ -1089,7 +1089,7 @@ never thinks about resolution at all. The per-module resolver adapters
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
-  close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
+close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
