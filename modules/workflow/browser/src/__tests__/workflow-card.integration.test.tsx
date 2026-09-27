@@ -38,6 +38,37 @@ describe("Workflow card", () => {
     expect(screen.getByText("status")).toBeTruthy();
   });
 
+  it("opens from a keyboard-reachable button that the card's menu does not trigger", async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+
+    renderCard(
+      <WorkflowCardDisplay
+        name="Judge workflow"
+        icon="⚖️"
+        onClick={onOpen}
+        action={
+          <WorkflowCardActions
+            isCopy={false}
+            hasCopies={false}
+            onSyncFromSource={vi.fn()}
+            onPushToCopies={vi.fn()}
+            onCopy={vi.fn()}
+            onDelete={vi.fn()}
+          />
+        }
+      />,
+    );
+
+    await user.click(screen.getByLabelText("Workflow actions"));
+    expect(onOpen).not.toHaveBeenCalled();
+
+    await user.keyboard("{Escape}");
+    screen.getByRole("button", { name: "Judge workflow" }).focus();
+    await user.keyboard("{Enter}");
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
   it("exposes the actions allowed by copy state", async () => {
     const user = userEvent.setup();
     const onSyncFromSource = vi.fn();

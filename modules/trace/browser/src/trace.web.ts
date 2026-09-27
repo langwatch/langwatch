@@ -47,6 +47,11 @@ export const traceWeb = defineWebModule("trace")
           .EvaluatorTracesMapping,
       }),
     },
+    presenceMenuItem: {
+      load: async () => ({
+        default: (await import("./ui/sections/presence/presence-menu-item.tsx")).PresenceMenuItem,
+      }),
+    },
     renderInputOutput: {
       load: async () => ({
         default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,

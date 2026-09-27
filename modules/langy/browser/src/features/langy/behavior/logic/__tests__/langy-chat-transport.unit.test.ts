@@ -146,24 +146,46 @@ describe("createLangyChatTransport", () => {
       ]);
     });
 
-    it("mints a fresh idempotency key for each logical send", async () => {
-      const { transport } = makeTransport({ conversationId: null });
+    describe("when choosing the turn's idempotency key", () => {
+      const keyOf = (call: number) =>
+        (mutation.mock.calls[call]![1] as { idempotencyKey: string }).idempotencyKey;
+      const userMessage = (id: string) => ({
+        id,
+        role: "user" as const,
+        parts: [{ type: "text" as const, text: "hi" }],
+      });
 
-      await transport.sendMessages(options());
-      const firstInput = mutation.mock.calls[0]![1] as {
-        idempotencyKey: string;
-      };
-      expect(firstInput.idempotencyKey).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-      );
+      it("repeats the key when the same send is retried, so the retry dedupes", async () => {
+        const { transport } = makeTransport({ conversationId: null });
 
-      // A second send is a NEW logical send — even with identical content it
-      // must mint a new key, so re-sending the same text starts a new turn.
-      await transport.sendMessages(options());
-      const secondInput = mutation.mock.calls[1]![1] as {
-        idempotencyKey: string;
-      };
-      expect(secondInput.idempotencyKey).not.toBe(firstInput.idempotencyKey);
+        await transport.sendMessages(options({ messages: [userMessage("m1")] }));
+        await transport.sendMessages(options({ messages: [userMessage("m1")] }));
+
+        expect(keyOf(1)).toBe(keyOf(0));
+      });
+
+      it("uses a new key when the same text is sent again as a new message", async () => {
+        const { transport } = makeTransport({ conversationId: null });
+
+        await transport.sendMessages(options({ messages: [userMessage("m1")] }));
+        await transport.sendMessages(options({ messages: [userMessage("m2")] }));
+
+        expect(keyOf(1)).not.toBe(keyOf(0));
+      });
+
+      it("uses a new key for every regenerate of the same message", async () => {
+        const { transport } = makeTransport({ conversationId: null });
+        const regenerate = options({
+          trigger: "regenerate-message",
+          messages: [userMessage("m1")],
+        });
+
+        await transport.sendMessages(options({ messages: [userMessage("m1")] }));
+        await transport.sendMessages(regenerate);
+        await transport.sendMessages(regenerate);
+
+        expect(new Set([keyOf(0), keyOf(1), keyOf(2)]).size).toBe(3);
+      });
     });
   });
 

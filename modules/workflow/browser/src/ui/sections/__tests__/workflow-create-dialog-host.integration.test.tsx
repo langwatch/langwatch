@@ -3,7 +3,7 @@
  * @see specs/workflows/workflow-management.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-trpc/workflow-api", () => {
@@ -49,7 +49,7 @@ describe("WorkflowCreateDialogHost", () => {
         </ChakraProvider>,
       );
 
-      fireEvent.click(screen.getByTestId("new-workflow-card-blank"));
+      fireEvent.click(within(screen.getByTestId("new-workflow-card-blank")).getByRole("button"));
 
       expect(screen.getByRole("button", { name: "Create workflow" })).toBeInTheDocument();
       expect(screen.queryByText("Create StudioWorkflow")).toBeNull();

@@ -24,10 +24,15 @@ function buildUtils({
   fetchFails?: boolean;
 }) {
   const invalidate = vi.fn().mockResolvedValue(void 0);
-  const getData = vi.fn(() => (previousModel ? { model: previousModel } : null));
+  const resolved = (model: string) => ({
+    model,
+    source: "role_default" as const,
+    scope: "project" as const,
+  });
+  const getData = vi.fn(() => (previousModel ? resolved(previousModel) : null));
   const fetch = fetchFails
     ? vi.fn().mockRejectedValue(new Error("resolver unavailable"))
-    : vi.fn().mockResolvedValue(nextModel ? { model: nextModel } : null);
+    : vi.fn().mockResolvedValue(nextModel ? resolved(nextModel) : null);
   const utils: Utils = {
     modelProvider: { invalidate, getResolvedDefault: { getData, fetch } },
   };

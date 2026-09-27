@@ -6,7 +6,6 @@ import type {
 } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-import { Link } from "@langwatch/browser-host/link";
 import {
   getComplexProps,
   getDrawerStack,
@@ -35,6 +34,7 @@ import { toEpochMs } from "@langwatch/time";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   WorkflowCardDisplay,
+  WorkflowCardLink,
   FormServerError,
 } from "@langwatch/workflow-browser-kit";
 import debounce from "lodash-es/debounce";
@@ -602,19 +602,21 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
             <Text fontSize="sm" color="fg.muted">
               This evaluator is powered by a workflow. Click below to open the workflow editor:
             </Text>
-            <Link
-              href={`/${projectSlug}/studio/${workflowCard.workflowId}`}
-              data-testid="open-workflow-link"
-              target="_blank"
-            >
-              <WorkflowCardDisplay
-                name={workflowCard.workflowName ?? "Workflow"}
-                icon={workflowCard.workflowIcon}
-                updatedAtLabel={formatTimeAgo(toEpochMs(workflowCard.updatedAt))}
-                action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
-                width="300px"
-              />
-            </Link>
+            <WorkflowCardDisplay
+              name={workflowCard.workflowName ?? "Workflow"}
+              icon={workflowCard.workflowIcon}
+              updatedAtLabel={formatTimeAgo(toEpochMs(workflowCard.updatedAt))}
+              action={<ExternalLink size={16} color="var(--chakra-colors-fg-muted)" />}
+              width="300px"
+              opener={
+                <WorkflowCardLink
+                  label={workflowCard.workflowName ?? "Workflow"}
+                  href={`/${projectSlug}/studio/${workflowCard.workflowId}`}
+                  target="_blank"
+                  data-testid="open-workflow-link"
+                />
+              }
+            />
           </VStack>
         )}
 

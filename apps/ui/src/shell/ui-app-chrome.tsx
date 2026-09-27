@@ -8,7 +8,6 @@ import {
   UNAVAILABLE_UI_SCOPE,
   useOptionalUiCapabilities,
 } from "@langwatch/browser-host/capabilities";
-import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-browser/chrome";
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
@@ -26,13 +25,16 @@ export default function UiAppChrome({ capabilities: root }: { capabilities: UiRo
 
   return (
     <UiNavigationHost commandBar capabilities={root}>
-      <UiAppChromeFrame scope={root.scope} />
+      <UiAppChromeFrame scope={root.scope} navigationChrome={root.navigationChrome} />
     </UiNavigationHost>
   );
 }
 
 /** Split so the hooks that read the host run only beneath it. */
-function UiAppChromeFrame({ scope }: Pick<UiRootCapabilities, "scope">) {
+function UiAppChromeFrame({
+  scope,
+  navigationChrome: { NavigationShell, useNavigationTracking },
+}: Pick<UiRootCapabilities, "scope" | "navigationChrome">) {
   useAnalyticsIdentity();
   useNavigationTracking();
   scope.useUiOrgQueryParamSelection();
