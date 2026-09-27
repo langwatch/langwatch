@@ -122,6 +122,24 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
     redirect: { from: "/governance/departments", to: "/governance/people" },
   },
   {
+    // Anomaly rules left the inventory's tabs; the pinned tab falls back to Catalog.
+    path: "/governance/anomaly-rules",
+    redirect: {
+      from: "/governance/anomaly-rules",
+      to: "/governance/inventory",
+      pinParams: { tab: "anomaly-rules" },
+    },
+  },
+  {
+    // Exact match only: /governance/users/:id keeps its own detail route.
+    path: "/governance/users",
+    redirect: {
+      from: "/governance/users",
+      to: "/governance/people",
+      pinParams: { tab: "people" },
+    },
+  },
+  {
     path: "/settings/gateway/*",
     redirect: { from: "/settings/gateway", to: "/gateway" },
   },
@@ -388,10 +406,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/governance/ingestion-source-detail.enterprise",
           },
           {
-            path: "/governance/anomaly-rules",
-            page: "pages/governance/anomaly-rules.enterprise",
-          },
-          {
             path: "/governance/people",
             page: "pages/governance/people",
           },
@@ -448,11 +462,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             // breakdown, model mix) defers to a follow-up.
             path: "/governance/teams/:id",
             page: "pages/governance/teams/[id]",
-          },
-          {
-            // View-all users listing - bird's-eye `View all users →` lands here.
-            path: "/governance/users",
-            page: "pages/governance/users",
           },
           {
             // Per-user detail - single-row scoped view keyed off the

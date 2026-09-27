@@ -108,7 +108,9 @@ describe("given the apps/ui Vite config", () => {
           html,
         )?.[1];
         expect(content).toBeDefined();
-        expect(parsePublicAppConfigMetaContent(content!).appBaseUrl).toBe("http://localhost:5560");
+        expect(parsePublicAppConfigMetaContent(content!).process?.appBaseUrl).toBe(
+          "http://localhost:5560",
+        );
       });
     });
   });
