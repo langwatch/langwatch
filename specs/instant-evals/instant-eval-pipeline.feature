@@ -300,3 +300,14 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     When it finishes
     Then exactly one spend record is reported for the run
     And it carries our cost, the customer price and the tokens
+
+  # apidiff parity with main: a run's passes wrap the accepted statement in a
+  # subquery, where the policy refuses an app function. Main ran them on the
+  # restricted identity without a second policy walk, and so does this.
+  @unit
+  Scenario: A statement calling eval at the top level runs its passes
+    Given a statement that calls eval in its top-level projection
+    And the policy accepted it for the run
+    When a pass wraps it in a subquery and runs
+    Then the pass reaches the database as the caller's restricted identity
+    And it is not refused for the eval call's position

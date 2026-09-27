@@ -152,7 +152,7 @@ function installation({
           }),
           validateLangWatchQL: () => ({ parameters: [], appFunctions: [] }),
           describeLangWatchQLJudgements: () => [JUDGEMENT],
-          executeLangWatchQL: async () => execution([]),
+          executeLangWatchQLPass: async () => execution([]),
         }),
         project: createApiFixture<ProjectApi>({
           findOrganizationId: async () => ORGANIZATION,

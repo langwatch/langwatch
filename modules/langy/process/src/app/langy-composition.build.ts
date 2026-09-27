@@ -1,6 +1,6 @@
 /**
- * LangyApp infrastructure: built from prisma/redis and own classes. Pieces
- * either stubs or redis-only (no token needed). commands/broadcast supplied
+ * LangyApp infrastructure: built from redis, config and own classes. The model
+ * and session-key members arrive built over peers; commands are supplied
  * externally (taken as dependency tokens).
  */
 import {
@@ -14,6 +14,7 @@ import type { Redis } from "ioredis";
 import { type LangyWorker } from "../channels/langy-worker.channel.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import { langyWorkerRuntimeOf } from "../rules/langy-worker-runtime.rules.ts";
 import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
 import {
   LangyGithubPrCounter,
@@ -24,8 +25,9 @@ import type {
   LangyCredentialComposition,
   LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
+import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
-import { LangyGithubPermit } from "./langy.members.ts";
+import { LangyGithubPermit, type LangyModel } from "./langy.members.ts";
 
 /** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
 export type LangyGithubPrRedis = Readonly<
@@ -109,10 +111,13 @@ export type LangyBuiltInfrastructure = Omit<LangyServiceCompositionOptions, "com
 export function buildLangyInfrastructure(input: {
   redis: RedisConnection | null;
   config: LangyServerConfig;
+  publicBaseUrl: string | undefined;
   worker: LangyWorker;
   repositories: LangyRepositories;
+  models: LangyModel;
+  sessionKeys: LangySessionKeyService;
 }): LangyBuiltInfrastructure {
-  const { redis, repositories, worker } = input;
+  const { redis, repositories, worker, models, sessionKeys } = input;
 
   const permits = LangyGithubPrPermitsAdapter.create(
     LangyGithubPrQuotaService.create({
@@ -121,20 +126,12 @@ export function buildLangyInfrastructure(input: {
   );
 
   const turns: LangyTurnTechnicalMembers = {
-    // Resolving the model a turn runs on refuses rather than inventing one: a
-    // guessed model bills a customer's key against a provider they did not
-    // choose (matches the deleted composition's own choice).
-    models: {
-      resolve: () => Promise.reject(new LangyNotEnabledError()),
-    },
+    models,
     worker,
     tokenBuffer: redis ? LangyTokenBufferRedisRepository.create({ redis }) : null,
     permits,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
-    sessionKeys: {
-      mint: () => Promise.reject(new LangyNotEnabledError()),
-      revoke: () => Promise.resolve(),
-    },
+    sessionKeys,
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
     context: { render: renderLangyTurnContext },
@@ -147,19 +144,12 @@ export function buildLangyInfrastructure(input: {
   };
 
   const credentials: LangyCredentialComposition = {
-    sessionKeys: {
-      mint: () => Promise.reject(new LangyNotEnabledError()),
-      revokeManaged: () => Promise.resolve("refused" as const),
-    },
+    sessionKeys,
     virtualKeys: {
       provision: () => Promise.reject(new LangyNotEnabledError()),
     },
     github: { enabled: false, mintTurnToken: () => Promise.resolve(null) },
-    runtime: {
-      workerCallbackUrl: undefined,
-      workerGatewayBaseUrl: undefined,
-      mirrorProjectId: undefined,
-    },
+    runtime: langyWorkerRuntimeOf({ config: input.config, publicBaseUrl: input.publicBaseUrl }),
   };
 
   return {

@@ -4,10 +4,7 @@
  * the answer. @see specs/instant-evals/instant-eval-pipeline.feature
  */
 
-import type {
-  LangWatchQLExecuteInput,
-  LangWatchQLQueryResult,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { describe, expect, it } from "vitest";
 
 import { instantEvalKeyColumns } from "../../rules/instant-eval-composition.rules.ts";
@@ -35,11 +32,11 @@ function result(overrides: Partial<LangWatchQLQueryResult> = {}): LangWatchQLQue
 
 /** An Analytics peer that records what it was asked and answers one result. */
 class RecordingRunner implements InstantEvalStatementRunner {
-  readonly asked: LangWatchQLExecuteInput[] = [];
+  readonly asked: LangWatchQLPassInput[] = [];
 
   constructor(private readonly answer: LangWatchQLQueryResult) {}
 
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
     this.asked.push(input);
     return this.answer;
   }

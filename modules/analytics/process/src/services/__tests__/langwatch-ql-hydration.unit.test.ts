@@ -1,7 +1,4 @@
-import type {
-  LangWatchQLExecuteInput,
-  LangWatchQLQueryResult,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -50,7 +47,7 @@ function emptyResult(rows: readonly Record<string, unknown>[]): LangWatchQLQuery
 }
 
 function hydrationService({
-  execute = vi.fn(async (_input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> =>
+  execute = vi.fn(async (_input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> =>
     emptyResult([{ transcript: "thread-a" }]),
   ),
 } = {}) {
@@ -59,7 +56,7 @@ function hydrationService({
     service: LangWatchQLHydrationService.create({
       reads: LangWatchQLHydrationReadService.create({ traces: traceSource }),
       compute: LangWatchQLHydrationComputeService.create({ renderer }),
-      runner: { executeLangWatchQL: execute },
+      runner: { executeLangWatchQLPass: execute },
     }),
   };
 }
@@ -75,7 +72,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
         traces: { ...traceSource, readTraces },
       }),
       compute: LangWatchQLHydrationComputeService.create({ renderer }),
-      runner: { executeLangWatchQL: async () => emptyResult([]) },
+      runner: { executeLangWatchQLPass: async () => emptyResult([]) },
     });
     const rows = [{ ConversationId: "thread-a" }];
 
@@ -114,7 +111,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
         traces: { ...traceSource, readThreadTraces },
       }),
       compute: LangWatchQLHydrationComputeService.create({ renderer }),
-      runner: { executeLangWatchQL: async () => emptyResult([]) },
+      runner: { executeLangWatchQLPass: async () => emptyResult([]) },
     });
 
     await expect(

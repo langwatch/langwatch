@@ -3,10 +3,7 @@
  * judging anything. @see specs/instant-evals/instant-eval-api.feature
  */
 
-import type {
-  LangWatchQLExecuteInput,
-  LangWatchQLQueryResult,
-} from "@langwatch/analytics-contract";
+import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { INSTANT_EVAL_CLASSIFIER_LIMITS } from "@langwatch/instant-eval-contract";
 import { describe, expect, it } from "vitest";
 
@@ -46,7 +43,7 @@ const ACCEPTED: AcceptedInstantEvalStatement = {
 class ScriptedRunner implements InstantEvalStatementRunner {
   constructor(private readonly total: number) {}
 
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
     const rows = input.sql.startsWith("SELECT count()")
       ? [{ total: this.total }]
       : [...Array(Math.min(this.total, 50)).keys()].map((index) => ({ TraceId: `t${index}` }));
@@ -158,7 +155,7 @@ describe("given a statement a run was accepted for", () => {
       const estimates = InstantEvalEstimateService.create({
         rowSource: InstantEvalRowSourceService.create({
           analytics: {
-            executeLangWatchQL: () => Promise.reject(new Error("clickhouse is down")),
+            executeLangWatchQLPass: () => Promise.reject(new Error("clickhouse is down")),
           },
         }),
         textSource: new ScriptedTexts(10),

@@ -10,6 +10,7 @@ import {
   LangWatchQLUnavailableError,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   type LangWatchQLSchema,
@@ -347,6 +348,42 @@ export class LangWatchQLService {
    */
   execute({ project, ...input }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     return this.executeForProjects({ ...input, projects: [project] });
+  }
+
+  /**
+   * Runs a wrapper composed around a statement `validate` already accepted, with no second
+   * policy walk: the wrapper holds that statement in a subquery, where an app function is
+   * refused. Main's instant-eval passes ran exactly so, as the caller's restricted identity.
+   */
+  async executePass({
+    project,
+    sql,
+    parameters,
+  }: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
+    const { executor } = this.deps;
+    if (!executor) {
+      logger.error(
+        { projectIds: [project.id] },
+        "LangWatchQL pass refused: no restricted identity is provisioned",
+      );
+
+      throw new LangWatchQLUnavailableError();
+    }
+
+    const execution = await executor.execute({
+      sql,
+      ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
+      tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+    });
+
+    return {
+      columns: execution.columns,
+      rows: execution.rows,
+      statistics: execution.statistics,
+      diagnostics: [],
+      followsTimeWindow: false,
+      followsGranularity: false,
+    };
   }
 
   /** The same, over every project in the set — an API key's readable projects. */

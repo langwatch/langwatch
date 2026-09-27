@@ -102,6 +102,7 @@ import { LocalControlConnectionService } from "../services/langy-local-control-c
 import { LocalControlLongPollService } from "../services/langy-local-control-long-poll.service.ts";
 import { LangyLocalControlTerminalService } from "../services/langy-local-control-terminal.service.ts";
 import { LocalControlSessionCoreService } from "../services/langy-local-session.service.ts";
+import { LangyModelService } from "../services/langy-model.service.ts";
 import { LangyLocalWorkerService } from "../services/langy-local-worker.service.ts";
 import { LangyLocalWorkspaceService } from "../services/langy-local-workspace.service.ts";
 import { LangyMaintenanceService } from "../services/langy-maintenance.service.ts";
@@ -229,13 +230,21 @@ export class LangyApp implements LangyApiContract {
       const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
       return { channel, door };
     });
+    const adapter = LangyPostgresService.create({ database: setup.members.prisma });
+    const sessionKeys = adapter.createSessionKeys({
+      apiKeys: setup.dependencies.apiKeys,
+      authz: setup.dependencies.authz,
+      metrics: LangySessionKeyMetricsOtelService.create(),
+    });
     const built = buildLangyInfrastructure({
       redis: setup.members.redis,
       config: setup.config,
       worker: channel,
       repositories: setup.repositories,
+      publicBaseUrl: setup.members.publicBaseUrl,
+      models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
+      sessionKeys,
     });
-    const adapter = LangyPostgresService.create({ database: setup.members.prisma });
     const commands = buildLangyConversationCommands({
       eventing: setup.members.eventing,
       processName: "langy",
@@ -249,11 +258,6 @@ export class LangyApp implements LangyApiContract {
       github: setup.dependencies.github,
       projects: setup.dependencies.projects,
       modelProviders: setup.dependencies.modelProviders,
-    });
-    const sessionKeys = adapter.createSessionKeys({
-      apiKeys: setup.dependencies.apiKeys,
-      authz: setup.dependencies.authz,
-      metrics: LangySessionKeyMetricsOtelService.create(),
     });
     const callers = LangyRestCallerService.create({
       featureFlags: setup.dependencies.featureFlags,

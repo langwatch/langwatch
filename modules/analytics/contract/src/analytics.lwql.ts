@@ -202,6 +202,9 @@ export type LangWatchQLExecuteInput = LangWatchQLRunContext &
     parameters?: Readonly<Record<string, unknown>>;
   }>;
 
+/** A wrapper around a statement the policy already accepted, run as the caller's identity. */
+export type LangWatchQLPassInput = Pick<LangWatchQLExecuteInput, "project" | "sql" | "parameters">;
+
 /**
  * One restricted execution over a SET of projects — every project an API key may read. Their
  * secrets become the tenant-capability set, so the query reads the union of their rows; an
@@ -268,6 +271,7 @@ export abstract class LangWatchQLService {
   abstract executeForProjects(
     input: LangWatchQLProjectSetExecuteInput & LangWatchQLEvalGate,
   ): Promise<LangWatchQLQueryResult>;
+  abstract executePass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 
 /**

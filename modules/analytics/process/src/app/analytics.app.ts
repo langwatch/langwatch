@@ -22,6 +22,7 @@ import {
   type LangWatchQLAvailability,
   type LangWatchQLCaller,
   type LangWatchQLExecuteInput,
+  type LangWatchQLPassInput,
   type LangWatchQLKeyReach,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
@@ -490,9 +491,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
         traces: new TraceApiHydrationSource(dependencies.traces),
       }),
       compute: LangWatchQLHydrationComputeService.create({ renderer: dependencies.traces }),
-      // The statement is run through this same door, so the hydration reaches
-      // it late: the bounds and the eval-function gate apply to it too.
-      runner: { executeLangWatchQL: (input) => this.executeLangWatchQL(input) },
+      // The page is read through a wrapper around the accepted statement, which
+      // the policy would refuse for holding an app function in a subquery.
+      runner: { executeLangWatchQLPass: (input) => this.executeLangWatchQLPass(input) },
     });
   }
 
@@ -720,6 +721,10 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       (await this.#isInstantEvalsEnabled(input.project.id));
 
     return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
+  }
+
+  executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
+    return this.#dependencies.langWatchQL.executePass(input);
   }
 
   /** This project's eval-function rollout, the one answer both paths above read. */

@@ -7,7 +7,7 @@ import type {
   LangWatchQLAcceptedStatement,
   LangWatchQLAppFunctionCall,
   LangWatchQLColumn,
-  LangWatchQLExecuteInput,
+  LangWatchQLPassInput,
   LangWatchQLJudgementCall,
   LangWatchQLQueryResult,
   LangWatchQLValidationInput,
@@ -92,11 +92,11 @@ class ScriptedAnalytics implements InstantEvalStatementValidator {
 
 /** A row source whose probe answers the projection the suite states. */
 class ProbeOnlyRunner implements InstantEvalStatementRunner {
-  readonly asked: LangWatchQLExecuteInput[] = [];
+  readonly asked: LangWatchQLPassInput[] = [];
 
   constructor(private readonly columns: readonly LangWatchQLColumn[]) {}
 
-  async executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
     this.asked.push(input);
 
     return {

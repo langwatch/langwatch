@@ -8,7 +8,7 @@
 import type {
   LangWatchQLCaller,
   LangWatchQLColumn,
-  LangWatchQLExecuteInput,
+  LangWatchQLPassInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
@@ -48,7 +48,7 @@ export class InstantEvalResultTruncatedError extends Error {
 
 /** The Analytics peer, narrowed to the one operation every pass runs. */
 export interface InstantEvalStatementRunner {
-  executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 
 /** What one pass reads about its selection, whoever asked for it. */
@@ -210,7 +210,6 @@ export class InstantEvalRowSourceService {
    */
   async #run({
     caller,
-    protections,
     sql,
     parameters,
     maxRows,
@@ -219,9 +218,8 @@ export class InstantEvalRowSourceService {
     maxRows: number;
     pass?: string;
   }): Promise<LangWatchQLQueryResult> {
-    const execution = await this.analytics.executeLangWatchQL({
+    const execution = await this.analytics.executeLangWatchQLPass({
       project: caller,
-      protections,
       sql,
       ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
     });

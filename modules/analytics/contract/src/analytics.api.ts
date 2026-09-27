@@ -12,6 +12,7 @@ import type {
 import type {
   LangWatchQLCaller,
   LangWatchQLExecuteInput,
+  LangWatchQLPassInput,
   LangWatchQLProtections,
   LangWatchQLQueryResult,
   LangWatchQLRunCaller,
@@ -148,6 +149,11 @@ export interface AnalyticsApi {
    */
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  /**
+   * Runs a wrapper composed around a statement `validateLangWatchQL` accepted, with no
+   * second policy walk: an instant-eval pass holds the statement in a subquery.
+   */
+  executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
   /**
    * The extraction half of a judged plan: the same page with every judged
    * column holding the text that would be judged rather than a verdict. No

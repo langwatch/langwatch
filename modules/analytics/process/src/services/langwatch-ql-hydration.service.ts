@@ -9,7 +9,7 @@ import {
   type LangWatchQLAppFunctionCall,
   type LangWatchQLCaller,
   type LangWatchQLColumn,
-  type LangWatchQLExecuteInput,
+  type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
   LWQL_HYDRATION_TRACE_IDS_PARAMETER,
@@ -35,7 +35,7 @@ import {
 
 /** The execute path a text hydration reads its rows through. */
 export interface LangWatchQLStatementRunner {
-  executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
+  executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 
 export class LangWatchQLHydrationService {
@@ -143,9 +143,8 @@ export class LangWatchQLHydrationService {
     traceIds: readonly string[];
   }): Promise<readonly Record<string, unknown>[]> {
     if (traceIds.length === 0) return [];
-    const execution = await this.runner.executeLangWatchQL({
+    const execution = await this.runner.executeLangWatchQLPass({
       project,
-      protections,
       sql: langWatchQLTraceRestrictedSql(sql),
       parameters: { ...parameters, [LWQL_HYDRATION_TRACE_IDS_PARAMETER]: [...traceIds] },
     });

@@ -1,14 +1,26 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import {
+  Config,
+  type ConfigOf,
+  gatewayInternalUrl,
+  gatewayLegacyUrl,
+  gatewayPublicUrl,
+} from "@langwatch/config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
 /**
- * Where the agent manager answers. `internalSecret` resolves through
- * `LangyApp.secrets` (ADR-132), never this slice — see
- * `assertLangyServerConfig` for the "both or neither" refusal.
+ * Where the agent manager answers, and the addresses its worker calls back on.
+ * `internalSecret` resolves through `LangyApp.secrets` (ADR-132), never this
+ * slice — see `assertLangyServerConfig` for the "both or neither" refusal.
  */
 export const langyConfig = Config.define((c) => ({
   agentUrl: c.env("LANGY_AGENT_URL", z.string().optional()),
+  workerCallbackUrl: c.env("LANGY_WORKER_CALLBACK_URL", z.string().optional()),
+  workerGatewayUrl: c.env("LANGY_WORKER_GATEWAY_URL", z.string().optional()),
+  mirrorProjectId: c.env("LANGY_MIRROR_PROJECT_ID", z.string().optional()),
+  gatewayInternalUrl,
+  gatewayPublicUrl,
+  gatewayLegacyUrl,
 }));
 
 export type LangyServerConfig = ConfigOf<typeof langyConfig>;

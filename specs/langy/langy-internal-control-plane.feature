@@ -31,3 +31,19 @@ Feature: The Langy internal control plane keeps the addresses its two halves dia
       Given the Langy internal control plane declaration
       When its addressing is read
       Then it is literal and carries no /api/v1 alias
+
+  Rule: The worker is handed the addresses main handed it
+
+    @unit
+    Scenario: The worker calls back on the deployment's public origin unless told otherwise
+      Given no worker callback override is configured
+      When a turn's credentials are composed
+      Then the worker calls back on the deployment's public origin
+      And a configured worker callback override wins over it
+
+    @unit
+    Scenario: The worker reaches the gateway at its internal address before its public one
+      Given the gateway's internal and public addresses are both configured
+      When a turn's credentials are composed
+      Then the worker is handed the internal address
+      And a configured worker gateway override wins over both
