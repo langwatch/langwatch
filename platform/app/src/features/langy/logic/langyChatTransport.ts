@@ -315,6 +315,11 @@ function subscribeTurnStream({
         sawOutput = true;
         onSignal({ type: "status", status: "" });
       };
+      const isReadinessStatus = () => {
+        const readiness = !sawOutput && !sawReadinessStatus;
+        sawReadinessStatus = true;
+        return readiness;
+      };
 
       const onEntry = (entry: LangyStreamEntry) => {
         if (closed) return;
@@ -350,12 +355,9 @@ function subscribeTurnStream({
             clearColdStartStatus();
             onSignal(entry);
             return;
-          case "status": {
-            const readiness = !sawOutput && !sawReadinessStatus;
-            sawReadinessStatus = true;
-            onSignal({ ...entry, readiness });
+          case "status":
+            onSignal({ ...entry, readiness: isReadinessStatus() });
             return;
-          }
           case "progress":
           case "milestone":
             onSignal(entry);
