@@ -65,10 +65,14 @@ export interface GithubApi {
     repositories?: GithubRepositoryRef[] | null;
   }): Promise<void>;
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]>;
-  mintTurnToken(input: {
+  /**
+   * A token for one turn, scoped to the repository when named: empty when the App is not
+   * configured, no installation is usable, or none covers the repository (main's null).
+   */
+  findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<GithubTurnToken | null>;
+  }): Promise<GithubTurnToken[]>;
   coversRepository(input: { organizationId: string; repositoryFullName: string }): Promise<boolean>;
   requestBranchMapping(input: {
     tenantId: string;

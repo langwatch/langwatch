@@ -633,7 +633,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async mintTurnToken(): Promise<never> {
+  async findTurnTokens(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 

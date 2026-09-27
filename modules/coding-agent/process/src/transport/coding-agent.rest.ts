@@ -16,41 +16,13 @@ import {
   codingAgentSessionEventsRestQuerySchema,
   codingAgentSessionEventsRestResponseSchema,
   type CodingAgentCallerScope,
-  type CodingAgentSessionCursor,
 } from "@langwatch/coding-agent-contract";
-import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
 import {
   pullRequestUsageQuerySchema,
   pullRequestUsageResponseSchema,
 } from "../rules/pull-request-usage-wire.rules.ts";
-
-/**
- * The opaque keyset cursor this door reads and writes. Kept here rather than
- * in the platform-neutral contract package: encoding needs `Buffer`, which
- * that package carries no Node types for.
- */
-function encodeCursor(cursor: CodingAgentSessionCursor): string {
-  return Buffer.from(JSON.stringify({ t: cursor.timeUnixMs, r: cursor.recordId })).toString(
-    "base64url",
-  );
-}
-
-function decodeCursor(raw: string): CodingAgentSessionCursor | null {
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
-      t?: unknown;
-      r?: unknown;
-    };
-    if (typeof parsed.t !== "number" || typeof parsed.r !== "string") {
-      return null;
-    }
-    return { timeUnixMs: parsed.t, recordId: parsed.r };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * What the project door resolved: the workspace the personal-workspace guard is
@@ -99,35 +71,7 @@ export const codingAgentRest = defineRestRouter(CodingAgentApi)
       "response's nextCursor to continue; filter with kinds (comma-separated).",
     responses: baseResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    // Both bounds or neither: half a window would silently widen the read
-    // past what the caller asked for.
-    if ((input.from === undefined) !== (input.to === undefined)) {
-      throw new ValidationError("from and to must be supplied together");
-    }
-
-    const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined;
-    if (input.cursor !== undefined && !cursor) {
-      throw new ValidationError("cursor is not decodable");
-    }
-
-    const { events, nextCursor } = await app.getSessionEvents({
-      projectId: scope.id,
-      sessionId: input.sessionId,
-      kinds: input.kinds,
-      occurredAt:
-        input.from !== undefined && input.to !== undefined
-          ? { fromMs: input.from, toMs: input.to }
-          : undefined,
-      cursor: cursor ?? undefined,
-      limit: input.limit,
-    });
-
-    return {
-      events,
-      nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
-    };
-  })
+  .handle(({ app, input, scope }) => app.readSessionEventsPage({ ...input, projectId: scope.id }))
   .build();
 
 /**

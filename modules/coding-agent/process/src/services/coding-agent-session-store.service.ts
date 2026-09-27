@@ -9,10 +9,10 @@ import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
   type CodingAgentSessionRow,
-  CodingAgentSessionRowMapper,
   type CodingAgentSessionState,
-  CodingAgentSessionStateMapper,
 } from "../eventing/coding-agent-session.projection.ts";
+import { toCodingAgentSessionRow } from "../rules/coding-agent-session-row-mapper.rules.ts";
+import { codingAgentSessionStateFromRow } from "../rules/coding-agent-session-state-mapper.rules.ts";
 
 /**
  * Whether a committed row's read-back columns can be trusted. Projection
@@ -94,7 +94,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
     appliedEventIds: string[];
   } {
     return {
-      row: CodingAgentSessionRowMapper.toRow({
+      row: toCodingAgentSessionRow({
         state,
         tenantId: String(context.tenantId),
         sessionId: String(context.aggregateId),
@@ -135,7 +135,7 @@ export class EventingCodingAgentSessionStoreService implements FoldProjectionSto
       return { state: null, appliedEventIds: [], miss: "undecodable" };
     }
     return {
-      state: CodingAgentSessionStateMapper.fromRow(found.row),
+      state: codingAgentSessionStateFromRow(found.row),
       appliedEventIds: found.appliedEventIds,
     };
   }

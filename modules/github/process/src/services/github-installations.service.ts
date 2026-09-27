@@ -189,11 +189,11 @@ export class GithubInstallationsService {
     return this.access.coversRepository(input);
   }
 
-  mintTurnToken(input: {
+  findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<GithubTurnToken | null> {
-    return this.access.mintTurnToken(input);
+  }): Promise<GithubTurnToken[]> {
+    return this.access.findTurnTokens(input);
   }
 
   private async tryReadSelectedRepositories(details: {

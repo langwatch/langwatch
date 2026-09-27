@@ -173,11 +173,11 @@ export class GithubFeatureService implements GithubApi {
     return this.installations.listRepositoriesForOrganization(organizationId);
   }
 
-  mintTurnToken(input: {
+  findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<GithubTurnToken | null> {
-    return this.installations.mintTurnToken(input);
+  }): Promise<GithubTurnToken[]> {
+    return this.installations.findTurnTokens(input);
   }
 
   coversRepository(input: {

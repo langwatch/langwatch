@@ -137,22 +137,24 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
     });
   }
 
-  async mintTurnToken(input: {
+  /** Empty for the absences main answered null for; a failure that is not one still throws. */
+  async findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<GithubTurnToken | null> {
+  }): Promise<GithubTurnToken[]> {
     if (!this.appTokens.configured) {
-      return null;
+      return [];
     }
 
     const usable = await this.usableInstallations(input.organizationId);
     if (usable.length === 0) {
-      return null;
+      return [];
     }
 
-    return input.repositoryFullName
-      ? this.mintForRepository(usable, input.repositoryFullName)
-      : this.mintForAnyInstallation(usable);
+    const token = input.repositoryFullName
+      ? await this.mintForRepository(usable, input.repositoryFullName)
+      : await this.mintForAnyInstallation(usable);
+    return token ? [token] : [];
   }
 
   private async usableInstallations(organizationId: string): Promise<GithubInstallationRow[]> {

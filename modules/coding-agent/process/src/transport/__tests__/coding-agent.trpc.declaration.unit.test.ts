@@ -3,7 +3,7 @@
  * The `codingAgents.*` wire, pinned: every procedure name, its kind and the
  * permission bound to it. A rename is a cache-key change in every browser.
  */
-import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { codingAgentTrpc } from "@langwatch/coding-agent-contract";
 import { describe, expect, it } from "vitest";
 
@@ -25,14 +25,9 @@ function boundProcedures(): { procedure: string; permission: unknown }[] {
     router: (record) => record,
   };
 
-  const mount = codingAgentTrpcTransport.router as TrpcRouterMount<never, never>;
-
-  (mount as unknown as (factory: TrpcProcedureFactory<object>, app: unknown) => void)(
-    runtime,
-    () => {
-      throw new Error("the wire table never resolves an application");
-    },
-  );
+  codingAgentTrpcTransport.router(runtime, () => {
+    throw new Error("the wire table never resolves an application");
+  });
 
   return bound;
 }

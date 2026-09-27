@@ -20,6 +20,8 @@ import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
+import { codingAgentSessionStateFromRow } from "../../rules/coding-agent-session-state-mapper.rules.ts";
 import {
   CodingAgentSessionStateProjection,
   contextUsageKey,
@@ -29,9 +31,7 @@ import {
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CodingAgentSessionFoldProjection,
-  CodingAgentSessionRowMapper,
   type CodingAgentSessionState,
-  CodingAgentSessionStateMapper,
 } from "../coding-agent-session.projection.ts";
 
 const SESSION_ID = "8f2c9a1e-4711-4e0f-9d2e-session";
@@ -69,14 +69,6 @@ function makeProjection() {
   });
 }
 
-/**
- * `initState` is protected. Reaching it needs a cast, but the cast has to name
- * the REAL state type — an earlier `() => never` here collapsed every downstream
- * assertion to `never` and hid its own type errors.
- */
-function initStateOf(projection: CodingAgentSessionFoldProjection): CodingAgentSessionState {
-  return (projection as unknown as { initState: () => CodingAgentSessionState }).initState();
-}
 
 /**
  * The working context the contribute service stamps a model-call
@@ -245,7 +237,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             request_id: "req_1",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.modelCalls).toBe(1);
@@ -261,7 +253,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "The session's cost is computed from tokens, same formula as the trace" */
     it("computes the span's cost and keeps the reported figure beside it", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       // What the agent states it was billed for the turn.
       state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -309,7 +301,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             ...(context !== undefined ? { "llm_request.context": context } : {}),
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
     };
 
@@ -341,7 +333,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             query_source: "repl_main_thread",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.costUsd).toBeCloseTo(17_854 * 0.000006, 6);
@@ -363,7 +355,7 @@ describe("CodingAgentSessionFoldProjection", () => {
           facts: { tool_name: "Bash" },
           statusCode: 2,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.failedTools).toBe(1);
@@ -380,7 +372,7 @@ describe("CodingAgentSessionFoldProjection", () => {
           facts: { tool_name: "Read" },
           statusCode: 1,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.failedTools).toBe(0);
@@ -392,7 +384,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario a sub-agent run stays inside its parent session */
     it("collects both traces on one session without double-counting", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
@@ -434,7 +426,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             source: "user_permanent",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.toolsDenied).toBe(1);
@@ -448,7 +440,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "an agent that states its own price keeps it beside the computed one" */
     it("sums it beside the computed cost, never into it", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -475,7 +467,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario a reported rate limit is counted apart from an inferred one */
     it("counts them apart from the 429-inferred counter", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -510,7 +502,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario compactions are told apart by what triggered them */
     it("tallies the trigger kinds, bucketing the unnamed as unknown", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       for (const [timeMs, trigger] of [
         [1_500, "auto"],
@@ -555,7 +547,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario a spawned session knows its parent */
     it("keeps the first parent and the fork flag once set", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -602,7 +594,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario Repository identity and worktree follow the latest context event */
     it("moves the repository and worktree to the latest event's answer", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({ facts: contextFacts() }),
@@ -630,7 +622,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario A context event that omits a field keeps the previous value */
     it("keeps the declared repository and worktree when a later event omits them", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({ facts: contextFacts() }),
@@ -657,7 +649,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario The branch follows the latest session context event */
     it("moves the branch to the one the session ended on", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({ facts: contextFacts() }),
@@ -688,7 +680,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario Every branch a session reports joins its branch set, first seen first */
     it("keeps every branch it drove, oldest first, alongside the current one", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({ facts: contextFacts() }),
@@ -710,7 +702,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario A branch reported twice joins the set once */
     it("names a branch once however often the session returns to it", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       for (const [index, branch] of ["main", "feat/a", "main", "feat/a"].entries()) {
         state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -729,7 +721,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario The branch set stops growing at its bound */
     it("holds the first branches it saw once the set is full", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       for (let index = 0; index < MAX_SET + 10; index++) {
         state = projection.handleCodingAgentSessionLogFactsContributed(
@@ -754,7 +746,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       "folds the same identity for %s, because nothing in the fold is per-agent",
       (agent) => {
         const projection = makeProjection();
-        let state = initStateOf(projection);
+        let state = projection.init();
 
         state = projection.handleCodingAgentSessionLogFactsContributed(
           logFactsEvent({
@@ -777,7 +769,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario The title lifts from a generate_session_title response body, capped */
     it("takes the latest non-empty title", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -827,7 +819,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario A session with no generated title is named by the first thing the user asked */
     it("names an unnamed session by its first prompt and keeps that name", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -848,7 +840,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario A generated title replaces the prompt-derived name */
     it("lets a generated title replace the prompt-derived name", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -873,7 +865,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario The harvest names the session by the first thing the user asked */
     it("fills the name from the companion event and never overwrites one", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       const harvestContext = (title: string): Record<string, string | number | boolean> => ({
         "event.name": "langwatch.session_context",
@@ -908,7 +900,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "The session's own name outranks the prompt-derived name" */
     it("holds the session's name over both derived titles", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -946,7 +938,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "A renamed session renames its row" */
     it("folds the newest name in place", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       const declared = (title: string) =>
         logFactsEvent({
@@ -969,7 +961,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "A blank name does not rename the session" */
     it("keeps the previous title when a later name is whitespace", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       const declared = (title: string) =>
         logFactsEvent({
@@ -992,7 +984,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario "A context record with no repository still folds its titles" */
     it("folds a context that names no repository", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -1020,7 +1012,7 @@ describe("CodingAgentSessionFoldProjection", () => {
       // A pre-00083 row decodes with a title and no source; it must keep the
       // old newest-wins behaviour rather than freezing on its first title.
       const decoded = {
-        ...initStateOf(projection),
+        ...projection.init(),
         title: "Good morning.",
         titleSource: null,
       };
@@ -1044,7 +1036,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario a session that sent only metrics still appears */
     it("materializes the session from metric contributions alone", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionMetricFactsContributed(
         metricFactsEvent({
@@ -1078,7 +1070,7 @@ describe("CodingAgentSessionFoldProjection", () => {
     /** @scenario re-delivered telemetry does not inflate a session */
     it("replaces the series' converged value instead of adding it", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionMetricFactsContributed(
         metricFactsEvent({
@@ -1106,7 +1098,7 @@ describe("CodingAgentSessionFoldProjection", () => {
 
     it("sums distinct delta units exactly once each", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       for (const [unit, value] of [
         ["point-1", 10],
@@ -1130,7 +1122,7 @@ describe("CodingAgentSessionFoldProjection", () => {
   describe("when the human accepts and rejects edits", () => {
     it("splits the decisions and tracks the languages", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionMetricFactsContributed(
         metricFactsEvent({
@@ -1160,7 +1152,7 @@ describe("CodingAgentSessionFoldProjection", () => {
   describe("when token metrics arrive for a session that also sent spans", () => {
     it("does not overlay them — the spans already carry the tokens", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
@@ -1193,10 +1185,10 @@ describe("CodingAgentSessionFoldProjection", () => {
           spanId: "llm-1",
           facts: { input_tokens: 10 },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
-      const row = CodingAgentSessionRowMapper.toRow({
+      const row = toCodingAgentSessionRow({
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
@@ -1222,7 +1214,7 @@ describe("CodingAgentSessionFoldProjection", () => {
             "vcs.worktree.name": "widgets-feat",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -1235,7 +1227,7 @@ describe("CodingAgentSessionFoldProjection", () => {
         state,
       );
 
-      const row = CodingAgentSessionRowMapper.toRow({
+      const row = toCodingAgentSessionRow({
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
@@ -1251,8 +1243,8 @@ describe("CodingAgentSessionFoldProjection", () => {
 
       // A session whose agent has no companion emitter writes the empty
       // string, and reads back as "nothing reported this".
-      const bare = CodingAgentSessionRowMapper.toRow({
-        state: initStateOf(projection),
+      const bare = toCodingAgentSessionRow({
+        state: projection.init(),
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
@@ -1261,15 +1253,15 @@ describe("CodingAgentSessionFoldProjection", () => {
       expect(bare.gitBranch).toBe("");
       expect(bare.title).toBe("");
       expect(bare.gitBranches).toEqual([]);
-      expect(CodingAgentSessionStateMapper.fromRow(bare).repositoryHost).toBeNull();
-      expect(CodingAgentSessionStateMapper.fromRow(bare).gitBranch).toBeNull();
-      expect(CodingAgentSessionStateMapper.fromRow(bare).title).toBeNull();
-      expect(CodingAgentSessionStateMapper.fromRow(bare).gitBranches).toEqual([]);
+      expect(codingAgentSessionStateFromRow(bare).repositoryHost).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).gitBranch).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).title).toBeNull();
+      expect(codingAgentSessionStateFromRow(bare).gitBranches).toEqual([]);
     });
 
     it("writes every branch the session drove, and decodes them back", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
       for (const [index, branch] of ["main", "feat/two"].entries()) {
         state = projection.handleCodingAgentSessionLogFactsContributed(
           logFactsEvent({
@@ -1285,7 +1277,7 @@ describe("CodingAgentSessionFoldProjection", () => {
         );
       }
 
-      const row = CodingAgentSessionRowMapper.toRow({
+      const row = toCodingAgentSessionRow({
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
@@ -1294,7 +1286,7 @@ describe("CodingAgentSessionFoldProjection", () => {
 
       expect(row.gitBranches).toEqual(["main", "feat/two"]);
       expect(row.gitBranch).toBe("feat/two");
-      expect(CodingAgentSessionStateMapper.fromRow(row).gitBranches).toEqual(["main", "feat/two"]);
+      expect(codingAgentSessionStateFromRow(row).gitBranches).toEqual(["main", "feat/two"]);
     });
   });
 });
@@ -1361,14 +1353,14 @@ describe("read-back losslessness (ADR-066)", () => {
       expect(Object.keys(state.metricSeries)).toContain("loc-added");
       expect(state.linesAdded).toBe(42);
 
-      const row = CodingAgentSessionRowMapper.toRow({
+      const row = toCodingAgentSessionRow({
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
         version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
       });
 
-      const decoded = CodingAgentSessionStateMapper.fromRow(row);
+      const decoded = codingAgentSessionStateFromRow(row);
 
       expect(decoded).toEqual(state);
     });
@@ -1382,8 +1374,8 @@ describe("read-back losslessness (ADR-066)", () => {
   describe("when a further contribution folds onto the recovered state", () => {
     /** Round-trips a state through the row the fold would have committed. */
     function recover(state: CodingAgentSessionState): CodingAgentSessionState {
-      return CodingAgentSessionStateMapper.fromRow(
-        CodingAgentSessionRowMapper.toRow({
+      return codingAgentSessionStateFromRow(
+        toCodingAgentSessionRow({
           state,
           tenantId: "tenant-1",
           sessionId: SESSION_ID,
@@ -1528,7 +1520,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             duration_ms: 800,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.agent).toBe("claude_cowork");
@@ -1554,7 +1546,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             model: "claude-fable-5",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.costUsd).toBeCloseTo(0.42);
@@ -1576,7 +1568,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             tool_result_size_bytes: 2_048,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.toolCalls).toBe(1);
@@ -1604,7 +1596,7 @@ describe("coding-agent session fold, per-agent gating", () => {
           agent: "claude_cowork",
           facts: modelFacts,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       const state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -1630,7 +1622,7 @@ describe("coding-agent session fold, per-agent gating", () => {
           agent: "claude_cowork",
           facts: { tool_name: "Bash", duration_ms: 120 },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       const state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -1662,7 +1654,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             "user.account_uuid": "0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.userId).toBe("0f6f44f5-2f4c-4a5e-9d3b-7f8f2f9a1b2c");
@@ -1684,7 +1676,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             output_tokens: 50,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.agentReportedCostUsd).toBeCloseTo(0.42);
@@ -1713,7 +1705,7 @@ describe("coding-agent session fold, per-agent gating", () => {
             tool_result_size_bytes: 2_048,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.toolResultBytes).toBe(2_048);
@@ -1756,7 +1748,7 @@ describe("coding-agent session fold, codex", () => {
           startMs: 1_000,
           endMs: 8_355,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.modelCalls).toBe(1);
@@ -1785,7 +1777,7 @@ describe("coding-agent session fold, codex", () => {
           agent: "codex",
           facts: codexTurnFacts,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       // 2,936 non-cached input + 11,008 cache-read + 7 output at gpt-5.6-sol's
@@ -1806,7 +1798,7 @@ describe("coding-agent session fold, codex", () => {
           agent: "codex",
           facts: codexTurnFacts,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       const second = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
@@ -1837,7 +1829,7 @@ describe("coding-agent session fold, codex", () => {
             "gen_ai.response.model": "a-model-no-registry-lists",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.inputTokens).toBe(2_936);
@@ -1855,7 +1847,7 @@ describe("coding-agent session fold, codex", () => {
           agent: "codex",
           facts: rest,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       // Taking the cache off a second time would leave nothing here, which
@@ -1874,7 +1866,7 @@ describe("coding-agent session fold, codex", () => {
           agent: "unknown",
           facts: codexTurnFacts,
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.modelCalls).toBe(0);
@@ -1898,7 +1890,7 @@ describe("coding-agent session fold, codex", () => {
             duration_ms: 340,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       // The SAME shell command also fires sandbox_outcome; mapping it onto
       // tool_result again would count the command twice.
@@ -1939,7 +1931,7 @@ describe("coding-agent session fold, codex", () => {
             duration_ms: 47,
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       const state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -1978,7 +1970,7 @@ describe("coding-agent session fold, codex", () => {
             mcp_server: "grafana",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.mcpServers).toEqual(["grafana"]);
@@ -2003,7 +1995,7 @@ describe("coding-agent session fold, codex", () => {
           state,
         );
 
-      let state = initStateOf(projection);
+      let state = projection.init();
       state = decide(state, "approved", 1_000);
       state = decide(state, "denied", 1_001);
       state = decide(state, "denied_with_network_policy_deny", 1_002);
@@ -2027,7 +2019,7 @@ describe("coding-agent session fold, codex", () => {
           timeMs: 1_000,
           facts: { "event.name": "codex.turn_ttft", duration_ms: 1_200 },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
       const state = projection.handleCodingAgentSessionLogFactsContributed(
         logFactsEvent({
@@ -2061,7 +2053,7 @@ describe("coding-agent session fold, codex", () => {
             "vcs.ref.head.name": "feat/pricing",
           },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.repositoryHost).toBe("github.com");
@@ -2124,7 +2116,7 @@ describe("usage by declared context", () => {
     /** @scenario A model call's tokens and cost are charged to the context stamped on it */
     it("records each branch's own tokens and cost, and the counters stay the sum", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
 
       state = projection.handleCodingAgentSessionSpanFactsContributed(
         spanFactsEvent({
@@ -2189,7 +2181,7 @@ describe("usage by declared context", () => {
           },
           stamp: stampOn("fix/review"),
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.usageByContext[contextUsageKey(stampOn("fix/review"))]).toMatchObject({
@@ -2216,7 +2208,7 @@ describe("usage by declared context", () => {
           },
           stamp: stampOn("main"),
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.usageByContext[contextUsageKey(stampOn("main"))]).toMatchObject({
@@ -2239,7 +2231,7 @@ describe("usage by declared context", () => {
           spanId: "llm-1",
           facts: callFacts(100),
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.usageByContext).toEqual({});
@@ -2256,7 +2248,7 @@ describe("usage by declared context", () => {
           facts: callFacts(100),
           stamp: { ...stampOn("main"), branch: "" },
         }),
-        initStateOf(projection),
+        projection.init(),
       );
 
       expect(state.usageByContext).toEqual({});
@@ -2267,7 +2259,7 @@ describe("usage by declared context", () => {
     /** @scenario The per-context usage record stops growing at its bound */
     it("keeps the first contexts it saw and keeps counting every call", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
       const calls = MAX_USAGE_CONTEXTS + 5;
 
       for (let index = 0; index < calls; index++) {
@@ -2295,7 +2287,7 @@ describe("usage by declared context", () => {
     /** @scenario The per-context usage survives the row and rebuilds identically */
     it("writes one entry per context and decodes them back under the same keys", () => {
       const projection = makeProjection();
-      let state = initStateOf(projection);
+      let state = projection.init();
       for (const [index, branch] of ["main", "feat/two"].entries()) {
         state = projection.handleCodingAgentSessionSpanFactsContributed(
           spanFactsEvent({
@@ -2310,7 +2302,7 @@ describe("usage by declared context", () => {
         );
       }
 
-      const row = CodingAgentSessionRowMapper.toRow({
+      const row = toCodingAgentSessionRow({
         state,
         tenantId: "tenant-1",
         sessionId: SESSION_ID,
@@ -2318,13 +2310,11 @@ describe("usage by declared context", () => {
       });
 
       expect(row.usageByContext.map((usage) => usage.branch)).toEqual(["main", "feat/two"]);
-      expect(CodingAgentSessionStateMapper.fromRow(row).usageByContext).toEqual(
-        state.usageByContext,
-      );
+      expect(codingAgentSessionStateFromRow(row).usageByContext).toEqual(state.usageByContext);
       // A row from before the column decodes to no record.
-      expect(
-        CodingAgentSessionStateMapper.fromRow({ ...row, usageByContext: [] }).usageByContext,
-      ).toEqual({});
+      expect(codingAgentSessionStateFromRow({ ...row, usageByContext: [] }).usageByContext).toEqual(
+        {},
+      );
     });
   });
 });

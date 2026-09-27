@@ -225,7 +225,9 @@ describe("mintInstallationToken", () => {
         "fetch",
         vi.fn<typeof fetch>(async () => new Response("nope", { status: 403 })),
       );
-      await expect(svc.mintInstallationToken({ installationId: "5" })).rejects.toThrow();
+      await expect(svc.mintInstallationToken({ installationId: "5" })).rejects.toThrow(
+        "GitHub token mint failed: 403",
+      );
       expect(redis.store.size).toBe(0);
     });
   });

@@ -2,7 +2,7 @@ import {
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   type LogFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
-import { type AppendStore, createTenantId, type Event } from "@langwatch/eventing";
+import { type AppendStore, createTenantId, type Event, EventSchema } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -372,10 +372,19 @@ describe("CodingAgentSessionEventsMapProjection", () => {
     it("answers for a payload with no readable facts instead of throwing", () => {
       for (const data of [undefined, null, {}, { facts: null }, "nonsense"]) {
         expect(
-          CodingAgentSessionEventsMapProjection.accepts({
-            type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
-            data,
-          } as unknown as Event),
+          CodingAgentSessionEventsMapProjection.accepts(
+            EventSchema.parse({
+              id: "evt_1",
+              aggregateId: "session_1",
+              aggregateType: "coding_agent_session",
+              tenantId: "project_1",
+              createdAt: 1_800_000_000_000,
+              occurredAt: 1_800_000_000_000,
+              type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+              version: "2026-01-01",
+              data,
+            }),
+          ),
         ).toBe(false);
       }
     });

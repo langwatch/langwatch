@@ -21,6 +21,7 @@ import {
   githubConfig,
   type GithubRepository,
   type GithubUsageCount,
+  type GithubWebhookEnvelope,
 } from "@langwatch/github-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import {
@@ -483,7 +484,11 @@ export class GithubApp implements GithubApiContract {
   parsePullRequestEvent(payload: unknown): GithubPullRequestEvent | null {
     return this.#service.parsePullRequestEvent(payload);
   }
-  applyWebhookPayload(input: Parameters<GithubApi["applyWebhookPayload"]>[0]): Promise<void> {
+  applyWebhookPayload(input: {
+    payload: GithubWebhookEnvelope;
+    eventType: string | undefined;
+    deliveryId: string | undefined;
+  }): Promise<void> {
     return this.#service.applyWebhookPayload(input);
   }
   getAllForOrganization(organizationId: string): Promise<readonly GithubInstallation[]> {
@@ -524,11 +529,11 @@ export class GithubApp implements GithubApiContract {
   listRepositoriesForOrganization(organizationId: string): Promise<readonly GithubRepositoryRef[]> {
     return this.#service.listRepositoriesForOrganization(organizationId);
   }
-  mintTurnToken(input: {
+  findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<GithubTurnToken | null> {
-    return this.#service.mintTurnToken(input);
+  }): Promise<GithubTurnToken[]> {
+    return this.#service.findTurnTokens(input);
   }
   coversRepository(input: {
     organizationId: string;

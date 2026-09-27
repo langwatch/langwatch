@@ -351,6 +351,15 @@ export const codingAgentSessionEventsRestResponseSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
+/** One page of a session's events as the REST door asks for it: its query and whose session. */
+export type CodingAgentSessionEventsPageInput = z.output<
+  typeof codingAgentSessionEventsRestQuerySchema
+> & { projectId: string; sessionId: string };
+/** The page the REST door answers, its keyset cursor already encoded. */
+export type CodingAgentSessionEventsPage = z.infer<
+  typeof codingAgentSessionEventsRestResponseSchema
+>;
+
 export const codingAgentSessionLookupInputSchema = z
   .object({
     projectId: z.string(),
