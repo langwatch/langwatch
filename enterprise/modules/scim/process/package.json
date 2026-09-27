@@ -57,6 +57,7 @@
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/enterprise-governance-process": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "nanoid": "^6.0.0",

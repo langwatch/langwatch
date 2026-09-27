@@ -7,7 +7,6 @@ import {
   type runtimeInputsSchema,
 } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "@langwatch/trace-contract";
-import { fetchSSE } from "@langwatch/workflow-browser/fetch-sse";
 /**
  * Runs a prompt from the playground and streams the reply, replacing
  * `useCopilotChat`. Deltas buffer and flush on an animation frame
@@ -16,6 +15,7 @@ import { fetchSSE } from "@langwatch/workflow-browser/fetch-sse";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 
+import { fetchSSE } from "./fetch-sse.ts";
 import { useConversationState } from "./use-conversation-state.ts";
 import { useDeltaBuffer } from "./use-delta-buffer.ts";
 

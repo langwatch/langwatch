@@ -24,11 +24,6 @@
       "types": "./dist/comparison-config-form.d.ts",
       "default": "./src/comparison-config-form.ts"
     },
-    "./evaluation-mappings": {
-      "langwatch-declaration-source": "./src/evaluation-mappings.ts",
-      "types": "./dist/evaluation-mappings.d.ts",
-      "default": "./src/evaluation-mappings.ts"
-    },
     "./evaluator-editor-callbacks": {
       "langwatch-declaration-source": "./src/evaluator-editor-callbacks.ts",
       "types": "./dist/evaluator-editor-callbacks.d.ts",
