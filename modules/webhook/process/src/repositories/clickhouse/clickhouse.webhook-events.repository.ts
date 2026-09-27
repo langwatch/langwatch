@@ -80,6 +80,18 @@ function rowStatusesFor(types?: string[]): string[] {
   ];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** The order the SQL pages in, applied again after the per-tenant pages merge. */
+function newestFirst(left: WebhookSpendEventRow, right: WebhookSpendEventRow): number {
+  const byTime = right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds;
+  if (byTime !== 0) return byTime;
+  if (left.gatewayRequestId === right.gatewayRequestId) return 0;
+  return left.gatewayRequestId < right.gatewayRequestId ? 1 : -1;
+}
+
 export type WebhookEventsCursor = {
   occurredAtMs: number;
   gatewayRequestId: string;
@@ -149,11 +161,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
     const statuses = rowStatusesFor(input.types);
     if (statuses.length === 0) return { rows: [], nextCursor: null };
     const clauses: string[] = [];
-    const queryParams: Record<string, unknown> = {
-      tenantIds: input.tenantIds,
-      statuses,
-      limit: input.limit,
-    };
+    const queryParams: Record<string, unknown> = { statuses, limit: input.limit };
     if (input.fromMs !== undefined) {
       clauses.push("AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})");
       queryParams.fromMs = input.fromMs;
@@ -170,19 +178,17 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
       queryParams.cursorOccurredAtMs = cursor.occurredAtMs;
       queryParams.cursorRequestId = cursor.gatewayRequestId;
     }
-    const client = await this.resolveClient(input.tenantIds[0]!);
-    const result = await client.query({
-      query: `SELECT ${SPEND_ROW_COLUMNS}
+    const query = `SELECT ${SPEND_ROW_COLUMNS}
         FROM ${SPEND_TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId = {tenantId:String}
           AND Status IN {statuses:Array(String)}
           ${clauses.join("\n          ")}
         ORDER BY OccurredAt DESC, GatewayRequestId DESC
-        LIMIT {limit:UInt32}`,
-      query_params: queryParams,
-      format: "JSONEachRow",
-    });
-    const rows = ((await result.json()) as Record<string, unknown>[]).map(mapSpendEventRow);
+        LIMIT {limit:UInt32}`;
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) => this.readTenantRows({ tenantId, query, queryParams })),
+    );
+    const rows = perTenant.flat().toSorted(newestFirst).slice(0, input.limit);
     const last = rows.at(-1);
     return {
       rows,
@@ -200,25 +206,45 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepository {
     tenantIds: string[];
     id: string;
   }): Promise<WebhookSpendEventRow | null> {
-    if (input.tenantIds.length === 0) return null;
     const parsed = parseEventId(input.id);
     if (!parsed) return null;
-    const client = await this.resolveClient(input.tenantIds[0]!);
-    const result = await client.query({
-      query: `SELECT ${SPEND_ROW_COLUMNS}
+    const perTenant = await Promise.all(
+      input.tenantIds.map((tenantId) =>
+        this.readTenantRows({
+          tenantId,
+          query: `SELECT ${SPEND_ROW_COLUMNS}
         FROM ${SPEND_TABLE} FINAL
-        WHERE TenantId IN {tenantIds:Array(String)}
+        WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
           AND Status IN {statuses:Array(String)}
         LIMIT 1`,
-      query_params: {
-        tenantIds: input.tenantIds,
-        gatewayRequestId: parsed.gatewayRequestId,
-        statuses: parsed.statuses,
-      },
+          queryParams: {
+            gatewayRequestId: parsed.gatewayRequestId,
+            statuses: parsed.statuses,
+          },
+        }),
+      ),
+    );
+    return perTenant.flat()[0] ?? null;
+  }
+
+  /** One statement per project tenant: the tenant guard admits exactly one tenant per read. */
+  private async readTenantRows({
+    tenantId,
+    query,
+    queryParams,
+  }: {
+    tenantId: string;
+    query: string;
+    queryParams: Record<string, unknown>;
+  }): Promise<WebhookSpendEventRow[]> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query,
+      query_params: { ...queryParams, tenantId },
       format: "JSONEachRow",
     });
-    const row = ((await result.json()) as Record<string, unknown>[])[0];
-    return row ? mapSpendEventRow(row) : null;
+    const raw = await result.json();
+    return Array.isArray(raw) ? raw.filter(isRecord).map(mapSpendEventRow) : [];
   }
 }

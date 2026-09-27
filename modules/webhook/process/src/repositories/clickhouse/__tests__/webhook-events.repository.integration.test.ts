@@ -6,6 +6,10 @@ import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { WebhookEventsClickHouseRepository } from "../clickhouse.webhook-events.repository.ts";
+import {
+  createWebhookClickHouseResolver,
+  type WebhookRoutedClickHouse,
+} from "../webhook-clickhouse.resolver.ts";
 
 const tenantId = `test-webhook-events-${Math.random().toString(36).slice(2, 10)}`;
 const baseTime = Date.UTC(2026, 6, 20, 12, 0, 0);
@@ -43,6 +47,7 @@ const CREATE_TABLE = `
 `;
 
 function spendRow(input: {
+  tenant?: string;
   gatewayRequestId: string;
   occurredAtMs: number;
   status: string;
@@ -50,7 +55,7 @@ function spendRow(input: {
   settleReason?: string;
 }): Record<string, unknown> {
   return {
-    TenantId: tenantId,
+    TenantId: input.tenant ?? tenantId,
     GatewayRequestId: input.gatewayRequestId,
     OrganizationId: "org-1",
     VirtualKeyId: "vk-1",
@@ -78,6 +83,19 @@ function spendRow(input: {
     CreatedAt: input.occurredAtMs,
     LastEventOccurredAt: input.occurredAtMs,
     EventTimestamp: input.occurredAtMs,
+  };
+}
+
+/** The routed member's contract: one statement reads the one tenant it is routed by. */
+function tenantRoutedClickHouse(raw: () => ClickHouseClient): WebhookRoutedClickHouse {
+  return {
+    async query({ tenantId: routed, sql, params }) {
+      if (!/TenantId = \{tenantId:String\}/.test(sql) || params?.tenantId !== routed) {
+        throw new Error(`statement is not scoped to its routed tenant ${routed}`);
+      }
+      const result = await raw().query({ query: sql, query_params: params, format: "JSONEachRow" });
+      return { rows: await result.json() };
+    },
   };
 }
 
@@ -198,5 +216,69 @@ describe("webhook emitted-events listing", () => {
     ];
     // Exact set: the disjoint window makes leakage a failure, not noise.
     expect(seen.toSorted()).toEqual([...ids].toSorted());
+  });
+
+  /** @scenario "The events listing reads each of the organization's projects under its own tenant" */
+  it("merges one tenant-scoped read per project into a single newest-first page", async () => {
+    const windowStart = baseTime + 200_000;
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const otherTenant = `${tenantId}-other`;
+    const older = `req-org-older-${suffix}`;
+    const middle = `req-org-middle-${suffix}`;
+    const newest = `req-org-newest-${suffix}`;
+    await client.insert({
+      table: "gateway_spend",
+      format: "JSONEachRow",
+      values: [
+        spendRow({
+          gatewayRequestId: older,
+          occurredAtMs: windowStart + 1000,
+          status: "confirmed",
+        }),
+        spendRow({
+          tenant: otherTenant,
+          gatewayRequestId: middle,
+          occurredAtMs: windowStart + 2000,
+          status: "confirmed",
+        }),
+        spendRow({
+          gatewayRequestId: newest,
+          occurredAtMs: windowStart + 3000,
+          status: "confirmed",
+        }),
+      ],
+    });
+    const routed = WebhookEventsClickHouseRepository.create(
+      createWebhookClickHouseResolver(tenantRoutedClickHouse(() => client)),
+    );
+    const window = { fromMs: windowStart - 1, toMs: windowStart + 60_000 };
+
+    const first = await routed.readEmittedEventsPage({
+      tenantIds: [tenantId, otherTenant],
+      ...window,
+      limit: 2,
+    });
+    expect(first.rows.map((row) => row.gatewayRequestId)).toEqual([newest, middle]);
+    expect(first.rows.map((row) => row.tenantId)).toEqual([tenantId, otherTenant]);
+
+    const second = await routed.readEmittedEventsPage({
+      tenantIds: [tenantId, otherTenant],
+      ...window,
+      cursor: first.nextCursor,
+      limit: 2,
+    });
+    expect(second.rows.map((row) => row.gatewayRequestId)).toEqual([older]);
+    expect(second.nextCursor).toBeNull();
+
+    const found = await routed.findEmittedEventById({
+      tenantIds: [tenantId, otherTenant],
+      id: `${middle}:completed`,
+    });
+    expect(found?.tenantId).toBe(otherTenant);
+    const outsider = await routed.findEmittedEventById({
+      tenantIds: [tenantId],
+      id: `${middle}:completed`,
+    });
+    expect(outsider).toBeNull();
   });
 });

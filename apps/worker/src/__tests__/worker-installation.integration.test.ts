@@ -12,6 +12,7 @@ import {
   type BlobCleanupDeps,
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
+import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
@@ -52,7 +53,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
   return module.repositoryRegistry === void 0 ? module : withMemoryRepositories(module);
 }
 
-async function bootWorker() {
+async function bootWorker({ live = false }: { live?: boolean } = {}) {
   const owners = processConfig(serverModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
@@ -66,7 +67,7 @@ async function bootWorker() {
 
   const prisma = unreachable<ProcessMembers["prisma"]>("prisma");
   const eventing = new EventSourcing({
-    enabled: false,
+    ...(live ? { eventStore: EventStoreMemory.createForTesting() } : { enabled: false }),
     participation: "consume",
     processStore: InMemoryProcessStore.createForTesting(),
     maintenance: () => [
@@ -204,6 +205,17 @@ describe("the worker process installation", () => {
       expect(byName.get("sso-connections")?.eventSubscribers.has("scimDirectoryMove")).toBe(true);
       expect(byName.get("join-requests")?.processManagers.size).toBeGreaterThan(0);
       expect(byName.get("scim_directory")?.eventSubscribers.has("moveDirectory")).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker routes span recording to the trace pipeline" */
+  it("registers the trace pipeline's recordSpan handler in the job registry it consumes", async () => {
+    const { runtime, eventing } = await bootWorker({ live: true });
+
+    try {
+      expect(eventing.globalJobRegistry.has("trace_processing:command:recordSpan")).toBe(true);
     } finally {
       await runtime.stop();
     }

@@ -32,6 +32,12 @@ Feature: Every installed module boots in the process that installs it
     And scim's own directory pipeline hosts the move
 
   @integration
+  Scenario: The worker routes span recording to the trace pipeline
+    Given the worker's installed modules over memory stores and a live event store
+    When the worker process boots
+    Then the job registry it consumes routes the trace pipeline's recordSpan command
+
+  @integration
   Scenario: Two process installations share no state
     Given two api processes booted over memory stores
     When one of them records a prompt tag
