@@ -122,6 +122,11 @@ jobs:
         working-directory: mcp/typescript
         run: pnpm run build
 
+      # The vendored scenario package the scenario tests load resolves
+      # `langwatch` to the workspace SDK, whose exports point at its dist.
+      - name: Build the SDK
+        run: node dev/scripts/ensure-built.mjs langwatch
+
       - name: Run tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
         # secret-backed run can only fail on a missing key. Skip it there;
