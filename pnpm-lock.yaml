@@ -2242,9 +2242,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
-      '@langwatch/entitlement-process':
-        specifier: workspace:*
-        version: link:../../../../modules/entitlement/process
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../../../modules/evaluation/contract
