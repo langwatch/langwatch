@@ -217,6 +217,22 @@ describe("extractLlmMessagesForSpan", () => {
         { role: "system", content: "Inline prompt" },
       ]);
     });
+
+    /** @scenario "Retrieved passages in a later system message reach the LLM span messages" */
+    it("still adds the system prompt when the input's only system message comes later", () => {
+      const messages = extractLlmMessagesForSpan({
+        span: withInstructions([
+          { role: "user", content: "Refund me" },
+          { role: "system", content: "Retrieved context: refunds within 30 days" },
+        ]),
+      });
+
+      expect(messages.input).toEqual([
+        { role: "system", content: "You are ACME's support agent." },
+        { role: "user", content: "Refund me" },
+        { role: "system", content: "Retrieved context: refunds within 30 days" },
+      ]);
+    });
   });
 });
 

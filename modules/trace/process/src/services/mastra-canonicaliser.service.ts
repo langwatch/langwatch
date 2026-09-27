@@ -8,7 +8,7 @@ import {
   extractLastUserMessageText,
   extractSystemInstructionFromMessages,
   normalizeToMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
 import type { AttributeCanonicaliser, ExtractorContext } from "./canonical-attributes.service.ts";
 import { MastraValuesService } from "./mastra-value.service.ts";
@@ -115,7 +115,7 @@ export class MastraCanonicaliserService implements AttributeCanonicaliser {
 
     const systemInstruction = extractSystemInstructionFromMessages(msgs);
     // Strip system messages — they go to gen_ai.system_instructions
-    const chatMsgs = systemInstruction ? stripSystemMessages(msgs) : msgs;
+    const chatMsgs = systemInstruction ? stripLiftedSystemMessage(msgs) : msgs;
     if (chatMsgs.length > 0) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMsgs);
       recordValueType(ctx, ATTR_KEYS.GEN_AI_INPUT_MESSAGES, "chat_messages");

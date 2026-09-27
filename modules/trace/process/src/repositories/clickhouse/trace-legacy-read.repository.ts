@@ -58,7 +58,10 @@ import { mapEventAttrsToEvent } from "../../rules/trace-event-attribute-mapping.
 import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
-import { parseLLMSpanMessages } from "../../rules/trace-llm-span-messages.rules.ts";
+import {
+  parseLLMSpanMessages,
+  systemPromptFieldOfLlmSpan,
+} from "../../rules/trace-llm-span-messages.rules.ts";
 import {
   applyEventProtections,
   applyTraceProtections,
@@ -1748,7 +1751,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // Build llmConfig dynamically from the parameter map
     const llmConfig: PromptStudioSpanResult["llmConfig"] = {
       model,
-      systemPrompt: messages.find((m) => m.role === "system")?.content,
+      ...systemPromptFieldOfLlmSpan({ attrs, messages }),
       temperature: null,
       maxTokens: null,
       topP: null,

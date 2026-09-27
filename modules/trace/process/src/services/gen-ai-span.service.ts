@@ -17,7 +17,7 @@ import {
 } from "../rules/canonical-guard.rules.ts";
 import {
   extractSystemInstructionFromMessages,
-  stripSystemMessages,
+  stripLiftedSystemMessage,
 } from "../rules/canonical-message.rules.ts";
 import type { ExtractorContext } from "./canonical-attributes.service.ts";
 
@@ -144,7 +144,7 @@ export class GenAiSpanService {
     const sysInstruction = extractSystemInstructionFromMessages(existing);
     if (sysInstruction !== null) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS, sysInstruction);
-      const stripped = stripSystemMessages(existing);
+      const stripped = stripLiftedSystemMessage(existing);
       attrs.take(ATTR_KEYS.GEN_AI_INPUT_MESSAGES);
       if (stripped.length > 0) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, stripped);

@@ -215,3 +215,30 @@ describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {
     });
   });
 });
+
+describe("TraceLlmSpanMessagesService.systemPromptFieldOfLlmSpan()", () => {
+  const messages = [
+    { role: "user" as const, content: "When do refunds close?" },
+    { role: "system" as const, content: "Retrieved context: refunds within 30 days" },
+  ];
+
+  describe("when canonicalisation lifted the prompt and a later system turn carries passages", () => {
+    /** @scenario "A system message later in the conversation stays in the input messages" */
+    it("answers the lifted prompt, not the passages", () => {
+      expect(
+        TraceLlmSpanMessagesService.systemPromptFieldOfLlmSpan({
+          attrs: { "gen_ai.system_instructions": "You are ACME's support agent." },
+          messages,
+        }),
+      ).toEqual({ systemPrompt: "You are ACME's support agent." });
+    });
+  });
+
+  describe("when nothing was lifted and the only system turn comes later", () => {
+    it("answers no prompt field", () => {
+      expect(
+        TraceLlmSpanMessagesService.systemPromptFieldOfLlmSpan({ attrs: {}, messages }),
+      ).toEqual({});
+    });
+  });
+});

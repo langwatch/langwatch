@@ -157,8 +157,8 @@ function jsonText(value: unknown): string {
 }
 
 /**
- * Canonicalisation moves a system prompt out of the input messages into
- * `gen_ai.system_instructions`; a reader of the messages still needs it.
+ * Canonicalisation moves the opening system prompt into `gen_ai.system_instructions`; a reader
+ * of the messages still needs it. A later system turn (retrieved passages) is not that prompt.
  */
 function withSystemInstructions({
   messages,
@@ -168,7 +168,7 @@ function withSystemInstructions({
   params: Span["params"];
 }): ChatMessage[] {
   const system = extractSystemInstructions(params ?? null);
-  if (!system || messages.some((message) => message.role === "system")) return messages;
+  if (!system || messages[0]?.role === "system") return messages;
   return [{ role: "system", content: system }, ...messages];
 }
 

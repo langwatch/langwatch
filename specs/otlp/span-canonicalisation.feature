@@ -30,6 +30,14 @@ Feature: Every supported instrumentation canonicalises to the same span shape
     And neither is typed llm, even when it names a model or an agent
     And a failed tool span keeps its error
 
+  @unit
+  Scenario: A system message later in the conversation stays in the input messages
+    Given a chat input that opens with a system prompt and carries a later system turn with retrieved passages
+    When the span is canonicalised
+    Then the opening system prompt moves to gen_ai.system_instructions
+    And the later system turn stays in gen_ai.input.messages
+    And a reader that restores the system prompt still restores it, and takes the passages for no prompt
+
   @unit @unimplemented
   Scenario: A span from an unrecognised instrumentation is kept, not dropped
     Given a span carrying attributes no canonicaliser claims

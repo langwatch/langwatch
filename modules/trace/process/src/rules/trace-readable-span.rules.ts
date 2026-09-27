@@ -107,7 +107,7 @@ function buildAttributes(span: Span): Attributes {
     attrs["gen_ai.system"] = span.vendor;
   }
 
-  assignParams({ attrs, params: span.params });
+  assignParams({ attrs, span });
   assignMetrics({ attrs, metrics: span.metrics });
   if ("contexts" in span && span.contexts) {
     attrs["retrieval.documents"] = JSON.stringify(span.contexts);
@@ -149,8 +149,32 @@ function assignIo({
   }
 }
 
-/** The named request parameters, plus everything else the span carried, flattened. */
-function assignParams({ attrs, params }: { attrs: Attributes; params: Span["params"] }): void {
+/** The attributes a span's input and output are read from, in extractInput/extractOutput order. */
+const IO_SOURCE_KEYS = {
+  input: ["gen_ai.input.messages", "langwatch.input", "gen_ai.tool.call.arguments"],
+  output: ["gen_ai.output.messages", "langwatch.output", "gen_ai.tool.call.result"],
+} as const;
+
+const isUnder = ({ key, source }: { key: string; source: string }) =>
+  key === source || key.startsWith(`${source}.`);
+
+/** The source attribute each printed side was read from: the first of its keys the span carries. */
+function printedSources({ span, keys }: { span: Span; keys: string[] }): string[] {
+  return (["input", "output"] as const).flatMap((side) => {
+    if (!span[side]) return [];
+    const source = IO_SOURCE_KEYS[side].find((candidate) =>
+      keys.some((key) => isUnder({ key, source: candidate })),
+    );
+    return source ? [source] : [];
+  });
+}
+
+/**
+ * The named request parameters, plus everything else the span carried, flattened, less the
+ * attributes already printed as the span's input and output.
+ */
+function assignParams({ attrs, span }: { attrs: Attributes; span: Span }): void {
+  const { params } = span;
   if (!params) {
     return;
   }
@@ -167,7 +191,12 @@ function assignParams({ attrs, params }: { attrs: Attributes; params: Span["para
     attrs["gen_ai.request.top_p"] = params.top_p;
   }
 
-  flattenParams({ params, prefix: "", attrs });
+  const flattened: Attributes = {};
+  flattenParams({ params, prefix: "", attrs: flattened });
+  const printed = printedSources({ span, keys: Object.keys(flattened) });
+  for (const [key, value] of Object.entries(flattened)) {
+    if (!printed.some((source) => isUnder({ key, source }))) attrs[key] = value;
+  }
 }
 
 /** The token counts and cost, each only when the span reported it. */

@@ -205,6 +205,21 @@ Feature: Reading a trace the way the drawer reads it
     And the span can stand for its trace
 
   @unit
+  Scenario: A judge reading an OTel GenAI agent trace sees the tool call and its result once
+    Given an OTel GenAI agent trace with chat spans and an execute_tool span, sent as OTLP
+    When it is stored and rendered as the digest and as LLM span messages
+    Then the execute_tool span is a tool span whose input is the arguments and whose output is the result
+    And the digest prints the tool's arguments and result once, not again as raw attributes
+    And the LLM span messages carry the tool result as a tool message
+
+  @unit
+  Scenario: Retrieved passages in a later system message reach the LLM span messages
+    Given a LangWatch SDK LLM span whose retrieved passages sit in a system message after the user turn
+    When it is stored and rendered as the digest and as LLM span messages
+    Then both renderings carry the passages
+    And the LLM span messages start with the system prompt, once
+
+  @unit
   Scenario: A conversation transcript renders the same on every day
     Given a thread rendered as a conversation transcript
     When it is rendered at two different times
