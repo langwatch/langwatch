@@ -28,14 +28,6 @@
       "types": "./dist/repositories/prisma/prisma.trace-edit-overlay.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
     },
-    "./api-trpc/trace-read-mappers": {
-      "types": "./dist/transport/api-trpc/trace-read-mappers.api.d.ts",
-      "default": "./src/transport/api-trpc/trace-read-mappers.api.ts"
-    },
-    "./api-trpc/trace-view-gates": {
-      "types": "./dist/transport/api-trpc/trace-view-gates.api.d.ts",
-      "default": "./src/transport/api-trpc/trace-view-gates.api.ts"
-    },
     "./api-rest/otlp-ingest": {
       "types": "./dist/transport/otlp-ingest.rest.d.ts",
       "default": "./src/transport/otlp-ingest.rest.ts"

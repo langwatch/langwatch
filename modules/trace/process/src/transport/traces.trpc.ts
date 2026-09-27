@@ -5,14 +5,12 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { nowInstant } from "@langwatch/time";
 import {
   customersAndLabelsResultSchema,
   discoverResultSchema,
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
-  SpanNotFoundError,
   TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
@@ -26,21 +24,16 @@ import {
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
-} from "./api-trpc/trace-read-mapper-ports.ts";
+} from "../rules/trace-read-mapper-ports.rules.ts";
 import {
-  buildContentPrivacy,
   buildSpanContentRedactions,
   contentSearchTermsForViewer,
   gateTraceLogVisibility,
   mapLegacySpanSummaryToTreeNode,
   mapSpansToDetailDtos,
-  mapSpanToDetail,
   mapTraceSummaryToHeader,
-  readDroppedFromParams,
-  readPiiIncompleteFromParams,
   redactV2Content,
-  toConversationContextTurn,
-} from "./api-trpc/trace-read-mappers.api.ts";
+} from "../rules/trace-read-mappers.rules.ts";
 import {
   gateHeaderCost,
   gateResources,
@@ -48,7 +41,7 @@ import {
   gateSessionTitle,
   gateTreeCost,
   withoutHiddenResourceAttrs,
-} from "./api-trpc/trace-view-gates.api.ts";
+} from "../rules/trace-view-gates.rules.ts";
 
 const evaluationsSchema = evaluationSchema.array();
 
@@ -455,44 +448,13 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
    */
   .procedure("conversationContext")
   .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    const protections = await app.resolveViewerProtections({
+  .handle(({ app, input, actor }) =>
+    app.readConversationContextForViewer({
       projectId: input.projectId,
-      userId: actor.id,
-    });
-    // Window: conversation membership is timeless; cap at 1y to keep
-    // partition pruning effective.
-    const now = nowInstant().epochMilliseconds;
-    const timeRange = { from: now - 365 * 24 * 60 * 60 * 1000, to: now };
-    const filterWhere = {
-      sql: "Attributes['gen_ai.conversation.id'] = {threadConversationId:String}",
-      params: { threadConversationId: input.conversationId },
-    };
-    const page = traceListPageSchema.parse(
-      await app.readTraceList({
-        tenantId: input.projectId,
-        timeRange,
-        sort: { columnId: "time", direction: "asc" },
-        page: 1,
-        pageSize: 200,
-        filterWhere,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-      }),
-    );
-    const turns = page.items.map((t) =>
-      toConversationContextTurn({
-        trace: t,
-        protections,
-        contentPrivacy: traceReadMapperPorts.contentPrivacy,
-      }),
-    );
-
-    return {
       conversationId: input.conversationId,
-      turns,
-      total: turns.length,
-    };
-  })
+      viewerUserId: actor.id,
+    }),
+  )
 
   .procedure("discover")
   .withPermission("traces:view")
@@ -824,104 +786,15 @@ export const tracesTrpcTransport = defineTrpcRouter(TraceApi, tracesTrpc)
 
   .procedure("spanDetail")
   .withPermission("traces:view")
-  .handle(async ({ app, input, actor }) => {
-    const protections = await app.resolveViewerProtections({
+  .handle(({ app, input, actor }) =>
+    app.readSpanDetailForViewer({
       projectId: input.projectId,
-      userId: actor.id,
-    });
-    const [span, rawEvents] = await Promise.all([
-      app.findSpan({
-        projectId: input.projectId,
-        traceId: input.traceId,
-        spanId: input.spanId,
-        visibilityCutoffMs: protections.visibilityCutoffMs,
-        occurredAtMs: input.occurredAtMs,
-      }),
-      app.readSpanEvents({
-        projectId: input.projectId,
-        traceId: input.traceId,
-        spanId: input.spanId,
-        occurredAtMs: input.occurredAtMs,
-      }),
-    ]);
-
-    if (!span) throw new SpanNotFoundError(input.spanId);
-
-    // Coding-agent spans store their content in the trace's OTLP LOGS, not on
-    // the span row — join it on here, BEFORE protections, so it goes through
-    // the same redaction pass as any other span content.
-    let targetSpan = span;
-    if (app.isCodingAgentShapedSpan(span)) {
-      const needsSiblingRefs =
-        typeof (span.params as Record<string, unknown> | null)?.request_id === "string";
-      const [logRows, summaryRows] = await Promise.all([
-        app.readTraceLogRecords({
-          projectId: input.projectId,
-          traceId: input.traceId,
-          occurredAtMs: input.occurredAtMs,
-        }),
-        needsSiblingRefs
-          ? app.readSpanSummaries({
-              projectId: input.projectId,
-              traceId: input.traceId,
-              occurredAtMs: input.occurredAtMs,
-            })
-          : Promise.resolve([]),
-      ]);
-      targetSpan = app.enrichSpanFromCodingAgentLogs({
-        span,
-        modelCallRefs: app.mapCodingAgentSummaryRows(summaryRows),
-        logRows,
-      });
-    }
-
-    const redactions = buildSpanContentRedactions(
-      [targetSpan],
-      protections,
-      traceReadMapperPorts.spanProtection,
-    );
-    const protectedSpan = traceReadMapperPorts.spanProtection.applySpanProtections(
-      targetSpan,
-      protections,
-      redactions,
-    );
-    const spanDetail = mapSpanToDetail(
-      protectedSpan,
-      rawEvents.map((e) => ({
-        name: e.event_type,
-        timeUnixMs:
-          typeof e.timestamps.started_at === "number"
-            ? e.timestamps.started_at
-            : parseInt(String(e.timestamps.started_at), 10),
-        attributes: traceReadMapperPorts.spanProtection.redactObject(
-          Object.fromEntries([
-            ...e.event_details.map((d): [string, unknown] => [d.key, d.value]),
-            ...e.metrics.map((m): [string, unknown] => [m.key, m.value]),
-          ]),
-          redactions,
-        ),
-      })),
-      traceReadMapperPorts.spanDisplay,
-    );
-
-    const redactedDetail = redactV2Content(
-      spanDetail,
-      protections,
-      traceReadMapperPorts.contentPrivacy,
-    );
-    const detailParams = spanDetail.params as Record<string, unknown> | null;
-    redactedDetail.contentPrivacy = buildContentPrivacy(
-      protections,
-      readDroppedFromParams(detailParams, traceReadMapperPorts.contentPrivacy),
-    );
-    redactedDetail.piiAnalysisIncomplete = readPiiIncompleteFromParams(
-      detailParams,
-      traceReadMapperPorts.contentPrivacy,
-    );
-    redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
-
-    return redactedDetail;
-  })
+      traceId: input.traceId,
+      spanId: input.spanId,
+      occurredAtMs: input.occurredAtMs,
+      viewerUserId: actor.id,
+    }),
+  )
 
   /**
    * OTel resource attributes + instrumentation scope per span. Standard span

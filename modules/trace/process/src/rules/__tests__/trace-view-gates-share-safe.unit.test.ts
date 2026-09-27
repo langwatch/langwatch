@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { applyDerivedTraceEventProtections } from "../../../rules/trace-read-redaction.rules.ts";
+import { applyDerivedTraceEventProtections } from "../trace-read-redaction.rules.ts";
 import {
   gateEvaluations,
   gateHeaderCost,
@@ -16,7 +16,7 @@ import {
   gateSessionCost,
   gateSessionTitle,
   gateTreeCost,
-} from "../trace-view-gates.api.ts";
+} from "../trace-view-gates.rules.ts";
 
 /**
  * @see specs/traces-v2/sessions-lens.feature (the session-rollup cost gate)

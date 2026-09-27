@@ -32,7 +32,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 
-import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
+import { TraceAttributeRedactionService } from "../services/trace-attribute-redaction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Ports

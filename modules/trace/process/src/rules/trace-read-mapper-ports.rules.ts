@@ -14,15 +14,18 @@ import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-} from "../../rules/trace-log-content-derivation.rules.ts";
+} from "./trace-log-content-derivation.rules.ts";
+import type {
+  TraceDerivedAttrPrefixes,
+  TraceReadMapperMembers,
+} from "./trace-read-mappers.rules.ts";
 import {
   applyDerivedTraceEventProtections,
   applySpanProtections,
   extractRedactionsFromAllSpanInputs,
   extractRedactionsFromAllSpanOutputs,
   redactObject,
-} from "../../rules/trace-read-redaction.rules.ts";
-import type { TraceDerivedAttrPrefixes, TraceReadMapperMembers } from "./trace-read-mappers.api.ts";
+} from "./trace-read-redaction.rules.ts";
 
 /** Backs only the header's drop banner, unwired — see the merge-traces-v2 handoff. */
 async function getResolvedPolicyForProject(_input: {

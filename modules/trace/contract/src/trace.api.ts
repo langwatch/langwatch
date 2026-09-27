@@ -92,6 +92,7 @@ import type {
   TraceDerivedEventsInput,
   TraceSummaryLookupInput,
 } from "./trace.queries.ts";
+import type { TracesConversationContext } from "./trace.responses.ts";
 import type { NormalizedSpan } from "./trace.spans.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 
@@ -231,6 +232,20 @@ export interface TraceApi extends TraceOtlpIngestApi {
     eventName: "trace_updated" | "discover_updated";
     signal?: AbortSignal;
   }): AsyncIterable<unknown>;
+  /** One conversation's turns, oldest first, through the viewer's protections. */
+  readConversationContextForViewer(input: {
+    projectId: string;
+    conversationId: string;
+    viewerUserId: string;
+  }): Promise<TracesConversationContext>;
+  /** One span's detail through the viewer's protections; refuses with `SpanNotFoundError`. */
+  readSpanDetailForViewer(input: {
+    projectId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs?: number;
+    viewerUserId: string;
+  }): Promise<SpanDetail>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
     input: { projectId: string; traceId: string; newName: string },

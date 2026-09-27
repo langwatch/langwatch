@@ -28,16 +28,16 @@ import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from ".
  * `Date`s: the ClickHouse driver serialises a `Date` into a `DateTime64(3)`
  * literal, while the read shape keeps the numbers every caller works in.
  */
+type DateWrite<V> = V extends number
+  ? Date
+  : V extends number | null
+    ? Date | null
+    : V extends number[]
+      ? Date[]
+      : V;
+
 type WithDateWrites<T, K extends keyof T> = {
-  [P in keyof T]: P extends K
-    ? T[P] extends number
-      ? Date
-      : T[P] extends number | null
-        ? Date | null
-        : T[P] extends number[]
-          ? Date[]
-          : T[P]
-    : T[P];
+  [P in keyof T]: P extends K ? DateWrite<T[P]> : T[P];
 };
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 

@@ -8,7 +8,7 @@ import {
 import type { CategoryVisibility, TraceLogRecordDto } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
+import { TestCodingAgentService } from "../../services/__tests__/support/coding-agent.service.fake.ts";
 import {
   buildContentPrivacy,
   contentSearchTermsForViewer,
@@ -17,7 +17,7 @@ import {
   redactV2Content as redactV2ContentWithPorts,
   type TraceContentPrivacy,
   type V2Protections,
-} from "../trace-read-mappers.api.ts";
+} from "../trace-read-mappers.rules.ts";
 
 /**
  * The data-privacy vocabulary the mappers take as a port, wired to the REAL

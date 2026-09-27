@@ -11,7 +11,7 @@ import {
   toConversationContextTurn as toConversationContextTurnWithPorts,
   type TraceContentPrivacy,
   type V2Protections,
-} from "../trace-read-mappers.api.ts";
+} from "../trace-read-mappers.rules.ts";
 
 /** The real data-privacy vocabulary, wired as the port the mapper now takes. */
 const contentPrivacy: TraceContentPrivacy = {

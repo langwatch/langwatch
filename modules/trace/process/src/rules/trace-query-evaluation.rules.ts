@@ -136,32 +136,8 @@ function evaluateNode({
       return result;
     }
 
-    case "LogicalExpression": {
-      const logExpr = node as LogicalExpressionToken;
-      // Negation threads down unchanged and the operator stays as-is — the
-      // exact shape `translateNode` compiles, so both sides always agree.
-      const left = evaluateNode({
-        node: logExpr.left,
-        negated,
-        trace,
-        state,
-      });
-      if (left === UNSUPPORTED) {
-        return UNSUPPORTED;
-      }
-
-      const right = evaluateNode({
-        node: logExpr.right,
-        negated,
-        trace,
-        state,
-      });
-      if (right === UNSUPPORTED) {
-        return UNSUPPORTED;
-      }
-
-      return logExpr.operator.operator === "OR" ? left || right : left && right;
-    }
+    case "LogicalExpression":
+      return evaluateLogical({ node: node as LogicalExpressionToken, negated, trace, state });
 
     case "UnaryOperator": {
       const unary = node as UnaryOperatorToken;
@@ -189,6 +165,28 @@ function evaluateNode({
     default:
       return UNSUPPORTED;
   }
+}
+
+/**
+ * Negation threads down unchanged and the operator stays as-is: the exact shape
+ * `translateNode` compiles, so both sides always agree.
+ */
+function evaluateLogical({
+  node,
+  negated,
+  trace,
+  state,
+}: {
+  node: LogicalExpressionToken;
+  negated: boolean;
+  trace: InMemoryTrace;
+  state: WalkState;
+}): boolean | Unsupported {
+  const left = evaluateNode({ node: node.left, negated, trace, state });
+  if (left === UNSUPPORTED) return UNSUPPORTED;
+  const right = evaluateNode({ node: node.right, negated, trace, state });
+  if (right === UNSUPPORTED) return UNSUPPORTED;
+  return node.operator.operator === "OR" ? left || right : left && right;
 }
 
 function evaluateTag(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean | Unsupported {

@@ -32,14 +32,14 @@ import {
   mapTraceSummaryToHeader,
   redactV2Content,
   type TraceReadMapperMembers,
-} from "../transport/api-trpc/trace-read-mappers.api.ts";
+} from "../rules/trace-read-mappers.rules.ts";
 import {
   gateEvaluations,
   gateHeaderCost,
   gateResources,
   gateTreeCost,
   withoutHiddenResourceAttrs,
-} from "../transport/api-trpc/trace-view-gates.api.ts";
+} from "../rules/trace-view-gates.rules.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
 /** Main's per-window ceilings: a person refreshing never meets them; a fan-out driver does. */
