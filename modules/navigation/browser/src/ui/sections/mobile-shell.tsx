@@ -1,6 +1,6 @@
 /** Mobile shell: compact bar with logo, product selector, menu. Menu opens overlay. */
 
-import { Box, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Spacer, Text, chakra } from "@chakra-ui/react";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
@@ -156,7 +156,7 @@ function MobileMenuOverlay({
   state: NavigationShellReadyState;
   onClose: () => void;
 }) {
-  const overlayRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // The overlay is a modal: it takes focus on open, and Escape closes
@@ -185,14 +185,22 @@ function MobileMenuOverlay({
   }, [onClose]);
 
   return (
-    <Box
+    <chakra.dialog
+      open
       ref={overlayRef}
       data-testid="mobile-menu-overlay"
-      role="dialog"
       aria-modal="true"
       aria-label="Navigation menu"
       position="fixed"
       inset={0}
+      width="auto"
+      height="auto"
+      maxWidth="none"
+      maxHeight="none"
+      margin={0}
+      padding={0}
+      border="none"
+      color="inherit"
       zIndex={1300}
       background="bg.page"
       display="flex"
@@ -215,7 +223,7 @@ function MobileMenuOverlay({
           <SidebarContent surface={state.activeProductId ?? "settings"} showExpanded isFullWidth />
         </SideMenuDensityProvider>
       </Box>
-    </Box>
+    </chakra.dialog>
   );
 }
 

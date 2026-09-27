@@ -97,7 +97,7 @@ export interface OnboardingScreenProps {
 export interface OnboardingScreen {
   id: string;
   required: boolean;
-  component: React.ComponentType<any>;
+  component: React.ComponentType<OnboardingScreenProps>;
   heading: string;
   subHeading?: string;
   widthVariant?: "narrow" | "full";

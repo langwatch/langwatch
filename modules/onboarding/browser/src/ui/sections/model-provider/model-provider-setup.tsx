@@ -2,9 +2,9 @@
  * The credential half of the onboarding model provider step.
  */
 
-import { EditModelProviderForm } from "@langwatch/model-provider-browser/edit-model-provider-form";
 import type React from "react";
 
+import { LentEditModelProviderForm } from "../../../behavior/lent-edit-model-provider-form.tsx";
 import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 
 interface ModelProviderSetupProps {
@@ -20,7 +20,7 @@ export function ModelProviderSetup({
   const { organization, project } = useOnboardingHost().scope();
 
   return (
-    <EditModelProviderForm
+    <LentEditModelProviderForm
       key={providerKey}
       providerKey={providerKey}
       modelProviderId="new"

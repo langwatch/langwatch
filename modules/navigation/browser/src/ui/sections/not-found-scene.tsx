@@ -7,16 +7,15 @@ import { Box, Button, Center, HStack, Input, Text, VStack } from "@chakra-ui/rea
 import { useColorMode, useColorModeValue } from "@langwatch/design-system/color-mode";
 import { SimpleSlider } from "@langwatch/design-system/slider";
 import { ArrowLeft, Home, Settings } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type Dispatch, type SetStateAction, useMemo, useRef, useState } from "react";
 
+import { useNotFoundCanvas } from "../../behavior/use-not-found-canvas.ts";
 import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import {
   type CanvasColors,
-  createNotFoundRenderer,
   defaultGridParams,
   type GridParams,
-  MAX_CANVAS_DPR,
 } from "../../model/not-found-canvas-renderer.ts";
 
 function ParamSlider({
@@ -59,6 +58,131 @@ function ParamSlider({
   );
 }
 
+/** The designer's grid tuning panel, shown only in development. */
+function NotFoundDevControls({
+  params,
+  setParams,
+}: {
+  params: GridParams;
+  setParams: Dispatch<SetStateAction<GridParams>>;
+}) {
+  const [showControls, setShowControls] = useState(false);
+  const updateParam = <K extends keyof GridParams>(key: K, value: GridParams[K]) => {
+    setParams((p) => ({ ...p, [key]: value }));
+  };
+
+  return (
+    <Box
+      position="absolute"
+      top={2}
+      right={2}
+      zIndex={10}
+      background="bg.panel"
+      borderRadius="md"
+      padding={showControls ? 3 : 1}
+      boxShadow="lg"
+      maxHeight="90vh"
+      overflowY="auto"
+    >
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => setShowControls(!showControls)}
+        marginBottom={showControls ? 2 : 0}
+      >
+        <Settings size={14} />
+        {showControls ? "Hide" : ""}
+      </Button>
+
+      {showControls && (
+        <VStack gap={2} align="stretch">
+          <ParamSlider
+            label="Rotation"
+            value={params.rotation}
+            min={0}
+            max={360}
+            step={1}
+            onChange={(v) => updateParam("rotation", v)}
+          />
+          <ParamSlider
+            label="Z Offset"
+            value={params.zOffset}
+            min={100}
+            max={15000}
+            step={100}
+            onChange={(v) => updateParam("zOffset", v)}
+          />
+          <ParamSlider
+            label="FOV Scale"
+            value={params.fovScale}
+            min={0.1}
+            max={3}
+            step={0.01}
+            onChange={(v) => updateParam("fovScale", v)}
+          />
+          <ParamSlider
+            label="Camera Y"
+            value={params.cameraY}
+            min={0}
+            max={5000}
+            step={10}
+            onChange={(v) => updateParam("cameraY", v)}
+          />
+          <ParamSlider
+            label="Pitch"
+            value={params.pitch}
+            min={-90}
+            max={90}
+            step={1}
+            onChange={(v) => updateParam("pitch", v)}
+          />
+          <ParamSlider
+            label="Aberration"
+            value={params.aberration}
+            min={0}
+            max={30}
+            step={0.5}
+            onChange={(v) => updateParam("aberration", v)}
+          />
+          <ParamSlider
+            label="Grid Size"
+            value={params.gridExtent}
+            min={500}
+            max={10000}
+            step={100}
+            onChange={(v) => updateParam("gridExtent", v)}
+          />
+          <ParamSlider
+            label="Grid Step"
+            value={params.gridStep}
+            min={20}
+            max={500}
+            step={10}
+            onChange={(v) => updateParam("gridStep", v)}
+          />
+          <Button size="xs" variant="outline" onClick={() => setParams(defaultGridParams)}>
+            Reset
+          </Button>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              console.log("Grid params:", params);
+              void navigator.clipboard
+                .writeText(JSON.stringify(params, null, 2))
+                .catch((error: unknown) => {
+                  console.warn("Copy failed:", error);
+                });
+            }}
+          >
+            Copy Params
+          </Button>
+        </VStack>
+      )}
+    </Box>
+  );
+}
+
 export function NotFoundScene() {
   const host = useNavigationHost();
   const { colorMode } = useColorMode();
@@ -67,23 +191,12 @@ export function NotFoundScene() {
   const containerRef = useRef<HTMLDivElement>(null);
   const redTextRef = useRef<HTMLDivElement>(null);
   const blueTextRef = useRef<HTMLDivElement>(null);
-  const raf = useRef(0);
-  const mouse = useRef({ x: 0, y: 0 });
-  const smoothMouse = useRef({ x: 0, y: 0 });
-  const rendererRef = useRef(createNotFoundRenderer());
 
-  const [showControls, setShowControls] = useState(false);
   const [params, setParams] = useState<GridParams>(defaultGridParams);
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
   const prefersReducedMotion = useReducedMotion();
-  const isVisible = useRef(true);
-  const isTabActive = useRef(true);
-
-  const updateParam = <K extends keyof GridParams>(key: K, value: GridParams[K]) => {
-    setParams((p) => ({ ...p, [key]: value }));
-  };
 
   const colors = useMemo<CanvasColors>(
     () =>
@@ -108,128 +221,15 @@ export function NotFoundScene() {
   const textBlueColor = useColorModeValue("blue.600/70", "blue.400/60");
   const textBaseOpacity = useColorModeValue(0.14, 0.08);
 
-  const onMove = useCallback((e: MouseEvent) => {
-    const el = containerRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    mouse.current.x = Math.max(-0.5, Math.min(0.5, (e.clientX - r.left) / r.width - 0.5));
-    mouse.current.y = Math.max(-0.5, Math.min(0.5, (e.clientY - r.top) / r.height - 0.5));
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    container.addEventListener("mousemove", onMove);
-
-    const render = rendererRef.current;
-
-    const sizeCanvas = () => {
-      const rect = container.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
-      const w = rect.width;
-      const h = rect.height;
-
-      const pixelWidth = Math.round(w * dpr);
-      const pixelHeight = Math.round(h * dpr);
-
-      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
-        canvas.width = pixelWidth;
-        canvas.height = pixelHeight;
-        canvas.style.width = `${w}px`;
-        canvas.style.height = `${h}px`;
-      }
-
-      return { w, h, dpr };
-    };
-
-    // Reduced motion: render a single static frame, no animation loop
-    if (prefersReducedMotion) {
-      const { w, h, dpr } = sizeCanvas();
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      render({
-        ctx,
-        width: w,
-        height: h,
-        timestamp: 0,
-        params: paramsRef.current,
-        colors,
-        smoothMouse: { x: 0, y: 0 },
-      });
-      return () => {
-        container.removeEventListener("mousemove", onMove);
-      };
-    }
-
-    // Pause when tab is hidden
-    const onVisibilityChange = () => {
-      isTabActive.current = !document.hidden;
-      if (!document.hidden && raf.current === 0) {
-        raf.current = requestAnimationFrame(loop);
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    // Pause when scrolled out of view
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        isVisible.current = entry?.isIntersecting ?? true;
-        if (entry?.isIntersecting && raf.current === 0) {
-          raf.current = requestAnimationFrame(loop);
-        }
-      },
-      { threshold: 0 },
-    );
-    observer.observe(container);
-
-    const loop = (timestamp: number) => {
-      raf.current = 0;
-
-      if (!isVisible.current || !isTabActive.current) return;
-
-      const { w, h, dpr } = sizeCanvas();
-
-      smoothMouse.current.x += (mouse.current.x - smoothMouse.current.x) * 0.06;
-      smoothMouse.current.y += (mouse.current.y - smoothMouse.current.y) * 0.06;
-
-      const textDx = smoothMouse.current.x * 3;
-      const textDy = smoothMouse.current.y * 1.5;
-      if (redTextRef.current) {
-        redTextRef.current.style.transform = `translate(${-2 - textDx}px, ${-1 - textDy}px)`;
-      }
-      if (blueTextRef.current) {
-        blueTextRef.current.style.transform = `translate(${2 + textDx}px, ${1 + textDy}px)`;
-      }
-
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      render({
-        ctx,
-        width: w,
-        height: h,
-        timestamp,
-        params: paramsRef.current,
-        colors,
-        smoothMouse: smoothMouse.current,
-      });
-
-      raf.current = requestAnimationFrame(loop);
-    };
-
-    raf.current = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(raf.current);
-      raf.current = 0;
-      container.removeEventListener("mousemove", onMove);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      observer.disconnect();
-    };
-  }, [onMove, colors, prefersReducedMotion]);
+  useNotFoundCanvas({
+    canvasRef,
+    containerRef,
+    redTextRef,
+    blueTextRef,
+    paramsRef,
+    colors,
+    prefersReducedMotion,
+  });
 
   return (
     <Center
@@ -275,116 +275,7 @@ export function NotFoundScene() {
         }}
       />
 
-      {isDevMode && (
-        <Box
-          position="absolute"
-          top={2}
-          right={2}
-          zIndex={10}
-          background="bg.panel"
-          borderRadius="md"
-          padding={showControls ? 3 : 1}
-          boxShadow="lg"
-          maxHeight="90vh"
-          overflowY="auto"
-        >
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => setShowControls(!showControls)}
-            marginBottom={showControls ? 2 : 0}
-          >
-            <Settings size={14} />
-            {showControls ? "Hide" : ""}
-          </Button>
-
-          {showControls && (
-            <VStack gap={2} align="stretch">
-              <ParamSlider
-                label="Rotation"
-                value={params.rotation}
-                min={0}
-                max={360}
-                step={1}
-                onChange={(v) => updateParam("rotation", v)}
-              />
-              <ParamSlider
-                label="Z Offset"
-                value={params.zOffset}
-                min={100}
-                max={15000}
-                step={100}
-                onChange={(v) => updateParam("zOffset", v)}
-              />
-              <ParamSlider
-                label="FOV Scale"
-                value={params.fovScale}
-                min={0.1}
-                max={3}
-                step={0.01}
-                onChange={(v) => updateParam("fovScale", v)}
-              />
-              <ParamSlider
-                label="Camera Y"
-                value={params.cameraY}
-                min={0}
-                max={5000}
-                step={10}
-                onChange={(v) => updateParam("cameraY", v)}
-              />
-              <ParamSlider
-                label="Pitch"
-                value={params.pitch}
-                min={-90}
-                max={90}
-                step={1}
-                onChange={(v) => updateParam("pitch", v)}
-              />
-              <ParamSlider
-                label="Aberration"
-                value={params.aberration}
-                min={0}
-                max={30}
-                step={0.5}
-                onChange={(v) => updateParam("aberration", v)}
-              />
-              <ParamSlider
-                label="Grid Size"
-                value={params.gridExtent}
-                min={500}
-                max={10000}
-                step={100}
-                onChange={(v) => updateParam("gridExtent", v)}
-              />
-              <ParamSlider
-                label="Grid Step"
-                value={params.gridStep}
-                min={20}
-                max={500}
-                step={10}
-                onChange={(v) => updateParam("gridStep", v)}
-              />
-              <Button size="xs" variant="outline" onClick={() => setParams(defaultGridParams)}>
-                Reset
-              </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  console.log("Grid params:", params);
-                  void navigator.clipboard
-                    .writeText(JSON.stringify(params, null, 2))
-                    .catch((error: unknown) => {
-                      console.warn("Copy failed:", error);
-                    });
-                }}
-              >
-                Copy Params
-              </Button>
-            </VStack>
-          )}
-        </Box>
-      )}
+      {isDevMode && <NotFoundDevControls params={params} setParams={setParams} />}
 
       <VStack gap={6} zIndex={1}>
         <Box

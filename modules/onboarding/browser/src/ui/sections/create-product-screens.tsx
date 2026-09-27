@@ -50,6 +50,11 @@ interface UseProductScreensProps {
   onContinue: () => void;
 }
 
+/** The coding-agent screen as an onboarding step: it reads its surface from context, not props. */
+function ViaClaudeCodeOnboardingScreen(_props: OnboardingScreenProps) {
+  return <ViaClaudeCodeScreen />;
+}
+
 export const useCreateProductScreens = ({
   flow,
   onSelectProduct,
@@ -101,7 +106,7 @@ export const useCreateProductScreens = ({
         heading: "Via Coding Agent",
         subHeading: "Pick how you want to work with LangWatch in your coding agent",
         widthVariant: "full",
-        component: ViaClaudeCodeScreen,
+        component: ViaClaudeCodeOnboardingScreen,
       },
       [ProductScreenIndex.VIA_PLATFORM]: {
         id: "via-platform",

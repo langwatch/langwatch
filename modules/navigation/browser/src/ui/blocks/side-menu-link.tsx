@@ -30,6 +30,19 @@ const DEFAULT_BETA_MESSAGE = "This feature is in beta";
 const DEFAULT_LEGACY_MESSAGE =
   "This feature is legacy and will be deprecated in the coming months.";
 
+type IconComponent = React.ComponentType<{ size?: string | number; color?: string }>;
+
+/** A component icon: a function component, or a forwardRef/memo object that carries `render`. */
+function isIconComponent(icon: IconComponent | React.ReactNode): icon is IconComponent {
+  return (
+    typeof icon === "function" || (typeof icon === "object" && icon !== null && "render" in icon)
+  );
+}
+
+function IconComponentNode({ icon: Icon, size }: { icon: IconComponent; size: string | number }) {
+  return <Icon size={size} color="var(--chakra-colors-nav-fg-muted)" />;
+}
+
 // Renders the common visual content (icon, label, badge)
 export const SideMenuItem = ({
   icon,
@@ -71,17 +84,12 @@ export const SideMenuItem = ({
     ) : null;
 
   const density = useSideMenuDensity();
-  const IconElem = icon as React.ComponentType<{
-    size?: string | number;
-    color?: string;
-  }>;
   // Use CSS variable for icon color to support dark mode
-  const iconNode =
-    typeof IconElem === "function" || (IconElem as unknown as { render?: unknown }).render ? (
-      <IconElem size={density.iconSize} color="var(--chakra-colors-nav-fg-muted)" />
-    ) : (
-      (icon as React.ReactNode)
-    );
+  const iconNode = isIconComponent(icon) ? (
+    <IconComponentNode icon={icon} size={density.iconSize} />
+  ) : (
+    icon
+  );
 
   return (
     <HStack
