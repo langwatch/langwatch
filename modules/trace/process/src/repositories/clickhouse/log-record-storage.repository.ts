@@ -8,7 +8,7 @@ import {
   type StoredLogRecordRow,
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const logRecordRowSchema = z.looseObject({

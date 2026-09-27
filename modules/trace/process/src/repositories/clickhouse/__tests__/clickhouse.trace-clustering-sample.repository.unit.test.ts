@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceClusteringSampleRepository } from "../clickhouse.trace-clustering-sample.repository.ts";
+import type { TraceClickHouseClient } from "../clickhouse.trace-member-client.repository.ts";
 
 type Request = Parameters<TraceClickHouseClient["query"]>[0];
 

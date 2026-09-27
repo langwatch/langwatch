@@ -5,7 +5,7 @@ import {
   TraceClickHouse,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
-} from "../trace-clickhouse-client.repository.ts";
+} from "./clickhouse.trace-member-client.repository.ts";
 
 /**
  * The aggregate every offloaded trace field is stored under. `event_log` is

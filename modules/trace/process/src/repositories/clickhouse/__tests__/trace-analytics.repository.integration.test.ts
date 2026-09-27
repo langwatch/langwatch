@@ -81,7 +81,6 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => ch,
-    defaultRetentionDays: 30,
   });
 }, 60_000);
 

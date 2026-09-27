@@ -7,7 +7,7 @@ import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
-} from "../../trace-clickhouse-client.repository.ts";
+} from "../clickhouse.trace-member-client.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
 /** TWIN-DRIFT PINS: table name, column set, insert settings and retention

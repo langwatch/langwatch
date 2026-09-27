@@ -56,9 +56,9 @@ describe("given a trace whose spans back a derivation", () => {
       });
 
       const call = ch.query.mock.calls[0]![0] as Required<ChQuery>;
-      expect(call.query).toContain("WHERE TenantId = {tenantId:String}");
-      expect(call.query).toContain("AND TraceId = {traceId:String}");
-      expect(call.query).toContain("AND StartTime BETWEEN");
+      expect(call.query).toContain("WHERE t.TenantId = {tenantId:String}");
+      expect(call.query).toContain("AND t.TraceId = {traceId:String}");
+      expect(call.query).toContain("AND t.StartTime BETWEEN");
       expect(call.query_params).toMatchObject({
         tenantId: "project-1",
         traceId: "trace-1",

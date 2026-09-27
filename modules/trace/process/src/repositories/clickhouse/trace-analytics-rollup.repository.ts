@@ -4,7 +4,7 @@ import { toDate } from "@langwatch/time";
 
 import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
 import { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
@@ -64,7 +64,6 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      defaultRetentionDays: number;
     },
   ) {
     super();
@@ -72,17 +71,16 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    defaultRetentionDays: number;
   }): TraceAnalyticsRollupClickHouseRepository {
     return new TraceAnalyticsRollupClickHouseRepository(options);
   }
 
   async insertRow({
     row,
-    retentionDays = this.options.defaultRetentionDays,
+    retentionDays,
   }: {
     row: TraceAnalyticsRollupRow;
-    retentionDays?: number;
+    retentionDays: number;
   }): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
@@ -111,10 +109,10 @@ export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRoll
 
   async insertRows({
     rows,
-    retentionDays = this.options.defaultRetentionDays,
+    retentionDays,
   }: {
     rows: TraceAnalyticsRollupRow[];
-    retentionDays?: number;
+    retentionDays: number;
   }): Promise<void> {
     if (rows.length === 0) return;
 

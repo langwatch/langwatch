@@ -30,7 +30,6 @@ setWindowedReadMetrics(windowedReadMetrics);
 function makeRepositoryReturning(record: Record<string, unknown>) {
   return TraceAnalyticsClickHouseRepository.create({
     resolveClient: async () => clientReturning(record),
-    defaultRetentionDays: 30,
   });
 }
 
@@ -39,7 +38,6 @@ function makeOrderingRepository(rows: Record<string, unknown>[]) {
   return {
     repository: TraceAnalyticsClickHouseRepository.create({
       resolveClient: async () => client,
-      defaultRetentionDays: 30,
     }),
     seen,
   };
@@ -372,10 +370,9 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
-          defaultRetentionDays: 30,
         });
 
-        await repository.upsert({ row: ROW });
+        await repository.upsert({ row: ROW, retentionDays: 30 });
 
         expect(inserts[0]?.clickhouse_settings).toMatchObject({
           input_format_skip_unknown_fields: 0,
@@ -388,10 +385,9 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
         const { client, inserts } = capturingInsertClient();
         const repository = TraceAnalyticsClickHouseRepository.create({
           resolveClient: async () => client,
-          defaultRetentionDays: 30,
         });
 
-        await repository.upsertBatch([{ row: ROW }]);
+        await repository.upsertBatch([{ row: ROW, retentionDays: 30 }]);
 
         expect(inserts[0]?.clickhouse_settings).toMatchObject({
           input_format_skip_unknown_fields: 0,

@@ -83,7 +83,6 @@ function makeRepo(responder: (sql: string) => unknown[]) {
         resolvedFor.push(tenantId);
         return client;
       },
-      defaultRetentionDays: 30,
     }),
     queries,
     parameters,
@@ -285,7 +284,6 @@ describe("given the trace-summary row carries a storage anchor", () => {
       return {
         repo: TraceSummaryClickHouseRepository.create({
           resolveClient: async () => client,
-          defaultRetentionDays: 30,
         }),
         insert,
       };
@@ -309,6 +307,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       await repo.upsert(
         stateWith({ storageAnchorMs: anchorMs, occurredAt: baselineMs }),
         "tenant-1",
+        30,
       );
 
       const record = insert.mock.calls[0]?.[0]?.values[0];
@@ -322,7 +321,11 @@ describe("given the trace-summary row carries a storage anchor", () => {
 
       // A state nothing could anchor: no frozen anchor, no span baseline, and a
       // createdAt that failed to parse (parseClickHouseDateTimeMs returns 0).
-      await repo.upsert(stateWith({ storageAnchorMs: 0, occurredAt: 0, createdAt: 0 }), "tenant-1");
+      await repo.upsert(
+        stateWith({ storageAnchorMs: 0, occurredAt: 0, createdAt: 0 }),
+        "tenant-1",
+        30,
+      );
 
       const record = insert.mock.calls[0]?.[0]?.values[0];
       expect(record.OccurredAt.getTime()).toBeGreaterThanOrEqual(before);
@@ -332,7 +335,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
       const { repo, insert } = makeInsertRepo();
       const farFutureMs = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-      await repo.upsert(stateWith({ storageAnchorMs: farFutureMs, occurredAt: 0 }), "tenant-1");
+      await repo.upsert(stateWith({ storageAnchorMs: farFutureMs, occurredAt: 0 }), "tenant-1", 30);
 
       // Deliberate: such a row was filed in a future partition with a TTL
       // deadline to match and would have outlived its tenant's retention. The

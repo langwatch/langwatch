@@ -6,7 +6,7 @@ Feature: Trace rollups and span storage fold idempotently
   # trace-rollup.projection.ts, span-storage.projection.ts,
   # custom-evaluation-sync.subscriber.ts, origin-guarded.subscriber.ts,
   # trace-attribute-cap.service.ts, trace-payload-cap.rules.ts,
-  # trace-cold-scan-detector.service.ts, trace-retention-floor.service.ts
+  # trace-retention-floor.service.ts
 
   @unit @unimplemented
   Scenario: A trace rolled up twice reports one set of totals, not doubled ones

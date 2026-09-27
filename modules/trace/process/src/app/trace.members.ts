@@ -62,8 +62,8 @@ import { ScenarioApi } from "@langwatch/scenario-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 
+import type { TraceClickHouseResolver } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import type { TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
 import type { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
 

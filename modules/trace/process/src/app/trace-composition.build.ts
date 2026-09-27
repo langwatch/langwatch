@@ -24,7 +24,12 @@ import {
 import { traceLegacySpoolChannels } from "../channels/trace-legacy-spool-channels.registry.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { MemberTraceClickHouseClientRepository } from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
+import {
+  MemberTraceClickHouseClientRepository,
+  TraceClickHouse,
+  type TraceClickHouseClient,
+  type TraceClickHouseResolver,
+} from "../repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import {
   type TraceLegacyFilterConditions,
@@ -37,11 +42,6 @@ import {
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../repositories/query-field-values.repository.ts";
-import {
-  type TraceClickHouseResolver,
-  TraceClickHouse,
-  type TraceClickHouseClient,
-} from "../repositories/trace-clickhouse-client.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";

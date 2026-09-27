@@ -14,7 +14,7 @@ export {
   passesTraceOriginGuards,
   type TraceSummarySubscriber,
 } from "./eventing/origin-guarded.subscriber.ts";
-export type { TraceClickHouseClient } from "./repositories/trace-clickhouse-client.repository.ts";
+export type { TraceClickHouseClient } from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
 export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";
 export { TraceListService } from "./services/trace-list-read.service.ts";
@@ -86,7 +86,7 @@ export {
 export type {
   TraceClickHouseResolver,
   TraceClickHouseWriteResolver,
-} from "./repositories/trace-clickhouse-client.repository.ts";
+} from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 export { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
 export { TraceQueryClassificationService } from "./services/trace-query-classification.service.ts";
 export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";

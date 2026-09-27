@@ -65,12 +65,12 @@ import {
   extractRedactionsForObject,
 } from "../../rules/trace-read-redaction.rules.ts";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service.ts";
-import type { TraceClickHouseClient } from "../trace-clickhouse-client.repository.ts";
 import {
   TraceLegacyReadRepository,
   type ResolveTraceSpansBatchFn,
   type ResolveTraceSpansFn,
 } from "../trace-legacy-read.repository.ts";
+import type { TraceClickHouseClient } from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 

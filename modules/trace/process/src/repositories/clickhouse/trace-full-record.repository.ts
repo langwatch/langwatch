@@ -26,12 +26,12 @@ import {
   mapTraceMetadata,
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
+import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
+import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
   TraceClickHouseClient,
   TraceClickHouse,
-} from "../trace-clickhouse-client.repository.ts";
-import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
-import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+} from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;

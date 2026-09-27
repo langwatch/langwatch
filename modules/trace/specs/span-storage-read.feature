@@ -32,6 +32,13 @@ Feature: Reading one stored span back for a derivation consumer
     Then it receives the version with the latest UpdatedAt
     And another tenant asking for the same span receives nothing
 
+  @integration
+  Scenario: A trace's spans are read back for derivation, one latest version each
+    Given a trace whose span is stored as several versions not yet merged
+    When the derivation consumer reads every span of that trace
+    Then it receives that span once, as the version with the latest UpdatedAt
+    And another tenant asking for the same trace receives nothing
+
   @unit
   Scenario: A span that has not landed is a miss, not an unbounded scan
     Given a referenced span that is not in its own window yet

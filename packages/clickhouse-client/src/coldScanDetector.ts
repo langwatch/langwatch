@@ -4,7 +4,7 @@
  * the dominant driver of the S3 bill. Detection only.
  */
 
-import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
+import { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
 
 /** Strip line and block comments so they can't hide or fake a predicate. */
 function stripComments(sql: string): string {

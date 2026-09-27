@@ -8,7 +8,7 @@ import { TraceSpanStorageRepository } from "../../span-storage-write.repository.
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
-} from "../../trace-clickhouse-client.repository.ts";
+} from "../clickhouse.trace-member-client.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
 // Adapter seam: verify it matches the port and batch survives crossing

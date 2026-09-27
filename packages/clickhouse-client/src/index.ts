@@ -175,6 +175,7 @@ export {
 /** Every time-partitioned table's prunable columns — the one map the
  * trace-server cold-scan detector and the analytics-server JOIN bound guard
  * both read, so they can't drift apart. */
+export { detectColdScan } from "./coldScanDetector.ts";
 export { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
 
 /** The partition-window read policy (ADR-068): one hinted attempt, a graceful

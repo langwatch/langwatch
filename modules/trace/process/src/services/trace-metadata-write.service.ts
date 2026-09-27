@@ -1,6 +1,7 @@
 import { nowInstant } from "@langwatch/time";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
+  generateOtelSpanId,
   type CustomMetadata,
   type ReservedTraceMetadata,
   type TraceMetadataUpdate,
@@ -59,7 +60,7 @@ export class TraceMetadataWriteService {
 
     const now = nowInstant().epochMilliseconds;
     const nowNano = String(now * 1_000_000);
-    const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+    const spanId = generateOtelSpanId();
 
     await this.#ingest.recordSpan({
       tenantId: projectId,

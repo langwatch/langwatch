@@ -1,5 +1,4 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ClickHouseTraceAttributeSpendRepository } from "../clickhouse/clickhouse.trace-attribute-spend.repository.ts";
@@ -24,8 +23,8 @@ import type { TraceRepositories } from "../trace.repositories.ts";
 import { PrismaTraceEditOverlayRepository } from "./prisma.trace-edit-overlay.repository.ts";
 
 /**
- * Live tier for Postgres repositories. Retention fallback resolves here so
- * both processes agree. See data-retention.config.ts.
+ * Live tier for Postgres repositories. Writes carry their retention; the
+ * platform default is data-retention's, asked through its peer by the stores.
  */
 export class PostgresTraceRepositories {
   static readonly requires = ["prisma", "clickhouse"] as const;
@@ -37,10 +36,7 @@ export class PostgresTraceRepositories {
     }>,
   ): TraceRepositories {
     const traceClickHouse = MemberTraceClickHouseClientRepository.resolverFor(members.clickhouse);
-    const storage = {
-      resolveClient: traceClickHouse,
-      defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
-    };
+    const storage = { resolveClient: traceClickHouse };
 
     return {
       editOverlay: PrismaTraceEditOverlayRepository.create(members.prisma),

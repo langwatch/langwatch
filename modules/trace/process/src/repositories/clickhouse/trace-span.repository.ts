@@ -10,13 +10,13 @@ import {
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import {
   TraceProjectedReadRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
+import type { TraceClickHouse } from "./clickhouse.trace-member-client.repository.ts";
 import { chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const STORED_SPANS_TABLE = "stored_spans";

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   TraceClickHouse,
   type TraceClickHouseClient,
-} from "../../trace-clickhouse-client.repository.ts";
+} from "../clickhouse.trace-member-client.repository.ts";
 import {
   ClickHouseTraceEventPayloadRepository,
   TraceEventPayloadFieldNotFoundError,
