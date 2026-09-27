@@ -39,6 +39,7 @@ import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
+  modelProviderTrpc,
 } from "@langwatch/model-provider-contract";
 import type {
   PromptAssignTagTrpcInput,
@@ -221,7 +222,7 @@ type BorrowedProcedures = {
   httpProxy: { execute: UnpublishedMutation };
   llmModelCost: { getModelLimits: UnpublishedQuery };
   modelProvider: {
-    getAllForProject: UnpublishedQuery;
+    getAllForProject: ContractApiMap<typeof modelProviderTrpc>["modelProvider"]["getAllForProject"];
     getAllForProjectForFrontend: UnpublishedQuery;
     getResolvedDefault: {
       query: {

@@ -25,7 +25,7 @@ import {
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
 import { NextLink } from "@langwatch/workflow-browser-kit";
-import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 

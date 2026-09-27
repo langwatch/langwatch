@@ -2,8 +2,7 @@
  * The scope reading the moved studio modules already do.
  */
 
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { ModelProviderListEntry } from "@langwatch/model-provider-contract";
+import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Temporal, toDate } from "@langwatch/time";
 import { useWorkflowHost, type WorkflowCopyTarget } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
@@ -28,7 +27,7 @@ export type StudioScopeReading = {
    * Every project the reader may replicate into, already derived by the host.
    */
   copyTargets: readonly WorkflowCopyTarget[];
-  modelProviders: Record<string, ModelProviderListEntry> | undefined;
+  modelProviders: RouterOutputs["modelProvider"]["getAllForProject"] | undefined;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
   isLoading: boolean;

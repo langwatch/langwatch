@@ -35,14 +35,13 @@ import {
   type SingleEvaluationResult,
   getEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
-import { HoverableBigText } from "@langwatch/workflow-browser/hoverable-big-text";
-import { RedactedField } from "@langwatch/workflow-browser/redacted-field";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
+import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
 import {
   buildPreconditionTraceDataFromTrace,
