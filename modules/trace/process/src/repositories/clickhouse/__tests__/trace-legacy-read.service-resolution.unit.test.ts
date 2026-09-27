@@ -171,7 +171,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
     const logger = createLogger("test");
 
     resolveTraceSpansFn = (projectId, normalizedSpans) =>
-      TraceOffloadResolutionService.resolveOffloadedTraces({
+      TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId,
         normalizedSpans,
         blobStore,

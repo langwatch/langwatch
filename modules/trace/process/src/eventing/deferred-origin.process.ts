@@ -58,10 +58,11 @@ export const resolveDeferredOriginIntentSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface DeferredOriginState {
+export const deferredOriginStateSchema = z.object({
   /** When the fallback fires, while one is armed; null once resolved or never armed. */
-  resolveAfterMs: number | null;
-}
+  resolveAfterMs: z.number().nullable(),
+});
+export type DeferredOriginState = z.infer<typeof deferredOriginStateSchema>;
 
 export const DEFERRED_ORIGIN_INITIAL_STATE: DeferredOriginState = { resolveAfterMs: null };
 

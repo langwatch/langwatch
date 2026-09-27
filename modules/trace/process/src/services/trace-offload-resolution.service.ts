@@ -52,7 +52,7 @@ export class TraceOffloadResolutionService {
    * the resolved map and re-running IO extraction when any span resolved. A missing event_log row
    * leaves that span's preview intact and is logged at warn, never propagated.
    */
-  static async resolveOffloadedTraces({
+  async resolveOffloadedTraces({
     projectId,
     normalizedSpans,
     blobStore,
@@ -82,7 +82,7 @@ export class TraceOffloadResolutionService {
     // keep the successes even when a span's resolver throws something unexpected.
     const spanSettlements = await Promise.allSettled(
       normalizedSpans.map((span) =>
-        TraceOffloadResolutionService.resolveSpan({
+        this.resolveSpan({
           span,
           projectId,
           blobStore,
@@ -140,7 +140,7 @@ export class TraceOffloadResolutionService {
    * whatever happens, so the namespace never reaches the UI, and a field that cannot be fetched
    * keeps the preview already sitting under its plain IO key.
    */
-  private static async resolveSpan({
+  private async resolveSpan({
     span,
     projectId,
     blobStore,
@@ -194,7 +194,7 @@ export class TraceOffloadResolutionService {
         continue;
       }
 
-      TraceOffloadResolutionService.warnFieldUnresolved({
+      this.warnFieldUnresolved({
         error: result.reason,
         projectId,
         span,
@@ -207,7 +207,7 @@ export class TraceOffloadResolutionService {
   }
 
   /** One field kept at its preview, said differently for a missing row than for a failed read. */
-  private static warnFieldUnresolved({
+  private warnFieldUnresolved({
     error,
     projectId,
     span,

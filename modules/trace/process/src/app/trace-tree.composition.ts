@@ -108,4 +108,4 @@ class NullTraceQueryClassificationAdapter implements TraceQueryClassifier {
 }
 
 /** The trace-tree read a composition root hands around. */
-export type TraceTreeService = ReturnType<TraceTreeComposition["build"]>;
+export type TraceTreeService = TraceService;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../../rules/trace-analytics-projection-version.rules.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
   type TraceAnalyticsRow,

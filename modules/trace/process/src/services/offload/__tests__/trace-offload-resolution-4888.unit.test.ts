@@ -127,7 +127,7 @@ const IO_ATTR_KEYS = [
   "gen_ai.output.messages",
 ] as const;
 
-describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB field byte-identical after resolution", () => {
+describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC1: >64 KB field byte-identical after resolution", () => {
   for (const attrKey of IO_ATTR_KEYS) {
     describe(`given a span with offloaded ${attrKey} (400 KB)`, () => {
       const fullValue = makeLargeValue(LARGE_BYTE_COUNT);
@@ -145,15 +145,13 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
       });
 
       describe("when resolved", () => {
-        let result: Awaited<
-          ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>
-        >;
+        let result: Awaited<ReturnType<TraceOffloadResolutionService["resolveOffloadedTraces"]>>;
 
         beforeEach(async () => {
           const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
           const logger = createMockLogger();
 
-          result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+          result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobSvc,
@@ -209,13 +207,13 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
     });
 
     describe("when resolved", () => {
-      let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
+      let result: Awaited<ReturnType<TraceOffloadResolutionService["resolveOffloadedTraces"]>>;
 
       beforeEach(async () => {
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
-        result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -242,7 +240,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
 // AC3 — eventref resolves from event_log; reserved keys stripped
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventref resolves + reserved keys stripped", () => {
+describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC3: eventref resolves + reserved keys stripped", () => {
   describe("given a span with a valid eventref (non-empty eventId)", () => {
     const attrKey = "langwatch.output";
     const fullValue = makeLargeValue();
@@ -261,7 +259,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -276,7 +274,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -293,7 +291,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
         const blobSvc = blobStoreResolving({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
@@ -311,7 +309,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC3: eventr
 // AC4 — no-eventref fast path: identical output, anyResolved=false, 0 CH calls
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eventref trace reads identical to pre-feature", () => {
+describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC4: no-eventref trace reads identical to pre-feature", () => {
   describe("given a trace with NO eventref pointers in any span", () => {
     const spanClean = makeSpan({
       spanAttributes: {
@@ -324,7 +322,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -339,7 +337,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -354,7 +352,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -369,7 +367,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
         const blobSvc = blobStoreResolving({});
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanClean],
           blobStore: blobSvc,
@@ -389,7 +387,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC4: no-eve
 // AC5 — resolution failure degrades to preview, never throws/500
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolution failure degrades to preview gracefully", () => {
+describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC5: resolution failure degrades to preview gracefully", () => {
   const attrKey = "langwatch.output";
   const previewValue = "x".repeat(IO_PREVIEW_BYTES) + "…";
 
@@ -415,7 +413,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
       it("does not throw", async () => {
         const logger = createMockLogger();
         await expect(
-          TraceOffloadResolutionService.resolveOffloadedTraces({
+          TraceOffloadResolutionService.create().resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobNotFoundStore(),
@@ -427,7 +425,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("returned span carries the original preview value (not empty, not undefined)", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobNotFoundStore(),
@@ -439,7 +437,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("logger.warn is called at least once", async () => {
         const logger = createMockLogger();
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobNotFoundStore(),
@@ -451,7 +449,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("reserved eventref key is still stripped from returned span attributes", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobNotFoundStore(),
@@ -477,7 +475,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
       it("does not throw", async () => {
         const logger = createMockLogger();
         await expect(
-          TraceOffloadResolutionService.resolveOffloadedTraces({
+          TraceOffloadResolutionService.create().resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobFieldNotFoundStore(),
@@ -489,7 +487,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("returned span carries the original preview value", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobFieldNotFoundStore(),
@@ -501,7 +499,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("logger.warn is called at least once", async () => {
         const logger = createMockLogger();
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobFieldNotFoundStore(),
@@ -519,7 +517,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
       it("does not throw", async () => {
         const logger = createMockLogger();
         await expect(
-          TraceOffloadResolutionService.resolveOffloadedTraces({
+          TraceOffloadResolutionService.create().resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobStoreWithoutClickHouse(),
@@ -531,7 +529,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("returned span carries the original preview value", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobStoreWithoutClickHouse(),
@@ -543,7 +541,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 
       it("logger.warn is called (not silently swallowed)", async () => {
         const logger = createMockLogger();
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobStoreWithoutClickHouse(),
@@ -560,7 +558,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC5: resolu
 // AC6 — partial/mixed: one resolved + one unresolved in same trace
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partial/mixed resolution in same trace", () => {
+describe("TraceOffloadResolutionService.create().resolveOffloadedTraces() — AC6: partial/mixed resolution in same trace", () => {
   const largeAttr = "langwatch.output";
   const smallAttr = "langwatch.input";
   const fullValue = makeLargeValue();
@@ -580,13 +578,13 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
     });
 
     describe("when resolved", () => {
-      let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
+      let result: Awaited<ReturnType<TraceOffloadResolutionService["resolveOffloadedTraces"]>>;
 
       beforeEach(async () => {
         const blobSvc = blobStoreResolving({ [largeAttr]: fullValue });
         const logger = createMockLogger();
 
-        result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [mixedSpan],
           blobStore: blobSvc,
@@ -648,7 +646,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
     describe("when resolved", () => {
       it("the successfully resolved field carries the full value", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [twoRefSpan],
           blobStore: partialBlobStore(),
@@ -660,7 +658,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
 
       it("the failed field keeps the preview value", async () => {
         const logger = createMockLogger();
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [twoRefSpan],
           blobStore: partialBlobStore(),
@@ -673,7 +671,7 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
       it("does not throw — the span-level error is absorbed", async () => {
         const logger = createMockLogger();
         await expect(
-          TraceOffloadResolutionService.resolveOffloadedTraces({
+          TraceOffloadResolutionService.create().resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [twoRefSpan],
             blobStore: partialBlobStore(),

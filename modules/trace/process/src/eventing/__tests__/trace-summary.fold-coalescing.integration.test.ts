@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
-} from "../../repositories/projection/trace-summary-projection.repository.ts";
+} from "../../repositories/trace-summary-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import type { TraceSummaryData } from "../trace-summary.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";

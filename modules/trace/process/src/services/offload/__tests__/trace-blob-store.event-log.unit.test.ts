@@ -808,7 +808,7 @@ describe("given a leaned span pointing at a real mixed-type EventPayload offload
         error: vi.fn(),
       };
 
-      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: TENANT_A,
         normalizedSpans: [stagedSpan],
         blobStore,

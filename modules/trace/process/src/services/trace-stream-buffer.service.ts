@@ -2,7 +2,7 @@ import type { Readable } from "node:stream";
 
 /**
  * Raised when a stream exceeds the byte cap passed to
- * {@link TraceStreamBufferService.streamToBuffer}. Callers reading untrusted object-store
+ * `TraceStreamBufferService.streamToBuffer`. Callers reading untrusted object-store
  * content pass a cap so a tampered or unexpectedly large object cannot OOM the worker.
  */
 export class StreamTooLargeError extends Error {
@@ -24,7 +24,7 @@ export class TraceStreamBufferService {
    * destroyed and {@link StreamTooLargeError} thrown, so an oversized object cannot exhaust
    * memory. Omit it only when the source is already size-bounded upstream.
    */
-  static async streamToBuffer(stream: Readable, maxBytes?: number): Promise<Buffer> {
+  async streamToBuffer(stream: Readable, maxBytes?: number): Promise<Buffer> {
     const chunks: Buffer[] = [];
     let total = 0;
     for await (const chunk of stream) {

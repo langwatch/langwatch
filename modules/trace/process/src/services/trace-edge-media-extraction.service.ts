@@ -63,7 +63,7 @@ async function rewriteAttributeList({
   for (const attr of attributes) {
     const stringValue = attr?.value?.stringValue;
     if (typeof stringValue === "string" && containsMediaMarkers(stringValue)) {
-      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.create().extractInlineMediaFromValue({
         value: stringValue,
         projectId,
         purpose: TRACE_MEDIA_PURPOSE,
@@ -101,7 +101,7 @@ export class TraceEdgeMediaExtractionService {
    * marker. Pure linear scans, no allocation, no I/O — this is the gate that
    * keeps the 99.9% no-media ingestion path at zero added cost.
    */
-  static spanCarriesMediaMarkers(span: OtlpSpan): boolean {
+  spanCarriesMediaMarkers(span: OtlpSpan): boolean {
     const attrsCarryMarkers = (attributes: OtlpKeyValue[] | undefined) =>
       Array.isArray(attributes) &&
       attributes.some(
@@ -128,7 +128,7 @@ export class TraceEdgeMediaExtractionService {
    * with stored-object references — or the original data unchanged when there is no media, the
    * flag is off, the project has content-drop rules, or anything fails.
    */
-  static async maybeExtractSpanMedia({
+  async maybeExtractSpanMedia({
     data,
     deps,
     logger,
@@ -138,7 +138,7 @@ export class TraceEdgeMediaExtractionService {
     logger: EdgeMediaExtractionLogger;
   }): Promise<RecordSpanCommandData> {
     const span = data.span;
-    if (!TraceEdgeMediaExtractionService.spanCarriesMediaMarkers(span)) {
+    if (!this.spanCarriesMediaMarkers(span)) {
       return data;
     }
 
@@ -164,7 +164,7 @@ export class TraceEdgeMediaExtractionService {
         return data;
       }
 
-      return await TraceEdgeMediaExtractionService.externaliseSpanMedia({
+      return await this.externaliseSpanMedia({
         data,
         service,
         deps,
@@ -192,7 +192,7 @@ export class TraceEdgeMediaExtractionService {
    * One budget covers the whole span, so a span cannot multiply the cost by spreading media over
    * many attributes.
    */
-  private static async externaliseSpanMedia({
+  private async externaliseSpanMedia({
     data,
     service,
     deps,
@@ -206,7 +206,7 @@ export class TraceEdgeMediaExtractionService {
     const span = data.span;
     const projectId = data.tenantId;
     const refs: ExtractedRef[] = [];
-    const budget = TraceValueMediaExtractionService.createExtractionBudget();
+    const budget = TraceValueMediaExtractionService.create().createExtractionBudget();
     const attributes = await rewriteAttributeList({
       attributes: span.attributes,
       projectId,
@@ -234,7 +234,7 @@ export class TraceEdgeMediaExtractionService {
       }
     }
 
-    TraceEdgeMediaExtractionService.reportBudgetDrops({ budget, refs, data, deps, logger });
+    this.reportBudgetDrops({ budget, refs, data, deps, logger });
     if (attributes === span.attributes && !eventsChanged) {
       return data;
     }
@@ -260,7 +260,7 @@ export class TraceEdgeMediaExtractionService {
    * Budget drops are fail-open per part but never silent: the affected parts ride through inline
    * and each reason is counted and logged, so a sustained rate is alertable.
    */
-  private static reportBudgetDrops({
+  private reportBudgetDrops({
     budget,
     refs,
     data,

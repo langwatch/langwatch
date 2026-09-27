@@ -131,7 +131,7 @@ export class TraceOffloadResolutionBatchService {
    * per-trace span arrays in result order, the blob store, IO recomputation and a warning logger,
    * plus the aggregate type and read concurrency. Returns one entry per trace, in input order.
    */
-  static async resolveOffloadedTracesBatch({
+  async resolveOffloadedTracesBatch({
     projectId,
     spansPerTrace,
     blobStore,

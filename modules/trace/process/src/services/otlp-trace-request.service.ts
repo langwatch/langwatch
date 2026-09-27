@@ -319,7 +319,9 @@ const normalizeOtlpAttributeValue = (v: AttributeValue): unknown => {
   return void 0;
 };
 
-const normalizeOtlpAttributes = (attributes: OtlpKeyValue[]): NormalizedAttributes => {
+const normalizeOtlpAttributes = (
+  attributes: OtlpKeyValue[] | null | undefined,
+): NormalizedAttributes => {
   const normalizedAttributes: NormalizedAttributes = {};
 
   for (const attr of attributes ?? []) {

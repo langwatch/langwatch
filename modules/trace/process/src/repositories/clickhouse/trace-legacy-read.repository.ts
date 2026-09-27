@@ -299,7 +299,7 @@ class OffloadedSpanResolver {
 
   toResolverFn(): ResolveTraceSpansFn {
     return (projectId, normalizedSpans) =>
-      TraceOffloadResolutionService.resolveOffloadedTraces({
+      TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId,
         normalizedSpans,
         blobStore: this.deps.blobStore,
@@ -310,7 +310,7 @@ class OffloadedSpanResolver {
 
   toBatchResolverFn(): ResolveTraceSpansBatchFn {
     return (projectId, spansPerTrace) =>
-      TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
+      TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
         projectId,
         spansPerTrace,
         blobStore: this.deps.blobStore,

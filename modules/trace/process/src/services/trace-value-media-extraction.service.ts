@@ -38,7 +38,7 @@ const CONCURRENT_STORES = 4;
 
 /**
  * Mutable cost budget threaded through one span's extraction. Create with
- * `TraceValueMediaExtractionService.createExtractionBudget()` and share across every attribute
+ * `this.createExtractionBudget()` and share across every attribute
  * value of the span so the cap and deadline are per-span, not per-attribute.
  */
 export interface ExtractionBudget {
@@ -131,7 +131,7 @@ function collectFromObject({
   path: PathSeg[];
   sites: CandidateSite[];
 }): void {
-  if (TraceValueMediaExtractionService.isExtractableMediaPart(value)) {
+  if (TraceValueMediaExtractionService.create().isExtractableMediaPart(value)) {
     sites.push({ path, node: value, kind: "part" });
 
     return;
@@ -222,7 +222,7 @@ async function storeSite(
           input_audio: { data: parsed.base64, mimeType: parsed.mimeType },
         }
       : imageOrBinaryPart;
-    const { ref } = await TraceContentExtractionService.processContentPart({
+    const { ref } = await TraceContentExtractionService.create().processContentPart({
       part: asPart,
       ...params,
     });
@@ -241,7 +241,7 @@ async function storeSite(
     };
   }
 
-  const { part, ref } = await TraceContentExtractionService.processContentPart({
+  const { part, ref } = await TraceContentExtractionService.create().processContentPart({
     part: site.node,
     ...params,
   });
@@ -397,7 +397,7 @@ export class TraceValueMediaExtractionService {
 
   private constructor() {}
 
-  static createExtractionBudget(now: number = nowInstant().epochMilliseconds): ExtractionBudget {
+  createExtractionBudget(now: number = nowInstant().epochMilliseconds): ExtractionBudget {
     return {
       deadlineAt: now + EXTRACTION_DEADLINE_MS,
       remainingParts: MAX_MEDIA_PARTS_PER_SPAN,
@@ -412,7 +412,7 @@ export class TraceValueMediaExtractionService {
    * service would externalize; url-only and non-part objects are false. It uses the same
    * `visitContentPart` dispatcher as the store phase, so the two cannot disagree on shape.
    */
-  static isExtractableMediaPart(part: unknown): boolean {
+  isExtractableMediaPart(part: unknown): boolean {
     if (typeof part !== "object" || part === null) {
       return false;
     }
@@ -440,7 +440,7 @@ export class TraceValueMediaExtractionService {
    * JSON strings and whole-string `data:` URIs alike. Storage runs in bounded waves under `budget`,
    * shared across a span's attribute values; a per-part store failure leaves that part inline.
    */
-  static async extractInlineMediaFromValue({
+  async extractInlineMediaFromValue({
     value,
     projectId,
     purpose,
@@ -465,7 +465,7 @@ export class TraceValueMediaExtractionService {
     const stored = await storeCandidates({
       sites,
       params: { projectId, purpose, ownerKind, ownerId, service },
-      budget: budget ?? TraceValueMediaExtractionService.createExtractionBudget(),
+      budget: budget ?? this.createExtractionBudget(),
       refs,
     });
     if (stored.length === 0) {

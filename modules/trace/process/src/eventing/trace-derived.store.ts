@@ -4,10 +4,10 @@ import type {
   FoldStateRead,
 } from "@langwatch/eventing";
 
-import type { TraceAnalyticsProjectionRepository } from "../repositories/projection/trace-analytics-projection.repository.ts";
+import type { TraceAnalyticsProjectionRepository } from "../repositories/trace-analytics-projection.repository.ts";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "./trace-derived.projection.ts";

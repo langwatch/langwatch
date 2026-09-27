@@ -45,14 +45,14 @@ export type OtlpTraceCollectionResult = Readonly<{
 }>;
 
 /** OTLP operations are part of Trace's one public process API. */
+/** One OTLP trace export, for the tenant it belongs to. */
+export type OtlpTracesInput = { tenantId: string; traceRequest: IExportTraceServiceRequest };
+
 export type TraceOtlpIngestApi = Readonly<{
   otlpCredential(input: OtlpIngestCredentialInput): Promise<OtlpIngestCredential>;
   otlpMarkCredentialUsed(input: { apiKeyId: string }): void;
   otlpUsageLimit(input: { project: OtlpIngestProject; customerTraceIds: string[] }): Promise<void>;
-  otlpTraces(input: {
-    tenantId: string;
-    traceRequest: IExportTraceServiceRequest;
-  }): Promise<OtlpTraceCollectionResult>;
+  otlpTraces(input: OtlpTracesInput): Promise<OtlpTraceCollectionResult>;
   otlpReportError(
     error: Error,
     context: Readonly<{ projectId: string; customerTraceIds: string[] }>,

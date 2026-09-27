@@ -38,7 +38,7 @@ export class TraceEdgeMediaPayloadService extends TraceIngressPayload {
   }
 
   async prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData> {
-    const extracted = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+    const extracted = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
       data,
       deps: this.options.deps,
       logger: this.options.logger,

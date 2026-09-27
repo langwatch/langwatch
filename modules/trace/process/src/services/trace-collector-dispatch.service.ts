@@ -19,16 +19,20 @@ import { isStorableSpanTimeMs } from "../rules/storable-span-time.rules.ts";
 const logger = createLogger("langwatch.collector");
 
 /** One already-normalized span, handed to the ingestion pipeline. */
-export type CollectorSpanIngest = (input: {
+export type CollectorSpanIngestInput = {
   tenantId: string;
   span: ReturnType<typeof TraceCollectorSpanService.convertSpanToOtlp>;
   resource: ReturnType<typeof TraceCollectorSpanService.buildResource>;
   instrumentationScope: Readonly<{ name: string }>;
   piiRedactionLevel: typeof DEFAULT_PII_REDACTION_LEVEL;
-}) => Promise<Readonly<{ status: string; error?: string | undefined }>>;
+};
+export type CollectorSpanIngestResult = Readonly<{ status: string; error?: string | undefined }>;
+export type CollectorSpanIngest = (
+  input: CollectorSpanIngestInput,
+) => Promise<CollectorSpanIngestResult>;
 
 /** One custom SDK evaluation, reported to the evaluation pipeline. */
-export type CollectorEvaluationReport = (input: {
+export type CollectorEvaluationReportInput = {
   tenantId: string;
   evaluationId: string;
   evaluatorId: string;
@@ -43,7 +47,8 @@ export type CollectorEvaluationReport = (input: {
   details: string | null;
   error: string | null;
   occurredAt: number;
-}) => Promise<unknown>;
+};
+export type CollectorEvaluationReport = (input: CollectorEvaluationReportInput) => Promise<unknown>;
 
 /**
  * What `partialSuccess.errorMessage` says about a span or an evaluation the pipeline refused.

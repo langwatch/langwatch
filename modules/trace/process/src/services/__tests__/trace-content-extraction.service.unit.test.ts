@@ -92,7 +92,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       };
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -110,7 +110,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const event = makeEventWithContent([{ type: "text", text: "Hello, world!" }]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -147,7 +147,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -218,7 +218,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -263,7 +263,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -313,7 +313,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { refs } = await TraceContentExtractionService.extractInlineMediaFromEvent({
+      const { refs } = await TraceContentExtractionService.create().extractInlineMediaFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -345,7 +345,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       await expect(
-        TraceContentExtractionService.extractInlineMediaFromEvent({
+        TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -368,7 +368,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const event = makeEventWithContent([{ type: "not-a-known-shape", someField: "value" }]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -404,7 +404,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -451,7 +451,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -494,7 +494,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -554,11 +554,12 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { rewrittenEvent } = await TraceContentExtractionService.extractInlineMediaFromEvent({
-        ...BASE_PARAMS,
-        event,
-        service,
-      });
+      const { rewrittenEvent } =
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
+          ...BASE_PARAMS,
+          event,
+          service,
+        });
 
       const content = (rewrittenEvent as { message: { content: unknown[] } }).message.content;
       expect(content[0]).toEqual({
@@ -596,7 +597,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -657,7 +658,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      const { refs } = await TraceContentExtractionService.extractInlineMediaFromEvent({
+      const { refs } = await TraceContentExtractionService.create().extractInlineMediaFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -705,7 +706,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       };
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -751,7 +752,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -778,7 +779,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -803,7 +804,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -837,7 +838,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -880,7 +881,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -916,7 +917,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const event = makeEventWithContent([{ type: "image", image: "https://example.com/cat.png" }]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -954,7 +955,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1008,7 +1009,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1038,7 +1039,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       const event = makeEventWithContent([{ type: "file", file: { file_id: "file-abc123" } }]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1072,7 +1073,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1121,7 +1122,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.extractInlineMediaFromEvent({
+      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1153,7 +1154,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.extractInlineMediaFromEvent({
+      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1186,7 +1187,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1216,7 +1217,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1237,7 +1238,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,
@@ -1269,7 +1270,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
         },
       ]);
 
-      await TraceContentExtractionService.extractInlineMediaFromEvent({
+      await TraceContentExtractionService.create().extractInlineMediaFromEvent({
         ...BASE_PARAMS,
         event,
         service,
@@ -1305,7 +1306,7 @@ describe("TraceContentExtractionService.extractInlineMediaFromEvent", () => {
       ]);
 
       const { rewrittenEvent, refs } =
-        await TraceContentExtractionService.extractInlineMediaFromEvent({
+        await TraceContentExtractionService.create().extractInlineMediaFromEvent({
           ...BASE_PARAMS,
           event,
           service,

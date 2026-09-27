@@ -339,7 +339,10 @@ export class TraceBlobStoreService {
       purpose: "access",
     });
 
-    return TraceStreamBufferService.streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.create().streamToBuffer(
+      await objectStore.get(uri),
+      MAX_SPOOL_BYTES,
+    );
   }
 
   /**
@@ -353,7 +356,7 @@ export class TraceBlobStoreService {
     // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
     // entirely — and a v1 reference points at an object written before this
     // deploy, which is exactly the input the cap exists to distrust.
-    return TraceStreamBufferService.streamToBuffer(body, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.create().streamToBuffer(body, MAX_SPOOL_BYTES);
   }
 
   /**

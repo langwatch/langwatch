@@ -144,7 +144,7 @@ const realIOService = TraceIOExtractionService.create(TraceCanonicalisationServi
 // AC6 — streamed / bounded-concurrency resolution
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
+describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch() — AC6 bounded resolution", () => {
   describe("given a large result set where every trace has one offloaded span", () => {
     const TRACE_COUNT = EVENT_LOG_RESOLVE_CONCURRENCY * 3;
     const fullValue = "X".repeat(100_000);
@@ -163,7 +163,7 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
       it("never exceeds the configured event_log read concurrency", async () => {
         const { blobStore, peakConcurrency } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: buildResultSet(),
           blobStore,
@@ -178,7 +178,7 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
       it("issues exactly one event_log read per offloaded field (no N×M blow-up)", async () => {
         const { blobStore, getCalls } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: buildResultSet(),
           blobStore,
@@ -192,13 +192,14 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
       it("returns one resolution entry per input trace, in order, all resolved", async () => {
         const { blobStore } = makeConcurrencyTrackingBlobStore(fullValue);
 
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: buildResultSet(),
-          blobStore,
-          ioExtractionService: realIOService,
-          logger: createMockLogger(),
-        });
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: buildResultSet(),
+            blobStore,
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
 
         expect(results).toHaveLength(TRACE_COUNT);
         expect(results.every((r) => r.anyResolved)).toBe(true);
@@ -219,13 +220,14 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
           eventId: "evt-dup",
         });
 
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [[span], [span]],
-          blobStore,
-          ioExtractionService: realIOService,
-          logger: createMockLogger(),
-        });
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [[span], [span]],
+            blobStore,
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
 
         expect(getCalls()).toBe(1);
         // Both output traces still receive the full value.
@@ -249,13 +251,14 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
           },
         });
 
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [[span]],
-          blobStore,
-          ioExtractionService: realIOService,
-          logger: createMockLogger(),
-        });
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [[span]],
+            blobStore,
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
 
         expect(results[0]!.resolvedSpans[0]!.spanAttributes).toMatchObject({
           "langwatch.output": "full batch output",
@@ -276,13 +279,14 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
           spanAttributes: { "langwatch.output": "small inline value" },
         });
 
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [[plainSpan]],
-          blobStore,
-          ioExtractionService: realIOService,
-          logger: createMockLogger(),
-        });
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [[plainSpan]],
+            blobStore,
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
 
         expect(getCalls()).toBe(0);
         expect(results[0]!.anyResolved).toBe(false);
@@ -298,7 +302,7 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
 // AC7 — degrade to preview WITH a warn log
 // ---------------------------------------------------------------------------
 
-describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
+describe("TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
   describe("given one trace whose event_log row is missing", () => {
     function makeMissingRowBlobStore(): TraceBlobStoreService {
       return blobStoreReading(async ({ field }: { field: string }) => {
@@ -309,22 +313,23 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
     describe("when resolved as a batch", () => {
       it("keeps the preview value for the unresolved field", async () => {
         const logger = createMockLogger();
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [
-            [
-              makeSpanWithOutputRef({
-                traceId: "trace-x",
-                spanId: "span-x",
-                eventId: "evt-missing",
-                preview: "the 64KB preview",
-              }),
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [
+              [
+                makeSpanWithOutputRef({
+                  traceId: "trace-x",
+                  spanId: "span-x",
+                  eventId: "evt-missing",
+                  preview: "the 64KB preview",
+                }),
+              ],
             ],
-          ],
-          blobStore: makeMissingRowBlobStore(),
-          ioExtractionService: realIOService,
-          logger,
-        });
+            blobStore: makeMissingRowBlobStore(),
+            ioExtractionService: realIOService,
+            logger,
+          });
 
         expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(
           "the 64KB preview",
@@ -334,7 +339,7 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
 
       it("logs a warning (no silent truncation)", async () => {
         const logger = createMockLogger();
-        await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
+        await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
           projectId: "proj-1",
           spansPerTrace: [
             [
@@ -355,21 +360,22 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
 
       it("strips the reserved eventref key even when resolution fails", async () => {
         const logger = createMockLogger();
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [
-            [
-              makeSpanWithOutputRef({
-                traceId: "trace-x",
-                spanId: "span-x",
-                eventId: "evt-missing",
-              }),
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [
+              [
+                makeSpanWithOutputRef({
+                  traceId: "trace-x",
+                  spanId: "span-x",
+                  eventId: "evt-missing",
+                }),
+              ],
             ],
-          ],
-          blobStore: makeMissingRowBlobStore(),
-          ioExtractionService: realIOService,
-          logger,
-        });
+            blobStore: makeMissingRowBlobStore(),
+            ioExtractionService: realIOService,
+            logger,
+          });
 
         const keys = Object.keys(results[0]!.resolvedSpans[0]!.spanAttributes);
         expect(keys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX))).toBe(true);
@@ -390,29 +396,30 @@ describe("TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch() — A
     describe("when resolved as a batch", () => {
       it("resolves the healthy traces and degrades only the failing one", async () => {
         const goodValue = "Y".repeat(80_000);
-        const results = await TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-          projectId: "proj-1",
-          spansPerTrace: [
-            [
-              makeSpanWithOutputRef({
-                traceId: "trace-good",
-                spanId: "span-good",
-                eventId: "evt-good",
-              }),
+        const results =
+          await TraceOffloadResolutionBatchService.create().resolveOffloadedTracesBatch({
+            projectId: "proj-1",
+            spansPerTrace: [
+              [
+                makeSpanWithOutputRef({
+                  traceId: "trace-good",
+                  spanId: "span-good",
+                  eventId: "evt-good",
+                }),
+              ],
+              [
+                makeSpanWithOutputRef({
+                  traceId: "trace-bad",
+                  spanId: "span-bad",
+                  eventId: "evt-bad",
+                  preview: "bad-preview",
+                }),
+              ],
             ],
-            [
-              makeSpanWithOutputRef({
-                traceId: "trace-bad",
-                spanId: "span-bad",
-                eventId: "evt-bad",
-                preview: "bad-preview",
-              }),
-            ],
-          ],
-          blobStore: makeSelectiveBlobStore(goodValue),
-          ioExtractionService: realIOService,
-          logger: createMockLogger(),
-        });
+            blobStore: makeSelectiveBlobStore(goodValue),
+            ioExtractionService: realIOService,
+            logger: createMockLogger(),
+          });
 
         expect(results[0]!.anyResolved).toBe(true);
         expect(results[0]!.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(goodValue);

@@ -37,6 +37,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import { spanStorabilityOf, UNSTORABLE_SPAN_SKIPPED } from "../rules/storable-span-time.rules.ts";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../rules/trace-analytics-projection-version.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
 import type { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
@@ -75,13 +76,6 @@ const traceAnalyticsEvents = [
  * {@link TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT}.
  */
 export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-07-29" as const;
-
-/**
- * The pre-split stamp — DECODED in place, not a store miss: rejecting it
- * would re-anchor the whole population from replay (ADR-071 consequences
- * 1-3). `OccurredAt` doubles as the correct `EarliestSpanStartMs` here.
- */
-export const TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT = "2026-07-27" as const;
 
 /**
  * How far OccurredAt (frozen anchor, ADR-071 step 3) may sit from a read's

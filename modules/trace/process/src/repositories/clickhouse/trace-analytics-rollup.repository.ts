@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 
 import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
-import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
+import { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;

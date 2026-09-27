@@ -82,7 +82,8 @@ import {
   type TraceContentReadService,
   type TraceViewerService,
   type TraceApi,
-  type TraceOtlpIngestApi,
+  type OtlpTracesInput,
+  type TraceViewerReadInput,
   type TraceAnnotationCommands,
   type TraceAnnotationMarker,
   type TraceSuggestionTarget,
@@ -147,6 +148,14 @@ import {
   traceConfig,
   TraceIdAmbiguousError,
   TraceNotFoundError,
+  type TraceListTracesInput,
+  type TraceFindTraceInput,
+  type TraceReadTracesWithSpansInput,
+  type TraceReadTracesWithSpansPreviewInput,
+  type TraceReadOrderedSpansInput,
+  type TraceReadThreadTracesInput,
+  type TraceReadThreadsTracesInput,
+  type TraceReadSampleTracesInput,
   TrackedEventInvalidError,
   trackEventRESTParamsValidatorSchema,
   SpanNotFoundError,
@@ -178,6 +187,7 @@ import {
   isCodingAgentShapedSpan,
   mapSummaryRowsToClaudeRefs,
 } from "../rules/claude-code-log-enrichment.rules.ts";
+import type { ClaudeSpanRef } from "../rules/claude-code-message-index.rules.ts";
 import { redactPatchForViewer } from "../rules/trace-edit-overlay-redaction.rules.ts";
 import { restoreWithheldEdits } from "../rules/trace-edit-overlay-restore.rules.ts";
 import {
@@ -267,8 +277,9 @@ import {
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
 import type {
-  CollectorEvaluationReport,
-  CollectorSpanIngest,
+  CollectorEvaluationReportInput,
+  CollectorSpanIngestInput,
+  CollectorSpanIngestResult,
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
 import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
@@ -307,67 +318,79 @@ export type TraceLogRecordReadRow = Readonly<{
 }>;
 
 /** The list, facet and discover reads behind the grid and its sidebar. */
+export type TraceListReadParams = {
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  sort: { columnId: string; direction: "asc" | "desc" };
+  page?: number;
+  pageSize: number;
+  cursor?: { sortValue: number; traceId: string };
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+  visibilityCutoffMs?: number | null;
+};
+
+export type TraceNewCountParams = {
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  since: number;
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+};
+
+export type TraceSuggestionsParams = {
+  tenantId: string;
+  field: string;
+  prefix: string;
+  limit?: number;
+};
+
+export type TraceDiscoverReadParams = {
+  tenantId: string;
+  timeRange: { from: number; to: number; live?: boolean };
+};
+
+export type TraceFacetValuesReadParams = {
+  tenantId: string;
+  timeRange: { from: number; to: number };
+  facetKey: string;
+  prefix?: string;
+  limit: number;
+  offset: number;
+};
+
 export type TracesListReader = Readonly<{
-  getList(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    sort: { columnId: string; direction: "asc" | "desc" };
-    page?: number;
-    pageSize: number;
-    cursor?: { sortValue: number; traceId: string };
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    visibilityCutoffMs?: number | null;
-  }): Promise<TraceListPage>;
+  getList(params: TraceListReadParams): Promise<TraceListPage>;
   getFacets(params: {
     tenantId: string;
     timeRange: { from: number; to: number; live?: boolean };
     filterFor: FacetFilterResolver;
   }): Promise<FacetDescriptor[]>;
-  getNewCount(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    since: number;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-  }): Promise<number>;
+  getNewCount(params: TraceNewCountParams): Promise<number>;
   getTraceIds(params: {
     tenantId: string;
     timeRange: { from: number; to: number };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
   }): Promise<string[]>;
-  getSuggestions(params: {
-    tenantId: string;
-    field: string;
-    prefix: string;
-    limit?: number;
-  }): Promise<string[]>;
+  getSuggestions(params: TraceSuggestionsParams): Promise<string[]>;
   resolveFacetKey(input: { field: string; protections: Protections }): string;
-  getDiscover(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-  }): Promise<DiscoverResult>;
-  getFacetValues(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number };
-    facetKey: string;
-    prefix?: string;
-    limit: number;
-    offset: number;
-  }): Promise<FacetValuesResult>;
+  getDiscover(params: TraceDiscoverReadParams): Promise<DiscoverResult>;
+  getFacetValues(params: TraceFacetValuesReadParams): Promise<FacetValuesResult>;
 }>;
 
 /** The Sessions lens read. */
+export type TraceSessionGroupsReadParams = {
+  tenantId: string;
+  timeRange: { from: number; to: number; live?: boolean };
+  sort?: { columnId: string; direction: "asc" | "desc" };
+  pageSize: number;
+  cursor?: string;
+  filterWhere?: { sql: string; params: Record<string, unknown> };
+  contentTerms?: string[];
+  visibilityCutoffMs?: number | null;
+};
+
 export type TracesSessionGroupsReader = Readonly<{
-  getSessionGroups(params: {
-    tenantId: string;
-    timeRange: { from: number; to: number; live?: boolean };
-    sort?: { columnId: string; direction: "asc" | "desc" };
-    pageSize: number;
-    cursor?: string;
-    filterWhere?: { sql: string; params: Record<string, unknown> };
-    contentTerms?: string[];
-    visibilityCutoffMs?: number | null;
-  }): Promise<SessionGroupsResult>;
+  getSessionGroups(params: TraceSessionGroupsReadParams): Promise<SessionGroupsResult>;
 }>;
 
 type ByTrace = { tenantId: string; traceId: string; occurredAtMs?: number };
@@ -1020,9 +1043,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     return this.#dependencies.traces.tree.getEvaluationEvents(input);
   }
 
-  async listTraces(
-    input: Parameters<TraceContentReadService["listTraces"]>[0],
-  ): Promise<TracesForProjectResult> {
+  async listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult> {
     const pageSize =
       input.query.pageSize === undefined
         ? undefined
@@ -1036,9 +1057,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       },
     });
   }
-  findTrace(
-    input: Parameters<TraceContentReadService["findTrace"]>[0],
-  ): Promise<Trace | undefined> {
+  findTrace(input: TraceFindTraceInput): Promise<Trace | undefined> {
     return this.#contentReader.findTrace(input);
   }
   async getTraceForViewer(input: {
@@ -1391,46 +1410,34 @@ export class TraceApp implements TraceApi, CollectorApp {
     return { ...saved, patch: redactPatchForViewer({ patch: saved.patch, ...view }) };
   }
 
-  async readTracesWithSpans(
-    input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0],
-  ): Promise<Trace[]> {
+  async readTracesWithSpans(input: TraceReadTracesWithSpansInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
     return this.#contentReader.readTracesWithSpans(input);
   }
 
-  async readTracesWithSpansPreview(
-    input: Parameters<TraceContentReadService["readTracesWithSpansPreview"]>[0],
-  ): Promise<Trace[]> {
+  async readTracesWithSpansPreview(input: TraceReadTracesWithSpansPreviewInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.traceIds);
 
     return this.#contentReader.readTracesWithSpansPreview(input);
   }
-  readOrderedSpansForTrace(
-    input: Parameters<TraceContentReadService["readOrderedSpansForTrace"]>[0],
-  ): Promise<Span[]> {
+  readOrderedSpansForTrace(input: TraceReadOrderedSpansInput): Promise<Span[]> {
     return this.#contentReader.readOrderedSpansForTrace(input);
   }
-  readThreadTraces(
-    input: Parameters<TraceContentReadService["readThreadTraces"]>[0],
-  ): Promise<Trace[]> {
+  readThreadTraces(input: TraceReadThreadTracesInput): Promise<Trace[]> {
     return this.#contentReader.readThreadTraces(input);
   }
-  async readThreadsTraces(
-    input: Parameters<TraceContentReadService["readThreadsTraces"]>[0],
-  ): Promise<Trace[]> {
+  async readThreadsTraces(input: TraceReadThreadsTracesInput): Promise<Trace[]> {
     await this.#readBounds.assertIdsWithinBound(input.projectId, input.threadIds);
 
     return this.#contentReader.readThreadsTraces(input);
   }
-  async readSampleTraces(
-    input: Parameters<TraceContentReadService["readSampleTraces"]>[0],
-  ): Promise<Trace[]> {
+  async readSampleTraces(input: TraceReadSampleTracesInput): Promise<Trace[]> {
     const pageSize = await this.#readBounds.clampPageSize(input.query.projectId, input.pageSize);
 
     return this.#contentReader.readSampleTraces({ ...input, pageSize });
   }
-  readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]): Promise<Trace[]> {
+  readForViewer(input: TraceViewerReadInput): Promise<Trace[]> {
     if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
     return this.#dependencies.viewer.readForViewer(input);
   }
@@ -1702,21 +1709,19 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   enrichSpanFromCodingAgentLogs(input: {
     span: Span;
-    modelCallRefs: unknown;
+    modelCallRefs: ClaudeSpanRef[];
     logRows: TraceLogRecordReadRow[];
   }): Span {
     return enrichSingleSpanWithClaudeLogContent({
       span: input.span,
-      modelCallRefs: input.modelCallRefs as Parameters<
-        typeof enrichSingleSpanWithClaudeLogContent
-      >[0]["modelCallRefs"],
+      modelCallRefs: input.modelCallRefs,
       logRows: input.logRows,
       traceCanonicalisation: this.#dependencies.traces.canonicalisation,
       codingAgents: this.#dependencies.codingAgents,
     });
   }
 
-  mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown {
+  mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): ClaudeSpanRef[] {
     return mapSummaryRowsToClaudeRefs(rows);
   }
 
@@ -1921,14 +1926,12 @@ export class TraceApp implements TraceApi, CollectorApp {
   // -------------------------------------------------------------------------
 
   /** One page of the trace grid. */
-  readTraceList(params: Parameters<TracesListReader["getList"]>[0]): Promise<TraceListPage> {
+  readTraceList(params: TraceListReadParams): Promise<TraceListPage> {
     return this.#dependencies.traces.list.getList(params);
   }
 
   /** One page of the Sessions lens. */
-  readSessionGroups(
-    params: Parameters<TracesSessionGroupsReader["getSessionGroups"]>[0],
-  ): Promise<SessionGroupsResult> {
+  readSessionGroups(params: TraceSessionGroupsReadParams): Promise<SessionGroupsResult> {
     return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
   }
 
@@ -1965,24 +1968,22 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /** How many traces have arrived since the grid last painted. */
-  readNewCount(params: Parameters<TracesListReader["getNewCount"]>[0]): Promise<number> {
+  readNewCount(params: TraceNewCountParams): Promise<number> {
     return this.#dependencies.traces.list.getNewCount(params);
   }
 
   /** The typeahead's values for one field. */
-  readSuggestions(params: Parameters<TracesListReader["getSuggestions"]>[0]): Promise<string[]> {
+  readSuggestions(params: TraceSuggestionsParams): Promise<string[]> {
     return this.#dependencies.traces.list.getSuggestions(params);
   }
 
   /** The facet payload the sidebar opens with. */
-  readDiscover(params: Parameters<TracesListReader["getDiscover"]>[0]): Promise<DiscoverResult> {
+  readDiscover(params: TraceDiscoverReadParams): Promise<DiscoverResult> {
     return this.#dependencies.traces.list.getDiscover(params);
   }
 
   /** One facet's values, paged. */
-  readFacetValues(
-    params: Parameters<TracesListReader["getFacetValues"]>[0],
-  ): Promise<FacetValuesResult> {
+  readFacetValues(params: TraceFacetValuesReadParams): Promise<FacetValuesResult> {
     return this.#dependencies.traces.list.getFacetValues(params);
   }
 
@@ -2743,7 +2744,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /** Where one already-normalized span goes: the receiver both doors share. */
-  ingestSpan(input: Parameters<CollectorSpanIngest>[0]): ReturnType<CollectorSpanIngest> {
+  ingestSpan(input: CollectorSpanIngestInput): Promise<CollectorSpanIngestResult> {
     const ingestion = this.#dependencies.ingestion;
     if (!ingestion) {
       throw new TraceIngestionUnavailableError();
@@ -2757,9 +2758,7 @@ export class TraceApp implements TraceApi, CollectorApp {
    * also travel. Parsed against its schema rather than cast, so a
    * differently-spelled field is rejected here, not malformed downstream.
    */
-  reportEvaluation(
-    input: Parameters<CollectorEvaluationReport>[0],
-  ): ReturnType<CollectorEvaluationReport> {
+  reportEvaluation(input: CollectorEvaluationReportInput): Promise<unknown> {
     return this.#dependencies.evaluations.reportEvaluation(
       reportEvaluationCommandDataSchema.parse(input),
     );
@@ -2914,9 +2913,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /** The trace signal: the same receiver `POST /api/collector` writes through. */
-  otlpTraces(
-    input: Parameters<TraceOtlpIngestApi["otlpTraces"]>[0],
-  ): Promise<OtlpTraceCollectionResult> {
+  otlpTraces(input: OtlpTracesInput): Promise<OtlpTraceCollectionResult> {
     const ingestion = this.#dependencies.ingestion;
     if (!ingestion) {
       throw new TraceIngestionUnavailableError();

@@ -64,10 +64,11 @@ async function rewriteMessage(
   const rewrittenParts: unknown[] = [];
   let changed = false;
   for (const raw of contentArray) {
-    const { part: rewritten, ref } = await TraceContentExtractionService.processContentPart({
-      part: raw,
-      ...params,
-    });
+    const { part: rewritten, ref } =
+      await TraceContentExtractionService.create().processContentPart({
+        part: raw,
+        ...params,
+      });
     if (rewritten !== raw) {
       changed = true;
     }
@@ -135,7 +136,7 @@ export class TraceContentExtractionService {
    * part with an optional ref. The part is unknown because the walker no longer pre-validates
    * against one schema. Exported for the generic value walker, which reads arbitrary JSON.
    */
-  static async processContentPart({
+  async processContentPart({
     part,
     projectId,
     purpose,
@@ -180,7 +181,7 @@ export class TraceContentExtractionService {
    * a new event whose parts reference the stored objects. Both event shapes are handled; an
    * unrecognized one comes back unchanged, and a store failure rethrows.
    */
-  static async extractInlineMediaFromEvent({
+  async extractInlineMediaFromEvent({
     event,
     projectId,
     ownerKind,
