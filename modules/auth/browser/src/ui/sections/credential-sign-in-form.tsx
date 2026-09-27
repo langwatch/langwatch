@@ -11,6 +11,7 @@ import { authApi as api } from "../../behavior/auth-api.ts";
 import "../elements/auth-front-door.css";
 import { useFocusWhenSettled } from "../../behavior/use-focus-when-settled.ts";
 import { useRetryCountdown } from "../../behavior/use-retry-countdown.ts";
+import { forgotPasswordHref } from "../../model/carried-email.ts";
 import { describeRemainingWait } from "../../model/credential-sign-in.ts";
 import { SHAPE } from "../../model/front-door-theme.ts";
 import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
@@ -174,7 +175,7 @@ export function CredentialSignInForm({
           labelEnd={
             <Box asChild>
               <Link
-                href="/auth/forgot-password"
+                href={forgotPasswordHref({ email: asksForAddress ? form.watch("email") : email })}
                 style={{
                   textDecoration: "underline",
                   textUnderlineOffset: "2px",

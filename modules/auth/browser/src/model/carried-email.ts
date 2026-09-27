@@ -25,6 +25,14 @@ export function signUpHref({
   return `/auth/signup${queryPart ? `?${queryPart}` : ""}${fragmentPart ? `#${fragmentPart}` : ""}`;
 }
 
+/** /auth/forgot-password with the address just typed in the fragment, never the query. */
+export function forgotPasswordHref({ email }: { email?: string | null }): string {
+  const fragment = new URLSearchParams();
+  if (email) fragment.set(KEY, email);
+  const fragmentPart = fragment.toString();
+  return `/auth/forgot-password${fragmentPart ? `#${fragmentPart}` : ""}`;
+}
+
 /** The address the fragment carries, if this browser arrived holding one. */
 export function readCarriedEmail(): string | undefined {
   if (typeof window === "undefined") return void 0;
