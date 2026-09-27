@@ -1,6 +1,6 @@
 import type { BoxProps } from "@chakra-ui/react";
 
-import type { AvailableSource } from "../variable-mapping-input.tsx";
+import type { AvailableSource, RenderSourceIcon } from "../variable-mapping-input.tsx";
 import type { Variable } from "../variables-section.tsx";
 
 export type PromptTextAreaOnAddMention = {
@@ -11,6 +11,8 @@ export type PromptTextAreaOnAddMention = {
 };
 
 export type PromptTextAreaWithVariablesProps = {
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
   /** The prompt text value */
   value: string;
   /** Callback when text changes */

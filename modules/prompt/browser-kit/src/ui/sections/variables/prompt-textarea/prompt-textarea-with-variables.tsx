@@ -48,6 +48,7 @@ export const PromptTextAreaWithVariables = ({
   borderless = false,
   fillHeight = false,
   role,
+  renderSourceIcon,
   ...boxProps
 }: PromptTextAreaWithVariablesProps) => {
   // In horizontal layout mode, allow unlimited height
@@ -620,6 +621,7 @@ export const PromptTextAreaWithVariables = ({
           onCreateVariable={onCreateVariable ? variableMenu.handleCreateVariable : undefined}
           onClose={variableMenu.closeMenu}
           triggerRef={variableMenu.addButtonRef}
+          renderSourceIcon={renderSourceIcon}
         />
 
         {/* Template Logic Menu */}

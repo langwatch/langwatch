@@ -1,8 +1,8 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { EqualsIcon, LLMIcon, WeaviateIcon } from "@langwatch/design-system/icons";
-import type { ComponentType } from "@langwatch/workflow-contract";
-import { Bot } from "lucide-react";
+import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
+import { Bot, Database } from "lucide-react";
 import {
   BookOpen,
   Box as BoxIcon,
@@ -179,3 +179,11 @@ export const ComponentIcon = ({
 
   return <ColorfulBlockIcon color={color} size={size} icon={componentIconMap[type]} />;
 };
+
+/** A variable source's icon, for the prompt kit's `renderSourceIcon` prop. */
+export function renderSourceTypeIcon(type: SourceType): React.ReactNode {
+  if (type === "dataset") {
+    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
+  }
+  return <ComponentIcon type={type} size="xs" />;
+}

@@ -2,7 +2,7 @@ import type { LlmConfigInputType } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
-import type { AvailableSource, FieldMapping } from "./variable-mapping-input.tsx";
+import type { AvailableSource, FieldMapping, RenderSourceIcon } from "./variable-mapping-input.tsx";
 import { type Variable, VariablesSection } from "./variables-section.tsx";
 
 /**
@@ -23,6 +23,8 @@ type PromptInputsFormValues = {
 // ============================================================================
 
 type FormVariablesSectionProps = {
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
   /** Section title (defaults to "Variables") */
   title?: string;
   /** Whether to show mapping UI */
@@ -70,6 +72,7 @@ export const FormVariablesSection = ({
   disabledMappings,
   showAddButton = true,
   showMissingMappingsError,
+  renderSourceIcon,
 }: FormVariablesSectionProps) => {
   const { control, getValues } = useFormContext<PromptInputsFormValues>();
 
@@ -157,6 +160,7 @@ export const FormVariablesSection = ({
       lockedVariables={lockedVariables}
       variableInfo={variableInfo}
       disabledMappings={disabledMappings}
+      renderSourceIcon={renderSourceIcon}
     />
   );
 };

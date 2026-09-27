@@ -9,6 +9,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  type RenderSourceIcon,
   VariableMappingInput,
 } from "./variable-mapping-input.tsx";
 import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
@@ -73,6 +74,8 @@ export type VariablesSectionProps = {
   disabledMappings?: Set<string>;
   /** Disable mapping input */
   isMappingDisabled?: boolean;
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
 };
 
 // ============================================================================
@@ -99,6 +102,7 @@ export const VariablesSection = ({
   variableInfo = {},
   disabledMappings = new Set(),
   isMappingDisabled = false,
+  renderSourceIcon,
 }: VariablesSectionProps) => {
   // Default showAddButton to canAddRemove if not specified
   const shouldShowAddButton = showAddButton ?? canAddRemove;
@@ -219,6 +223,7 @@ export const VariablesSection = ({
         setEditingId={setEditingId}
         onUpdate={handleUpdateVariable}
         onRemove={handleRemoveVariable}
+        renderSourceIcon={renderSourceIcon}
       />
 
       {/* Validation error for missing mappings */}
@@ -249,7 +254,7 @@ type VariableListProps = Required<
     | "isMappingDisabled"
   >
 > &
-  Pick<VariablesSectionProps, "onMappingChange" | "onValueChange"> & {
+  Pick<VariablesSectionProps, "onMappingChange" | "onValueChange" | "renderSourceIcon"> & {
     editingId: string | null;
     setEditingId: (identifier: string | null) => void;
     onUpdate: (identifier: string, updates: Partial<Variable>) => boolean;
@@ -276,6 +281,7 @@ function VariableList({
   setEditingId,
   onUpdate,
   onRemove,
+  renderSourceIcon,
 }: VariableListProps) {
   return variables.length === 0 ? (
     <Text fontSize="13px" color="fg.subtle">
@@ -316,6 +322,7 @@ function VariableList({
             }
             infoTooltip={infoTooltip}
             isMappingDisabled={isMappingDisabled_internal}
+            renderSourceIcon={renderSourceIcon}
           />
         );
       })}
@@ -362,6 +369,8 @@ type VariableRowProps = {
   infoTooltip?: string;
   /** Whether the mapping input is disabled (shows info instead) */
   isMappingDisabled?: boolean;
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
 };
 
 const VariableRow = ({
@@ -383,6 +392,7 @@ const VariableRow = ({
   onDefaultValueChange,
   infoTooltip,
   isMappingDisabled = false,
+  renderSourceIcon,
 }: VariableRowProps) => {
   const [editValue, setEditValue] = useState(variable.identifier);
   const [hasError, setHasError] = useState(false);
@@ -491,6 +501,7 @@ const VariableRow = ({
                 isMissing={isMissing}
                 optionalHighlighting={optionalHighlighting}
                 inputTestId={`mapping-input-${variable.identifier}`}
+                renderSourceIcon={renderSourceIcon}
               />
             </Box>
           ) : (

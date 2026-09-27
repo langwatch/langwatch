@@ -75,6 +75,129 @@ function dropIndexAt(positions: LinePosition[], relativeY: number): number {
   return index === -1 ? positions.length : index;
 }
 
+/** A client Y offset relative to the container's top, or null with no container. */
+function relativeYIn(container: HTMLDivElement | null, clientY: number): number | null {
+  return container ? clientY - container.getBoundingClientRect().top : null;
+}
+
+/** Writes the reordered text undoably into the textarea, then reports it. */
+function commitParagraphMove({
+  paragraphs,
+  from,
+  to,
+  container,
+  onChange,
+}: {
+  paragraphs: Paragraph[];
+  from: number;
+  to: number;
+  container: HTMLDivElement | null;
+  onChange: (value: string) => void;
+}): void {
+  const { newText, movedLineStart } = moveParagraph({ paragraphs, from, to });
+  const textarea = container?.querySelector("textarea");
+  if (textarea) setTextareaValueUndoable(textarea, newText, movedLineStart);
+  onChange(newText);
+}
+
+/** The drag half: which line is dragged, where it would land, and the drop itself. */
+function useParagraphDragHandlers({
+  draggedParagraph,
+  setDraggedParagraph,
+  setDropTargetParagraph,
+  parseParagraphs,
+  onChange,
+  containerRef,
+  borderless,
+  paragraphPositionsRef,
+}: {
+  draggedParagraph: number | null;
+  setDraggedParagraph: (index: number | null) => void;
+  setDropTargetParagraph: (index: number | null) => void;
+  parseParagraphs: () => Paragraph[];
+  onChange: (value: string) => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  borderless: boolean;
+  paragraphPositionsRef: React.RefObject<LinePosition[]>;
+}) {
+  // Handle paragraph drag start
+  const handleParagraphDragStart = useCallback(
+    (e: DragEvent, paragraphIndex: number) => {
+      setDraggedParagraph(paragraphIndex);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(paragraphIndex));
+    },
+    [setDraggedParagraph],
+  );
+
+  // Handle paragraph drag over
+  const handleParagraphDragOver = useCallback(
+    (e: DragEvent, paragraphIndex: number) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (draggedParagraph !== null && draggedParagraph !== paragraphIndex) {
+        setDropTargetParagraph(paragraphIndex);
+      }
+    },
+    [draggedParagraph, setDropTargetParagraph],
+  );
+
+  // Handle paragraph drop
+  const handleParagraphDrop = useCallback(
+    (e: DragEvent, targetIndex: number) => {
+      e.preventDefault();
+
+      if (draggedParagraph !== null && draggedParagraph !== targetIndex) {
+        commitParagraphMove({
+          paragraphs: parseParagraphs(),
+          from: draggedParagraph,
+          to: targetIndex,
+          container: containerRef.current,
+          onChange,
+        });
+      }
+      setDraggedParagraph(null);
+      setDropTargetParagraph(null);
+    },
+    [
+      draggedParagraph,
+      parseParagraphs,
+      onChange,
+      containerRef,
+      setDraggedParagraph,
+      setDropTargetParagraph,
+    ],
+  );
+
+  // Handle drag end (cleanup)
+  const handleParagraphDragEnd = useCallback(() => {
+    setDraggedParagraph(null);
+    setDropTargetParagraph(null);
+  }, [setDraggedParagraph, setDropTargetParagraph]);
+
+  // Calculate drop target index based on mouse Y position during drag
+  const handleDragOverContainer = useCallback(
+    (e: React.DragEvent) => {
+      if (draggedParagraph === null || !borderless) return;
+      e.preventDefault();
+
+      const relativeY = relativeYIn(containerRef.current, e.clientY);
+      if (relativeY !== null) {
+        setDropTargetParagraph(dropIndexAt(paragraphPositionsRef.current, relativeY));
+      }
+    },
+    [draggedParagraph, borderless, containerRef, setDropTargetParagraph, paragraphPositionsRef],
+  );
+
+  return {
+    handleParagraphDragStart,
+    handleParagraphDragOver,
+    handleParagraphDrop,
+    handleParagraphDragEnd,
+    handleDragOverContainer,
+  };
+}
+
 /**
  * Handles paragraph-level drag and drop for reordering text lines.
  * Only active in borderless mode.
@@ -112,57 +235,22 @@ export const useParagraphDragDrop = ({
     paragraphPositionsRef.current = calculateParagraphPositions();
   }, [calculateParagraphPositions]);
 
-  // Handle paragraph drag start
-  const handleParagraphDragStart = useCallback((e: DragEvent, paragraphIndex: number) => {
-    setDraggedParagraph(paragraphIndex);
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", String(paragraphIndex));
-  }, []);
-
-  // Handle paragraph drag over
-  const handleParagraphDragOver = useCallback(
-    (e: DragEvent, paragraphIndex: number) => {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "move";
-      if (draggedParagraph !== null && draggedParagraph !== paragraphIndex) {
-        setDropTargetParagraph(paragraphIndex);
-      }
-    },
-    [draggedParagraph],
-  );
-
-  // Handle paragraph drop
-  const handleParagraphDrop = useCallback(
-    (e: DragEvent, targetIndex: number) => {
-      e.preventDefault();
-
-      if (draggedParagraph === null || draggedParagraph === targetIndex) {
-        setDraggedParagraph(null);
-        setDropTargetParagraph(null);
-        return;
-      }
-
-      const { newText, movedLineStart } = moveParagraph({
-        paragraphs: parseParagraphs(),
-        from: draggedParagraph,
-        to: targetIndex,
-      });
-      // Use undo-able replacement so Ctrl+Z works, then sync React state
-      const textarea = containerRef.current?.querySelector("textarea");
-      if (textarea) setTextareaValueUndoable(textarea, newText, movedLineStart);
-      onChange(newText);
-
-      setDraggedParagraph(null);
-      setDropTargetParagraph(null);
-    },
-    [draggedParagraph, parseParagraphs, onChange, containerRef],
-  );
-
-  // Handle drag end (cleanup)
-  const handleParagraphDragEnd = useCallback(() => {
-    setDraggedParagraph(null);
-    setDropTargetParagraph(null);
-  }, []);
+  const {
+    handleParagraphDragStart,
+    handleParagraphDragOver,
+    handleParagraphDrop,
+    handleParagraphDragEnd,
+    handleDragOverContainer,
+  } = useParagraphDragHandlers({
+    draggedParagraph,
+    setDraggedParagraph,
+    setDropTargetParagraph,
+    parseParagraphs,
+    onChange,
+    containerRef,
+    borderless,
+    paragraphPositionsRef,
+  });
 
   // Handle mouse move to detect which line is being hovered
   const handleMouseMove = useCallback(
@@ -174,29 +262,10 @@ export const useParagraphDragDrop = ({
       const positions = paragraphPositionsRef.current;
       if (positions.length <= 1) return;
 
-      const container = containerRef.current;
-      if (!container) return;
-
-      const relativeY = e.clientY - container.getBoundingClientRect().top;
-      setHoveredParagraph(lineAt(positions, relativeY));
+      const relativeY = relativeYIn(containerRef.current, e.clientY);
+      if (relativeY !== null) setHoveredParagraph(lineAt(positions, relativeY));
     },
     [borderless, updateParagraphPositions, containerRef],
-  );
-
-  // Calculate drop target index based on mouse Y position during drag
-  const handleDragOverContainer = useCallback(
-    (e: React.DragEvent) => {
-      if (draggedParagraph === null || !borderless) return;
-      e.preventDefault();
-
-      const positions = paragraphPositionsRef.current;
-      const container = containerRef.current;
-      if (!container) return;
-
-      const relativeY = e.clientY - container.getBoundingClientRect().top;
-      setDropTargetParagraph(dropIndexAt(positions, relativeY));
-    },
-    [draggedParagraph, borderless, containerRef],
   );
 
   // Reset hover states on mouse leave

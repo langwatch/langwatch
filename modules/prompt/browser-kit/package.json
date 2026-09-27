@@ -23,7 +23,6 @@
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",

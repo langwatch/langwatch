@@ -11668,9 +11668,6 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/workflow-browser-kit':
-        specifier: workspace:*
-        version: link:../../workflow/browser-kit
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
