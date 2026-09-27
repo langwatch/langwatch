@@ -122,19 +122,29 @@ COPY services/langyworker/tsconfig.json ./services/langyworker/
 COPY services/langyworker/tsconfig.build.json ./services/langyworker/
 COPY services/langyworker/src ./services/langyworker/src
 COPY services/langyworker/scripts ./services/langyworker/scripts
+# Full source for every workspace package the CLI and the worker reach
+# (`pnpm -r --filter "langwatch..." --filter "@langwatch/langyworker..." exec pwd`):
+# langy-contract is bundled into the binary and imports these at runtime.
+COPY modules/authz/contract ./modules/authz/contract
+COPY packages/actor ./packages/actor
+COPY packages/api ./packages/api
+COPY packages/api-fixture ./packages/api-fixture
+COPY packages/config ./packages/config
+COPY packages/handled-error ./packages/handled-error
+COPY packages/kernel ./packages/kernel
+COPY packages/ksuid ./packages/ksuid
+COPY packages/observability ./packages/observability
+COPY packages/secrets ./packages/secrets
+COPY packages/time ./packages/time
+COPY packages/vitest-config ./packages/vitest-config
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
-COPY packages/api/package.json ./packages/api/
-COPY modules/authz/contract/package.json ./modules/authz/contract/
 COPY modules/authz/process/package.json ./modules/authz/process/
 COPY modules/automation/contract/package.json ./modules/automation/contract/
 COPY modules/automation/process/package.json ./modules/automation/process/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
-COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
 COPY packages/redaction/package.json ./packages/redaction/
-COPY packages/ssrf/package.json ./packages/ssrf/
-COPY packages/handled-error/package.json ./packages/handled-error/
 COPY apps/server/package.json ./apps/server/
 COPY mcp/typescript/package.json ./mcp/typescript/
 COPY skills/package.json ./skills/
@@ -144,7 +154,7 @@ WORKDIR /src
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "langwatch..." --filter "@langwatch/langyworker..."
 
 # Back to the SDK for the generator + compile steps below, which resolve their
-# inputs (../../packages, ../../apps/api, ../../services/langevals,
+# inputs (../../modules, ../../packages, ../../specs, ../../services/langevals,
 # ../../feature-map.json) relative to it.
 WORKDIR /src/sdks/typescript
 
@@ -164,7 +174,7 @@ COPY modules/model-provider/contract/src/catalog/model-catalog.json /src/modules
 COPY modules/scenario/contract/src/suite-fields.ts /src/modules/scenario/contract/src/suite-fields.ts
 COPY modules/scenario/contract/src/evaluator-attachments.ts /src/modules/scenario/contract/src/evaluator-attachments.ts
 COPY packages/redaction/src                           /src/packages/redaction/src
-COPY apps/api/src/features/discovery/openapi-document.json /src/apps/api/src/features/discovery/openapi-document.json
+COPY specs/api-reference/openapi-document.json         /src/specs/api-reference/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts
 # copy-types.sh also embeds the repo-root feature-map.json (feature-map.generated.ts),
 # and generate-skills-bundle.mjs walks the whole skills/ tree (feature-skills.ts,
