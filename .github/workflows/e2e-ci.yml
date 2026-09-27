@@ -186,6 +186,11 @@ jobs:
           --health-start-period 30s
 
     steps:
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api refuses to boot without a 32-byte hex encryption key. Generated
+        # per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
