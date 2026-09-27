@@ -1,7 +1,7 @@
+import { generate } from "@langwatch/ksuid";
 import { NotFoundError } from "@langwatch/prompt-contract";
 import type { PromptTag } from "@langwatch/prompt-contract";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
 import {
   PromptTagAssignmentRepository,
@@ -49,7 +49,7 @@ export class MemoryPromptTagAssignmentRepository extends PromptTagAssignmentRepo
     );
     const now = toDate(nowInstant());
     const assignment: StoredAssignment = {
-      id: current?.id ?? `vtag_${nanoid()}`,
+      id: current?.id ?? generate("vtag").toString(),
       configId: params.configId,
       versionId: params.versionId,
       tagId: params.tagId,

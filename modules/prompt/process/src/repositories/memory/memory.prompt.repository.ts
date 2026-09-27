@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   LATEST_SCHEMA_VERSION,
   NotFoundError,
@@ -303,7 +304,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     });
     const now = toDate(nowInstant());
     const config: StoredConfig = {
-      id: `prompt_${nanoid()}`,
+      id: generate("prompt").toString(),
       name: configData.name ?? "",
       projectId: configData.projectId,
       organizationId: configData.organizationId,

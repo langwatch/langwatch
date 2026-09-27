@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type {
   Prisma,
@@ -6,7 +7,6 @@ import type {
   PromptTagAssignment,
 } from "@langwatch/prisma-client/generated";
 import { NotFoundError } from "@langwatch/prompt-contract";
-import { nanoid } from "nanoid";
 
 import {
   PromptTagAssignmentRepository,
@@ -105,7 +105,7 @@ export class PrismaPromptTagAssignmentRepository extends PromptTagAssignmentRepo
         configId_tagId: { configId, tagId },
       },
       create: {
-        id: `vtag_${nanoid()}`,
+        id: generate("vtag").toString(),
         configId,
         versionId,
         tagId,

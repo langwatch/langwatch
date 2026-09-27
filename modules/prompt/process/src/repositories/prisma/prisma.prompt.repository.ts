@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { uniqueConstraintTargets } from "@langwatch/prisma-client/errors";
 import type {
@@ -22,7 +23,6 @@ import {
   sortKeysDeep,
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
-import { nanoid } from "nanoid";
 
 import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
 import {
@@ -1048,7 +1048,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   }
 
   private generateConfigId() {
-    return `prompt_${nanoid()}`;
+    return generate("prompt").toString();
   }
 
   /**
