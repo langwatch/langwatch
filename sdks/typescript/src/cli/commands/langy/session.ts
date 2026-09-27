@@ -212,7 +212,7 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     if (!project || !readProjectApiKey || !endpoint) {
       throw new LocalCallFailure({
         code: "exec_failed",
-        message: `This terminal cannot fetch the project's key. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+        message: `This terminal cannot fetch the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written because the command line was started without a LangWatch endpoint, and offer to write them again once \`langwatch langy --share-control\` runs signed in.`,
       });
     }
     let apiKey: string;
@@ -220,15 +220,21 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       apiKey = await readProjectApiKey(project.id);
     } catch (error) {
       const status = refusalStatus(error);
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         throw new LocalCallFailure({
           code: "key_refused",
-          message: `LangWatch did not hand out the project's key to this login: it needs project:update on ${project.name}. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+          message: `The LangWatch login on this machine has expired, so ${file} was not changed. Tell the user in one line to run \`langwatch login --device\` in that terminal, and offer to write the credentials again after.`,
+        });
+      }
+      if (status === 403) {
+        throw new LocalCallFailure({
+          code: "key_refused",
+          message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
         });
       }
       throw new LocalCallFailure({
         code: "exec_failed",
-        message: `LangWatch did not answer the request for the project's key. Tell the user in one line that LANGWATCH_API_KEY and LANGWATCH_ENDPOINT must be added to ${file} by hand, from the project's settings page, and end your turn.`,
+        message: `LangWatch did not answer the request for the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written, and offer to try again.`,
       });
     }
     return writeLangwatchEnv({
