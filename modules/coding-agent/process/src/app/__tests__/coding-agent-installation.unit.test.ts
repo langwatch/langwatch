@@ -8,6 +8,7 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -97,6 +98,7 @@ function installation() {
         findPersonalTeamOwners: async () => [],
       }),
       user: createApiFixture<UserApi>(),
+      governance: createApiFixture<GovernanceRestApi>({ isSourceBilled: async () => false }),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async (command) => {
           audits.push(command);

@@ -37,6 +37,7 @@ import {
   type CodingAgentReceivedSpan,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -64,7 +65,7 @@ import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts"
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
-import { AllBilledCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
+import { GovernanceCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
@@ -134,6 +135,7 @@ type CodingAgentDependencies = {
   organizations: typeof OrganizationApi;
   users: typeof UserApi;
   auditLog: typeof AuditLogApi;
+  governance: typeof GovernanceRestApi;
 };
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
@@ -158,6 +160,8 @@ export class CodingAgentApp implements CodingAgentApi {
     users: UserApi,
     /** Where a read that names people is written down. */
     auditLog: AuditLogApi,
+    /** Decides which coding-assistant sources a bundled plan covers. */
+    governance: GovernanceRestApi,
   };
 
   static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
@@ -168,7 +172,7 @@ export class CodingAgentApp implements CodingAgentApi {
       sessionEvents: repositories.sessionEvents,
       github: dependencies.github,
       projects: dependencies.projects,
-      billing: AllBilledCodingAgentBillingService.create(),
+      billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
       clock: SystemCodingAgentClockService.create(),
     });
     const scopeService = CodingAgentCallerScopeService.create({

@@ -27,7 +27,7 @@ class PolicyHarness {
   }
 
   resolve(input: { organizationId: string; sourceType: string }): Promise<boolean> {
-    return this.policy.resolveSourceNonBillable(input);
+    return this.policy.isSourceBilled(input);
   }
 }
 
@@ -35,22 +35,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("resolveSourceNonBillable", () => {
+describe("isSourceBilled", () => {
   describe("when no catalog tile matches the source", () => {
-    it("defaults the OTLP/ingest path to non-billable (bundled)", async () => {
+    it("defaults the OTLP/ingest path to not billed (bundled)", async () => {
       const result = await PolicyHarness.create([]).resolve({
-        organizationId: "org_1",
-        sourceType: "claude_code",
-      });
-      expect(result).toBe(true);
-    });
-  });
-
-  describe("when the matching tile opts into per-token billing", () => {
-    it("returns false (billed) for bundledPlan === false", async () => {
-      const result = await PolicyHarness.create([
-        { config: { assistantKind: "claude_code", bundledPlan: false } },
-      ]).resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
       });
@@ -58,8 +46,20 @@ describe("resolveSourceNonBillable", () => {
     });
   });
 
+  describe("when the matching tile opts into per-token billing", () => {
+    it("returns true (billed) for bundledPlan === false", async () => {
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_code", bundledPlan: false } },
+      ]).resolve({
+        organizationId: "org_1",
+        sourceType: "claude_code",
+      });
+      expect(result).toBe(true);
+    });
+  });
+
   describe("when the matching tile is bundled or leaves the flag absent", () => {
-    it("returns true for bundledPlan === true", async () => {
+    it("returns false for bundledPlan === true", async () => {
       expect(
         await PolicyHarness.create([
           { config: { assistantKind: "codex", bundledPlan: true } },
@@ -67,16 +67,16 @@ describe("resolveSourceNonBillable", () => {
           organizationId: "org_1",
           sourceType: "codex",
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
 
-    it("returns true when bundledPlan is omitted", async () => {
+    it("returns false when bundledPlan is omitted", async () => {
       expect(
         await PolicyHarness.create([{ config: { assistantKind: "gemini" } }]).resolve({
           organizationId: "org_1",
           sourceType: "gemini",
         }),
-      ).toBe(true);
+      ).toBe(false);
     });
   });
 
@@ -88,7 +88,7 @@ describe("resolveSourceNonBillable", () => {
         organizationId: "org_1",
         sourceType: "opencode",
       });
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
@@ -101,7 +101,7 @@ describe("resolveSourceNonBillable", () => {
         organizationId: "org_1",
         sourceType: "claude_cowork",
       });
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
     it("leaves Cowork bundled when only the Claude Code tile is unticked", async () => {
@@ -111,7 +111,7 @@ describe("resolveSourceNonBillable", () => {
         organizationId: "org_1",
         sourceType: "claude_cowork",
       });
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it("leaves Claude Code bundled when only the Cowork tile is unticked", async () => {
@@ -121,7 +121,7 @@ describe("resolveSourceNonBillable", () => {
         organizationId: "org_1",
         sourceType: "claude_code",
       });
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 

@@ -5,6 +5,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceRepositories } from "../governance.repositories.ts";
 import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
 import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
+import { PrismaCostAttributionPolicyRepository } from "./prisma.cost-attribution-policy.repository.ts";
 import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
 import { PrismaDiscoveredAgentRepository } from "./prisma.discovered-agent.repository.ts";
 import { PrismaDiscoveredPersonRepository } from "./prisma.discovered-person.repository.ts";
@@ -39,6 +40,7 @@ export class PostgresGovernanceRepositories {
     return {
       aiTools: PrismaAiToolCatalogRepository.create(prisma),
       anomalyRules: PrismaAnomalyRuleRepository.create(prisma),
+      costAttributionPolicies: PrismaCostAttributionPolicyRepository.create(prisma),
       departments: PrismaDepartmentRepository.create(prisma),
       discoveredAgents: PrismaDiscoveredAgentRepository.create(prisma),
       discoveredPeople: PrismaDiscoveredPersonRepository.create(prisma),

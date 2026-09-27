@@ -233,6 +233,7 @@ import { GovernanceIngestReceiverService } from "../services/governance-ingest-r
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
+import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
 import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
 import { IdentityMatchSuggestionService } from "../services/identity-match-suggestion.service.ts";
 import { IdentityMatchService } from "../services/identity-match.service.ts";
@@ -540,6 +541,9 @@ export class GovernanceApp implements GovernanceRestApi {
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
     this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
+    this.costAttributionPolicy = PostgresGovernancePolicyService.create(
+      repositories.costAttributionPolicies,
+    );
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
       loginKeys: dependencies.apiKeys,
@@ -821,6 +825,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly activityMonitor: ActivityMonitorService;
   private readonly cliSessions: DefaultGovernanceCliSessionInventoryService;
   private readonly sessionPolicy: OrganizationSessionPolicyService;
+  private readonly costAttributionPolicy: PostgresGovernancePolicyService;
   private readonly people: GovernancePeopleScreenService;
   private readonly agentsScreen: GovernanceAgentsScreenService;
   private readonly costBreakdown: GovernanceCostBreakdownService;
@@ -1143,6 +1148,10 @@ export class GovernanceApp implements GovernanceRestApi {
 
   ingestOtlpLogs(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
     return this.ingestService.receiveOtlpLogs(input);
+  }
+
+  isSourceBilled(input: { organizationId: string; sourceType: string }): Promise<boolean> {
+    return this.costAttributionPolicy.isSourceBilled(input);
   }
 
   ingestOtlpMetrics(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {

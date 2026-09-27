@@ -8,6 +8,7 @@ import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -122,6 +123,7 @@ function mount({
       }),
       organizations: createApiFixture<OrganizationApi>({}),
       users: createApiFixture<UserApi>({}),
+      governance: createApiFixture<GovernanceRestApi>({ isSourceBilled: async () => false }),
       auditLog: createApiFixture<AuditLogApi>({
         record: async (command) => {
           audits.push(command);

@@ -13,6 +13,7 @@ import type {
   OcsfEventBatchWriter,
   OcsfSeatReportReader,
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
+import type { CostAttributionPolicyRepository } from "./cost-attribution-policy.repository.ts";
 import type { DepartmentRepository } from "./department.repository.ts";
 import type { DiscoveredAgentRepository } from "./discovered-agent.repository.ts";
 import type { DiscoveredPersonRepository } from "./discovered-person.repository.ts";
@@ -48,6 +49,7 @@ export interface GovernanceRepositories {
   readonly activityMonitor: ActivityMonitorRepository;
   readonly aiTools: AiToolCatalogRepository;
   readonly anomalyRules: AnomalyRuleRepository;
+  readonly costAttributionPolicies: CostAttributionPolicyRepository;
   readonly departments: DepartmentRepository;
   readonly discoveredAgents: DiscoveredAgentRepository;
   readonly discoveredPeople: DiscoveredPersonRepository;

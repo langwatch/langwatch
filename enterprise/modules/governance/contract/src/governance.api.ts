@@ -195,6 +195,7 @@ export interface GovernanceRestApi {
   ingestWebhook(input: GovernanceIngestWebhookInput): Promise<GovernanceIngestResponse>;
   ingestOtlpLogs(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
   ingestOtlpMetrics(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse>;
+  isSourceBilled(input: { organizationId: string; sourceType: string }): Promise<boolean>;
 
   listIngestionTemplatesForMember(scope: { projectId: string }): Promise<IngestionTemplate[]>;
   listIngestionTemplatesForAdmin(scope: { projectId: string }): Promise<IngestionTemplate[]>;
