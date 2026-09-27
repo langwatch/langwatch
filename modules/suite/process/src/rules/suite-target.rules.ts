@@ -1,15 +1,10 @@
 import { isConnectedAgentStale } from "@langwatch/agent-contract";
-import type { TimeInput } from "@langwatch/time";
 import {
   parseScenarioParameterDefinitions,
   partitionParameterDefinitions,
 } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-
-/** A suite id, when the caller did not supply one. */
-export function defaultSuiteId(): string {
-  return `suite_${crypto.randomUUID()}`;
-}
+import type { TimeInput } from "@langwatch/time";
 
 /** The url-safe name a suite is addressed by. */
 export function suiteSlugOf(value: string): string {

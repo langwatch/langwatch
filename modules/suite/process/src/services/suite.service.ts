@@ -1,6 +1,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   jsonValueSchema,
@@ -41,7 +42,7 @@ import { nowInstant, type Instant } from "@langwatch/time";
 
 import type { SuiteExecution } from "../app/suite.app.ts";
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
-import { defaultSuiteId, isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
+import { isAgentTarget, suiteSlugOf } from "../rules/suite-target.rules.ts";
 import type { ConnectedPresenceReader } from "./connected-target.service.ts";
 import { SuiteRunService } from "./suite-run.service.ts";
 
@@ -66,6 +67,9 @@ export type SuiteServiceOptions = {
   now?: () => Instant;
 };
 
+/** The suite's KSUID resource (`KSUID_RESOURCES.SCENARIO_TEST_SUITE`), a persisted prefix. */
+const SUITE_KSUID_RESOURCE = "suite";
+
 export class SuiteService {
   static create(options: SuiteServiceOptions): SuiteService {
     return new SuiteService(options);
@@ -79,7 +83,13 @@ export class SuiteService {
       get: (input) => this.get(input),
       readPlanEvaluators: (input) => this.readPlanEvaluators(input),
       testSuiteToSuite: (testSuite) => SuiteService.testSuiteToSuite(testSuite),
+      newSuiteId: () => this.newSuiteId(),
     });
+  }
+
+  /** A new suite's id: the caller's generator where one is given, a KSUID otherwise. */
+  private newSuiteId(): string {
+    return this.options.generateId?.() ?? generate(SUITE_KSUID_RESOURCE).toString();
   }
 
   list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
@@ -117,7 +127,7 @@ export class SuiteService {
 
     return this.options.repository.create({
       ...parsed,
-      id: (this.options.generateId ?? defaultSuiteId)(),
+      id: this.newSuiteId(),
       slug,
     });
   }
@@ -286,7 +296,7 @@ export class SuiteService {
       labels: source.labels,
       simulatorModel: source.simulatorModel,
       judgeModel: source.judgeModel,
-      id: (this.options.generateId ?? defaultSuiteId)(),
+      id: this.newSuiteId(),
       slug,
     });
   }
