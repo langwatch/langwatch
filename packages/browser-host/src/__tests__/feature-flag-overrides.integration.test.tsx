@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The `?ff_<flag>=on|off|clear` browser override: set from the address once and remembered by this browser.
+ * The `?ff_<flag>=on|off|clear` browser override: set from the address once and
+ * remembered by this browser.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { act, renderHook } from "@testing-library/react";

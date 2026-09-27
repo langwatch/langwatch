@@ -89,7 +89,10 @@ export function applyFeatureFlagOverridesFromSearch(search: string): void {
   if (changed) writeOverrides(next);
 }
 
-/** The overrides, read on the first render so a flag that picks the screen never paints the other. */
+/**
+ * The overrides, read on the first render so a flag that picks the screen never
+ * paints the other.
+ */
 export function useFeatureFlagOverrides(): FeatureFlagOverrides {
   const [overrides, setOverrides] = useState<FeatureFlagOverrides>(readFeatureFlagOverrides);
 

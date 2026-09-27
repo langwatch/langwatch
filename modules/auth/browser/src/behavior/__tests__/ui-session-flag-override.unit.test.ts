@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
- * A flag this browser set with `?ff_` is the session's answer, and the server is never asked for it.
+ * A flag this browser set with `?ff_` is the session's answer, and the server is
+ * never asked for it.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import {
