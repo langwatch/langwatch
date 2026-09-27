@@ -102,8 +102,39 @@ export async function catchUpConversationFold({
   // repair and no history worth refetching.
   if (outcome === "abandoned") return;
 
-  const turnEnded = isLangyTurnProjectionTerminal(useLangyStore.getState().turnProjection);
-  if (outcome === "behind" || turnEnded) {
+  const { turnProjection } = useLangyStore.getState();
+  const turnEnded = isLangyTurnProjectionTerminal(turnProjection);
+  // A tail that stopped short of the cursor it was told about cannot carry the fold there (a
+  // process with no event log serves an empty one), so the snapshot has to.
+  const shortOfTarget =
+    !turnProjection.cursor || compareLangyEventCursors(targetCursor, turnProjection.cursor) > 0;
+  if (outcome === "behind" || turnEnded || shortOfTarget) {
     void utils.langy.messages.invalidate({ projectId, conversationId });
   }
+}
+
+/**
+ * Bring the fold up to a transcript snapshot: fold the tail up to its cursor, and where the tail
+ * cannot reach it, take the snapshot's cursor and in-flight turn instead.
+ */
+export async function catchUpToSnapshot({
+  utils,
+  projectId,
+  conversationId,
+  snapshot,
+}: {
+  utils: ApiUtils;
+  projectId: string;
+  conversationId: string;
+  snapshot: { cursor: LangyEventCursor; currentTurnId: string | null };
+}): Promise<void> {
+  await catchUpConversationFold({
+    utils,
+    projectId,
+    conversationId,
+    targetCursor: snapshot.cursor,
+  });
+  const store = useLangyStore.getState();
+  if (store.activeConversationId !== conversationId) return;
+  store.seedTurnProjection(snapshot);
 }
