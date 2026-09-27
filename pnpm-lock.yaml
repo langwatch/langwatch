@@ -10128,9 +10128,6 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
-      '@langwatch/model-provider-browser':
-        specifier: workspace:*
-        version: link:../../model-provider/browser
       '@langwatch/model-provider-browser-kit':
         specifier: workspace:*
         version: link:../../model-provider/browser-kit
