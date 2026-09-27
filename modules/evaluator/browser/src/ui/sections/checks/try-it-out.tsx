@@ -18,7 +18,6 @@ import {
   useFilterParams,
   FilterToggle,
 } from "@langwatch/analytics-browser-kit";
-import { FilterSidebar } from "@langwatch/analytics-browser/surfaces/filter-sidebar";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -41,6 +40,7 @@ import { Pause, Play, RefreshCw, Search } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 
+import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
 import {

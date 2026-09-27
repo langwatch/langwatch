@@ -4,28 +4,6 @@ import { useCallback } from "react";
 
 import { useOrganizationTeamProject } from "../../studio-host/use-organization-team-project.ts";
 
-export {
-  AuthConfigSection,
-  type AuthConfigSectionProps,
-  BodyTemplateEditor,
-  type BodyTemplateEditorProps,
-  HeadersConfigSection,
-  type HeadersConfigSectionProps,
-  HttpConfigEditor,
-  type HttpConfigEditorProps,
-  HttpMethodSelector,
-  type HttpMethodSelectorProps,
-  HttpTestPanel,
-  type HttpTestPanelProps,
-  type HttpTestResult,
-  messagesToJson,
-  OutputPathInput,
-  type HttpOutputPathInputProps,
-  type TestMessage,
-  TestMessagesBuilder,
-  type TestMessagesBuilderProps,
-} from "@langwatch/agent-browser/agent-http-editor";
-
 export function useHttpTest({
   url,
   method,

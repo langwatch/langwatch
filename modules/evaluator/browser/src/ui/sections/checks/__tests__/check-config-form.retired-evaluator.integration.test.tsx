@@ -18,7 +18,8 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
 
 // The mapping editor mounts the whole trace host; what the form does with a
 // definition it cannot resolve is decided before any mapping is drawn.
-vi.mock("../../../elements/evaluations/evaluator-traces-mapping.tsx", () => ({
+vi.mock("../../../../behavior/lent-peers.tsx", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   EvaluatorTracesMapping: () => null,
 }));
 

@@ -35,6 +35,12 @@ export const traceWeb = defineWebModule("trace")
           .AnnotationQueueConversation,
       }),
     },
+    evaluatorTracesMapping: {
+      load: async () => ({
+        default: (await import("./ui/sections/evaluations/evaluator-traces-mapping.tsx"))
+          .EvaluatorTracesMapping,
+      }),
+    },
     renderInputOutput: {
       load: async () => ({
         default: (await import("./ui/sections/traces/render-input-output.tsx")).RenderInputOutput,

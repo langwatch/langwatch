@@ -79,8 +79,11 @@ vi.mock("../../code/workflow-code-editor.transport.tsx", () => ({
 }));
 
 vi.mock("../../../../../behavior/agents/http/index.ts", () => ({
-  HttpConfigEditor: () => null,
   useHttpTest: () => ({ handleTest: vi.fn() }),
+}));
+
+vi.mock("../../../../../behavior/lent-agent.tsx", () => ({
+  HttpConfigEditor: () => null,
 }));
 
 vi.mock("@langwatch/prompt-browser-kit", () => ({

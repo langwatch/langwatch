@@ -15,7 +15,8 @@ import type {
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 
-import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";

@@ -40,7 +40,8 @@ import { useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
-import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {

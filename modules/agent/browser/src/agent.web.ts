@@ -84,4 +84,12 @@ export const agentWeb = defineWebModule("agent")
           .WorkflowSelectorDrawer,
       }),
     },
+  })
+  /** The HTTP agent's configuration editor, lent to the studio's panels (§3.4 rule 7). */
+  .withCapabilities({
+    httpConfigEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/http-config-editor.tsx")).HttpConfigEditor,
+      }),
+    },
   });

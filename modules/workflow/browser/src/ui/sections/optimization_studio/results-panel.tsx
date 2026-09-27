@@ -1,5 +1,6 @@
 import { HStack, type StackProps } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useRouter } from "@langwatch/browser-host/use-router";
 import { api } from "@langwatch/browser-trpc/workflow-api";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { slugify } from "@langwatch/design-system/slugify";
@@ -11,8 +12,10 @@ import {
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
+  useBatchRunSelection,
+  useBatchRunsPolling,
 } from "@langwatch/experiment-browser-kit";
-import { useBatchEvaluationState } from "@langwatch/experiment-browser/batch-evaluation-state";
+import type { ExperimentRun } from "@langwatch/experiment-contract";
 import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
 import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { useEffect, useState } from "react";
@@ -113,16 +116,23 @@ export function EvaluationResults({
     getWorkflow,
   }));
 
+  const polling = useBatchRunsPolling();
+  const batchEvaluationRuns = api.experiments.getExperimentBatchEvaluationRuns.useQuery(
+    { projectId: project?.id ?? "", experimentId: experiment.data?.id ?? "" },
+    { refetchInterval: polling.refetchInterval, enabled: !!project && !!experiment.data },
+  );
+  const router = useRouter();
+  const runs: ExperimentRun[] | undefined = batchEvaluationRuns.data?.runs;
   const {
     selectedRun,
     isFinished,
-    batchEvaluationRuns,
     selectedRunId: selectedRunId_,
-  } = useBatchEvaluationState({
-    project: project,
-    experiment: experiment.data,
+  } = useBatchRunSelection({
+    runs,
     selectedRunId,
-    setSelectedRunId,
+    routerRunId: typeof router.query.runId === "string" ? router.query.runId : undefined,
+    selectRun: setSelectedRunId,
+    polling,
   });
 
   // Fetch selected run data for new table
@@ -144,7 +154,7 @@ export function EvaluationResults({
     : null;
 
   // Transform runs for new sidebar
-  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map((run: any) => ({
+  const sidebarRuns: BatchRunSummary[] = (runs ?? []).map((run) => ({
     runId: run.runId,
     workflowVersion: run.workflowVersion,
     timestamps: run.timestamps,
@@ -154,7 +164,7 @@ export function EvaluationResults({
       datasetCost: run.summary.datasetCost,
       evaluationsCost: run.summary.evaluationsCost,
       evaluations: Object.fromEntries(
-        Object.entries(run.summary.evaluations).map(([id, ev]: [string, any]) => [
+        Object.entries(run.summary.evaluations).map(([id, ev]) => [
           id,
           {
             name: ev.name,
@@ -170,7 +180,7 @@ export function EvaluationResults({
 
   const hasNothingToShow =
     (experiment.isError && experiment.error.data?.httpStatus === 404) ||
-    batchEvaluationRuns.data?.runs.length === 0 ||
+    runs?.length === 0 ||
     !experiment.data ||
     !project;
   if (hasNothingToShow) {

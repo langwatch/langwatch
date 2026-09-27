@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1", slug: "p1" } }),
 }));
-vi.mock("@langwatch/trace-browser/surfaces/project-span-names", () => ({
+vi.mock("../../../../behavior/use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({ spanNames: [], metadataKeys: [] }),
 }));
 

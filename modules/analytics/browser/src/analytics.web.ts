@@ -51,4 +51,12 @@ export const analyticsWeb = defineWebModule("analytics")
         default: (await import("./ui/sections/series-filters-dialog.tsx")).SeriesFiltersDialog,
       }),
     },
+  })
+  /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
+  .withCapabilities({
+    filterSidebar: {
+      load: async () => ({
+        default: (await import("./ui/sections/filters/filter-sidebar.tsx")).FilterSidebar,
+      }),
+    },
   });

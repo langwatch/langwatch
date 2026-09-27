@@ -4,7 +4,11 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
+import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
+import type { MappingState } from "@langwatch/dataset-contract";
+import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
@@ -330,6 +334,43 @@ export type UiStudioPromptEditorProps = {
   onInputMappingsChange: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
+/** What a screen hands analytics' filter sidebar; it reads the filters from the URL itself. */
+export type UiFilterSidebarProps = { defaultShowFilters?: boolean; hideTopics?: boolean };
+
+/** What a check form hands trace's mapping editor, which reads its own sample traces. */
+export type UiEvaluatorTracesMappingProps = {
+  targetFields: string[];
+  traceMapping?: MappingState;
+  setTraceMapping?: (mapping: MappingState) => void;
+};
+
+/** What an evaluator editor hands experiment's comparison evaluator form. */
+export type UiComparisonConfigFormProps = {
+  value: ComparisonEvaluatorConfig;
+  onChange: (next: ComparisonEvaluatorConfig) => void;
+  targets: TargetConfig[];
+  datasetColumns: { id: string; name: string }[];
+  datasetName?: string;
+};
+
+/** What an HTTP agent's properties panel hands agent's configuration editor. */
+export type UiHttpConfigEditorProps = {
+  url: string;
+  onUrlChange: (url: string) => void;
+  method: HttpMethod;
+  onMethodChange: (method: HttpMethod) => void;
+  bodyTemplate: string;
+  onBodyTemplateChange: (body: string) => void;
+  outputPath: string;
+  onOutputPathChange: (path: string) => void;
+  auth: HttpAuth | undefined;
+  onAuthChange: (auth: HttpAuth | undefined) => void;
+  headers: HttpHeader[];
+  onHeadersChange: (headers: HttpHeader[]) => void;
+  onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
+  paddingX?: number | string;
+};
+
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
   surface: "simulations" | "simulationRuns" | "connectedAgents";
@@ -415,7 +456,11 @@ export type UiDeclaredCapabilities = {
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
+  comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
+  evaluatorTracesMapping: UiDeclaredComponent<UiEvaluatorTracesMappingProps>;
   evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
+  filterSidebar: UiDeclaredComponent<UiFilterSidebarProps>;
+  httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
