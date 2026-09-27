@@ -10,6 +10,7 @@ import {
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 import { memo, type ReactNode, useEffect } from "react";
 
+import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useShowLangy } from "../../behavior/use-show-langy.ts";
@@ -29,6 +30,7 @@ export default function ProjectLangyLayout({ children }: { children?: ReactNode 
     redirectToProjectOnboarding: false,
   });
   useLangyScopeReset();
+  useLangyConversationDeepLink();
 
   return (
     <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy}>

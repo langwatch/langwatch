@@ -536,6 +536,12 @@ Feature: Langy works in a folder shared from the developer's machine
       And the address bar no longer carries the conversation parameter
 
     @unit
+    Scenario: Every project page reads the follow-along link
+      Given the project layout that mounts Langy
+      When any project page renders
+      Then the follow-along link in its address is read, so opening it lands on the conversation
+
+    @unit
     Scenario: A link to a conversation I cannot see is refused silently
       Given a follow-along link for a conversation I have no access to
       When I open that link
