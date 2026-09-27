@@ -110,27 +110,98 @@ const toEntryRecords = (
 ): ({ id: string } & Record<string, unknown>)[] =>
   rows.map((row) => ({ id: row.id, ...(row.entry as Record<string, unknown>) }));
 
-export function DatasetEditorTable({
+/** The nearest ancestor that scrolls, which the row virtualizer measures against. */
+function scrollContainerOf(element: HTMLElement | null): HTMLElement | null {
+  let parent = element?.parentElement ?? null;
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    if (style.overflow === "auto" || style.overflowY === "auto") return parent;
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+/** The selection checkbox column, then one column per dataset column. */
+function buildTableColumns({
+  columnHelper,
+  columns,
+  allSelected,
+  rowCount,
+  selectedRows,
+  clearRowSelection,
+  selectAllRows,
+  toggleRowSelection,
+}: {
+  columnHelper: ReturnType<typeof createColumnHelper<DatasetTableRowData>>;
+  columns: EditorColumn[];
+  allSelected: boolean;
+  rowCount: number;
+  selectedRows: Set<number>;
+  clearRowSelection: () => void;
+  selectAllRows: (rowCount: number) => void;
+  toggleRowSelection: (row: number) => void;
+}): ColumnDef<DatasetTableRowData>[] {
+  const cols: ColumnDef<DatasetTableRowData>[] = [];
+
+  cols.push(
+    columnHelper.display({
+      id: "select",
+      header: () => (
+        <Checkbox.Root
+          size="sm"
+          top="1px"
+          aria-label="Select all rows"
+          checked={allSelected}
+          onCheckedChange={() => (allSelected ? clearRowSelection() : selectAllRows(rowCount))}
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+        </Checkbox.Root>
+      ),
+      cell: (info) => (
+        <RowCheckbox
+          rowIndex={info.row.index}
+          checked={selectedRows.has(info.row.index)}
+          onToggle={toggleRowSelection}
+        />
+      ),
+      size: CHECKBOX_WIDTH_PX,
+      enableResizing: false,
+      meta: { columnType: "checkbox", columnId: "__checkbox__" },
+    }) as ColumnDef<DatasetTableRowData>,
+  );
+
+  for (const column of columns) {
+    cols.push(
+      columnHelper.accessor((row) => row.dataset[column.id], {
+        id: `dataset.${column.id}`,
+        header: () => (
+          <HStack gap={1}>
+            <ColumnTypeIcon type={column.type} />
+            <Text fontSize="13px" fontWeight="medium">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        cell: (info) => info.getValue(),
+        meta: { columnType: "dataset", columnId: column.id, dataType: column.type },
+      }) as ColumnDef<DatasetTableRowData>,
+    );
+  }
+
+  return cols;
+}
+
+/** One page of the dataset's records: the read, its error report and the page clamp. */
+function useDatasetEditorPage({
   datasetId,
-  readEnabled = true,
-  headerActions,
+  readEnabled,
 }: {
   datasetId: string;
-  /** Gate the record read: false while the dataset is still preparing or has
-   *  failed (ADR-032 I-READY), so `listPaginated` is never asked for a dataset
-   *  that would refuse it. */
-  readEnabled?: boolean;
-  /** Page-specific actions rendered at the end of the chrome button row. */
-  headerActions?: ReactNode;
+  readEnabled: boolean;
 }) {
   const host = useDatasetHost();
   const project = host.project();
-  const [store] = useState(() => createDatasetEditorStore());
-  const editColumnsDrawer = useDisclosure();
-  const addRowsFromCSVModal = useDisclosure();
-
-  // ── Data loading ──────────────────────────────────────────────────
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DATASET_EDITOR_PAGE_SIZE);
 
@@ -181,6 +252,49 @@ export function DatasetEditorTable({
     const count = Math.max(1, Math.ceil(serverRecordCount / pageSize));
     if (page > count) setPage(count);
   }, [serverRecordCount, pageSize, page]);
+
+  return {
+    databaseDataset,
+    setPage,
+    pageSize,
+    setPageSize,
+    serverRecordCount,
+    pageCount,
+    currentPage,
+    isLastPage,
+  };
+}
+
+export function DatasetEditorTable({
+  datasetId,
+  readEnabled = true,
+  headerActions,
+}: {
+  datasetId: string;
+  /** Gate the record read: false while the dataset is still preparing or has
+   *  failed (ADR-032 I-READY), so `listPaginated` is never asked for a dataset
+   *  that would refuse it. */
+  readEnabled?: boolean;
+  /** Page-specific actions rendered at the end of the chrome button row. */
+  headerActions?: ReactNode;
+}) {
+  const host = useDatasetHost();
+  const project = host.project();
+  const [store] = useState(() => createDatasetEditorStore());
+  const editColumnsDrawer = useDisclosure();
+  const addRowsFromCSVModal = useDisclosure();
+
+  // ── Data loading ──────────────────────────────────────────────────
+
+  const {
+    databaseDataset,
+    setPage,
+    pageSize,
+    setPageSize,
+    serverRecordCount,
+    currentPage,
+    isLastPage,
+  } = useDatasetEditorPage({ datasetId, readEnabled });
 
   const datasetName = databaseDataset.data?.name;
   const columnTypes: DatasetColumns = useMemo(
@@ -291,72 +405,29 @@ export function DatasetEditorTable({
 
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
 
-  const tableColumns = useMemo(() => {
-    const cols: ColumnDef<DatasetTableRowData>[] = [];
-
-    cols.push(
-      columnHelper.display({
-        id: "select",
-        header: () => (
-          <Checkbox.Root
-            size="sm"
-            top="1px"
-            aria-label="Select all rows"
-            checked={allSelected}
-            onCheckedChange={() => {
-              if (allSelected) {
-                clearRowSelection();
-              } else {
-                selectAllRows(rowCount);
-              }
-            }}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-          </Checkbox.Root>
-        ),
-        cell: (info) => (
-          <RowCheckbox
-            rowIndex={info.row.index}
-            checked={selectedRows.has(info.row.index)}
-            onToggle={toggleRowSelection}
-          />
-        ),
-        size: CHECKBOX_WIDTH_PX,
-        enableResizing: false,
-        meta: { columnType: "checkbox", columnId: "__checkbox__" },
-      }) as ColumnDef<DatasetTableRowData>,
-    );
-
-    for (const column of columns) {
-      cols.push(
-        columnHelper.accessor((row) => row.dataset[column.id], {
-          id: `dataset.${column.id}`,
-          header: () => (
-            <HStack gap={1}>
-              <ColumnTypeIcon type={column.type} />
-              <Text fontSize="13px" fontWeight="medium">
-                {column.name}
-              </Text>
-            </HStack>
-          ),
-          cell: (info) => info.getValue(),
-          meta: { columnType: "dataset", columnId: column.id, dataType: column.type },
-        }) as ColumnDef<DatasetTableRowData>,
-      );
-    }
-
-    return cols;
-  }, [
-    columnHelper,
-    columns,
-    allSelected,
-    rowCount,
-    selectedRows,
-    clearRowSelection,
-    selectAllRows,
-    toggleRowSelection,
-  ]);
+  const tableColumns = useMemo(
+    () =>
+      buildTableColumns({
+        columnHelper,
+        columns,
+        allSelected,
+        rowCount,
+        selectedRows,
+        clearRowSelection,
+        selectAllRows,
+        toggleRowSelection,
+      }),
+    [
+      columnHelper,
+      columns,
+      allSelected,
+      rowCount,
+      selectedRows,
+      clearRowSelection,
+      selectAllRows,
+      toggleRowSelection,
+    ],
+  );
 
   const table = useReactTable({
     data: rowData,
@@ -368,16 +439,8 @@ export function DatasetEditorTable({
   const tableRef = useRef<HTMLTableElement>(null);
   const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
   useEffect(() => {
-    if (!tableRef.current) return;
-    let parent = tableRef.current.parentElement;
-    while (parent) {
-      const style = window.getComputedStyle(parent);
-      if (style.overflow === "auto" || style.overflowY === "auto") {
-        setScrollContainer(parent);
-        break;
-      }
-      parent = parent.parentElement;
-    }
+    const container = scrollContainerOf(tableRef.current);
+    if (container) setScrollContainer(container);
   }, []);
 
   // Clear cell selection when clicking outside the table
