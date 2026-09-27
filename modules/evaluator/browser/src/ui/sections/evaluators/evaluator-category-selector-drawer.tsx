@@ -1,4 +1,5 @@
 import { Button, Heading, HStack } from "@chakra-ui/react";
+import type { UiEvaluatorCategorySelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { AnimatePresence, motion, type Variants } from "motion/react";
@@ -19,13 +20,7 @@ import { categoryNames, EvaluatorTypeSelectorContent } from "./evaluator-type-se
 
 export type { EvaluatorCategoryId } from "../../../index.ts";
 
-export type EvaluatorCategorySelectorDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSelectCategory?: (category: EvaluatorCategoryId) => void;
-  onSelectWorkflow?: () => void;
-  onSelectCode?: () => void;
-};
+export type EvaluatorCategorySelectorDrawerProps = UiEvaluatorCategorySelectorDrawerProps;
 
 type View =
   | { step: "category" }

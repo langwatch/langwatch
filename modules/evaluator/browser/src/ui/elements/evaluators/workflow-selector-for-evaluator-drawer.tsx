@@ -10,6 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import type { UiWorkflowSelectorForEvaluatorDrawerProps } from "@langwatch/browser-host/drawer";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -27,13 +28,7 @@ import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LuArrowLeft } from "react-icons/lu";
 
-export type WorkflowSelectorForEvaluatorDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onSave?: (evaluator: { id: string; name: string; workflowId: string }) => void;
-  /** Name for the new evaluator (optional, prompts if not provided) */
-  evaluatorName?: string;
-};
+export type WorkflowSelectorForEvaluatorDrawerProps = UiWorkflowSelectorForEvaluatorDrawerProps;
 
 type FormData = {
   name: string;

@@ -6,8 +6,43 @@
 
 import type { ComponentType } from "react";
 
+import type {
+  UiAgentListDrawerProps,
+  UiAgentTypeSelectorDrawerProps,
+  UiAgentWorkflowEditorDrawerProps,
+} from "./agent-drawers.ts";
+import type {
+  UiCodeEvaluatorEditorDrawerProps,
+  UiEvaluatorCategorySelectorDrawerProps,
+  UiEvaluatorEditorDrawerProps,
+  UiEvaluatorListDrawerProps,
+  UiWorkflowSelectorForEvaluatorDrawerProps,
+} from "./evaluator-drawers.ts";
+import type { UiFoundryDrawerProps } from "./ops-drawers.ts";
+import type { UiInviteMemberDrawerProps } from "./organization-drawers.ts";
+import type { UiPromptEditorDrawerProps, UiPromptListDrawerProps } from "./prompt-drawers.ts";
+import type {
+  UiAgentTestingCaseEditorDrawerProps,
+  UiScenarioRunDetailDrawerProps,
+} from "./scenario-drawers.ts";
+
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
-export type UiDrawerMap = Record<never, never>;
+export type UiDrawerMap = {
+  agentList: UiAgentListDrawerProps;
+  agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
+  agentTypeSelector: UiAgentTypeSelectorDrawerProps;
+  agentWorkflowEditor: UiAgentWorkflowEditorDrawerProps;
+  codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
+  evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;
+  evaluatorEditor: UiEvaluatorEditorDrawerProps;
+  evaluatorList: UiEvaluatorListDrawerProps;
+  foundry: UiFoundryDrawerProps;
+  inviteMember: UiInviteMemberDrawerProps;
+  promptEditor: UiPromptEditorDrawerProps;
+  promptList: UiPromptListDrawerProps;
+  scenarioRunDetail: UiScenarioRunDetailDrawerProps;
+  workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
+};
 
 /**
  * A callback of a drawer no map declares yet. A method type, so it compares bivariantly: a

@@ -3,7 +3,12 @@
  * The drawer law, end to end: a module declares a drawer, the shell composes
  * one registry, and the address bar is what opens and stacks it.
  */
-import { clearDrawerStack, CurrentDrawer, useDrawer } from "@langwatch/browser-host/drawer";
+import {
+  clearDrawerStack,
+  CurrentDrawer,
+  type UiEvaluatorEditorDrawerProps,
+  useDrawer,
+} from "@langwatch/browser-host/drawer";
 import { defineWebModule } from "@langwatch/ui-kernel";
 import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
@@ -49,7 +54,7 @@ function TraceDetailsDrawer({ traceId }: { traceId?: string }) {
   );
 }
 
-function EvaluatorEditorDrawer() {
+function EvaluatorEditorDrawer(_props: UiEvaluatorEditorDrawerProps) {
   const { goBack } = useDrawer();
   return (
     <div>

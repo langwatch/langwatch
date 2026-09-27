@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import type { UiCodeEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
 import {
   getComplexProps,
   getFlowCallbacks,
@@ -31,32 +32,11 @@ import {
   validCodeEvaluatorFields,
 } from "../../blocks/code-evaluator-editor.tsx";
 import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
-import {
-  EvaluatorGateSection,
-  type EvaluatorGateConfig,
-  type EvaluatorMappingsConfig,
-} from "./evaluator-editor-shared.tsx";
+import { EvaluatorGateSection, type EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
 
 type EditableField = CodeEvaluatorField;
 
-export type CodeEvaluatorEditorDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  /** When set, the drawer edits this existing code evaluator instead of creating one. */
-  evaluatorId?: string;
-  /**
-   * Workbench mapping context. When present, the inputs render with their
-   * source mapping merged inline (like the prompt drawer); without it, the
-   * inputs are a plain identifier + type list.
-   */
-  mappingsConfig?: EvaluatorMappingsConfig;
-  onMappingChange?: (identifier: string, mapping: UIFieldMapping | undefined) => void;
-  /** Called with the saved evaluator; flow callbacks take precedence. */
-  onSave?: (evaluator: { id: string; name: string }) => void;
-  gate?: EvaluatorGateConfig;
-  onRequiredChange?: (required: boolean) => void;
-  onRemove?: () => void;
-};
+export type CodeEvaluatorEditorDrawerProps = UiCodeEvaluatorEditorDrawerProps;
 
 function seedFromSavedEvaluator(
   data: { name: string; config: unknown },

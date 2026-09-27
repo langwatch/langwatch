@@ -1,4 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import type { UiAgentTypeSelectorDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
 
@@ -7,15 +8,7 @@ import type { NewAgentType } from "../../model/new-agent-drawer.ts";
 
 export type AgentType = NewAgentType;
 
-export type AgentTypeSelectorDrawerProps = {
-  open?: boolean;
-  onClose?: () => void;
-  onGoBack?: () => void;
-  canGoBack?: boolean;
-  onSelect?: (type: AgentType) => void;
-  /** Where "Connect from Code" goes; opened by address, it navigates to the connect drawer. */
-  onConnectFromCode?: () => void;
-};
+export type AgentTypeSelectorDrawerProps = UiAgentTypeSelectorDrawerProps;
 
 const agentTypes: {
   type: AgentType;

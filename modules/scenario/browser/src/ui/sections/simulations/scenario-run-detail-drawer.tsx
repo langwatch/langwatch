@@ -1,5 +1,9 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import {
+  type UiScenarioRunDetailDrawerProps,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
@@ -26,15 +30,6 @@ import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
 import { useScenarioRunDetail } from "./use-scenario-run-detail.ts";
 
-/**
- * The Agent Testing variant: wider, side by side when the width allows, and
- * able to open on a run that has no id yet. Lazy so the classic drawer's
- * chunk does not grow for v1 readers.
- */
-export interface ScenarioRunDetailDrawerProps {
-  open?: boolean;
-}
-
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
 }
@@ -46,7 +41,7 @@ export { formatResultsForCopy };
  * with `variant: "agent-testing"`, which renders the wide variant; without it
  * the drawer renders exactly as v1 always has.
  */
-export function ScenarioRunDetailDrawer(props: ScenarioRunDetailDrawerProps) {
+export function ScenarioRunDetailDrawer(props: UiScenarioRunDetailDrawerProps) {
   const params = useDrawerParams();
   if (params.variant === "agent-testing") {
     return (
@@ -150,7 +145,7 @@ function ConversationExpandButton({
   );
 }
 
-function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) {
+function ClassicScenarioRunDetailDrawer({ open }: UiScenarioRunDetailDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const scenarioRunId = params.scenarioRunId;

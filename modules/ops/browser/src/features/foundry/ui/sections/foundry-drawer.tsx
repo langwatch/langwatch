@@ -1,4 +1,5 @@
 import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { UiFoundryDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { nowInstant } from "@langwatch/time";
 import { Play, RotateCcw } from "lucide-react";
@@ -12,7 +13,7 @@ import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { type Preset, SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
 
-export function FoundryDrawer({ onClose }: { onClose: () => void }) {
+export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
   const { currentProject: project } = useFoundryTransport();
   const selectedApiKey = useFoundryProjectStore((s) => s.selectedApiKey);
   const apiKey = selectedApiKey ?? project?.apiKey;

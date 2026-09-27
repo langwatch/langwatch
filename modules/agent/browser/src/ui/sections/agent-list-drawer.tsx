@@ -1,30 +1,19 @@
 import { Alert, Box, Button, Heading, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
-import {
-  useAgentListArchive,
-  type AgentListArchiveOptions,
-} from "../../behavior/use-agent-list-archive.ts";
+import { useAgentListArchive } from "../../behavior/use-agent-list-archive.ts";
 import { AgentArchiveDialog } from "../blocks/agent-archive-dialog.tsx";
 import { agentTypeIcons, agentTypeLabels } from "../blocks/agent-card.tsx";
 
 type AgentWithFields = WireOf<StoredAgentWithFields>;
-export interface AgentListDrawerProps extends AgentListArchiveOptions {
-  open: boolean;
-  items: AgentWithFields[];
-  isLoading: boolean;
-  errorMessage?: string;
-  onClose: () => void;
-  onSelect(agent: AgentWithFields): void;
-  onEdit(agent: AgentWithFields): void;
-  onCreateNew: () => void;
-}
+export type AgentListDrawerProps = UiAgentListDrawerProps;
 
 export function AgentListDrawer(props: AgentListDrawerProps) {
   const isOpen = props.open;

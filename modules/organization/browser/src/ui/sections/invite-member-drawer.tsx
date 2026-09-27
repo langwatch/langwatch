@@ -1,6 +1,7 @@
 // biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
 
 import { Heading } from "@chakra-ui/react";
+import type { UiInviteMemberDrawerProps } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 import type React from "react";
 
@@ -15,10 +16,7 @@ import { AddMembersForm } from "./add-members-form.tsx";
 export function InviteMemberDrawer({
   open = true,
   initialEmail = "",
-}: {
-  open?: boolean;
-  initialEmail?: string;
-}): React.ReactElement | null {
+}: UiInviteMemberDrawerProps): React.ReactElement | null {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
