@@ -568,6 +568,12 @@
       "path": "modules/role/process/tsconfig.json"
     },
     {
+      "path": "modules/rum/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/rum/process/tsconfig.json"
+    },
+    {
       "path": "modules/sample-agents/contract/tsconfig.json"
     },
     {

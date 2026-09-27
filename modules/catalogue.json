@@ -244,6 +244,12 @@
       "subjects": ["custom-role", "role"]
     },
     {
+      "id": "rum",
+      "root": "modules/rum",
+      "classification": "core",
+      "subjects": ["rum"]
+    },
+    {
       "id": "sample-agents",
       "root": "modules/sample-agents",
       "classification": "core",

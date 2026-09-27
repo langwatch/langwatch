@@ -65,6 +65,7 @@ export const serverModuleMembers = {
   project: ["encryption", "logger"],
   prompt: ["logger", "publicBaseUrl", "rateLimiter"],
   role: ["prisma"],
+  rum: ["logger", "telemetryExporter"],
   "sample-agents": ["logger", "publicBaseUrl"],
   scenario: [
     "clickhouse",

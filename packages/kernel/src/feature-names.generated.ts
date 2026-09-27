@@ -38,6 +38,7 @@ export const FEATURE_NAMES = [
   "project",
   "prompt",
   "role",
+  "rum",
   "sample-agents",
   "scenario",
   "secret",

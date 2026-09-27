@@ -170,6 +170,7 @@ type ServerHalfOnDisk =
   | "project"
   | "prompt"
   | "role"
+  | "rum"
   | "saas"
   | "sample-agents"
   | "scenario"

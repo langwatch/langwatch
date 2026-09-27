@@ -48,6 +48,7 @@ import { presenceServer } from "@langwatch/presence-process";
 import { projectServer } from "@langwatch/project-process";
 import { promptServer } from "@langwatch/prompt-process";
 import { roleServer } from "@langwatch/role-process";
+import { rumServer } from "@langwatch/rum-process";
 import { sampleAgentsServer } from "@langwatch/sample-agents-process";
 import { scenarioServer } from "@langwatch/scenario-process";
 import { secretServer } from "@langwatch/secret-process";
@@ -106,6 +107,7 @@ export const serverModules = [
   projectServer,
   promptServer,
   roleServer,
+  rumServer,
   saasServer,
   sampleAgentsServer,
   scenarioServer,
