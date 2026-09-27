@@ -119,6 +119,10 @@ jobs:
         with:
           install: all
 
+      # Both sides' clickhouse-migrate runs goose, which the runner lacks.
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
       - name: Run apidiff
         id: run
         env:
