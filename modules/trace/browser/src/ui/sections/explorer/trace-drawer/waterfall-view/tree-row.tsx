@@ -132,11 +132,7 @@ export const TreeRow = memo(function TreeRow({
   // the red marker is what says it. The green "changed" wash would only argue
   // with it, so it stays off those rows.
   const showsCorrectedTint = isEdited && !isDeletedByCorrection;
-  const correctedBackground = showsCorrectedTint ? "green.subtle" : undefined;
-  const unselectedBackground = isHovered ? "colorPalette.subtle/40" : correctedBackground;
-  const rowBackground = isSelected
-    ? { base: "bg.emphasized", _dark: "blue.subtle" }
-    : unselectedBackground;
+  const look = rowLook({ isSelected, isHovered, isDimmed, isDraftDeleted, showsCorrectedTint });
   const isError = span.status === "error";
   const isLlm = span.type === "llm" && span.model != null;
   // A named tool span gets the same two-line treatment as an LLM span: the
@@ -155,17 +151,268 @@ export const TreeRow = memo(function TreeRow({
     ? LuSparkles
     : (SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!);
   const palette = isSkill ? "purple" : getSpanPalette(span.type);
+
+  return (
+    <Tooltip
+      content={
+        <SpanTooltipBody
+          span={span}
+          displayName={displayName}
+          palette={palette}
+          isSkill={isSkill}
+          hiddenCount={isCollapsed ? hiddenDescendantCount : 0}
+          logCount={logCount}
+          rootStart={rootStart}
+          rootDuration={rootDuration}
+        />
+      }
+      positioning={{ placement: "right" }}
+      // The default tooltip surface is inverted (dark in light mode), but
+      // this rich tooltip's content uses panel-side tokens (`fg`,
+      // `fg.muted`, palette badges) — render it on a panel surface so
+      // every token resolves legibly in both colour modes.
+      contentProps={{
+        bg: "bg.panel",
+        color: "fg",
+        borderWidth: "1px",
+        borderColor: "border",
+        boxShadow: "md",
+      }}
+    >
+      <Box position="relative">
+        {/* Pulse layer: a one-shot orange wash that fades over 1.2s when
+            a new span arrives via SSE. Sits absolutely above the row's
+            existing background so selection / hover state continues to
+            show through underneath as the pulse fades out. Pointer
+            events off so the click target on the row stays the row. */}
+        {isPulsing && <PulseLayer />}
+        <HStack
+          height={`${rowH}px`}
+          gap={0}
+          paddingLeft={`${depth * INDENT_PX + 4}px`}
+          paddingRight={2}
+          // Light mode picks up a neutral grey for selection (`bg.emphasized`) rather
+          // than a blue tint — keeps the row visually distinct from the hover state
+          // without competing with the bar's own colour.
+          colorPalette={isError ? "red" : palette}
+          bg={look.background}
+          // Edge tick on a corrected row so a change is spottable while
+          // scanning the tree, not only once the row is read.
+          boxShadow={
+            showsCorrectedTint ? "inset 2px 0 0 var(--chakra-colors-green-solid)" : undefined
+          }
+          // Dark mode keeps the pre-PR behaviour of fading non-selected rows when one
+          // is picked — the dark theme depends on that contrast to keep the focus row
+          // "popping".
+          opacity={look.opacity}
+          _hover={{
+            bg: isSelected
+              ? { base: "bg.emphasized", _dark: "blue.subtle" }
+              : "colorPalette.subtle/40",
+          }}
+          cursor="pointer"
+          // Anchors the hover actions, which hang centered under the row.
+          position="relative"
+          data-testid="waterfall-row"
+          onClick={handleClick}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          flexShrink={0}
+          transition="all 0.1s ease"
+          borderLeftWidth={isSelected ? "2px" : "0px"}
+          borderLeftColor={isSelected ? { base: "fg.muted", _dark: "blue.solid" } : "transparent"}
+        >
+          <CollapseChevron
+            hasChildren={hasChildren}
+            isCollapsed={isCollapsed}
+            onToggle={() => onToggleCollapse(span.spanId)}
+          />
+
+          {/* Uses `colorPalette` scope resolution rather than interpolating the palette into the
+              token string — the latter gave near-invisible icon contrast in some dark palettes. */}
+          <Flex
+            width="18px"
+            height="18px"
+            align="center"
+            justify="center"
+            flexShrink={0}
+            marginRight={1.5}
+            borderRadius="sm"
+            colorPalette={isError ? "red" : palette}
+            bg="colorPalette.subtle"
+            color="colorPalette.fg"
+          >
+            <Icon as={TypeIcon} boxSize={3} />
+          </Flex>
+
+          {/* Span name + metadata */}
+          <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
+            <HStack gap={1} minWidth={0}>
+              <Text
+                textStyle="xs"
+                color={isError ? "red.fg" : "fg"}
+                textDecoration={
+                  isDraftDeleted || isDeletedByCorrection ? "line-through" : undefined
+                }
+                truncate
+                minWidth={0}
+                lineHeight={1.2}
+                // The badges beside it can squeeze the name down to a few
+                // characters, so the name carries the whole of itself.
+                title={displayName}
+              >
+                {displayName}
+              </Text>
+              <NameBadges
+                isPrompt={isPrompt}
+                logCount={logCount}
+                isEdited={showsCorrectedTint}
+                isDeletedByCorrection={isDeletedByCorrection}
+                hiddenCount={isCollapsed ? hiddenDescendantCount : 0}
+              />
+            </HStack>
+            {(isLlm || isNamedTool) && (
+              <KindPill
+                label={(isLlm ? span.model : span.toolName) ?? ""}
+                isStruck={isDraftDeleted || isDeletedByCorrection}
+              />
+            )}
+          </Flex>
+
+          {/* Signal badges — sit on the row, not inside the name column,
+              so they vertically center against the full row height
+              instead of clinging to the top line on two-line LLM rows. */}
+          {signals.length > 0 && (
+            <Flex align="center" flexShrink={0} marginLeft={1} alignSelf="center">
+              <LangwatchSignalBadges signals={signals} />
+            </Flex>
+          )}
+
+          {/* Error indicator */}
+          {isError && (
+            <Icon as={LuTriangleAlert} boxSize={3} color="red.fg" flexShrink={0} marginLeft={1} />
+          )}
+
+          <RowMarks
+            spanId={span.spanId}
+            displayName={displayName}
+            traceId={traceId}
+            comments={comments}
+            isEditing={isEditing}
+            isDraftDeleted={isDraftDeleted}
+            onToggleDelete={onToggleDelete}
+          />
+
+          <RowFigures cost={span.cost} durationMs={span.durationMs} />
+
+          <RowHoverActions
+            spanId={span.spanId}
+            displayName={displayName}
+            traceId={traceId}
+            comments={comments}
+            isHovered={isHovered}
+            isEditing={isEditing}
+            isDraftDeleted={isDraftDeleted}
+            onToggleDelete={onToggleDelete}
+          />
+        </HStack>
+      </Box>
+    </Tooltip>
+  );
+});
+
+type WaterfallSpan = WaterfallTreeNode["span"];
+
+const SELECTED_BACKGROUND = { base: "bg.emphasized", _dark: "blue.subtle" };
+
+/**
+ * The row's background and opacity. Dark mode keeps fading the rows that are
+ * not picked, since its contrast depends on it; a removed span fades always.
+ */
+function rowLook({
+  isSelected,
+  isHovered,
+  isDimmed,
+  isDraftDeleted,
+  showsCorrectedTint,
+}: {
+  isSelected: boolean;
+  isHovered: boolean;
+  isDimmed: boolean;
+  isDraftDeleted: boolean;
+  showsCorrectedTint: boolean;
+}) {
+  const correctedBackground = showsCorrectedTint ? "green.subtle" : undefined;
+  const unselectedBackground = isHovered ? "colorPalette.subtle/40" : correctedBackground;
+  const fadesInDark = isDimmed && !isSelected && !isHovered;
+  return {
+    background: isSelected ? SELECTED_BACKGROUND : unselectedBackground,
+    opacity: isDraftDeleted ? 0.45 : { base: 1, _dark: fadesInDark ? 0.4 : 1 },
+  };
+}
+
+/**
+ * Cost and duration as fixed-width, right-aligned tabular columns, so every
+ * row's figures line up. The cost slot is always there, empty without a cost.
+ */
+function RowFigures({ cost, durationMs }: { cost?: number | null; durationMs: number }) {
+  return (
+    <>
+      <Text
+        textStyle="xs"
+        color="fg.muted"
+        flexShrink={0}
+        marginLeft={2}
+        minWidth="52px"
+        textAlign="right"
+        whiteSpace="nowrap"
+        fontVariantNumeric="tabular-nums"
+      >
+        {cost != null && cost > 0 ? formatCost(cost) : ""}
+      </Text>
+      <Text
+        textStyle="xs"
+        color="fg.muted"
+        flexShrink={0}
+        marginLeft={2}
+        minWidth="52px"
+        textAlign="right"
+        whiteSpace="nowrap"
+        fontVariantNumeric="tabular-nums"
+      >
+        {durationMs === 0 ? "<1ms" : formatDuration(durationMs)}
+      </Text>
+    </>
+  );
+}
+
+/** The row's hover card: the span's kind, usage, timing and ids. */
+function SpanTooltipBody({
+  span,
+  displayName,
+  palette,
+  isSkill,
+  hiddenCount,
+  logCount,
+  rootStart,
+  rootDuration,
+}: {
+  span: WaterfallSpan;
+  displayName: string;
+  palette: string;
+  isSkill: boolean;
+  hiddenCount: number;
+  logCount: number;
+  rootStart: number;
+  rootDuration: number;
+}) {
   const duration = span.durationMs;
   const isZeroDuration = duration === 0;
+  const isError = span.status === "error";
   const offsetMs = Math.max(0, span.startTimeMs - rootStart);
   const sharePct = rootDuration > 0 ? Math.round((duration / rootDuration) * 100) : 0;
-  const totalTokens =
-    (span.inputTokens ?? 0) +
-    (span.outputTokens ?? 0) +
-    (span.cacheReadTokens ?? 0) +
-    (span.cacheCreationTokens ?? 0);
-
-  const tooltipContent = (
+  const totalTokens = totalTokensOf(span);
+  return (
     <Box minWidth="240px" maxWidth="340px">
       <Text textStyle="xs" fontWeight="semibold" color="fg" wordBreak="break-word">
         {displayName}
@@ -235,9 +482,7 @@ export const TreeRow = memo(function TreeRow({
         <TipCell label="Duration" value={isZeroDuration ? "<1ms" : formatDuration(duration)} />
         {sharePct > 0 && <TipCell label="Of trace" value={`${sharePct}%`} />}
         <TipCell label="Offset" value={`+${formatDuration(offsetMs)}`} />
-        {isCollapsed && hiddenDescendantCount > 0 && (
-          <TipCell label="Hidden spans" value={`${hiddenDescendantCount}`} />
-        )}
+        {hiddenCount > 0 && <TipCell label="Hidden spans" value={`${hiddenCount}`} />}
         {logCount > 0 && <TipCell label="Logs" value={`${logCount}, click to view`} />}
         <TipCell label="Span ID" value={span.spanId.slice(0, 16)} mono />
         {/* Always rendered so the tooltip grid keeps a stable row count
@@ -252,325 +497,190 @@ export const TreeRow = memo(function TreeRow({
       </Box>
     </Box>
   );
+}
 
+function totalTokensOf(span: WaterfallSpan): number {
   return (
-    <Tooltip
-      content={tooltipContent}
-      positioning={{ placement: "right" }}
-      // The default tooltip surface is inverted (dark in light mode), but
-      // this rich tooltip's content uses panel-side tokens (`fg`,
-      // `fg.muted`, palette badges) — render it on a panel surface so
-      // every token resolves legibly in both colour modes.
-      contentProps={{
-        bg: "bg.panel",
-        color: "fg",
-        borderWidth: "1px",
-        borderColor: "border",
-        boxShadow: "md",
+    (span.inputTokens ?? 0) +
+    (span.outputTokens ?? 0) +
+    (span.cacheReadTokens ?? 0) +
+    (span.cacheCreationTokens ?? 0)
+  );
+}
+
+/**
+ * A one-shot orange wash over a span that just arrived. It sits above the row's
+ * own background, so selection and hover show through as it fades.
+ */
+function PulseLayer() {
+  return (
+    <Box
+      position="absolute"
+      inset={0}
+      pointerEvents="none"
+      zIndex={1}
+      css={{
+        animation: "lw-span-pulse 1.2s ease-out forwards",
+        "@keyframes lw-span-pulse": {
+          "0%": {
+            backgroundColor: "var(--chakra-colors-orange-subtle)",
+            boxShadow: "inset 2px 0 0 var(--chakra-colors-orange-solid)",
+          },
+          "100%": {
+            backgroundColor: "transparent",
+            boxShadow: "inset 2px 0 0 transparent",
+          },
+        },
+        "@media (prefers-reduced-motion: reduce)": {
+          animation: "none",
+          backgroundColor: "transparent",
+        },
       }}
+    />
+  );
+}
+
+function CollapseChevron({
+  hasChildren,
+  isCollapsed,
+  onToggle,
+}: {
+  hasChildren: boolean;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Flex
+      width="16px"
+      height="16px"
+      align="center"
+      justify="center"
+      flexShrink={0}
+      onClick={(e) => {
+        if (hasChildren) {
+          e.stopPropagation();
+          onToggle();
+        }
+      }}
+      opacity={hasChildren ? 1 : 0}
+      cursor={hasChildren ? "pointer" : "default"}
+      borderRadius="xs"
+      _hover={hasChildren ? { bg: "bg.emphasized" } : undefined}
     >
-      <Box position="relative">
-        {/* Pulse layer: a one-shot orange wash that fades over 1.2s when
-            a new span arrives via SSE. Sits absolutely above the row's
-            existing background so selection / hover state continues to
-            show through underneath as the pulse fades out. Pointer
-            events off so the click target on the row stays the row. */}
-        {isPulsing && (
-          <Box
-            position="absolute"
-            inset={0}
-            pointerEvents="none"
-            zIndex={1}
-            css={{
-              animation: "lw-span-pulse 1.2s ease-out forwards",
-              "@keyframes lw-span-pulse": {
-                "0%": {
-                  backgroundColor: "var(--chakra-colors-orange-subtle)",
-                  boxShadow: "inset 2px 0 0 var(--chakra-colors-orange-solid)",
-                },
-                "100%": {
-                  backgroundColor: "transparent",
-                  boxShadow: "inset 2px 0 0 transparent",
-                },
-              },
-              "@media (prefers-reduced-motion: reduce)": {
-                animation: "none",
-                backgroundColor: "transparent",
-              },
-            }}
-          />
-        )}
-        <HStack
-          height={`${rowH}px`}
-          gap={0}
-          paddingLeft={`${depth * INDENT_PX + 4}px`}
-          paddingRight={2}
-          // Light mode picks up a neutral grey for selection (`bg.emphasized`) rather
-          // than a blue tint — keeps the row visually distinct from the hover state
-          // without competing with the bar's own colour.
-          colorPalette={isError ? "red" : palette}
-          bg={rowBackground}
-          // Edge tick on a corrected row so a change is spottable while
-          // scanning the tree, not only once the row is read.
-          boxShadow={
-            showsCorrectedTint ? "inset 2px 0 0 var(--chakra-colors-green-solid)" : undefined
-          }
-          // Dark mode keeps the pre-PR behaviour of fading non-selected rows when one
-          // is picked — the dark theme depends on that contrast to keep the focus row
-          // "popping".
-          opacity={
-            isDraftDeleted
-              ? 0.45
-              : {
-                  base: 1,
-                  _dark: isDimmed && !isSelected && !isHovered ? 0.4 : 1,
-                }
-          }
-          _hover={{
-            bg: isSelected
-              ? { base: "bg.emphasized", _dark: "blue.subtle" }
-              : "colorPalette.subtle/40",
-          }}
-          cursor="pointer"
-          // Anchors the hover actions, which hang centered under the row.
-          position="relative"
-          data-testid="waterfall-row"
-          onClick={handleClick}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          flexShrink={0}
-          transition="all 0.1s ease"
-          borderLeftWidth={isSelected ? "2px" : "0px"}
-          borderLeftColor={isSelected ? { base: "fg.muted", _dark: "blue.solid" } : "transparent"}
-        >
-          {/* Chevron */}
-          <Flex
-            width="16px"
-            height="16px"
-            align="center"
-            justify="center"
-            flexShrink={0}
-            onClick={(e) => {
-              if (hasChildren) {
-                e.stopPropagation();
-                onToggleCollapse(span.spanId);
-              }
-            }}
-            opacity={hasChildren ? 1 : 0}
-            cursor={hasChildren ? "pointer" : "default"}
-            borderRadius="xs"
-            _hover={hasChildren ? { bg: "bg.emphasized" } : undefined}
-          >
-            <Icon as={isCollapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
-          </Flex>
+      <Icon as={isCollapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
+    </Flex>
+  );
+}
 
-          {/* Uses `colorPalette` scope resolution rather than interpolating the palette into the
-              token string — the latter gave near-invisible icon contrast in some dark palettes. */}
-          <Flex
-            width="18px"
-            height="18px"
-            align="center"
-            justify="center"
-            flexShrink={0}
-            marginRight={1.5}
-            borderRadius="sm"
-            colorPalette={isError ? "red" : palette}
-            bg="colorPalette.subtle"
-            color="colorPalette.fg"
-          >
-            <Icon as={TypeIcon} boxSize={3} />
-          </Flex>
-
-          {/* Span name + metadata */}
-          <Flex direction="column" flex={1} minWidth={0} gap={0} justify="center">
-            <HStack gap={1} minWidth={0}>
-              <Text
-                textStyle="xs"
-                color={isError ? "red.fg" : "fg"}
-                textDecoration={
-                  isDraftDeleted || isDeletedByCorrection ? "line-through" : undefined
-                }
-                truncate
-                minWidth={0}
-                lineHeight={1.2}
-                // The badges beside it can squeeze the name down to a few
-                // characters, so the name carries the whole of itself.
-                title={displayName}
-              >
-                {displayName}
-              </Text>
-              {/* Book icon (the Prompts nav glyph) flags spans that used a
+/** What sits beside the span's name: prompt, logs, edit and delete marks, and the hidden count. */
+function NameBadges({
+  isPrompt,
+  logCount,
+  isEdited,
+  isDeletedByCorrection,
+  hiddenCount,
+}: {
+  isPrompt: boolean;
+  logCount: number;
+  isEdited: boolean;
+  isDeletedByCorrection: boolean;
+  hiddenCount: number;
+}) {
+  return (
+    <>
+      {/* Book icon (the Prompts nav glyph) flags spans that used a
                   managed prompt, so prompt-bearing spans are spottable in
                   the tree without opening each one. */}
-              {isPrompt && (
-                <Icon
-                  boxSize="11px"
-                  color="purple.fg"
-                  flexShrink={0}
-                  aria-label="Uses a managed prompt"
-                >
-                  <BookText />
-                </Icon>
-              )}
-              {/* Flags a span that has correlated log records — the ONLY
+      {isPrompt && (
+        <Icon boxSize="11px" color="purple.fg" flexShrink={0} aria-label="Uses a managed prompt">
+          <BookText />
+        </Icon>
+      )}
+      {/* Flags a span that has correlated log records — the ONLY
                   place a tool the user denied, a mid-run retry, or a
                   compaction shows up, since none of those produce a span
                   of their own. Generic: not scoped to any span type. */}
-              {logCount > 0 && (
-                <Icon
-                  boxSize="11px"
-                  color="cyan.fg"
-                  flexShrink={0}
-                  aria-label={`Has ${logCount} log ${logCount === 1 ? "record" : "records"}`}
-                >
-                  <ScrollText />
-                </Icon>
-              )}
-              {/* The row's green wash and edge tick are colour, which a reader
+      {logCount > 0 && (
+        <Icon
+          boxSize="11px"
+          color="cyan.fg"
+          flexShrink={0}
+          aria-label={`Has ${logCount} log ${logCount === 1 ? "record" : "records"}`}
+        >
+          <ScrollText />
+        </Icon>
+      )}
+      {/* The row's green wash and edge tick are colour, which a reader
                   who cannot separate the hues has nothing to read. The badge
                   says the same thing in words, the way the deleted one does. */}
-              {showsCorrectedTint && (
-                <Text
-                  textStyle="2xs"
-                  color="green.fg"
-                  bg="green.subtle"
-                  paddingX={1.5}
-                  borderRadius="sm"
-                  fontWeight="semibold"
-                  flexShrink={0}
-                  lineHeight={1.4}
-                >
-                  Edited
-                </Text>
-              )}
-              {/* A span the stored correction removes is still listed while
+      {isEdited && (
+        <Text
+          textStyle="2xs"
+          color="green.fg"
+          bg="green.subtle"
+          paddingX={1.5}
+          borderRadius="sm"
+          fontWeight="semibold"
+          flexShrink={0}
+          lineHeight={1.4}
+        >
+          Edited
+        </Text>
+      )}
+      {/* A span the stored correction removes is still listed while
                   the reader is on the captured trace, and the badge is what
                   tells them the corrected trace does not have it. */}
-              {isDeletedByCorrection && (
-                <Text
-                  textStyle="2xs"
-                  color="red.fg"
-                  bg="red.subtle"
-                  paddingX={1.5}
-                  borderRadius="sm"
-                  fontWeight="semibold"
-                  flexShrink={0}
-                  lineHeight={1.4}
-                >
-                  Deleted
-                </Text>
-              )}
-              {/* Hidden-descendant count — a collapsed parent says how
+      {isDeletedByCorrection && (
+        <Text
+          textStyle="2xs"
+          color="red.fg"
+          bg="red.subtle"
+          paddingX={1.5}
+          borderRadius="sm"
+          fontWeight="semibold"
+          flexShrink={0}
+          lineHeight={1.4}
+        >
+          Deleted
+        </Text>
+      )}
+      {/* Hidden-descendant count — a collapsed parent says how
                   much it's hiding, so plain collapse reads differently
                   from a GroupRow's "×N repeated" fold. */}
-              {isCollapsed && hiddenDescendantCount > 0 && (
-                <Text textStyle="2xs" color="fg.subtle" flexShrink={0} lineHeight={1.2}>
-                  +{hiddenDescendantCount}
-                </Text>
-              )}
-            </HStack>
-            {(isLlm || isNamedTool) && (
-              // Model / tool name as a compact pill (one per span) rather
-              // than a bare text line — matches the header's Chip-based
-              // Models pill idiom. The rich detail (full model name, token
-              // breakdown, cost) lives in the row tooltip, which covers the
-              // pill.
-              <HStack gap={1} marginTop="1px">
-                <Text
-                  textStyle="2xs"
-                  color="fg.muted"
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="full"
-                  paddingX={1.5}
-                  lineHeight={1.4}
-                  truncate
-                  maxWidth="100%"
-                  bg="bg.subtle"
-                  // The pill names the model or tool the row ran. On a row the
-                  // correction removes it goes with the row, so it is struck
-                  // through with the name rather than reading as a live one.
-                  textDecoration={
-                    isDraftDeleted || isDeletedByCorrection ? "line-through" : undefined
-                  }
-                >
-                  {isLlm ? span.model! : span.toolName}
-                </Text>
-              </HStack>
-            )}
-          </Flex>
-
-          {/* Signal badges — sit on the row, not inside the name column,
-              so they vertically center against the full row height
-              instead of clinging to the top line on two-line LLM rows. */}
-          {signals.length > 0 && (
-            <Flex align="center" flexShrink={0} marginLeft={1} alignSelf="center">
-              <LangwatchSignalBadges signals={signals} />
-            </Flex>
-          )}
-
-          {/* Error indicator */}
-          {isError && (
-            <Icon as={LuTriangleAlert} boxSize={3} color="red.fg" flexShrink={0} marginLeft={1} />
-          )}
-
-          <RowMarks
-            spanId={span.spanId}
-            displayName={displayName}
-            traceId={traceId}
-            comments={comments}
-            isEditing={isEditing}
-            isDraftDeleted={isDraftDeleted}
-            onToggleDelete={onToggleDelete}
-          />
-
-          {/* Cost + duration render as fixed-width right-aligned columns
-              (tabular numerals) so every row's trailing figures line up
-              vertically — variable-width text here made the whole right
-              edge of the list read as ragged. The cost slot is always
-              present (empty for spans without one) so the duration
-              column can't drift between LLM and non-LLM rows. */}
-          <Text
-            textStyle="xs"
-            color="fg.muted"
-            flexShrink={0}
-            marginLeft={2}
-            minWidth="52px"
-            textAlign="right"
-            whiteSpace="nowrap"
-            fontVariantNumeric="tabular-nums"
-          >
-            {span.cost != null && span.cost > 0 ? formatCost(span.cost) : ""}
-          </Text>
-
-          <Text
-            textStyle="xs"
-            color="fg.muted"
-            flexShrink={0}
-            marginLeft={2}
-            minWidth="52px"
-            textAlign="right"
-            whiteSpace="nowrap"
-            fontVariantNumeric="tabular-nums"
-          >
-            {isZeroDuration ? "<1ms" : formatDuration(duration)}
-          </Text>
-
-          <RowHoverActions
-            spanId={span.spanId}
-            displayName={displayName}
-            traceId={traceId}
-            comments={comments}
-            isHovered={isHovered}
-            isEditing={isEditing}
-            isDraftDeleted={isDraftDeleted}
-            onToggleDelete={onToggleDelete}
-          />
-        </HStack>
-      </Box>
-    </Tooltip>
+      {hiddenCount > 0 && (
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0} lineHeight={1.2}>
+          +{hiddenCount}
+        </Text>
+      )}
+    </>
   );
-});
+}
+
+/** The model or tool a row ran, as a compact pill; the tooltip carries the detail. */
+function KindPill({ label, isStruck }: { label: string; isStruck: boolean }) {
+  return (
+    <HStack gap={1} marginTop="1px">
+      <Text
+        textStyle="2xs"
+        color="fg.muted"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="full"
+        paddingX={1.5}
+        lineHeight={1.4}
+        truncate
+        maxWidth="100%"
+        bg="bg.subtle"
+        // The pill names the model or tool the row ran. On a row the
+        // correction removes it goes with the row, so it is struck
+        // through with the name rather than reading as a live one.
+        textDecoration={isStruck ? "line-through" : undefined}
+      >
+        {label}
+      </Text>
+    </HStack>
+  );
+}
 
 /**
  * What a row says about itself with the pointer elsewhere: how many comments the span
