@@ -4,11 +4,11 @@
  * @see specs/suites/suite-model-selection.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SimulationSuite } from "../../../../model/prisma-types.ts";
 import { SuiteFormDrawer } from "../suite-form-drawer.tsx";
 
 // -- Mock data --

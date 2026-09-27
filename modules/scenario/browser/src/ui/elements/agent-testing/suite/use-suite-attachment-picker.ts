@@ -5,7 +5,6 @@
  */
 
 import { setFlowCallbacks, type useDrawer } from "@langwatch/browser-host/drawer";
-import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-browser/evaluator-editor-callbacks";
 import type {
   EvaluatorAttachment,
   ScenarioMapping,
@@ -174,22 +173,19 @@ export function openEvaluatorPicker({
   setFlowCallbacks("evaluatorList", {
     onSelect: (evaluator: AttachableEvaluator) => attach({ evaluator, origin: "list" }),
   });
-  setFlowCallbacks(
-    "evaluatorEditor",
-    createEvaluatorEditorCallbacks({
-      onSave: async (saved) => {
-        const evaluator = await utils.evaluators.getById.fetch({
-          id: saved.id,
-          projectId,
-        });
-        if (testSuiteId) {
-          openDrawer(SUITE_EDITOR_DRAWER, { testSuiteId }, { resetStack: true });
-        }
-        if (evaluator) attach({ evaluator, origin: "created" });
-        return true;
-      },
-    }),
-  );
+  setFlowCallbacks("evaluatorEditor", {
+    onSave: async (saved: { id: string }) => {
+      const evaluator = await utils.evaluators.getById.fetch({
+        id: saved.id,
+        projectId,
+      });
+      if (testSuiteId) {
+        openDrawer(SUITE_EDITOR_DRAWER, { testSuiteId }, { resetStack: true });
+      }
+      if (evaluator) attach({ evaluator, origin: "created" });
+      return true;
+    },
+  });
   openDrawer("evaluatorList", { onClose: goBack });
 }
 

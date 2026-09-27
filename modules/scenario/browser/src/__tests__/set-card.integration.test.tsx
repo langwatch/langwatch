@@ -4,6 +4,7 @@
  * @see specs/scenarios/internal-set-namespace.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ON_PLATFORM_DISPLAY_NAME } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -28,13 +29,10 @@ describe("<SetCard/>", () => {
     };
 
     describe("when the SetCard renders", () => {
-      // Skipped: ON_PLATFORM_DISPLAY_NAME is currently "Manual Run" not "On-Platform Scenarios".
-      // The source (internal-set-id.ts) needs to be updated to use "On-Platform Scenarios"
-      // before this test can pass.
-      it.skip('displays "On-Platform Scenarios" as the name', () => {
+      it("displays the on-platform display name", () => {
         render(<SetCard {...defaultProps} />, { wrapper: Wrapper });
 
-        expect(screen.getByText("On-Platform Scenarios")).toBeInTheDocument();
+        expect(screen.getByText(ON_PLATFORM_DISPLAY_NAME)).toBeInTheDocument();
       });
 
       it("does not display the raw internal ID", () => {

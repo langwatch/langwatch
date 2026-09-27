@@ -1,4 +1,4 @@
-import { HStack, Input, Text } from "@chakra-ui/react";
+import { HStack, Input, Text, chakra } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -93,30 +93,24 @@ export function ScenarioInlineTagsInput({
           gap={1}
         >
           <Text>{tag}</Text>
-          <button
+          <chakra.button
             type="button"
             aria-label={`Remove ${tag} label`}
             onClick={(e) => {
               e.stopPropagation();
               handleRemove(index);
             }}
-            style={{
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              background: "transparent",
-              border: "none",
-              color: "var(--chakra-colors-blue-fg)",
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.color = "var(--chakra-colors-blue-emphasized)";
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.color = "var(--chakra-colors-blue-fg)";
-            }}
+            cursor="pointer"
+            display="flex"
+            alignItems="center"
+            background="transparent"
+            border="none"
+            color="blue.fg"
+            _hover={{ color: "blue.emphasized" }}
+            _focusVisible={{ color: "blue.emphasized" }}
           >
             <X size={12} />
-          </button>
+          </chakra.button>
         </HStack>
       ))}
 

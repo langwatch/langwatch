@@ -224,7 +224,9 @@ export function MediaPart({
           onEnded={audioPlayback?.onEnded}
           ref={audioPlayback?.ref ?? null}
           style={{ width: "100%", maxWidth: "400px" }}
-        />
+        >
+          <track kind="captions" />
+        </audio>
       </VStack>
     );
   }
@@ -261,7 +263,9 @@ export function MediaPart({
           onLoadedData={handleLoad}
           onError={handleError}
           style={{ maxWidth: "400px", maxHeight: "300px", borderRadius: "6px" }}
-        />
+        >
+          <track kind="captions" />
+        </video>
       </VStack>
     );
   }

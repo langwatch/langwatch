@@ -76,7 +76,10 @@ export function WholeCallAudio({
         src={src}
         onError={() => setFailed(true)}
         style={{ width: "100%", maxWidth: "400px" }}
-      />
+      >
+        {/* A recorded call carries no caption file; the track states that. */}
+        <track kind="captions" />
+      </audio>
     </VStack>
   );
 }

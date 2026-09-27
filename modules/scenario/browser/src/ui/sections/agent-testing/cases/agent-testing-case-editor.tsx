@@ -5,10 +5,10 @@
  */
 
 import { setFlowCallbacks } from "@langwatch/browser-host/drawer";
+import type { Scenario } from "@langwatch/scenario-contract";
 import { useCallback, useState, useEffect } from "react";
 
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { Scenario } from "../../../../model/prisma-types.ts";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
 import type { RunDialogSubject } from "../run/run-dialog-types.ts";
 import { RunDialog } from "../run/run-dialog.tsx";

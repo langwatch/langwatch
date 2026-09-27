@@ -13,10 +13,14 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
-import { targetLabelOf, parseSuiteTargets, type SuiteRunResult } from "@langwatch/suite-contract";
+import {
+  targetLabelOf,
+  parseSuiteTargets,
+  type Suite as SimulationSuite,
+  type SuiteRunResult,
+} from "@langwatch/suite-contract";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import type { SimulationSuite } from "../../model/prisma-types.ts";
 import { api } from "../scenario-api.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";

@@ -8,7 +8,6 @@
 import { Circle, chakra, Icon, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { REQUIRED_TO_PASS_LABEL } from "@langwatch/evaluator-browser/surfaces/evaluator-editor-shared";
 import {
   SCENARIO_MISSING_MAPPING_TOOLTIP,
   type EvaluatorAttachment,
@@ -22,6 +21,9 @@ import { FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { EvaluatorPillRow } from "../shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
 import { SmallButton } from "../shared/small-button.tsx";
+
+/** The same words the evaluator editor puts on its gate switch. */
+const REQUIRED_TO_PASS_LABEL = "Required to pass";
 
 export const EVALUATORS_SECTION_HELP =
   "Every conversation in this suite gets these checks, on top of its criteria.";

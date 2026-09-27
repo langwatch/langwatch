@@ -16,6 +16,7 @@ import {
   SuiteRunConfirmationDialog,
   NowProvider,
 } from "@langwatch/suite-browser-kit";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { fromDate, nowInstant, subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,7 +34,6 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { DashboardLayout } from "../dashboard-layout.tsx";
 import { ScenarioWorkflowHostBridge } from "../workflow-host-bridge.tsx";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";

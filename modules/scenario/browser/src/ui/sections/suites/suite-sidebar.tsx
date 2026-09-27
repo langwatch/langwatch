@@ -23,6 +23,7 @@ import {
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import {
   FlaskConical,
   List,
@@ -37,7 +38,6 @@ import { useMemo, useState } from "react";
 
 import { ALL_RUNS_ID, toExternalSetSelection } from "../../../behavior/suites/use-suite-routing.ts";
 import { useNow } from "../../../behavior/use-now.ts";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 

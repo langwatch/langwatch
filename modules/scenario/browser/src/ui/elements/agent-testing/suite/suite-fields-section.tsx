@@ -33,6 +33,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { SUITE_FIELD_TYPES, type SuiteFieldType } from "@langwatch/scenario-contract";
 import { GripVertical, X } from "lucide-react";
 
+import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { DIALOG_FIELD_STYLE, FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
@@ -101,7 +102,7 @@ function FieldRow({
   row,
   index,
   isSortable,
-  autoFocus,
+  focusOnMount,
   onPatch,
   onRemove,
 }: {
@@ -109,8 +110,9 @@ function FieldRow({
   index: number;
   /** False while the suite has a single field: there is nothing to reorder. */
   isSortable: boolean;
-  autoFocus: boolean;
+  focusOnMount: boolean;
 } & Pick<SuiteFieldsSectionProps, "onPatch" | "onRemove">) {
+  const identifierRef = useFocusOnMount<HTMLInputElement>(focusOnMount);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: row.key,
     disabled: !isSortable,
@@ -149,7 +151,7 @@ function FieldRow({
           paddingY={1}
           aria-label={`Field ${index + 1} identifier`}
           placeholder={FIELD_IDENTIFIER_PLACEHOLDER}
-          autoFocus={autoFocus}
+          ref={identifierRef}
           value={row.identifier}
           onChange={(event) => onPatch(index, { identifier: event.target.value })}
         />
@@ -228,7 +230,7 @@ export function SuiteFieldsSection({
                 row={row}
                 index={index}
                 isSortable={rows.length > 1}
-                autoFocus={index === lastEmpty}
+                focusOnMount={index === lastEmpty}
                 onPatch={onPatch}
                 onRemove={onRemove}
               />

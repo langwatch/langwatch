@@ -9,6 +9,7 @@ import { Box, Input, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
 
+import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   CASE_EDITOR_DRAWER_SIZE,
@@ -65,13 +66,15 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
   const { draft } = model;
   if (model.isLoading || !draft) return <SuiteEditorSkeleton />;
 
+  const nameRef = useFocusOnMount<HTMLInputElement>();
+
   return (
     <VStack align="stretch" gap={5} minHeight="full">
       <Box>
         <FieldLabel>Name</FieldLabel>
         <Input
           {...DIALOG_FIELD_STYLE}
-          autoFocus
+          ref={nameRef}
           aria-label="Test suite name"
           placeholder="Case lookups"
           value={draft.name}
