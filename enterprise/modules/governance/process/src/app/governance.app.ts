@@ -10,12 +10,8 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  *
  * Governance answers over two transports today — a project-scoped REST family
  * (ingestion templates) and two tRPC surfaces (personal virtual keys, routing
- * policies) — and before this each door declared its own private bag. The two
- * tRPC files each wrote `Readonly<{ governance: GovernanceApi }>`, agreeing
- * by attention rather than by construction, and the REST family took its two
- * capabilities as separate resolver functions that neither tRPC door could
- * reach. One object now holds the union, so a rule written here is the rule
- * every door gets.
+ * policies) — and before this each door declared its own private bag. One object now holds
+ * the union, so a rule written here is the rule every door gets.
  *
  * What lives here as a method is what a door would otherwise have to know:
  *
@@ -38,7 +34,6 @@ import {
   type Department,
   type DepartmentAssignments,
   type GovernanceBudgetOverviewForUser,
-  type GovernanceApi,
   type RecordWorkspaceViewResult,
   type RecordWorkspaceViewInput,
   type QuarantineFillStats,
@@ -286,27 +281,8 @@ const logger = createLogger("langwatch:governance");
 
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
-/** Where an actor's own workspace lives, for the admin's drill-in link. */
-/**
- * What this application is assembled from, once its three peers have been
- * resolved from {@link GovernanceApp.dependencies} and merged with the
- * bespoke members: the private view the constructor holds, not the shape a
- * process supplies.
- */
+/** The peers this application reads, resolved from {@link GovernanceApp.dependencies}. */
 export interface GovernanceAppDependencies {
-  /**
-   * The ~100-operation governance facade, and the CLI/ingest collaborators
-   * behind it. Optional because nothing constructs
-   * `createGovernanceInstallation` today — no `GovernanceInstallationOptions`
-   * is assembled anywhere a process boots — so a process that installs this
-   * app supplies none of the three. Every method that reads one of them (the
-   * CLI/ingest accessors, and the personal-virtual-key, routing-policy and
-   * CLI-bootstrap operations the REST family does not call) throws a plain
-   * error if it is ever reached before a process actually supplies it; the
-   * seven ingestion-template and two department operations this REST family
-   * serves read none of the three.
-   */
-  governance?: GovernanceApi;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an
@@ -431,36 +407,7 @@ export interface GovernanceAppDependencies {
   permissions: Pick<AuthzService, "getDecision">;
 }
 
-/**
- * What a process cannot hand this application from a peer's API: the
- * governance capability itself and the four bespoke directories behind it.
- *
- * Every one of these is a conversion debt with a named destination — the
- * capability becomes what this app IS rather than something injected into it,
- * the two personal-virtual-key checks and the actor lookup become repository
- * reads, and the CLI and ingest bags split into peers, channels and config.
- * Until then they travel beside the process's own members the way
- * `ScimBespokeMembers` does, so that what is genuinely unfinished is visible
- * in the type rather than hidden inside one undifferentiated bag.
- *
- * `governance` and `ingest` stay two separate keys here rather than
- * folding into one grouped optional slot: `buildAppWithUnfinishedCapability`
- * in `app/__tests__/governance.app.unit.test.ts` builds this application by
- * naming them at this same top level, and a grouped slot would turn that into
- * an excess-property error. Each is independently optional instead, for the
- * one reason given on {@link GovernanceAppDependencies.governance}.
- */
-export type GovernanceBespokeMembers = Omit<
-  GovernanceAppDependencies,
-  "projects" | "organizations" | "permissions" | "scim"
->;
-
-/**
- * How a process installs this application: three peers, its own Prisma read,
- * and the still-unfinished governance/ingest bag (see
- * {@link GovernanceAppDependencies.governance}) — untouched by the
- * personalVirtualKeys/actors conversion below.
- */
+/** How a process installs this application: its peers, its members, its repositories. */
 type GovernanceSetup = Readonly<{
   dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
@@ -472,7 +419,6 @@ type GovernanceSetup = Readonly<{
     /** The process's own fact, absent where the deployment named no `BASE_HOST`. */
     publicBaseUrl?: string | undefined;
   }> &
-    Pick<GovernanceBespokeMembers, "governance"> &
     Readonly<{ rateLimiter: RateLimiter }>;
   repositories: GovernanceRepositories;
 }>;
@@ -538,7 +484,6 @@ export class GovernanceApp implements GovernanceRestApi {
       ottl,
       ingestionSecrets,
       dependencies: {
-        governance: members.governance,
         agents: dependencies.agents,
         projects: dependencies.projects,
         auth: dependencies.auth,
@@ -788,11 +733,6 @@ export class GovernanceApp implements GovernanceRestApi {
       databricksScimUsers: channels.databricksScimUsers.create({ http }),
     });
 
-    // In a real deployment all three arrive together, from the one call that
-    // builds the facade (`createGovernanceInstallation`) — never singly. No
-    // process makes that call today, so every service below stays unbuilt
-    // and its accessor throws if a CLI/ingest transport or a personal-key/
-    // routing-policy tRPC operation ever reaches it.
     this.personalUsageDashboards = PersonalUsageDashboardService.create({
       usage: DefaultGovernancePersonalUsageService.create({
         traces: dependencies.traces,
@@ -920,23 +860,6 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly cliActivityService: GovernanceCliActivityApi;
   private readonly cliService: GovernanceCliService;
   private readonly ingestService: GovernanceIngestService;
-
-  /**
-   * Every accessor below resolves to the ~100-operation governance facade
-   * (see the comment on {@link GovernanceAppDependencies.governance}), which
-   * no process builds yet. Its callers all sit behind the CLI/ingest
-   * transports this module drops from its boot graph, or a tRPC surface no
-   * composition root mounts — so this throw is unreachable in practice, and
-   * honest about why on the day it stops being unreachable.
-   */
-  private unfinishedCapability(): never {
-    throw new Error("governance: this capability is not installed on this app");
-  }
-
-  /** The governance facade, or a throw naming why it is absent. */
-  private get governanceApi(): GovernanceApi {
-    return this.dependencies.governance ?? this.unfinishedCapability();
-  }
 
   /**
    * One permission question at one scope. Both CLI families ask it — the gate
@@ -1140,11 +1063,6 @@ export class GovernanceApp implements GovernanceRestApi {
   /** The Activity Monitor reads, each with its ownership proof. */
   cliActivity(): GovernanceCliActivityApi {
     return this.cliActivityService;
-  }
-
-  /** The same governance capability the console's tRPC procedures read. */
-  governance(): GovernanceApi {
-    return this.governanceApi;
   }
 
   cliBudgetStatus(input: GovernanceCliRequest): Promise<GovernanceCliBudgetStatusAnswer> {

@@ -35,7 +35,6 @@ import { governanceServer } from "../../governance.server.ts";
 import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import { MemoryGovernanceRepositories } from "../../repositories/memory/memory.governance.repositories.ts";
 import { GovernanceApp } from "../governance.app.ts";
-import { TestGovernanceService } from "./support/test-governance-service.ts";
 
 const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
@@ -78,10 +77,9 @@ async function buildApp() {
   return { app, getOrganizationId, repositories };
 }
 
-/** The one app in this file that also carries the still-unfinished bag. */
-async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
+/** The app with a CLI session and a plan decision the CLI plane reads. */
+async function buildCliApp(planType = "ENTERPRISE") {
   const repositories: GovernanceRepositories = MemoryGovernanceRepositories.create();
-  const governance = new TestGovernanceService();
   const getCliAccessSession = vi.fn<AuthApi["getCliAccessSession"]>(async () => ({
     userId: "user-1",
     organizationId: "organization-1",
@@ -120,7 +118,6 @@ async function buildAppWithUnfinishedCapability(planType = "ENTERPRISE") {
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
-      governance,
       rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
@@ -271,7 +268,7 @@ describe("GovernanceApp ingestion templates", () => {
 describe("GovernanceApp as the module a process installs", () => {
   describe("given the one REST declaration the module mounts", () => {
     it("answers every capability the declarations name from the one app", async () => {
-      const { app } = await buildAppWithUnfinishedCapability();
+      const { app } = await buildCliApp();
 
       expect(governanceServer.transports.map((transport) => transport.protocol)).toEqual([
         "rest",
@@ -294,7 +291,6 @@ describe("GovernanceApp as the module a process installs", () => {
       expect("admit" in app.cliAccess()).toBe(true);
       expect(app.cliCredentials().budgetStatus).toBeTypeOf("function");
       expect(app.cliActivity().sources).toBeTypeOf("function");
-      expect(app.governance().cliBootstrapResolve).toBeTypeOf("function");
       expect(typeof app.ingestOtlpTraces).toBe("function");
       expect(typeof app.ingestWebhook).toBe("function");
       expect(typeof app.ingestOtlpLogs).toBe("function");
@@ -302,7 +298,7 @@ describe("GovernanceApp as the module a process installs", () => {
     });
 
     it("resolves the CLI caller and Enterprise plan through the named peers", async () => {
-      const { app, getCliAccessSession, getActivePlan } = await buildAppWithUnfinishedCapability();
+      const { app, getCliAccessSession, getActivePlan } = await buildCliApp();
       const request = new Request("http://api.test/api/auth/cli/bootstrap", {
         headers: { authorization: "Bearer lw_at_token" },
       });
@@ -330,7 +326,7 @@ describe("GovernanceApp as the module a process installs", () => {
     });
 
     it("refuses the caller organization when its plan is not Enterprise", async () => {
-      const { app, getActivePlan } = await buildAppWithUnfinishedCapability("FREE");
+      const { app, getActivePlan } = await buildCliApp("FREE");
 
       await expect(
         app.cliAccess().planDecision({
@@ -343,11 +339,10 @@ describe("GovernanceApp as the module a process installs", () => {
     });
   });
 
-  describe("given a process that supplies none of the still-unfinished capability", () => {
-    it("still constructs, and only the capability itself throws", async () => {
+  describe("given a process that composes the app over its peers alone", () => {
+    it("constructs and answers a template read", async () => {
       const { app } = await buildApp();
 
-      expect(() => app.governance()).toThrow(/governance/);
       await expect(app.listIngestionTemplatesForMember({ projectId: PROJECT_ID })).resolves.toEqual(
         [],
       );

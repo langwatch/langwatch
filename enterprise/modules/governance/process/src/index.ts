@@ -15,14 +15,13 @@ export {
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
-export type { GovernanceInstallationOptions } from "./app/governance-installation-composition.build.ts";
 
 /**
  * The feature's application: the one typed thing its transports are given.
  * Every door reaches the same object, so a rule written on it is the rule
  * every door gets.
  */
-export type { GovernanceAppDependencies, GovernanceBespokeMembers } from "./app/governance.app.ts";
+export type { GovernanceAppDependencies } from "./app/governance.app.ts";
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
@@ -67,7 +66,6 @@ export { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process
 export {
   createDepartmentDirectory,
   createGovernanceEventsPipeline,
-  createGovernanceInstallation,
   createGovernanceSignals,
   createIngestionPullEventing,
   createIngestionPullExecution,
