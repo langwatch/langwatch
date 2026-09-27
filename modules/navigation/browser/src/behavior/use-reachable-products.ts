@@ -4,6 +4,24 @@ import { useMemo } from "react";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { PRODUCTS, type ProductId } from "../model/products.ts";
 
+function reachableProductIds({
+  flagValues,
+  hasPermission,
+}: {
+  flagValues: Partial<Record<FrontendFeatureFlag, boolean>>;
+  hasPermission: (permission: string) => boolean;
+}): ProductId[] {
+  return PRODUCTS.filter((product) =>
+    product.gates.every((gate) => {
+      if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
+      if (gate.permission !== undefined && !hasPermission(gate.permission)) {
+        return false;
+      }
+      return true;
+    }),
+  ).map((product) => product.id);
+}
+
 /** Products user can open; evaluated against flags/permissions; isLoading covers queries */
 export function useReachableProducts({
   enabled = true,
@@ -29,17 +47,7 @@ export function useReachableProducts({
     release_ui_ai_governance_enabled: governanceFlag.enabled,
   };
 
-  const reachableIds = enabled
-    ? PRODUCTS.filter((product) =>
-        product.gates.every((gate) => {
-          if (gate.flag !== undefined && !flagValues[gate.flag]) return false;
-          if (gate.permission !== undefined && !hasPermission(gate.permission)) {
-            return false;
-          }
-          return true;
-        }),
-      ).map((product) => product.id)
-    : [];
+  const reachableIds = enabled ? reachableProductIds({ flagValues, hasPermission }) : [];
 
   // A stable identity for a stable answer: consumers put this list in
   // effect dependencies (the "/" landing), so a fresh array every render

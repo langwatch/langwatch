@@ -41,6 +41,88 @@ interface GroupConfig {
   items: ListItem[];
 }
 
+function groupOf({ label, items }: { label: string; items: ListItem[] }): GroupConfig[] {
+  return items.length > 0 ? [{ label, items }] : [];
+}
+
+function commandsOf(commands: Command[]): ListItem[] {
+  return commands.map((d): ListItem => ({ type: "command", data: d }));
+}
+
+function queryGroupsOf({
+  easterEggItem,
+  idResult,
+  filteredNavigation,
+  filteredActions,
+  filteredSupport,
+  filteredTheme,
+  filteredPage,
+  searchResults,
+  filteredProjects,
+}: {
+  easterEggItem: ListItem | null;
+  idResult: SearchResult | null;
+  filteredNavigation: Command[];
+  filteredActions: Command[];
+  filteredSupport: Command[];
+  filteredTheme: Command[];
+  filteredPage: Command[];
+  searchResults: SearchResult[];
+  filteredProjects: FilteredProject[];
+}): GroupConfig[] {
+  return [
+    // Easter egg at the very top
+    ...groupOf({ label: "Easter Egg", items: easterEggItem ? [easterEggItem] : [] }),
+    ...groupOf({
+      label: "Jump to ID",
+      items: idResult ? [{ type: "search", data: idResult }] : [],
+    }),
+    ...groupOf({ label: "Navigation", items: commandsOf(filteredNavigation) }),
+    ...groupOf({ label: "Actions", items: commandsOf(filteredActions) }),
+    ...groupOf({ label: "Help & Support", items: commandsOf(filteredSupport) }),
+    ...groupOf({ label: "Theme", items: commandsOf(filteredTheme) }),
+    ...groupOf({ label: "Page Actions", items: commandsOf(filteredPage) }),
+    ...groupOf({
+      label: "Search Results",
+      items: searchResults.map((d): ListItem => ({ type: "search", data: d })),
+    }),
+    ...groupOf({
+      label: "Switch Project",
+      items: filteredProjects.map((d): ListItem => ({ type: "project", data: d })),
+    }),
+  ];
+}
+
+/**
+ * Ask Langy leads an empty bar; while typing it sits under the matches and
+ * above the fallbacks. Mirrors `useCommandBarItems`'s order, or the keyboard
+ * index disagrees with the screen.
+ */
+function orderedGroups({
+  query,
+  emptyQueryGroups,
+  queryGroups,
+  askLangyItem,
+  searchInTracesItem,
+  searchInDocsItem,
+}: {
+  query: string;
+  emptyQueryGroups: GroupConfig[];
+  queryGroups: GroupConfig[];
+  askLangyItem: ListItem | null;
+  searchInTracesItem: ListItem | null;
+  searchInDocsItem: ListItem | null;
+}): GroupConfig[] {
+  const askGroup = groupOf({ label: "Ask Langy", items: askLangyItem ? [askLangyItem] : [] });
+  if (query === "") return [...askGroup, ...emptyQueryGroups];
+  return [
+    ...queryGroups,
+    ...askGroup,
+    ...groupOf({ label: "Search Traces", items: searchInTracesItem ? [searchInTracesItem] : [] }),
+    ...groupOf({ label: "Search Docs", items: searchInDocsItem ? [searchInDocsItem] : [] }),
+  ];
+}
+
 /**
  * Results section component for the command bar.
  * Renders all command groups with proper indexing.
@@ -94,135 +176,44 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
       [recentItemsLimited, topLevelNavigation],
     );
 
-    // Build group configurations for query state
-    const queryGroups = useMemo<GroupConfig[]>(() => {
-      const groups: GroupConfig[] = [];
+    const queryGroups = useMemo<GroupConfig[]>(
+      () =>
+        queryGroupsOf({
+          easterEggItem,
+          idResult,
+          filteredNavigation,
+          filteredActions,
+          filteredSupport,
+          filteredTheme,
+          filteredPage,
+          searchResults,
+          filteredProjects,
+        }),
+      [
+        easterEggItem,
+        idResult,
+        filteredNavigation,
+        filteredActions,
+        filteredSupport,
+        filteredTheme,
+        filteredPage,
+        searchResults,
+        filteredProjects,
+      ],
+    );
 
-      // Easter egg at the very top
-      if (easterEggItem) {
-        groups.push({
-          label: "Easter Egg",
-          items: [easterEggItem],
-        });
-      }
-
-      if (idResult) {
-        groups.push({
-          label: "Jump to ID",
-          items: [{ type: "search" as const, data: idResult }],
-        });
-      }
-
-      if (filteredNavigation.length > 0) {
-        groups.push({
-          label: "Navigation",
-          items: filteredNavigation.map((d) => ({
-            type: "command" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (filteredActions.length > 0) {
-        groups.push({
-          label: "Actions",
-          items: filteredActions.map((d) => ({
-            type: "command" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (filteredSupport.length > 0) {
-        groups.push({
-          label: "Help & Support",
-          items: filteredSupport.map((d) => ({
-            type: "command" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (filteredTheme.length > 0) {
-        groups.push({
-          label: "Theme",
-          items: filteredTheme.map((d) => ({
-            type: "command" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (filteredPage.length > 0) {
-        groups.push({
-          label: "Page Actions",
-          items: filteredPage.map((d) => ({
-            type: "command" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (searchResults.length > 0) {
-        groups.push({
-          label: "Search Results",
-          items: searchResults.map((d) => ({
-            type: "search" as const,
-            data: d,
-          })),
-        });
-      }
-
-      if (filteredProjects.length > 0) {
-        groups.push({
-          label: "Switch Project",
-          items: filteredProjects.map((d) => ({
-            type: "project" as const,
-            data: d,
-          })),
-        });
-      }
-
-      return groups;
-    }, [
-      easterEggItem,
-      idResult,
-      filteredNavigation,
-      filteredActions,
-      filteredSupport,
-      filteredTheme,
-      filteredPage,
-      searchResults,
-      filteredProjects,
-    ]);
-
-    /**
-     * The two things we can always offer, for any string — not matches,
-     * and must never outrank one. Must mirror `useCommandBarItems`'s
-     * ordering, or the keyboard index disagrees with the screen.
-     */
-    const fallbackGroups = useMemo<GroupConfig[]>(() => {
-      const groups: GroupConfig[] = [];
-      if (searchInTracesItem) {
-        groups.push({ label: "Search Traces", items: [searchInTracesItem] });
-      }
-      if (searchInDocsItem) {
-        groups.push({ label: "Search Docs", items: [searchInDocsItem] });
-      }
-      return groups;
-    }, [searchInTracesItem, searchInDocsItem]);
-
-    // Ask Langy leads on an empty bar; while typing it sits under the real
-    // matches and above the fallbacks.
-    const groups = useMemo<GroupConfig[]>(() => {
-      const askGroup: GroupConfig | null = askLangyItem
-        ? { label: "Ask Langy", items: [askLangyItem] }
-        : null;
-      if (query === "") {
-        return askGroup ? [askGroup, ...emptyQueryGroups] : emptyQueryGroups;
-      }
-      return [...queryGroups, ...(askGroup ? [askGroup] : []), ...fallbackGroups];
-    }, [query, emptyQueryGroups, queryGroups, askLangyItem, fallbackGroups]);
+    const groups = useMemo<GroupConfig[]>(
+      () =>
+        orderedGroups({
+          query,
+          emptyQueryGroups,
+          queryGroups,
+          askLangyItem,
+          searchInTracesItem,
+          searchInDocsItem,
+        }),
+      [query, emptyQueryGroups, queryGroups, askLangyItem, searchInTracesItem, searchInDocsItem],
+    );
 
     // Render groups with running index calculation
     const renderGroups = () => {
