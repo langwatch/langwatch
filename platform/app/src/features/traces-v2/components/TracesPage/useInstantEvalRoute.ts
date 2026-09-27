@@ -74,6 +74,7 @@ function refusalOf({ error }: { error: unknown }): InstantEvalRefusal | null {
   }
   if (
     handled.code === "instant_eval_not_enabled" ||
+    handled.code === "instant_eval_classifier_not_configured" ||
     handled.code === "instant_eval_classifier_unavailable"
   ) {
     return { kind: "model" };

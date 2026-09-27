@@ -416,6 +416,32 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the new session records "oidc pwd otp"
     And the unsupported assertion is omitted
 
+  # The identity provider can be down, or not yet resolvable, while the app
+  # starts. That must cost single sign-on only, never the whole application.
+  @integration
+  Scenario: An unreachable identity provider at startup does not take the application down
+    Given the deployment signs in through Okta, which requires verified ID tokens
+    And Okta's discovery URL refuses connections while the application starts
+    When the application initializes
+    Then initialization completes with Okta not mounted
+    And an error log names the provider and the discovery host
+    And a sign-in through Okta is refused as an unknown provider
+    And password sign-up still works
+
+  @integration
+  Scenario: Single sign-on comes back once the identity provider is reachable, still verifying ID tokens
+    Given Okta was unreachable when the application started
+    When Okta's discovery document becomes reachable
+    Then Okta is mounted without a restart
+    And its sign-in carries an ID-token nonce
+    And a callback whose ID token the published keys did not sign writes no Account or Session
+
+  @integration
+  Scenario: An identity provider whose discovery cannot verify ID tokens is never mounted
+    Given Okta's discovery document publishes an issuer but no signing key set
+    When the application initializes
+    Then initialization completes with Okta not mounted
+
   @unit
   Scenario: A valid signed Auth0 callback reaches account and session creation
     Given Auth0 discovery publishes the issuer, audience and signing key

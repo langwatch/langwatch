@@ -1,7 +1,6 @@
 import { buildSocialProviders } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { betterAuth } from "better-auth";
-
 import { env } from "~/env.mjs";
 import {
   addressRoutesToConnection,
@@ -16,6 +15,7 @@ import {
   identityStorageAdapter,
   lastWayInGuard,
   mfaCeremonies,
+  microsoftAccountRekey,
   PASSWORD_HASH_ROUNDS,
   passkeySignUp,
   passwordResetSessionBridge,
@@ -181,7 +181,9 @@ export const auth = betterAuth({
   rateLimit: rateLimit({ hasSecondaryStorage: !!store }),
 
   secondaryStorage: store,
-  socialProviders: buildSocialProviders(env),
+  socialProviders: buildSocialProviders(env, {
+    onMicrosoftProfile: (profile) => microsoftAccountRekey()(profile),
+  }),
 
   plugins: plugins({
     backupCodeCount: BACKUP_CODE_COUNT,

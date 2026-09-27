@@ -61366,7 +61366,7 @@ For on-premises deployments with SSO, map email domains to organizations:
 -- Connect to PostgreSQL and run:
 UPDATE "Organization"
 SET "ssoProvider" = 'okta',
-    "ssoEmailDomain" = 'yourcompany.com'
+    "ssoDomain" = 'yourcompany.com'
 WHERE "id" = 'your-org-id';
 ```
 
@@ -61374,16 +61374,13 @@ This ensures users with `@yourcompany.com` emails are automatically associated w
 
 ## Migrating from Email/Password to SSO
 
-1. Enable SSO by setting the provider configuration above
-2. Flag existing email/password users for SSO migration:
+An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
 
-```sql
-UPDATE "User"
-SET "pendingSsoSetup" = true
-WHERE "email" LIKE '%@yourcompany.com';
-```
+1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
+2. Enable SSO by setting the provider configuration above.
+3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
 
-3. When flagged users next sign in via SSO, their accounts are automatically linked
+Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
 
 <Note>
 Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
@@ -66572,6 +66569,24 @@ docker compose up -d
 
 ## Breaking Changes
 
+### 3.16 or 3.17 to 3.18: Sign-in and SSO
+
+The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:
+
+- Password users sign in with their existing password on the new email-first sign-in page.
+- SSO users land on their existing user and organization. The callback URL stays `/api/auth/callback/<provider>`, so the identity provider registration does not change.
+- Azure AD accounts move to the key the new sign-in looks them up by on each user's first sign-in after the upgrade. There is no SQL to run.
+- Browser sessions and API keys keep working.
+- The identity migrations run on first start. Check **Ops > Migrations** afterwards; see [Check the migration results](#check-the-migration-results).
+
+The first start runs a migration preflight before the app reports ready. `--timeout 45m` on `helm upgrade` gives it room to start. A migration that cannot finish during the preflight stays gated and does not block startup, so check **Ops > Migrations** once the rollout completes. The app can restart once or twice while the bundled ClickHouse restarts on its new image; that is expected.
+
+**Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
+
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+
+**Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
+
 ### Dataset Object Storage (Helm)
 
 Datasets moved from PostgreSQL to object storage, with a one-time automatic migration on upgrade. Helm deployments running more than one worker replica with the default local storage must either scale workers to 1 or configure S3-compatible storage before upgrading.
@@ -66669,7 +66684,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `teams` | at the time of the report | How the install is divided up, which is what team-level features have to work against. | Team |
 | `projects` | at the time of the report | How many projects the install carries, which is the unit limits and screens are scoped to. | Project |
 | `users` | at the time of the report | How many people use the install, which is what support and seat questions start from. | OrganizationUser |
-| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER |
+| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
 

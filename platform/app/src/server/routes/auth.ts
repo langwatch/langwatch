@@ -24,7 +24,10 @@ import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limi
 import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
-import { withholdInternalSignInError } from "~/server/better-auth/signin-error-redirect";
+import {
+  redirectFailedSignInCallback,
+  withholdInternalSignInError,
+} from "~/server/better-auth/signin-error-redirect";
 import { prisma } from "~/server/db";
 
 const secured = createServiceApp({ basePath: "/api" });
@@ -218,10 +221,18 @@ const betterAuthCatchAll = async (c: Context) => {
   // The two are one doctrine — only a refusal we have written down crosses —
   // applied to the two shapes an answer takes.
   // See `better-auth/signin-error-redirect.ts`.
-  return withholdInternalSignInError({
-    response: answered,
+  const traceId = c.get("traceId") as string | undefined;
+  // The two act on different statuses (a 3xx to the error page, a 5xx on a
+  // callback), so each answer passes through at most one of them.
+  return await redirectFailedSignInCallback({
+    response: withholdInternalSignInError({
+      response: answered,
+      errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
+      traceId,
+    }),
+    path: c.req.path,
     errorPageUrl: SIGN_IN_ERROR_PAGE_URL,
-    traceId: c.get("traceId") as string | undefined,
+    traceId,
   });
 };
 

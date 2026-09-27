@@ -139,7 +139,10 @@ describe("the account's email addresses", () => {
     identifiersRef.current = [];
     addMock.mockResolvedValue({ identifierId: "id_new" });
     resendAddedMock.mockResolvedValue({ sent: true });
-    resendOwnMock.mockResolvedValue({ sent: true });
+    resendOwnMock.mockResolvedValue({
+      sent: true,
+      identifierId: "own-address",
+    });
     removeMock.mockResolvedValue({ removed: true });
     completeMock.mockResolvedValue({ verified: true });
     // The verifier is per-browser and the whole file shares one: a ceremony
@@ -364,11 +367,49 @@ describe("the account's email addresses", () => {
 
     fireEvent.click(screen.getByTestId("resend-address-link"));
 
-    await waitFor(() => expect(resendOwnMock).toHaveBeenCalledWith({}));
+    await waitFor(() =>
+      expect(resendOwnMock).toHaveBeenCalledWith({
+        codeChallenge: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      }),
+    );
     expect(resendAddedMock).not.toHaveBeenCalled();
     expect(await screen.findByTestId("address-link-sent")).toHaveTextContent(
       "sam@acme.test",
     );
+  });
+
+  describe("given the account's own address was never confirmed", () => {
+    /** @scenario "An existing unconfirmed account confirms its own address from Settings" */
+    it("keeps the proof for the identifier the server named, so the emailed link completes here", async () => {
+      confirmationRef.current = { email: "sam@acme.test", confirmed: false };
+      identifiersRef.current = [
+        address({
+          identifierId: "own-address",
+          value: "sam@acme.test",
+          isPrimary: true,
+          confirmed: false,
+          resendable: true,
+        }),
+      ];
+      const first = renderSection();
+      fireEvent.click(screen.getByTestId("resend-address-link"));
+      await waitFor(() => expect(resendOwnMock).toHaveBeenCalled());
+      await screen.findByTestId("address-link-sent");
+      first.unmount();
+
+      searchParamsRef.current = new URLSearchParams(
+        "confirm=own-address&verification=verif_1&token=tok_1",
+      );
+      renderSection();
+
+      expect(await screen.findByTestId("address-confirmed-now")).toBeTruthy();
+      expect(completeMock).toHaveBeenCalledWith({
+        identifierId: "own-address",
+        verificationId: "verif_1",
+        token: "tok_1",
+        codeVerifier: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      });
+    });
   });
 
   describe("given no identifiers yet and the account's own address", () => {

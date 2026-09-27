@@ -7,6 +7,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import type { PriorSession } from "~/server/app-layer/identity/prior-session.service";
 import {
+  accountIdentifiers,
   localSignUpDecision,
   priorSession,
   signInRouter,
@@ -35,6 +36,7 @@ import {
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { codeChallengeSchema } from "./identity.schemas";
 
 /**
  * The unauthenticated auth screens (D13, ADR-117 §6).
@@ -324,6 +326,14 @@ export const authRouter = createTRPCRouter({
    * revised). This is what sends it, and what the app's "we have not confirmed
    * this yet" nudge will resend from.
    *
+   * The account already exists by the time anybody is signed in, so this
+   * runs the settings page's PKCE ceremony against the account's own email
+   * identifier rather than a sign-up link: a sign-up link refuses an address
+   * that already holds an account, because a mailed link alone must never
+   * confirm an account somebody else may have created. The browser sends the
+   * challenge and keeps the verifier; the answer names the identifier so it
+   * can file the verifier under it.
+   *
    * Protected, unlike everything else on this router, and that is the design
    * rather than an inconsistency. A public "send a confirmation to this
    * address" is a mailer pointed at any address anybody types, and the guard
@@ -334,12 +344,16 @@ export const authRouter = createTRPCRouter({
    * send to is the one they are already signed in as.
    */
   sendMyAddressConfirmation: protectedProcedure
-    .input(z.object({}))
+    .input(
+      z.object({
+        codeChallenge: codeChallengeSchema,
+      }),
+    )
     .noPermission({
       reason:
         "sends the session user's own address confirmation; no tenant scope is involved",
     })
-    .mutation(async ({ ctx }) => {
+    .mutation(async ({ ctx, input }) => {
       const email = ctx.session.user.email;
       if (!email) {
         throw new NoAddressToConfirmError();
@@ -359,8 +373,13 @@ export const authRouter = createTRPCRouter({
         });
       }
 
-      await signUpVerification().requestVerification({ email });
-      return { sent: true as const };
+      const { identifierId } =
+        await accountIdentifiers().sendOwnAddressConfirmation({
+          userId: ctx.session.user.id,
+          email,
+          codeChallenge: input.codeChallenge,
+        });
+      return { sent: true as const, identifierId };
     }),
 
   /**

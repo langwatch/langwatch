@@ -483,6 +483,11 @@ const presentations = {
     describe: () =>
       "The questions alone fill what the judge can read at once. Shorten them, or ask fewer of them in one query.",
   },
+  instant_eval_classifier_not_configured: {
+    title: "Instant Evals need a judge on this installation",
+    describe: () =>
+      "Instant Evals are on for this project, but this installation has nothing to judge with yet. Ask whoever runs it to add a judge key or connect it to LangWatch.",
+  },
   instant_eval_classifier_unavailable: {
     title: "The judgements couldn't be made right now",
     describe: () =>

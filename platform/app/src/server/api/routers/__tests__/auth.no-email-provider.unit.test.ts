@@ -14,6 +14,7 @@ const {
   addressState,
   requestVerification,
   issueUnconfirmedAddressProof,
+  sendOwnAddressConfirmation,
   hasEmailProvider,
   isEmailUnconfigured,
 } = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ const {
   addressState: vi.fn(),
   requestVerification: vi.fn(),
   issueUnconfirmedAddressProof: vi.fn(),
+  sendOwnAddressConfirmation: vi.fn(),
   hasEmailProvider: vi.fn(),
   isEmailUnconfigured: vi.fn(),
 }));
@@ -35,6 +37,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     requestVerification,
     issueUnconfirmedAddressProof,
   }),
+  accountIdentifiers: () => ({ sendOwnAddressConfirmation }),
 }));
 
 vi.mock("~/server/mailer/providers", async (importOriginal) => ({
@@ -46,6 +49,9 @@ vi.mock("~/server/mailer/providers", async (importOriginal) => ({
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
+
+/** A well-formed S256 challenge: 43 base64url characters. */
+const CHALLENGE = "a".repeat(43);
 
 const signedOut = () =>
   authRouter.createCaller(createInnerTRPCContext({ session: null }));
@@ -75,6 +81,7 @@ describe("auth router without an email provider", () => {
     addressState.mockResolvedValue("unknown");
     requestVerification.mockResolvedValue(void 0);
     issueUnconfirmedAddressProof.mockResolvedValue("unconfirmed-proof");
+    sendOwnAddressConfirmation.mockResolvedValue({ identifierId: "idf_own" });
   });
 
   describe("when sign-up asks for a confirmation link", () => {
@@ -159,9 +166,31 @@ describe("auth router without an email provider", () => {
     /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
     it("refuses to send with a named error instead of failing", async () => {
       await expect(
-        signedIn().sendMyAddressConfirmation({}),
+        signedIn().sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
       ).rejects.toMatchObject({
         cause: { code: "auth_email_sending_unavailable" },
+      });
+      expect(requestVerification).not.toHaveBeenCalled();
+      expect(sendOwnAddressConfirmation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a signed-in account resends its own confirmation with a provider configured", () => {
+    beforeEach(() => {
+      hasEmailProvider.mockReturnValue(true);
+      isEmailUnconfigured.mockReturnValue(false);
+    });
+
+    /** @scenario "The own address confirmation only ever goes to the session's own address" */
+    it("starts the session-bound ceremony for the session's own address, never a sign-up link", async () => {
+      await expect(
+        signedIn().sendMyAddressConfirmation({ codeChallenge: CHALLENGE }),
+      ).resolves.toEqual({ sent: true, identifierId: "idf_own" });
+
+      expect(sendOwnAddressConfirmation).toHaveBeenCalledWith({
+        userId: "user-1",
+        email: "sam@acme.com",
+        codeChallenge: CHALLENGE,
       });
       expect(requestVerification).not.toHaveBeenCalled();
     });

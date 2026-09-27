@@ -263,7 +263,12 @@ function useOwnAddressResend({
   const resend = async () => {
     if (!ownAddress) return null;
     try {
-      await mutation.mutateAsync({});
+      // The same ceremony as an added address: the server picks the
+      // identifier from the session and names it back, so the verifier is
+      // filed under the id the emailed link will carry.
+      const { codeVerifier, codeChallenge } = await mintAddressCeremony();
+      const { identifierId } = await mutation.mutateAsync({ codeChallenge });
+      rememberAddressVerifier({ identifierId, codeVerifier });
       setResentTo(ownAddress);
       return null;
     } catch (error) {

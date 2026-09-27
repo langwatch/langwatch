@@ -193,6 +193,20 @@ describe("given an install with the report switched fully on", () => {
       expect(payload.connected).toBe(true);
     });
 
+    it("names the sign-in provider the install resolved, even from its deprecated name", async () => {
+      env.NEXTAUTH_PROVIDER = "okta";
+
+      const payload = await report({
+        prisma: prismaOver(),
+        organizationIds: ["org-1"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: null,
+        repository,
+      });
+
+      expect(payload.auth_method).toBe("okta");
+    });
+
     it("counts what ClickHouse holds for every organization it carries", async () => {
       const payload = await report({
         prisma: prismaOver(),

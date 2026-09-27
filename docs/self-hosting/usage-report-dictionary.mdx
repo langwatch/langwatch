@@ -45,7 +45,7 @@ Sent with every report. `DISABLE_USAGE_STATS=true` stops the report as a whole.
 | `teams` | at the time of the report | How the install is divided up, which is what team-level features have to work against. | Team |
 | `projects` | at the time of the report | How many projects the install carries, which is the unit limits and screens are scoped to. | Project |
 | `users` | at the time of the report | How many people use the install, which is what support and seat questions start from. | OrganizationUser |
-| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER |
+| `auth_method` | at the time of the report | Which sign-in method is configured, so an authentication problem can be reproduced rather than guessed at. | AUTH_PROVIDER, else the deprecated NEXTAUTH_PROVIDER |
 | `sso_provider` | at the time of the report | The name of the identity provider in use, never its configuration or its secrets, so an SSO problem names the product it is about. | Organization.ssoProvider |
 | `connected` | at the time of the report | Whether this install's license names a hosted service, which decides what it may call and which host answers it. | the signed license |
 
