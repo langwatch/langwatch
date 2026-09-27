@@ -215,7 +215,7 @@ function readErrorCode(body: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function readStringArray(value: unknown): readonly string[] | undefined {
+function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || !value.every(isString)) return undefined;
   return value;
 }

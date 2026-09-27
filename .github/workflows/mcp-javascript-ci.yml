@@ -92,9 +92,11 @@ jobs:
             ${{ runner.os }}-mcp-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'mcp/typescript/tsconfig.json') }}-
             ${{ runner.os }}-mcp-tsbuildinfo-
 
+      # Build mode: the tsconfig references the evaluator contract, egress,
+      # handled-error and redaction, whose declarations a plain `--project`
+      # run expects already built (TS6305 on a fresh checkout).
       - name: Run typecheck
-        working-directory: mcp/typescript
-        run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json
+        run: pnpm -w exec tsc -b mcp/typescript
 
   build_and_test:
     needs: changes
