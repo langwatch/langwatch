@@ -7,7 +7,13 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
 import type { PresenceBroadcast, PresenceEmitter } from "../../app/presence.app.ts";
-import { BroadcastTenantRateLimiterService } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+import type { BroadcastTenantRateLimiterService } from "../../services/broadcast-tenant-rate-limiter.service.ts";
+
+/** The two token buckets a broadcast fabric counts against: what it sends, and what it relays. */
+export type BroadcastRateLimits = Readonly<{
+  sender: BroadcastTenantRateLimiterService;
+  subscriber: BroadcastTenantRateLimiterService;
+}>;
 
 export type BroadcastEventType =
   | "trace_updated"
@@ -54,15 +60,24 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> empty time
   private active = false;
-  private readonly senderRateLimiter = BroadcastTenantRateLimiterService.create();
-  private readonly subscriberRateLimiter = BroadcastTenantRateLimiterService.create();
+  private readonly senderRateLimiter: BroadcastTenantRateLimiterService;
+  private readonly subscriberRateLimiter: BroadcastTenantRateLimiterService;
   private closed = false;
 
-  static create(redis: Cluster | IORedis | null): RedisBroadcastRepository {
-    return new RedisBroadcastRepository(redis);
+  static create(
+    redis: Cluster | IORedis | null,
+    rateLimits: BroadcastRateLimits,
+  ): RedisBroadcastRepository {
+    return new RedisBroadcastRepository(redis, rateLimits);
   }
 
-  private constructor(private readonly redis: Cluster | IORedis | null) {}
+  private constructor(
+    private readonly redis: Cluster | IORedis | null,
+    rateLimits: BroadcastRateLimits,
+  ) {
+    this.senderRateLimiter = rateLimits.sender;
+    this.subscriberRateLimiter = rateLimits.subscriber;
+  }
 
   /** Activates Redis delivery and stale-emitter cleanup when the host starts serving. */
   async start(): Promise<void> {
@@ -91,7 +106,12 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     rateLimited: boolean;
   }): Promise<void> {
     if (input.rateLimited) {
-      await this.broadcastToTenantRateLimited(input.projectId, input.event, input.channel, "delta");
+      await this.broadcastToTenantRateLimited({
+        tenantId: input.projectId,
+        event: input.event,
+        eventType: input.channel,
+        tier: "delta",
+      });
       return;
     }
     await this.broadcastToTenant(input.projectId, input.event, input.channel);
@@ -227,12 +247,17 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
    * publishing. Returns `false` (and silently drops the event) when the per-tenant per-tier
    * bucket is exhausted, preventing upstream overload on high-frequency delta streams.
    */
-  async broadcastToTenantRateLimited(
-    tenantId: string,
-    event: string,
-    eventType: BroadcastEventType = "trace_updated",
-    tier: "structural" | "delta" = "structural",
-  ): Promise<boolean> {
+  async broadcastToTenantRateLimited({
+    tenantId,
+    event,
+    eventType = "trace_updated",
+    tier = "structural",
+  }: {
+    tenantId: string;
+    event: string;
+    eventType?: BroadcastEventType;
+    tier?: "structural" | "delta";
+  }): Promise<boolean> {
     if (!this.active) throw new BroadcasterNotActiveError();
     if (!this.senderRateLimiter.consume(tenantId, tier)) {
       return false;

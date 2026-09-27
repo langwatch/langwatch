@@ -62,7 +62,7 @@ function deferrableClient() {
       query: vi.fn(settle),
       insert: vi.fn(settle),
       close: vi.fn(async () => undefined),
-    } as unknown as ClickHouseVendorClient,
+    } satisfies ClickHouseVendorClient,
     get started() {
       return started;
     },
@@ -153,7 +153,7 @@ describe("given a statement that fails transiently and is retried", () => {
         },
         insert: async () => ({ ok: true }),
         close: async () => undefined,
-      } as unknown as ClickHouseVendorClient;
+      } satisfies ClickHouseVendorClient;
 
       const limited = limit(retryingClient, 1);
 

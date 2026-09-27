@@ -44,7 +44,7 @@ export interface SubsystemProbeCredential {
  * workflow probe named no target reports `not_configured`: the platform is not
  * broken because nobody told the probe what to look at.
  */
-export class SubsystemProbeAdapter implements SubsystemProbe {
+export class SubsystemProbeRunService implements SubsystemProbe {
   readonly name: PlatformHealthCheckName;
   readonly #probes: SubsystemProbeRunner;
   readonly #credential: SubsystemProbeCredential;
@@ -63,8 +63,8 @@ export class SubsystemProbeAdapter implements SubsystemProbe {
     name: PlatformHealthCheckName;
     probes: SubsystemProbeRunner;
     credential: SubsystemProbeCredential;
-  }): SubsystemProbeAdapter {
-    return new SubsystemProbeAdapter(options);
+  }): SubsystemProbeRunService {
+    return new SubsystemProbeRunService(options);
   }
 
   async run(

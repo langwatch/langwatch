@@ -23,7 +23,7 @@ import { PlatformHealthKeyService } from "../services/platform-health-key.servic
 import { PlatformHealthService } from "../services/platform-health.service.ts";
 import { ProjectKeyedProbeService } from "../services/project-keyed-probe.service.ts";
 import { ScenarioCanaryService } from "../services/scenario-canary.service.ts";
-import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
+import { SubsystemProbeRunService } from "../services/subsystem-probe-run.service.ts";
 import {
   SubsystemProbeService,
   type SubsystemProbeCollaborators,
@@ -108,7 +108,7 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     return new PlatformHealthApp({
       health: PlatformHealthService.create({
         probes: PLATFORM_HEALTH_CHECK_NAMES.map((name) =>
-          SubsystemProbeAdapter.create({ name, probes, credential }),
+          SubsystemProbeRunService.create({ name, probes, credential }),
         ),
       }),
       key: PlatformHealthKeyService.create({

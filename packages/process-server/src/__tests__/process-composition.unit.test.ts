@@ -10,7 +10,7 @@ import {
 function compositionRuntime(phases: string[]): ProcessBoot {
   return {
     surfaceDefaults: {},
-    async boot(role, modules, pipelines) {
+    async boot({ role, modules, pipelines }) {
       const eventing = pipelines.configure(30);
       phases.push(eventing.consumersEnabled ? "consumer" : "producer");
       return bootInstalledProcess({

@@ -254,7 +254,7 @@ describe("ttlReconciler", () => {
         // clause is operator-managed.
         await expect(
           reconcileTTL({ connectionUrl: "http://localhost:1/langwatch" }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "ECONNREFUSED" });
       });
     });
 
@@ -279,7 +279,7 @@ describe("ttlReconciler", () => {
         // proving it got past the env-var guards.
         await expect(
           reconcileTTL({ connectionUrl: "http://localhost:1/testdb" }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "ECONNREFUSED" });
       });
     });
   });

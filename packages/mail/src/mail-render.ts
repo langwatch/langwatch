@@ -1,7 +1,7 @@
-import type { TriggerDigestMail } from "../templates/trigger-digest-email.tsx";
+import type { TriggerDigestMail } from "./templates/trigger-digest-email.tsx";
 
 /**
- * Rendering port: messages a backend process asks to render. Abstract class
+ * The messages a backend process asks to render. Abstract class
  * allows type-safe dependency injection with test substitution, keeping react-email
  * off worker boot graphs.
  */

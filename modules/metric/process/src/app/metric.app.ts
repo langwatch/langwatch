@@ -20,10 +20,7 @@ import type { OtlpDoorRequest } from "@langwatch/otlp";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { createCodingAgentMetricFactsDispatchSubscriber } from "../eventing/coding-agent-metric-facts-dispatch.subscriber.ts";
-import {
-  ClickHouseMetricDataPointAppendRepository,
-  createMetricClickHouseResolver,
-} from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
+import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
 import { resolveMetricCommandShardCount } from "../rules/metric-command-lanes.rules.ts";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
 import {
@@ -81,7 +78,7 @@ export class MetricApp implements MetricApiContract {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
     const pipeline = MetricProcessingService.create({
       repository: ClickHouseMetricDataPointAppendRepository.create({
-        resolveClient: createMetricClickHouseResolver(members.clickhouse),
+        resolveClient: ClickHouseMetricDataPointAppendRepository.resolverOver(members.clickhouse),
         defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,
       }),
       defaultRetentionDays: METRIC_DEFAULT_RETENTION_DAYS,

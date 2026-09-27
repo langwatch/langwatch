@@ -6,7 +6,7 @@ import { describe, expect, it, vi, type Mock } from "vitest";
 
 import { point } from "../../../app/__tests__/metric.fixture.ts";
 import type { MetricClickHouseClient } from "../clickhouse.metric-data-point-append.repository.ts";
-import { MetricDataPointMapper } from "../clickhouse.metric-data-point.mapper.ts";
+import { metricRawRow } from "../clickhouse.metric-data-point.mapper.ts";
 import { MetricDataPointClickHouseRepository } from "../clickhouse.metric-data-point.repository.ts";
 
 type InsertCall = { table: string; values: readonly unknown[] };
@@ -546,7 +546,7 @@ describe("MetricDataPointClickHouseRepository", () => {
 
   it("reports the missing authoritative column and row identity", async () => {
     const pointToRead = pointAt({ timeUnixMs: base + 1_000 });
-    const stored = MetricDataPointMapper.rawRow({ point: pointToRead, retentionDays: 30 });
+    const stored = metricRawRow({ point: pointToRead, retentionDays: 30 });
     const { BucketCounts: _bucketCounts, ...missingBucketCounts } = stored;
     const query: MetricClickHouseClient["query"] = async (request) => {
       if (request.query.includes("{seriesIds:Array(String)}")) return response([]);

@@ -139,356 +139,355 @@ export interface SeekMetricRow {
 }
 
 /**
- * Metric data points between their canonical shape and the ClickHouse rows
- * that store them. Both directions in one class, as with the trace
- * full-record mapper — write and read shapes stay comparable only together.
+ * One of the three Array(UInt64) count columns, refusing rows without it. Validates
+ * before dereference (prevents "Cannot read properties of undefined"). Error names
+ * column and row for diagnostics; degrades to generic failure with trace id.
  */
-export class MetricDataPointMapper {
-  /**
-   * One of the three Array(UInt64) count columns, refusing rows without it. Validates
-   * before dereference (prevents "Cannot read properties of undefined"). Error names
-   * column and row for diagnostics; degrades to generic failure with trace id.
-   */
-  private static countsColumn({
-    row,
-    column,
-  }: {
-    row: {
-      SeriesId: string;
-      PointId: string;
-      BucketCounts: string[];
-      PositiveBucketCounts: string[];
-      NegativeBucketCounts: string[];
-    };
-    column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
-  }): string[] {
-    const counts = row[column];
-    if (!Array.isArray(counts)) {
-      const problem =
-        counts === undefined
-          ? `is missing the ${column} column`
-          : `carries a non-array ${typeof counts} in the ${column} column`;
-      throw new Error(
-        `metric_data_points row ${problem} (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
-      );
-    }
-    return counts.map(String);
-  }
-
-  static firstAcceptanceWinsVersion(acceptedAt: number): string {
-    return (MAX_UINT64 - BigInt(acceptedAt)).toString();
-  }
-
-  static rawRow({
-    point,
-    retentionDays,
-  }: {
-    point: CanonicalMetricDataPoint;
-    retentionDays: number;
-  }): {
-    TenantId: string;
+function countsColumn({
+  row,
+  column,
+}: {
+  row: {
+    SeriesId: string;
     PointId: string;
-    SeriesId: string;
-    ResourceSchemaUrl: string;
-    ResourceAttributesJson: string;
-    ResourceAttributeKeys: string[];
-    ScopeSchemaUrl: string;
-    ScopeName: string;
-    ScopeVersion: string;
-    ScopeAttributesJson: string;
-    ScopeAttributeKeys: string[];
-    MetricName: string;
-    MetricDescription: string;
-    MetricUnit: string;
-    MetricKind: CanonicalMetricDataPoint["metricKind"];
-    AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
-    IsMonotonic: boolean | null;
-    PointAttributesJson: string;
-    PointAttributeKeys: string[];
-    StartTimeUnixNano: string;
-    TimeUnixNano: string;
-    TimeUnixMs: Date;
-    Flags: number;
-    ValueType: CanonicalMetricDataPoint["valueType"];
-    ValueInt: string | null;
-    ValueDouble: number | null;
-    Count: string | null;
-    Sum: number | null;
-    Min: number | null;
-    Max: number | null;
-    ExplicitBounds: number[];
     BucketCounts: string[];
-    ExponentialScale: number | null;
-    ExponentialZeroThreshold: number | null;
-    ZeroCount: string | null;
-    PositiveOffset: number | null;
     PositiveBucketCounts: string[];
-    NegativeOffset: number | null;
     NegativeBucketCounts: string[];
-    SummaryQuantilesJson: string;
-    CanonicalPayload: string;
-    OccurredAt: Date;
-    AcceptedAt: Date;
-    DedupVersion: string;
-    _retention_days: number;
-    _size_bytes: number;
-  } {
-    return {
-      TenantId: point.tenantId,
-      PointId: point.pointId,
-      SeriesId: point.seriesId,
-      ResourceSchemaUrl: point.resourceSchemaUrl,
-      ResourceAttributesJson: point.resourceAttributesJson,
-      ResourceAttributeKeys: point.resourceAttributeKeys,
-      ScopeSchemaUrl: point.scopeSchemaUrl,
-      ScopeName: point.scopeName,
-      ScopeVersion: point.scopeVersion,
-      ScopeAttributesJson: point.scopeAttributesJson,
-      ScopeAttributeKeys: point.scopeAttributeKeys,
-      MetricName: point.metricName,
-      MetricDescription: point.metricDescription,
-      MetricUnit: point.metricUnit,
-      MetricKind: point.metricKind,
-      AggregationTemporality: point.aggregationTemporality,
-      IsMonotonic: point.isMonotonic,
-      PointAttributesJson: point.pointAttributesJson,
-      PointAttributeKeys: point.pointAttributeKeys,
-      StartTimeUnixNano: point.startTimeUnixNano,
-      TimeUnixNano: point.timeUnixNano,
-      TimeUnixMs: clickHouseTimestamp(point.timeUnixMs),
-      Flags: point.flags,
-      ValueType: point.valueType,
-      ValueInt: point.valueInt,
-      ValueDouble: point.valueDouble,
-      Count: point.count,
-      Sum: point.sum,
-      Min: point.min,
-      Max: point.max,
-      ExplicitBounds: point.explicitBounds,
-      BucketCounts: point.bucketCounts,
-      ExponentialScale: point.exponentialScale,
-      ExponentialZeroThreshold: point.exponentialZeroThreshold,
-      ZeroCount: point.zeroCount,
-      PositiveOffset: point.positiveOffset,
-      PositiveBucketCounts: point.positiveBucketCounts,
-      NegativeOffset: point.negativeOffset,
-      NegativeBucketCounts: point.negativeBucketCounts,
-      SummaryQuantilesJson: point.summaryQuantilesJson,
-      CanonicalPayload: point.canonicalPayload,
-      OccurredAt: clickHouseTimestamp(point.occurredAt),
-      AcceptedAt: clickHouseTimestamp(point.acceptedAt),
-      // Keep the first acceptance when the same PointId is retried.
-      DedupVersion: MetricDataPointMapper.firstAcceptanceWinsVersion(point.acceptedAt),
-      _retention_days: retentionDays,
-      _size_bytes: point.canonicalSizeBytes,
-    };
+  };
+  column: "BucketCounts" | "PositiveBucketCounts" | "NegativeBucketCounts";
+}): string[] {
+  const counts = row[column];
+  if (!Array.isArray(counts)) {
+    const problem =
+      counts === undefined
+        ? `is missing the ${column} column`
+        : `carries a non-array ${typeof counts} in the ${column} column`;
+    throw new Error(
+      `metric_data_points row ${problem} (series ${row.SeriesId ?? "unknown"}, point ${row.PointId ?? "unknown"}); a read returned a row this decoder cannot trust`,
+    );
   }
+  return counts.map(String);
+}
 
-  static seriesRow({
-    point,
-    retentionDays,
-  }: {
-    point: CanonicalMetricDataPoint;
-    retentionDays: number;
-  }): {
-    TenantId: string;
-    SeriesId: string;
-    ResourceSchemaUrl: string;
-    ResourceAttributesJson: string;
-    ResourceAttributeKeys: string[];
-    ScopeSchemaUrl: string;
-    ScopeName: string;
-    ScopeVersion: string;
-    ScopeAttributesJson: string;
-    ScopeAttributeKeys: string[];
-    MetricName: string;
-    MetricDescription: string;
-    MetricUnit: string;
-    MetricKind: CanonicalMetricDataPoint["metricKind"];
-    AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
-    IsMonotonic: boolean | null;
-    PointAttributesJson: string;
-    PointAttributeKeys: string[];
-    LastSeenAt: Date;
-    _retention_days: number;
-    _size_bytes: number;
-  } {
-    return {
-      TenantId: point.tenantId,
-      SeriesId: point.seriesId,
-      ResourceSchemaUrl: point.resourceSchemaUrl,
-      ResourceAttributesJson: point.resourceAttributesJson,
-      ResourceAttributeKeys: point.resourceAttributeKeys,
-      ScopeSchemaUrl: point.scopeSchemaUrl,
-      ScopeName: point.scopeName,
-      ScopeVersion: point.scopeVersion,
-      ScopeAttributesJson: point.scopeAttributesJson,
-      ScopeAttributeKeys: point.scopeAttributeKeys,
-      MetricName: point.metricName,
-      MetricDescription: point.metricDescription,
-      MetricUnit: point.metricUnit,
-      MetricKind: point.metricKind,
-      AggregationTemporality: point.aggregationTemporality,
-      IsMonotonic: point.isMonotonic,
-      PointAttributesJson: point.pointAttributesJson,
-      PointAttributeKeys: point.pointAttributeKeys,
-      LastSeenAt: clickHouseTimestamp(point.timeUnixMs),
-      _retention_days: retentionDays,
-      _size_bytes: 0,
-    };
-  }
+export function firstAcceptanceWinsVersion(acceptedAt: number): string {
+  return (MAX_UINT64 - BigInt(acceptedAt)).toString();
+}
 
-  /**
-   * The shadow ledger carries identifiers and source-byte counts only: never
-   * attributes, values, buckets or payloads.
-   */
-  static usageEstimateRow(point: CanonicalMetricDataPoint): {
-    OrganizationId: string;
-    TenantId: string;
-    PointId: string;
-    SeriesId: string;
-    MetricName: string;
-    AcceptedAt: Date;
-    AcceptedHour: Date;
-    CanonicalSourceBytes: number;
-    DedupVersion: string;
-  } {
-    return {
-      OrganizationId: point.organizationId,
-      TenantId: point.tenantId,
-      PointId: point.pointId,
-      SeriesId: point.seriesId,
-      MetricName: point.metricName,
-      AcceptedAt: clickHouseTimestamp(point.acceptedAt),
-      AcceptedHour: clickHouseTimestamp(Math.floor(point.acceptedAt / 3_600_000) * 3_600_000),
-      CanonicalSourceBytes: point.canonicalSizeBytes,
-      DedupVersion: MetricDataPointMapper.firstAcceptanceWinsVersion(point.acceptedAt),
-    };
-  }
+export function metricRawRow({
+  point,
+  retentionDays,
+}: {
+  point: CanonicalMetricDataPoint;
+  retentionDays: number;
+}): {
+  TenantId: string;
+  PointId: string;
+  SeriesId: string;
+  ResourceSchemaUrl: string;
+  ResourceAttributesJson: string;
+  ResourceAttributeKeys: string[];
+  ScopeSchemaUrl: string;
+  ScopeName: string;
+  ScopeVersion: string;
+  ScopeAttributesJson: string;
+  ScopeAttributeKeys: string[];
+  MetricName: string;
+  MetricDescription: string;
+  MetricUnit: string;
+  MetricKind: CanonicalMetricDataPoint["metricKind"];
+  AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
+  IsMonotonic: boolean | null;
+  PointAttributesJson: string;
+  PointAttributeKeys: string[];
+  StartTimeUnixNano: string;
+  TimeUnixNano: string;
+  TimeUnixMs: Date;
+  Flags: number;
+  ValueType: CanonicalMetricDataPoint["valueType"];
+  ValueInt: string | null;
+  ValueDouble: number | null;
+  Count: string | null;
+  Sum: number | null;
+  Min: number | null;
+  Max: number | null;
+  ExplicitBounds: number[];
+  BucketCounts: string[];
+  ExponentialScale: number | null;
+  ExponentialZeroThreshold: number | null;
+  ZeroCount: string | null;
+  PositiveOffset: number | null;
+  PositiveBucketCounts: string[];
+  NegativeOffset: number | null;
+  NegativeBucketCounts: string[];
+  SummaryQuantilesJson: string;
+  CanonicalPayload: string;
+  OccurredAt: Date;
+  AcceptedAt: Date;
+  DedupVersion: string;
+  _retention_days: number;
+  _size_bytes: number;
+} {
+  return {
+    TenantId: point.tenantId,
+    PointId: point.pointId,
+    SeriesId: point.seriesId,
+    ResourceSchemaUrl: point.resourceSchemaUrl,
+    ResourceAttributesJson: point.resourceAttributesJson,
+    ResourceAttributeKeys: point.resourceAttributeKeys,
+    ScopeSchemaUrl: point.scopeSchemaUrl,
+    ScopeName: point.scopeName,
+    ScopeVersion: point.scopeVersion,
+    ScopeAttributesJson: point.scopeAttributesJson,
+    ScopeAttributeKeys: point.scopeAttributeKeys,
+    MetricName: point.metricName,
+    MetricDescription: point.metricDescription,
+    MetricUnit: point.metricUnit,
+    MetricKind: point.metricKind,
+    AggregationTemporality: point.aggregationTemporality,
+    IsMonotonic: point.isMonotonic,
+    PointAttributesJson: point.pointAttributesJson,
+    PointAttributeKeys: point.pointAttributeKeys,
+    StartTimeUnixNano: point.startTimeUnixNano,
+    TimeUnixNano: point.timeUnixNano,
+    TimeUnixMs: clickHouseTimestamp(point.timeUnixMs),
+    Flags: point.flags,
+    ValueType: point.valueType,
+    ValueInt: point.valueInt,
+    ValueDouble: point.valueDouble,
+    Count: point.count,
+    Sum: point.sum,
+    Min: point.min,
+    Max: point.max,
+    ExplicitBounds: point.explicitBounds,
+    BucketCounts: point.bucketCounts,
+    ExponentialScale: point.exponentialScale,
+    ExponentialZeroThreshold: point.exponentialZeroThreshold,
+    ZeroCount: point.zeroCount,
+    PositiveOffset: point.positiveOffset,
+    PositiveBucketCounts: point.positiveBucketCounts,
+    NegativeOffset: point.negativeOffset,
+    NegativeBucketCounts: point.negativeBucketCounts,
+    SummaryQuantilesJson: point.summaryQuantilesJson,
+    CanonicalPayload: point.canonicalPayload,
+    OccurredAt: clickHouseTimestamp(point.occurredAt),
+    AcceptedAt: clickHouseTimestamp(point.acceptedAt),
+    // Keep the first acceptance when the same PointId is retried.
+    DedupVersion: firstAcceptanceWinsVersion(point.acceptedAt),
+    _retention_days: retentionDays,
+    _size_bytes: point.canonicalSizeBytes,
+  };
+}
 
-  static rollupRow({ row, retentionDays }: { row: MetricRollupRow; retentionDays: number }): {
-    TenantId: string;
-    SeriesId: string;
-    MetricName: string;
-    MetricUnit: string;
-    MetricKind: MetricRollupRow["metricKind"];
-    AggregationTemporality: MetricRollupRow["aggregationTemporality"];
-    IsMonotonic: boolean | null;
-    BucketStart: Date;
-    BucketEnd: Date;
-    GaugeLast: number | null;
-    Min: number | null;
-    Max: number | null;
-    Sum: number | null;
-    Count: string;
-    ExplicitBounds: number[];
-    BucketCounts: string[];
-    ExponentialScale: number | null;
-    ExponentialZeroThreshold: number | null;
-    ZeroCount: string;
-    PositiveOffset: number;
-    PositiveBucketCounts: string[];
-    NegativeOffset: number;
-    NegativeBucketCounts: string[];
-    ResetCount: number;
-    GapCount: number;
-    SourcePointCount: number;
-    UpdatedAt: Date;
-    _retention_days: number;
-    _size_bytes: number;
-  } {
-    return {
-      TenantId: row.tenantId,
-      SeriesId: row.seriesId,
-      MetricName: row.metricName,
-      MetricUnit: row.metricUnit,
-      MetricKind: row.metricKind,
-      AggregationTemporality: row.aggregationTemporality,
-      IsMonotonic: row.isMonotonic,
-      BucketStart: clickHouseTimestamp(row.bucketStartMs),
-      BucketEnd: clickHouseTimestamp(row.bucketEndMs),
-      GaugeLast: row.gaugeLast,
-      Min: row.min,
-      Max: row.max,
-      Sum: row.sum,
-      Count: row.count,
-      ExplicitBounds: row.explicitBounds,
-      BucketCounts: row.bucketCounts,
-      ExponentialScale: row.exponentialScale,
-      ExponentialZeroThreshold: row.exponentialZeroThreshold,
-      ZeroCount: row.zeroCount,
-      PositiveOffset: row.positiveOffset,
-      PositiveBucketCounts: row.positiveBucketCounts,
-      NegativeOffset: row.negativeOffset,
-      NegativeBucketCounts: row.negativeBucketCounts,
-      ResetCount: row.resetCount,
-      GapCount: row.gapCount,
-      SourcePointCount: row.sourcePointCount,
-      UpdatedAt: clickHouseTimestamp(row.updatedAt),
-      _retention_days: retentionDays,
-      _size_bytes: 0,
-    };
-  }
+export function metricSeriesRow({
+  point,
+  retentionDays,
+}: {
+  point: CanonicalMetricDataPoint;
+  retentionDays: number;
+}): {
+  TenantId: string;
+  SeriesId: string;
+  ResourceSchemaUrl: string;
+  ResourceAttributesJson: string;
+  ResourceAttributeKeys: string[];
+  ScopeSchemaUrl: string;
+  ScopeName: string;
+  ScopeVersion: string;
+  ScopeAttributesJson: string;
+  ScopeAttributeKeys: string[];
+  MetricName: string;
+  MetricDescription: string;
+  MetricUnit: string;
+  MetricKind: CanonicalMetricDataPoint["metricKind"];
+  AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
+  IsMonotonic: boolean | null;
+  PointAttributesJson: string;
+  PointAttributeKeys: string[];
+  LastSeenAt: Date;
+  _retention_days: number;
+  _size_bytes: number;
+} {
+  return {
+    TenantId: point.tenantId,
+    SeriesId: point.seriesId,
+    ResourceSchemaUrl: point.resourceSchemaUrl,
+    ResourceAttributesJson: point.resourceAttributesJson,
+    ResourceAttributeKeys: point.resourceAttributeKeys,
+    ScopeSchemaUrl: point.scopeSchemaUrl,
+    ScopeName: point.scopeName,
+    ScopeVersion: point.scopeVersion,
+    ScopeAttributesJson: point.scopeAttributesJson,
+    ScopeAttributeKeys: point.scopeAttributeKeys,
+    MetricName: point.metricName,
+    MetricDescription: point.metricDescription,
+    MetricUnit: point.metricUnit,
+    MetricKind: point.metricKind,
+    AggregationTemporality: point.aggregationTemporality,
+    IsMonotonic: point.isMonotonic,
+    PointAttributesJson: point.pointAttributesJson,
+    PointAttributeKeys: point.pointAttributeKeys,
+    LastSeenAt: clickHouseTimestamp(point.timeUnixMs),
+    _retention_days: retentionDays,
+    _size_bytes: 0,
+  };
+}
 
-  static fromSeekRow(row: SeekMetricRow): MetricSequencePoint {
-    return {
-      seriesId: row.SeriesId,
-      pointId: row.PointId,
-      timeUnixMs: Number(row.TimeUnixMs),
-      timeUnixNano: String(row.TimeUnixNano),
-      metricKind: row.MetricKind,
-      aggregationTemporality: row.AggregationTemporality,
-    };
-  }
+/**
+ * The shadow ledger carries identifiers and source-byte counts only: never
+ * attributes, values, buckets or payloads.
+ */
+export function metricUsageEstimateRow(point: CanonicalMetricDataPoint): {
+  OrganizationId: string;
+  TenantId: string;
+  PointId: string;
+  SeriesId: string;
+  MetricName: string;
+  AcceptedAt: Date;
+  AcceptedHour: Date;
+  CanonicalSourceBytes: number;
+  DedupVersion: string;
+} {
+  return {
+    OrganizationId: point.organizationId,
+    TenantId: point.tenantId,
+    PointId: point.pointId,
+    SeriesId: point.seriesId,
+    MetricName: point.metricName,
+    AcceptedAt: clickHouseTimestamp(point.acceptedAt),
+    AcceptedHour: clickHouseTimestamp(Math.floor(point.acceptedAt / 3_600_000) * 3_600_000),
+    CanonicalSourceBytes: point.canonicalSizeBytes,
+    DedupVersion: firstAcceptanceWinsVersion(point.acceptedAt),
+  };
+}
 
-  static fromRollupRow(row: RollupSourceRow): MetricRollupSourcePoint {
-    return {
-      tenantId: row.TenantId,
-      pointId: row.PointId,
-      seriesId: row.SeriesId,
-      metricName: row.MetricName,
-      metricUnit: row.MetricUnit,
-      metricKind: row.MetricKind,
-      aggregationTemporality: row.AggregationTemporality,
-      isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
-      startTimeUnixNano: String(row.StartTimeUnixNano),
-      timeUnixNano: String(row.TimeUnixNano),
-      timeUnixMs: Number(row.TimeUnixMs),
-      valueType: row.ValueType,
-      valueInt: row.ValueInt === null ? null : String(row.ValueInt),
-      valueDouble: row.ValueDouble,
-      count: row.Count === null ? null : String(row.Count),
-      sum: row.Sum,
-      min: row.Min,
-      max: row.Max,
-      explicitBounds: row.ExplicitBounds,
-      bucketCounts: MetricDataPointMapper.countsColumn({ row, column: "BucketCounts" }),
-      exponentialScale: row.ExponentialScale,
-      exponentialZeroThreshold: row.ExponentialZeroThreshold,
-      zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
-      positiveOffset: row.PositiveOffset,
-      positiveBucketCounts: MetricDataPointMapper.countsColumn({
-        row,
-        column: "PositiveBucketCounts",
-      }),
-      negativeOffset: row.NegativeOffset,
-      negativeBucketCounts: MetricDataPointMapper.countsColumn({
-        row,
-        column: "NegativeBucketCounts",
-      }),
-    };
-  }
+export function metricRollupRow({
+  row,
+  retentionDays,
+}: {
+  row: MetricRollupRow;
+  retentionDays: number;
+}): {
+  TenantId: string;
+  SeriesId: string;
+  MetricName: string;
+  MetricUnit: string;
+  MetricKind: MetricRollupRow["metricKind"];
+  AggregationTemporality: MetricRollupRow["aggregationTemporality"];
+  IsMonotonic: boolean | null;
+  BucketStart: Date;
+  BucketEnd: Date;
+  GaugeLast: number | null;
+  Min: number | null;
+  Max: number | null;
+  Sum: number | null;
+  Count: string;
+  ExplicitBounds: number[];
+  BucketCounts: string[];
+  ExponentialScale: number | null;
+  ExponentialZeroThreshold: number | null;
+  ZeroCount: string;
+  PositiveOffset: number;
+  PositiveBucketCounts: string[];
+  NegativeOffset: number;
+  NegativeBucketCounts: string[];
+  ResetCount: number;
+  GapCount: number;
+  SourcePointCount: number;
+  UpdatedAt: Date;
+  _retention_days: number;
+  _size_bytes: number;
+} {
+  return {
+    TenantId: row.tenantId,
+    SeriesId: row.seriesId,
+    MetricName: row.metricName,
+    MetricUnit: row.metricUnit,
+    MetricKind: row.metricKind,
+    AggregationTemporality: row.aggregationTemporality,
+    IsMonotonic: row.isMonotonic,
+    BucketStart: clickHouseTimestamp(row.bucketStartMs),
+    BucketEnd: clickHouseTimestamp(row.bucketEndMs),
+    GaugeLast: row.gaugeLast,
+    Min: row.min,
+    Max: row.max,
+    Sum: row.sum,
+    Count: row.count,
+    ExplicitBounds: row.explicitBounds,
+    BucketCounts: row.bucketCounts,
+    ExponentialScale: row.exponentialScale,
+    ExponentialZeroThreshold: row.exponentialZeroThreshold,
+    ZeroCount: row.zeroCount,
+    PositiveOffset: row.positiveOffset,
+    PositiveBucketCounts: row.positiveBucketCounts,
+    NegativeOffset: row.negativeOffset,
+    NegativeBucketCounts: row.negativeBucketCounts,
+    ResetCount: row.resetCount,
+    GapCount: row.gapCount,
+    SourcePointCount: row.sourcePointCount,
+    UpdatedAt: clickHouseTimestamp(row.updatedAt),
+    _retention_days: retentionDays,
+    _size_bytes: 0,
+  };
+}
 
-  static validatePoint({
-    point,
-    operation,
-  }: {
-    point: CanonicalMetricDataPoint;
-    operation: string;
-  }): void {
-    EventUtils.validateTenantId({ tenantId: point.tenantId }, operation);
-    if (!/^[a-f0-9]{64}$/.test(point.pointId)) {
-      throw new SecurityError({ operation, message: "invalid PointId", tenantId: point.tenantId });
-    }
+export function metricPointFromSeekRow(row: SeekMetricRow): MetricSequencePoint {
+  return {
+    seriesId: row.SeriesId,
+    pointId: row.PointId,
+    timeUnixMs: Number(row.TimeUnixMs),
+    timeUnixNano: String(row.TimeUnixNano),
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+  };
+}
+
+export function metricRollupSourceFromRow(row: RollupSourceRow): MetricRollupSourcePoint {
+  return {
+    tenantId: row.TenantId,
+    pointId: row.PointId,
+    seriesId: row.SeriesId,
+    metricName: row.MetricName,
+    metricUnit: row.MetricUnit,
+    metricKind: row.MetricKind,
+    aggregationTemporality: row.AggregationTemporality,
+    isMonotonic: row.IsMonotonic === null ? null : Boolean(row.IsMonotonic),
+    startTimeUnixNano: String(row.StartTimeUnixNano),
+    timeUnixNano: String(row.TimeUnixNano),
+    timeUnixMs: Number(row.TimeUnixMs),
+    valueType: row.ValueType,
+    valueInt: row.ValueInt === null ? null : String(row.ValueInt),
+    valueDouble: row.ValueDouble,
+    count: row.Count === null ? null : String(row.Count),
+    sum: row.Sum,
+    min: row.Min,
+    max: row.Max,
+    explicitBounds: row.ExplicitBounds,
+    bucketCounts: countsColumn({ row, column: "BucketCounts" }),
+    exponentialScale: row.ExponentialScale,
+    exponentialZeroThreshold: row.ExponentialZeroThreshold,
+    zeroCount: row.ZeroCount === null ? null : String(row.ZeroCount),
+    positiveOffset: row.PositiveOffset,
+    positiveBucketCounts: countsColumn({
+      row,
+      column: "PositiveBucketCounts",
+    }),
+    negativeOffset: row.NegativeOffset,
+    negativeBucketCounts: countsColumn({
+      row,
+      column: "NegativeBucketCounts",
+    }),
+  };
+}
+
+export function validateMetricPoint({
+  point,
+  operation,
+}: {
+  point: CanonicalMetricDataPoint;
+  operation: string;
+}): void {
+  EventUtils.validateTenantId({ tenantId: point.tenantId }, operation);
+  if (!/^[a-f0-9]{64}$/.test(point.pointId)) {
+    throw new SecurityError({ operation, message: "invalid PointId", tenantId: point.tenantId });
   }
 }

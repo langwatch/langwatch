@@ -12,7 +12,8 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
   isNativeEvaluatorType,
-  codeEvaluatorIdFromCheckType,
+  getCodeEvaluatorId,
+  isCodeEvaluatorCheckType,
 } from "@langwatch/evaluator-contract";
 import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
 import type { Trace, TraceApi } from "@langwatch/trace-contract";
@@ -327,11 +328,10 @@ export class EvaluationExecutionService implements EvaluationExecution {
     workflowId?: string | null;
     parentCausalityDepth?: number;
   }): Promise<SingleEvaluationResult> {
-    const codeEvaluatorId = codeEvaluatorIdFromCheckType(evaluatorType);
-    if (codeEvaluatorId) {
+    if (isCodeEvaluatorCheckType(evaluatorType)) {
       return this.deps.evaluators.executeCode({
         projectId,
-        evaluatorId: codeEvaluatorId,
+        evaluatorId: getCodeEvaluatorId(evaluatorType),
         data,
         traceId: trace?.trace_id,
         parentCausalityDepth,

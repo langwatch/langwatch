@@ -4,7 +4,7 @@ import {
   API_KEYS_AND_SECRETS_DETECTION,
   AVAILABLE_EVALUATORS,
   codeEvaluatorConfigSchema,
-  codeEvaluatorIdFromCheckType,
+  getCodeEvaluatorId,
   defaultCodeEvaluatorConfig,
   evaluatorDisplayName,
   evaluatorSchema,
@@ -71,8 +71,8 @@ describe("evaluator contract", () => {
     );
     expect(evaluatorDisplayName("OpenAI Moderation")).toBe("Moderation");
     expect(isCodeEvaluatorCheckType("code/evaluator_abc")).toBe(true);
-    expect(codeEvaluatorIdFromCheckType("code/evaluator_abc")).toBe("evaluator_abc");
-    expect(codeEvaluatorIdFromCheckType("workflow")).toBeUndefined();
+    expect(getCodeEvaluatorId("code/evaluator_abc")).toBe("evaluator_abc");
+    expect(() => getCodeEvaluatorId("workflow")).toThrow("is not a code evaluator check type");
   });
 
   /** @scenario "Evaluator vocabulary has one portable source" */

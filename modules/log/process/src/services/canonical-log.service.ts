@@ -23,6 +23,17 @@ import {
 } from "../app/log.members.ts";
 
 type UnknownRecord = Record<string, unknown>;
+
+const ANY_VALUE_KINDS = [
+  "stringValue",
+  "boolValue",
+  "intValue",
+  "doubleValue",
+  "bytesValue",
+  "arrayValue",
+  "kvlistValue",
+] as const;
+type AnyValueKind = (typeof ANY_VALUE_KINDS)[number];
 type PIIRedactionLevel = LogPiiRedactionLevel;
 type CanonicalLogPreparationInput = LogPreparationInput;
 const unknownRecordSchema = z.record(z.string(), z.unknown());
@@ -35,6 +46,18 @@ const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 const CODEX_EVENT_NAME_PREFIX = "codex.";
 
 type LogRedactionService = LogRedaction;
+
+type PreparationTally = {
+  accepted: PreparedCanonicalLogRecord[];
+  errors: string[];
+  rejectedLogRecords: number;
+};
+
+type PreparationContext = Readonly<{
+  args: CanonicalLogPreparationInput;
+  redaction: LogRedaction;
+  acceptedAt: number;
+}>;
 
 type PreparedCanonicalLogRecord = LogPreparation["accepted"][number];
 
@@ -65,9 +88,7 @@ export class CanonicalLogService implements LogPreparer {
     args: CanonicalLogPreparationInput,
     redaction: LogRedaction,
   ): Promise<LogPreparation> {
-    const accepted: PreparedCanonicalLogRecord[] = [];
-    const errors: string[] = [];
-    let rejectedLogRecords = 0;
+    const tally: PreparationTally = { accepted: [], errors: [], rejectedLogRecords: 0 };
     const acceptedAt = args.acceptedAt ?? nowInstant().epochMilliseconds;
 
     const request = exportLogsRequestSchema.safeParse(args.request);
@@ -75,54 +96,96 @@ export class CanonicalLogService implements LogPreparer {
       const resourceLogParsed = unknownRecordSchema.safeParse(resourceLogRaw);
       if (!resourceLogParsed.success) continue;
       const resourceLog = structuredClone(resourceLogParsed.data);
-      const resourceTemplate = CanonicalLogService.isRecord(resourceLog.resource)
-        ? resourceLog.resource
-        : {};
       const scopeLogs = Array.isArray(resourceLog.scopeLogs) ? resourceLog.scopeLogs : [];
       for (const scopeLogRaw of scopeLogs) {
         const scopeLogParsed = unknownRecordSchema.safeParse(scopeLogRaw);
         if (!scopeLogParsed.success) continue;
-        const scopeLog = structuredClone(scopeLogParsed.data);
-        const scopeTemplate = CanonicalLogService.isRecord(scopeLog.scope) ? scopeLog.scope : {};
-        const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
-        for (const logRecordRaw of logRecords) {
-          if (!CanonicalLogService.isRecord(logRecordRaw)) {
-            rejectedLogRecords++;
-            errors.push("log record is malformed");
-            continue;
-          }
-          const resource = structuredClone(resourceTemplate);
-          const scope = structuredClone(scopeTemplate);
-          const logRecord = structuredClone(logRecordRaw);
-          try {
-            await CanonicalLogService.redactTypedLog({
-              resourceAttributes: resource.attributes,
-              scopeAttributes: scope.attributes,
-              logAttributes: logRecord.attributes,
-              body: logRecord.body,
-              redaction,
-              piiRedactionLevel: args.piiRedactionLevel,
-              tenantId: args.tenantId,
-            });
-            accepted.push(
-              CanonicalLogService.buildRecord({
-                tenantId: args.tenantId,
-                organizationId: args.organizationId,
-                resourceLog: { ...resourceLog, resource },
-                scopeLog: { ...scopeLog, scope },
-                logRecord,
-                piiRedactionLevel: args.piiRedactionLevel,
-                acceptedAt,
-              }),
-            );
-          } catch (error) {
-            rejectedLogRecords++;
-            errors.push(`log record: ${error instanceof Error ? error.message : String(error)}`);
-          }
-        }
+        await CanonicalLogService.prepareScopeLog({
+          place: { resourceLog, scopeLog: structuredClone(scopeLogParsed.data) },
+          context: { args, redaction, acceptedAt },
+          tally,
+        });
       }
     }
-    return { accepted, rejectedLogRecords, errors };
+    return {
+      accepted: tally.accepted,
+      rejectedLogRecords: tally.rejectedLogRecords,
+      errors: tally.errors,
+    };
+  }
+
+  /** Every record of one scope, each prepared against fresh copies of its resource and scope. */
+  private static async prepareScopeLog({
+    place,
+    context,
+    tally,
+  }: {
+    place: Readonly<{ resourceLog: UnknownRecord; scopeLog: UnknownRecord }>;
+    context: PreparationContext;
+    tally: PreparationTally;
+  }): Promise<void> {
+    const { resourceLog, scopeLog } = place;
+    const resourceTemplate = CanonicalLogService.isRecord(resourceLog.resource)
+      ? resourceLog.resource
+      : {};
+    const scopeTemplate = CanonicalLogService.isRecord(scopeLog.scope) ? scopeLog.scope : {};
+    const logRecords = Array.isArray(scopeLog.logRecords) ? scopeLog.logRecords : [];
+    for (const logRecordRaw of logRecords) {
+      if (!CanonicalLogService.isRecord(logRecordRaw)) {
+        tally.rejectedLogRecords++;
+        tally.errors.push("log record is malformed");
+        continue;
+      }
+      await CanonicalLogService.prepareLogRecord({
+        resourceLog: { ...resourceLog, resource: structuredClone(resourceTemplate) },
+        scopeLog: { ...scopeLog, scope: structuredClone(scopeTemplate) },
+        logRecord: structuredClone(logRecordRaw),
+        context,
+        tally,
+      });
+    }
+  }
+
+  /** One record redacted and built, or counted as rejected with its reason. */
+  private static async prepareLogRecord({
+    resourceLog,
+    scopeLog,
+    logRecord,
+    context,
+    tally,
+  }: {
+    resourceLog: UnknownRecord & { resource: UnknownRecord };
+    scopeLog: UnknownRecord & { scope: UnknownRecord };
+    logRecord: UnknownRecord;
+    context: PreparationContext;
+    tally: PreparationTally;
+  }): Promise<void> {
+    const { args, redaction, acceptedAt } = context;
+    try {
+      await CanonicalLogService.redactTypedLog({
+        resourceAttributes: resourceLog.resource.attributes,
+        scopeAttributes: scopeLog.scope.attributes,
+        logAttributes: logRecord.attributes,
+        body: logRecord.body,
+        redaction,
+        piiRedactionLevel: args.piiRedactionLevel,
+        tenantId: args.tenantId,
+      });
+      tally.accepted.push(
+        CanonicalLogService.buildRecord({
+          tenantId: args.tenantId,
+          organizationId: args.organizationId,
+          resourceLog,
+          scopeLog,
+          logRecord,
+          piiRedactionLevel: args.piiRedactionLevel,
+          acceptedAt,
+        }),
+      );
+    } catch (error) {
+      tally.rejectedLogRecords++;
+      tally.errors.push(`log record: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   static resolveLogCommandShardCount(value: string | undefined): number {
@@ -196,95 +259,95 @@ export class CanonicalLogService implements LogPreparer {
 
   private static canonicalAnyValue(value: unknown): unknown {
     if (!CanonicalLogService.isRecord(value)) return { type: "empty" };
-    const present = [
-      "stringValue",
-      "boolValue",
-      "intValue",
-      "doubleValue",
-      "bytesValue",
-      "arrayValue",
-      "kvlistValue",
-    ].filter((key) => value[key] !== undefined && value[key] !== null);
+    const present = ANY_VALUE_KINDS.filter(
+      (key) => value[key] !== undefined && value[key] !== null,
+    );
     if (present.length === 0) return { type: "empty" };
     if (present.length > 1) throw new Error("OTLP AnyValue contains multiple values");
     const kind = present[0]!;
-    if (kind === "stringValue") {
-      if (typeof value.stringValue !== "string") {
-        throw new Error("stringValue must be a string");
-      }
-      return { type: "string", value: value.stringValue };
+    return CanonicalLogService.canonicalValueOfKind(kind, value[kind]);
+  }
+
+  private static canonicalValueOfKind(kind: AnyValueKind, raw: unknown): unknown {
+    switch (kind) {
+      case "stringValue":
+        if (typeof raw !== "string") throw new Error("stringValue must be a string");
+        return { type: "string", value: raw };
+      case "boolValue":
+        return CanonicalLogService.canonicalBool(raw);
+      case "intValue":
+        return CanonicalLogService.canonicalInt(raw);
+      case "doubleValue":
+        return CanonicalLogService.canonicalDouble(raw);
+      case "bytesValue":
+        return { type: "bytes", value: CanonicalLogService.canonicalBytes(raw) };
+      case "arrayValue":
+        return CanonicalLogService.canonicalArray(raw);
+      case "kvlistValue":
+        return CanonicalLogService.canonicalKvlist(raw);
     }
-    if (kind === "boolValue") {
-      const bool = value.boolValue;
-      if (typeof bool === "boolean") return { type: "bool", value: bool };
-      if (bool === "true" || bool === "false") {
-        return { type: "bool", value: bool === "true" };
-      }
-      throw new Error("boolValue must be a boolean");
+  }
+
+  private static canonicalBool(raw: unknown): unknown {
+    if (typeof raw === "boolean") return { type: "bool", value: raw };
+    if (raw === "true" || raw === "false") return { type: "bool", value: raw === "true" };
+    throw new Error("boolValue must be a boolean");
+  }
+
+  private static canonicalInt(raw: unknown): unknown {
+    if (typeof raw === "number" && !Number.isSafeInteger(raw)) {
+      throw new Error("intValue is not safely represented");
     }
-    if (kind === "intValue") {
-      const raw = value.intValue;
-      if (typeof raw === "number" && !Number.isSafeInteger(raw)) {
-        throw new Error("intValue is not safely represented");
-      }
-      if (CanonicalLogService.isRecord(raw) && "low" in raw && "high" in raw) {
-        const low = BigInt(Number(raw.low ?? 0) >>> 0);
-        const high = BigInt(Number(raw.high ?? 0) >>> 0);
-        return {
-          type: "int",
-          value: BigInt.asIntN(64, (high << 32n) | low).toString(),
-        };
-      }
-      const decimal = String(raw);
-      if (!/^-?\d+$/.test(decimal)) throw new Error("intValue is not an integer");
-      return { type: "int", value: BigInt(decimal).toString() };
+    if (CanonicalLogService.isRecord(raw) && "low" in raw && "high" in raw) {
+      const low = BigInt(Number(raw.low ?? 0) >>> 0);
+      const high = BigInt(Number(raw.high ?? 0) >>> 0);
+      return { type: "int", value: BigInt.asIntN(64, (high << 32n) | low).toString() };
     }
-    if (kind === "doubleValue") {
-      const number = Number(value.doubleValue);
-      if (!Number.isFinite(number)) throw new Error("doubleValue must be finite");
-      return { type: "double", value: number };
-    }
-    if (kind === "bytesValue") {
-      const raw = value.bytesValue;
-      if (typeof raw === "string") {
-        const unpadded = raw.replace(/=+$/, "");
-        const roundTrip = Buffer.from(raw, "base64").toString("base64").replace(/=+$/, "");
-        if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || roundTrip !== unpadded) {
-          throw new Error("bytesValue is not valid base64");
-        }
+    const decimal = String(raw);
+    if (!/^-?\d+$/.test(decimal)) throw new Error("intValue is not an integer");
+    return { type: "int", value: BigInt(decimal).toString() };
+  }
+
+  private static canonicalDouble(raw: unknown): unknown {
+    const number = Number(raw);
+    if (!Number.isFinite(number)) throw new Error("doubleValue must be finite");
+    return { type: "double", value: number };
+  }
+
+  /** The bytes as base64, whichever of the three wire shapes carried them. */
+  private static canonicalBytes(raw: unknown): string {
+    if (typeof raw === "string") {
+      const unpadded = raw.replace(/=+$/, "");
+      const roundTrip = Buffer.from(raw, "base64").toString("base64").replace(/=+$/, "");
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw) || roundTrip !== unpadded) {
+        throw new Error("bytesValue is not valid base64");
       }
-      let bytes: Uint8Array | Buffer | null;
-      if (raw instanceof Uint8Array) {
-        bytes = raw;
-      } else if (typeof raw === "string") {
-        bytes = Buffer.from(raw, "base64");
-      } else if (CanonicalLogService.isRecord(raw)) {
-        bytes = Buffer.from(
-          Object.entries(raw)
-            .toSorted(([left], [right]) => Number(left) - Number(right))
-            .map(([, byte]) => Number(byte)),
-        );
-      } else {
-        bytes = null;
-      }
-      if (!bytes) throw new Error("bytesValue is malformed");
-      return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
+      return Buffer.from(raw, "base64").toString("base64");
     }
-    if (kind === "arrayValue") {
-      const array = value.arrayValue;
-      if (!CanonicalLogService.isRecord(array) || !Array.isArray(array.values)) {
-        throw new Error("arrayValue is malformed");
-      }
-      return {
-        type: "array",
-        value: array.values.map((item) => CanonicalLogService.canonicalAnyValue(item)),
-      };
+    if (raw instanceof Uint8Array) return Buffer.from(raw).toString("base64");
+    if (!CanonicalLogService.isRecord(raw)) throw new Error("bytesValue is malformed");
+    return Buffer.from(
+      Object.entries(raw)
+        .toSorted(([left], [right]) => Number(left) - Number(right))
+        .map(([, byte]) => Number(byte)),
+    ).toString("base64");
+  }
+
+  private static canonicalArray(raw: unknown): unknown {
+    if (!CanonicalLogService.isRecord(raw) || !Array.isArray(raw.values)) {
+      throw new Error("arrayValue is malformed");
     }
-    const list = value.kvlistValue;
-    if (!CanonicalLogService.isRecord(list) || !Array.isArray(list.values)) {
+    return {
+      type: "array",
+      value: raw.values.map((item) => CanonicalLogService.canonicalAnyValue(item)),
+    };
+  }
+
+  private static canonicalKvlist(raw: unknown): unknown {
+    if (!CanonicalLogService.isRecord(raw) || !Array.isArray(raw.values)) {
       throw new Error("kvlistValue is malformed");
     }
-    return { type: "kvlist", value: CanonicalLogService.canonicalAttributes(list.values) };
+    return { type: "kvlist", value: CanonicalLogService.canonicalAttributes(raw.values) };
   }
 
   private static canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {

@@ -6,7 +6,7 @@ export type {
   SubsystemProbeReason,
 } from "./services/subsystem-probe.service.ts";
 export {
-  SubsystemProbeAdapter,
+  SubsystemProbeRunService,
   type SubsystemProbeCredential,
   type SubsystemProbeRunner,
 } from "./services/subsystem-probe-run.service.ts";

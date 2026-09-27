@@ -46,13 +46,13 @@ type ChainBuilder<Owners extends readonly PreambleOwner[]> = (
 
 export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly []> {
   static create(name: string): ServerPreamble {
-    return new ServerPreamble(name, {});
+    return new ServerPreamble(name, { owners: [] });
   }
 
   private constructor(
     private readonly name: string,
     private readonly state: Readonly<{
-      owners?: Owners;
+      owners: Owners;
       chain?: ChainBuilder<Owners>;
       telemetry?: (context: FactoryContext<Owners>) => Telemetry | Promise<Telemetry>;
       metrics?: (context: FactoryContext<Owners>) => Metrics | Promise<Metrics>;
@@ -96,7 +96,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
   }
 
   async start(): Promise<ProcessServer> {
-    const owners = this.state.owners ?? ([] as unknown as Owners);
+    const owners = this.state.owners;
     const environment = process.env;
     const config = parseProcessConfig({ owners, environment });
 

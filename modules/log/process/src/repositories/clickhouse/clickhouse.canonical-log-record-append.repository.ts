@@ -39,9 +39,7 @@ export type LogClickHouseClientResolver = (tenantId: string) => Promise<LogClick
  * Adapts the process's routed `clickhouse` member to Log's tenant-resolved
  * client, so the append/read repositories below keep their own shape.
  */
-export function createLogClickHouseResolver(
-  clickhouse: ClickHouseQueryClient,
-): LogClickHouseClientResolver {
+function logClickHouseResolver(clickhouse: ClickHouseQueryClient): LogClickHouseClientResolver {
   return (tenantId) =>
     Promise.resolve<LogClickHouseClient>({
       async insert(params) {
@@ -218,6 +216,11 @@ export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRe
     private readonly defaultRetentionDays: number,
   ) {
     super();
+  }
+
+  /** The routed `clickhouse` member, as the tenant-resolved client this repository reads. */
+  static resolverOver(clickhouse: ClickHouseQueryClient): LogClickHouseClientResolver {
+    return logClickHouseResolver(clickhouse);
   }
 
   static create(options: {

@@ -615,6 +615,11 @@ class WatchSupervisor {
   }
 }
 
+/** A detached child's whole process group, or nothing to signal when it never got a pid. */
+function processGroupOf(pid) {
+  return pid === undefined ? undefined : -pid;
+}
+
 /**
  * Starts the command, or reports why and returns null. `captureIO` is what
  * lets the crash renderer see stdout/stderr; off, `stdio: "inherit"` passes
@@ -759,7 +764,7 @@ async function runSentinel(args, env) {
   });
 
   const stack = stackControls({
-    target: -child.pid,
+    target: processGroupOf(child.pid),
     graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
   });
   const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
@@ -904,7 +909,7 @@ function startDirect(argv, env, detached) {
   const child = startChild(argv, env, detached);
   if (child === null) return null;
   return {
-    target: async () => (detached ? -child.pid : child.pid),
+    target: async () => (detached ? processGroupOf(child.pid) : child.pid),
     onFailed: (cb) =>
       child.on("error", (err) => {
         stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);

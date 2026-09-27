@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { SubsystemProbe, SubsystemProbeResult } from "../../app/platform-health.members.ts";
 import { PlatformHealthService } from "../platform-health.service.ts";
 import {
-  SubsystemProbeAdapter,
+  SubsystemProbeRunService,
   type SubsystemProbeRunner,
 } from "../subsystem-probe-run.service.ts";
 import type { SubsystemProbeOutcome } from "../subsystem-probe.service.ts";
@@ -122,7 +122,7 @@ describe("given a subsystem refused the probe with a message of its own", () => 
 
       const service = PlatformHealthService.create({
         probes: [
-          SubsystemProbeAdapter.create({
+          SubsystemProbeRunService.create({
             name: "workflows",
             probes,
             credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
@@ -149,7 +149,7 @@ describe("given a subsystem the deployment named no target for", () => {
       const service = PlatformHealthService.create({
         probes: [
           healthy("collector"),
-          SubsystemProbeAdapter.create({
+          SubsystemProbeRunService.create({
             name: "triggers",
             probes,
             credential: { authToken: "probe-key", findProjectIds: async () => ["project-1"] },
