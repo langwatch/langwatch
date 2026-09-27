@@ -838,6 +838,8 @@ describe("given a folder shared with a Langy conversation", () => {
         "sed -e 's/a/b/' -e '/^#/d' agent.mjs",
         "sed -ne '/HEAD/p' agent.mjs",
         "grep -A 2 -n '/api/' agent.mjs",
+        "grep --regexp=/api/ agent.mjs",
+        "sed --expression='/^#/d' agent.mjs",
       ]) {
         expect(bash(command).kind, command).not.toBe("refuse");
       }

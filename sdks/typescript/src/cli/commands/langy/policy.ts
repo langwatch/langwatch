@@ -1693,7 +1693,8 @@ function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string
       const value = equalsAt === -1 ? undefined : token.slice(equalsAt + 1);
       if (SCRIPT_LONG_FLAGS.has(flag)) {
         scriptGiven = true;
-        if (value === undefined && takesNext(index + 1)) {
+        if (value !== undefined) text.add(index);
+        else if (takesNext(index + 1)) {
           text.add(index + 1);
           index += 1;
         }
