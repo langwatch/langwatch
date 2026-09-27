@@ -8,8 +8,9 @@ import {
 } from "@langwatch/prompt-browser-kit";
 
 import { useLlmConfigPopoverState } from "../../../../behavior/use-llm-config-popover-state.ts";
+import { allModelOptions } from "../../../../behavior/use-model-selection-options.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { allModelOptions, ModelSelector } from "./model-selector.tsx";
+import { ModelSelector } from "./model-selector.tsx";
 import { type Output, OutputsSection, type OutputType } from "./outputs-section.tsx";
 
 // Default output when structured outputs is disabled

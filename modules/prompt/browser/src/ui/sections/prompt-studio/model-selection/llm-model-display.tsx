@@ -3,9 +3,12 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../../../behavior/use-model-selection-options.ts";
 import { MODEL_ICON_SIZE } from "../../../../model/model-selection-constants.ts";
 import { modelProviderIcons } from "./model-provider-icons.tsx";
-import { allModelOptions, useModelSelectionOptions } from "./model-selector.tsx";
 import { OverflownTextWithTooltip } from "./overflown-text.tsx";
 
 export interface LLMModelDisplayProps extends StackProps {

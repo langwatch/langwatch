@@ -388,382 +388,383 @@ function findWindowIndexContainingTab(windows: Window[], tabId: string): number 
   return windows.findIndex((w) => w.tabs.some((t) => t.id === tabId));
 }
 
+type TabsLayout = { windows: Window[]; activeWindowId: string | null };
+type TabsLogger = PromptTabsCapabilities["logger"];
+
+function activateWindow({
+  state,
+  windowId,
+  logger,
+}: {
+  state: TabsLayout;
+  windowId: string;
+  logger: TabsLogger;
+}): void {
+  if (!state.windows.some((w) => w.id === windowId)) {
+    logger.warn({ windowId }, "Window not found, cannot set active");
+    return;
+  }
+  state.activeWindowId = windowId;
+}
+
+/** Adds a tab to the active window, opening a window when there is none. */
+function appendTab({
+  state,
+  tabId,
+  data,
+}: {
+  state: TabsLayout;
+  tabId: string;
+  data: TabData;
+}): void {
+  let activeWindow = state.windows.find((w) => w.id === state.activeWindowId);
+  if (!activeWindow) {
+    const windowId = createWindowId();
+    activeWindow = { id: windowId, tabs: [], activeTabId: tabId };
+    state.windows.push(activeWindow);
+    state.activeWindowId = windowId;
+  }
+  activeWindow.tabs.push({ id: tabId, data });
+  activeWindow.activeTabId = tabId;
+}
+
+/** The tab that shifted into `index`, or the one before it when `index` was last. */
+const neighbourAt = <Item>(items: Item[], index: number): Item | undefined =>
+  items[index] ?? items[index - 1];
+
+/** Removes a tab; an emptied window goes too, and the neighbour takes over as active. */
+function removeTabFrom({
+  state,
+  tabId,
+  logger,
+}: {
+  state: TabsLayout;
+  tabId: string;
+  logger: TabsLogger;
+}): void {
+  const windowIndex = findWindowIndexContainingTab(state.windows, tabId);
+  const tabbedWindow = state.windows[windowIndex];
+  if (!tabbedWindow) {
+    logger.warn({ tabId }, "Tab not found, cannot remove");
+    return;
+  }
+  const tabIndex = tabbedWindow.tabs.findIndex((tab) => tab.id === tabId);
+  tabbedWindow.tabs.splice(tabIndex, 1);
+
+  if (tabbedWindow.tabs.length === 0) {
+    state.windows.splice(windowIndex, 1);
+    if (state.activeWindowId === tabbedWindow.id) {
+      state.activeWindowId = neighbourAt(state.windows, windowIndex)?.id ?? null;
+    }
+    return;
+  }
+  if (tabbedWindow.activeTabId !== tabId) return;
+
+  const targetTab = neighbourAt(tabbedWindow.tabs, tabIndex);
+  if (!targetTab) {
+    logger.warn({ tabId }, "No target tab found after removal. This should never happen.");
+    return;
+  }
+  tabbedWindow.activeTabId = targetTab.id;
+}
+
+/** Opens a copy of a tab in a new window, directly after the source window. */
+function splitTabIn({
+  state,
+  tabId,
+  logger,
+}: {
+  state: TabsLayout;
+  tabId: string;
+  logger: TabsLogger;
+}): void {
+  const tabWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
+  const tabWindow = state.windows[tabWindowIndex];
+  if (!tabWindow) {
+    logger.warn({ tabId }, "Tab not found in any window, cannot split");
+    return;
+  }
+
+  const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
+  if (!sourceTab) {
+    logger.warn({ tabId, windowId: tabWindow.id }, "Source tab not found in window, cannot split");
+    return;
+  }
+
+  const newWindowId = createWindowId();
+  const newTabId = createTabId();
+  const newWindow: Window = {
+    id: newWindowId,
+    tabs: [
+      {
+        id: newTabId,
+        // current() snapshots the immer draft so no proxy escapes into state;
+        // cloneDeep detaches the subtrees current() still shares with the base.
+        data: cloneDeep(current(sourceTab).data),
+      },
+    ],
+    activeTabId: newTabId,
+  };
+
+  state.windows.splice(tabWindowIndex + 1, 0, newWindow);
+  state.activeWindowId = newWindowId;
+}
+
+/** Takes a tab out of its window, handing that window's focus to the neighbour. */
+function takeTab({
+  state,
+  tabId,
+  logger,
+}: {
+  state: TabsLayout;
+  tabId: string;
+  logger: TabsLogger;
+}): { tab: Tab; sourceWindow: Window } | undefined {
+  const sourceWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
+  if (sourceWindowIndex === -1) {
+    logger.warn({ tabId }, "Tab not found, cannot move");
+    return undefined;
+  }
+  const sourceWindow = state.windows[sourceWindowIndex];
+  if (!sourceWindow) {
+    logger.warn({ tabId }, "Source window not found, cannot move");
+    return undefined;
+  }
+  const tabIndex = sourceWindow.tabs.findIndex((t) => t.id === tabId);
+  const [tab] = sourceWindow.tabs.splice(tabIndex, 1);
+  if (!tab) {
+    logger.warn({ tabId }, "Tab not found, cannot move");
+    return undefined;
+  }
+
+  if (sourceWindow.activeTabId === tabId && sourceWindow.tabs.length > 0) {
+    const targetTab = neighbourAt(sourceWindow.tabs, tabIndex);
+    if (targetTab) sourceWindow.activeTabId = targetTab.id;
+  }
+  return { tab, sourceWindow };
+}
+
+/** Moves a tab into a window at an index (clamped), dropping windows it emptied. */
+function moveTabIn({
+  state,
+  move,
+  logger,
+}: {
+  state: TabsLayout;
+  move: { tabId: string; windowId: string; index: number };
+  logger: TabsLogger;
+}): void {
+  const { tabId, windowId, index } = move;
+  const taken = takeTab({ state, tabId, logger });
+  if (!taken) return;
+
+  const targetWindow = state.windows.find((w) => w.id === windowId);
+  if (!targetWindow) {
+    logger.warn({ windowId }, "Target window not found, cannot move tab");
+    taken.sourceWindow.tabs.push(taken.tab);
+    return;
+  }
+
+  const clampedIndex = Math.max(0, Math.min(index, targetWindow.tabs.length));
+  if (clampedIndex !== index) {
+    logger.warn(
+      { tabId, windowId, requestedIndex: index, clampedIndex },
+      "Index out of bounds, clamping to valid range",
+    );
+  }
+
+  targetWindow.tabs.splice(clampedIndex, 0, taken.tab);
+  targetWindow.activeTabId = tabId;
+  state.activeWindowId = windowId;
+
+  state.windows = state.windows.filter((tabbedWindow) => tabbedWindow.tabs.length > 0);
+  if (!state.windows.find((w) => w.id === state.activeWindowId)) {
+    state.activeWindowId = state.windows[0]?.id ?? null;
+  }
+}
+
+function activateTab({
+  state,
+  target,
+  logger,
+}: {
+  state: TabsLayout;
+  target: { windowId: string; tabId: string };
+  logger: TabsLogger;
+}): void {
+  const { windowId, tabId } = target;
+  const tabbedWindow = state.windows.find((w) => w.id === windowId);
+  if (!tabbedWindow) {
+    logger.warn({ windowId, tabId }, "Window not found, cannot set active tab");
+    return;
+  }
+  if (!tabbedWindow.tabs.some((tab) => tab.id === tabId)) {
+    logger.warn({ windowId, tabId }, "Tab not found in window, cannot set active");
+    return;
+  }
+  tabbedWindow.activeTabId = tabId;
+  state.activeWindowId = windowId;
+}
+
+/** Drops empty windows and points each window at a tab it holds; true when anything changed. */
+function repairWindows({ state, logger }: { state: TabsLayout; logger: TabsLogger }): boolean {
+  let repaired = false;
+  state.windows = state.windows.filter((w) => {
+    if (w.tabs.length > 0) return true;
+    logger.warn({ windowId: w.id }, "Removing empty window during rehydration");
+    repaired = true;
+    return false;
+  });
+
+  for (const window of state.windows) {
+    if (window.tabs.some((t) => t.id === window.activeTabId)) continue;
+    logger.warn(
+      { windowId: window.id, activeTabId: window.activeTabId },
+      "Active tab not found in window, resetting to first tab",
+    );
+    window.activeTabId = window.tabs[0]?.id ?? "";
+    repaired = true;
+  }
+  return repaired;
+}
+
+/** Points the active window at one that exists; true when it had to move. */
+function repairActiveWindow({ state, logger }: { state: TabsLayout; logger: TabsLogger }): boolean {
+  if (!state.activeWindowId) return false;
+  if (state.windows.some((w) => w.id === state.activeWindowId)) return false;
+  logger.warn(
+    { activeWindowId: state.activeWindowId },
+    "Active window not found, resetting to first window",
+  );
+  state.activeWindowId = state.windows[0]?.id ?? null;
+  return true;
+}
+
+/**
+ * Validates what storage rehydrated: corrupt or mis-shaped data is cleared,
+ * and a logically inconsistent layout is repaired in place.
+ */
+function repairRehydratedState({
+  state,
+  error,
+  clearPersisted,
+  logger,
+}: {
+  state: TabsLayout | undefined;
+  error: unknown;
+  clearPersisted: () => void;
+  logger: TabsLogger;
+}): void {
+  if (error) {
+    logger.error({ error }, "Failed to rehydrate store, clearing corrupted data");
+    clearPersisted();
+    return;
+  }
+  if (!state) return;
+
+  const validation = PersistedStateSchema.safeParse({
+    windows: state.windows,
+    activeWindowId: state.activeWindowId,
+  });
+  if (!validation.success) {
+    logger.error(
+      { error: validation.error },
+      "Invalid store data shape, resetting to initial state",
+    );
+    clearPersisted();
+    Object.assign(state, initialState);
+    return;
+  }
+
+  const repairedWindows = repairWindows({ state, logger });
+  const repairedActive = repairActiveWindow({ state, logger });
+
+  if (state.windows.length === 0) {
+    logger.warn("No valid windows after rehydration, resetting to initial state");
+    Object.assign(state, initialState);
+    clearPersisted();
+  } else if (repairedWindows || repairedActive) {
+    logger.info("Fixed state inconsistencies during rehydration");
+  }
+}
+
 function createDraggableTabsBrowserStore(projectId: string, capabilities: PromptTabsCapabilities) {
   const { logger } = capabilities;
   const storageKey = getStorageKey(projectId);
+  const clearPersisted = () => clearAllPersistedDataForProject(projectId, capabilities);
 
   return create<DraggableTabsBrowserState>()(
     persist(
       immer((set, get) => ({
         ...initialState,
 
-        /**
-         * Set the active tabbedWindow by ID.
-         * Single Responsibility: Updates the active tabbedWindow state.
-         */
         setActiveWindow: ({ windowId }) => {
-          set((state) => {
-            const windowExists = state.windows.some((w) => w.id === windowId);
-            if (!windowExists) {
-              logger.warn({ windowId }, "Window not found, cannot set active");
-              return;
-            }
-            state.activeWindowId = windowId;
-          });
+          set((state) => activateWindow({ state, windowId, logger }));
         },
 
-        /**
-         * Add a new tab to the active tabbedWindow, or create a new tabbedWindow if none exists.
-         * Single Responsibility: Creates and adds a new tab with the provided data.
-         */
         addTab: ({ data }) => {
           const tabId = createTabId();
-          set((state) => {
-            const newTab: Tab = { id: tabId, data };
-
-            let activeWindow = state.windows.find((w) => w.id === state.activeWindowId);
-
-            if (!activeWindow) {
-              const windowId = createWindowId();
-              activeWindow = { id: windowId, tabs: [], activeTabId: tabId };
-              state.windows.push(activeWindow);
-              state.activeWindowId = windowId;
-            }
-
-            activeWindow.tabs.push(newTab);
-            activeWindow.activeTabId = tabId;
-          });
+          set((state) => appendTab({ state, tabId, data }));
           return tabId;
         },
 
-        /**
-         * Remove a tab by its ID and clean up empty windows.
-         */
         removeTab: ({ tabId }) => {
-          set((state) => {
-            // Find the window containing the tab
-            const windowIndex = findWindowIndexContainingTab(state.windows, tabId);
-
-            if (windowIndex === -1) {
-              logger.warn({ tabId }, "Tab not found, cannot remove");
-              return;
-            }
-
-            const tabbedWindow = state.windows[windowIndex];
-            if (!tabbedWindow) {
-              logger.warn({ tabId }, "Tab not found, cannot remove");
-              return;
-            }
-            const tabIndex = tabbedWindow.tabs.findIndex((tab) => tab.id === tabId);
-
-            // Remove the tab from the window
-            tabbedWindow.tabs.splice(tabIndex, 1);
-
-            // If window is now empty, remove it entirely
-            if (tabbedWindow.tabs.length === 0) {
-              state.windows.splice(windowIndex, 1);
-
-              // Activate the window that shifted into this index, or the previous one if
-              // this was last.
-              if (state.activeWindowId === tabbedWindow.id) {
-                const nextWindow = state.windows[windowIndex] ?? state.windows[windowIndex - 1];
-                state.activeWindowId = nextWindow?.id ?? null;
-              }
-            } else if (tabbedWindow.activeTabId === tabId) {
-              // Activate the tab that shifted into this index, or the previous one if this
-              // was last.
-              const targetTab = tabbedWindow.tabs[tabIndex] ?? tabbedWindow.tabs[tabIndex - 1];
-
-              if (!targetTab) {
-                logger.warn(
-                  { tabId },
-                  "No target tab found after removal. This should never happen.",
-                );
-                return;
-              }
-
-              tabbedWindow.activeTabId = targetTab.id;
-            }
-          });
+          set((state) => removeTabFrom({ state, tabId, logger }));
         },
 
-        /**
-         * Split a tab into a new tabbedWindow by duplicating it.
-         * Single Responsibility: Creates a new tabbedWindow with a copy of the specified tab.
-         */
         splitTab: ({ tabId }) => {
-          set((state) => {
-            // Find the tabbedWindow that contains the source tab
-            const tabWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
-            const tabWindow = state.windows[tabWindowIndex];
-
-            if (!tabWindow) {
-              logger.warn({ tabId }, "Tab not found in any window, cannot split");
-              return;
-            }
-
-            // Find the source tab in the tabbedWindow
-            const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
-            if (!sourceTab) {
-              logger.warn(
-                { tabId, windowId: tabWindow.id },
-                "Source tab not found in window, cannot split",
-              );
-              return;
-            }
-
-            // Create a new tabbedWindow with a copy of the source tab
-            const newWindowId = createWindowId();
-            const newTabId = createTabId();
-            const newWindow: Window = {
-              id: newWindowId,
-              tabs: [
-                {
-                  id: newTabId,
-                  // sourceTab is an immer draft. current() takes a plain
-                  // snapshot so no draft proxy can escape into state, and
-                  // cloneDeep detaches that snapshot: current() structurally
-                  // shares untouched subtrees with the base state, so the
-                  // clone is what makes the split tab own its data outright.
-                  data: cloneDeep(current(sourceTab).data),
-                },
-              ],
-              activeTabId: newTabId,
-            };
-
-            // Insert new tabbedWindow directly after the source tabbedWindow
-            state.windows.splice(tabWindowIndex + 1, 0, newWindow);
-            state.activeWindowId = newWindowId;
-          });
+          set((state) => splitTabIn({ state, tabId, logger }));
         },
 
-        /**
-         * Move a tab from one tabbedWindow to another at a specific index.
-         * Single Responsibility: Handles tab drag-and-drop between windows with cleanup.
-         */
-        moveTab: ({ tabId, windowId, index }) => {
-          set((state) => {
-            // Find the source window containing the tab
-            const sourceWindowIndex = findWindowIndexContainingTab(state.windows, tabId);
-
-            if (sourceWindowIndex === -1) {
-              logger.warn({ tabId }, "Tab not found, cannot move");
-              return;
-            }
-
-            const sourceWindow = state.windows[sourceWindowIndex];
-            if (!sourceWindow) {
-              logger.warn({ tabId }, "Source window not found, cannot move");
-              return;
-            }
-            const tabIndex = sourceWindow.tabs.findIndex((t) => t.id === tabId);
-            const [tabToMove] = sourceWindow.tabs.splice(tabIndex, 1);
-            if (!tabToMove) {
-              logger.warn({ tabId }, "Tab not found, cannot move");
-              return;
-            }
-
-            // Update source window's active tab if needed
-            if (sourceWindow.activeTabId === tabId && sourceWindow.tabs.length > 0) {
-              const targetTab = sourceWindow.tabs[tabIndex] ?? sourceWindow.tabs[tabIndex - 1];
-              if (targetTab) {
-                sourceWindow.activeTabId = targetTab.id;
-              }
-            }
-
-            // Add tab to target tabbedWindow
-            const targetWindow = state.windows.find((w) => w.id === windowId);
-            if (!targetWindow) {
-              logger.warn({ windowId }, "Target window not found, cannot move tab");
-              // Restore tab to source window
-              sourceWindow.tabs.push(tabToMove);
-              return;
-            }
-
-            // Clamp index to valid range
-            const clampedIndex = Math.max(0, Math.min(index, targetWindow.tabs.length));
-            if (clampedIndex !== index) {
-              logger.warn(
-                { tabId, windowId, requestedIndex: index, clampedIndex },
-                "Index out of bounds, clamping to valid range",
-              );
-            }
-
-            targetWindow.tabs.splice(clampedIndex, 0, tabToMove);
-            targetWindow.activeTabId = tabId;
-            state.activeWindowId = windowId;
-
-            // Clean up empty windows
-            state.windows = state.windows.filter((tabbedWindow) => tabbedWindow.tabs.length > 0);
-
-            // Ensure we have a valid active tabbedWindow
-            if (!state.windows.find((w) => w.id === state.activeWindowId)) {
-              state.activeWindowId = state.windows[0]?.id ?? null;
-            }
-          });
+        moveTab: (move) => {
+          set((state) => moveTabIn({ state, move, logger }));
         },
 
-        /**
-         * Set the active tab for a specific tabbedWindow.
-         * Single Responsibility: Updates active tab and tabbedWindow state.
-         */
-        setActiveTab: ({ windowId, tabId }) => {
-          set((state) => {
-            const tabbedWindow = state.windows.find((w) => w.id === windowId);
-
-            if (!tabbedWindow) {
-              logger.warn({ windowId, tabId }, "Window not found, cannot set active tab");
-              return;
-            }
-
-            if (!tabbedWindow.tabs.some((tab) => tab.id === tabId)) {
-              logger.warn({ windowId, tabId }, "Tab not found in window, cannot set active");
-              return;
-            }
-
-            tabbedWindow.activeTabId = tabId;
-            state.activeWindowId = windowId;
-          });
+        setActiveTab: (target) => {
+          set((state) => activateTab({ state, target, logger }));
         },
 
-        /**
-         * Update tab data using an updater function for flexible partial updates.
-         * @example
-         * @example
-         */
         updateTabData: ({ tabId, updater }) => {
           set((state) => {
             const tab = state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
-
             if (!tab) {
               logger.warn({ tabId }, "Tab not found, cannot update data");
               return;
             }
-
             tab.data = updater(tab.data);
           });
         },
 
-        /**
-         * Check if a tab ID is currently active.
-         */
-        isTabIdActive: (tabId) => {
-          const state = get();
-          return state.windows.some((w) => w.activeTabId === tabId);
-        },
+        isTabIdActive: (tabId) => get().windows.some((w) => w.activeTabId === tabId),
 
         /**
-         * Reset the store to initial state and clear its persisted storage.
-         * Single Responsibility: Clears all tabs and windows.
+         * Resets to the initial state and clears the light index key AND every
+         * per-tab key: the prefix scan also catches `${projectId}:tab:*` keys
+         * this instance never tracked.
          */
         reset: () => {
           set(initialState);
-          // Remove the light index key AND every per-tab key. A bare
-          // removeItem(storageKey) would strand the `${projectId}:tab:*`
-          // keys (the leak this store split introduced), so delegate to the
-          // prefix-scan cleanup, which is robust even for per-tab keys this
-          // instance never tracked in memory.
-          clearAllPersistedDataForProject(projectId, capabilities);
+          clearPersisted();
         },
 
-        /**
-         * Get data by tabId
-         */
-        getByTabId: (tabId) => {
-          const state = get();
-          return state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId)?.data;
-        },
+        getByTabId: (tabId) =>
+          get()
+            .windows.flatMap((w) => w.tabs)
+            .find((t) => t.id === tabId)?.data,
       })),
       {
         name: storageKey,
 
-        // Persist per-tab `data` (form values/chat/demonstrations) under its own storage key so
-        // editing one tab doesn't re-serialize and write every other open tab's content. See
-        // createTabAwarePersistStorage for details. Transient UI flags (meta.openHistoryOnLoad)
-        // are stripped there too, right before each tab's data is written, so they don't
-        // re-trigger on reload.
+        // Per-tab `data` persists under its own key, so editing one tab does not
+        // rewrite every other open tab (see createTabAwarePersistStorage).
         partialize: (state) => ({
           windows: state.windows,
           activeWindowId: state.activeWindowId,
         }),
         storage: createTabAwarePersistStorage(projectId, capabilities),
 
-        // Validate and handle corrupted data during rehydration
-        onRehydrateStorage: () => (state, error) => {
-          if (error) {
-            logger.error({ error }, "Failed to rehydrate store, clearing corrupted data");
-            clearAllPersistedDataForProject(projectId, capabilities);
-            return;
-          }
-
-          // Validate the rehydrated state shape
-          if (state) {
-            const validation = PersistedStateSchema.safeParse({
-              windows: state.windows,
-              activeWindowId: state.activeWindowId,
-            });
-
-            if (!validation.success) {
-              logger.error(
-                { error: validation.error },
-                "Invalid store data shape, resetting to initial state",
-              );
-              clearAllPersistedDataForProject(projectId, capabilities);
-              // Reset to initial state
-              Object.assign(state, initialState);
-              return;
-            }
-
-            // Validate logical consistency
-            let hasInconsistency = false;
-
-            // Remove windows with no tabs
-            state.windows = state.windows.filter((w) => {
-              if (w.tabs.length === 0) {
-                logger.warn({ windowId: w.id }, "Removing empty window during rehydration");
-                hasInconsistency = true;
-                return false;
-              }
-              return true;
-            });
-
-            // Validate each window's activeTabId exists in its tabs
-            state.windows.forEach((window) => {
-              const hasActiveTab = window.tabs.some((t) => t.id === window.activeTabId);
-              if (!hasActiveTab) {
-                logger.warn(
-                  { windowId: window.id, activeTabId: window.activeTabId },
-                  "Active tab not found in window, resetting to first tab",
-                );
-                window.activeTabId = window.tabs[0]?.id ?? "";
-                hasInconsistency = true;
-              }
-            });
-
-            // Validate activeWindowId exists in windows
-            if (state.activeWindowId) {
-              const hasActiveWindow = state.windows.some((w) => w.id === state.activeWindowId);
-              if (!hasActiveWindow) {
-                logger.warn(
-                  { activeWindowId: state.activeWindowId },
-                  "Active window not found, resetting to first window",
-                );
-                state.activeWindowId = state.windows[0]?.id ?? null;
-                hasInconsistency = true;
-              }
-            }
-
-            // If state is now empty after cleanup, reset completely
-            if (state.windows.length === 0) {
-              logger.warn("No valid windows after rehydration, resetting to initial state");
-              Object.assign(state, initialState);
-              clearAllPersistedDataForProject(projectId, capabilities);
-            } else if (hasInconsistency) {
-              // Log that we fixed inconsistencies
-              logger.info("Fixed state inconsistencies during rehydration");
-            }
-          }
-        },
+        onRehydrateStorage: () => (state, error) =>
+          repairRehydratedState({ state, error, clearPersisted, logger }),
       },
     ),
   );

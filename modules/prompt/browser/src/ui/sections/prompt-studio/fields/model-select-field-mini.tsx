@@ -7,12 +7,15 @@ import React, { useCallback, useState } from "react";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../../../behavior/use-model-selection-options.ts";
+import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "../model-selection/llm-config-popover.tsx";
 import { LLMModelDisplay } from "../model-selection/llm-model-display.tsx";
-import { allModelOptions, useModelSelectionOptions } from "../model-selection/model-selector.tsx";
 import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout.tsx";
 
 type ModelSelectFieldMiniProps = {

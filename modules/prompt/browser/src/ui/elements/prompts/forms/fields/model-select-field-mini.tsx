@@ -2,7 +2,6 @@ import { Box, Popover as ChakraPopover, HStack, Skeleton } from "@chakra-ui/reac
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import type { LlmConfigOutputType } from "@langwatch/workflow-browser-kit";
 import React, { useCallback, useState } from "react";
@@ -10,6 +9,7 @@ import { ChevronDown } from "react-feather";
 import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../../../behavior/lent-model-provider.tsx";
+import { useModelSelectionOptions } from "../../../../../behavior/use-model-selection-options.ts";
 import {
   LLMConfigPopover,
   type Output,
@@ -66,11 +66,11 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   // form value lives in form state; reading it here for the empty-state
   // check is cheap and the picker re-renders on form changes anyway.
   const watchedLlm = useWatch({ control, name: "version.configData.llm" });
-  const { isEmpty, isLoading } = useModelSelectionOptions(
-    allModelOptions,
-    watchedLlm?.model ?? "",
-    "chat",
-  );
+  const { isEmpty, isLoading } = useModelSelectionOptions({
+    options: allModelOptions,
+    model: watchedLlm?.model ?? "",
+    mode: "chat",
+  });
 
   if (isLoading) {
     // While the providers query is in flight, render a chip-shaped

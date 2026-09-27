@@ -2,12 +2,13 @@
  * Hook for deriving mappings and sources in evaluations context.
  */
 
+import { setComplexProps, useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-browser-kit";
 import { datasetColumnTypeToFieldType } from "@langwatch/workflow-browser-kit";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { convertToUIMapping } from "../../model/experiments-v3/field-mapping-converters.ts";
@@ -77,3 +78,20 @@ export const useEvaluationMappings = (
     isValid: !!targetId && !!target,
   };
 };
+
+/**
+ * Hands the open prompt editor this experiment's mappings and sources for its
+ * target as drawer props, again whenever the active dataset or mappings change.
+ */
+export function useSyncPromptEditorMappings(): void {
+  const { currentDrawer } = useDrawer();
+  const targetId = useDrawerParams().targetId;
+  const editedTargetId =
+    currentDrawer === "promptEditor" && typeof targetId === "string" ? targetId : undefined;
+  const { availableSources, inputMappings, isValid } = useEvaluationMappings(editedTargetId);
+
+  useEffect(() => {
+    if (!isValid) return;
+    setComplexProps({ availableSources, inputMappings });
+  }, [isValid, availableSources, inputMappings]);
+}

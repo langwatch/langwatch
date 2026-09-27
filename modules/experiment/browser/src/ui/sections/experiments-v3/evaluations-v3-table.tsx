@@ -45,6 +45,7 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
+import { useSyncPromptEditorMappings } from "../../../behavior/experiments-v3/use-evaluation-mappings.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
 import { useOpenEvaluatorEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
@@ -368,6 +369,8 @@ export function EvaluationsV3Table({
 
   // Hook for opening target editor with proper flow callbacks
   const { openTargetEditor, buildAvailableSources, isDatasetSource } = useOpenTargetEditor();
+  // The open prompt editor follows the active dataset through its drawer props.
+  useSyncPromptEditorMappings();
 
   // Hook for opening the grading-evaluator mapping drawer. Used to guide the
   // user to unmapped fields right after adding an evaluator (see Issue A).
