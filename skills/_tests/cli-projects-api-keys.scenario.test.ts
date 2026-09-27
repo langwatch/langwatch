@@ -1,12 +1,14 @@
-import scenario from "@langwatch/scenario";
 import { spawnSync } from "child_process";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   createClaudeCodeAgent,
   setupLocalCli,

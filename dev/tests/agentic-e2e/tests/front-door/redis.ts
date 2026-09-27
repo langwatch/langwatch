@@ -12,9 +12,7 @@ function redisDbIndex(): number {
   const explicit = process.env.REDIS_DB_INDEX;
   if (explicit !== undefined && explicit !== "") return Number(explicit);
   const port = Number(
-    process.env.PORT ||
-      new URL(process.env.BASE_URL ?? "http://localhost:5570").port ||
-      5570,
+    process.env.PORT || new URL(process.env.BASE_URL ?? "http://localhost:5570").port || 5570,
   );
   const index = Math.floor((port - 5560) / 10);
   return index < 0 || index > 15 ? 0 : index;
@@ -36,13 +34,7 @@ async function scanResetKeys(): Promise<string[]> {
   const keys: string[] = [];
   let cursor = "0";
   do {
-    const [next, batch] = await redis.scan(
-      cursor,
-      "MATCH",
-      `${RESET_KEY_PREFIX}*`,
-      "COUNT",
-      200,
-    );
+    const [next, batch] = await redis.scan(cursor, "MATCH", `${RESET_KEY_PREFIX}*`, "COUNT", 200);
     cursor = next;
     keys.push(...batch);
   } while (cursor !== "0");
@@ -54,9 +46,7 @@ async function scanResetKeys(): Promise<string[]> {
  * the user (not "newest of all") so two tests requesting resets close
  * together can never read each other's link.
  */
-export async function findPasswordResetToken(
-  userId: string,
-): Promise<string | null> {
+export async function findPasswordResetToken(userId: string): Promise<string | null> {
   const redis = getClient();
   let newest: { token: string; createdAt: number } | null = null;
   for (const key of await scanResetKeys()) {

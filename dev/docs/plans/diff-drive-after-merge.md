@@ -84,13 +84,13 @@ for it; the findings are concrete and the fixes are small.
 
 Triage order, because not all `kind`s mean the same thing:
 
-| kind | What it usually means |
-| --- | --- |
-| `absent-on-branch` | a route we dropped. **The most serious** - it is a removal we may not have intended |
-| `probe-failed` | the branch could not answer at all. Often a boot or wiring bug, not an API change |
-| `status-differs` | a status collapsed, very often to 200 or 500. A 404 that became a 200 is a regression, not a delta |
-| `shape-differs` | a field added, removed or renamed. Additive is usually fine; removed is not |
-| `identical` | noise, and most of the stream |
+| kind               | What it usually means                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
+| `absent-on-branch` | a route we dropped. **The most serious** - it is a removal we may not have intended                |
+| `probe-failed`     | the branch could not answer at all. Often a boot or wiring bug, not an API change                  |
+| `status-differs`   | a status collapsed, very often to 200 or 500. A 404 that became a 200 is a regression, not a delta |
+| `shape-differs`    | a field added, removed or renamed. Additive is usually fine; removed is not                        |
+| `identical`        | noise, and most of the stream                                                                      |
 
 ## Traps recorded from the last attempts
 
@@ -98,7 +98,7 @@ Triage order, because not all `kind`s mean the same thing:
   has an empty `logs/` and nothing else: it never got a stack up. Check for
   `findings.jsonl` before believing a clean result.
 - **`api_boot=no-stack` for a whole session** means every "read `haven logs
-  backend`" step in every brief was a no-op. If the counters say `no-stack`, the
+backend`" step in every brief was a no-op. If the counters say `no-stack`, the
   boot evidence in any handoff from that session is worth nothing.
 - **Do not diff against a stale base.** If main has moved again by the time this
   runs, `git fetch` first - but do not re-point the base at a ref the branch does

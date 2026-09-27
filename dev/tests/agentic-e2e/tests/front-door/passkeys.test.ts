@@ -5,10 +5,6 @@
  */
 import { expect, test } from "./fixtures";
 import {
-  addVirtualAuthenticator,
-  removeVirtualAuthenticator,
-} from "./webauthn";
-import {
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
   givenARegisteredAccount,
@@ -17,6 +13,7 @@ import {
   whenISignInWithPassword,
   whenISignOut,
 } from "./steps";
+import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -70,11 +67,9 @@ test.describe("Passkeys", () => {
       await expect(page.getByTestId("passkeys-settings-section")).toBeVisible();
       await page.getByTestId("create-passkey").click();
       await expect(page.getByTestId("passkey-ceremony-dialog")).toBeVisible();
-      await expect(page.getByTestId("passkey-ceremony-dialog")).not.toBeVisible(
-        {
-          timeout: 15000,
-        },
-      );
+      await expect(page.getByTestId("passkey-ceremony-dialog")).not.toBeVisible({
+        timeout: 15000,
+      });
       await expect(page.getByTestId("passkey-card")).toBeVisible();
 
       // ── #9 + #5 (negative half): sign back in WITH the passkey ──
@@ -83,9 +78,7 @@ test.describe("Passkeys", () => {
       await page.getByLabel("Email", { exact: true }).fill(email);
 
       const optionsResponse = page.waitForResponse((response) =>
-        response
-          .url()
-          .includes("/api/auth/passkey/generate-authenticate-options"),
+        response.url().includes("/api/auth/passkey/generate-authenticate-options"),
       );
       // An account that holds a passkey is ASKED for it, not offered a
       // button (signin-signup-screens.feature "An account with a passkey is

@@ -311,7 +311,7 @@ Matching production locally costs a laptop three Node runtimes and two to four
 Go ones per worktree, and a developer running several worktrees pays that
 several times. The thing the 2026-09-03 amendment was protecting against — a
 stack that boots, serves pages and quietly processes no jobs — was never the
-*process count*. It was the **switch**: `WORKERS_IN_PROCESS` and `START_WORKERS`
+_process count_. It was the **switch**: `WORKERS_IN_PROCESS` and `START_WORKERS`
 let a stack be configured into a topology nobody could see. Remove the switch
 and the process count is free to be a local convenience again.
 
@@ -319,12 +319,12 @@ and the process count is free to be a local convenience again.
 
 Locally, a stack is **four lanes**, not six:
 
-| Lane      | Process                                     | What it is                                                                    |
-| --------- | ------------------------------------------- | ----------------------------------------------------------------------------- |
-| `ui`      | Vite (`apps/ui`)                            | the browser application, its own process as before                            |
-| `backend` | Node (`tools/dev-runtime`)                  | the **api application and the worker application in one process**             |
-| `go`      | Go (`cmd/service combined`)                 | **aigateway and nlpgo in one process**, on the two ports they already bind    |
-| `langy`   | Go (`cmd/service langyagent`), optional     | its own lane — see below                                                      |
+| Lane      | Process                                 | What it is                                                                 |
+| --------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| `ui`      | Vite (`apps/ui`)                        | the browser application, its own process as before                         |
+| `backend` | Node (`tools/dev-runtime`)              | the **api application and the worker application in one process**          |
+| `go`      | Go (`cmd/service combined`)             | **aigateway and nlpgo in one process**, on the two ports they already bind |
+| `langy`   | Go (`cmd/service langyagent`), optional | its own lane — see below                                                   |
 
 `backend` is a **launcher, not a process role.** Neither application learns it
 is sharing a process:

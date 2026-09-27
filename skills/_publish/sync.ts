@@ -8,8 +8,9 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { inlineMdx } from "../_lib/mdx-inline.js";
+
 import { listPublishedSkills } from "../_lib/feature-skills.js";
+import { inlineMdx } from "../_lib/mdx-inline.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

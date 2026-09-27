@@ -19,12 +19,12 @@ them, and neither would §3.6's compile refusal.
 `assertNoSensitiveScope` (`packages/api/src/access/access.ts:533-549`) leaks in
 the four ways §3.6 names, all reproduced by reading the code:
 
-| # | Leak | Confirmed at |
-| --- | --- | --- |
-| a | plain `Error`, so a hole is a request-time 500 | `access.ts:546` |
-| b | `SCOPE_INPUT_FIELDS = Object.values(SCOPE_TIER_FIELDS)` — three tier fields, no `userId` | `access.ts:269`; `modules/authz/contract/src/vocabulary.ts:55-59` |
-| c | `field in input`, exact key match | `access.ts:545` |
-| d | runs only on the `no-permission` declaration kind | `access.ts:301-302` |
+| #   | Leak                                                                                     | Confirmed at                                                      |
+| --- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| a   | plain `Error`, so a hole is a request-time 500                                           | `access.ts:546`                                                   |
+| b   | `SCOPE_INPUT_FIELDS = Object.values(SCOPE_TIER_FIELDS)` — three tier fields, no `userId` | `access.ts:269`; `modules/authz/contract/src/vocabulary.ts:55-59` |
+| c   | `field in input`, exact key match                                                        | `access.ts:545`                                                   |
+| d   | runs only on the `no-permission` declaration kind                                        | `access.ts:301-302`                                               |
 
 Two things §3.6 does not say, and they change the sizing:
 
@@ -38,7 +38,7 @@ guard's real surface is the **56** tRPC procedures that call `.noPermission(...)
 `SENSITIVE_SCOPE_FIELDS`.
 
 **(f) A REST `withPermission(p)` does not target an input field.** The
-permission is enforced by the *door*, against the credential
+permission is enforced by the _door_, against the credential
 (`rest/runtime.ts:1269` → `apps/api/src/app-rest/api-rest.credentials.ts:71-92`).
 The only declaration-level discharge REST has today is
 `withPermission(p, { at: "route", param })`, which routes through
@@ -74,7 +74,7 @@ Method:
 2. Anchor on `.get|post|put|patch|delete("<path>", "<op>")` for REST and
    `.procedure("<name>")` for tRPC, then walk the fluent chain **upward through
    `node.parent`** collecting `.withParams/.withQuery/.withInput/.withPermission/
-   .withAccess/.noPermission/.serviceAuthorized/.handle`, stopping at the next
+.withAccess/.noPermission/.serviceAuthorized/.handle`, stopping at the next
    anchor.
 3. tRPC server transports declare no schema, so each `.procedure(n)` is joined
    to its contract's `.query|mutation|subscription(n).withInput(schema)` through
@@ -116,7 +116,7 @@ Access kinds: `withPermission` 371, `serviceAuthorized` 27, `noPermission` 17,
 
 - **"43 snake_case keys in module contracts" is not 43 route-input keys.** The
   four snake_case spellings occur 1,264 times across `modules/` and
-  `enterprise/`, but almost all are wire *output* shapes (trace records, gateway
+  `enterprise/`, but almost all are wire _output_ shapes (trace records, gateway
   envelopes). As declared **input** keys on a route or procedure there are
   exactly **four**, on two routes: `project_id` and `team_id` on
   `gateway-spend.rest.ts:552` and `:638`.
@@ -135,7 +135,7 @@ No site in this census lets a caller address another tenant's resource. Every
 candidate was traced from the handler to an authorization decision; the ones
 that looked worst are in §3.2 and §3.3 with the line that stops them.
 
-This is a statement about *this* census, not about the tree. Three exploitable
+This is a statement about _this_ census, not about the tree. Three exploitable
 authorization defects are already recorded in
 `.claude/handoffs/astra-alignment-review.md` findings 1-3. §5 explains why this
 detector reaches none of them.
@@ -147,22 +147,22 @@ discharge. Each is unreachable, and the line that makes it so is named. These
 are exactly §3.6's "correct today only by convention" class: nothing stops a
 later edit from reading `input.projectId` instead of the credential.
 
-| Site | Route | Key | Declared access | Why it is safe |
-| --- | --- | --- | --- | --- |
-| `modules/analytics/process/src/transport/dashboard-widget.rest.ts:147` | `GET /api/v1/projects/:projectId/analytics/dashboard-widgets` | `projectId` (path) | `withPermission("analytics:view")`, no target | handler reads `projectFor({ app, scope })` at `:168`, never `input.projectId` |
-| same file `:172, :204, :230, :264, :295` | POST / GET / PATCH / POST dashboard / DELETE | `projectId` (path) | `analytics:create|view|update|delete`, no target | same `projectFor(... scope)` call in each handler |
-| `modules/dashboard/process/src/transport/saved-workbench-chart.rest.ts:108` | `GET /api/v1/projects/:projectId/analytics/charts` | `projectId` (path) | `withPermission("analytics:view")`, no target | `projectFor` returns `input.scope.id` at `saved-workbench-chart.rest.ts:66` |
-| same file `:133, :168, :197, :233, :256, :287` | the other six chart routes | `projectId` (path) | `analytics:*`, no target | same, `:127/:157/:191/:221/...` |
-| `modules/secret/process/src/transport/secret.rest.ts:67` | `GET /` | `projectId` (query) | `withPermission("secrets:view")` | `app.list({ projectId: scope.id })` at `:77`; the file says so at `:6-8` |
-| `modules/secret/process/src/transport/secret.rest.ts:82` | `GET /:id` | `projectId` (query) | `withPermission("secrets:view")` | `app.get({ projectId: scope.id, id })` at `:87` |
-| `modules/secret/process/src/transport/secret.rest.ts:130` | `DELETE /:id` | `projectId` (input) | `withPermission("secrets:manage")` | `app.delete({ projectId: scope.id, id })` at `:135` |
-| `modules/stored-object/process/src/transport/stored-object.rest.ts:23` | `POST /:uploadToken/confirmation` | `projectId` (input) | `withPermission("project:update")` | handler passes `input` through (`:30`); safe **only** because `assertInputScope` refuses `input.projectId !== caller.scope.id` at `access.ts:518-526`, the project door having set `caller.scope` |
-| `modules/stored-object/process/src/transport/stored-object.rest.ts:31` | `GET /:id` | `projectId` (query) | `withPermission("project:view")` | same guard; handler is `app.resolveDelivery(input)` at `:37` |
-| `modules/stored-object/process/src/transport/stored-object.rest.ts:39` | `DELETE /:id` | `projectId` (input) | `withPermission("project:manage")` | same guard; handler is `app.delete(input)` at `:45` |
-| `modules/project/process/src/transport/project.rest.ts:247` | `GET /:projectId/api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` — no permission at all | handler is `async () => refuseBaseKeyToApiToken()` at `:251`; the route refuses unconditionally |
-| `modules/project/process/src/transport/project.rest.ts:254` | `POST /:projectId/regenerate-api-key` | `projectId` (path) | `withAccess(anyAuthenticated(...))` | same unconditional refusal at `:259` |
-| `modules/authz/process/src/transport/authz-role-binding.rest.ts:96` | `GET /` | `userId` (query) | `withPermission("organization:manage")` | rows come from `organization.organizationId` at `:107`; `input.userId` is only a post-filter at `:109` |
-| `modules/workflow/process/src/transport/workflow-studio.rest.ts:103` | `POST /api/workflows/code-completion` | `projectId` (query) | `withAccess({ kind: "public", ... })` | **does not reach runtime**: see §3.4 |
+| Site                                                                        | Route                                                         | Key                 | Declared access                                            | Why it is safe                                                                                                                                                                                    |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `modules/analytics/process/src/transport/dashboard-widget.rest.ts:147`      | `GET /api/v1/projects/:projectId/analytics/dashboard-widgets` | `projectId` (path)  | `withPermission("analytics:view")`, no target              | handler reads `projectFor({ app, scope })` at `:168`, never `input.projectId`                                                                                                                     |
+| same file `:172, :204, :230, :264, :295`                                    | POST / GET / PATCH / POST dashboard / DELETE                  | `projectId` (path)  | `analytics:create                                          | view                                                                                                                                                                                              | update | delete`, no target | same `projectFor(... scope)` call in each handler |
+| `modules/dashboard/process/src/transport/saved-workbench-chart.rest.ts:108` | `GET /api/v1/projects/:projectId/analytics/charts`            | `projectId` (path)  | `withPermission("analytics:view")`, no target              | `projectFor` returns `input.scope.id` at `saved-workbench-chart.rest.ts:66`                                                                                                                       |
+| same file `:133, :168, :197, :233, :256, :287`                              | the other six chart routes                                    | `projectId` (path)  | `analytics:*`, no target                                   | same, `:127/:157/:191/:221/...`                                                                                                                                                                   |
+| `modules/secret/process/src/transport/secret.rest.ts:67`                    | `GET /`                                                       | `projectId` (query) | `withPermission("secrets:view")`                           | `app.list({ projectId: scope.id })` at `:77`; the file says so at `:6-8`                                                                                                                          |
+| `modules/secret/process/src/transport/secret.rest.ts:82`                    | `GET /:id`                                                    | `projectId` (query) | `withPermission("secrets:view")`                           | `app.get({ projectId: scope.id, id })` at `:87`                                                                                                                                                   |
+| `modules/secret/process/src/transport/secret.rest.ts:130`                   | `DELETE /:id`                                                 | `projectId` (input) | `withPermission("secrets:manage")`                         | `app.delete({ projectId: scope.id, id })` at `:135`                                                                                                                                               |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:23`      | `POST /:uploadToken/confirmation`                             | `projectId` (input) | `withPermission("project:update")`                         | handler passes `input` through (`:30`); safe **only** because `assertInputScope` refuses `input.projectId !== caller.scope.id` at `access.ts:518-526`, the project door having set `caller.scope` |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:31`      | `GET /:id`                                                    | `projectId` (query) | `withPermission("project:view")`                           | same guard; handler is `app.resolveDelivery(input)` at `:37`                                                                                                                                      |
+| `modules/stored-object/process/src/transport/stored-object.rest.ts:39`      | `DELETE /:id`                                                 | `projectId` (input) | `withPermission("project:manage")`                         | same guard; handler is `app.delete(input)` at `:45`                                                                                                                                               |
+| `modules/project/process/src/transport/project.rest.ts:247`                 | `GET /:projectId/api-key`                                     | `projectId` (path)  | `withAccess(anyAuthenticated(...))` — no permission at all | handler is `async () => refuseBaseKeyToApiToken()` at `:251`; the route refuses unconditionally                                                                                                   |
+| `modules/project/process/src/transport/project.rest.ts:254`                 | `POST /:projectId/regenerate-api-key`                         | `projectId` (path)  | `withAccess(anyAuthenticated(...))`                        | same unconditional refusal at `:259`                                                                                                                                                              |
+| `modules/authz/process/src/transport/authz-role-binding.rest.ts:96`         | `GET /`                                                       | `userId` (query)    | `withPermission("organization:manage")`                    | rows come from `organization.organizationId` at `:107`; `input.userId` is only a post-filter at `:109`                                                                                            |
+| `modules/workflow/process/src/transport/workflow-studio.rest.ts:103`        | `POST /api/workflows/code-completion`                         | `projectId` (query) | `withAccess({ kind: "public", ... })`                      | **does not reach runtime**: see §3.4                                                                                                                                                              |
 
 The three `ops-process` procedures that take a `projectId` they never read
 (`ops-process.trpc.ts:86, :115, :124`) sit behind `admitOperator` and are
@@ -174,7 +174,7 @@ Four shapes, all of which §3.6 already names as a legal discharge:
 
 **(i) tRPC `withPermission` targets the field — 343 sites.** The permission is
 resolved at the caller-supplied tier id
-(`modules/authz/contract/src/declaration.ts:195-209`), so the input key *is* the
+(`modules/authz/contract/src/declaration.ts:195-209`), so the input key _is_ the
 authorization target. This is `atPathScope` in everything but spelling. Includes
 every `organizationId`-keyed member/group/role procedure
 (`organization.trpc.ts:76, :89, :149, :209`; `group.trpc.ts:43, :63, :67`;
@@ -184,7 +184,7 @@ non-member — `organization-group.service.ts:201-204` calls
 `teams.getOrganizationMembers({ organizationId, userIds: [userId] })`.
 
 **(ii) The `allow` waiver — 9 + 11 sites.** `.noPermission({ reason, allow })`
-already *is* §3.6's `unverified(field).because(reason)`, with the reason
+already _is_ §3.6's `unverified(field).because(reason)`, with the reason
 required. `api-key.trpc.ts:23, :30, :37, :44, :61, :72, :83, :90, :97` each
 name `allow: { organizationId: "<why>" }`;
 `personal-workspace-features.trpc.ts:11-15` and
@@ -193,34 +193,34 @@ shared constant.
 
 **(iii) Honoured deferral — the handler resolves the owner and checks it.**
 
-| Site | What discharges it |
-| --- | --- |
-| `modules/stored-object/process/src/transport/stored-object-file.rest.ts:150` | the reference deferral; owner authorization at `:200-216` (astra finding 4 confirms) |
-| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:88` | `permittedPerson({ app, userId: caller.userId, projectId })` at `:100` before any read |
-| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:195` | `app.abortWorkbenchRun({ ...input, userId: caller.userId })` at `:201` — abort ownership checked in the app |
-| `modules/gateway/process/src/transport/virtual-key.trpc.ts:39` and 10 siblings | every handler co-keys `input.organizationId` with `actor.id`; `listVisibleVirtualKeys` intersects against the caller's membership |
-| `modules/gateway/process/src/transport/gateway-usage.trpc.ts:29, :48` | same membership intersection before any total is summed |
-| `modules/model-provider/process/src/transport/model-provider.trpc.ts:75, :117, :127, :145` | `model-provider-command.service.ts:82` `authorizeWrite(actorId, existing?.scopes, scopes)`; delete authorizes at `:124` |
-| `modules/model-provider/process/src/transport/llm-model-cost.trpc.ts:59` | scope derived from the stored row, not the input; `manage` authorized on it |
-| `modules/user/process/src/transport/user.trpc.ts:141` | `user.app.ts:801-803` — `userId !== caller.id && !isOperator(...)` throws `UserAccountAccessDeniedError` |
-| `modules/user/process/src/transport/user.trpc.ts:149` | `user.app.ts:813-815` — operator only |
-| `modules/feature-flag/process/src/transport/feature-flag.trpc.ts:21` | `feature-flag.app.ts:187` `authorizeLooseTarget(input)` |
-| `modules/authz/process/src/transport/authz.trpc.ts:22` | answers the caller's own standing; a non-member resolves to the empty set |
-| `modules/project/process/src/transport/project.trpc.ts:95` | `createStanding({ app, input, actor })` asks the named team/organization before the write |
-| `modules/ops/.../ops-platform.trpc.ts`, `ops-process.trpc.ts` | `app.admitOperator(operator, "ops:view")` first line of every handler |
+| Site                                                                                       | What discharges it                                                                                                                |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `modules/stored-object/process/src/transport/stored-object-file.rest.ts:150`               | the reference deferral; owner authorization at `:200-216` (astra finding 4 confirms)                                              |
+| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:88`             | `permittedPerson({ app, userId: caller.userId, projectId })` at `:100` before any read                                            |
+| `modules/experiment/process/src/transport/experiment-workbench-run.rest.ts:195`            | `app.abortWorkbenchRun({ ...input, userId: caller.userId })` at `:201` — abort ownership checked in the app                       |
+| `modules/gateway/process/src/transport/virtual-key.trpc.ts:39` and 10 siblings             | every handler co-keys `input.organizationId` with `actor.id`; `listVisibleVirtualKeys` intersects against the caller's membership |
+| `modules/gateway/process/src/transport/gateway-usage.trpc.ts:29, :48`                      | same membership intersection before any total is summed                                                                           |
+| `modules/model-provider/process/src/transport/model-provider.trpc.ts:75, :117, :127, :145` | `model-provider-command.service.ts:82` `authorizeWrite(actorId, existing?.scopes, scopes)`; delete authorizes at `:124`           |
+| `modules/model-provider/process/src/transport/llm-model-cost.trpc.ts:59`                   | scope derived from the stored row, not the input; `manage` authorized on it                                                       |
+| `modules/user/process/src/transport/user.trpc.ts:141`                                      | `user.app.ts:801-803` — `userId !== caller.id && !isOperator(...)` throws `UserAccountAccessDeniedError`                          |
+| `modules/user/process/src/transport/user.trpc.ts:149`                                      | `user.app.ts:813-815` — operator only                                                                                             |
+| `modules/feature-flag/process/src/transport/feature-flag.trpc.ts:21`                       | `feature-flag.app.ts:187` `authorizeLooseTarget(input)`                                                                           |
+| `modules/authz/process/src/transport/authz.trpc.ts:22`                                     | answers the caller's own standing; a non-member resolves to the empty set                                                         |
+| `modules/project/process/src/transport/project.trpc.ts:95`                                 | `createStanding({ app, input, actor })` asks the named team/organization before the write                                         |
+| `modules/ops/.../ops-platform.trpc.ts`, `ops-process.trpc.ts`                              | `app.admitOperator(operator, "ops:view")` first line of every handler                                                             |
 
 **(iv) The credential bounds the id in the handler.**
 
-| Site | What discharges it |
-| --- | --- |
-| `modules/gateway/process/src/transport/gateway-spend.rest.ts:552, :638` | `resolveSpendScope` starts from the credential organization's own projects and **intersects** the supplied ids — `prisma.gateway-spend-scope.repository.ts:86-96`. A foreign `project_id` drops out of the set. |
-| `modules/organization/.../organization-management.rest.ts:190, :212, :236, :279` | every `:userId` is passed with `organizationId: scope.id` in the same call (`:201, :226, :268, :287`) |
-| `modules/organization/.../team.rest.ts:244, :271` and `group.rest.ts:199, :217` | same co-keying with `scope.id` |
-| `modules/project/process/src/transport/project.rest.ts:169` (`teamId`) | `project.service.ts:268-272` `assertTeamCanHoldANewProject({ teamId, organizationId })` |
-| `modules/project/process/src/transport/project.rest.ts:209` / `project.trpc.ts:170` (`teamId`) | `project.service.ts:334-343` `findActiveTeamInOrganization` refuses a destination team outside the credential's organization |
-| `modules/langy/process/src/transport/langy-internal.rest.ts:79` | the handler cross-checks the `(projectId, conversationId, turnId)` triple at `:94` and 404s a forged one; the door is the deployment's own bearer, which **fails closed** when unconfigured (`api-rest.host.ts:479-481`) |
-| `modules/langy/process/src/transport/langy-internal.rest.ts:136` | `revokeWorkerSessionKey({ apiKeyId, projectId })` refuses any key that is not a Langy session key |
-| `modules/organization/.../join-request.trpc.ts:40` | `fileJoinRequest({ userId: actor.id, organizationId })` — the offer list is the gate |
+| Site                                                                                           | What discharges it                                                                                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `modules/gateway/process/src/transport/gateway-spend.rest.ts:552, :638`                        | `resolveSpendScope` starts from the credential organization's own projects and **intersects** the supplied ids — `prisma.gateway-spend-scope.repository.ts:86-96`. A foreign `project_id` drops out of the set.          |
+| `modules/organization/.../organization-management.rest.ts:190, :212, :236, :279`               | every `:userId` is passed with `organizationId: scope.id` in the same call (`:201, :226, :268, :287`)                                                                                                                    |
+| `modules/organization/.../team.rest.ts:244, :271` and `group.rest.ts:199, :217`                | same co-keying with `scope.id`                                                                                                                                                                                           |
+| `modules/project/process/src/transport/project.rest.ts:169` (`teamId`)                         | `project.service.ts:268-272` `assertTeamCanHoldANewProject({ teamId, organizationId })`                                                                                                                                  |
+| `modules/project/process/src/transport/project.rest.ts:209` / `project.trpc.ts:170` (`teamId`) | `project.service.ts:334-343` `findActiveTeamInOrganization` refuses a destination team outside the credential's organization                                                                                             |
+| `modules/langy/process/src/transport/langy-internal.rest.ts:79`                                | the handler cross-checks the `(projectId, conversationId, turnId)` triple at `:94` and 404s a forged one; the door is the deployment's own bearer, which **fails closed** when unconfigured (`api-rest.host.ts:479-481`) |
+| `modules/langy/process/src/transport/langy-internal.rest.ts:136`                               | `revokeWorkerSessionKey({ apiKeyId, projectId })` refuses any key that is not a Langy session key                                                                                                                        |
+| `modules/organization/.../join-request.trpc.ts:40`                                             | `fileJoinRequest({ userId: actor.id, organizationId })` — the offer list is the gate                                                                                                                                     |
 
 ### 3.4 One site that is neither: a declaration that cannot load
 
@@ -252,17 +252,17 @@ its existence is what makes the route refuse.
 Per finding, which leak it falls through and whether
 normalisation + `UnverifiedScopeInput<K>` would have refused it at build time.
 
-| Finding class | Leak it falls through | Refused at build by §3.6? |
-| --- | --- | --- |
-| dashboard-widget ×6, saved-workbench-chart ×6 (`:projectId`, no target) | (d)/(e) — REST never reaches the guard | **Yes.** `projectId` normalises into the closed set, the declaration names no discharge, `handle` types as `UnverifiedScopeInput<"projectId">`. The fix is one clause: `.atPathScope("projectId")`. |
-| secret ×3, stored-object ×3 (`projectId` in query/body) | (d)/(e) | **Yes**, same shape. stored-object is the more valuable catch: its handlers pass `input` straight to the app, so the only thing standing between it and a cross-tenant read is `assertInputScope`, which is itself exact-match and credential-tier-only. |
-| `project.rest.ts:247, :254` (`anyAuthenticated` + `:projectId`) | (b) is not it — (d)/(e). `anyAuthenticated` performs **no** permission check and the browser door leaves `caller.scope` null, so `assertInputScope` no-ops too | **Yes**, and this is the one where the type earns its keep: today two routes take a tenant id under an access kind that checks nothing, and only an unconditional `refuseBaseKeyToApiToken()` keeps it honest. |
-| `gateway-spend.rest.ts:552, :638` (`project_id`, `team_id`) | (c) — snake_case. Invisible to `assertNoSensitiveScope` **and** to `assertInputScope` **and** to `assertNoScopeInput` | **Yes** — this is precisely what `Normalize<K>` is for. It is also the whole of the snake_case exposure: four keys, two routes. |
-| the 6 `:userId` REST routes and 27 `userId` tRPC inputs | (b) — `userId` is not in the set at all | **Yes.** Every one becomes `.matchesCaller("userId")` or `.unverified("userId").because(...)`. `user.trpc.ts:141/:149` is the textbook case: `.noPermission({ reason })` with no `allow`, `userId` straight from the caller, and the entire gate 600 lines away in `user.app.ts:801`. |
-| `authz-role-binding.rest.ts:96` (`userId` as filter) | (b) | **Yes**, and the honest discharge is `.unverified("userId").because("filter over rows already bounded to the credential's organization")`. |
-| `workflow-studio.rest.ts:103` | none — leak (d) does not apply; the *build-time* check already covers `public` | **Already refused**, at declaration time. Evidence that the §3.6 idiom works; §3.6's contribution is extending it past `public` to every kind. |
-| `.noPermission` procedures naming `allow` (20 sites) | none | **No, and correctly so** — `allow` is already the waiver. §3.6 should adopt it rather than replace it: same map, same required reason. |
-| astra findings 1, 2 and 3 | **none of the four** | **No.** See §5. |
+| Finding class                                                           | Leak it falls through                                                                                                                                          | Refused at build by §3.6?                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| dashboard-widget ×6, saved-workbench-chart ×6 (`:projectId`, no target) | (d)/(e) — REST never reaches the guard                                                                                                                         | **Yes.** `projectId` normalises into the closed set, the declaration names no discharge, `handle` types as `UnverifiedScopeInput<"projectId">`. The fix is one clause: `.atPathScope("projectId")`.                                                                                   |
+| secret ×3, stored-object ×3 (`projectId` in query/body)                 | (d)/(e)                                                                                                                                                        | **Yes**, same shape. stored-object is the more valuable catch: its handlers pass `input` straight to the app, so the only thing standing between it and a cross-tenant read is `assertInputScope`, which is itself exact-match and credential-tier-only.                              |
+| `project.rest.ts:247, :254` (`anyAuthenticated` + `:projectId`)         | (b) is not it — (d)/(e). `anyAuthenticated` performs **no** permission check and the browser door leaves `caller.scope` null, so `assertInputScope` no-ops too | **Yes**, and this is the one where the type earns its keep: today two routes take a tenant id under an access kind that checks nothing, and only an unconditional `refuseBaseKeyToApiToken()` keeps it honest.                                                                        |
+| `gateway-spend.rest.ts:552, :638` (`project_id`, `team_id`)             | (c) — snake_case. Invisible to `assertNoSensitiveScope` **and** to `assertInputScope` **and** to `assertNoScopeInput`                                          | **Yes** — this is precisely what `Normalize<K>` is for. It is also the whole of the snake_case exposure: four keys, two routes.                                                                                                                                                       |
+| the 6 `:userId` REST routes and 27 `userId` tRPC inputs                 | (b) — `userId` is not in the set at all                                                                                                                        | **Yes.** Every one becomes `.matchesCaller("userId")` or `.unverified("userId").because(...)`. `user.trpc.ts:141/:149` is the textbook case: `.noPermission({ reason })` with no `allow`, `userId` straight from the caller, and the entire gate 600 lines away in `user.app.ts:801`. |
+| `authz-role-binding.rest.ts:96` (`userId` as filter)                    | (b)                                                                                                                                                            | **Yes**, and the honest discharge is `.unverified("userId").because("filter over rows already bounded to the credential's organization")`.                                                                                                                                            |
+| `workflow-studio.rest.ts:103`                                           | none — leak (d) does not apply; the _build-time_ check already covers `public`                                                                                 | **Already refused**, at declaration time. Evidence that the §3.6 idiom works; §3.6's contribution is extending it past `public` to every kind.                                                                                                                                        |
+| `.noPermission` procedures naming `allow` (20 sites)                    | none                                                                                                                                                           | **No, and correctly so** — `allow` is already the waiver. §3.6 should adopt it rather than replace it: same map, same required reason.                                                                                                                                                |
+| astra findings 1, 2 and 3                                               | **none of the four**                                                                                                                                           | **No.** See §5.                                                                                                                                                                                                                                                                       |
 
 ---
 
@@ -283,15 +283,15 @@ The three confirmed exploitable defects in
   there is no caller-supplied key for a normaliser to normalise.
 
 §3.6's closed set is defined over **input spellings**. All three defects are
-mismatches between *the tier a permission was checked at* and *the tier the
-query reads*. That is a different invariant, and the honest conclusion is:
+mismatches between _the tier a permission was checked at_ and _the tier the
+query reads_. That is a different invariant, and the honest conclusion is:
 
 1. §3.6 is worth building — it converts 21 conventions into declarations and
    closes the `userId` and snake_case blind spots outright. The fact that the
    census found no hole is evidence that the conventions are currently held, not
    that they are enforced.
 2. §3.6 is **not** the rule that would have caught the three known holes. A
-   second rule is needed, about the *width* of what a handler reads relative to
+   second rule is needed, about the _width_ of what a handler reads relative to
    the tier its permission was checked at. Sizing that is not this audit's job.
 3. The closed set should probably grow by one more pair before it ships:
    `scopeType` + `scopeId`, which `role-binding.trpc.ts:29` and the model-provider

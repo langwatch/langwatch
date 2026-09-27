@@ -1,7 +1,9 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { sync } from "../_publish/sync.js";
 
 const EXTERNAL_LINK = /^(https?:|mailto:|#|\{\{)/;

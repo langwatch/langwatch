@@ -9,10 +9,7 @@
 
 import crypto from "node:crypto";
 
-const endpoint = (process.env.LW_ENDPOINT ?? "http://localhost:5560").replace(
-  /\/+$/,
-  "",
-);
+const endpoint = (process.env.LW_ENDPOINT ?? "http://localhost:5560").replace(/\/+$/, "");
 const apiKey = process.env.LW_API_KEY;
 if (!apiKey) {
   console.error("Missing required env var LW_API_KEY");
@@ -26,9 +23,7 @@ function positiveIntEnv(name, fallback, max) {
   if (raw === undefined) return fallback;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 1 || value > max) {
-    console.error(
-      `Invalid ${name}=${raw}: expected an integer between 1 and ${max}.`,
-    );
+    console.error(`Invalid ${name}=${raw}: expected an integer between 1 and ${max}.`);
     process.exit(1);
   }
   return value;
@@ -157,10 +152,7 @@ const LABEL_SETS = [
 ];
 
 const USERS = Array.from({ length: 18 }, (_, i) => `demo-user-${i + 1}`);
-const CUSTOMERS = Array.from(
-  { length: 10 },
-  (_, i) => `demo-customer-${i + 1}`,
-);
+const CUSTOMERS = Array.from({ length: 10 }, (_, i) => `demo-customer-${i + 1}`);
 
 // pre-build a pool of threads (some multi-trace) to feed avg-traces/thread
 let threadCounter = 0;
@@ -206,9 +198,7 @@ function buildLlmSpan(spanId, isError) {
   const model = weightedPick(MODELS);
   const promptTokens = Math.round(lognormal(5.2, 0.6)); // ~ 100-400 typical
   const completionTokens = Math.round(lognormal(4.8, 0.7)); // ~ 60-350 typical
-  const cost =
-    (promptTokens / 1000) * model.inRate +
-    (completionTokens / 1000) * model.outRate;
+  const cost = (promptTokens / 1000) * model.inRate + (completionTokens / 1000) * model.outRate;
   const question = pick(USER_QUESTIONS);
   const answer = pick(ASSISTANT_ANSWERS);
   return {
@@ -389,18 +379,13 @@ async function main() {
   for (let d = DAYS - 1; d >= 0; d--) {
     const dayStart = new Date(now - d * dayMs);
     dayStart.setUTCHours(0, 0, 0, 0);
-    const activity = activityWeight(
-      new Date(dayStart.getTime() + 12 * 60 * 60 * 1000),
-    );
+    const activity = activityWeight(new Date(dayStart.getTime() + 12 * 60 * 60 * 1000));
     // mild upward trend: more recent days get slightly more traffic
     const trend = 0.8 + 0.4 * ((DAYS - 1 - d) / Math.max(1, DAYS - 1));
     const jitter = 0.75 + rand() * 0.5; // +/-25%
     const dayOfWeek = dayStart.getUTCDay();
     const dayWeekdayFactor = dayOfWeek === 0 || dayOfWeek === 6 ? 0.5 : 1.0;
-    const count = Math.max(
-      1,
-      Math.round(PER_DAY * trend * jitter * dayWeekdayFactor),
-    );
+    const count = Math.max(1, Math.round(PER_DAY * trend * jitter * dayWeekdayFactor));
     for (let i = 0; i < count; i++) {
       const ts = randomTimestampOnDay(dayStart.getTime());
       traces.push(buildTrace(Math.min(ts, now)));
@@ -412,11 +397,7 @@ async function main() {
     `Seeding ${traces.length} synthetic traces over the last ${DAYS} days into ${endpoint} ...`,
   );
 
-  const { succeeded, failed } = await runPool(
-    traces,
-    (trace) => post(trace),
-    5,
-  );
+  const { succeeded, failed } = await runPool(traces, (trace) => post(trace), 5);
 
   const failRate = failed / traces.length;
   console.log(
@@ -424,9 +405,7 @@ async function main() {
       `(days=${DAYS}, per_day~${PER_DAY}).`,
   );
   if (failRate > 0.02) {
-    console.error(
-      `Failure rate ${(failRate * 100).toFixed(1)}% exceeds 2% threshold.`,
-    );
+    console.error(`Failure rate ${(failRate * 100).toFixed(1)}% exceeds 2% threshold.`);
     process.exit(1);
   }
 }

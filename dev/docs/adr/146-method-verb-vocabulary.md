@@ -14,13 +14,13 @@ the method is for.
 
 Measured by the verb each flagged method actually starts with:
 
-| verb | findings |
-| ---- | -------- |
-| `resolve*` | 63 |
-| `read*` | 40 |
-| `get*` | 27 |
-| `map` / `pick` / `infer` / `describe` | 22 |
-| `find*` | 0 — already exempt |
+| verb                                  | findings           |
+| ------------------------------------- | ------------------ |
+| `resolve*`                            | 63                 |
+| `read*`                               | 40                 |
+| `get*`                                | 27                 |
+| `map` / `pick` / `infer` / `describe` | 22                 |
+| `find*`                               | 0 — already exempt |
 
 The rule already exempts conversions (`parse`, `format`, `normalize`, `derive`,
 `compute`, `build`, `to*`, `as*`) on the reasoning that a conversion is handed
@@ -38,11 +38,11 @@ fragment of them and none of the fragments agreed.
 
 **Reads.**
 
-| verb | contract |
-| ---- | -------- |
+| verb                       | contract                                                                                                                                                    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get<Noun>` / `getBy<Key>` | exactly one, or throws. Never nullable. `getBy<Key>` only when the key distinguishes the method and the entity itself comes back (`getById`, `getByEmail`). |
-| `find<Noun>` | an array. The empty array is the absence. |
-| `list<Noun>` | a page (`{ items, cursor }`), in a service or a repository (Alex, 2026-09-24). A repository's unpaged collection is `find*`. |
+| `find<Noun>`               | an array. The empty array is the absence.                                                                                                                   |
+| `list<Noun>`               | a page (`{ items, cursor }`), in a service or a repository (Alex, 2026-09-24). A repository's unpaged collection is `find*`.                                |
 
 **A keyed read that may miss is a `get*`** (Alex, 2026-09-24). One thing by its key
 that may not exist throws the module's not-found `HandledError`; a caller for

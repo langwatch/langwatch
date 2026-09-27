@@ -5,6 +5,7 @@ import {
   redactSessionJsonl,
   truncateJsonlToByteBudget,
 } from "@langwatch/redaction";
+
 import { getConfig } from "../config.js";
 
 /** Transcripts are capped after redaction; oldest lines are dropped first. */

@@ -27,6 +27,7 @@ The other 17 installed modules (`annotation`, `authz`, `codingAgent`,
 `slices` map at all — see each section for what that means for that module.
 
 Legend for **Port difficulty**:
+
 - `mechanical` — leaves and handles map 1:1, ownership is unambiguous.
 - `needs-a-decision` — a collision, a missing wire, a secret declared as
   config, or an ownership question sits in the way of a pure rename.
@@ -47,7 +48,7 @@ Supplied by the deleted app config (`slices.agent`):
 | publicBaseUrl | `publicBaseUrl` (derived from `deploymentPublicBaseUrl`, i.e. `BASE_HOST`) | shared deployment fact, see below |
 | connected | `config.infrastructure.connectedAgents` | a top-level-only field never declared by any module contract — trace it before porting |
 
-Process half (`agent.app.ts`) declares its OWN `agentAppConfigSchema = z.object({ publicBaseUrl: z.url(), connected: agentServerConfigSchema.nullable(), httpTesting: z.boolean().optional() })` — note `agentServerConfigSchema` here is **not** this module's own contract schema name (`replicaCount`/`relayMaxPayloadMb` above); it is a *different* schema of the same name imported from elsewhere for `connected`. Confirm which `agentServerConfigSchema` resolves at that import before folding.
+Process half (`agent.app.ts`) declares its OWN `agentAppConfigSchema = z.object({ publicBaseUrl: z.url(), connected: agentServerConfigSchema.nullable(), httpTesting: z.boolean().optional() })` — note `agentServerConfigSchema` here is **not** this module's own contract schema name (`replicaCount`/`relayMaxPayloadMb` above); it is a _different_ schema of the same name imported from elsewhere for `connected`. Confirm which `agentServerConfigSchema` resolves at that import before folding.
 
 Port difficulty: needs-a-decision
 Notes: `replicaCount`/`relayMaxPayloadMb` (the contract's own leaves) are never referenced in the deleted app's `slices.agent` at all — dead declarations, or read some other way. Confirm before deleting.
@@ -95,7 +96,7 @@ Config leaves:
 
 Secrets: none declared directly, but see note.
 
-Supplied by the deleted app config: **not present in `slices` at all.** `apiKeyPepper` is instead a top-level `apiConfigDefinition` field (`apiKeyServerConfigDefinition.pepper` referenced directly, line 193 of `apps/api/src/config.ts`), and the api's `resolveApiConfig` synthesizes its actual source value as `firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE)` where `API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]` is *itself* pre-substituted (`CREDENTIALS_SECRET` is synthesized first as `firstDefined(source, ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"])`). So the real precedence, unwound, is: `API_KEY_PEPPER` → `CREDENTIALS_SECRET` → `NEXTAUTH_SECRET`.
+Supplied by the deleted app config: **not present in `slices` at all.** `apiKeyPepper` is instead a top-level `apiConfigDefinition` field (`apiKeyServerConfigDefinition.pepper` referenced directly, line 193 of `apps/api/src/config.ts`), and the api's `resolveApiConfig` synthesizes its actual source value as `firstDefined(source, API_KEY_PEPPER_ENV_PRECEDENCE)` where `API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"]` is _itself_ pre-substituted (`CREDENTIALS_SECRET` is synthesized first as `firstDefined(source, ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"])`). So the real precedence, unwound, is: `API_KEY_PEPPER` → `CREDENTIALS_SECRET` → `NEXTAUTH_SECRET`.
 
 Process half (`api-key.app.ts`) uses `configSchema = apiKeyServerConfigSchema` directly — no separate app-level schema.
 

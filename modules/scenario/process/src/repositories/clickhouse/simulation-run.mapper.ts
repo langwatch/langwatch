@@ -8,11 +8,11 @@ import {
   simulationRunDataSchema,
 } from "@langwatch/scenario-contract";
 
-import { type ClickHouseCriteriaColumns, columnsToCriteria } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
+import { type ClickHouseCriteriaColumns, columnsToCriteria } from "./simulation-criteria.mapper.ts";
 
 /**
  * Timestamp columns arrive as Unix milliseconds via toUnixTimestamp64Milli().

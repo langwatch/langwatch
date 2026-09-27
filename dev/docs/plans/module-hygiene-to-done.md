@@ -4,18 +4,18 @@ Scope: the original sixteen-route request and the subsequent 57-module audit. Pr
 
 ## Delivery order
 
-| Order | Lane | Completion evidence |
-| --- | --- | --- |
-| 1 | Governance CLI and ingest | Real private composition and one truthful API boundary; mounted routes; organisation-specific entitlement and CLI-session refusal tests. |
-| 1 | Scenario generation and export | Real ScenarioApi operations, private model execution, mounted generation/download, target permissions, CSV/gzip/cancellation proof. |
-| 1 | Gateway internal and OTLP aliases | Real gateway composition and HMAC mount; aliases share canonical OTLP ingest with matching bytes/status/auth. |
-| 2 | Webhook SQS | Production delivery invokes the injected channel; memory behaviour and retry/failure proof. |
-| 2 | Hosted MCP | Cohesive protocol/service/channel boundaries, typed framework hosting, lifecycle/session/OAuth/CORS parity and bound specs. A first extraction alone does not close this finding. |
-| 2 | Langy leftovers | Every leftover surface is wired through its real owner or removed with caller and parity evidence; internal secret scoping remains intact. |
-| 3 | Authorization | Proven same-target checks declared at boundary; denied requests cannot call the operation; distinct-target checks retained. |
-| 3 | Transport errors | Concrete domain errors and declared outputs preserve released semantics; obsolete remappers removed only with equivalent coverage. |
-| 3 | Prompt memory | Faithful repositories selected by memory tier; tenant/filter/order/version behaviour and installed-module proof. |
-| 3 | Billing memory | Billable events and meter memory implementations preserve aggregation, money/time units and tenant isolation; registry proof. |
+| Order | Lane                              | Completion evidence                                                                                                                                                               |
+| ----- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Governance CLI and ingest         | Real private composition and one truthful API boundary; mounted routes; organisation-specific entitlement and CLI-session refusal tests.                                          |
+| 1     | Scenario generation and export    | Real ScenarioApi operations, private model execution, mounted generation/download, target permissions, CSV/gzip/cancellation proof.                                               |
+| 1     | Gateway internal and OTLP aliases | Real gateway composition and HMAC mount; aliases share canonical OTLP ingest with matching bytes/status/auth.                                                                     |
+| 2     | Webhook SQS                       | Production delivery invokes the injected channel; memory behaviour and retry/failure proof.                                                                                       |
+| 2     | Hosted MCP                        | Cohesive protocol/service/channel boundaries, typed framework hosting, lifecycle/session/OAuth/CORS parity and bound specs. A first extraction alone does not close this finding. |
+| 2     | Langy leftovers                   | Every leftover surface is wired through its real owner or removed with caller and parity evidence; internal secret scoping remains intact.                                        |
+| 3     | Authorization                     | Proven same-target checks declared at boundary; denied requests cannot call the operation; distinct-target checks retained.                                                       |
+| 3     | Transport errors                  | Concrete domain errors and declared outputs preserve released semantics; obsolete remappers removed only with equivalent coverage.                                                |
+| 3     | Prompt memory                     | Faithful repositories selected by memory tier; tenant/filter/order/version behaviour and installed-module proof.                                                                  |
+| 3     | Billing memory                    | Billable events and meter memory implementations preserve aggregation, money/time units and tenant isolation; registry proof.                                                     |
 
 At most three workers run concurrently. Each owns disjoint paths. Shared framework additions and dependency integration are coordinated centrally. New collaborator needs are resolved through the owning API or framework, never an untyped bag or a placeholder that only refuses.
 

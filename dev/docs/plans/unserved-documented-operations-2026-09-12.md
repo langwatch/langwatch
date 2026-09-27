@@ -119,4 +119,3 @@ deliberate canonicalization and not a gap.
 ## events (1)
 
     POST /api/v1/events/track
-

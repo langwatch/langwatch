@@ -14,8 +14,7 @@
       "@langwatch/ops-contract": ["../contract/src/index.ts"],
       "@langwatch/feature-flag-contract": ["../../feature-flag/contract/src/index.ts"],
       "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
-    },
-
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
   "references": [

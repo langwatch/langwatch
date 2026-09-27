@@ -173,10 +173,10 @@ Feature specs in `specs/` define what tests must exist. **Every scenario in a fe
 
 ### Convention
 
-| Feature file                              | Test file                                                                                                                                     |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feature file                              | Test file                                                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `specs/analytics/chart-rendering.feature` | the owning feature package's own `__tests__/chart-rendering.integration.test.ts`, e.g. `modules/analytics/process/src/**/__tests__/` |
-| `specs/langy/langy-panel-layout.feature`  | `modules/langy/browser/src/model/__tests__/langy-panel-layout.unit.test.ts`                                                             |
+| `specs/langy/langy-panel-layout.feature`  | `modules/langy/browser/src/model/__tests__/langy-panel-layout.unit.test.ts`                                                          |
 
 The scenario title in the feature file should match the `it()` description in the test. Use `describe("Feature: <feature name>")` as the outer block.
 
@@ -259,9 +259,11 @@ and bound by Go and runner unit tests. Start with
 `go run ./cmd/visualdiff run -dry-run`; the routes and flows it renders live in
 `tools/visualdiff/visualdiff.yaml`, so widening the coverage is editing
 YAML. See `tools/visualdiff/README.md`.
+
 ## Use-proof
 
 A use-proof is a concrete, observable demonstration that the feature works as intended. It can be:
+
 - A screenshot of the rendered UI showing the feature in action
 - A command-line output demonstrating the API response
 - A browser-test report with screenshots of the full workflow

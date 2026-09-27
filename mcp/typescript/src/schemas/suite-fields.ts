@@ -12,16 +12,11 @@ export const suiteFieldSchema = z.object({
     .string()
     .min(1)
     .max(64)
-    .regex(
-      /^[a-z][a-z0-9_]*$/,
-      "Lowercase letters, digits and underscores, starting with a letter",
-    )
+    .regex(/^[a-z][a-z0-9_]*$/, "Lowercase letters, digits and underscores, starting with a letter")
     .describe(
       "The field name, as scenarios and evaluator mappings address it, for example golden_sql. Lowercase letters, digits and underscores, starting with a letter. situation, criteria, name, input and output are reserved.",
     ),
-  type: z
-    .enum(SUITE_FIELD_TYPES)
-    .describe("The value type every scenario carries for this field."),
+  type: z.enum(SUITE_FIELD_TYPES).describe("The value type every scenario carries for this field."),
 });
 
 /** The fields a test suite declares, in the order the platform shows them. */
@@ -33,11 +28,7 @@ export const suiteFieldsSchema = z
   );
 
 /** The sources an evaluator input can read from. */
-export const SCENARIO_MAPPING_SOURCE_IDS = [
-  "conversation",
-  "scenario",
-  "trace",
-] as const;
+export const SCENARIO_MAPPING_SOURCE_IDS = ["conversation", "scenario", "trace"] as const;
 
 /** Where one evaluator input reads its value: a source path or a literal. */
 export const scenarioMappingSchema = z
@@ -123,8 +114,7 @@ export interface EvaluatorAttachmentWire {
   mappings: Record<string, ScenarioMapping>;
 }
 
-const newAttachmentId = (): string =>
-  `att_${crypto.randomUUID().replace(/-/g, "").slice(0, 21)}`;
+const newAttachmentId = (): string => `att_${crypto.randomUUID().replace(/-/g, "").slice(0, 21)}`;
 
 /**
  * The attachments of a tool call, as the REST body carries them: a missing

@@ -22,10 +22,10 @@ import {
   type TasksConfig,
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
-import { storageSeed } from "./storage-seed/storage-seed.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
 import { lwqlRenderAccessConfig } from "./lwql-render-access-config.ts";
 import { prismaMigrate } from "./prisma-migrate.ts";
+import { storageSeed } from "./storage-seed/storage-seed.ts";
 import { systemMigrationsPass } from "./system-migrations-pass.ts";
 
 const tasks = new Map<string, (input: TaskInput) => Promise<void>>([

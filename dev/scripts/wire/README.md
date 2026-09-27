@@ -36,7 +36,6 @@ A status collapsed to 200 or a setting that stopped being configurable is a
 regression, not a delta — this tool sees names, not those. It narrows the
 question; it does not answer all of it.
 
-
 # Orphaned-consumer check
 
 `orphaned-consumers.py` takes the symbols a slice renamed **away** and searches

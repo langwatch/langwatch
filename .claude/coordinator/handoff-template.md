@@ -43,9 +43,9 @@ is authoritative and the next agent reads it.>
 <What is actually done and green, as claims a reviewer can check. Not a
 chronology.
 
-  Good: "trace-export REST family declared and mounted; 6 routes answer on the
-  same paths as origin/main."
-  Bad:  "Worked on the trace module, made good progress on the REST side."
+Good: "trace-export REST family declared and mounted; 6 routes answer on the
+same paths as origin/main."
+Bad: "Worked on the trace module, made good progress on the REST side."
 
 If nothing is done, write `none`. That is a legitimate handoff.>
 
@@ -57,8 +57,8 @@ If nothing is done, write `none`. That is a legitimate handoff.>
 
 <Command -> result, one per line. Only checks that actually ran.
 
-  pnpm --filter @langwatch/trace-process test src/transport -> 24 passed
-  pnpm --filter @langwatch/trace-process typecheck -> clean
+pnpm --filter @langwatch/trace-process test src/transport -> 24 passed
+pnpm --filter @langwatch/trace-process typecheck -> clean
 
 A check you did not run is not listed. Do not write "should pass".>
 
@@ -79,11 +79,11 @@ If the work is complete, say what the coordinator should verify.>
 
 <Exact lines for the coordinator to apply, per file:
 
-  apps/api/src/app-rest/api-rest.doors.ts
-    add: installApiTraceExport,   (after installApiTrace, line 34)
+apps/api/src/app-rest/api-rest.doors.ts
+add: installApiTraceExport, (after installApiTrace, line 34)
 
-  packages/architecture-enforcer/src/feature-shape-baseline.json
-    drop: "trace|nested-transport"
+packages/architecture-enforcer/src/feature-shape-baseline.json
+drop: "trace|nested-transport"
 
 `none` if there are none.>
 

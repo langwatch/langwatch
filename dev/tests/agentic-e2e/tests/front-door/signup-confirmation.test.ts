@@ -17,11 +17,8 @@
  * added `tests/agentic-e2e/tests` root in `check-feature-parity.ts`.
  */
 import { type Page } from "@playwright/test";
+
 import { expect, test } from "./fixtures";
-import {
-  addVirtualAuthenticator,
-  removeVirtualAuthenticator,
-} from "./webauthn";
 import {
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
@@ -32,16 +29,14 @@ import {
   thenTheLinkSignsMeInWithNoSecondPrompt,
   whenIOpenTheConfirmationLinkFor,
 } from "./steps";
+import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 
 // Reached signed out — never inherit the shared browser-test@langwatch.ai
 // session this package's other suites reuse.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe("Sign-up confirmation", () => {
-  async function whenIRequestSignUpVerification(
-    page: Page,
-    email: string,
-  ): Promise<void> {
+  async function whenIRequestSignUpVerification(page: Page, email: string): Promise<void> {
     await page.getByLabel("Email", { exact: true }).fill(email);
     const requestFinished = page.waitForResponse((response) =>
       response.url().includes("/api/trpc/auth.requestSignUpVerification"),
@@ -55,15 +50,9 @@ test.describe("Sign-up confirmation", () => {
   }
 
   async function whenIChooseAPasswordAfterProof(page: Page): Promise<void> {
-    await page
-      .getByLabel("Password", { exact: true })
-      .fill(FRONT_DOOR_PASSWORD);
-    await page
-      .getByLabel("Confirm password", { exact: true })
-      .fill(FRONT_DOOR_PASSWORD);
-    await page
-      .getByRole("button", { name: "Create account", exact: true })
-      .click();
+    await page.getByLabel("Password", { exact: true }).fill(FRONT_DOOR_PASSWORD);
+    await page.getByLabel("Confirm password", { exact: true }).fill(FRONT_DOOR_PASSWORD);
+    await page.getByRole("button", { name: "Create account", exact: true }).click();
   }
 
   /**
@@ -96,9 +85,7 @@ test.describe("Sign-up confirmation", () => {
    * comment already describes as the bug ("null (sam@acme.com)").
    */
   // @scenario "An account with no display name is called by its email, never null"
-  test("an account with no display name is called by its email, never 'null'", async ({
-    page,
-  }) => {
+  test("an account with no display name is called by its email, never 'null'", async ({ page }) => {
     const email = generateFrontDoorEmail("noname");
 
     await givenIAmOnTheSignUpScreen(page);
@@ -121,9 +108,7 @@ test.describe("Sign-up confirmation", () => {
    * only after the account and credential are created.
    */
   // @scenario "Signing up with a passkey consumes the verified address proof"
-  test("a verified address can be finished with a passkey and signs in", async ({
-    page,
-  }) => {
+  test("a verified address can be finished with a passkey and signs in", async ({ page }) => {
     const email = generateFrontDoorEmail("passkey-signup");
     const authenticator = await addVirtualAuthenticator(page);
 
@@ -134,9 +119,7 @@ test.describe("Sign-up confirmation", () => {
       await expect(page.getByTestId("verified-address")).toContainText(email);
       await expect(page.getByTestId("passkey-sign-up")).toBeVisible();
       await page.getByTestId("passkey-sign-up").click();
-      await expect(
-        page.getByText("Could not create a passkey", { exact: false }),
-      ).toHaveCount(0);
+      await expect(page.getByText("Could not create a passkey", { exact: false })).toHaveCount(0);
       await thenTheLinkSignsMeInWithNoSecondPrompt(page, email);
     } finally {
       await removeVirtualAuthenticator(authenticator);

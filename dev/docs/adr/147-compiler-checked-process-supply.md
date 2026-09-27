@@ -52,9 +52,9 @@ await createApp({ role: "api" })
   .withSecrets(secrets)
   .withEncryption(cipher)
   .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
-  .withTransportAuth((a) => a
-    .withStaticTokens({ cron, langyInternal, instanceAdmin })
-    .withBrowserSession(session))
+  .withTransportAuth((a) =>
+    a.withStaticTokens({ cron, langyInternal, instanceAdmin }).withBrowserSession(session),
+  )
   .boot();
 ```
 

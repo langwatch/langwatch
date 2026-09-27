@@ -41,9 +41,7 @@ test.describe("Sign-in basics", () => {
    * brush the limit at all.
    */
   // @scenario "Signing in and out repeatedly does not trip the sign-in rate limit"
-  test("signing out and back in several times never hits the rate limit", async ({
-    page,
-  }) => {
+  test("signing out and back in several times never hits the rate limit", async ({ page }) => {
     // The longest journey in the suite: ten real navigations, and CI's
     // software-rendered Chrome has measured 90s-18.7min swings on the same
     // code. `slow()` on just this test, not raised globally — a stuck step
@@ -78,9 +76,7 @@ test.describe("Sign-in basics", () => {
    * present, the prefill itself is asserted too.
    */
   // @scenario "The forgot-password link carries the address already typed"
-  test("forgot-password link carries the typed address in the URL fragment", async ({
-    page,
-  }) => {
+  test("forgot-password link carries the typed address in the URL fragment", async ({ page }) => {
     const email = generateFrontDoorEmail("forgot");
     await givenARegisteredAccount(page, { email });
 

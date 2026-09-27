@@ -4,11 +4,12 @@
  * Skips without the CLI/VK env, or under CI=1. Plain cells live in Lane A.
  */
 import { spawnSync } from "child_process";
-import dotenv from "dotenv";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import dotenv from "dotenv";
 import { describe, it } from "vitest";
 
 const __filename = fileURLToPath(import.meta.url);

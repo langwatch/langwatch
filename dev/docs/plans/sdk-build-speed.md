@@ -28,14 +28,14 @@ Cold vs warm is stated per row. "Cold" means the output directory and any
 `pnpm --filter langwatch build` is `prebuild` → `rm -rf dist && tsup` →
 `postbuild`.
 
-| Step | user CPU | wall | share of CPU |
-|---|---|---|---|
-| `prebuild` (`pnpm run generate`) | 0.23s of real work | 3.70 / 4.14 / 4.53s | — |
-| `tsup`, all three configs | **20.77s** | 22.61s | 100% |
-| — JS transpile, all three configs | 2.45s | 4.83s | **12%** |
-| — library DTS (config 1) | 17.00s | 21.59s | **82%** |
-| — agent DTS (config 2) | 3.30s | 5.16s | **16%** |
-| `postbuild` | ~0.4s | ~0.5s | — |
+| Step                              | user CPU           | wall                | share of CPU |
+| --------------------------------- | ------------------ | ------------------- | ------------ |
+| `prebuild` (`pnpm run generate`)  | 0.23s of real work | 3.70 / 4.14 / 4.53s | —            |
+| `tsup`, all three configs         | **20.77s**         | 22.61s              | 100%         |
+| — JS transpile, all three configs | 2.45s              | 4.83s               | **12%**      |
+| — library DTS (config 1)          | 17.00s             | 21.59s              | **82%**      |
+| — agent DTS (config 2)            | 3.30s              | 5.16s               | **16%**      |
+| `postbuild`                       | ~0.4s              | ~0.5s               | —            |
 
 Declaration generation is **88% of the build**. The transpile everyone assumes
 is the cost is 12%.
@@ -61,18 +61,18 @@ for all three. For declarations, yes, and it is most of the build.
 Measured with a scratch `tsconfig` (`emitDeclarationOnly`, `incremental`,
 `rootDir: src`, `src/cli/**` excluded, `declarationMap: false`):
 
-| | user CPU | wall |
-|---|---|---|
-| tsup `dts` today (both configs) | **20.30s** | — |
-| `tsc --emitDeclarationOnly`, cold | **8.95s** | 17.47s |
-| `tsc --emitDeclarationOnly`, warm (unchanged inputs) | **3.04s** | 5.55s |
+|                                                      | user CPU   | wall   |
+| ---------------------------------------------------- | ---------- | ------ |
+| tsup `dts` today (both configs)                      | **20.30s** | —      |
+| `tsc --emitDeclarationOnly`, cold                    | **8.95s**  | 17.47s |
+| `tsc --emitDeclarationOnly`, warm (unchanged inputs) | **3.04s**  | 5.55s  |
 
 Whole pipeline, run end to end into the real `dist/` (tsup with `dts: false` on
 all three configs, then `tsc -p tsconfig.dts.json`):
 
-| | user CPU | wall |
-|---|---|---|
-| Baseline `tsup` | 20.77s | 22.61s |
+|                   | user CPU  | wall   |
+| ----------------- | --------- | ------ |
+| Baseline `tsup`   | 20.77s    | 22.61s |
 | Proposed pipeline | **9.68s** | 16.81s |
 
 **−11.1s user CPU, −53%.** `pnpm run postbuild` passed against that `dist`
@@ -93,12 +93,12 @@ all three configs, then `tsc -p tsconfig.dts.json`):
 
 ### 2.2 What does change in the tarball — needs a release decision
 
-| | today | proposed |
-|---|---|---|
-| `.d.ts` files | 20 | 181 |
-| `.d.ts` bytes | 1,208,225 | 1,493,461 |
-| `.d.mts` files | 20 | **0** |
-| `.d.mts` bytes | 1,208,248 | 0 |
+|                           | today     | proposed             |
+| ------------------------- | --------- | -------------------- |
+| `.d.ts` files             | 20        | 181                  |
+| `.d.ts` bytes             | 1,208,225 | 1,493,461            |
+| `.d.mts` files            | 20        | **0**                |
+| `.d.mts` bytes            | 1,208,248 | 0                    |
 | declaration bytes shipped | 2,416,473 | **1,493,461 (−38%)** |
 
 Two shape changes, both real:
@@ -114,7 +114,7 @@ Two shape changes, both real:
 2. **The internal module tree becomes visible as 161 extra `.d.ts` files.** The
    same types ship today, inlined into the bundle; they would now ship as
    separate files under `dist/internal/**`, `dist/client-sdk/**`. `files:
-   ["dist"]` already covers them.
+["dist"]` already covers them.
 
 ### 2.3 Two `.ts` specifiers leak into the per-file emit
 
@@ -147,13 +147,13 @@ scope here. Flagging it: **the remaining 5.9s CPU is behind that one decision.**
 
 ## 3. Levers measured and rejected
 
-| Lever | Measured | Verdict |
-|---|---|---|
-| Treat the 1 MB generated OpenAPI types as external to the DTS bundle | 17.00s → **14.20s** CPU (−2.8s, −16%), and the emitted `index.d.ts` then carries a dangling `./internal/generated/openapi/api-client` import — tsup writes no per-file declarations, so the output is **broken** | Reject. The 1 MB file is *not* what makes DTS slow; it is 16% of it. The compiler still loads and checks `api-client.ts` to resolve the re-exported types, so externalising the *output* does not remove the *work*. |
-| Generate the OpenAPI types as `.d.ts` directly | Bounded above by the 2.8s in the row above — a `.d.ts` input would be copied rather than emitted, but still type-checked | Reject. Bounded at ≤2.8s, needs every importer to be type-only, and §2's lever removes the bundler from the path entirely, which is where that 2.8s came from. |
-| Drop CJS — declarations | dual-format DTS 17.00s vs ESM-only DTS **16.15s** = **−0.85s (5%)** | Reject. The type-check happens once; the second format is a re-print. |
-| Drop CJS — transpile | all three configs dual 2.45s vs ESM-only **1.58s** = **−0.87s** | Reject **for this package**. |
-| `isolatedDeclarations` | Forced on: **140 errors across 135 of 562 source files** (TS9010 ×103, TS9007 ×9, TS9008 ×7, TS9011 ×6, TS9016 ×4, TS9025 ×3, TS9013 ×2, TS9038 ×2, TS9009 ×2, TS9012 ×1). A/B on the same config, both non-incremental: **7.27s → 6.82s CPU, −6%** | Reject now, revisit never-unless. `tsc` itself barely speeds up; the flag pays off only with a separate syntactic emitter, which this repo does not have. Consistent with `typescript-tidy-projects.md` §10.6, which rules it out for internal packages and leaves published ones "arguable" — at 0.25 errors/file this package is far cheaper than `trace/contract` (15.7/file), but 140 hand annotations for 0.45s is not a trade. |
+| Lever                                                                | Measured                                                                                                                                                                                                                                            | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Treat the 1 MB generated OpenAPI types as external to the DTS bundle | 17.00s → **14.20s** CPU (−2.8s, −16%), and the emitted `index.d.ts` then carries a dangling `./internal/generated/openapi/api-client` import — tsup writes no per-file declarations, so the output is **broken**                                    | Reject. The 1 MB file is _not_ what makes DTS slow; it is 16% of it. The compiler still loads and checks `api-client.ts` to resolve the re-exported types, so externalising the _output_ does not remove the _work_.                                                                                                                                                                                                                 |
+| Generate the OpenAPI types as `.d.ts` directly                       | Bounded above by the 2.8s in the row above — a `.d.ts` input would be copied rather than emitted, but still type-checked                                                                                                                            | Reject. Bounded at ≤2.8s, needs every importer to be type-only, and §2's lever removes the bundler from the path entirely, which is where that 2.8s came from.                                                                                                                                                                                                                                                                       |
+| Drop CJS — declarations                                              | dual-format DTS 17.00s vs ESM-only DTS **16.15s** = **−0.85s (5%)**                                                                                                                                                                                 | Reject. The type-check happens once; the second format is a re-print.                                                                                                                                                                                                                                                                                                                                                                |
+| Drop CJS — transpile                                                 | all three configs dual 2.45s vs ESM-only **1.58s** = **−0.87s**                                                                                                                                                                                     | Reject **for this package**.                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `isolatedDeclarations`                                               | Forced on: **140 errors across 135 of 562 source files** (TS9010 ×103, TS9007 ×9, TS9008 ×7, TS9011 ×6, TS9016 ×4, TS9025 ×3, TS9013 ×2, TS9038 ×2, TS9009 ×2, TS9012 ×1). A/B on the same config, both non-incremental: **7.27s → 6.82s CPU, −6%** | Reject now, revisit never-unless. `tsc` itself barely speeds up; the flag pays off only with a separate syntactic emitter, which this repo does not have. Consistent with `typescript-tidy-projects.md` §10.6, which rules it out for internal packages and leaves published ones "arguable" — at 0.25 errors/file this package is far cheaper than `trace/contract` (15.7/file), but 140 hand annotations for 0.45s is not a trade. |
 
 ### 3.1 On dropping CJS specifically
 
@@ -168,7 +168,7 @@ JS format. Against that:
   happens either way.
 - Consumers are external and uncountable from here.
 
-CJS is load-bearing for this package; keep it. The lever is real for *internal*
+CJS is load-bearing for this package; keep it. The lever is real for _internal_
 packages the repo consumes itself (nothing in this repo `require()`s
 `langwatch`), but those are not this package and not this lane.
 
@@ -177,11 +177,11 @@ packages the repo consumes itself (nothing in this repo `require()`s
 `prebuild` is `pnpm run generate` = `pnpm run generate:server-types && pnpm run
 generate:openapi-types`.
 
-| | wall (3 runs) |
-|---|---|
-| `pnpm run generate` | 3.70 / 4.14 / 4.53s |
-| `./copy-types.sh && node scripts/generate-openapi-types.mjs` (identical work) | 0.50 / 0.62 / 0.60s |
-| one bare `pnpm run` with no script | 1.85s wall / 0.51s user |
+|                                                                               | wall (3 runs)           |
+| ----------------------------------------------------------------------------- | ----------------------- |
+| `pnpm run generate`                                                           | 3.70 / 4.14 / 4.53s     |
+| `./copy-types.sh && node scripts/generate-openapi-types.mjs` (identical work) | 0.50 / 0.62 / 0.60s     |
+| one bare `pnpm run` with no script                                            | 1.85s wall / 0.51s user |
 
 The work is **0.33s**: `copy-types.sh` 0.25s, `generate-openapi-types.mjs`
 0.08s. Everything else is three nested `pnpm run` process spawns.
@@ -256,12 +256,7 @@ These are requests, not edits.
   },
   "references": [],
   "include": ["./src/**/*.ts"],
-  "exclude": [
-    "./src/cli/**",
-    "./src/**/__tests__/**",
-    "./src/**/*.test.ts",
-    "./src/**/*.test-d.ts"
-  ]
+  "exclude": ["./src/cli/**", "./src/**/__tests__/**", "./src/**/*.test.ts", "./src/**/*.test-d.ts"]
 }
 ```
 
@@ -323,15 +318,15 @@ grep -rn 'from \"[^\"]*\.ts\"' sdks/typescript/dist --include='*.d.ts'   # expec
 
 ## 7. Summary
 
-| Lever | Measured saving | Risk to published output | Needs the dirty config? |
-|---|---|---|---|
-| `tsc --emitDeclarationOnly` replaces tsup `dts` | **−11.1s CPU (20.77 → 9.68), −53%** | `.d.mts` stops shipping (unreferenced, but `attw` unverified); 161 internal `.d.ts` appear; declarations shrink 38% | yes — `tsup.config.ts` + `package.json` |
-| Collapse `generate`'s nested `pnpm run` | **−3.1 to −3.9s wall**, ~1.0s CPU | none | yes — `package.json` |
-| Fix the two `.ts` type-only specifiers | none (correctness) | removes a latent dangling specifier | no — two clean-ish files |
-| Let the `.tsbuildinfo` outlive `rm -rf dist` | a further **−5.9s CPU** (8.95 → 3.04) | stale-artifact risk; needs a decision | yes |
-| Drop CJS | −1.7s CPU (8%) today, −0.87s after lever 1 | breaks every `require("langwatch")` consumer | — rejected |
-| OpenAPI types external to the DTS bundle | −2.8s CPU, output broken as measured | — | — rejected |
-| `isolatedDeclarations` | −0.45s CPU (6%) for 140 annotations | — | — rejected |
+| Lever                                           | Measured saving                            | Risk to published output                                                                                            | Needs the dirty config?                 |
+| ----------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `tsc --emitDeclarationOnly` replaces tsup `dts` | **−11.1s CPU (20.77 → 9.68), −53%**        | `.d.mts` stops shipping (unreferenced, but `attw` unverified); 161 internal `.d.ts` appear; declarations shrink 38% | yes — `tsup.config.ts` + `package.json` |
+| Collapse `generate`'s nested `pnpm run`         | **−3.1 to −3.9s wall**, ~1.0s CPU          | none                                                                                                                | yes — `package.json`                    |
+| Fix the two `.ts` type-only specifiers          | none (correctness)                         | removes a latent dangling specifier                                                                                 | no — two clean-ish files                |
+| Let the `.tsbuildinfo` outlive `rm -rf dist`    | a further **−5.9s CPU** (8.95 → 3.04)      | stale-artifact risk; needs a decision                                                                               | yes                                     |
+| Drop CJS                                        | −1.7s CPU (8%) today, −0.87s after lever 1 | breaks every `require("langwatch")` consumer                                                                        | — rejected                              |
+| OpenAPI types external to the DTS bundle        | −2.8s CPU, output broken as measured       | —                                                                                                                   | — rejected                              |
+| `isolatedDeclarations`                          | −0.45s CPU (6%) for 140 annotations        | —                                                                                                                   | — rejected                              |
 
 ## 8. Coordinator verdict: the `.d.mts` recommendation is reversed
 
@@ -340,10 +335,10 @@ exports map alone: nothing names one, so they look like dead weight. I ran
 `attw` against the real packed tarball, and the opposite is true. Today's
 published package grades:
 
-| | node10 | node16 (CJS) | node16 (ESM) | bundler |
-|---|---|---|---|---|
-| `langwatch` | ok | ok | **masquerading as CJS** | ok |
-| the other five subpaths | **resolution failed** | ok | **masquerading as CJS** | ok |
+|                         | node10                | node16 (CJS) | node16 (ESM)            | bundler |
+| ----------------------- | --------------------- | ------------ | ----------------------- | ------- |
+| `langwatch`             | ok                    | ok           | **masquerading as CJS** | ok      |
+| the other five subpaths | **resolution failed** | ok           | **masquerading as CJS** | ok      |
 
 `types` points at a `.d.ts`, and the package has no `"type": "module"`, so every
 ESM consumer is handed CJS-flavoured types for an ESM file. The twelve `.d.mts`

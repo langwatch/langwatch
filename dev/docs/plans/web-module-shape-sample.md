@@ -28,17 +28,17 @@ act: you add a `surfaces/` entry, and that shows up in review.
     ".": "./src/trace.web.ts",
 
     // application-only entries. The default tier - no namespace, no ceremony.
-    "./trace-host":            "./src/ui/sections/trace-host.tsx",
-    "./trace-routes":          "./src/ui/sections/trace-routes.tsx",
+    "./trace-host": "./src/ui/sections/trace-host.tsx",
+    "./trace-routes": "./src/ui/sections/trace-routes.tsx",
 
     // the published tier. Every entry here is an API another module may import,
     // and every one of them was a deliberate decision.
-    "./surfaces/trace-id-peek":     "./src/surfaces/trace-id-peek.tsx",
-    "./surfaces/sse-subscription":  "./src/surfaces/sse-subscription.ts",
-    "./surfaces/trace-filters":     "./src/surfaces/trace-filters/index.ts",
+    "./surfaces/trace-id-peek": "./src/surfaces/trace-id-peek.tsx",
+    "./surfaces/sse-subscription": "./src/surfaces/sse-subscription.ts",
+    "./surfaces/trace-filters": "./src/surfaces/trace-filters/index.ts",
 
-    "./testing":               "./src/testing/index.ts"
-  }
+    "./testing": "./src/testing/index.ts",
+  },
 }
 ```
 
@@ -51,7 +51,7 @@ Three rules hold that file, and all three are mechanical:
    check refuses a commit that raises it. Growing the API is then a conversation,
    not a side effect of an import somebody added.
 3. **A name the design system already has may not be published.** `copy-icon`
-   and `format-money` exist in `@langwatch/design-system` *and* in feature
+   and `format-money` exist in `@langwatch/design-system` _and_ in feature
    packages today, and `experiment` imports the feature copies. The rule reads
    the design system's exports and refuses the duplicate at the point it is
    declared.
@@ -100,7 +100,7 @@ export function TraceIdPeek({ traceId }: { traceId: string }) {
 import { TraceIdPeek } from "@langwatch/trace-browser/surfaces/trace-id-peek";
 
 export function ExperimentRunRow({ run }: { run: Run }) {
-  return <TraceIdPeek traceId={run.traceId} />;   // one import line, no wiring
+  return <TraceIdPeek traceId={run.traceId} />; // one import line, no wiring
 }
 ```
 
@@ -147,7 +147,7 @@ entries, and they are nearly dependency-free leaves:
 `authz/surfaces/scope-picker` imports **nothing** external,
 `prompt/surfaces/variables` imports **nothing**, and
 `model-provider/surfaces/model-selector` reaches only for React, Chakra, two
-*contract* packages and the design system. None of them depends on its owner's
+_contract_ packages and the design system. None of them depends on its owner's
 web package, so extracting them drags no feature along.
 
 ### Where it lives: `modules/<name>/web-kit`, and it is not a module
@@ -177,15 +177,15 @@ it costs nothing today because none of the fourteen does.
 
 They are not one kind of thing, and routing them by kind is most of the work:
 
-| what it is | entries | where it goes |
-| --- | --- | --- |
-| domain-aware shared components | `scope-picker`, `model-selector`, `period-selector`, `llm-model-display`, `trace-id-peek`, `provider-icons`, `workflow-icons` | the new shared web package |
-| a shared hook | `trace/surfaces/sse-subscription` | the new shared web package |
-| types | `experiment/workbench-types`, `prompt/surfaces/variables` | the owning **contract** package - they are not components and a contract is already framework-free |
-| an api client, published **twice** | `workflow-web/workflow-api` **and** `api-client-web/workflow-api` | `@langwatch/browser-trpc`, which already exists and already has it - the workflow-web copy is a duplicate nobody noticed |
-| cross-module **state** | `langy/surfaces/langy-store`, `langy/surfaces/langy-context` | neither. Three modules read langy's store directly, and a shared package holding live state re-creates the cycle at one remove. This is the one genuine decision left, and it is about who owns the state rather than where the file sits |
+| what it is                         | entries                                                                                                                       | where it goes                                                                                                                                                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| domain-aware shared components     | `scope-picker`, `model-selector`, `period-selector`, `llm-model-display`, `trace-id-peek`, `provider-icons`, `workflow-icons` | the new shared web package                                                                                                                                                                                                                |
+| a shared hook                      | `trace/surfaces/sse-subscription`                                                                                             | the new shared web package                                                                                                                                                                                                                |
+| types                              | `experiment/workbench-types`, `prompt/surfaces/variables`                                                                     | the owning **contract** package - they are not components and a contract is already framework-free                                                                                                                                        |
+| an api client, published **twice** | `workflow-web/workflow-api` **and** `api-client-web/workflow-api`                                                             | `@langwatch/browser-trpc`, which already exists and already has it - the workflow-web copy is a duplicate nobody noticed                                                                                                                  |
+| cross-module **state**             | `langy/surfaces/langy-store`, `langy/surfaces/langy-context`                                                                  | neither. Three modules read langy's store directly, and a shared package holding live state re-creates the cycle at one remove. This is the one genuine decision left, and it is about who owns the state rather than where the file sits |
 
-Domain-*free* primitives are a separate matter and do not go to the new package
+Domain-_free_ primitives are a separate matter and do not go to the new package
 at all - they go to `@langwatch/design-system`, which already holds that role and
 already exports `copy-icon` and `format-money` that feature packages currently
 shadow.
@@ -195,15 +195,15 @@ takes one it already had, and two are a decision. That is the whole of it.
 
 ## The sizes, so nobody plans this by feel
 
-| | |
-| --- | --- |
-| entries only `apps/*` imports | **73** - already correct, no change |
-| entries a peer imports | **174** |
-| ...of those, used by **one** peer | **125** - coupling, not API |
-| ...used by three or more | **14** - the genuinely shared set |
-| entries nothing imports at all | **29** - delete |
-| peer entries already under `surfaces/` | **86** of 171 |
-| `surfaces/` entries only the app imports | **17** - move out of the tier |
+|                                          |                                     |
+| ---------------------------------------- | ----------------------------------- |
+| entries only `apps/*` imports            | **73** - already correct, no change |
+| entries a peer imports                   | **174**                             |
+| ...of those, used by **one** peer        | **125** - coupling, not API         |
+| ...used by three or more                 | **14** - the genuinely shared set   |
+| entries nothing imports at all           | **29** - delete                     |
+| peer entries already under `surfaces/`   | **86** of 171                       |
+| `surfaces/` entries only the app imports | **17** - move out of the tier       |
 
 So the published API a lane has to design is **14 entries**, not 174. The other
 158 are each one of three cheap answers: move it to its single consumer, move it

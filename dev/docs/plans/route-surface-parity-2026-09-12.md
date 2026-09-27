@@ -11,7 +11,7 @@ this branch answers with nothing at all?**
 
 It matters because it is the one class of parity gap that **neither apidiff nor
 visualdiff can see**. apidiff probes documented API operations, so a dropped
-*page* is invisible to it. visualdiff renders the routes listed in
+_page_ is invisible to it. visualdiff renders the routes listed in
 `tools/visualdiff/visualdiff.yaml`, so a dropped page nobody thought to list is
 invisible to it too — it can only diff screens it is told to render. A route
 that fell out of the route table and out of the visualdiff list at the same
@@ -23,7 +23,7 @@ Static, no stack, reproducible in about a second. Both scripts are throwaway;
 the method is the part worth keeping.
 
 - **main's surface**: `git ls-tree -r origin/main --name-only platform/app/src/pages`,
-  which is the Next.js pages router, so file path *is* route. Dropped:
+  which is the Next.js pages router, so file path _is_ route. Dropped:
   `__tests__`, `/api/`, `_app`/`_document`/`_error`, and colocated component
   files (a basename carrying an uppercase letter, or `*.unit.test`) — Next.js
   would route those too, but no person ever reached them. 150 real pages.
@@ -34,7 +34,7 @@ the method is the part worth keeping.
 - **plus what is contributed at install time**: the route table is not the
   whole answer. `apps/ui/src/features/annotation/index.ts` calls
   `ui.routes("project", annotationRoutes)`, adding five `/:project/annotations*`
-  routes that appear nowhere in the table. It is currently the *only*
+  routes that appear nowhere in the table. It is currently the _only_
   `.routes(` call in the tree — worth re-checking before trusting this method
   again, because a second contributor would silently widen the branch's real
   surface past what the table shows.
@@ -43,7 +43,7 @@ the method is the part worth keeping.
 
 Two false-positive classes this method hits if you skip the steps above, both
 of which cost me a detour: the annotation routes (contributed, not tabled) and
-the inline redirects (`/me/devices` and `/:project/evaluations` are *declared*,
+the inline redirects (`/me/devices` and `/:project/evaluations` are _declared_,
 just not as pages). Neither is a gap.
 
 ## A. On main, and this branch has neither a page nor a redirect
@@ -104,7 +104,7 @@ base and a different screen on the candidate, and visualdiff will classify them
 `changed` — correctly, and uselessly. Read this list before triaging a
 visualdiff report: a `changed` row on any of these sixteen is the redirect
 doing its job, not a regression. They are worth keeping in the route list
-anyway, because the redirect *itself* is behaviour worth diffing — a redirect
+anyway, because the redirect _itself_ is behaviour worth diffing — a redirect
 that stopped redirecting is a real regression, and it would show up here.
 
 ## C. On this branch only — new or restored

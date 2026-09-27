@@ -19,9 +19,9 @@ sites naming files that no longer exist, and one genuinely dead module.
 
 | Package                     | Files |  Lines |       External importers |
 | --------------------------- | ----: | -----: | -----------------------: |
-| `@langwatch/trace-process`   |   181 | 29,990 |                       50 |
+| `@langwatch/trace-process`  |   181 | 29,990 |                       50 |
 | `@langwatch/trace-contract` |    60 |  8,427 |                      237 |
-| `@langwatch/trace-browser`      |   135 | 17,626 | 235 (all `platform/app`) |
+| `@langwatch/trace-browser`  |   135 | 17,626 | 235 (all `platform/app`) |
 
 Plus 90 test files in the server package.
 
@@ -747,9 +747,9 @@ already written.
 
 | Package                     | External non-test importers | Where they live                                                              |
 | --------------------------- | --------------------------: | ---------------------------------------------------------------------------- |
-| `@langwatch/trace-process`   |                      **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
+| `@langwatch/trace-process`  |                      **50** | `platform/app` 43 · `apps/api` 5 · `apps/worker` 2 — **zero** in `packages/` |
 | `@langwatch/trace-contract` |                     **237** | `platform/app` 184 · 53 across 13 other feature packages                     |
-| `@langwatch/trace-browser`      |                     **235** | `platform/app` only (205 under `features/traces-v2/`)                        |
+| `@langwatch/trace-browser`  |                     **235** | `platform/app` only (205 under `features/traces-v2/`)                        |
 
 **Server package: 150 distinct symbols across 61 import statements; only 26 are used
 by more than one file.** `Protections` leads at 16 files, then `RecordSpanCommand`,

@@ -2,6 +2,7 @@
 // non-existent tools. See .claude/skills/feature-map/SKILL.md
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = join(__dirname, "../../../..");
@@ -52,7 +53,9 @@ describe("feature map MCP tool names", () => {
   describe("given the tools this server registers", () => {
     it("names only tools that exist", () => {
       const registered = registeredToolNames();
-      const missing = [...toolNamesInFeatureMap()].filter((name) => !registered.has(name)).toSorted();
+      const missing = [...toolNamesInFeatureMap()]
+        .filter((name) => !registered.has(name))
+        .toSorted();
 
       // Listed, not registered: an agent following the map calls a tool that
       // is not there. Either rename the entry, or register the tool.

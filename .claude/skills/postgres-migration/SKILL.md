@@ -23,7 +23,7 @@ pnpm prisma:migrate
 ```
 
 `--create-only` is not optional discipline — every recipe below edits the generated
-SQL before it is applied, because Prisma generates the *breaking* form by default.
+SQL before it is applied, because Prisma generates the _breaking_ form by default.
 
 ## The five rules that never bend
 

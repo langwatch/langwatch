@@ -52,16 +52,16 @@ one module can serve several features.
 
 ## Where each surface actually comes from
 
-| Field             | Verify against                                                                                                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Field             | Verify against                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `surfaces.api`    | `modules/<f>/server/src/transport/public-rest/` and `transport/api-rest/`, mounted by `apps/api/src/api-<f>-rest.feature.ts` or `apps/api/src/app-rest/app-rest.packaged-families.ts` |
-| tRPC namespaces   | `apps/api/src/app-trpc/app-trpc.features.ts`                                                                                                                                                    |
-| `platform.ui`     | `apps/ui/src/model/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                                        |
-| sidebar placement | `apps/ui/src/features/chrome/`                                                                                                                                                                  |
-| `platform.mcp`    | `mcp/typescript/src/create-mcp-server.ts` (`registerTools`) over `mcp/typescript/src/tools/`                                                                                                    |
-| `code.cli`        | `sdks/typescript/src/cli/commands/` — one directory per command group, `sdks/typescript/src/cli/index.ts` is the entry                                                                          |
-| `code.skill`      | `skills/<name>/SKILL.md` (the user-facing skills, not `.claude/skills`)                                                                                                                         |
-| `code.sdk`        | `sdks/python/src/langwatch/__init__.py`, `sdks/typescript/src/index.ts`, `sdks/go/`                                                                                                             |
+| tRPC namespaces   | `apps/api/src/app-trpc/app-trpc.features.ts`                                                                                                                                          |
+| `platform.ui`     | `apps/ui/src/model/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                              |
+| sidebar placement | `apps/ui/src/features/chrome/`                                                                                                                                                        |
+| `platform.mcp`    | `mcp/typescript/src/create-mcp-server.ts` (`registerTools`) over `mcp/typescript/src/tools/`                                                                                          |
+| `code.cli`        | `sdks/typescript/src/cli/commands/` — one directory per command group, `sdks/typescript/src/cli/index.ts` is the entry                                                                |
+| `code.skill`      | `skills/<name>/SKILL.md` (the user-facing skills, not `.claude/skills`)                                                                                                               |
+| `code.sdk`        | `sdks/python/src/langwatch/__init__.py`, `sdks/typescript/src/index.ts`, `sdks/go/`                                                                                                   |
 
 ## Updating
 

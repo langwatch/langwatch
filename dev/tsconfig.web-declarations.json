@@ -9,11 +9,7 @@
     "noEmitOnError": true,
     "strict": true,
     "jsx": "react-jsx",
-    "lib": [
-      "es2023",
-      "dom",
-      "dom.iterable"
-    ],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "types": [
       "node",
       "react",
@@ -25,9 +21,7 @@
     "rootDir": "..",
     "outDir": ".cache/web-declarations",
     "tsBuildInfoFile": ".cache/web-declarations/tsconfig.build.tsbuildinfo",
-    "customConditions": [
-      "langwatch-declaration-source"
-    ],
+    "customConditions": ["langwatch-declaration-source"],
     "noUncheckedIndexedAccess": true,
     "target": "es2023",
     "verbatimModuleSyntax": true,
@@ -66,7 +60,7 @@
     "../modules/evaluator/browser/src/**/*.json",
     "../modules/analytics/browser/src/**/*.ts",
     "../modules/analytics/browser/src/**/*.tsx",
-    "../modules/analytics/browser/src/**/*.json",
+    "../modules/analytics/browser/src/**/*.json"
   ],
   "files": [
     "../modules/analytics/browser/src/__tests__/lwql-fixtures.ts",

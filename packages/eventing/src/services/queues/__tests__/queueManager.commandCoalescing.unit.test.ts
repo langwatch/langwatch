@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../../commands/command.ts";
 import type { CommandHandlerClass } from "../../../commands/commandHandlerClass.ts";
 import { defineCommandSchema } from "../../../commands/commandSchema.ts";
+import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import type { Event } from "../../../domain/types.ts";
 import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";

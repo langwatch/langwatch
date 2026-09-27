@@ -96,7 +96,7 @@ A module is one folder owning up to four workspace packages.
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
-the port moves it to its owner — main decides *what*, the record decides *where* (Alex, 2026-09-25).
+the port moves it to its owner — main decides _what_, the record decides _where_ (Alex, 2026-09-25).
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
 Operator views over enterprise subjects (license registry, self-hosted instances) live in an enterprise

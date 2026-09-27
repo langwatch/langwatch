@@ -12,8 +12,8 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
 });
 vi.mock("../public-http-request.js", () => ({ requestPublicJson: vi.fn() }));
 
-import { makeRequest } from "../langwatch-api.js";
 import { runAgent, type AgentSummary } from "../langwatch-api-agents.js";
+import { makeRequest } from "../langwatch-api.js";
 import { requestPublicJson } from "../public-http-request.js";
 import { runPlanTargetSchema, toWireTargets } from "../schemas/run-plan.js";
 import { handleGetAgent } from "../tools/get-agent.js";
@@ -91,7 +91,9 @@ describe("handleListAgents()", () => {
     /** @scenario "A listed agent the key cannot choose says so" */
     it("lists it with its owner and says only its owner can run it", async () => {
       mockRequest.mockResolvedValueOnce({
-        data: [connectedAgent({ selectable: false, notSelectableReason: "owned_by_another_person" })],
+        data: [
+          connectedAgent({ selectable: false, notSelectableReason: "owned_by_another_person" }),
+        ],
         pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
       });
 

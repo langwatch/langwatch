@@ -550,10 +550,10 @@ Identity was the last vertical still beside the shared infrastructure packages,
 so the feature catalogue, the layout checks and the per-feature CI job all
 skipped it.
 
-| ADR-115 said               | Now                                   |
-| -------------------------- | ------------------------------------- |
+| ADR-115 said               | Now                         |
+| -------------------------- | --------------------------- |
 | `packages/identity`        | `modules/identity/contract` |
-| `packages/identity-server` | `modules/identity/process`   |
+| `packages/identity-server` | `modules/identity/process`  |
 
 `@langwatch/identity` is therefore `@langwatch/identity-contract`: the layout
 derives a package's name from its role, so a package at

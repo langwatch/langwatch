@@ -178,9 +178,10 @@ resolve their category:
 
 ```ts
 const retentionClass = classifyEventLogRowRetention(record);
-const retentionDays = retentionClass === "indefinite"
-  ? INDEFINITE_RETENTION_DAYS
-  : policy[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+const retentionDays =
+  retentionClass === "indefinite"
+    ? INDEFINITE_RETENTION_DAYS
+    : (policy[retentionClass] ?? PLATFORM_DEFAULT_RETENTION_DAYS);
 ```
 
 `_size_bytes` is `MATERIALIZED` — CH computes it server-side at insert

@@ -19,8 +19,8 @@ Do not redo these. Each cost a verification pass to establish.
    legacy users included. Served now by a `byIssuerSubject` shape through
    `resolveByIssuerSubject`. Regression test proven by sabotage.
 2. **D04 / `connectionGrandfatherMigration` is left out of the migration
-   registry ON PURPOSE.** A scenario pins it: *"PR1 does not run the unproved
-   SSO grandfather migration"*. Registering it fails
+   registry ON PURPOSE.** A scenario pins it: _"PR1 does not run the unproved
+   SSO grandfather migration"_. Registering it fails
    `runtime-enrollment.unit.test.ts`. It was recommended as a fix by a review
    agent and reverted. Do not "fix" it. The real residual risk is sequencing:
    nothing populates `SsoConnection`, so a later `SSOCONN_ROUTING=enforce` flip
@@ -32,7 +32,7 @@ Do not redo these. Each cost a verification pass to establish.
 4. **Gating is asymmetric.** On cloud the identifier backfill sets
    `enrolledAutomatically = false`, so this branch is inert until an operator
    enrolls an organization. On self-hosted `runsAutomaticallyOnSelfHosted =
-   true`, so the next migration pass finalizes users with no operator action.
+true`, so the next migration pass finalizes users with no operator action.
    "Ships gated off" is only half true, and self-hosted is the tier with the
    least soak.
 
@@ -116,13 +116,13 @@ things block it, and the first two are the ADR's and the spec's own words:
    `dispatch(command)` that no longer decides has no events to hand the
    convergence wait, so "applied", "refused" and "not yet" collapse into one
    answer. The ADR marks this as blocking §Decision 4 (the collapse of the five
-   ledgers), and it is also why *"A write refused by the rule records nothing
-   and says so"* is called **unimplementable as written**.
+   ledgers), and it is also why _"A write refused by the rule records nothing
+   and says so"_ is called **unimplementable as written**.
 2. **Deleting provisional heads is not safe on its own.** §Decision 2 removes
    the only rows a newborn has before their fold lands. The regression the spec
    shouts about in capitals — a brand-new person on a verified company domain
    told there is nothing for them to join, then sent off to start their own
-   organization — is *caused by* that deletion. The "still being set up"
+   organization — is _caused by_ that deletion. The "still being set up"
    surfaces prevent it, so the UI scenarios land first or in the same change.
 3. **The calling-path guard is load-bearing for two callers.**
    `identity-backfill.service.ts` wraps two dispatches in `tolerateRefusal` and
@@ -135,8 +135,8 @@ one of them true; a decision run twice across a queue hop; an expiry email that
 can contradict what was recorded). The decision is **what shape the outcome
 channel takes**, because everything else is sequenced behind it.
 
-The ADR names the obvious shape and leaves it undesigned: *the handler records
-`{commandId, outcome}`; dispatch reads it.* Open questions a design has to
+The ADR names the obvious shape and leaves it undesigned: _the handler records
+`{commandId, outcome}`; dispatch reads it._ Open questions a design has to
 answer: where that record lives (event? projection? a dedicated table?), how
 long it is kept, what a caller sees when the fold has not run yet, and whether
 "refused" carries the refusal's code.

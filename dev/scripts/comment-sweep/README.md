@@ -51,7 +51,7 @@ and provably comment-only and still wrong. No other check can see it.
 ## `count-splits.py` — the general form of that check
 
 `count-orphans.py` only ever matched a **single-line** `/** … */` before the
-blank line. A lane found the gap: it split a *multi-line* JSDoc from a `//`
+blank line. A lane found the gap: it split a _multi-line_ JSDoc from a `//`
 section divider beneath it, which clears the finding the same way and the regex
 cannot see it.
 
@@ -60,7 +60,7 @@ python3 dev/scripts/comment-sweep/count-splits.py --files <slice.tsv>
 python3 dev/scripts/comment-sweep/count-splits.py --commit SHA
 ```
 
-It reports every blank line the diff *inserted between two comment lines*, which
+It reports every blank line the diff _inserted between two comment lines_, which
 is the gaming pattern in general: `comment-block-size` counts adjacent comment
 lines as one block, so a blank line halves the count while changing no prose.
 Exit 1 if any are found. Run it instead of relying on the orphan regex alone;

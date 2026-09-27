@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
 import path from "path";
 import { fileURLToPath } from "url";
+
+import { describe, expect, it } from "vitest";
+
 import { listNativeSkills, renderSkill } from "../_compiler/native.js";
 
 // Backs specs/langy/langy-code-access.feature: the code-changes skill is what
@@ -18,9 +20,7 @@ function codeChangesSkill(): string {
 }
 
 function connectAgentSkill(): string {
-  const skill = listNativeSkills(skillsRoot).find(
-    (s) => s.slug === "connect-agent",
-  );
+  const skill = listNativeSkills(skillsRoot).find((s) => s.slug === "connect-agent");
   expect(skill, "connect-agent is a shipped native skill").toBeTruthy();
   return renderSkill(skill!);
 }
@@ -143,9 +143,7 @@ describe("the code-changes skill", () => {
     /** @scenario "The pull request title is the commit subject" */
     it("takes the pull request title from the commit subject and bans adjectives", () => {
       const rendered = codeChangesSkill();
-      expect(rendered).toContain(
-        "The title is the commit subject with the type prefix removed",
-      );
+      expect(rendered).toContain("The title is the commit subject with the type prefix removed");
       expect(rendered).toContain("comprehensive");
     });
 
@@ -156,11 +154,9 @@ describe("the code-changes skill", () => {
       expect(rendered).toContain(
         "may only state what a command output **in this conversation** showed",
       );
-      expect(rendered).toContain("langwatch agent get \"<name>\"");
+      expect(rendered).toContain('langwatch agent get "<name>"');
       expect(rendered).toContain("the restart is left to the user");
-      expect(rendered).toContain(
-        "Copy that address into your reply, character for character",
-      );
+      expect(rendered).toContain("Copy that address into your reply, character for character");
     });
   });
 });
@@ -172,7 +168,7 @@ describe("the connect-agent skill", () => {
       const rendered = connectAgentSkill();
       expect(rendered).toContain("When the change goes into a pull request");
       expect(rendered).toContain("Restart the service that holds the connect call");
-      expect(rendered).toContain("`langwatch agent get \"<name>\"`");
+      expect(rendered).toContain('`langwatch agent get "<name>"`');
       expect(rendered).toContain("the restart is left to the user");
       expect(rendered).toContain(
         "is false unless the `agent get` output in this conversation lists both options",

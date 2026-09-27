@@ -36,7 +36,9 @@ function contractFiles() {
   const transports = [];
   for (const parent of ["modules", "enterprise/modules"]) {
     for (const module of listDir(join(repoRoot, parent))) {
-      transports.push(...moduleContractFiles(join(repoRoot, parent, module, "process/src/transport")));
+      transports.push(
+        ...moduleContractFiles(join(repoRoot, parent, module, "process/src/transport")),
+      );
     }
   }
   const byPath = (left, right) => left.localeCompare(right);

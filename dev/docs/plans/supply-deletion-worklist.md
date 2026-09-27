@@ -10,12 +10,12 @@ session; diffs checked, both net zero lines, so counts below still hold.
 
 ## Headline numbers
 
-| Claim | Handover | Found | Verdict |
-| --- | --- | --- | --- |
-| live `.withProvided(` call sites | 89 | 89 (consumers) / 100 (repo-wide) | confirmed |
-| worker absence classes / body lines | 15 / 279 | 15 / 279 | confirmed exactly |
-| files teaching the old shape | 16 | 16 | confirmed exactly |
-| installation tests broken today | 6, of which 4 unfixable | **4**, not 6 | **disagreement** |
+| Claim                               | Handover                | Found                            | Verdict           |
+| ----------------------------------- | ----------------------- | -------------------------------- | ----------------- |
+| live `.withProvided(` call sites    | 89                      | 89 (consumers) / 100 (repo-wide) | confirmed         |
+| worker absence classes / body lines | 15 / 279                | 15 / 279                         | confirmed exactly |
+| files teaching the old shape        | 16                      | 16                               | confirmed exactly |
+| installation tests broken today     | 6, of which 4 unfixable | **4**, not 6                     | **disagreement**  |
 
 ## 1. Deleted supply spellings
 
@@ -102,23 +102,23 @@ Same shape, no exact match on 116 - not worth further chase.
 All 15 have a live call site (none dead), cheapest/shortest body first, all
 line refs into `worker-production.composition.ts`:
 
-| Class | Lines | Declared | Live call site |
-| --- | --- | --- | --- |
-| `WorkerGithubAbsenceReport` | 3 | :337 | factory `githubAbsence()` :1973, invoked :846 |
-| `WorkerIdentityAbsenceReport` | 3 | :2492 | factory `identityAbsence()` :1937, invoked :1702 |
-| `WorkerTraceAbsenceReport` | 4 | :295 | factory `traceAbsence()` :1850, invoked :1036, used :1070 |
-| `AbsentTraceTriggerMatches` | 5 | :2628 | `new AbsentTraceTriggerMatches()` :1845 |
-| `AbsentEvaluationGraphActivity` | 13 | :2593 | `new AbsentEvaluationGraphActivity()` :1445 |
-| `LoggedWorkerScenarioAbsence` | 15 | :2362 | `.create()` :1872, factory invoked :1147, used :1187 |
-| `LoggedWorkerGithubAbsence` | 16 | :2470 | `.create()` :1977, factory invoked :846 |
-| `LoggedWorkerIdentityAbsence` | 16 | :2497 | `.create()` :1941, factory invoked :1702 |
-| `LoggedWorkerTopicAbsence` | 16 | :2515 | `.create()` :1959, factory `topicAbsence()` invoked :1594 |
-| `LoggedWorkerTraceAbsence` | 16 | :2608 | `.create()` :1854, factory invoked :1036 |
-| `LoggedWorkerEvaluationAbsence` | 23 | :2564 | `.create()` :1968, factory invoked :1490 |
-| `LoggedWorkerLangyAbsence` | 27 | :2441 | `.create()` :1917, factory invoked :1062, used :1125 |
-| `LoggedWorkerModelProviderAbsence` | 30 | :2532 | `.create()` :1950, factory invoked :1093 |
-| `LoggedWorkerGatewaySpendAbsence` | 36 | :2324 | `.create()` :1863, factory invoked :911, used :946 |
-| `LoggedWorkerAutomationSettlementAbsence` | 56 | :2383 | `.create()` :1908, factory invoked :1288, used :1324/:1425 |
+| Class                                     | Lines | Declared | Live call site                                             |
+| ----------------------------------------- | ----- | -------- | ---------------------------------------------------------- |
+| `WorkerGithubAbsenceReport`               | 3     | :337     | factory `githubAbsence()` :1973, invoked :846              |
+| `WorkerIdentityAbsenceReport`             | 3     | :2492    | factory `identityAbsence()` :1937, invoked :1702           |
+| `WorkerTraceAbsenceReport`                | 4     | :295     | factory `traceAbsence()` :1850, invoked :1036, used :1070  |
+| `AbsentTraceTriggerMatches`               | 5     | :2628    | `new AbsentTraceTriggerMatches()` :1845                    |
+| `AbsentEvaluationGraphActivity`           | 13    | :2593    | `new AbsentEvaluationGraphActivity()` :1445                |
+| `LoggedWorkerScenarioAbsence`             | 15    | :2362    | `.create()` :1872, factory invoked :1147, used :1187       |
+| `LoggedWorkerGithubAbsence`               | 16    | :2470    | `.create()` :1977, factory invoked :846                    |
+| `LoggedWorkerIdentityAbsence`             | 16    | :2497    | `.create()` :1941, factory invoked :1702                   |
+| `LoggedWorkerTopicAbsence`                | 16    | :2515    | `.create()` :1959, factory `topicAbsence()` invoked :1594  |
+| `LoggedWorkerTraceAbsence`                | 16    | :2608    | `.create()` :1854, factory invoked :1036                   |
+| `LoggedWorkerEvaluationAbsence`           | 23    | :2564    | `.create()` :1968, factory invoked :1490                   |
+| `LoggedWorkerLangyAbsence`                | 27    | :2441    | `.create()` :1917, factory invoked :1062, used :1125       |
+| `LoggedWorkerModelProviderAbsence`        | 30    | :2532    | `.create()` :1950, factory invoked :1093                   |
+| `LoggedWorkerGatewaySpendAbsence`         | 36    | :2324    | `.create()` :1863, factory invoked :911, used :946         |
+| `LoggedWorkerAutomationSettlementAbsence` | 56    | :2383    | `.create()` :1908, factory invoked :1288, used :1324/:1425 |
 
 ## 3. Files teaching the old shape - 16, confirmed exactly
 
@@ -126,24 +126,24 @@ line refs into `worker-production.composition.ts`:
 and `.claude/handoffs/`/`.claude/manifests/` files also match but are dated
 lane records, not current teaching docs - excluded, per L8's own rule.
 
-| File | Stale spelling(s) |
-| --- | --- |
-| `.claude/skills/architecture-guide/references/contract.md` | `withProvided` |
-| `.claude/skills/module/references/extend.md` | `withProvided` |
-| `.claude/skills/module-review/references/review-checklist.md` | `withTransports` (module-side, see caution) |
-| `.claude/skills/architecture-guide/references/config-composition.md` | `withTransports` (process-side, line 150 - genuinely stale) |
-| `.claude/skills/module/references/transport.md` | `withTransports` (module-side, see caution) |
-| `.claude/skills/architecture-guide/references/testing.md` | `withMemoryRepositories`, `withProvided` |
-| `.claude/skills/module/references/new.md` | `withPersistence`, `withProvided`, `withTransports` |
-| `.claude/skills/module/references/wire.md` | `withInfrastructure`, `withPersistence`, `withProvided` |
-| `.claude/skills/architecture-guide/SKILL.md` | `withInfrastructure`, `withTransports` |
-| `.claude/skills/architecture-guide/references/server.md` | `withTransports`, `withMemoryRepositories`, `withProvided` |
-| `.claude/skills/module/references/convert.md` | `withInfrastructure`, `withTransports`, `withPersistence`, `withProvided` |
-| `.claude/skills/architecture-guide/references/composition-by-size.md` | all 6 (rewrite, don't edit, per L8) |
-| `packages/oxlint-rules/src/rules/banned-legacy-names.rule.mjs` | `withInfrastructure`, `withPersistence` (already banned; L9 adds the other 4) |
-| `packages/oxlint-rules/tests/rules/banned-legacy-names.unit.test.mjs` | `withPersistence`, `withInfrastructure` |
-| `dev/docs/adr/133-composition-spec.md` | `withPersistence`, `withTransports`, `withInfrastructure` |
-| `dev/docs/adr/144-declarative-process-composition.md` | `withTransports`, `withProvided` |
+| File                                                                  | Stale spelling(s)                                                             |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `.claude/skills/architecture-guide/references/contract.md`            | `withProvided`                                                                |
+| `.claude/skills/module/references/extend.md`                          | `withProvided`                                                                |
+| `.claude/skills/module-review/references/review-checklist.md`         | `withTransports` (module-side, see caution)                                   |
+| `.claude/skills/architecture-guide/references/config-composition.md`  | `withTransports` (process-side, line 150 - genuinely stale)                   |
+| `.claude/skills/module/references/transport.md`                       | `withTransports` (module-side, see caution)                                   |
+| `.claude/skills/architecture-guide/references/testing.md`             | `withMemoryRepositories`, `withProvided`                                      |
+| `.claude/skills/module/references/new.md`                             | `withPersistence`, `withProvided`, `withTransports`                           |
+| `.claude/skills/module/references/wire.md`                            | `withInfrastructure`, `withPersistence`, `withProvided`                       |
+| `.claude/skills/architecture-guide/SKILL.md`                          | `withInfrastructure`, `withTransports`                                        |
+| `.claude/skills/architecture-guide/references/server.md`              | `withTransports`, `withMemoryRepositories`, `withProvided`                    |
+| `.claude/skills/module/references/convert.md`                         | `withInfrastructure`, `withTransports`, `withPersistence`, `withProvided`     |
+| `.claude/skills/architecture-guide/references/composition-by-size.md` | all 6 (rewrite, don't edit, per L8)                                           |
+| `packages/oxlint-rules/src/rules/banned-legacy-names.rule.mjs`        | `withInfrastructure`, `withPersistence` (already banned; L9 adds the other 4) |
+| `packages/oxlint-rules/tests/rules/banned-legacy-names.unit.test.mjs` | `withPersistence`, `withInfrastructure`                                       |
+| `dev/docs/adr/133-composition-spec.md`                                | `withPersistence`, `withTransports`, `withInfrastructure`                     |
+| `dev/docs/adr/144-declarative-process-composition.md`                 | `withTransports`, `withProvided`                                              |
 
 Caution: `review-checklist.md` and `transport.md`'s only match is the
 module-side `<f>.server.ts`'s `.withTransports(...)`, which this drive does

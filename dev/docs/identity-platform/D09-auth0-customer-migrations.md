@@ -27,7 +27,7 @@ forced to reconfigure their IdP mid-migration.
 | Auth0 dependency today                                                 | What retires it                                                            | When                                                |
 | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
 | OIDC broker for enterprise SSO (genericOAuth `auth0`/`okta` providers) | Direct per-org `SsoConnection` (OIDC/SAML), one customer at a time         | this deliverable, per tenant                        |
-| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set                                                     | D13 — shipped; flag and legacy screens removed               |
+| Front-door screens (Universal Login owned the unauthenticated visuals) | First-party screen set                                                     | D13 — shipped; flag and legacy screens removed      |
 | `Organization.ssoDomain`/`ssoProvider` string routing                  | Connection-based routing                                                   | D04 (`SSOCONN_ROUTING`)                             |
 | `src/server/auth0/passwordService.ts` (Management API password ops)    | Identifier-model password change (`change-password-auth0.feature` rewrite) | D10                                                 |
 | Federated logout                                                       | Direct-connection logout semantics                                         | this deliverable per tenant; code deleted D10       |

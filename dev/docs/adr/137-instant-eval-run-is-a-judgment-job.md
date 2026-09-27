@@ -86,12 +86,12 @@ at **composition**: the caller's text goes inside a subquery, character for
 character, and the wrapper only decides which of its rows come back. Four
 wrappers, in `app-layer/instant-evals/run/composition.ts`:
 
-| Pass | Shape | What it is for |
-|---|---|---|
-| probe | `SELECT * FROM (<sql>) AS q LIMIT 0` | what the statement projects, reading no rows and judging nothing |
-| count | `SELECT count() FROM (SELECT q.TraceId FROM (<sql>) AS q LIMIT limit+1) AS c` | the run's total, bounded one past its limit |
-| keys | `SELECT q.TraceId … FROM (<sql>) AS q [WHERE <order> > {after}] ORDER BY <order> LIMIT n` | one page of row keys |
-| page | `SELECT * FROM (<sql>) AS q WHERE q.TraceId IN ({page_ids}) ORDER BY q.TraceId` | the rows of one page, where the extraction and eval functions hydrate |
+| Pass  | Shape                                                                                     | What it is for                                                        |
+| ----- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| probe | `SELECT * FROM (<sql>) AS q LIMIT 0`                                                      | what the statement projects, reading no rows and judging nothing      |
+| count | `SELECT count() FROM (SELECT q.TraceId FROM (<sql>) AS q LIMIT limit+1) AS c`             | the run's total, bounded one past its limit                           |
+| keys  | `SELECT q.TraceId … FROM (<sql>) AS q [WHERE <order> > {after}] ORDER BY <order> LIMIT n` | one page of row keys                                                  |
+| page  | `SELECT * FROM (<sql>) AS q WHERE q.TraceId IN ({page_ids}) ORDER BY q.TraceId`           | the rows of one page, where the extraction and eval functions hydrate |
 
 `/api/v1/query` still runs the text verbatim; only this surface wraps it, which
 is why the wrapping lives on the run and not in the query service.
@@ -122,7 +122,7 @@ and they are dropped by matching the pair before anything is judged, so a row
 the page does not own is never paid for. The over-fetch is bounded by the
 page's own row ceiling, past which the read is refused rather than truncated.
 
-Page *n* covers the same keys whoever runs it, which is what makes a
+Page _n_ covers the same keys whoever runs it, which is what makes a
 redelivery safe rather than merely harmless, **provided the inner statement is
 deterministic**. One carrying `LIMIT n` with no `ORDER BY` is not: ClickHouse
 may return a different n rows per execution, and the statement is executed once
@@ -304,11 +304,11 @@ parameters, so there is none of the caller's left to fill.
 
 ### The three templates
 
-| Target | View | Text | Addressed by |
-|---|---|---|---|
-| `traces` | `analytics.traces` | `llm_readable_trace(TraceId, 8000)` | the trace |
-| `threads` | `analytics.trace_metrics` grouped by `ConversationId` | `conversation_bounded(ConversationId, 8000, '')` | `argMax(TraceId, OccurredAt)` |
-| `llm_spans` | `analytics.spans` where the span type is `llm` | `llm_messages_span(TraceId, SpanId)` | the trace and span pair |
+| Target      | View                                                  | Text                                             | Addressed by                  |
+| ----------- | ----------------------------------------------------- | ------------------------------------------------ | ----------------------------- |
+| `traces`    | `analytics.traces`                                    | `llm_readable_trace(TraceId, 8000)`              | the trace                     |
+| `threads`   | `analytics.trace_metrics` grouped by `ConversationId` | `conversation_bounded(ConversationId, 8000, '')` | `argMax(TraceId, OccurredAt)` |
+| `llm_spans` | `analytics.spans` where the span type is `llm`        | `llm_messages_span(TraceId, SpanId)`             | the trace and span pair       |
 
 Each projects `TraceId`, whatever optional key columns the target has
 (`ThreadId`, `SpanId`, `OccurredAt`), and one eval column per question aliased
@@ -388,13 +388,13 @@ range?, options?}`, the same vocabulary the `llm_*` evaluators use plus a
 threshold, because the judge answers a probability and the line between yes and
 no is the caller's. Each becomes one eval call:
 
-| Question | Call |
-|---|---|
-| boolean | `eval(text, instructions)` |
-| boolean with two criteria | `eval_criteria(text, instructions, [yes, no])` |
-| boolean with a threshold | `eval_passed(text, instructions, threshold)` |
-| score | `eval_score(text, instructions, min, max)` |
-| category | `eval_category(text, instructions, ['name: meaning', ...])` |
+| Question                  | Call                                                        |
+| ------------------------- | ----------------------------------------------------------- |
+| boolean                   | `eval(text, instructions)`                                  |
+| boolean with two criteria | `eval_criteria(text, instructions, [yes, no])`              |
+| boolean with a threshold  | `eval_passed(text, instructions, threshold)`                |
+| score                     | `eval_score(text, instructions, min, max)`                  |
+| category                  | `eval_category(text, instructions, ['name: meaning', ...])` |
 
 Criteria and a threshold together are refused, naming both forms. There is no
 function taking both, because a ClickHouse SQL UDF is a lambda with a fixed

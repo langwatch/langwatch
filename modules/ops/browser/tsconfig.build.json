@@ -7,7 +7,7 @@
     "paths": {
       "@langwatch/ops-browser": ["./src/index.ts"],
       "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
-    },
+    }
   },
   "files": [
     "./src/index.ts",

@@ -16,20 +16,26 @@ prefix. The rule now is: **children emit, the viewer renders**.
 One JSON object per line, on stdout:
 
 ```json
-{"time":"2026-09-07T11:10:46.108Z","level":"info","msg":"listening","service":"langwatch-api","port":6560}
+{
+  "time": "2026-09-07T11:10:46.108Z",
+  "level": "info",
+  "msg": "listening",
+  "service": "langwatch-api",
+  "port": 6560
+}
 ```
 
-| Field     | Required | Shape |
-| --------- | -------- | ----- |
-| `time`    | yes      | RFC 3339, UTC, millisecond precision |
-| `level`   | yes      | lowercase word: `trace` `debug` `info` `warn` `error` `fatal` |
-| `msg`     | yes      | the message, no timestamp, level or service in the text |
-| `service` | yes      | the process identity (`langwatch-api`, `langwatch-service-nlpgo`, …) |
-| `stack`   | on error | the full multi-line trace, as one string with `\n` in it |
-| anything else | — | the line's own fields |
+| Field         | Required | Shape                                                                |
+| ------------- | -------- | -------------------------------------------------------------------- |
+| `time`        | yes      | RFC 3339, UTC, millisecond precision                                 |
+| `level`       | yes      | lowercase word: `trace` `debug` `info` `warn` `error` `fatal`        |
+| `msg`         | yes      | the message, no timestamp, level or service in the text              |
+| `service`     | yes      | the process identity (`langwatch-api`, `langwatch-service-nlpgo`, …) |
+| `stack`       | on error | the full multi-line trace, as one string with `\n` in it             |
+| anything else | —        | the line's own fields                                                |
 
 Vite writes the same shape too, through a `customLogger` (`apps/ui/vite/dev-logging.ts`)
-that replaces its own two-digit clock and `[vite]` tag: a multi-line message  - 
+that replaces its own two-digit clock and `[vite]` tag: a multi-line message -
 the startup banner, a stack - becomes one record, its lines rejoined with `\n`
 in `msg` (or, for an error, split into `msg` plus `stack`), rather than one
 record per line. Node's own crash output and the lane wrappers still fall

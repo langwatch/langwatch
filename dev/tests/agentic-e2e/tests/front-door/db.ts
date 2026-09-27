@@ -6,8 +6,7 @@
 import { Pool } from "pg";
 
 const DATABASE_URL =
-  process.env.DATABASE_URL ??
-  "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb";
+  process.env.DATABASE_URL ?? "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb";
 
 /**
  * `pg` ignores the Prisma-style `?schema=` param (see
@@ -40,9 +39,7 @@ function getPool(): Pool {
  * substring on the JSON-encoded `identifier` rather than pulling every row
  * into JS. Call BEFORE visiting the link — claiming renames the identifier.
  */
-export async function findSignUpVerificationToken(
-  email: string,
-): Promise<string | null> {
+export async function findSignUpVerificationToken(email: string): Promise<string | null> {
   const result = await getPool().query<{ token: string }>(
     `SELECT token FROM "VerificationToken"
      WHERE identifier LIKE 'identity-signup-verification:%'

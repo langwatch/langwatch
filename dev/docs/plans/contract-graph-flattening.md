@@ -68,31 +68,31 @@ Remaining on the path: `experiment -> scenario` (`ScenarioParameterDefinition`),
 
 ## All remaining edges
 
-| contract | edges | depends on |
-| --- | --- | --- |
-| `scenario` | 8 | `agent`, `automation`, `evaluator`, `feature-flag`, `model-provider`, `trace`, `user`, `workflow` |
-| `experiment` | 6 | `authz`, `dataset`, `evaluator`, `model-provider`, `scenario`, `workflow` |
-| `workflow` | 5 | `agent`, `authz`, `dataset`, `evaluator`, `prompt` |
-| `suite` | 3 | `evaluator`, `model-provider`, `scenario` |
-| `annotation` | 2 | `trace`, `user` |
-| `api-key` | 2 | `authz`, `project` |
-| `dashboard` | 2 | `analytics`, `automation` |
-| `dataset` | 2 | `annotation`, `trace` |
-| `evaluation` | 2 | `evaluator`, `experiment` |
-| `monitor` | 2 | `evaluation`, `evaluator` |
-| `ops` | 2 | `feature-flag`, `project` |
-| `organization` | 2 | `authz`, `project` |
-| `trace` | 2 | `analytics`, `evaluation` |
-| `auth` | 1 | `identity` |
-| `automation` | 1 | `monitor` |
-| `coding-agent` | 1 | `trace` |
-| `evaluator` | 1 | `analytics` |
-| `langy` | 1 | `authz` |
-| `prompt` | 1 | `dataset` |
-| `role` | 1 | `authz` |
-| `share` | 1 | `data-retention` |
-| `stored-object` | 1 | `authz` |
-| `user` | 1 | `organization` |
+| contract        | edges | depends on                                                                                        |
+| --------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| `scenario`      | 8     | `agent`, `automation`, `evaluator`, `feature-flag`, `model-provider`, `trace`, `user`, `workflow` |
+| `experiment`    | 6     | `authz`, `dataset`, `evaluator`, `model-provider`, `scenario`, `workflow`                         |
+| `workflow`      | 5     | `agent`, `authz`, `dataset`, `evaluator`, `prompt`                                                |
+| `suite`         | 3     | `evaluator`, `model-provider`, `scenario`                                                         |
+| `annotation`    | 2     | `trace`, `user`                                                                                   |
+| `api-key`       | 2     | `authz`, `project`                                                                                |
+| `dashboard`     | 2     | `analytics`, `automation`                                                                         |
+| `dataset`       | 2     | `annotation`, `trace`                                                                             |
+| `evaluation`    | 2     | `evaluator`, `experiment`                                                                         |
+| `monitor`       | 2     | `evaluation`, `evaluator`                                                                         |
+| `ops`           | 2     | `feature-flag`, `project`                                                                         |
+| `organization`  | 2     | `authz`, `project`                                                                                |
+| `trace`         | 2     | `analytics`, `evaluation`                                                                         |
+| `auth`          | 1     | `identity`                                                                                        |
+| `automation`    | 1     | `monitor`                                                                                         |
+| `coding-agent`  | 1     | `trace`                                                                                           |
+| `evaluator`     | 1     | `analytics`                                                                                       |
+| `langy`         | 1     | `authz`                                                                                           |
+| `prompt`        | 1     | `dataset`                                                                                         |
+| `role`          | 1     | `authz`                                                                                           |
+| `share`         | 1     | `data-retention`                                                                                  |
+| `stored-object` | 1     | `authz`                                                                                           |
+| `user`          | 1     | `organization`                                                                                    |
 
 ## Measuring
 

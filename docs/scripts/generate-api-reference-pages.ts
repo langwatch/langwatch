@@ -169,7 +169,8 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,  "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
+    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
   "/api/cron/old_lambdas_cleanup": UNDOCUMENTED_APP_INTERNAL,

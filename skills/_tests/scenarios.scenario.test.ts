@@ -1,11 +1,13 @@
-import scenario, { assertSkillWasRead, bashCommands } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead, bashCommands } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   copyFixtureToWorkDir,
   createClaudeCodeAgent,
@@ -985,9 +987,9 @@ describe("Scenarios Skill", () => {
             script: [
               scenario.user(
                 `My support agent is connected to LangWatch as "${agentName}" and it is online right now. ` +
-                  "A production conversation went wrong. The customer wrote: \"I am not the workspace admin, " +
+                  'A production conversation went wrong. The customer wrote: "I am not the workspace admin, ' +
                   `my colleague Priya Raman handles SSO, her email is ${colleagueEmail}, send her the SAML steps ` +
-                  "and loop her in.\" The agent answered \"Done, I forwarded the steps to Priya\" without " +
+                  'and loop her in." The agent answered "Done, I forwarded the steps to Priya" without ' +
                   "looking her up or calling any tool. Reproduce that failure as a platform scenario in a " +
                   `test suite called "${suiteName}" so we can prove the fix. Do not write test files.`,
               ),
@@ -1022,7 +1024,7 @@ describe("Scenarios Skill", () => {
           removeSkillTestWorkDir(tempFolder);
         }
       },
-      3_600_000
+      3_600_000,
     );
   });
 });

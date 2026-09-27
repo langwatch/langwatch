@@ -5,13 +5,13 @@ Both halves of `pnpm lint` count: `lint:oxlint` **and** `architecture-enforcer l
 
 ## The scoreboard
 
-| | session start | now |
-| --- | ---: | ---: |
-| oxlint errors | 6,075 | 5,949 |
-| oxlint warnings | 17,947 | 6,085 |
-| oxlint total | 24,022 | 12,023 |
-| architecture-enforcer | 3,137 | 2,761 |
-| **true total** | **27,159** | **14,784** |
+|                       | session start |        now |
+| --------------------- | ------------: | ---------: |
+| oxlint errors         |         6,075 |      5,949 |
+| oxlint warnings       |        17,947 |      6,085 |
+| oxlint total          |        24,022 |     12,023 |
+| architecture-enforcer |         3,137 |      2,761 |
+| **true total**        |    **27,159** | **14,784** |
 
 Typecheck held at its 114-error / 40-file baseline throughout, verified by
 comparing error-code distribution and the erroring file set, not just the count.
@@ -43,22 +43,22 @@ zero duplicates, and confirm the per-rule counts returned to where they were.
 
 ## Remaining work, largest first
 
-| rule | count | shape of the work |
-| --- | ---: | --- |
-| `comment-block-size-warning` | 5,212 | prose, see the rate note below |
-| `fallible-result-naming` | 1,346 | rename + narrow the catch to the absence case |
-| `no-try-prefix` | 757 | same family |
-| `package-boundaries` | 434 | real boundary debt |
-| `feature-source-layout` | 320 | 173 are `services/` subdirectories |
-| `temporal-only` | 381 | |
-| `zod-object-composition` | 403 | |
-| `service-classes` | 301 | |
-| enforcer: `unused-module-export` | 559 | |
-| enforcer: `boundary-signature-mirrors` | 282 | |
+| rule                                   | count | shape of the work                             |
+| -------------------------------------- | ----: | --------------------------------------------- |
+| `comment-block-size-warning`           | 5,212 | prose, see the rate note below                |
+| `fallible-result-naming`               | 1,346 | rename + narrow the catch to the absence case |
+| `no-try-prefix`                        |   757 | same family                                   |
+| `package-boundaries`                   |   434 | real boundary debt                            |
+| `feature-source-layout`                |   320 | 173 are `services/` subdirectories            |
+| `temporal-only`                        |   381 |                                               |
+| `zod-object-composition`               |   403 |                                               |
+| `service-classes`                      |   301 |                                               |
+| enforcer: `unused-module-export`       |   559 |                                               |
+| enforcer: `boundary-signature-mirrors` |   282 |                                               |
 
 ### The comment-block rate note — read before committing to the 5,212
 
-The budget is 5 lines *including* `/**` and `*/`, so it is **3 content lines**,
+The budget is 5 lines _including_ `/**` and `*/`, so it is **3 content lines**,
 about 230 characters. The flagged blocks average nearer 300. This is not
 tightening; it is deciding which quarter of the explanation to delete.
 
@@ -102,14 +102,14 @@ the four new ones are NOT baselined and are reported.
 holds a machine-wide check-queue slot. Attribution, by running each policy alone
 against a fresh snapshot:
 
-| | peak RSS |
-| --- | ---: |
-| workspace snapshot alone (files, catalogue, manifests) | 0.16 GiB |
-| `unused-module-export` | 2.44 GiB |
-| `source-folder-shape` | 1.29 GiB |
-| `service-projection-boundaries` | 1.01 GiB — **for 0 findings** |
-| `frontend-ui-boundaries` | 0.87 GiB |
-| everything else | ≤ 0.59 GiB |
+|                                                        |                      peak RSS |
+| ------------------------------------------------------ | ----------------------------: |
+| workspace snapshot alone (files, catalogue, manifests) |                      0.16 GiB |
+| `unused-module-export`                                 |                      2.44 GiB |
+| `source-folder-shape`                                  |                      1.29 GiB |
+| `service-projection-boundaries`                        | 1.01 GiB — **for 0 findings** |
+| `frontend-ui-boundaries`                               |                      0.87 GiB |
+| everything else                                        |                    ≤ 0.59 GiB |
 
 The snapshot is cheap. The cost is the shared syntax-tree cache in
 `src/workspace/module-graph.ts`.
@@ -123,7 +123,7 @@ once (`await setTimeout(0)`) collected all 14,158 and dropped the heap to
 **0.20 GiB**.
 
 The cause is `KeepDuringJob`: `new WeakRef(target)` and `deref()` both add the
-target to the *current job's* kept-alive list, and a whole lint run is one
+target to the _current job's_ kept-alive list, and a whole lint run is one
 synchronous job. A weak cache needs a turn boundary to be weak. This one has
 none, so it behaves as an unbounded strong cache that merely reads as bounded.
 
@@ -132,11 +132,11 @@ none, so it behaves as an unbounded strong cache that merely reads as bounded.
 Replacing the `WeakRef` with a bounded LRU, findings identical at 2761 across 55
 policies every time:
 
-| tree cache | peak RSS | wall |
-| ---: | ---: | ---: |
-| 512 | 1.54 GiB | 44.5s |
-| 2048 | 2.09 GiB | 31.5s |
-| 4096 | 2.70 GiB | 23.8s |
+|        tree cache | peak RSS |  wall |
+| ----------------: | -------: | ----: |
+|               512 | 1.54 GiB | 44.5s |
+|              2048 | 2.09 GiB | 31.5s |
+|              4096 | 2.70 GiB | 23.8s |
 | unbounded (today) | 2.76 GiB | 19.9s |
 
 The cache is earning its keep: policies re-read the same files, so a smaller
@@ -145,11 +145,11 @@ cache buys memory with re-parsing, roughly linearly. Not shipped for that reason
 ### Could the policies just be oxlint rules?
 
 Mostly no, and the RAM is not the reason to want it. The expensive policies are
-expensive *because* they are whole-tree: `unused-module-export` asks "does any
+expensive _because_ they are whole-tree: `unused-module-export` asks "does any
 file in the repository import this name?", `boundary-signature-mirrors` and
 `memory-twin-drift` compare two files, `package-cycle` needs the import graph. An
 oxlint plugin rule sees one file at a time and cannot answer any of those. The
-policies that *could* move are the per-file ones, which are already the cheap
+policies that _could_ move are the per-file ones, which are already the cheap
 ones — moving them would save little.
 
 ### Two fixes tried and rejected on measurement

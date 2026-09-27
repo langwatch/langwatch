@@ -1447,8 +1447,7 @@ jobs:
           cat apps/api/test-failures.txt
 
   langwatch-app-complete:
-    needs:
-      [
+    needs: [
         changes,
         # `affected` decides test-unit's matrix, and test-unit is an allowed
         # skip. So if this job failed and were not named here, test-unit would

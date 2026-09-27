@@ -14,7 +14,7 @@
 
 ADR-104 gave every runtime one typed environment boundary: a composition root
 parses the variables it owns with Zod and hands features semantic values. It
-made the boundary typed. It did not make it *classified*. To that seam,
+made the boundary typed. It did not make it _classified_. To that seam,
 `OPENAI_API_KEY` and `BASE_HOST` are the same kind of thing — a string in a
 record — so nothing in the repository could answer "is this value safe to
 print", and every guard that wanted to answer it grew its own list.
@@ -51,12 +51,12 @@ class. TypeScript parses it with Zod; haven reads the same file in Go. There is
 no second list and no generated Go source to keep in step — a key added once is
 masked everywhere.
 
-| Class | What it is | Count | In a log line |
-| --- | --- | --- | --- |
-| `secret` | A rotating credential | 29 | `[redacted]` |
-| `composite` | Shape and credential in one string | 10 | scheme, host, port and path kept; userinfo and query stripped |
-| `pointer` | Names a credential on disk | 1 | verbatim — the file it names is the vault's problem |
-| `config` | Everything else | ~90 | verbatim |
+| Class       | What it is                         | Count | In a log line                                                 |
+| ----------- | ---------------------------------- | ----- | ------------------------------------------------------------- |
+| `secret`    | A rotating credential              | 29    | `[redacted]`                                                  |
+| `composite` | Shape and credential in one string | 10    | scheme, host, port and path kept; userinfo and query stripped |
+| `pointer`   | Names a credential on disk         | 1     | verbatim — the file it names is the vault's problem           |
+| `config`    | Everything else                    | ~90   | verbatim                                                      |
 
 `config` is the class nobody has to think about, and keeping it large is the
 point: the ~90 keys that are deployment shape stay as free to print, log and
@@ -86,7 +86,7 @@ paste into an issue as they are today.
 
 `SecretSource` has one method, `resolve({ keys })`. It is batched, not per-key,
 so a source backed by a subprocess pays once per boot instead of once per
-variable. Absence is a missing map entry; a throw means the *source* failed
+variable. Absence is a missing map entry; a throw means the _source_ failed
 (signed out, unreachable), which needs different words than "that secret does
 not exist".
 
@@ -110,14 +110,14 @@ it cannot use biometric unlock.
 When `NODE_ENV=production` the source is not constructed at all. A pod never
 shells out, holds no vault session, and gains no failure mode. Teams wanting
 1Password upstream get it through external-secrets or the 1Password Operator
-syncing *into* a `Secret`, outside the application and invisible to it.
+syncing _into_ a `Secret`, outside the application and invisible to it.
 
 ### The profile is explicit, never the worktree name
 
 Alex's ruling, and the right one. A worktree slug is a directory name, and this
 repository makes worktrees constantly. A lookup keyed on it would miss on a
 rename and fall silently through the chain — the worst failure mode for a
-secret is not a wrong value but an *absent* one at boot, three directories from
+secret is not a wrong value but an _absent_ one at boot, three directories from
 the cause. It also encodes the wrong cardinality: secrets are per-developer,
 occasionally per-environment, essentially never per-worktree; five worktrees
 would mean five items holding the same `OPENAI_API_KEY` and five places to

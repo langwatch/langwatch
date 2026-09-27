@@ -4,8 +4,9 @@
  * connection and bind loopback when running locally.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AddressInfo } from "node:net";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { initConfig } from "../config.js";
 import { startHttpServer } from "../http-server.js";

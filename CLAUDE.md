@@ -80,17 +80,17 @@ hold them absolutely:
 
 ## The product
 
-| Process | Package | What it is |
-|---|---|---|
-| `apps/ui` | `@langwatch/ui` | The browser application (Vite SPA, :5560) |
-| `apps/api` | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560) |
-| `apps/worker` | `@langwatch/worker` | Queues, schedulers, projections, subscribers |
-| `apps/tasks` | `@langwatch/tasks` | One-shot migrations and backfills, run before serve |
-| `apps/server` | `@langwatch/server` | The `npx @langwatch/server` CLI |
-| `services/aigateway` | Go | Virtual-key data plane (:5563) |
-| `services/nlpgo` | Go | Optimization-studio executions and evaluators (:5561) |
-| `services/langyagent` | Go | Langy conversation manager (PORT+4) |
-| `services/langevals` | Python | Evaluators |
+| Process               | Package                   | What it is                                            |
+| --------------------- | ------------------------- | ----------------------------------------------------- |
+| `apps/ui`             | `@langwatch/ui`           | The browser application (Vite SPA, :5560)             |
+| `apps/api`            | `@langwatch/platform-api` | tRPC + REST + SSE, serves the browser bundle (:6560)  |
+| `apps/worker`         | `@langwatch/worker`       | Queues, schedulers, projections, subscribers          |
+| `apps/tasks`          | `@langwatch/tasks`        | One-shot migrations and backfills, run before serve   |
+| `apps/server`         | `@langwatch/server`       | The `npx @langwatch/server` CLI                       |
+| `services/aigateway`  | Go                        | Virtual-key data plane (:5563)                        |
+| `services/nlpgo`      | Go                        | Optimization-studio executions and evaluators (:5561) |
+| `services/langyagent` | Go                        | Langy conversation manager (PORT+4)                   |
+| `services/langevals`  | Python                    | Evaluators                                            |
 
 The three long-running processes (ui, api, worker) always run together: a
 stack missing one serves pages and quietly processes no jobs, which looks
@@ -185,7 +185,7 @@ The non-negotiables, all lint-enforced:
   is refused by `createUi` at install, by name, before any component
   renders. Drawers are URL-routed singletons with a navigation stack: a
   sub-flow **navigates** (`openDrawer("target", { onSuccess, onClose: goBack
-  })`), never mounts a drawer component from inside another drawer.
+})`), never mounts a drawer component from inside another drawer.
 - **The kit law:** a module's browser package is closed — sharing means moving
   the thing to `*-browser-kit`. A kit is a leaf (contracts, design-system,
   browser-host only), fetches nothing, is a real package not a subpath, and
@@ -202,21 +202,21 @@ The non-negotiables, all lint-enforced:
 
 ## Skills — load before working
 
-| Working on | Load |
-|---|---|
-| Any process/module/transport/worker/backend-test work | `backend` |
-| Any screen, drawer, browser half, kit, component test | `frontend` |
-| Which component, theming, UI pattern docs | `design-system` (and `chakra-ui-*` for raw Chakra v3 work) |
-| Any migration: schema.prisma, a goose file, a projection table | `postgres-migration` / `clickhouse-migration` |
-| Citing or deciding any shape | `architecture-guide` → `dev/docs/ARCHITECTURE.md` |
-| A lint message that is wrong, or a new house rule | `lint-rule` |
-| Transactional email | `mail-template` |
-| Adding/renaming a feature, REST namespace, UI route, MCP tool | `feature-map` |
-| Dev stack won't come up | `haven-setup` |
-| Coordinating lanes / picking up the drive | `coordinator` |
-| A long conflicted merge of origin/main | `merge-drive` |
-| Verifying a feature in a real browser | `browser-test` / `browser-pair` |
-| The GitHub project board | `langwatch-kanban` |
+| Working on                                                     | Load                                                       |
+| -------------------------------------------------------------- | ---------------------------------------------------------- |
+| Any process/module/transport/worker/backend-test work          | `backend`                                                  |
+| Any screen, drawer, browser half, kit, component test          | `frontend`                                                 |
+| Which component, theming, UI pattern docs                      | `design-system` (and `chakra-ui-*` for raw Chakra v3 work) |
+| Any migration: schema.prisma, a goose file, a projection table | `postgres-migration` / `clickhouse-migration`              |
+| Citing or deciding any shape                                   | `architecture-guide` → `dev/docs/ARCHITECTURE.md`          |
+| A lint message that is wrong, or a new house rule              | `lint-rule`                                                |
+| Transactional email                                            | `mail-template`                                            |
+| Adding/renaming a feature, REST namespace, UI route, MCP tool  | `feature-map`                                              |
+| Dev stack won't come up                                        | `haven-setup`                                              |
+| Coordinating lanes / picking up the drive                      | `coordinator`                                              |
+| A long conflicted merge of origin/main                         | `merge-drive`                                              |
+| Verifying a feature in a real browser                          | `browser-test` / `browser-pair`                            |
+| The GitHub project board                                       | `langwatch-kanban`                                         |
 
 Before any non-trivial frontend change, also read the relevant pattern docs
 under `dev/docs/best_practices/` (`react.md`, `list-table.md`, `drawers`,
@@ -393,11 +393,11 @@ worker in one process (a launcher, not a process role — each still resolves
 its own secrets, config and graph; boot is worker then api, shutdown drains
 the worker first). Production is unchanged: three Node deployments.
 
-| Script | What runs |
-|---|---|
-| `pnpm dev` | ui + backend + go (+ langy when selected) |
-| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone |
-| `pnpm dev:api` + `pnpm dev:worker` | the production process shape — use when a blocked worker job must not read as API latency |
+| Script                                   | What runs                                                                                 |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                 |
+| `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                            |
+| `pnpm dev:api` + `pnpm dev:worker`       | the production process shape — use when a blocked worker job must not read as API latency |
 
 Both lanes restart on change, debounced (`LANGWATCH_DEV_WATCH_DEBOUNCE_MS`,
 default 750 ms), the Go lane through `air` on successful builds only. The Go
@@ -490,18 +490,18 @@ survive a rollback (ADR-155). Adding a column means nullable or `DEFAULT`;
 removing one waits a full release behind the code that stopped using it and
 carries `-- contract: retired in <release>`; renaming is never in place.
 
-| Rule | Why / how |
-|---|---|
-| Never edit deployed migrations | Immutable history; new migration instead (unmerged ones may be fixed) |
-| Unqualified table names in Prisma migrations | `"Monitor"`, not `"langwatch_db"."Monitor"` — schema comes from the connection string |
-| Every ClickHouse query filters `TenantId` first | `WHERE TenantId = {tenantId:String}` — no other ID is unique across tenants |
-| Every Prisma query on a project-level model carries `projectId` | The multitenancy middleware rejects queries without it |
-| Filter on the partition key (`StartedAt`/`OccurredAt`/`StartTime`) whenever a date range exists | Partition pruning; without it cold S3 partitions are scanned |
-| IN-tuple dedup (`GROUP BY key + max(UpdatedAt)`), not `LIMIT 1 BY`, with heavy columns | `LIMIT 1 BY` materialises whole granules of heavy payloads → OOM |
-| `argMax(column, UpdatedAt)` for sort keys on deduped tables | `max()` picks stale versions and breaks cursor pagination |
-| ClickHouse down-migrations stay commented out | Note: "To roll back, uncomment and run manually" |
-| One `ALTER TABLE` per goose `StatementBegin`/`StatementEnd` block | ClickHouse has no multi-statement queries |
-| "Cannot find module" for generated files | `pnpm start:prepare:files` from the root |
+| Rule                                                                                            | Why / how                                                                             |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Never edit deployed migrations                                                                  | Immutable history; new migration instead (unmerged ones may be fixed)                 |
+| Unqualified table names in Prisma migrations                                                    | `"Monitor"`, not `"langwatch_db"."Monitor"` — schema comes from the connection string |
+| Every ClickHouse query filters `TenantId` first                                                 | `WHERE TenantId = {tenantId:String}` — no other ID is unique across tenants           |
+| Every Prisma query on a project-level model carries `projectId`                                 | The multitenancy middleware rejects queries without it                                |
+| Filter on the partition key (`StartedAt`/`OccurredAt`/`StartTime`) whenever a date range exists | Partition pruning; without it cold S3 partitions are scanned                          |
+| IN-tuple dedup (`GROUP BY key + max(UpdatedAt)`), not `LIMIT 1 BY`, with heavy columns          | `LIMIT 1 BY` materialises whole granules of heavy payloads → OOM                      |
+| `argMax(column, UpdatedAt)` for sort keys on deduped tables                                     | `max()` picks stale versions and breaks cursor pagination                             |
+| ClickHouse down-migrations stay commented out                                                   | Note: "To roll back, uncomment and run manually"                                      |
+| One `ALTER TABLE` per goose `StatementBegin`/`StatementEnd` block                               | ClickHouse has no multi-statement queries                                             |
+| "Cannot find module" for generated files                                                        | `pnpm start:prepare:files` from the root                                              |
 
 Migrations are tasks, not the api's job:
 `pnpm prisma:migrate` / `pnpm clickhouse:migrate` (both proxy
@@ -510,23 +510,23 @@ pipeline.
 
 ## Traps no tool catches
 
-| Trap | Instead |
-|---|---|
-| `gh pr edit --body` | `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="…"` (avoids the Projects deprecation warning) |
-| `gh api graphql -f`/`-F` variables | Inline the values in the query string — the flags break on multiline queries |
-| Trusting `gh pr checks` alone | `gh run list --branch <branch>` — pr checks dedups by name and masks failing runs |
-| Branch names | Issues: `issue123/slug`; features: `feat/slug` |
-| `form.watch()` in a child component receiving `form` | `useWatch({ control: form.control, name })` — `form.watch()` does not re-render children; only the form owner watches |
-| Duplicating Zod and TS types | Zod + `infer` when both validation and types are needed; `as const` for internal constants |
-| `pnpm test -- path` | No `--`: `pnpm test path` — pnpm adds it |
-| Importing the compiler API from `typescript` | TS7's root export is a version constant; the API lives behind `typescript/unstable/*`, sessions via `src/test-utils/tsAst.ts` (ADR-099) |
-| A package tsconfig without `incremental` + its own `tsBuildInfoFile` | Every package sets both, `dist/tsconfig.<stem>.tsbuildinfo` — beside the output, never under `node_modules` |
-| Inline `import(…)` | Top-level `import`/`import type` (lint-enforced). One exception: the SDK CLI startup path, where lazy import is load-bearing and pinned by a boot test |
-| Positional parameters | Named parameters via object destructuring: `fn({ a, b })` |
-| Repeating a docs page's frontmatter `title` as its first heading | The frontmatter renders as the H1 and lede — give the first section its own name |
+| Trap                                                                                   | Instead                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gh pr edit --body`                                                                    | `gh api repos/OWNER/REPO/pulls/N -X PATCH -f body="…"` (avoids the Projects deprecation warning)                                                                                                                                         |
+| `gh api graphql -f`/`-F` variables                                                     | Inline the values in the query string — the flags break on multiline queries                                                                                                                                                             |
+| Trusting `gh pr checks` alone                                                          | `gh run list --branch <branch>` — pr checks dedups by name and masks failing runs                                                                                                                                                        |
+| Branch names                                                                           | Issues: `issue123/slug`; features: `feat/slug`                                                                                                                                                                                           |
+| `form.watch()` in a child component receiving `form`                                   | `useWatch({ control: form.control, name })` — `form.watch()` does not re-render children; only the form owner watches                                                                                                                    |
+| Duplicating Zod and TS types                                                           | Zod + `infer` when both validation and types are needed; `as const` for internal constants                                                                                                                                               |
+| `pnpm test -- path`                                                                    | No `--`: `pnpm test path` — pnpm adds it                                                                                                                                                                                                 |
+| Importing the compiler API from `typescript`                                           | TS7's root export is a version constant; the API lives behind `typescript/unstable/*`, sessions via `src/test-utils/tsAst.ts` (ADR-099)                                                                                                  |
+| A package tsconfig without `incremental` + its own `tsBuildInfoFile`                   | Every package sets both, `dist/tsconfig.<stem>.tsbuildinfo` — beside the output, never under `node_modules`                                                                                                                              |
+| Inline `import(…)`                                                                     | Top-level `import`/`import type` (lint-enforced). One exception: the SDK CLI startup path, where lazy import is load-bearing and pinned by a boot test                                                                                   |
+| Positional parameters                                                                  | Named parameters via object destructuring: `fn({ a, b })`                                                                                                                                                                                |
+| Repeating a docs page's frontmatter `title` as its first heading                       | The frontmatter renders as the H1 and lede — give the first section its own name                                                                                                                                                         |
 | `langwatch login`/`instrument` against a local instance with the machine's real config | They rewrite machine-global files and repoint every other session; export `LANGWATCH_CLI_CONFIG`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME` under `<worktree>/.claude/tmp/dogfood/` first — `dev/docs/best_practices/dogfooding-isolation.md` |
-| Dogfooding agent-usage features with `claude -p` | Drive a real interactive session in a sub-tmux (`new-session -d`, `send-keys`, `capture-pane`); headless mode skips the lifecycle these features observe. Verify the data landed in the product |
-| Spawning a subagent without naming model, effort and context size | Every spawn states all three plus one clause why — routing table in `.claude/coordinator/COORDINATOR.md` §3 |
+| Dogfooding agent-usage features with `claude -p`                                       | Drive a real interactive session in a sub-tmux (`new-session -d`, `send-keys`, `capture-pane`); headless mode skips the lifecycle these features observe. Verify the data landed in the product                                          |
+| Spawning a subagent without naming model, effort and context size                      | Every spawn states all three plus one clause why — routing table in `.claude/coordinator/COORDINATOR.md` §3                                                                                                                              |
 
 ## Structure
 
@@ -549,8 +549,8 @@ Key references: `dev/docs/ARCHITECTURE.md` (the record) ·
 `dev/docs/lint-rules.md` (generated) · `dev/docs/best_practices/` ·
 `dev/docs/adr/` · `.claude/skills/core/` (operating rules).
 
-
 <!-- rtk-instructions v2 -->
+
 # RTK (Rust Token Killer) - Token-Optimized Commands
 
 > This section below the marker is generated by `rtk init`. Its Golden Rule has
@@ -566,12 +566,13 @@ repository requires it, and on a machine without it `rtk git status` is
 at all. Check once (`command -v rtk`) and prefix from then on, or just leave it
 off; every command below works unprefixed.
 
-What *is* always safe is the prefix itself, once the binary exists: where rtk
+What _is_ always safe is the prefix itself, once the binary exists: where rtk
 has a filter it shrinks the output, and where it has none it passes the command
 through unchanged.
 
 **If you use it, use it consistently**: each command in a chain needs its own
 prefix.
+
 ```bash
 # ❌ Wrong
 rtk git add . && git commit -m "msg" && git push
@@ -583,6 +584,7 @@ rtk git add . && rtk git commit -m "msg" && rtk git push
 ## RTK Commands by Workflow
 
 ### Build & Compile (80-90% savings)
+
 ```bash
 rtk cargo build         # Cargo build output
 rtk cargo check         # Cargo check output
@@ -594,6 +596,7 @@ rtk next build          # Next.js build with route metrics (87%)
 ```
 
 ### Test (60-99% savings)
+
 ```bash
 rtk cargo test          # Cargo test failures only (90%)
 rtk go test             # Go test failures only (90%)
@@ -607,6 +610,7 @@ rtk test <cmd>          # Generic test wrapper - failures only
 ```
 
 ### Git (59-80% savings)
+
 ```bash
 rtk git status          # Compact status
 rtk git log             # Compact log (works with all git flags)
@@ -625,6 +629,7 @@ rtk git worktree        # Compact worktree
 Note: Git passthrough works for ALL subcommands, even those not explicitly listed.
 
 ### GitHub (26-87% savings)
+
 ```bash
 rtk gh pr view <num>    # Compact PR view (87%)
 rtk gh pr checks        # Compact PR checks (79%)
@@ -634,6 +639,7 @@ rtk gh api              # Compact API responses (26%)
 ```
 
 ### JavaScript/TypeScript Tooling (70-90% savings)
+
 ```bash
 rtk pnpm list           # Compact dependency tree (70%)
 rtk pnpm outdated       # Compact outdated packages (80%)
@@ -645,6 +651,7 @@ rtk uv run <cmd>        # Compact uv project command output
 ```
 
 ### Files & Search (60-75% savings)
+
 ```bash
 rtk ls <path>           # Tree format, compact (65%)
 rtk read <file>         # Code reading with filtering (60%)
@@ -653,6 +660,7 @@ rtk find <pattern>      # Find grouped by directory (70%)
 ```
 
 ### Analysis & Debug (70-90% savings)
+
 ```bash
 rtk err <cmd>           # Filter errors only from any command
 rtk log <file>          # Deduplicated logs with counts
@@ -664,6 +672,7 @@ rtk diff                # Ultra-compact diffs
 ```
 
 ### Infrastructure (85% savings)
+
 ```bash
 rtk docker ps           # Compact container list
 rtk docker images       # Compact image list
@@ -673,12 +682,14 @@ rtk kubectl logs        # Deduplicated pod logs
 ```
 
 ### Network (65-70% savings)
+
 ```bash
 rtk curl <url>          # Compact HTTP responses (70%)
 rtk wget <url>          # Compact download output (65%)
 ```
 
 ### Meta Commands
+
 ```bash
 rtk gain                # View token savings statistics
 rtk gain --history      # View command history with savings
@@ -690,16 +701,16 @@ rtk init --global       # Add RTK to ~/.claude/CLAUDE.md
 
 ## Token Savings Overview
 
-| Category | Commands | Typical Savings |
-|----------|----------|-----------------|
-| Tests | vitest, playwright, cargo test | 90-99% |
-| Build | next, tsc, lint, prettier | 70-87% |
-| Git | status, log, diff, add, commit | 59-80% |
-| GitHub | gh pr, gh run, gh issue | 26-87% |
-| Package Managers | pnpm, npm, npx | 70-90% |
-| Files | ls, read, grep, find | 60-75% |
-| Infrastructure | docker, kubectl | 85% |
-| Network | curl, wget | 65-70% |
+| Category         | Commands                       | Typical Savings |
+| ---------------- | ------------------------------ | --------------- |
+| Tests            | vitest, playwright, cargo test | 90-99%          |
+| Build            | next, tsc, lint, prettier      | 70-87%          |
+| Git              | status, log, diff, add, commit | 59-80%          |
+| GitHub           | gh pr, gh run, gh issue        | 26-87%          |
+| Package Managers | pnpm, npm, npx                 | 70-90%          |
+| Files            | ls, read, grep, find           | 60-75%          |
+| Infrastructure   | docker, kubectl                | 85%             |
+| Network          | curl, wget                     | 65-70%          |
 
 Overall average: **60-90% token reduction** on common development operations.
 <!-- /rtk-instructions -->

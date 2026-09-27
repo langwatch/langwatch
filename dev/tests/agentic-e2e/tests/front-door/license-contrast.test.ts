@@ -39,11 +39,7 @@ function channelLuminance(value: number): number {
 
 /** WCAG relative luminance of an `rgb(r, g, b)` / `rgba(r, g, b, a)` triple. */
 function relativeLuminance([r, g, b]: [number, number, number]): number {
-  return (
-    0.2126 * channelLuminance(r) +
-    0.7152 * channelLuminance(g) +
-    0.0722 * channelLuminance(b)
-  );
+  return 0.2126 * channelLuminance(r) + 0.7152 * channelLuminance(g) + 0.0722 * channelLuminance(b);
 }
 
 function parseRgb(css: string): [number, number, number] {

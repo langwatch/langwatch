@@ -6,11 +6,11 @@ packs, so a new project gets a useful dashboard without opening the UI.
 
 ## Env vars
 
-| Var | Meaning |
-|---|---|
-| `LW_ENDPOINT` | Base URL of the LangWatch app, e.g. `https://app.langwatch.ai` |
-| `LW_API_KEY` | Project API key, sent as the `X-Auth-Token` header |
-| `PROJECT_ID` | Target project id (used only for the widget routes; dashboard routes resolve the project from `LW_API_KEY`) |
+| Var           | Meaning                                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------------------- |
+| `LW_ENDPOINT` | Base URL of the LangWatch app, e.g. `https://app.langwatch.ai`                                              |
+| `LW_API_KEY`  | Project API key, sent as the `X-Auth-Token` header                                                          |
+| `PROJECT_ID`  | Target project id (used only for the widget routes; dashboard routes resolve the project from `LW_API_KEY`) |
 
 ## Usage
 
@@ -24,16 +24,16 @@ LW_ENDPOINT=https://app.langwatch.ai LW_API_KEY=sk-... PROJECT_ID=proj_... \
 Pins land at the dashboard's next free row, single column — so the manifest
 order below is literally the widget's top-to-bottom order on the dashboard.
 
-| # | Pack | File |
-|---|---|---|
-| 1 | north-star-widgets | north-star-metric-stat.json |
-| 2 | north-star-widgets | north-star-area-timeseries.json |
-| 3 | north-star-widgets | north-star-stacked-bars.json |
-| 4 | legacy-parity-widgets | legacy-trace-count-over-time.json |
-| 5 | north-star-widgets | north-star-donut.json |
-| 6 | north-star-widgets | north-star-leaderboard.json |
-| 7 | north-star-widgets | north-star-heatmap.json |
-| 8 | legacy-parity-widgets | legacy-latency-percentiles.json |
+| #   | Pack                  | File                              |
+| --- | --------------------- | --------------------------------- |
+| 1   | north-star-widgets    | north-star-metric-stat.json       |
+| 2   | north-star-widgets    | north-star-area-timeseries.json   |
+| 3   | north-star-widgets    | north-star-stacked-bars.json      |
+| 4   | legacy-parity-widgets | legacy-trace-count-over-time.json |
+| 5   | north-star-widgets    | north-star-donut.json             |
+| 6   | north-star-widgets    | north-star-leaderboard.json       |
+| 7   | north-star-widgets    | north-star-heatmap.json           |
+| 8   | legacy-parity-widgets | legacy-latency-percentiles.json   |
 
 **Prototype note:** this is single-column only. Every widget gets
 `gridColumn = 0`, so widgets share the gridRow numbering line and just
@@ -43,6 +43,7 @@ starter board, not a real layout tool.
 ## Idempotency
 
 Re-running the script is safe:
+
 - Dashboard: skipped if a dashboard named "Analytics starter" already exists.
 - Widgets: skipped if a widget with the same `name` already exists.
 - Pins: skipped if the widget's `dashboardId` already matches this dashboard.

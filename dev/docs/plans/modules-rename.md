@@ -24,14 +24,14 @@ Package names (`@langwatch/<feature>-server` etc.) do not change. Only directori
 
 ## Census (2026-09-08, before the fold lane)
 
-| Surface | Count |
-| --- | --- |
-| Files whose text names `packages/features` (excluding lockfile, node_modules, dist) | 737 |
-| Files whose text names `packages/enterprise` | 169 |
-| `tsconfig*.json` with a relative reference into a feature package | 55 |
-| Literals in `packages/architecture-enforcer/src` + `packages/oxlint-rules/src` | 89 |
-| Feature roots in `packages/features/catalogue.json` | 49 core + 8 enterprise |
-| Skills and `.claude/skills` files naming the paths | 22 |
+| Surface                                                                             | Count                  |
+| ----------------------------------------------------------------------------------- | ---------------------- |
+| Files whose text names `packages/features` (excluding lockfile, node_modules, dist) | 737                    |
+| Files whose text names `packages/enterprise`                                        | 169                    |
+| `tsconfig*.json` with a relative reference into a feature package                   | 55                     |
+| Literals in `packages/architecture-enforcer/src` + `packages/oxlint-rules/src`      | 89                     |
+| Feature roots in `packages/features/catalogue.json`                                 | 49 core + 8 enterprise |
+| Skills and `.claude/skills` files naming the paths                                  | 22                     |
 
 Machinery that hardcodes the layout:
 
@@ -63,11 +63,11 @@ Machinery that hardcodes the layout:
 Rename the names a module author types, in the same commit as the directory move, with TS-LSP
 rename-symbol (not grep):
 
-| Today | New | Files |
-| --- | --- | --- |
-| `featureApi`, `FeatureApiToken`, `FeatureName` (runtime-composition) | `moduleApi`, `ModuleApiToken`, `ModuleName` | 62, 9, 8 |
-| `defineFeature`, `withFeature`, `runtime.feature()` | `defineModule`, `withModule`, `runtime.module()` | 55, 24, 15 |
-| `createFeatureApi`, `FeatureApi`, `FeatureApiMap`, `FeatureApiClient` (`@langwatch/api/web`) | `createModuleApi`, `ModuleApi`, `ModuleApiMap`, `ModuleApiClient` | 43, 3 |
+| Today                                                                                        | New                                                               | Files      |
+| -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------- |
+| `featureApi`, `FeatureApiToken`, `FeatureName` (runtime-composition)                         | `moduleApi`, `ModuleApiToken`, `ModuleName`                       | 62, 9, 8   |
+| `defineFeature`, `withFeature`, `runtime.feature()`                                          | `defineModule`, `withModule`, `runtime.module()`                  | 55, 24, 15 |
+| `createFeatureApi`, `FeatureApi`, `FeatureApiMap`, `FeatureApiClient` (`@langwatch/api/web`) | `createModuleApi`, `ModuleApi`, `ModuleApiMap`, `ModuleApiClient` | 43, 3      |
 
 Source files named after the old word move with it: `feature-api-token.ts` → `module-api-token.ts`,
 `feature-namespace.ts` → `module-namespace.ts`, `feature-api.ts` → `module-api.ts`.

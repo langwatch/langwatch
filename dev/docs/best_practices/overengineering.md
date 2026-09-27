@@ -68,15 +68,15 @@ nobody made — it is what happens when the migration path becomes the design.
 
 ## The signals, and what finds them
 
-| Signal                                                            | Found by                     | Where                                               |
-| ----------------------------------------------------------------- | ---------------------------- | --------------------------------------------------- |
-| A named function that returns its own argument                    | `no-identity-function-ts`    | `dev/lint/ast-grep/rules/`                          |
-| A method forwarding to the same name on a collaborator            | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/`                          |
+| Signal                                                            | Found by                     | Where                                                   |
+| ----------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------- |
+| A named function that returns its own argument                    | `no-identity-function-ts`    | `dev/lint/ast-grep/rules/`                              |
+| A method forwarding to the same name on a collaborator            | `no-same-name-delegation-ts` | `dev/lint/ast-grep/rules/`                              |
 | A class that forwards most of its methods to **one** collaborator | `layer-class`                | `packages/architecture-enforcer/src/overengineering.ts` |
-| A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                |
-| Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                |
-| A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                             |
-| A service module over its size ceiling                            | `service-ceilings`           | `src/service-ceilings.ts`                            |
+| A type alias nesting conditional types past 3                     | `conditional-type-depth`     | same                                                    |
+| Overloads differing only by a boolean literal                     | `overload-by-literal`        | same                                                    |
+| A comment block over 60 lines                                     | `comment-block-size`         | `src/comment-blocks.ts`                                 |
+| A service module over its size ceiling                            | `service-ceilings`           | `src/service-ceilings.ts`                               |
 
 The ast-grep rules run from `make lint-rules` and are proved against fixtures
 by `make lint-rules-test`. The architecture-enforcer policies run from

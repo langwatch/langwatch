@@ -53,8 +53,7 @@ function assertSecureEndpoint(raw) {
   }
   const loopback = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
   const httpsOrLoopbackHttp =
-    url.protocol === "https:" ||
-    (url.protocol === "http:" && loopback.has(url.hostname));
+    url.protocol === "https:" || (url.protocol === "http:" && loopback.has(url.hostname));
   if (!httpsOrLoopbackHttp) {
     console.error(
       `Refusing to send LW_API_KEY over ${url.protocol} to ${url.host}. Use https:// (http:// is allowed only for localhost).`,
@@ -135,9 +134,7 @@ async function ensureWidgets(items) {
   for (const { pack, file, definition } of items) {
     const existing = existingByName.get(definition.name);
     if (existing) {
-      console.log(
-        `skip   ${pack}/${file} — "${definition.name}" already exists`,
-      );
+      console.log(`skip   ${pack}/${file} — "${definition.name}" already exists`);
       results.push(existing);
       continue;
     }
@@ -146,9 +143,7 @@ async function ensureWidgets(items) {
       code: definition.code,
       queries: definition.queries,
     });
-    console.log(
-      `create ${pack}/${file} — "${definition.name}" -> ${created.id}`,
-    );
+    console.log(`create ${pack}/${file} — "${definition.name}" -> ${created.id}`);
     results.push(created);
   }
   return results;
@@ -175,8 +170,7 @@ async function main() {
   await pinWidgets(widgets, dashboard);
 
   const openUrl =
-    dashboard.platformUrl ??
-    `${endpoint}/analytics/reports?dashboard=${dashboard.id}`;
+    dashboard.platformUrl ?? `${endpoint}/analytics/reports?dashboard=${dashboard.id}`;
   console.log(`Done. Open ${openUrl}`);
 }
 

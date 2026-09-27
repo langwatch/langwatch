@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { initConfig } from "../config.js";
 
 const TEST_ENDPOINT = "https://test.langwatch.ai";
