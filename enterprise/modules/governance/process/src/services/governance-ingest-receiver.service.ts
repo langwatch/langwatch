@@ -55,12 +55,13 @@ export type GovernanceIngestMetricCollectionChannel = (input: {
   organizationId: string;
   metricRequest: IExportMetricsServiceRequest;
 }) => Promise<
-  Readonly<{
-    outcome: string;
-    errorMessage?: string | undefined;
-    rejectedDataPoints: number;
-    acceptedDataPoints: number;
-  }>
+  | Readonly<{
+      outcome: "collected";
+      errorMessage?: string | undefined;
+      rejectedDataPoints: number;
+      acceptedDataPoints: number;
+    }>
+  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
 >;
 
 /**
@@ -105,23 +106,18 @@ export type GovernanceIngestTraceReceipt =
 
 export type GovernanceIngestWebhookReceipt =
   | Readonly<{ outcome: "wrong-endpoint" }>
-  /** This deployment folds no logs, so the webhook can never land one. */
-  | Readonly<{ outcome: "not-served" }>
   | Readonly<{ outcome: "received"; bytes: number; eventId: string }>;
 
-export type GovernanceIngestLogReceipt =
-  | Readonly<{ outcome: "not-served" }>
-  | Readonly<{
-      outcome: "received";
-      bytes: number;
-      logRecords: number;
-      costEvents: number;
-      ledgerRows: number;
-      hint?: string | undefined;
-    }>;
+export type GovernanceIngestLogReceipt = Readonly<{
+  outcome: "received";
+  bytes: number;
+  logRecords: number;
+  costEvents: number;
+  ledgerRows: number;
+  hint?: string | undefined;
+}>;
 
 export type GovernanceIngestMetricReceipt =
-  | Readonly<{ outcome: "not-served" }>
   | Readonly<{ outcome: "unavailable"; errorMessage?: string | undefined }>
   | Readonly<{ outcome: "error" }>
   | Readonly<{
@@ -148,10 +144,10 @@ export type GovernanceIngestReceiverMembers = Readonly<{
   projects: Pick<ProjectApi, "ensureInternal">;
   /** The trace pipeline. Required — without it there is no receiver at all. */
   traceCollection: GovernanceIngestTraceCollection;
-  /** The log pipeline, where this process folds logs. */
-  logCollection?: GovernanceIngestLogCollectionChannel | undefined;
-  /** The metric pipeline, where this process folds metrics. */
-  metricCollection?: GovernanceIngestMetricCollectionChannel | undefined;
+  /** The log pipeline: OTLP log records and webhook envelopes. */
+  logCollection: GovernanceIngestLogCollectionChannel;
+  /** The metric pipeline. */
+  metricCollection: GovernanceIngestMetricCollectionChannel;
   /** The spend ledger a cost event is priced into. */
   spend: GovernanceIngestSpend;
   /**
@@ -413,9 +409,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     body: string;
   }): Promise<GovernanceIngestWebhookReceipt> {
     const { source } = input;
-    const logCollection = this.members.logCollection;
-
-    if (!logCollection) return { outcome: "not-served" };
+    const { logCollection } = this.members;
 
     if (!WEBHOOK_SOURCE_TYPES.has(source.sourceType)) return { outcome: "wrong-endpoint" };
 
@@ -462,9 +456,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
    */
   async receiveLogs(batch: GovernanceIngestBatch): Promise<GovernanceIngestLogReceipt> {
     const { source } = batch;
-    const logCollection = this.members.logCollection;
-
-    if (!logCollection) return { outcome: "not-served" };
+    const { logCollection } = this.members;
 
     let bodyBytes = 0;
     let logRecordCount = 0;
@@ -570,8 +562,6 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
   async receiveMetrics(batch: GovernanceIngestBatch): Promise<GovernanceIngestMetricReceipt> {
     const { source } = batch;
 
-    if (!this.members.metricCollection) return { outcome: "not-served" };
-
     let bodyBytes = 0;
     let metricCount = 0;
     let rejectedDataPoints = 0;
@@ -645,9 +635,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         parseHint?: string | undefined;
       }>
   > {
-    const metricCollection = this.members.metricCollection;
-
-    if (!metricCollection) return { outcome: "error" };
+    const { metricCollection } = this.members;
 
     try {
       const tenantId = await this.governanceTenantOf(source);

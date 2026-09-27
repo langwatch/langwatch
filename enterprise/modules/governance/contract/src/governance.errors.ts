@@ -307,20 +307,6 @@ export class IngestionRateLimitedError extends HandledError {
   }
 }
 
-/** A permanent 404: this deployment folds that signal nowhere, so an exporter must not retry. */
-export class IngestionSignalNotServedError extends HandledError {
-  declare readonly code: "ingestion_signal_not_served";
-
-  constructor(signal: string) {
-    super(
-      "ingestion_signal_not_served",
-      `This deployment does not receive ${signal} on an ingestion source.`,
-      { httpStatus: 404, fault: "customer", meta: { signal } },
-    );
-    this.name = "IngestionSignalNotServedError";
-  }
-}
-
 /** The source's type is not served at the path it was sent to. */
 export class IngestionWrongEndpointError extends HandledError {
   declare readonly code: "ingestion_wrong_endpoint";

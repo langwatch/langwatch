@@ -15,6 +15,8 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   type OrganizationApi,
@@ -104,6 +106,8 @@ async function buildApp(options: {
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>({ findById, findByEmail }),
       auditLog: createApiFixture<AuditLogApi>(),
+      logs: createApiFixture<LogApi>(),
+      metrics: createApiFixture<MetricApi>(),
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),

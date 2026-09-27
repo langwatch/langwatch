@@ -12,6 +12,8 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/kernel";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { memoryStores } from "@langwatch/process-stores";
@@ -94,6 +96,8 @@ async function boot(rest: RestHost) {
       "model-provider": createApiFixture<ModelProviderApi>(),
       user: createApiFixture<UserApi>(),
       "audit-log": createApiFixture<AuditLogApi>(),
+      log: createApiFixture<LogApi>(),
+      metric: createApiFixture<MetricApi>(),
     })
     .boot();
 }

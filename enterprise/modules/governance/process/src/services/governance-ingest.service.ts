@@ -2,7 +2,6 @@
 import {
   IngestionRateLimitedError,
   IngestionReceiverUnavailableError,
-  IngestionSignalNotServedError,
   IngestionSourceUnauthorizedError,
   IngestionWrongEndpointError,
   type GovernanceIngestHeaders,
@@ -79,8 +78,6 @@ export class GovernanceIngestService {
 
     const receipt = await this.#receiver.receiveWebhook({ source: gate.source, body: input.raw });
 
-    if (receipt.outcome === "not-served") throw new IngestionSignalNotServedError("webhook events");
-
     if (receipt.outcome === "wrong-endpoint") {
       throw new IngestionWrongEndpointError(
         "Webhook path is only valid for workato, otel_generic, and s3_custom (callback-mode) sources",
@@ -99,8 +96,6 @@ export class GovernanceIngestService {
       contentType: input.headers["content-type"] ?? void 0,
       read: () => decodeOtlpBody(input.raw, input.headers["content-encoding"] ?? null),
     });
-
-    if (receipt.outcome === "not-served") throw new IngestionSignalNotServedError("OTLP logs");
 
     const body: GovernanceIngestReceipt = {
       accepted: true,
@@ -124,8 +119,6 @@ export class GovernanceIngestService {
       contentType: input.headers["content-type"] ?? void 0,
       read: () => decodeOtlpBody(input.raw, input.headers["content-encoding"] ?? null),
     });
-
-    if (receipt.outcome === "not-served") throw new IngestionSignalNotServedError("OTLP metrics");
 
     if (receipt.outcome === "unavailable" || receipt.outcome === "error") {
       throw new IngestionReceiverUnavailableError();

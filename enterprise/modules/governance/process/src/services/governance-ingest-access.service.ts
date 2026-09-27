@@ -25,6 +25,8 @@ export type GovernanceIngestAccessMembers = Readonly<{
   sources: Pick<IngestionSourceService, "findByIngestSecret">;
   /** The process's counter the per-caller throttle is kept in. */
   rateLimiter: RateLimiter;
+  /** Main's `LW_INGEST_RATE_LIMIT_DISABLED` opt-out: nothing is counted and nobody is shed. */
+  rateLimitDisabled: boolean;
 }>;
 
 /** What the receivers ask before they read a byte of a payload. */
@@ -64,6 +66,8 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
 
   /** Wedged BEFORE the secret lookup, so scanners shed at the edge. */
   private async throttle(headers: Headers): Promise<GovernanceIngestAuthorization | null> {
+    if (this.members.rateLimitDisabled) return null;
+
     const ip = extractClientIp(headers);
     const decision = await this.members.rateLimiter.check(`ingest:${ip}`, {
       requests: INGEST_RATE_LIMIT_MAX_REQUESTS,

@@ -9,6 +9,8 @@ import {
   metricConfig,
   type CanonicalMetricDataPoint,
   type MetricApi as MetricApiContract,
+  type MetricCollectionInput,
+  type MetricRequestCollectionResult,
   type MetricDataPointPreparation,
   type MetricOtlpDoorResult,
   type MetricPiiRedactionLevel,
@@ -60,16 +62,19 @@ export class MetricApp implements MetricApiContract {
   readonly #service: MetricService;
   readonly #pipeline: MetricProcessingPipeline;
   readonly #receiver: OtlpMetricReceiverService;
+  readonly #collection: MetricRequestCollectionService;
   #commands: EventingCommands<MetricProcessingPipeline> | undefined;
 
-  private constructor(
-    service: MetricService,
-    pipeline: MetricProcessingPipeline,
-    receiver: OtlpMetricReceiverService,
-  ) {
-    this.#service = service;
-    this.#pipeline = pipeline;
-    this.#receiver = receiver;
+  private constructor(parts: {
+    service: MetricService;
+    pipeline: MetricProcessingPipeline;
+    receiver: OtlpMetricReceiverService;
+    collection: MetricRequestCollectionService;
+  }) {
+    this.#service = parts.service;
+    this.#pipeline = parts.pipeline;
+    this.#receiver = parts.receiver;
+    this.#collection = parts.collection;
   }
 
   static create({ dependencies, members, config }: MetricSetup): MetricApp {
@@ -86,18 +91,17 @@ export class MetricApp implements MetricApiContract {
       ],
     }).build();
     const service = MetricService.create({ preparation });
-    const app: MetricApp = new MetricApp(
+    const collection = MetricRequestCollectionService.create({
+      traces: dependencies.traces,
+      metrics: service,
+      recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
+    });
+    const app: MetricApp = new MetricApp({
       service,
       pipeline,
-      OtlpMetricReceiverService.create({
-        traces: dependencies.traces,
-        collection: MetricRequestCollectionService.create({
-          traces: dependencies.traces,
-          metrics: service,
-          recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
-        }),
-      }),
-    );
+      receiver: OtlpMetricReceiverService.create({ traces: dependencies.traces, collection }),
+      collection,
+    });
     return app;
   }
 
@@ -113,6 +117,10 @@ export class MetricApp implements MetricApiContract {
 
   receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult> {
     return this.#receiver.receive(request);
+  }
+
+  collectOtlpMetrics(input: MetricCollectionInput): Promise<MetricRequestCollectionResult> {
+    return this.#collection.handleOtlpMetricRequest(input);
   }
 
   async recordCanonicalMetricDataPoints(

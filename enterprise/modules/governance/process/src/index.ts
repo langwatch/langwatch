@@ -130,9 +130,7 @@ export type {
   GovernanceCliPersonalWorkspace,
 } from "./services/governance-cli-credentials.service.ts";
 
-// The Activity Monitor's push-mode receivers. A signal whose collection this
-// process did not compose answers `not-served`, so an exporter gets a
-// permanent 404 rather than a 500 from a receiver that pretends to serve it.
+// The Activity Monitor's push-mode receivers.
 export { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
 export type {
   GovernanceIngestAccessApi,

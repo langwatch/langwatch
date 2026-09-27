@@ -161,6 +161,8 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import { LogApi } from "@langwatch/log-contract";
+import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -382,6 +384,10 @@ export interface GovernanceAppDependencies {
   users: Pick<UserApi, "findById" | "findByEmail" | "findLastHomePath">;
   /** Audit-log owns the AuditLog table: workspace-view rows are written and deduped there. */
   auditLog: Pick<AuditLogApi, "record" | "hasRecordedSince">;
+  /** Where a push source's OTLP logs and webhook envelopes are collected. */
+  logs: Pick<LogApi, "collectOtlpLogs">;
+  /** Where a push source's OTLP metrics are collected. */
+  metrics: Pick<MetricApi, "collectOtlpMetrics">;
   /** Auth owns CLI bearer validation and revocation. */
   auth: Pick<
     AuthApi,
@@ -496,6 +502,8 @@ export class GovernanceApp implements GovernanceRestApi {
     modelProviders: ModelProviderApi,
     users: UserApi,
     auditLog: AuditLogApi,
+    logs: LogApi,
+    metrics: MetricApi,
   };
   static readonly config = governanceConfig;
   static readonly secrets = governanceSecrets;
@@ -546,6 +554,8 @@ export class GovernanceApp implements GovernanceRestApi {
         modelProviders: dependencies.modelProviders,
         users: dependencies.users,
         auditLog: dependencies.auditLog,
+        logs: dependencies.logs,
+        metrics: dependencies.metrics,
       },
       repositories,
       erasureSuppression,
@@ -553,6 +563,7 @@ export class GovernanceApp implements GovernanceRestApi {
       gatewayBaseUrl: governanceGatewayBaseUrl({ config, isSaas: members.isSaas }),
       publicBaseUrl: members.publicBaseUrl,
       rateLimiter: members.rateLimiter,
+      ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,
     });
   }
 
@@ -566,6 +577,7 @@ export class GovernanceApp implements GovernanceRestApi {
     gatewayBaseUrl,
     publicBaseUrl,
     rateLimiter,
+    ingestRateLimitDisabled,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -576,6 +588,7 @@ export class GovernanceApp implements GovernanceRestApi {
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
     rateLimiter: RateLimiter;
+    ingestRateLimitDisabled: boolean;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
@@ -839,17 +852,25 @@ export class GovernanceApp implements GovernanceRestApi {
       ingestionKeys: this.ingestionKeys,
     });
     this.ingestService = GovernanceIngestService.create({
-      access: GovernanceIngestAccessService.create({ sources: this.ingestionSources, rateLimiter }),
+      access: GovernanceIngestAccessService.create({
+        sources: this.ingestionSources,
+        rateLimiter,
+        rateLimitDisabled: ingestRateLimitDisabled,
+      }),
       receiver: GovernanceIngestReceiverService.create({
         sources: this.ingestionSources,
         costEvents: CanonicalCostExtractorService.create(),
         ottl,
         projects: dependencies.projects,
         directory: GovernanceIngestPrincipalService.create({
-          users: dependencies.users,
           organizations: dependencies.organizations,
         }),
         traceCollection: (input) => dependencies.traces.otlpTraces(input),
+        // Main's DEFAULT_PII_REDACTION_LEVEL for every push receiver.
+        logCollection: (input) =>
+          dependencies.logs.collectOtlpLogs({ ...input, piiRedactionLevel: "ESSENTIAL" }),
+        metricCollection: (input) =>
+          dependencies.metrics.collectOtlpMetrics({ ...input, piiRedactionLevel: "ESSENTIAL" }),
         spend: dependencies.gateway,
       }),
     });

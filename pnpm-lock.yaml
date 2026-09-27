@@ -2759,6 +2759,12 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
+      '@langwatch/log-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/log/contract
+      '@langwatch/metric-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/metric/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract

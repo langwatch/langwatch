@@ -16,7 +16,6 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { memoryRateLimiter } from "@langwatch/test-harness";
-import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
@@ -68,6 +67,7 @@ const renderHandled: RestErrorHandler = (error) =>
 type World = {
   source?: GovernanceIngestionSource | null;
   rateLimiter?: RateLimiter;
+  rateLimitDisabled?: boolean;
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
@@ -88,6 +88,7 @@ function mountIngest(world: World = {}) {
     access: GovernanceIngestAccessService.create({
       sources: { findByIngestSecret },
       rateLimiter: world.rateLimiter ?? memoryRateLimiter(),
+      rateLimitDisabled: world.rateLimitDisabled ?? false,
     }),
     receiver: GovernanceIngestReceiverService.create({
       sources: { recordEventReceived },
@@ -105,11 +106,18 @@ function mountIngest(world: World = {}) {
         }),
       }),
       traceCollection: world.traceCollection ?? traceCollectionMock,
-      ...(world.logCollection ? { logCollection: world.logCollection } : {}),
-      ...(world.metricCollection ? { metricCollection: world.metricCollection } : {}),
+      logCollection:
+        world.logCollection ??
+        vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0),
+      metricCollection:
+        world.metricCollection ??
+        vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
+          outcome: "collected",
+          acceptedDataPoints: 0,
+          rejectedDataPoints: 0,
+        }),
       spend: createApiFixture<GatewayApi>(),
       directory: GovernanceIngestPrincipalService.create({
-        users: createApiFixture<UserApi>(),
         organizations: createApiFixture<OrganizationApi>(),
       }),
     }),
@@ -155,6 +163,10 @@ function mountIngest(world: World = {}) {
 
 const traceBody = JSON.stringify({
   resourceSpans: [{ scopeSpans: [{ spans: [{ name: "one", attributes: [] }] }] }],
+});
+
+const logBody = JSON.stringify({
+  resourceLogs: [{ scopeLogs: [{ logRecords: [{ body: { stringValue: "one" } }] }] }],
 });
 
 const metricBody = JSON.stringify({
@@ -206,6 +218,19 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("given the deployment switched the throttle off", () => {
+    it("lets a caller the limiter would refuse through to its source", async () => {
+      const api = mountIngest({
+        rateLimiter: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
+        rateLimitDisabled: true,
+      });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(response.status).toBe(202);
+    });
+  });
+
   describe("given a source type the OTLP path does not serve", () => {
     it("answers wrong_endpoint and hands nothing to the trace pipeline", async () => {
       const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" } });
@@ -247,51 +272,51 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
-  describe("given a deployment that folds no logs anywhere", () => {
-    it("answers a permanent 404 rather than a status an exporter would retry", async () => {
-      const api = mountIngest();
-
-      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, "{}");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_signal_not_served",
+  describe("when an OTLP log batch arrives for a source", () => {
+    it("hands its records to the log pipeline under the governance project", async () => {
+      const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue({
+        outcome: "collected",
+        acceptedLogRecords: 1,
+        rejectedLogRecords: 0,
       });
-      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
-    });
+      const api = mountIngest({ logCollection });
 
-    it("refuses the webhook receiver the same way", async () => {
-      const api = mountIngest();
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody);
 
-      const response = await api.post(`/api/ingest/webhook/${SOURCE_ID}`, "{}");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_signal_not_served",
-      });
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({ accepted: true, logRecords: 1 });
+      expect(logCollection).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "gov_project", organizationId: ORGANIZATION_ID }),
+      );
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
     });
   });
 
-  describe("given a deployment that folds no metrics anywhere", () => {
-    it("answers a permanent 404, not a retryable one", async () => {
-      const api = mountIngest();
+  describe("when an OTLP metric batch arrives for a source", () => {
+    it("hands its data points to the metric pipeline and reports what was accepted", async () => {
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
+        outcome: "collected",
+        acceptedDataPoints: 1,
+        rejectedDataPoints: 0,
+      });
+      const api = mountIngest({ metricCollection });
 
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody);
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(202);
       await expect(response.json()).resolves.toMatchObject({
-        code: "ingestion_signal_not_served",
+        accepted: true,
+        acceptedDataPoints: 1,
       });
+      expect(metricCollection).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("when the metric pipeline is momentarily unavailable", () => {
     it("answers 503 and records no source event, so the retry cannot double-count", async () => {
-      const metricCollection = vi.fn().mockResolvedValue({
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
         outcome: "unavailable",
         errorMessage: "queue down",
-        rejectedDataPoints: 0,
-        acceptedDataPoints: 0,
       });
       const api = mountIngest({ metricCollection });
 
