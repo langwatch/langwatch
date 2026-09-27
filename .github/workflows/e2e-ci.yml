@@ -106,6 +106,8 @@ jobs:
       SKIP_ENV_VALIDATION: "true"
       OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
       NODE_ENV: "development"
+      # The front-door suite runs passkey ceremonies, served only with the switch on.
+      PASSKEYS_ENABLED: "on"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
@@ -297,19 +299,19 @@ jobs:
           # Migrations already ran in earlier steps; skip them during pnpm start
           SKIP_PRISMA_MIGRATE: "true"
           SKIP_CLICKHOUSE_MIGRATE: "true"
-          # Identity sign-in routes from projections folded by the worker.
-          # Keep CI's single-process topology while running that stack.
-          WORKERS_IN_PROCESS: "1"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
           # The api started below serves the suite; the e2e stack borrows it instead of booting its own.
           LANGWATCH_E2E_BASE_URL: "http://localhost:5570"
         run: |
           # Start the API process in the background. It serves the REST and
-          # tRPC families AND the browser bundle built above, so one process
-          # answers everything the suite drives.
+          # tRPC families AND the browser bundle built above.
           API_PORT=5570 pnpm --filter @langwatch/platform-api start &
           APP_PID=$!
+          # The worker folds the projections the api waits on (grants, sign-in
+          # routing); without it every command that reads its own write times out.
+          pnpm --filter @langwatch/worker start &
+          WORKER_PID=$!
 
           # Wait for app to be ready (global-setup.ts also checks, but this ensures the process is up)
           sleep 5
@@ -319,7 +321,7 @@ jobs:
           TEST_EXIT=$?
 
           # Cleanup
-          kill $APP_PID || true
+          kill $APP_PID $WORKER_PID || true
           exit $TEST_EXIT
 
       - name: Upload test results
