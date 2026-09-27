@@ -94,7 +94,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
   }
 
   async create(input: CreateDatasetInput): Promise<DatasetRow> {
-    const now = this.#database.now();
+    const now = toDate(this.#database.now());
     this.#nextId += 1;
     const written = normalise(input);
     const row: DatasetRow = {
@@ -127,7 +127,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     const updated: DatasetRow = {
       ...row,
       ...normalise(input.data),
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);
@@ -152,7 +152,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     const updated: DatasetRow = {
       ...row,
       ...normalise(input.content),
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     };
 
     this.#database.putDataset(updated);
@@ -194,7 +194,11 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     }
     if (row.status !== "uploading" || row.archivedAt) return 0;
 
-    this.#database.putDataset({ ...row, status: "processing", updatedAt: this.#database.now() });
+    this.#database.putDataset({
+      ...row,
+      status: "processing",
+      updatedAt: toDate(this.#database.now()),
+    });
 
     return 1;
   }
@@ -309,7 +313,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
     }
     if (row.status !== status) return 0;
 
-    this.#database.putDataset({ ...row, ...data, updatedAt: this.#database.now() });
+    this.#database.putDataset({ ...row, ...data, updatedAt: toDate(this.#database.now()) });
 
     return 1;
   }

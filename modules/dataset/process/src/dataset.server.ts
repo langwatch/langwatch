@@ -5,6 +5,7 @@ import { DatasetApp } from "#app/dataset.app";
 import type { DatasetNormalize, DatasetNormalizeQueue } from "#app/dataset.app";
 import type { DatasetContentRepository } from "#repositories/dataset-content.repository";
 import { datasetRepositories } from "#repositories/dataset-repositories.registry";
+import { DatasetMigrationService } from "#services/dataset-migration.service";
 import { DatasetNormalizationService } from "#services/dataset-normalization.service";
 import { DatasetNormalizeService } from "#services/dataset-normalize.service";
 import type { DatasetNormalizeDeps } from "#services/dataset-normalize.service";
@@ -24,7 +25,13 @@ export const datasetServer = defineServerModule("dataset")
     batchRecordTrpcTransport,
   )
   .withTasks(({ repositories }) => [
-    DatasetContentBackfillTask.create({ migration: () => repositories.migration }),
+    DatasetContentBackfillTask.create({
+      migration: () =>
+        DatasetMigrationService.create({
+          repository: repositories.migration,
+          storage: repositories.migrationChunks,
+        }),
+    }),
   ]);
 
 /** Normalization seams for a composing process. */

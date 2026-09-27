@@ -1,14 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
-import { StreamingChunkWriterService } from "../../services/dataset-chunk-writer.service.ts";
-import type { DatasetChunkRepository } from "../dataset-chunk.repository.ts";
 import type {
+  DatasetMigrationFingerprint,
+  DatasetMigrationMetadata,
   DatasetMigrationOutcome,
   DatasetMigrationRepository,
-  DatasetMigrationRunResult,
-  DatasetMigrationSummary,
 } from "../dataset-migration.repository.ts";
 import {
   DATASET_MUTATION_TXN_MAX_WAIT_MS,
@@ -16,8 +15,6 @@ import {
 } from "./prisma.dataset-content.repository.ts";
 
 const logger = createLogger("langwatch:dataset:migration");
-const DATASET_PAGE_SIZE = 50;
-const RECORD_PAGE_SIZE = 1000;
 
 /**
  * Process adapter for the one-off Postgres-to-object-storage migration. Takes
@@ -25,95 +22,70 @@ const RECORD_PAGE_SIZE = 1000;
  * derived from its call arguments and no hand-written delegate can state it.
  */
 export class PrismaDatasetMigrationRepository implements DatasetMigrationRepository {
-  static create(options: {
-    database: PrismaClient;
-    storage: DatasetChunkRepository;
-  }): PrismaDatasetMigrationRepository {
+  static create(options: { database: PrismaClient }): PrismaDatasetMigrationRepository {
     return new PrismaDatasetMigrationRepository(options);
   }
 
-  private constructor(
-    private readonly options: {
-      database: PrismaClient;
-      storage: DatasetChunkRepository;
-    },
-  ) {}
+  private constructor(private readonly options: { database: PrismaClient }) {}
 
-  async run(input: { dryRun?: boolean } = {}): Promise<DatasetMigrationRunResult> {
-    try {
-      return {
-        status: "completed",
-        summary: await this.migrateAll(input),
-      };
-    } catch (error) {
-      if (isMissingColumnError(error)) {
-        return { status: "schema-pending" };
-      }
-      throw error;
-    }
+  async findProjectIds(): Promise<string[]> {
+    const projects = await this.options.database.project.findMany({ select: { id: true } });
+    return projects.map((project) => project.id);
   }
 
-  async migrateDataset(
-    input: { datasetId: string; projectId: string },
-    options: { dryRun?: boolean } = {},
-  ): Promise<DatasetMigrationOutcome> {
-    if (options.dryRun) {
-      logger.info(input, "[dry-run] would migrate dataset content to chunked JSONL");
-      return "would-migrate";
-    }
+  async findPostgresDatasetIds(input: {
+    projectId: string;
+    afterId?: string | undefined;
+    limit: number;
+  }): Promise<string[]> {
+    const page = await this.options.database.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        contentLayout: "postgres",
+        useS3: false,
+        ...(input.afterId ? { id: { gt: input.afterId } } : {}),
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+      take: input.limit,
+    });
+    return page.map((dataset) => dataset.id);
+  }
 
+  async isPostgresLayout(input: { datasetId: string; projectId: string }): Promise<boolean> {
     const current = await this.options.database.dataset.findFirst({
       where: { id: input.datasetId, projectId: input.projectId },
       select: { contentLayout: true, useS3: true },
     });
-    if (current?.contentLayout !== "postgres" || current.useS3) {
-      return "already-migrated";
-    }
+    return current?.contentLayout === "postgres" && !current.useS3;
+  }
 
-    const baseline = await this.readFingerprint(this.options.database.datasetRecord, input);
-    const storage = this.options.storage;
-    const writer = StreamingChunkWriterService.create({
-      storage,
-      projectId: input.projectId,
-      datasetId: input.datasetId,
-    });
+  getFingerprint(input: {
+    datasetId: string;
+    projectId: string;
+  }): Promise<DatasetMigrationFingerprint> {
+    return fingerprintOf(this.options.database.datasetRecord, input);
+  }
 
-    let cursorId: string | undefined;
-    let hasMoreRecords = true;
-    while (hasMoreRecords) {
-      const page = await this.options.database.datasetRecord.findMany({
-        where: input,
-        select: { id: true, entry: true },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: RECORD_PAGE_SIZE,
-        ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
-      });
-      hasMoreRecords = page.length > 0;
-      if (!hasMoreRecords) continue;
-
-      for (const row of page) {
-        await writer.push(row.entry, { id: row.id });
-      }
-      cursorId = page.at(-1)?.id;
-    }
-
-    const metadata = await writer.finalize();
-    await storage.deleteChunksFrom({
-      ...input,
-      fromIndex: metadata.chunkCount,
-    });
-
-    return this.commitMigration({
-      ...input,
-      baseline,
-      metadata,
+  async findRecordPage(input: {
+    datasetId: string;
+    projectId: string;
+    afterId?: string | undefined;
+    limit: number;
+  }): Promise<{ id: string; entry: unknown }[]> {
+    return this.options.database.datasetRecord.findMany({
+      where: { datasetId: input.datasetId, projectId: input.projectId },
+      select: { id: true, entry: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: input.limit,
+      ...(input.afterId ? { cursor: { id: input.afterId }, skip: 1 } : {}),
     });
   }
 
-  private async commitMigration(input: {
+  async commit(input: {
     datasetId: string;
     projectId: string;
-    baseline: DatasetFingerprint;
+    baseline: DatasetMigrationFingerprint;
     metadata: DatasetMigrationMetadata;
   }): Promise<DatasetMigrationOutcome> {
     return this.options.database.$transaction(
@@ -129,13 +101,14 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
           return "already-migrated";
         }
 
-        const recheck = await this.readFingerprint(database.datasetRecord, {
+        const recheck = await fingerprintOf(database.datasetRecord, {
           datasetId: input.datasetId,
           projectId: input.projectId,
         });
         const recordSetChanged =
           recheck.count !== input.baseline.count ||
-          recheck.maxUpdatedAt?.getTime() !== input.baseline.maxUpdatedAt?.getTime();
+          recheck.maxUpdatedAt?.epochMilliseconds !==
+            input.baseline.maxUpdatedAt?.epochMilliseconds;
         if (recordSetChanged) {
           logger.warn(input, "Dataset records changed during migration; leaving Postgres live");
           return "skipped-concurrent-write";
@@ -171,111 +144,20 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
     );
   }
 
-  private async migrateAll(input: { dryRun?: boolean }): Promise<DatasetMigrationSummary> {
-    const summary: DatasetMigrationSummary = {
-      migrated: 0,
-      wouldMigrate: 0,
-      alreadyMigrated: 0,
-      skippedConcurrentWrite: 0,
-      failed: 0,
-    };
-    const projects = await this.options.database.project.findMany({
-      select: { id: true },
-    });
-
-    for (const project of projects) {
-      let cursor: string | undefined;
-      let hasMoreDatasets = true;
-      while (hasMoreDatasets) {
-        const page = await this.options.database.dataset.findMany({
-          where: {
-            projectId: project.id,
-            contentLayout: "postgres",
-            useS3: false,
-            ...(cursor ? { id: { gt: cursor } } : {}),
-          },
-          select: { id: true },
-          orderBy: { id: "asc" },
-          take: DATASET_PAGE_SIZE,
-        });
-        hasMoreDatasets = page.length > 0;
-        if (!hasMoreDatasets) continue;
-
-        await this.migratePage({ projectId: project.id, page, input, summary });
-        cursor = page.at(-1)?.id;
-      }
-    }
-
-    return summary;
-  }
-
-  /** Migrates one page of datasets, counting each outcome; a failed one waits for a later run. */
-  private async migratePage({
-    projectId,
-    page,
-    input,
-    summary,
-  }: {
-    projectId: string;
-    page: { id: string }[];
-    input: { dryRun?: boolean };
-    summary: DatasetMigrationSummary;
-  }): Promise<void> {
-    for (const dataset of page) {
-      try {
-        increment(summary, await this.migrateDataset({ datasetId: dataset.id, projectId }, input));
-      } catch (error) {
-        summary.failed += 1;
-        logger.warn(
-          { error, datasetId: dataset.id, projectId },
-          "Dataset migration failed; a later run can retry it",
-        );
-      }
-    }
-  }
-
-  private async readFingerprint(
-    records: PrismaClient["datasetRecord"],
-    input: { datasetId: string; projectId: string },
-  ): Promise<DatasetFingerprint> {
-    const result = await records.aggregate({
-      where: input,
-      _count: { _all: true },
-      _max: { updatedAt: true },
-    });
-    return {
-      count: result._count._all,
-      maxUpdatedAt: result._max.updatedAt,
-    };
+  isSchemaPending(error: unknown): boolean {
+    return z.object({ code: z.literal("P2022") }).validate(error);
   }
 }
 
-type DatasetFingerprint = {
-  count: number;
-  maxUpdatedAt: Date | null;
-};
-
-type DatasetMigrationMetadata = {
-  rowCount: number;
-  sizeBytes: number;
-  chunkCount: number;
-  chunkOffsets: {
-    index: number;
-    startRow: number;
-    endRow: number;
-    byteSize: number;
-  }[];
-};
-
-function increment(summary: DatasetMigrationSummary, outcome: DatasetMigrationOutcome): void {
-  if (outcome === "migrated") summary.migrated += 1;
-  if (outcome === "would-migrate") summary.wouldMigrate += 1;
-  if (outcome === "already-migrated") summary.alreadyMigrated += 1;
-  if (outcome === "skipped-concurrent-write") {
-    summary.skippedConcurrentWrite += 1;
-  }
-}
-
-function isMissingColumnError(error: unknown): boolean {
-  return z.object({ code: z.literal("P2022") }).validate(error);
+async function fingerprintOf(
+  records: PrismaClient["datasetRecord"],
+  input: { datasetId: string; projectId: string },
+): Promise<DatasetMigrationFingerprint> {
+  const result = await records.aggregate({
+    where: input,
+    _count: { _all: true },
+    _max: { updatedAt: true },
+  });
+  const maxUpdatedAt = result._max.updatedAt;
+  return { count: result._count._all, maxUpdatedAt: maxUpdatedAt ? fromDate(maxUpdatedAt) : null };
 }

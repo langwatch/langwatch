@@ -1,3 +1,4 @@
+import { BadRequestError, NotFoundError } from "@langwatch/api/rest";
 import {
   copyDatasetInputSchema,
   datasetLookupInputSchema,
@@ -22,6 +23,7 @@ import {
   type DatasetEntrySelection,
   type DatasetRecordMutationResult,
   type DatasetWithRecords,
+  type DatasetApiDeleteInput,
   type DeleteDatasetRecordsInput,
   type ListDatasetsInput,
   type RetryNormalizeInput,
@@ -291,6 +293,19 @@ export class DatasetService {
     return { success: true };
   }
 
+  /** Archives the dataset, or restores it when the caller undoes the archive. */
+  async archiveOrRestoreDataset(input: DatasetApiDeleteInput): Promise<{ success: true }> {
+    if (input.undo) {
+      await this.restoreDataset({ datasetId: input.datasetId, projectId: input.projectId });
+
+      return { success: true };
+    }
+
+    await this.archiveDataset({ slugOrId: input.datasetId, projectId: input.projectId });
+
+    return { success: true };
+  }
+
   async updateMapping(input: {
     datasetId: string;
     projectId: string;
@@ -331,6 +346,16 @@ export class DatasetService {
     return this.records.getDatasetWithRecords(input);
   }
 
+  /** The whole dataset inline, refused rather than truncated when it exceeds `limitMb`. */
+  async getDatasetWithinLimit(
+    input: DatasetLookupInput & { limitMb: number },
+  ): Promise<DatasetWithRecords> {
+    const read = await this.getDatasetWithRecords(input);
+    if (read.truncated) throw new BadRequestError(`Dataset size exceeds ${input.limitMb}MB limit`);
+
+    return read;
+  }
+
   async getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead> {
     return this.records.getDatasetHead(input);
   }
@@ -355,6 +380,14 @@ export class DatasetService {
 
   async deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }> {
     return this.records.deleteRecords(input);
+  }
+
+  /** Entries removed by id; a batch that matched none is a 404, not an empty success. */
+  async deleteMatchingRecords(input: DeleteDatasetRecordsInput): Promise<{ deletedCount: number }> {
+    const result = await this.deleteRecords(input);
+    if (result.count === 0) throw new NotFoundError("No matching records found");
+
+    return { deletedCount: result.count };
   }
 
   async uploadToExistingDataset(

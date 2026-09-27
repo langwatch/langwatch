@@ -1,4 +1,5 @@
 import type { BatchEvaluationRepository } from "./batch-evaluation.repository.ts";
+import type { DatasetChunkRepository } from "./dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "./dataset-content.repository.ts";
 import type { DatasetMigrationRepository } from "./dataset-migration.repository.ts";
 import type { DatasetRecordContentRepository } from "./dataset-record-content.repository.ts";
@@ -21,4 +22,6 @@ export interface DatasetRepositories {
   readonly usage: DatasetUsageRepository;
   /** The one-off content move only the dataset-content-backfill task runs. */
   readonly migration: DatasetMigrationRepository;
+  /** The chunk store that move writes into. */
+  readonly migrationChunks: DatasetChunkRepository;
 }

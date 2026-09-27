@@ -16,13 +16,12 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StoredObjectFileStreamRead } from "#app/stored-object.members";
-
 import {
-  storedObjectFileRest,
-  type FilesProjectPermissionCheck,
-  type FilesRateLimiter,
-  type StoredObjectFileApi,
-} from "../stored-object-file.rest.ts";
+  StoredObjectFileReadService,
+  type StoredObjectFileGate,
+} from "#services/stored-object-file-read.service";
+
+import { storedObjectFileRest, type StoredObjectFileApi } from "../stored-object-file.rest.ts";
 
 const OWNER_PROJECT = "project-owner";
 const OBJECT_ID = "stored-object-1";
@@ -111,7 +110,7 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({ status: "missing" });
+      await expect(response.json()).resolves.toEqual({ error: "stored_object_missing" });
     });
   });
 
@@ -127,7 +126,7 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({ status: "not_found" });
+      await expect(response.json()).resolves.toEqual({ error: "stored_object_not_found" });
     });
 
     it("answers 404 with a not-found status when the owner holds no row", async () => {
@@ -140,7 +139,7 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({ status: "not_found" });
+      await expect(response.json()).resolves.toEqual({ error: "stored_object_not_found" });
     });
   });
 
@@ -156,7 +155,7 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({ error: "file temporarily unavailable" });
+      await expect(response.json()).resolves.toEqual({ error: "storage_unavailable" });
     });
   });
 
@@ -172,7 +171,7 @@ describe("given the /api/files family", () => {
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
 
       expect(response.status).toBe(502);
-      await expect(response.json()).resolves.toEqual({ error: "file temporarily unavailable" });
+      await expect(response.json()).resolves.toEqual({ error: "storage_unavailable" });
     });
   });
 
@@ -181,11 +180,13 @@ describe("given the /api/files family", () => {
     /** @scenario "GET /api/files/:id resolves the owning project from the row id before applying the membership check" */
     it("resolves the owner from the row, refuses on the shared permission check, and streams nothing", async () => {
       const read = vi.fn(async () => availableRead());
-      const permissionCheck = vi.fn<FilesProjectPermissionCheck>(async ({ projectId }) => {
-        if (projectId !== "project-of-the-caller") {
-          throw new ProjectPermissionDeniedTestError();
-        }
-      });
+      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
+        async ({ projectId }) => {
+          if (projectId !== "project-of-the-caller") {
+            throw new ProjectPermissionDeniedTestError();
+          }
+        },
+      );
       const api = mount({
         read,
         caller: { userId: "user-1" },
@@ -210,7 +211,10 @@ describe("given the /api/files family", () => {
     /** @scenario "GET /api/files/:id throttles by caller identity before any cross-tenant lookup" */
     it("answers 429 keyed on the caller, before the cross-tenant owner lookup runs", async () => {
       const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
-      const rateLimit = vi.fn<FilesRateLimiter>(async () => ({ allowed: false, resetAt: 1_000 }));
+      const rateLimit = vi.fn<StoredObjectFileGate["countRead"]>(async () => ({
+        allowed: false,
+        resetAt: 1_000,
+      }));
       const api = mount({ owner, rateLimit });
 
       const response = await api.fetch(`/api/files/${OBJECT_ID}`);
@@ -224,7 +228,9 @@ describe("given the /api/files family", () => {
   describe("when the caller presents a browser session and no API key", () => {
     /** @scenario "GET /api/files/:id authenticates a browser via session cookie when no API key header is present" */
     it("authorizes through the session user's project permission and streams the bytes", async () => {
-      const permissionCheck = vi.fn<FilesProjectPermissionCheck>(async () => undefined);
+      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
+        async () => undefined,
+      );
       const api = mount({
         read: async () => availableRead(),
         caller: { userId: "user-1" },
@@ -322,7 +328,9 @@ describe("given the /api/files family", () => {
   describe("when the caller presents a project API key and no session", () => {
     /** @scenario "GET /api/files/:id authenticates via API key header when no session cookie is present" */
     it("accepts the key scoped to the owning project and never consults a user permission", async () => {
-      const permissionCheck = vi.fn<FilesProjectPermissionCheck>(async () => undefined);
+      const permissionCheck = vi.fn<StoredObjectFileGate["assertProjectPermission"]>(
+        async () => undefined,
+      );
       const api = mount({
         read: async () => availableRead(),
         caller: { apiKeyProjectId: OWNER_PROJECT },
@@ -362,11 +370,11 @@ function mount(options: {
   owner?: () => Promise<{ projectId: string }>;
   caller?: { apiKeyProjectId?: string; userId?: string };
   apiKeyCeiling?: (permission: AuthzPermission) => Promise<void>;
-  assertProjectPermission?: FilesProjectPermissionCheck;
-  rateLimit?: FilesRateLimiter;
+  assertProjectPermission?: StoredObjectFileGate["assertProjectPermission"];
+  rateLimit?: StoredObjectFileGate["countRead"];
 }) {
   const caller = options.caller ?? { apiKeyProjectId: OWNER_PROJECT };
-  const api: StoredObjectFileApi = {
+  const files = StoredObjectFileReadService.create({
     identify: async () => ({
       ...(caller.apiKeyProjectId
         ? {
@@ -380,7 +388,8 @@ function mount(options: {
     assertProjectPermission: options.assertProjectPermission ?? (async () => undefined),
     resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
     readById: options.read ?? (async () => availableRead()),
-  };
+  });
+  const api: StoredObjectFileApi = { readFile: (input) => files.read(input) };
 
   const runtime = createRestRuntime({
     identity: {

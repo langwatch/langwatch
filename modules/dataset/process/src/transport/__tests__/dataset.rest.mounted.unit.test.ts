@@ -1,18 +1,24 @@
 /** REST endpoints mounted with real requests, stubbed application. */
 
 import {
+  BadRequestError,
   bindRestMiddleware,
+  canonicalErrorResponse,
   createRestRuntime,
+  NotFoundError,
   projectRestFacts,
   UnauthorizedError,
-  type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { MAX_FILE_SIZE_BYTES, type DatasetApi } from "@langwatch/dataset-contract";
-import { HandledError } from "@langwatch/handled-error";
+import {
+  DatasetConflictError,
+  DatasetNotFoundError,
+  DatasetNotReadyError,
+  MAX_FILE_SIZE_BYTES,
+  type DatasetApi,
+} from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
-import { createDatasetErrorHandler } from "../dataset-rest.errors.ts";
 import { createDatasetRest } from "../dataset.rest.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
@@ -40,25 +46,6 @@ function domainError(name: string, message: string): Error {
   return error;
 }
 
-/** The process boundary this family layers over, reduced to what it renders. */
-const boundaryErrorHandler: RestErrorHandler = (error, c) => {
-  if (HandledError.isHandled(error)) {
-    const serialized = error.serialize();
-
-    return c.json(
-      {
-        error: serialized.code,
-        message: error.message,
-        ...serialized.meta,
-        reasons: serialized.reasons,
-      },
-      serialized.httpStatus as 400,
-    );
-  }
-
-  return c.json({ error: "internal_server_error" }, 500);
-};
-
 function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean } = {}) {
   const stub = completeDatasetApi({
     listDatasets: vi.fn(async () => ({
@@ -66,7 +53,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
       pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
     })) as never,
     upsertDataset: vi.fn(async () => dataset) as never,
-    getDatasetWithRecords: vi.fn(async () => ({
+    getDatasetWithinLimit: vi.fn(async () => ({
       dataset,
       records: [{ id: "rec-1", entry: { input: "hello" } }],
       truncated: false,
@@ -76,7 +63,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
       pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
     })) as never,
     batchCreateRecords: vi.fn(async () => [{ id: "rec-1", entry: { input: "hello" } }]) as never,
-    deleteRecords: vi.fn(async () => ({ count: 2 })) as never,
+    deleteMatchingRecords: vi.fn(async () => ({ deletedCount: 2 })) as never,
     archiveDataset: vi.fn(async () => ({ id: "dataset_1", archived: true as const })) as never,
     platformUrl: ({ projectSlug, path }) => `https://app.langwatch.test/${projectSlug}${path}`,
     ...overrides,
@@ -112,7 +99,7 @@ function mount(overrides: Partial<DatasetApi> = {}, options: { refuse?: boolean 
   const hono = runtime.mount(createDatasetRest().router(), {
     app: () => stub,
     credential: "project",
-    onError: createDatasetErrorHandler({ boundaryErrorHandler }),
+    onError: canonicalErrorResponse,
     facts: [
       bindRestMiddleware(projectRestFacts, () => ({
         projectSlug: "project-one",
@@ -290,14 +277,14 @@ describe("the mounted dataset REST family", () => {
     it("answers 409 when the slug the name produces is already taken", async () => {
       const { send } = mount({
         upsertDataset: vi.fn(async () => {
-          throw domainError("DatasetConflictError", "slug taken");
+          throw new DatasetConflictError("slug taken");
         }) as never,
       });
 
       const response = await send("POST", "/api/dataset", { name: "Test Data" });
 
       expect(response.status).toBe(409);
-      await expect(response.json()).resolves.toMatchObject({ error: "Conflict" });
+      await expect(response.json()).resolves.toMatchObject({ code: "dataset_conflict" });
     });
   });
 
@@ -314,12 +301,12 @@ describe("the mounted dataset REST family", () => {
       const idResponse = await byId.send("GET", "/api/dataset/dataset_xyz");
 
       expect(slugResponse.status).toBe(200);
-      expect(bySlug.stub.getDatasetWithRecords).toHaveBeenCalledWith({
+      expect(bySlug.stub.getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "my-data",
         projectId: "project-1",
         limitMb: 25,
       });
-      expect(byId.stub.getDatasetWithRecords).toHaveBeenCalledWith({
+      expect(byId.stub.getDatasetWithinLimit).toHaveBeenCalledWith({
         slugOrId: "dataset_xyz",
         projectId: "project-1",
         limitMb: 25,
@@ -330,11 +317,9 @@ describe("the mounted dataset REST family", () => {
     /** @scenario "Get dataset enforces 25MB response size limit" */
     it("refuses rather than truncating when the read exceeds that ceiling", async () => {
       const { send } = mount({
-        getDatasetWithRecords: vi.fn(async () => ({
-          dataset,
-          records: [],
-          truncated: true,
-        })) as never,
+        getDatasetWithinLimit: vi.fn(async () => {
+          throw new BadRequestError("Dataset size exceeds 25MB limit");
+        }) as never,
       });
 
       const response = await send("GET", "/api/dataset/large-dataset");
@@ -348,8 +333,8 @@ describe("the mounted dataset REST family", () => {
     /** @scenario "Get dataset returns 404 for non-existent slug" */
     it("answers 404 for a slug that names no dataset", async () => {
       const { send } = mount({
-        getDatasetWithRecords: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+        getDatasetWithinLimit: vi.fn(async () => {
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -358,15 +343,15 @@ describe("the mounted dataset REST family", () => {
 
     it("answers 425 with the lifecycle state while the dataset is still preparing", async () => {
       const { send } = mount({
-        getDatasetWithRecords: vi.fn(async () => {
-          throw domainError("DatasetNotReadyError", "still preparing");
+        getDatasetWithinLimit: vi.fn(async () => {
+          throw new DatasetNotReadyError({ status: "processing" });
         }) as never,
       });
 
       const response = await send("GET", "/api/dataset/still-preparing");
 
       expect(response.status).toBe(425);
-      await expect(response.json()).resolves.toMatchObject({ error: "DatasetNotReady" });
+      await expect(response.json()).resolves.toMatchObject({ code: "dataset_not_ready" });
     });
   });
 
@@ -415,7 +400,7 @@ describe("the mounted dataset REST family", () => {
     it("answers 409 when the new name collides with another dataset", async () => {
       const { send } = mount({
         upsertDataset: vi.fn(async () => {
-          throw domainError("DatasetConflictError", "slug taken");
+          throw new DatasetConflictError("slug taken");
         }) as never,
       });
 
@@ -426,7 +411,7 @@ describe("the mounted dataset REST family", () => {
     it("answers 404 when the project has no such dataset", async () => {
       const { send } = mount({
         upsertDataset: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -452,7 +437,7 @@ describe("the mounted dataset REST family", () => {
     it("answers 404 for a slug that names no dataset", async () => {
       const { send } = mount({
         archiveDataset: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -502,7 +487,7 @@ describe("the mounted dataset REST family", () => {
     it("answers 404 for a dataset that does not exist", async () => {
       const { send } = mount({
         listRecords: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -562,12 +547,12 @@ describe("the mounted dataset REST family", () => {
 
       expect(response.status).toBe(422);
       const body = (await response.json()) as {
-        error: string;
-        reasons: { meta: { field: string; message: string } }[];
+        code: string;
+        meta: { reasons: { meta: { field: string; message: string } }[] };
       };
-      expect(body.error).toBe("validation_error");
-      expect(body.reasons[0]?.meta.field).toBe("entries");
-      expect(body.reasons[0]?.meta.message).toMatch(/batch size|4000/i);
+      expect(body.code).toBe("validation_error");
+      expect(body.meta.reasons[0]?.meta.field).toBe("entries");
+      expect(body.meta.reasons[0]?.meta.message).toMatch(/batch size|4000/i);
       expect(stub.batchCreateRecords).not.toHaveBeenCalled();
     });
 
@@ -605,15 +590,14 @@ describe("the mounted dataset REST family", () => {
       });
 
       expect(response.status).toBe(500);
-      const body = (await response.json()) as { message: string };
-      expect(body.message).toContain("columnTypes");
+      await expect(response.json()).resolves.toMatchObject({ type: "internal_error" });
     });
 
     /** @scenario "Batch create records returns 404 for non-existent dataset" */
     it("answers 404 when the dataset does not exist", async () => {
       const { send } = mount({
         batchCreateRecords: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -635,7 +619,7 @@ describe("the mounted dataset REST family", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ deletedCount: 2 });
-      expect(stub.deleteRecords).toHaveBeenCalledWith({
+      expect(stub.deleteMatchingRecords).toHaveBeenCalledWith({
         slugOrId: "my-dataset",
         projectId: "project-1",
         recordIds: ["rec-1", "rec-2"],
@@ -644,7 +628,11 @@ describe("the mounted dataset REST family", () => {
 
     /** @scenario "Delete records with no matching IDs returns 404" */
     it("answers 404 when none of the named ids matched", async () => {
-      const { send } = mount({ deleteRecords: vi.fn(async () => ({ count: 0 })) as never });
+      const { send } = mount({
+        deleteMatchingRecords: vi.fn(async () => {
+          throw new NotFoundError("No matching records found");
+        }) as never,
+      });
 
       const response = await send("DELETE", "/api/dataset/my-dataset/records", {
         recordIds: ["nonexistent"],
@@ -658,8 +646,8 @@ describe("the mounted dataset REST family", () => {
     /** @scenario "Delete records for non-existent dataset returns 404" */
     it("answers 404 rather than a count of nothing", async () => {
       const { send } = mount({
-        deleteRecords: vi.fn(async () => {
-          throw domainError("DatasetNotFoundError", "no such dataset");
+        deleteMatchingRecords: vi.fn(async () => {
+          throw new DatasetNotFoundError("no such dataset");
         }) as never,
       });
 
@@ -673,7 +661,7 @@ describe("the mounted dataset REST family", () => {
       const { send, stub } = mount();
 
       expect((await send("DELETE", "/api/dataset/my-dataset/records", {})).status).toBe(422);
-      expect(stub.deleteRecords).not.toHaveBeenCalled();
+      expect(stub.deleteMatchingRecords).not.toHaveBeenCalled();
     });
   });
 
@@ -689,8 +677,10 @@ describe("the mounted dataset REST family", () => {
 
         const response = await sendStream(path, upload.body);
 
-        expect(response.status).toBe(400);
-        await expect(response.json()).resolves.toMatchObject({ error: "validation_error" });
+        // The canonical renderer answers `validation_error` at 422 (400 under the retired family
+        // handler); the drift is reported in the lint-w9-stored-object-dataset handoff.
+        expect(response.status).toBe(422);
+        await expect(response.json()).resolves.toMatchObject({ code: "validation_error" });
         expect(upload.pulled()).toBeLessThan(fileBytes);
         expect(createDatasetFromUpload).not.toHaveBeenCalled();
         expect(uploadToExistingDataset).not.toHaveBeenCalled();
@@ -810,7 +800,7 @@ describe("the mounted dataset REST family", () => {
     it("answers 409 when the name's slug is already taken", async () => {
       const { sendStream } = mount({
         createDatasetFromUpload: vi.fn(async () => {
-          throw domainError("DatasetConflictError", "slug taken");
+          throw new DatasetConflictError("slug taken");
         }),
       });
 
@@ -884,7 +874,7 @@ describe("the mounted dataset REST family", () => {
 
         expect(response.status).toBe(401);
         expect(stub.listDatasets).not.toHaveBeenCalled();
-        expect(stub.getDatasetWithRecords).not.toHaveBeenCalled();
+        expect(stub.getDatasetWithinLimit).not.toHaveBeenCalled();
       }
     });
   });

@@ -1,4 +1,7 @@
+import { memoryObjectStorage } from "@langwatch/process-stores";
+
 import type { DatasetRepositories } from "../dataset.repositories.ts";
+import { ObjectStorageDatasetChunkRepository } from "../object-storage/object-storage.dataset-chunk.repository.ts";
 import { MemoryBatchEvaluationRepository } from "./memory.batch-evaluation.repository.ts";
 import { MemoryDatasetContentRepository } from "./memory.dataset-content.repository.ts";
 import { MemoryDatasetMigrationRepository } from "./memory.dataset-migration.repository.ts";
@@ -22,6 +25,9 @@ export class MemoryDatasetRepositories {
       batchEvaluations: MemoryBatchEvaluationRepository.create({ database }),
       usage: MemoryDatasetUsageRepository.create({ database }),
       migration: MemoryDatasetMigrationRepository.create(),
+      migrationChunks: ObjectStorageDatasetChunkRepository.create({
+        objectStorage: memoryObjectStorage(),
+      }),
     };
   }
 }

@@ -33,6 +33,7 @@ import {
   type DatasetRecordPage,
   type DatasetUsageCount,
   type DatasetWithRecords,
+  type DatasetApiDeleteInput,
   type DeleteDatasetRecordsInput,
   type ListDatasetsInput,
   type RetryNormalizeInput,
@@ -298,6 +299,23 @@ export class DatasetApp implements DatasetApi {
   /** Archives a dataset. */
   archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }> {
     return this.#datasets.archiveDataset(input);
+  }
+
+  /** Archives a dataset, or restores it when the caller undoes the archive. */
+  archiveOrRestoreDataset(input: DatasetApiDeleteInput): Promise<{ success: true }> {
+    return this.#datasets.archiveOrRestoreDataset(input);
+  }
+
+  /** The whole dataset inline, refused rather than truncated past `limitMb`. */
+  getDatasetWithinLimit(
+    input: DatasetLookupInput & { limitMb: number },
+  ): Promise<DatasetWithRecords> {
+    return this.#datasets.getDatasetWithinLimit(input);
+  }
+
+  /** Entries removed by id, refused when none matched. */
+  deleteMatchingRecords(input: DeleteDatasetRecordsInput): Promise<{ deletedCount: number }> {
+    return this.#datasets.deleteMatchingRecords(input);
   }
 
   /** Restores a dataset the caller just archived. */

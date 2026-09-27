@@ -4,6 +4,7 @@ import {
   type DatasetRecord,
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
+import { toDate } from "@langwatch/time";
 
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
@@ -78,7 +79,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
-    const now = this.#database.now();
+    const now = toDate(this.#database.now());
 
     for (const entry of input.entries) {
       this.#database.putRecord(
@@ -113,7 +114,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     const updated = datasetRecordSchema.parse({
       ...record,
       entry: input.entry,
-      updatedAt: this.#database.now(),
+      updatedAt: toDate(this.#database.now()),
     });
 
     this.#database.putRecord(updated);

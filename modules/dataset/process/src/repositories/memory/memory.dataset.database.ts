@@ -1,5 +1,5 @@
 import { type DatasetRecord, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { DatasetRow } from "../dataset.repository.ts";
 
@@ -18,8 +18,8 @@ export type MemoryBatchEvaluation = {
   datasetSlug: string;
   datasetId: string;
   evaluation: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 };
 
 /**
@@ -106,7 +106,7 @@ export class MemoryDatasetDatabase {
   }
 
   /** The clock every write here stamps with, so two twins agree on "now". */
-  now(): Date {
-    return toDate(nowInstant());
+  now(): Instant {
+    return nowInstant();
   }
 }

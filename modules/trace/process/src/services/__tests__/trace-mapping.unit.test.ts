@@ -179,13 +179,13 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   };
 
   it("returns all spans when key is empty", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "", "");
+    const result = TRACE_MAPPINGS.spans.mapping({ trace: mockTrace as any, key: "", subkey: "" });
 
     expect(result).toHaveLength(2);
   });
 
   it("returns all spans when key is * (any span wildcard)", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "*", "");
+    const result = TRACE_MAPPINGS.spans.mapping({ trace: mockTrace as any, key: "*", subkey: "" });
 
     expect(result).toHaveLength(2);
     expect(result).toEqual(
@@ -197,14 +197,22 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("filters spans by specific name", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "openai/gpt-4", "");
+    const result = TRACE_MAPPINGS.spans.mapping({
+      trace: mockTrace as any,
+      key: "openai/gpt-4",
+      subkey: "",
+    });
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(expect.objectContaining({ name: "openai/gpt-4" }));
   });
 
   it("returns input field from all spans when key is * and subkey is input", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "*", "input");
+    const result = TRACE_MAPPINGS.spans.mapping({
+      trace: mockTrace as any,
+      key: "*",
+      subkey: "input",
+    });
 
     expect(result).toHaveLength(2);
     // input field is an object with { type, value }
@@ -215,7 +223,7 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("returns full span objects when key is * and subkey is * (full span object wildcard)", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "*", "*");
+    const result = TRACE_MAPPINGS.spans.mapping({ trace: mockTrace as any, key: "*", subkey: "*" });
 
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual(
@@ -228,7 +236,11 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("returns specific field from specific span", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "openai/gpt-4", "output");
+    const result = TRACE_MAPPINGS.spans.mapping({
+      trace: mockTrace as any,
+      key: "openai/gpt-4",
+      subkey: "output",
+    });
 
     expect(result).toHaveLength(1);
     // output field is an object with { type, value }
@@ -236,7 +248,11 @@ describe("TRACE_MAPPINGS.spans.mapping", () => {
   });
 
   it("returns full span object when key is specific and subkey is *", () => {
-    const result = TRACE_MAPPINGS.spans.mapping(mockTrace as any, "my-custom-span", "*");
+    const result = TRACE_MAPPINGS.spans.mapping({
+      trace: mockTrace as any,
+      key: "my-custom-span",
+      subkey: "*",
+    });
 
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual(
@@ -608,31 +624,51 @@ describe("TRACE_MAPPINGS.metadata.mapping", () => {
   };
 
   it("returns full metadata object when key is empty", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "");
+    const result = TRACE_MAPPINGS.metadata.mapping({
+      trace: mockTrace as any,
+      key: "",
+      subkey: "",
+    });
 
     expect(result).toBe(JSON.stringify(mockTrace.metadata));
   });
 
   it("returns full metadata object when key is * (any key wildcard)", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "*");
+    const result = TRACE_MAPPINGS.metadata.mapping({
+      trace: mockTrace as any,
+      key: "*",
+      subkey: "",
+    });
 
     expect(result).toEqual(mockTrace.metadata);
   });
 
   it("returns specific metadata field", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "user_id");
+    const result = TRACE_MAPPINGS.metadata.mapping({
+      trace: mockTrace as any,
+      key: "user_id",
+      subkey: "",
+    });
 
     expect(result).toBe("user-123");
   });
 
   it("returns labels array when key is labels", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "labels");
+    const result = TRACE_MAPPINGS.metadata.mapping({
+      trace: mockTrace as any,
+      key: "labels",
+      subkey: "",
+    });
 
     expect(result).toEqual(["label1", "label2"]);
   });
 
   it("returns undefined for non-existent key", () => {
-    const result = TRACE_MAPPINGS.metadata.mapping(mockTrace as any, "non_existent");
+    const result = TRACE_MAPPINGS.metadata.mapping({
+      trace: mockTrace as any,
+      key: "non_existent",
+      subkey: "",
+    });
 
     expect(result).toBeUndefined();
   });
@@ -926,9 +962,14 @@ describe("TRACE_MAPPINGS.threads", () => {
         metadata: { thread_id: "other-thread" },
       });
 
-      const result = TRACE_MAPPINGS.threads.mapping(trace1 as any, "", "", {
-        allTraces: [trace1, trace2, unrelatedTrace] as any[],
-        selectedFields: ["thread_id"],
+      const result = TRACE_MAPPINGS.threads.mapping({
+        trace: trace1 as any,
+        key: "",
+        subkey: "",
+        data: {
+          allTraces: [trace1, trace2, unrelatedTrace] as any[],
+          selectedFields: ["thread_id"],
+        },
       });
 
       expect(result).toHaveLength(2);
@@ -943,9 +984,14 @@ describe("TRACE_MAPPINGS.threads", () => {
         input: { type: "text", value: "Second" },
       });
 
-      const result = TRACE_MAPPINGS.threads.mapping(trace1 as any, "", "", {
-        allTraces: [trace1, trace2] as any[],
-        selectedFields: ["input", "output"],
+      const result = TRACE_MAPPINGS.threads.mapping({
+        trace: trace1 as any,
+        key: "",
+        subkey: "",
+        data: {
+          allTraces: [trace1, trace2] as any[],
+          selectedFields: ["input", "output"],
+        },
       });
 
       expect(result).toHaveLength(2);
@@ -958,9 +1004,14 @@ describe("TRACE_MAPPINGS.threads", () => {
     it("returns an empty array", () => {
       const trace = makeTrace();
 
-      const result = TRACE_MAPPINGS.threads.mapping(trace as any, "", "", {
-        allTraces: undefined,
-        selectedFields: ["thread_id"],
+      const result = TRACE_MAPPINGS.threads.mapping({
+        trace: trace as any,
+        key: "",
+        subkey: "",
+        data: {
+          allTraces: undefined,
+          selectedFields: ["thread_id"],
+        },
       });
 
       expect(result).toEqual([]);
@@ -971,9 +1022,14 @@ describe("TRACE_MAPPINGS.threads", () => {
     it("returns an empty array", () => {
       const trace = makeTrace({ metadata: {} });
 
-      const result = TRACE_MAPPINGS.threads.mapping(trace as any, "", "", {
-        allTraces: [trace] as any[],
-        selectedFields: ["thread_id"],
+      const result = TRACE_MAPPINGS.threads.mapping({
+        trace: trace as any,
+        key: "",
+        subkey: "",
+        data: {
+          allTraces: [trace] as any[],
+          selectedFields: ["thread_id"],
+        },
       });
 
       expect(result).toEqual([]);
@@ -1062,8 +1118,13 @@ describe("threads_until_current mapping", () => {
 
   it("returns only traces up to and including the current trace timestamp", () => {
     const currentTrace = allTraces[1]!; // t2, timestamp 2000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
-      allTraces,
+    const result = TRACE_MAPPINGS.threads_until_current.mapping({
+      trace: currentTrace,
+      key: "",
+      subkey: "",
+      data: {
+        allTraces,
+      },
     }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2"]);
@@ -1071,8 +1132,13 @@ describe("threads_until_current mapping", () => {
 
   it("includes traces with equal timestamps", () => {
     const currentTrace = allTraces[2]!; // t3, timestamp 3000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
-      allTraces,
+    const result = TRACE_MAPPINGS.threads_until_current.mapping({
+      trace: currentTrace,
+      key: "",
+      subkey: "",
+      data: {
+        allTraces,
+      },
     }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2", "t3"]);
@@ -1080,8 +1146,13 @@ describe("threads_until_current mapping", () => {
 
   it("excludes traces from other threads", () => {
     const currentTrace = allTraces[2]!; // t3, thread-A
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
-      allTraces,
+    const result = TRACE_MAPPINGS.threads_until_current.mapping({
+      trace: currentTrace,
+      key: "",
+      subkey: "",
+      data: {
+        allTraces,
+      },
     }) as any[];
 
     expect(result.map((t: any) => t.trace_id)).not.toContain("t4");
@@ -1089,9 +1160,14 @@ describe("threads_until_current mapping", () => {
 
   it("extracts selectedFields from filtered traces", () => {
     const currentTrace = allTraces[1]!; // t2, timestamp 2000
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(currentTrace, "", "", {
-      allTraces,
-      selectedFields: ["input"],
+    const result = TRACE_MAPPINGS.threads_until_current.mapping({
+      trace: currentTrace,
+      key: "",
+      subkey: "",
+      data: {
+        allTraces,
+        selectedFields: ["input"],
+      },
     }) as Record<string, unknown>[];
 
     expect(result).toEqual([{ input: "first" }, { input: "second" }]);
@@ -1099,8 +1175,13 @@ describe("threads_until_current mapping", () => {
 
   it("returns empty array when trace has no thread_id", () => {
     const noThreadTrace = { ...allTraces[0]!, metadata: {} } as any;
-    const result = TRACE_MAPPINGS.threads_until_current.mapping(noThreadTrace, "", "", {
-      allTraces,
+    const result = TRACE_MAPPINGS.threads_until_current.mapping({
+      trace: noThreadTrace,
+      key: "",
+      subkey: "",
+      data: {
+        allTraces,
+      },
     });
 
     expect(result).toEqual([]);

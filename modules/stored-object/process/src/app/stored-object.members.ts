@@ -1,5 +1,6 @@
 import type { Readable } from "node:stream";
 
+import type { RequestActor } from "@langwatch/api/rest";
 import type { ObjectDigest, SignedObjectUpload } from "@langwatch/process-stores/members";
 import type {
   StoredObjectByteStream,
@@ -21,6 +22,22 @@ export type StoredObjectProbe =
 export type StoredObjectFileStreamRead =
   | { row: StoredObjectFileRow; stream: Readable }
   | { row: StoredObjectFileRow; status: "missing" };
+
+/** One object's bytes as the file door serves them: safe media type, length and headers. */
+/** One file-door read: who asked, which object, and the owner and filename the URL named. */
+export type StoredObjectFileReadInput = Readonly<{
+  actor: RequestActor | null;
+  id: string;
+  claimedProjectId?: string | undefined;
+  requestedFilename?: string | undefined;
+}>;
+
+export type StoredObjectFileBytes = Readonly<{
+  stream: Readable;
+  mediaType: string;
+  byteLength: number;
+  headers: Readonly<Record<string, string>>;
+}>;
 
 /** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
 export interface StoredObjectFileReader {

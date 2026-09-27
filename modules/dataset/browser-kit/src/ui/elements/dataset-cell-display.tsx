@@ -91,7 +91,7 @@ export function DatasetCellDisplay({
           datasetId,
           fallbackText: displayValue.text,
           fallbackTruncated: displayValue.truncated,
-          onChange: (next) => setCellValue(datasetId, row, columnId, next),
+          onChange: (next) => setCellValue({ datasetId, row, columnId, value: next }),
           onOpenEditor: () => setEditingCell({ row, columnId }),
         })
       : null;

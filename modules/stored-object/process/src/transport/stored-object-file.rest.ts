@@ -1,114 +1,27 @@
 /**
  * `/api/files` — the bytes of one stored object, for the page that renders it
  * and for the project key that fetches it. An object is addressed by its id,
- * so the owning project is resolved in the handler, not by the door.
+ * so the owning project is resolved by the module, not by the door.
  */
-import { Readable } from "node:stream";
-
 import { deferredScope } from "@langwatch/api/access";
 import {
   defineRestRouter,
-  jsonResponse,
   MANAGEMENT_API_VERSION,
-  rateLimitedResponse,
-  safeMediaType,
-  sanitizeFilenameSegment,
-  STORED_OBJECT_RESPONSE_BASE_HEADERS,
-  type RestRawResult,
+  type RestBytesProducer,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
-  FILE_VIEW_PERMISSIONS,
-  isReadbackSafe,
-  type StoredObjectFileViewPermission,
   storedObjectFileRouteFilenameQuerySchema,
   storedObjectFileRouteIdParamsSchema,
   storedObjectFileRouteNamedParamsSchema,
   storedObjectFileRouteScopedParamsSchema,
-  StoredObjectOwnerLookupUnavailableError,
 } from "@langwatch/stored-object-contract";
-import { HTTPException } from "hono/http-exception";
 
-import type { StoredObjectFileStreamRead } from "#app/stored-object.members";
-import { requiredPermissionForPurpose } from "#rules/stored-object-purpose-permission.rules";
+import type { StoredObjectFileBytes, StoredObjectFileReadInput } from "#app/stored-object.members";
 
-/** Per-caller rate limit on the read routes. */
-const FILES_RATE_LIMIT_WINDOW_SECONDS = 60;
-const FILES_RATE_LIMIT_MAX = 120;
-
-/** The codes the permission check raises when it refuses the caller. */
-const DENIAL_CODES: ReadonlySet<string> = new Set([
-  "project_permission_denied",
-  "lite_member_restricted",
-  // The ADR-092 engine's denial. A route that has migrated to
-  // `authz.authorize()` throws this instead of the legacy pair, and without
-  // it here the engine's 403 would surface as a 500.
-  "permission_denied",
-]);
-
-/**
- * True only for the denial shapes the permission check documents. Anything
- * else — a dropped database connection, a Prisma fault — is an members
- * failure that must bubble up as a 5xx, never be masked as a 403.
- */
-export function isPermissionDenial(err: unknown): boolean {
-  return HandledError.isHandled(err) && DENIAL_CODES.has(err.code);
-}
-
-/**
- * Refuses the read unless `userId` holds `permission` on `projectId`.
- */
-export type FilesProjectPermissionCheck = (args: {
-  userId: string;
-  projectId: string;
-  permission: StoredObjectFileViewPermission;
-}) => Promise<void>;
-
-/** A fixed-window counter, keyed on the caller. */
-export type FilesRateLimiter = (args: {
-  key: string;
-  windowSeconds: number;
-  max: number;
-}) => Promise<{ allowed: boolean; resetAt: number }>;
-
-/**
- * Who the deployment's dual-credential verifier let in. The key's own ceiling
- * travels with it, so both gates below ask the credential this request
- * actually carried.
- */
-export type StoredObjectFileCaller = Readonly<{
-  apiKeyProjectId?: string | undefined;
-  userId?: string | undefined;
-  apiKeyCeiling?: ((permission: AuthzPermission) => Promise<void>) | undefined;
-}>;
-
-/** What one count of a caller's reads answers. */
-export type StoredObjectFileAllowance = Readonly<{ allowed: boolean; resetAt: number }>;
-
-/**
- * What the byte door reaches. The verifier, the counter and the person's
- * project permission belong to the DEPLOYMENT; the two reads belong to this
- * module. The family asks all five in the order its handler fixes.
- */
+/** What the byte door reaches: one read that counts, authorizes and streams. */
 export interface StoredObjectFileApi {
-  /** Who this request presents, as the process's own verifier resolved it. */
-  identify(input: { request: Request }): Promise<StoredObjectFileCaller>;
-  countRead(input: {
-    key: string;
-    windowSeconds: number;
-    max: number;
-  }): Promise<StoredObjectFileAllowance>;
-  assertProjectPermission(input: {
-    userId: string;
-    projectId: string;
-    permission: StoredObjectFileViewPermission;
-  }): Promise<void>;
-  /** Which project owns an object, for a URL that does not say. Throws when none does. */
-  resolveOwner(input: { id: string }): Promise<{ projectId: string }>;
-  /** One object's row and, when the bytes are there, a stream of them. Throws when absent. */
-  readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead>;
+  readFile(input: StoredObjectFileReadInput): Promise<StoredObjectFileBytes>;
 }
 
 export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>()("stored-object");
@@ -142,15 +55,17 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .get("/api/files/:projectId/:storedObjectId/:filename", "readNamedProjectStoredObjectBytes")
   .withParams(storedObjectFileRouteNamedParamsSchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
-  .withRawResponse({ produces: SERVED_MEDIA_TYPES })
+  .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, request }) =>
-    serveStoredObjectBytes({
-      app,
-      request,
-      id: input.storedObjectId,
-      claimedProjectId: input.projectId,
-      requestedFilename: input.filename,
+  .handle(async ({ app, input, actor, response }) =>
+    served({
+      response,
+      file: await app.readFile({
+        actor,
+        id: input.storedObjectId,
+        claimedProjectId: input.projectId,
+        requestedFilename: input.filename,
+      }),
     }),
   )
 
@@ -158,15 +73,17 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .withParams(storedObjectFileRouteScopedParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
-  .withRawResponse({ produces: SERVED_MEDIA_TYPES })
+  .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, request }) =>
-    serveStoredObjectBytes({
-      app,
-      request,
-      id: input.storedObjectId,
-      claimedProjectId: input.projectId,
-      requestedFilename: input.filename,
+  .handle(async ({ app, input, actor, response }) =>
+    served({
+      response,
+      file: await app.readFile({
+        actor,
+        id: input.storedObjectId,
+        claimedProjectId: input.projectId,
+        requestedFilename: input.filename,
+      }),
     }),
   )
 
@@ -174,295 +91,28 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .withParams(storedObjectFileRouteIdParamsSchema)
   .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
-  .withRawResponse({ produces: SERVED_MEDIA_TYPES })
+  .withResponse("bytes", { produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
-  .handle(async ({ app, input, request }) =>
-    serveStoredObjectBytes({
-      app,
-      request,
-      id: input.storedObjectId,
-      requestedFilename: input.filename,
+  .handle(async ({ app, input, actor, response }) =>
+    served({
+      response,
+      file: await app.readFile({
+        actor,
+        id: input.storedObjectId,
+        requestedFilename: input.filename,
+      }),
     }),
   )
   .build();
 
-/**
- * Count the caller, resolve the owner, admit the caller to that project, read
- * the row, then hold the caller to the permission the object's purpose maps
- * to. The order is the family's whole security argument.
- */
-async function serveStoredObjectBytes({
-  app,
-  request,
-  id,
-  claimedProjectId,
-  requestedFilename,
-}: {
-  app: StoredObjectFileApi;
-  request: Request;
-  id: string;
-  claimedProjectId?: string | undefined;
-  requestedFilename?: string | undefined;
-}): Promise<RestRawResult> {
-  const caller = await app.identify({ request });
-  const allowance = await countCaller({ app, caller });
-
-  if (!allowance.allowed) return rateLimitedResponse(allowance.resetAt);
-
-  const owner = await ownerOf({ app, id, claimedProjectId });
-
-  if (owner.status === "not_found") return jsonResponse({ status: "not_found" }, 404);
-  if (owner.status === "unavailable") return unavailable();
-
-  // Pinned once: the gate below and the read after it MUST use the same value,
-  // or a future edit could authorize one project and read another.
-  const ownerProjectId = owner.projectId;
-
-  await authorizeFileRead({ app, caller, ownerProjectId });
-
-  const result = await readOf({ app, ownerProjectId, id });
-
-  if (!("row" in result)) {
-    return result.status === "not_found"
-      ? jsonResponse({ status: "not_found" }, 404)
-      : unavailable();
-  }
-
-  await authorizeFilePurpose({ app, caller, ownerProjectId, purpose: result.row.purpose });
-
-  if (!("stream" in result)) return jsonResponse({ status: "missing" }, 404);
-
-  return bytesOf({ row: result.row, stream: result.stream, requestedFilename });
-}
-
-/**
- * Keyed on the caller's own identity so id probes are throttled BEFORE the
- * shared cross-tenant lookup; keying on the owner project would need that
- * lookup first, which is the fan-out this counter exists to stop.
- */
-async function countCaller({
-  app,
-  caller,
-}: {
-  app: StoredObjectFileApi;
-  caller: StoredObjectFileCaller;
-}): Promise<StoredObjectFileAllowance> {
-  const key = caller.apiKeyProjectId ?? caller.userId;
-
-  // The verifier sets one of the two on every request it admits; reaching here
-  // with neither means a future edit broke that contract. Refuse rather than
-  // fall back to a shared bucket every caller would share.
-  if (!key) throw new HTTPException(500, { message: "rate-limit key unresolved" });
-
-  return app.countRead({
-    key: `files-route:caller:${key}`,
-    windowSeconds: FILES_RATE_LIMIT_WINDOW_SECONDS,
-    max: FILES_RATE_LIMIT_MAX,
+/** The 200, with the length and headers the module decided; HEAD cancels the unsent stream. */
+function served(input: {
+  response: RestBytesProducer<typeof SERVED_MEDIA_TYPES>;
+  file: StoredObjectFileBytes;
+}) {
+  return input.response.stream(input.file.stream, {
+    mediaType: input.file.mediaType,
+    byteLength: input.file.byteLength,
+    headers: input.file.headers,
   });
-}
-
-/** A degraded instance must not read as a deleted object. */
-type ResolvedOwner =
-  | Readonly<{ status: "found"; projectId: string }>
-  | Readonly<{ status: "not_found" }>
-  | Readonly<{ status: "unavailable" }>;
-
-/** A read that found no row, or an outage the handler must not report as a deletion. */
-type FileReadOutcome =
-  | StoredObjectFileStreamRead
-  | Readonly<{ status: "not_found" }>
-  | Readonly<{ status: "unavailable" }>;
-
-function isStoredObjectNotFound(err: unknown): boolean {
-  return err instanceof HandledError && err.code === "stored_object_not_found";
-}
-
-/**
- * The project-scoped URL carries the claimed owner, so it is taken directly:
- * the gate refuses a foreign claim and the scoped read answers 404 for one
- * owning no row. The id-only URL falls back to the cross-tenant lookup.
- */
-async function ownerOf({
-  app,
-  id,
-  claimedProjectId,
-}: {
-  app: StoredObjectFileApi;
-  id: string;
-  claimedProjectId?: string | undefined;
-}): Promise<ResolvedOwner> {
-  if (claimedProjectId) return { status: "found", projectId: claimedProjectId };
-
-  try {
-    const owner = await app.resolveOwner({ id });
-
-    return { status: "found", projectId: owner.projectId };
-  } catch (err) {
-    if (isStoredObjectNotFound(err)) return { status: "not_found" };
-    if (err instanceof StoredObjectOwnerLookupUnavailableError) return { status: "unavailable" };
-
-    throw err;
-  }
-}
-
-/** A storage failure other than a miss is an outage, not a deletion. */
-async function readOf({
-  app,
-  ownerProjectId,
-  id,
-}: {
-  app: StoredObjectFileApi;
-  ownerProjectId: string;
-  id: string;
-}): Promise<FileReadOutcome> {
-  try {
-    return await app.readById({ projectId: ownerProjectId, id });
-  } catch (err) {
-    if (isStoredObjectNotFound(err)) return { status: "not_found" };
-
-    return { status: "unavailable" };
-  }
-}
-
-/**
- * Whether the caller may read objects owned by `ownerProjectId` AT ALL. The
- * purpose is not known yet, so ANY of the file-view permissions admits; a key
- * is pinned to the project it resolved to AND capped by its own ceiling.
- */
-async function authorizeFileRead({
-  app,
-  caller,
-  ownerProjectId,
-}: {
-  app: StoredObjectFileApi;
-  caller: StoredObjectFileCaller;
-  ownerProjectId: string;
-}): Promise<void> {
-  if (caller.apiKeyProjectId) {
-    if (caller.apiKeyProjectId !== ownerProjectId) {
-      throw new HTTPException(403, { message: "forbidden" });
-    }
-
-    return enforceAnyOf(ceilingOf(caller), FILE_VIEW_PERMISSIONS);
-  }
-
-  const userId = caller.userId;
-
-  if (!userId) throw new HTTPException(401, { message: "unauthenticated" });
-
-  for (const permission of FILE_VIEW_PERMISSIONS) {
-    try {
-      await app.assertProjectPermission({ userId, projectId: ownerProjectId, permission });
-
-      return;
-    } catch (err) {
-      if (!isPermissionDenial(err)) throw err;
-    }
-  }
-
-  throw new HTTPException(403, { message: "forbidden" });
-}
-
-/**
- * The permission the object's purpose maps to, asked once the row is known. A
- * caller admitted on either category alone would otherwise read media of the
- * category it does not hold.
- */
-async function authorizeFilePurpose({
-  app,
-  caller,
-  ownerProjectId,
-  purpose,
-}: {
-  app: StoredObjectFileApi;
-  caller: StoredObjectFileCaller;
-  ownerProjectId: string;
-  purpose: string;
-}): Promise<void> {
-  const permission = requiredPermissionForPurpose(purpose);
-
-  // The key's own refusal, with its own code — the shape `authorizeFileRead`
-  // already lets through.
-  if (caller.apiKeyProjectId) return ceilingOf(caller)(permission);
-
-  const userId = caller.userId;
-
-  if (!userId) return;
-
-  try {
-    await app.assertProjectPermission({ userId, projectId: ownerProjectId, permission });
-  } catch (err) {
-    if (!isPermissionDenial(err)) throw err;
-
-    throw new HTTPException(403, { message: "forbidden" });
-  }
-}
-
-/**
- * The verifier sets a ceiling on every key it resolves; reaching here without
- * one means that contract broke. Refuse rather than read.
- */
-function ceilingOf(caller: StoredObjectFileCaller): (permission: AuthzPermission) => Promise<void> {
-  const ceiling = caller.apiKeyCeiling;
-
-  if (!ceiling) throw new HTTPException(500, { message: "api key ceiling unresolved" });
-
-  return ceiling;
-}
-
-/** The key's ceiling, satisfied by ANY of the permissions a file read can need. */
-async function enforceAnyOf(
-  ceiling: (permission: AuthzPermission) => Promise<void>,
-  permissions: readonly AuthzPermission[],
-): Promise<void> {
-  let refusal: unknown;
-
-  for (const permission of permissions) {
-    try {
-      await ceiling(permission);
-
-      return;
-    } catch (err) {
-      if (!HandledError.isHandled(err)) throw err;
-
-      refusal = err;
-    }
-  }
-
-  throw refusal;
-}
-
-/** The one sentence every transient byte failure answers with. */
-function unavailable(): Response {
-  return jsonResponse({ error: "file temporarily unavailable" }, 502);
-}
-
-/**
- * The 200: the safe media type, the stored length, the sanitised filename and
- * the hardening headers every byte door carries. A HEAD request is answered
- * from this route, and the runtime cancels the stream it does not send.
- */
-function bytesOf({
-  row,
-  stream,
-  requestedFilename,
-}: {
-  row: { id: string; size_bytes: number; media_type: string };
-  stream: Readable;
-  requestedFilename?: string | undefined;
-}): RestRawResult {
-  const filename =
-    (requestedFilename ? sanitizeFilenameSegment(requestedFilename) : "") ||
-    sanitizeFilenameSegment(row.id);
-
-  return {
-    status: 200,
-    headers: {
-      "Content-Type": safeMediaType({ mediaType: row.media_type, readbackSafe: isReadbackSafe }),
-      "Content-Length": String(row.size_bytes),
-      "Content-Disposition": `inline; filename="${filename}"`,
-      ...STORED_OBJECT_RESPONSE_BASE_HEADERS,
-    },
-    body: Readable.toWeb(stream) as ReadableStream,
-  };
 }

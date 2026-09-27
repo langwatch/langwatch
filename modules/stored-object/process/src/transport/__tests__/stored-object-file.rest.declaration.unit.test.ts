@@ -44,7 +44,7 @@ describe("the files REST family", () => {
 
     it("writes its own bytes, and names the path it addresses the object by", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.rawResponse !== undefined]).toEqual([route.operation, true]);
+        expect([route.operation, route.response?.kind]).toEqual([route.operation, "bytes"]);
         expect([route.operation, route.params !== undefined]).toEqual([route.operation, true]);
       }
     });

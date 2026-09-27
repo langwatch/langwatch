@@ -47,17 +47,7 @@ export const datasetTrpcTransport = defineTrpcRouter(DatasetApi, datasetTrpc)
 
   .procedure("deleteById")
   .withPermission("datasets:delete")
-  .handle(async ({ app, input }) => {
-    if (input.undo) {
-      await app.restoreDataset({ datasetId: input.datasetId, projectId: input.projectId });
-
-      return { success: true as const };
-    }
-
-    await app.archiveDataset({ slugOrId: input.datasetId, projectId: input.projectId });
-
-    return { success: true as const };
-  })
+  .handle(async ({ app, input }) => app.archiveOrRestoreDataset(input))
 
   .procedure("updateMapping")
   .withPermission("datasets:update")

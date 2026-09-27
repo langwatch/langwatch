@@ -7,6 +7,7 @@ import {
   type ChunkOffset,
   type DatasetChunk,
 } from "../../../rules/dataset-chunking.rules.ts";
+import { DatasetMigrationService } from "../../../services/dataset-migration.service.ts";
 import type { DatasetChunkRepository } from "../../dataset-chunk.repository.ts";
 import { ObjectStorageDatasetChunkRepository } from "../../object-storage/object-storage.dataset-chunk.repository.ts";
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
@@ -99,8 +100,8 @@ function fixture(input: {
   // Prisma's delegates derive their return types from the arguments each call
   // was made with, so no hand-written stand-in can be declared to satisfy one.
   // The fake records what it was asked, which is what every claim below reads.
-  const migration = PrismaDatasetMigrationRepository.create({
-    database: database as never,
+  const migration = DatasetMigrationService.create({
+    repository: PrismaDatasetMigrationRepository.create({ database: database as never }),
     storage: input.storage ?? storage,
   });
 

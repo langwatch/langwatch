@@ -99,7 +99,7 @@ const mapThreadToDatasetEntry = (
           for (const field of selectedFields) {
             const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
             if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(trace, "", "", {});
+              filteredTrace[field] = traceMapping.mapping({ trace, key: "", subkey: "" });
             }
           }
           return filteredTrace;
