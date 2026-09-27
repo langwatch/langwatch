@@ -15,7 +15,6 @@ import {
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
 import type {
   CreateLlmConfigVersionParams,
@@ -533,7 +532,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       .parse(input);
     const row: StoredVersion = {
       ...clone(input),
-      id: `prompt_version_${nanoid()}`,
+      id: generate("promptversion").toString(),
       createdAt: toDate(nowInstant()),
       author: null,
     };

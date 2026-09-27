@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { uniqueConstraintTargets } from "@langwatch/prisma-client";
 import type {
   LlmPromptConfig,
@@ -14,7 +15,6 @@ import {
   getVersionValidator,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
-import { nanoid } from "nanoid";
 
 import {
   LlmConfigVersionsRepository,
@@ -214,7 +214,7 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...restVersionData,
-          id: `prompt_version_${nanoid()}`,
+          id: generate("promptversion").toString(),
           version: nextVersion,
           configData: restVersionData.configData as Prisma.InputJsonValue,
           runtimeParameters: (runtimeParameters as Prisma.InputJsonValue) ?? {},
@@ -283,6 +283,6 @@ export class PrismaLlmConfigVersionsRepository extends LlmConfigVersionsReposito
   }
 
   generateVersionId(): string {
-    return `prompt_version_${nanoid()}`;
+    return generate("promptversion").toString();
   }
 }
