@@ -9,6 +9,7 @@ import {
   canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
+  RestHost,
 } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment, ExperimentRun } from "@langwatch/experiment-contract";
@@ -18,6 +19,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ExperimentV3RunLoop } from "../../app/experiment-workbench.members.ts";
 import { ExperimentApp, type ExperimentAppDependencies } from "../../app/experiment.app.ts";
+import { experimentServer } from "../../experiment.server.ts";
 import type {
   ExperimentRunProgressRepository,
   ExperimentRunProgressState,
@@ -33,6 +35,7 @@ import {
 } from "../experiment-v3-legacy.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "../experiment-v3.rest.ts";
 import { experimentWorkbenchRunRest } from "../experiment-workbench-run.rest.ts";
+import { experimentRestCredential } from "../experiment.rest.ts";
 
 const PROJECT = "project-1";
 
@@ -126,16 +129,15 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
   };
   const app = ExperimentApp.createForTesting(dependencies);
 
-  const runtime = createRestRuntime({
-    identity: {
-      identify: () => ({ actor: { type: "user" as const, id: "user-1" }, scope: null }),
-      authenticate: () => ({
-        actor: { type: "user" as const, id: "user-1" },
-        scope: { tier: "project" as const, id: PROJECT },
-      }),
-      authorize: () => ({ permitted: true, organizationRole: null }),
-    },
-  });
+  const identity = {
+    identify: () => ({ actor: { type: "user" as const, id: "user-1" }, scope: null }),
+    authenticate: () => ({
+      actor: { type: "user" as const, id: "user-1" },
+      scope: { tier: "project" as const, id: PROJECT },
+    }),
+    authorize: () => ({ permitted: true, organizationRole: null }),
+  };
+  const runtime = createRestRuntime({ identity });
   const keyedFacts = [
     bindRestMiddleware(projectRestFacts, () => ({
       projectSlug: "acme",
@@ -160,11 +162,38 @@ function harness({ experiments = {}, progress = null, ports = null }: Harness = 
   const browser = browserFamily(experimentWorkbenchRunRest);
   const legacyKeyed = keyedFamily(experimentV3LegacyRest);
   const legacyBrowser = browserFamily(experimentWorkbenchRunLegacyRest);
+  // Every REST family the module declares, mounted in its declared order on the host.
+  const host = RestHost.create({
+    identities: {
+      project: identity,
+      organization: identity,
+      apiKey: identity,
+      scimToken: identity,
+      "instance-admin": identity,
+      browser: identity,
+    },
+    bearers: () => identity,
+    audit: { record: async () => {} },
+  });
+  for (const transport of experimentServer.transports) {
+    if (transport.protocol !== "rest") continue;
+    host.mount(transport.router(), () => app, {
+      facts: [
+        ...keyedFacts,
+        bindRestMiddleware(experimentRestCredential, () => ({
+          kind: "apiKey" as const,
+          userId: "user-1",
+        })),
+      ],
+    });
+  }
 
   return {
     startRun,
     request: (path: string, init?: RequestInit) =>
       keyed.fetch(new Request(`http://api.test/api/experiments${path}`, init)),
+    mounted: (path: string) =>
+      host.app.fetch(new Request(`http://api.test/api/experiments${path}`)),
     legacy: (path: string, init?: RequestInit) =>
       legacyKeyed.fetch(new Request(`http://api.test/api/evaluations/v3${path}`, init)),
     execute: (body: unknown) => browser.fetch(executeRequest("/api/experiments", body)),
@@ -311,6 +340,20 @@ describe("POST /api/experiments/:slug/run", () => {
 });
 
 describe("GET /api/experiments/runs", () => {
+  describe("when the module mounts every experiments family", () => {
+    /** @scenario "The run list is not answered as an experiment named runs" */
+    it("answers the run list's own 400 rather than an experiment lookup", async () => {
+      const { mounted } = harness();
+
+      const response = await mounted("/runs");
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: "experimentSlug query parameter is required",
+      });
+    });
+  });
+
   describe("when no experimentSlug is given", () => {
     it("answers 400 with main's flat body", async () => {
       const { request } = harness();

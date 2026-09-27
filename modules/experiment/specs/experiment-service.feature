@@ -133,3 +133,10 @@ Feature: Experiment service boundary
     Then each precondition carries its field, rule and value, with an optional key and subkey
     And the trace mappings carry their mapping and expansions
     And a precondition or mapping missing a required part is refused
+
+  @integration
+  Scenario: The run list is not answered as an experiment named runs
+    Given every experiments REST family is mounted in the module's order
+    When a caller lists runs at GET /api/experiments/runs without an experimentSlug
+    Then the run list answers 400 asking for experimentSlug
+    And no experiment called "runs" is looked up

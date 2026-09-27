@@ -25,14 +25,13 @@ export type { ExperimentAppDependencies };
 export const experimentServer = defineServerModule("experiment")
   .withApp(ExperimentApp)
   .withTransports(
+    // The workbench's project-keyed family and the two doors a browser opens.
+    // It mounts before `experimentRest`, whose `/:slug` would otherwise answer
+    // `GET /api/experiments/runs`. Both App tokens are this module's own App.
+    experimentV3Rest,
     experimentRest,
     experimentInitRest,
     experimentDspyStepsRest,
-    // The workbench's project-keyed family and the two doors a browser opens.
-    // Both name `ExperimentV3RestApi`, which this module's own App answers:
-    // one App reference serves every transport a module declares, so the token
-    // a router names types the handler and nothing more.
-    experimentV3Rest,
     experimentWorkbenchRunRest,
     // `/api/evaluations/v3/*`, the SDKs' older name for the same doors.
     experimentV3LegacyRest,

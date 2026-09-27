@@ -82,12 +82,13 @@ export interface MonitorAppInfrastructure {
   /** Mints the id a new monitor row is written under. */
   generateId: () => string;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
-  publicBaseUrl?: string;
+  publicBaseUrl?: string | undefined;
 }
 
+/** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type MonitorSetup = FeatureSetup<
   typeof MonitorApp.dependencies,
-  Readonly<{ monitor: MonitorAppInfrastructure | undefined }>,
+  Readonly<{ monitor: MonitorAppInfrastructure | undefined; publicBaseUrl: string | undefined }>,
   undefined,
   MonitorRepositories
 >;
@@ -101,7 +102,7 @@ export class MonitorApp implements MonitorApi {
     /** Seven-day trend, read through the evaluation application. */
     evaluation: EvaluationApi,
   };
-  static readonly reads = ["monitor"] as const;
+  static readonly reads = ["monitor", "publicBaseUrl"] as const;
 
   #monitors: MonitorService;
   #usage: MonitorRepositories["monitors"];
@@ -145,7 +146,10 @@ export class MonitorApp implements MonitorApi {
       });
 
     return MonitorApp.fromInfrastructure({
-      infrastructure,
+      infrastructure: {
+        ...infrastructure,
+        publicBaseUrl: setup.members.publicBaseUrl ?? infrastructure.publicBaseUrl,
+      },
       dependencies: setup.dependencies,
       repositories: setup.repositories,
     });
