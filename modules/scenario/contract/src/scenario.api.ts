@@ -49,6 +49,7 @@ import type {
   ScenarioTestSuiteRunDefinition,
   ScenarioTestSuiteUpdateInput,
   ScenarioRunConfig,
+  ScenarioLookup,
 } from "./scenario.ts";
 import type {
   ScenarioDuplicateInput,
@@ -286,8 +287,8 @@ export interface ScenarioApi {
   count(input: { projectId: string }): Promise<number>;
   /** One live scenario. Throws `ScenarioNotFoundError` when the project holds none. */
   getById(input: ScenarioIdInput): Promise<Scenario>;
-  /** The same read, archived rows included. */
-  tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null>;
+  /** The same read, archived rows included; a miss is `found: false`, not a refusal. */
+  readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup>;
   create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,

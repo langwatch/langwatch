@@ -1,5 +1,6 @@
 import type {
   Scenario,
+  ScenarioLookup,
   ScenarioCreateInput,
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -39,10 +40,10 @@ export abstract class ScenarioRepository {
   ): Promise<Scenario>;
   abstract findById(input: { id: string; projectId: string }): Promise<Scenario>;
   abstract findByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario>;
-  abstract tryFindByIdIncludingArchived(input: {
+  abstract readByIdIncludingArchived(input: {
     id: string;
     projectId: string;
-  }): Promise<Scenario | null>;
+  }): Promise<ScenarioLookup>;
   abstract findAll(input: { projectId: string }): Promise<Scenario[]>;
   abstract count(input: { projectId: string }): Promise<number>;
   abstract update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario>;

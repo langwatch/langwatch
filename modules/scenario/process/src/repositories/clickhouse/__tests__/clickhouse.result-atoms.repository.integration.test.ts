@@ -11,11 +11,11 @@ import { targetKeyOf } from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { evaluationsToColumns } from "../../../rules/simulation-evaluation-columns.rules.ts";
 import {
   MAX_RUN_TARGETS,
   ResultAtomsClickHouseRepository,
 } from "../clickhouse.result-atoms.repository.ts";
-import { evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;

@@ -52,7 +52,10 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
 
   .procedure("getByIdIncludingArchived")
   .withPermission("scenarios:view")
-  .handle(({ app, input }) => app.tryGetByIdIncludingArchived(input))
+  .handle(async ({ app, input }) => {
+    const lookup = await app.readByIdIncludingArchived(input);
+    return lookup.found ? lookup.scenario : null;
+  })
 
   .procedure("update")
   .withPermission("scenarios:manage")

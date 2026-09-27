@@ -22,14 +22,14 @@ import type {
 } from "../app/scenario.app.ts";
 import { nlpFetchChannels } from "../channels/nlp-fetch-channels.registry.ts";
 import {
-  NodeScenarioChildProcessAdapter,
+  NodeScenarioChildService,
   type ScenarioChildProcessConfig,
-} from "./node-scenario-child-process.service.ts";
+} from "./node-scenario-child.service.ts";
 import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
 import { ScenarioExecutionService } from "./scenario-execution.service.ts";
 import { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
-import { OtelScenarioProcessorMetricsAdapter } from "./scenario-processor-metrics.service.ts";
+import { ScenarioProcessorMetricsService } from "./scenario-processor-metrics.service.ts";
 import { ScenarioProcessorService } from "./scenario-processor.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 
@@ -142,8 +142,8 @@ export class ScenarioExecutorService {
       execution,
       pool,
       cancellations: this.input.cancellationSubscriptions,
-      childProcesses: NodeScenarioChildProcessAdapter.create({ config: this.#childConfig(), pool }),
-      metrics: OtelScenarioProcessorMetricsAdapter.create(),
+      childProcesses: NodeScenarioChildService.create({ config: this.#childConfig(), pool }),
+      metrics: ScenarioProcessorMetricsService.create(),
     });
   }
 

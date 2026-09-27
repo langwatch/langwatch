@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { evaluatorAttachmentsSchema, parseEvaluatorAttachments } from "./evaluator-attachments.ts";
@@ -55,6 +56,9 @@ export const scenarioSchema = z
   })
   .strict();
 export type Scenario = z.infer<typeof scenarioSchema>;
+
+/** A scenario read by id, archived rows included; a miss answers `found: false`. */
+export type ScenarioLookup = { found: true; scenario: Scenario } | { found: false };
 
 /** A Scenario-owned test suite backed by a `SimulationSuite` row of kind `test suite`. */
 export const scenarioTestSuiteSchema = z
@@ -179,5 +183,5 @@ export type ScenarioRunConfig = z.infer<typeof scenarioRunConfigSchema>;
 
 export type ScenarioReferenceState = {
   id: string;
-  archivedAt: Date | null;
+  archivedAt: Instant | null;
 };

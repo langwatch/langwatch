@@ -4,7 +4,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildChildEnvironment } from "../services/node-scenario-child-process.service.ts";
+import { buildChildEnvironment } from "../services/node-scenario-child.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 function jobData(target: ExecutionJobData["target"]["type"]): ExecutionJobData {

@@ -16,11 +16,11 @@ import {
   type SimulationExportRun,
 } from "@langwatch/scenario-contract";
 
-import { SimulationRepository } from "../simulation.repository.ts";
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
-} from "./simulation-evaluations.columns.ts";
+} from "../../rules/simulation-evaluation-columns.rules.ts";
+import { SimulationRepository } from "../simulation.repository.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,

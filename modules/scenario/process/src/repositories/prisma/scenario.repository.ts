@@ -24,6 +24,7 @@ import {
   snapshotFieldsOf,
   touchesVersionedFields,
   type Scenario,
+  type ScenarioLookup,
   type ScenarioActor,
   type ScenarioCreateInput,
   type ScenarioTestSuite,
@@ -41,7 +42,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { type Instant, toDate } from "@langwatch/time";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
 
 import {
   DEFAULT_SUITE_NAME,
@@ -158,11 +159,11 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return scenarioSchema.parse(row);
   }
 
-  async tryFindByIdIncludingArchived(input: ScenarioIdentity): Promise<Scenario | null> {
+  async readByIdIncludingArchived(input: ScenarioIdentity): Promise<ScenarioLookup> {
     const row = await this.database.scenario.findFirst({
       where: scenarioWhere(input, true),
     });
-    return row ? scenarioSchema.parse(row) : null;
+    return row ? { found: true, scenario: scenarioSchema.parse(row) } : { found: false };
   }
 
   async findAll(input: { projectId: string }): Promise<Scenario[]> {
@@ -330,10 +331,14 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     ids: string[];
     projectId: string;
   }): Promise<ScenarioReferenceState[]> {
-    return this.database.scenario.findMany({
+    const rows = await this.database.scenario.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, archivedAt: true },
     });
+    return rows.map(({ id, archivedAt }) => ({
+      id,
+      archivedAt: archivedAt ? fromDate(archivedAt) : null,
+    }));
   }
 
   async findNamesByIds(input: {

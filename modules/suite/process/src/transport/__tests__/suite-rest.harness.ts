@@ -342,7 +342,9 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
       input.ids.flatMap((id) => {
         const row = world.scenarios.get(id);
 
-        return row ? [{ id: row.id, archivedAt: row.archivedAt }] : [];
+        return row
+          ? [{ id: row.id, archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null }]
+          : [];
       }),
     getNamesByIds: async (input) =>
       input.ids.flatMap((id) => {

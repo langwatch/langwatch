@@ -48,6 +48,7 @@ import {
   type RunParameterValues,
   type RunTarget,
   type Scenario,
+  type ScenarioLookup,
   type ScenarioAuthorLabel,
   type ScenarioCaller,
   type ScenarioCreateInput,
@@ -692,8 +693,8 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /** One scenario, archived ones included. */
-  tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.#dependencies.scenarios.tryGetByIdIncludingArchived(input);
+  readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup> {
+    return this.#dependencies.scenarios.readByIdIncludingArchived(input);
   }
 
   /**

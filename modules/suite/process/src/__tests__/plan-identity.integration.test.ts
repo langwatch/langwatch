@@ -32,6 +32,7 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
+import { fromDate } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -144,7 +145,10 @@ function fakeScenarioService(): ScenarioApi {
         where: { id: { in: ids }, projectId: pid },
         select: { id: true, archivedAt: true },
       });
-      return rows;
+      return rows.map(({ id, archivedAt }) => ({
+        id,
+        archivedAt: archivedAt ? fromDate(archivedAt) : null,
+      }));
     },
     getRunConfigs: async ({
       ids,

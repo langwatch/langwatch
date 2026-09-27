@@ -79,7 +79,7 @@ export type ScenarioChildProcessResult = {
   agentInstance?: { hostname: string; label: string | null };
 };
 
-export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
+export class NodeScenarioChildService implements ScenarioChildBootstrap {
   static readonly parseResult = parseChildProcessResultValue;
   static readonly buildEnvironment = buildChildEnvironmentValue;
   static readonly buildOtelResourceAttributes = buildOtelResourceAttributesValue;
@@ -87,8 +87,8 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
   static create(options: {
     config: ScenarioChildProcessConfig;
     pool: ScenarioExecutionPoolService;
-  }): NodeScenarioChildProcessAdapter {
-    return new NodeScenarioChildProcessAdapter(options);
+  }): NodeScenarioChildService {
+    return new NodeScenarioChildService(options);
   }
 
   private constructor(
@@ -366,10 +366,9 @@ function buildChildProcessEnvironment(
   return environment;
 }
 
-export const parseChildProcessResult = NodeScenarioChildProcessAdapter.parseResult;
-export const buildChildEnvironment = NodeScenarioChildProcessAdapter.buildEnvironment;
-export const buildOtelResourceAttributes =
-  NodeScenarioChildProcessAdapter.buildOtelResourceAttributes;
+export const parseChildProcessResult = NodeScenarioChildService.parseResult;
+export const buildChildEnvironment = NodeScenarioChildService.buildEnvironment;
+export const buildOtelResourceAttributes = NodeScenarioChildService.buildOtelResourceAttributes;
 
 type ChildLog = (
   level: "info" | "warn" | "error",

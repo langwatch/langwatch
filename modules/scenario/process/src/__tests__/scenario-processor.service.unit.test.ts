@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import {
-  type NodeScenarioChildProcessAdapter,
+  type NodeScenarioChildService,
   ScenarioExecutionPoolService,
   ScenarioProcessorService,
   buildOtelResourceAttributes,
@@ -73,7 +73,7 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
 function processorFixture() {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   const execution = createApiFixture<ScenarioExecutionService>();
-  const childProcesses = createApiFixture<NodeScenarioChildProcessAdapter>();
+  const childProcesses = createApiFixture<NodeScenarioChildService>();
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
   const cancellations = new TestCancellationSubscriber();
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;

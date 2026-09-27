@@ -3,7 +3,6 @@
  *
  * @see specs/scenarios/pre-compiled-child-process.feature
  */
-import type { ChildProcess } from "child_process";
 import { EventEmitter } from "events";
 
 import type { ChildProcessJobData } from "@langwatch/scenario-contract";
@@ -22,20 +21,18 @@ const stdinEnd = vi.fn();
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(() => {
-    const child = new EventEmitter() as unknown as ChildProcess;
-    Object.assign(child, {
+    return Object.assign(new EventEmitter(), {
       pid: 123,
       stdin: { write: stdinWrite, end: stdinEnd, on: vi.fn() },
       stdout: new EventEmitter(),
       stderr: new EventEmitter(),
       kill: vi.fn(),
     });
-    return child;
   }),
 }));
 
 import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
-import { NodeScenarioChildProcessAdapter } from "../services/node-scenario-child-process.service.ts";
+import { NodeScenarioChildService } from "../services/node-scenario-child.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
@@ -72,7 +69,7 @@ const jobData: ChildProcessJobData = {
   parameters: {},
 };
 
-describe("NodeScenarioChildProcessAdapter", () => {
+describe("NodeScenarioChildService", () => {
   beforeEach(() => {
     stdinWrite.mockClear();
     stdinEnd.mockClear();
@@ -81,7 +78,7 @@ describe("NodeScenarioChildProcessAdapter", () => {
   describe("given a child process spawned from the pre-compiled bundle", () => {
     /** @scenario "Child process receives job data via stdin" */
     it("writes the job data to the child's stdin as JSON", () => {
-      const adapter = NodeScenarioChildProcessAdapter.create({
+      const adapter = NodeScenarioChildService.create({
         config: {
           packageRoot: "/app",
           sourcePath: "/app/src/adapter.ts",

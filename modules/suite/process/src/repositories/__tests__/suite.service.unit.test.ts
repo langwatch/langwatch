@@ -23,7 +23,7 @@ import {
   SuiteScopeEmptyError,
   SuiteTargetsRequiredError,
 } from "@langwatch/suite-contract";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -248,7 +248,7 @@ describe("SuiteService", () => {
       scenarios: mockScenarioService({
         getReferenceStates: vi.fn().mockResolvedValue([
           { id: "scenario_active", archivedAt: null },
-          { id: "scenario_archived", archivedAt: new Date() },
+          { id: "scenario_archived", archivedAt: nowInstant() },
         ]),
         getRunConfigs: vi.fn().mockResolvedValue([
           {
@@ -307,7 +307,7 @@ describe("SuiteService", () => {
       scenarios: mockScenarioService({
         getReferenceStates: vi
           .fn()
-          .mockResolvedValue([{ id: "scenario_1", archivedAt: new Date() }]),
+          .mockResolvedValue([{ id: "scenario_1", archivedAt: nowInstant() }]),
         getRunConfigs: vi.fn(),
         getNamesByIds: vi.fn(),
       }),
@@ -363,7 +363,7 @@ describe("SuiteService", () => {
       }),
       getReferenceStates: vi
         .fn()
-        .mockResolvedValue([{ id: "scenario_archived", archivedAt: new Date() }]),
+        .mockResolvedValue([{ id: "scenario_archived", archivedAt: nowInstant() }]),
       getRunConfigs: vi.fn(),
     });
     const service = SuiteService.create({
@@ -526,7 +526,7 @@ describe("SuiteService", () => {
       scenarios: mockScenarioService({
         getReferenceStates: vi.fn().mockResolvedValue([
           { id: "scenario_active", archivedAt: null },
-          { id: "scenario_archived", archivedAt: new Date() },
+          { id: "scenario_archived", archivedAt: nowInstant() },
         ]),
         getRunConfigs: vi.fn().mockResolvedValue([
           {
@@ -884,7 +884,7 @@ describe("SuiteService", () => {
       getTestSuiteRunDefinition,
       getReferenceStates: vi.fn().mockResolvedValue([
         { id: "scenario_1", archivedAt: null },
-        { id: "scenario_archived", archivedAt: new Date() },
+        { id: "scenario_archived", archivedAt: nowInstant() },
       ]),
       getRunConfigs: vi.fn().mockResolvedValue([
         {
@@ -1350,7 +1350,7 @@ describe("SuiteService", () => {
         scenarios: mockScenarioService({
           getReferenceStates: vi.fn().mockResolvedValue([
             { id: "scenario_active", archivedAt: null },
-            { id: "scenario_archived", archivedAt: new Date() },
+            { id: "scenario_archived", archivedAt: nowInstant() },
           ]),
           getRunConfigs: vi
             .fn()

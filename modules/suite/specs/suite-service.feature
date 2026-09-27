@@ -44,3 +44,9 @@ Feature: Suite service
     When the evaluators the run carries are read
     Then the test suite's attachments come first, then the plan's
     And an evaluator attached on both sides is listed once, as the suite's copy
+
+  @unit
+  Scenario: A stored run plan reads back although its row carries fields and evaluators
+    Given a run plan row that also holds the fields and evaluators columns
+    When the Prisma suite repository creates or reads it
+    Then it answers the run plan rather than refusing the extra columns

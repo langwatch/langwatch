@@ -5,7 +5,10 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { columnsToEvaluations, evaluationsToColumns } from "../simulation-evaluations.columns.ts";
+import {
+  columnsToEvaluations,
+  evaluationsToColumns,
+} from "../../../rules/simulation-evaluation-columns.rules.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,

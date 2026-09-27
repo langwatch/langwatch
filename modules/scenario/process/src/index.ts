@@ -23,8 +23,8 @@ export { HttpLitellmModelChannel } from "./channels/http/http.litellm-model.chan
 export type { LitellmModelChannel, LitellmModelInput } from "./channels/litellm-model.channel.ts";
 export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
 export type { NlpFetchChannel, NlpFetchTimeouts } from "./channels/nlp-fetch.channel.ts";
-export * from "./services/node-scenario-child-process.service.ts";
-export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
+export * from "./services/node-scenario-child.service.ts";
+export { ScenarioProcessorMetricsService } from "./services/scenario-processor-metrics.service.ts";
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
 export * from "./services/scenario-child-execution.service.ts";

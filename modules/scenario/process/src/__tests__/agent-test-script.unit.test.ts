@@ -14,7 +14,7 @@ import {
   HttpSerializedConnectedAgentChannel,
 } from "../channels/http/http.serialized-connected-agent.channel.ts";
 import {
-  AgentTestScriptAdapter,
+  AgentTestScriptService,
   ScriptedUserAgent,
 } from "../services/agent-test-script.service.ts";
 
@@ -42,10 +42,10 @@ function fakeExecutor() {
   return { calls, executor };
 }
 
-describe("AgentTestScriptAdapter", () => {
+describe("AgentTestScriptService", () => {
   describe("when the child builds the cast of a scripted run", () => {
     const adapter = new AnsweringAgent();
-    const cast = AgentTestScriptAdapter.create().build({
+    const cast = AgentTestScriptService.create().build({
       adapter,
       script: { kind: "agent_test", userMessage: "ping" },
     });
@@ -102,7 +102,7 @@ describe("AgentTestScriptAdapter", () => {
         },
         sleep: async () => {},
       });
-      const cast = AgentTestScriptAdapter.create().build({
+      const cast = AgentTestScriptService.create().build({
         adapter,
         script: { kind: "agent_test", userMessage: "ping" },
       });

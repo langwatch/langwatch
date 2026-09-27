@@ -568,7 +568,10 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
       }),
     ).rejects.toMatchObject({ code: "scenario_not_found" });
     await expect(
-      scenarios.tryGetByIdIncludingArchived({ id: archivedScenario.id, projectId }),
-    ).resolves.toMatchObject({ version: 1, archivedAt: expect.any(Date) });
+      scenarios.readByIdIncludingArchived({ id: archivedScenario.id, projectId }),
+    ).resolves.toMatchObject({
+      found: true,
+      scenario: { version: 1, archivedAt: expect.any(Date) },
+    });
   });
 });

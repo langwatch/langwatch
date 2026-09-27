@@ -107,8 +107,28 @@ function serviceAnswering(answers: Answers = {}) {
   });
 }
 
-const httpAgent = (config: Record<string, unknown>): Agent =>
-  ({ id: "agent-1", type: "http", config }) as unknown as Agent;
+const httpAgent = (config: Extract<Agent, { type: "http" }>["config"]): Agent => ({
+  id: "agent-1",
+  projectId: PROJECT_ID,
+  name: "http-agent",
+  type: "http",
+  config,
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  environment: "production",
+  ownerUserId: null,
+  hostLabel: null,
+  identityKey: "http-agent@production",
+  lastSeenAt: null,
+});
+
+/** A row as storage hands it back, which the agent contract's type no longer describes. */
+function storedRow(row: Record<string, unknown>): Agent {
+  return JSON.parse(JSON.stringify(row));
+}
 
 const connectedAgent = (timeoutMs: number): Agent => ({
   id: "agent-1",
@@ -234,7 +254,9 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
     it("throws target not found when the configuration will not parse", async () => {
       // A half-configured agent cannot be run, and saying so here is cheaper
       // than a request that fails inside the sandbox.
-      const service = serviceAnswering({ agent: httpAgent({ method: "POST" }) });
+      const service = serviceAnswering({
+        agent: storedRow({ ...httpAgent({ url: "", method: "POST" }), config: { method: "POST" } }),
+      });
 
       await expect(fetchFor(service, "http")).rejects.toMatchObject(TARGET_NOT_FOUND);
     });

@@ -18,7 +18,7 @@ import {
 } from "../rules/agent-first-script.rules.ts";
 import { buildRemoteTraceRunConfig } from "../rules/remote-trace-run.rules.ts";
 import { selectRoleModelParams } from "../rules/scenario-role-model.rules.ts";
-import { AgentTestScriptAdapter } from "./agent-test-script.service.ts";
+import { AgentTestScriptService } from "./agent-test-script.service.ts";
 
 /**
  * Some TracerProvider implementations (like ProxyTracerProvider) wrap a delegate. This interface
@@ -68,7 +68,7 @@ function buildRunCast({
   script?: ScenarioRunner.ScriptStep[];
 } {
   if (jobData.script) {
-    return AgentTestScriptAdapter.create().build({
+    return AgentTestScriptService.create().build({
       adapter,
       script: jobData.script,
       doesAgentGreetFirst: agentGreetsFirst(jobData.adapterData),
@@ -276,9 +276,9 @@ function formatScenarioChildErrorValue(error: unknown): string {
   return parts.filter((p) => p.length > 0).join(": ");
 }
 
-export class ScenarioChildExecutionAdapter {
-  static create(): ScenarioChildExecutionAdapter {
-    return new ScenarioChildExecutionAdapter();
+export class ScenarioChildExecutionService {
+  static create(): ScenarioChildExecutionService {
+    return new ScenarioChildExecutionService();
   }
 
   private constructor() {}
@@ -288,6 +288,6 @@ export class ScenarioChildExecutionAdapter {
   static readonly formatError = formatScenarioChildErrorValue;
 }
 
-export const executeScenarioChild = ScenarioChildExecutionAdapter.execute;
-export const flushScenarioOtelTraces = ScenarioChildExecutionAdapter.flushTraces;
-export const formatScenarioChildError = ScenarioChildExecutionAdapter.formatError;
+export const executeScenarioChild = ScenarioChildExecutionService.execute;
+export const flushScenarioOtelTraces = ScenarioChildExecutionService.flushTraces;
+export const formatScenarioChildError = ScenarioChildExecutionService.formatError;

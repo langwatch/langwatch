@@ -24,10 +24,12 @@ export class ScriptedUserAgent extends ScenarioRunner.UserSimulatorAgentAdapter 
   }
 }
 
-export class AgentTestScriptAdapter {
-  static create(): AgentTestScriptAdapter {
-    return new AgentTestScriptAdapter();
+export class AgentTestScriptService {
+  static create(): AgentTestScriptService {
+    return new AgentTestScriptService();
   }
+
+  private constructor() {}
 
   /**
    * The agents and steps of an agent test run: user says the message, agent
