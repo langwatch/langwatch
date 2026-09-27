@@ -22,6 +22,11 @@ import { RenderInputOutput } from "../render-input-output.tsx";
 
 // TraceMediaPart resolves the owning project from context; MediaPart needs a
 // real id for its stored-object existence probe.
+vi.mock(
+  "../../../../behavior/lent-media-part.tsx",
+  () => import("../../__tests__/lent-media-part.stand-in.tsx"),
+);
+
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
 }));

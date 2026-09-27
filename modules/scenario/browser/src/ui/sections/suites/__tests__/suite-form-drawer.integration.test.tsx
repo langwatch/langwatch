@@ -48,6 +48,7 @@ const mocks = vi.hoisted(() => ({
   mockUpdateMutate: vi.fn(),
   mockRunMutate: vi.fn(),
   mockDrawerOpen: vi.fn(() => true),
+  mockOpenDrawer: vi.fn(),
   mockDrawerParams: {} as Record<string, string | undefined>,
   mockGetByIdData: null as SimulationSuite | null,
 }));
@@ -132,7 +133,7 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: vi.fn(() => ({
-    openDrawer: vi.fn(),
+    openDrawer: mocks.mockOpenDrawer,
     closeDrawer: vi.fn(),
     drawerOpen: mocks.mockDrawerOpen,
   })),
@@ -167,15 +168,6 @@ vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
       </div>
     ) : null,
 }));
-
-function renderHttpEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return open ? (
-    <div data-testid="agent-http-editor-child-drawer">
-      <span>New HTTP Agent</span>
-      <button onClick={onClose}>Close Agent Editor</button>
-    </div>
-  ) : null;
-}
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -215,6 +207,7 @@ describe("<SuiteFormDrawer/>", () => {
     mocks.mockCreateMutate.mockClear();
     mocks.mockUpdateMutate.mockClear();
     mocks.mockRunMutate.mockClear();
+    mocks.mockOpenDrawer.mockClear();
     // Default: drawer is open, no suiteId (create mode), no suite data
     mocks.mockDrawerOpen.mockReturnValue(true);
     mocks.mockDrawerParams = {};
@@ -225,13 +218,13 @@ describe("<SuiteFormDrawer/>", () => {
     /** @scenario 'Form drawer title reads "New Run Plan" for creation' */
     /** @scenario 'Form placeholder uses "Run Plan" terminology' */
     it("displays the 'New Run Plan' title", () => {
-      render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
       expect(screen.getByText("New Run Plan")).toBeInTheDocument();
     });
 
     it("renders fields for Name, Description, Scenarios, and Targets", () => {
-      render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
       expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
       expect(
@@ -242,7 +235,7 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     it("renders Save and Run Now buttons", () => {
-      render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
       expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
@@ -250,7 +243,7 @@ describe("<SuiteFormDrawer/>", () => {
 
     /** @scenario "The run plan drawer exposes simulator and judge model fields" */
     it("exposes user-simulator and judge model fields", () => {
-      render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
       expect(screen.getByText("Models")).toBeInTheDocument();
       expect(screen.getByText("User simulator")).toBeInTheDocument();
@@ -261,7 +254,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a name validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         const saveButton = screen.getByRole("button", { name: /Save/i });
         await user.click(saveButton);
@@ -274,7 +267,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a scenarios validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Type a name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -291,7 +284,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("shows a targets validation error", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Type a name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -312,7 +305,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("clears the name error but keeps scenario and target errors", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Click Save with all fields empty to trigger all validation errors
         const saveButton = screen.getByRole("button", { name: /^Save$/i });
@@ -346,7 +339,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("pre-populates the name field", () => {
         mocks.mockGetByIdData = makeSuiteConfig({ name: "Regression Suite" });
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         const nameInput = screen.getByPlaceholderText(
           "e.g., Critical Path Run Plan",
@@ -359,7 +352,7 @@ describe("<SuiteFormDrawer/>", () => {
           description: "Runs every deploy",
         });
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         const descInput = screen.getByPlaceholderText(
           "Core journeys that must pass before deploy",
@@ -371,7 +364,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("displays the Edit Run Plan title", () => {
         mocks.mockGetByIdData = makeSuiteConfig();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         expect(screen.getByText("Edit Run Plan")).toBeInTheDocument();
       });
@@ -383,7 +376,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("filters the visible scenarios", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // All scenarios should be visible initially
         expect(screen.getByText("Angry refund request")).toBeInTheDocument();
@@ -407,7 +400,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("passes repeatCount as a number to the create mutation", async () => {
         const user = userEvent.setup();
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Fill in required fields
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -447,7 +440,7 @@ describe("<SuiteFormDrawer/>", () => {
   describe("given the drawer registry decides visibility", () => {
     describe("when drawerOpen returns true", () => {
       it("renders the drawer shell", () => {
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         expect(screen.getByTestId("drawer")).toBeInTheDocument();
       });
@@ -457,7 +450,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("does not render drawer content", () => {
         mocks.mockDrawerOpen.mockReturnValue(false);
 
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
       });
@@ -470,7 +463,7 @@ describe("<SuiteFormDrawer/>", () => {
 
       beforeEach(() => {
         user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
       });
 
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
@@ -493,7 +486,7 @@ describe("<SuiteFormDrawer/>", () => {
       /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
       it("returns to suite editor with form state intact", async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Enter a name to establish form state
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
@@ -518,54 +511,45 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when 'Add Target' is clicked", () => {
-      let user: ReturnType<typeof userEvent.setup>;
-
-      beforeEach(() => {
-        user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-      });
-
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
-      it("opens the agent HTTP editor as a child drawer", async () => {
+      it("navigates to the agent HTTP editor drawer", async () => {
+        const user = userEvent.setup();
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
-        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
-      });
-
-      it("keeps the suite editor mounted underneath", async () => {
-        await user.click(screen.getByRole("button", { name: "Add Target" }));
-
-        // Parent suite editor content remains in the DOM
-        expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
-        expect(screen.getByText("Scenarios *")).toBeInTheDocument();
+        expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentHttpEditor");
       });
     });
 
-    describe("when the agent HTTP editor child drawer is closed", () => {
-      /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
-      it("returns to suite editor with form state intact", async () => {
+    describe("when the reader comes back from the agent HTTP editor", () => {
+      beforeEach(async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-
-        // Enter a name to establish form state
-        const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");
-        await user.type(nameInput, "My Suite");
-
-        // Open agent editor
+        const first = render(<SuiteFormDrawer />, { wrapper: Wrapper });
+        await user.type(screen.getByPlaceholderText("e.g., Critical Path Run Plan"), "My Suite");
         await user.click(screen.getByRole("button", { name: "Add Target" }));
-        expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
+        first.unmount();
+      });
 
-        // Close agent editor
-        fireEvent.click(screen.getByText("Close Agent Editor"));
+      /** @scenario "Going back from a sub-flow returns to the drawer that opened it" */
+      it("returns to the suite editor with the plan it was holding", () => {
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
-        // Child drawer is gone
-        expect(screen.queryByTestId("agent-http-editor-child-drawer")).not.toBeInTheDocument();
-
-        // Suite editor still shows form state
         const nameInputAfter = screen.getByPlaceholderText(
           "e.g., Critical Path Run Plan",
         ) as HTMLInputElement;
         expect(nameInputAfter.value).toBe("My Suite");
+      });
+
+      it("hands the held plan back once, so a later fresh open starts empty", () => {
+        render(<SuiteFormDrawer />, { wrapper: Wrapper }).unmount();
+
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
+
+        const nameInput = screen.getByPlaceholderText(
+          "e.g., Critical Path Run Plan",
+        ) as HTMLInputElement;
+        expect(nameInput.value).toBe("");
       });
     });
 
@@ -573,7 +557,7 @@ describe("<SuiteFormDrawer/>", () => {
       /** @scenario "The caller's unsaved work survives the walk into a sub-flow and back" */
       it("preserves suite name and scenario selections through a child drawer round-trip", async () => {
         const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+        render(<SuiteFormDrawer />, { wrapper: Wrapper });
 
         // Fill in name
         const nameInput = screen.getByPlaceholderText("e.g., Critical Path Run Plan");

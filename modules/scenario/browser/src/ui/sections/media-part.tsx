@@ -2,6 +2,7 @@
  * MediaPart — renders a single AG-UI media content part inline.
  */
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
+import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contract";
 import { ExternalLink, File, FileText } from "lucide-react";
 import {
   useCallback,
@@ -12,36 +13,12 @@ import {
   type SetStateAction,
 } from "react";
 
-import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback.ts";
 import { resolveMediaPart } from "../../model/media-part-source.ts";
 import type { MediaPartData } from "../../model/media-parts.ts";
 import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
 import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
 
 type LoadStatus = "loading" | "ok" | "probing" | "missing" | "error";
-
-export type MediaProbeResult =
-  | { status: "available"; mediaType: string }
-  | { status: "missing"; mediaType: string }
-  | { status: "not_found" }
-  | null
-  | undefined;
-
-export interface MediaPartProps {
-  part: MediaPartData;
-  /** Project that owns this stored object. Required for the server-side existence probe. */
-  projectId: string;
-  /**
-   * Playback coordination — supplied by ScenarioMessageRenderer via
-   * `useSequentialAudioPlayback().getAudioProps(id)`. When omitted the
-   * <audio> element renders without coordination (standalone usage).
-   */
-  audioPlayback?: AudioPlaybackProps;
-  /** Result of the app-owned stored-object existence probe. */
-  probe?: MediaProbeResult;
-  /** Called once after a stored media element fails to load. */
-  onProbeRequired?: (storedObjectId: string) => void;
-}
 
 function useMediaProbe(probe: MediaProbeResult, setStatus: Dispatch<SetStateAction<LoadStatus>>) {
   const probeFailed = probe === null;

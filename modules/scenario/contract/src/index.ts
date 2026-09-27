@@ -100,3 +100,4 @@ export {
   type RunEvaluatorDefinition,
   type RunEvaluators,
 } from "./scenario-run-evaluators.ts";
+export type { MediaAudioPlayback, MediaPartProps, MediaProbeResult } from "./media-part.types.ts";

@@ -36,3 +36,9 @@ Feature: A drawer opened from a link, with nothing behind it
       Given dataset is installed
       When a surface opens the "addOrEditDataset" drawer
       Then dataset's create-or-edit editor mounts
+
+    @unit
+    Scenario: The run plan editor opens by its drawer name
+      Given scenario is installed
+      When a surface opens the "suiteEditor" drawer
+      Then scenario's run plan editor loads

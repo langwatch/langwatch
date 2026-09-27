@@ -4,12 +4,13 @@
  * @see specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { MediaProbeResult } from "@langwatch/scenario-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { MediaPartData } from "../../../model/media-parts.ts";
-import { MediaPart, type MediaProbeResult } from "../media-part.tsx";
+import { MediaPart } from "../media-part.tsx";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -508,6 +509,49 @@ describe("<MediaPart/>", () => {
       // The "missing" / "error" placeholders must NOT appear.
       expect(screen.queryByTestId("media-part-missing")).not.toBeInTheDocument();
       expect(screen.queryByTestId("media-part-error")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a legacy stored recording is raw pcm16", () => {
+    /** @scenario "The drawer plays an externalized pcm16 recording" */
+    it("fetches the bytes, wraps them as WAV and plays the wrapped blob", async () => {
+      const pcmBytes = new Uint8Array([0, 0, 16, 32, 255, 127, 0, 128]);
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => pcmBytes.buffer,
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const createObjectURL = vi.fn().mockReturnValue("blob:wrapped-audio");
+      vi.stubGlobal("URL", { ...URL, createObjectURL, revokeObjectURL: vi.fn() });
+
+      try {
+        render(
+          <MediaPart
+            projectId={TEST_PROJECT_ID}
+            part={{
+              type: "audio",
+              source: { type: "url", value: "/api/files/p1/legacy-pcm", mimeType: "audio/pcm16" },
+            }}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const audio = await screen.findByTestId("media-part-audio");
+        // The player plays the wrapped blob, never the raw unplayable bytes.
+        await waitFor(() => {
+          expect(audio).toHaveAttribute("src", "blob:wrapped-audio");
+        });
+        expect(fetchMock).toHaveBeenCalledWith(
+          "/api/files/p1/legacy-pcm",
+          expect.objectContaining({ credentials: "same-origin" }),
+        );
+        const blob: unknown = createObjectURL.mock.calls[0]?.[0];
+        expect(blob).toBeInstanceOf(Blob);
+        expect(blob instanceof Blob && blob.type).toBe("audio/wav");
+        expect(blob instanceof Blob && blob.size).toBe(44 + pcmBytes.length);
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 });

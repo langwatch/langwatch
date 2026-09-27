@@ -11,6 +11,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
 import { RenderInputOutput } from "../render-input-output.tsx";
 
+vi.mock(
+  "../../../../behavior/lent-media-part.tsx",
+  () => import("../../__tests__/lent-media-part.stand-in.tsx"),
+);
+
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
 }));
@@ -96,63 +101,6 @@ describe("Media rendering in trace views", () => {
 
     const chip = screen.getByTestId("media-part-binary");
     expect(chip).toHaveTextContent("report.pdf");
-  });
-
-  /** @scenario "The drawer plays an externalized pcm16 recording" */
-  it("wraps a legacy raw-pcm16 reference into playable WAV on the client", async () => {
-    // Legacy stored object: raw pcm16 bytes served under audio/pcm16 (before
-    // store-time wrapping existed). The client must fetch + wrap + play.
-    const pcmBytes = new Uint8Array([0, 0, 16, 32, 255, 127, 0, 128]);
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: async () => pcmBytes.buffer,
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const createObjectURL = vi.fn().mockReturnValue("blob:wrapped-audio");
-    const revokeObjectURL = vi.fn();
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL,
-      revokeObjectURL,
-    });
-
-    try {
-      render(
-        <RenderInputOutput
-          value={JSON.stringify([
-            {
-              role: "user",
-              content: [
-                {
-                  type: "input_audio",
-                  input_audio: {
-                    url: "/api/files/p1/legacy-pcm",
-                    mimeType: "audio/pcm16",
-                  },
-                },
-              ],
-            },
-          ])}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      const audio = await screen.findByTestId("media-part-audio");
-      // A placeholder holds the space until the wrap resolves; the player then
-      // plays from the wrapped blob, never from the raw unplayable bytes.
-      await vi.waitFor(() => {
-        expect(audio).toHaveAttribute("src", "blob:wrapped-audio");
-      });
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/files/p1/legacy-pcm",
-        expect.objectContaining({ credentials: "same-origin" }),
-      );
-      const blob = createObjectURL.mock.calls[0]![0] as Blob;
-      expect(blob.type).toBe("audio/wav");
-      expect(blob.size).toBe(44 + pcmBytes.length);
-    } finally {
-      vi.unstubAllGlobals();
-    }
   });
 
   /** @scenario "Media inside a typed-raw JSON string still renders as media" */
