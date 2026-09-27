@@ -12,6 +12,7 @@
     "noImplicitReturns": true,
     "verbatimModuleSyntax": true,
     "paths": {
+      "@langwatch/auth-contract": ["../../auth/contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
       "@langwatch/coding-agent-contract": ["../../coding-agent/contract/src/index.ts"],
       "@langwatch/enterprise-governance-contract": [
@@ -24,6 +25,9 @@
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
   "references": [
+    {
+      "path": "../../auth/contract/tsconfig.build.json"
+    },
     {
       "path": "tsconfig.build.json"
     },

@@ -48,9 +48,16 @@ export const inviteLandingSchema = z
   .strict();
 export type InviteLanding = z.infer<typeof inviteLandingSchema>;
 
-/** The caller's own address and whether it is confirmed; null where the session carries none. */
+/**
+ * The caller's own address and whether it is confirmed; null where the session carries none.
+ * `canSendConfirmation` is false where this installation has no way to send email.
+ */
 export const addressConfirmationSchema = z
-  .object({ email: z.string().nullable(), confirmed: z.boolean() })
+  .object({
+    email: z.string().nullable(),
+    confirmed: z.boolean(),
+    canSendConfirmation: z.boolean(),
+  })
   .strict();
 export type AddressConfirmation = z.infer<typeof addressConfirmationSchema>;
 

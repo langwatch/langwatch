@@ -38,6 +38,15 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
       removeIdentifier: mutation(),
       completeVerification: mutation(),
     },
+    auth: {
+      myAddressConfirmation: {
+        useQuery: () => ({
+          data: { email: "sam@acme.test", confirmed: true, canSendConfirmation: true },
+          isPending: false,
+        }),
+      },
+      sendMyAddressConfirmation: mutation(),
+    },
     license: {
       getSsoGateStatus: { useQuery: () => ({ data: state.ssoGate, isLoading: false }) },
     },

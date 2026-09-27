@@ -10,6 +10,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { EmailContent, EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { resolvedSecrets } from "@langwatch/process-stores";
@@ -70,6 +71,7 @@ async function bootAuth({ sent }: { sent: EmailContent[] }) {
       "audit-log": createApiFixture<AuditLogApi>(),
       entitlement: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      notification: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>(),
     })

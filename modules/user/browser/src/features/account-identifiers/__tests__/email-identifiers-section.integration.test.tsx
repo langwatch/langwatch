@@ -7,7 +7,7 @@
 
 import { webcrypto } from "node:crypto";
 
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FakePersonalHostOptions } from "../../../testing.tsx";
@@ -17,8 +17,13 @@ import { refusalCopy } from "../model/refusal-copy.ts";
 import { EmailIdentifiersSection } from "../ui/sections/email-identifiers-section.tsx";
 
 const { state, calls } = vi.hoisted(() => ({
-  state: { identifiers: [] as unknown[] },
+  state: {
+    identifiers: new Array<unknown>(),
+    confirmation: { email: "sam@acme.test", confirmed: true, canSendConfirmation: true },
+  },
   calls: {
+    sendOwn: vi.fn(),
+    invalidateConfirmation: vi.fn(),
     add: vi.fn(),
     resend: vi.fn(),
     remove: vi.fn(),
@@ -32,7 +37,16 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => {
     useMutation: () => ({ isPending: false, mutateAsync: run }),
   });
   const api = {
-    useUtils: () => ({ identity: { myIdentifiers: { invalidate: calls.invalidate } } }),
+    useUtils: () => ({
+      identity: { myIdentifiers: { invalidate: calls.invalidate } },
+      auth: { myAddressConfirmation: { invalidate: calls.invalidateConfirmation } },
+    }),
+    auth: {
+      myAddressConfirmation: {
+        useQuery: () => ({ data: state.confirmation, isPending: false }),
+      },
+      sendMyAddressConfirmation: mutation(calls.sendOwn),
+    },
     identity: {
       myIdentifiers: {
         useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
@@ -81,6 +95,8 @@ const rows = () => screen.getAllByTestId("email-identifier-row");
 beforeEach(() => {
   vi.clearAllMocks();
   state.identifiers = [];
+  state.confirmation = { email: "sam@acme.test", confirmed: true, canSendConfirmation: true };
+  calls.sendOwn.mockResolvedValue({ sent: true, identifierId: "idf_own" });
   calls.add.mockResolvedValue({ identifierId: "id_new" });
   calls.resend.mockResolvedValue({ sent: true });
   calls.remove.mockResolvedValue({ removed: true });
@@ -292,6 +308,113 @@ describe("given no identifiers yet", () => {
       expect(rows()[0]!.textContent).toContain("sam@acme.test");
       expect(rows()[0]!.textContent).toContain("Primary");
       expect(screen.queryByTestId("remove-address")).toBeNull();
+    });
+  });
+});
+
+/** The S256 challenge a verifier answers, as the server checks it. */
+async function challengeOf(codeVerifier: string): Promise<string> {
+  const digest = await webcrypto.subtle.digest("SHA-256", new TextEncoder().encode(codeVerifier));
+  return Buffer.from(digest).toString("base64url");
+}
+
+const ownLink = { confirm: "idf_own", verification: "verif_own", token: "tok_own" };
+
+describe("given an account whose own address was never confirmed", () => {
+  beforeEach(() => {
+    state.confirmation = { email: "sam@acme.test", confirmed: false, canSendConfirmation: true };
+  });
+
+  describe("when the link is asked for from Settings and opened in the window that asked", () => {
+    /** @scenario "An existing unconfirmed account confirms its own address from Settings" */
+    it("starts the own-address ceremony, completes it with the kept proof, and re-reads the address everywhere", async () => {
+      renderSection();
+      expect(within(rows()[0]!).getByTestId("address-unconfirmed")).toBeTruthy();
+
+      fireEvent.click(within(rows()[0]!).getByTestId("resend-address-link"));
+
+      await waitFor(() => expect(calls.sendOwn).toHaveBeenCalledTimes(1));
+      expect((await screen.findByTestId("address-link-sent")).textContent).toContain(
+        "sam@acme.test",
+      );
+      const kept = sessionStorage.getItem(sessionStorage.key(0) ?? "");
+      expect(kept).toBeTruthy();
+      expect(calls.sendOwn.mock.calls[0]![0]).toEqual({
+        codeChallenge: await challengeOf(kept ?? ""),
+      });
+      expect(calls.resend).not.toHaveBeenCalled();
+
+      cleanup();
+      renderSection({ query: ownLink });
+
+      expect(await screen.findByTestId("address-confirmed-now")).toBeTruthy();
+      expect(calls.complete).toHaveBeenCalledWith({
+        identifierId: "idf_own",
+        verificationId: "verif_own",
+        token: "tok_own",
+        codeVerifier: kept,
+      });
+      await waitFor(() => expect(calls.invalidateConfirmation).toHaveBeenCalled());
+      expect(calls.invalidate).toHaveBeenCalled();
+    });
+
+    /** @scenario "An existing unconfirmed account confirms its own address from Settings" */
+    it("sends the own address's link through the session, not as an added address", async () => {
+      state.identifiers = [
+        address({ identifierId: "idf_own", isPrimary: true, confirmed: false, resendable: true }),
+      ];
+      renderSection();
+
+      fireEvent.click(within(rows()[0]!).getByTestId("resend-address-link"));
+
+      await waitFor(() => expect(calls.sendOwn).toHaveBeenCalledTimes(1));
+      expect(calls.resend).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the link is used without the proof the asking window kept", () => {
+    /** @scenario "The own address link opened without the window that asked confirms nothing" */
+    it("confirms nothing and the address still reads as not confirmed", async () => {
+      renderSection({ query: ownLink });
+
+      expect(await screen.findByTestId("address-wrong-browser")).toBeTruthy();
+      expect(calls.complete).not.toHaveBeenCalled();
+      expect(within(rows()[0]!).getByTestId("address-unconfirmed")).toBeTruthy();
+    });
+  });
+});
+
+describe("given an installation with no email provider configured", () => {
+  beforeEach(() => {
+    state.confirmation = { email: "sam@acme.test", confirmed: false, canSendConfirmation: false };
+  });
+
+  describe("when the own address is listed before it has identifiers", () => {
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("offers no resend for it", () => {
+      renderSection();
+
+      expect(within(rows()[0]!).getByTestId("address-unconfirmed")).toBeTruthy();
+      expect(screen.queryByTestId("resend-address-link")).toBeNull();
+    });
+  });
+
+  describe("when unconfirmed addresses are listed", () => {
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("takes the resend away from every one of them", () => {
+      state.identifiers = [
+        address({ identifierId: "idf_own", isPrimary: true, confirmed: false, resendable: true }),
+        address({
+          identifierId: "other",
+          value: "sam@other.test",
+          confirmed: false,
+          resendable: true,
+        }),
+      ];
+      renderSection();
+
+      expect(rows()).toHaveLength(2);
+      expect(screen.queryByTestId("resend-address-link")).toBeNull();
     });
   });
 });

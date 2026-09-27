@@ -5096,6 +5096,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/notification-contract':
+        specifier: workspace:*
+        version: link:../../notification/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13991,6 +13994,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../../auth/contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host

@@ -168,8 +168,8 @@ export interface AuthApi {
   /** Mails a sign-up confirmation link, refusing an address that already has an account. */
   requestNewAccountVerification(input: Readonly<{ email: string }>): Promise<void>;
   /**
-   * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per
-   * caller; refuses an account the process resolved no address for.
+   * Starts identity's PKCE ceremony for the signed-in caller's own address, metered per caller;
+   * refuses an account with no address, and an installation that cannot send email.
    */
   sendMyAddressConfirmation(
     input: Readonly<{ actorId: string; email: string | null; codeChallenge: string }>,

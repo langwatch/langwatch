@@ -61,6 +61,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { EmailDelivery } from "@langwatch/mail";
+import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
@@ -210,6 +211,8 @@ export class AuthApp implements AuthApiContract {
     entitlements: EntitlementApi,
     /** Whether a signed license permits platform single sign-on (ADR-027). */
     licensing: LicensingApi,
+    /** Whether this installation names a way to send email, before a confirmation is offered. */
+    notifications: NotificationService,
     /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
     sso: SsoApi,
     /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
@@ -443,6 +446,8 @@ export class AuthApp implements AuthApiContract {
       addressConfirmation: AddressConfirmationService.create({
         isConfirmed: async ({ email }) =>
           (await dependencies.users.findByEmail({ email }))?.emailVerified === true,
+        hasMailDelivery: async () =>
+          (await dependencies.notifications.getMailDelivery()).provider !== undefined,
       }),
       priorSessions: PriorSessionService.create({
         sessions: repositories.sessions,
@@ -855,6 +860,7 @@ export class AuthApp implements AuthApiContract {
     input: Readonly<{ actorId: string; email: string | null; codeChallenge: string }>,
   ): Promise<EmailIdentifierAdded> {
     if (!input.email) throw new NoAddressToConfirmError();
+    await this.#addressConfirmation.assertCanSend();
 
     const budget = await this.isWithinBudget({
       key: `auth.sendMyAddressConfirmation:${input.actorId}`,

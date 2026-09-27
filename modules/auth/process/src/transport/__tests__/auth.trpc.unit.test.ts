@@ -296,12 +296,17 @@ describe("the signed-out front door", () => {
 
   describe("when a signed-in person asks whether their own address is confirmed", () => {
     it("asks about the address the session named, never one the caller typed", async () => {
-      getMyAddressConfirmation.mockResolvedValueOnce({ email: "ana@acme.com", confirmed: true });
+      getMyAddressConfirmation.mockResolvedValueOnce({
+        email: "ana@acme.com",
+        confirmed: true,
+        canSendConfirmation: true,
+      });
       const signedIn = router.createCaller({ actor: { id: "user_ana" }, email: "ana@acme.com" });
 
       await expect(signedIn.myAddressConfirmation()).resolves.toEqual({
         email: "ana@acme.com",
         confirmed: true,
+        canSendConfirmation: true,
       });
       expect(getMyAddressConfirmation).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });

@@ -11,6 +11,7 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { EmailDelivery } from "@langwatch/mail";
+import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -45,6 +46,7 @@ const CHALLENGE = "c".repeat(43);
 async function appFor(
   limiter: ReturnType<typeof countingLimiter>["rateLimiter"],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
+  mailDelivery: { provider?: string } = { provider: "smtp" },
 ): Promise<AuthApp> {
   return AuthApp.create({
     config: {
@@ -68,6 +70,9 @@ async function appFor(
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
       licensing: createApiFixture<LicensingApi>(),
+      notifications: createApiFixture<NotificationService>({
+        getMailDelivery: async () => ({ ...mailDelivery, smtpConfigured: false }),
+      }),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
@@ -172,6 +177,35 @@ describe("given a signed-in caller asking for their own confirmation link", () =
       expect(started).toEqual([
         { userId: "user_ana", email: "ana@acme.com", codeChallenge: CHALLENGE },
       ]);
+    });
+  });
+
+  describe("when the installation has no email provider configured", () => {
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("says a confirmation cannot be sent", async () => {
+      const { rateLimiter } = countingLimiter();
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+
+      await expect(app.getMyAddressConfirmation({ email: null })).resolves.toEqual({
+        email: null,
+        confirmed: false,
+        canSendConfirmation: false,
+      });
+    });
+
+    /** @scenario "Without a way to send email, the address confirmation nudge stays silent" */
+    it("refuses to send with a named error before spending budget or starting a ceremony", async () => {
+      const { rateLimiter, windows } = countingLimiter();
+      const app = await appFor(rateLimiter, createApiFixture<IdentityApi>(), {});
+
+      await expect(
+        app.sendMyAddressConfirmation({
+          actorId: "user_ana",
+          email: "ana@acme.com",
+          codeChallenge: CHALLENGE,
+        }),
+      ).rejects.toMatchObject({ code: "auth_email_sending_unavailable", httpStatus: 400 });
+      expect(windows).toEqual([]);
     });
   });
 });

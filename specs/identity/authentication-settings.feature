@@ -140,7 +140,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
   # mailed link alone must never confirm an account somebody else may have
   # created. Confirming it marks the account's address as confirmed, which is
   # what single sign-on reads before it links a sign-in to the account.
-  @unimplemented
+  @integration
   Scenario: An existing unconfirmed account confirms its own address from Settings
     Given "sam" has an account whose own address was never confirmed
     When "sam" asks from Settings for the link to be sent again
@@ -148,7 +148,7 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then the address is confirmed
     And the account's address reads as confirmed everywhere, including to single sign-on
 
-  @unimplemented
+  @integration
   Scenario: The own address link opened without the window that asked confirms nothing
     Given "sam" has an account whose own address was never confirmed
     And a confirmation link for it went out from Settings
@@ -176,6 +176,15 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     When "sam" asks for the own address confirmation
     Then the link goes to the address "sam" is signed in as
     And no sign-up link is sent
+
+  # An installation with no email provider cannot send the link at all, so it
+  # neither offers one nor fails quietly when asked anyway (ADR-117).
+  @unit @integration
+  Scenario: Without a way to send email, the address confirmation nudge stays silent
+    Given the installation has no email provider configured
+    And my account's address is unconfirmed
+    Then no resend confirmation action is offered for it
+    And asking to send the confirmation anyway is refused with a named error
 
   # Attaching is not claiming. An unverified identifier blocks nobody, so
   # refusing here would buy no protection and would answer "does an account

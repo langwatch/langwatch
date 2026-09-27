@@ -119,17 +119,19 @@ function AddressList({ identifiers }: { identifiers: ReturnType<typeof useEmailI
       row={{
         value: identifiers.ownAddress,
         isPrimary: true,
-        confirmed: void 0,
-        resendable: false,
+        confirmed: identifiers.ownAddressConfirmed,
+        resendable: identifiers.ownAddressResendable,
         removable: false,
         refusalCode: null,
         demotesFirst: false,
       }}
-      linkJustSent={false}
+      linkJustSent={identifiers.sentTo !== void 0 && identifiers.sentTo === identifiers.ownAddress}
       lastUsedAt={void 0}
-      isSending={false}
+      isSending={identifiers.isOwnAddressSending}
       isRemoving={false}
-      onResend={() => Promise.resolve(void 0)}
+      onResend={() =>
+        identifiers.resend({ identifierId: void 0, value: identifiers.ownAddress ?? null })
+      }
       onRemove={() => void 0}
       hideRemove
     />

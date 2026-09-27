@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/coding-agent-browser-kit": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
