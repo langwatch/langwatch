@@ -1130,24 +1130,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh feature-parity
 
-  # The frozen OpenAPI document against the surface the API process mounts.
+  # The frozen OpenAPI document against the routes the API process answers.
   #
-  # This replaces `openapi-completeness`, which was deleted at the deployment
-  # cutover along with the generator it read. The check is not the same one and
-  # deliberately so. The old pair asserted that every documented operation
-  # carried a body, parameters and a success response; this one asserts the
-  # fact those presupposed — that the operation is still SERVED.
+  # `specs/api-reference/openapi-document.json` is frozen: three routes serve
+  # it and the SDKs generate clients from it, so this job never writes it. The
+  # check boots the api over memory stores, composes its application and
+  # matches every documented operation against the route table.
   #
-  # `apps/api/src/features/discovery/openapi-document.json` is frozen: three
-  # routes serve it and both SDKs generate clients from it, so this job never
-  # writes it. The task describes the mounted surface into a scratch file and
-  # diffs the two.
-  #
-  # ONE direction fails: an operation the document lists that no route on the
-  # process answers. An integrator generated a client from it, and the call now
-  # 404s. Operations served and undocumented are printed and never failed on,
-  # because the document is frozen and every route added since the freeze is
-  # one of them — failing there would make this a wall rather than a signal.
+  # ONE direction fails: an operation the document lists that no route
+  # answers, since a client generated from it would 404. Accepted gaps sit in
+  # `specs/api-reference/openapi-unserved-baseline.json`, and an entry that is
+  # served again fails too, so the baseline only shrinks. Operations served and
+  # undocumented are reported and never failed on.
   openapi-drift:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
@@ -1170,7 +1164,7 @@ jobs:
       - uses: ./.github/actions/prepare-generated-files
 
       - name: Check the frozen OpenAPI document against the served surface
-        run: pnpm --filter @langwatch/platform-api run task openapi-check
+        run: pnpm --filter @langwatch/platform-api run openapi:check
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'

@@ -50,7 +50,7 @@ on:
       - "modules/trace/contract/src/trace-format.schemas.ts"
       - "modules/evaluator/contract/src/evaluators.native.ts"
       - "modules/model-provider/contract/src/catalog/model-catalog.json"
-      - "apps/api/src/features/discovery/openapi-document.json"
+      - "specs/api-reference/openapi-document.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -128,7 +128,7 @@ jobs:
               - 'modules/trace/contract/src/trace-format.schemas.ts'
               - 'modules/evaluator/contract/src/evaluators.native.ts'
               - 'modules/model-provider/contract/src/catalog/model-catalog.json'
-              - 'apps/api/src/features/discovery/openapi-document.json'
+              - 'specs/api-reference/openapi-document.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 

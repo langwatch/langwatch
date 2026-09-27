@@ -11766,14 +11766,13 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `apps/api/src/features/discovery/openapi-document.json` — three routes serve it and both SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json` — three routes serve it and both SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
 
 ```bash
-# from the repo root: describe the live Hono routes and report how much of the
-# published surface the document can still cover. It writes to the path you name
-# (a scratch file otherwise) and never over the checked-in artifact, which is
-# replaced deliberately, with a diff in front of a person.
-pnpm --filter @langwatch/platform-api task openapi-generate
+# from the repo root: check that every operation the document lists is still
+# served by a route. It never writes the checked-in artifact, which is edited
+# deliberately, with a diff in front of a person.
+pnpm --filter @langwatch/platform-api run openapi:check
 
 # from sdks/typescript/
 pnpm generate:openapi-types         # regenerate the TS generated client from that spec

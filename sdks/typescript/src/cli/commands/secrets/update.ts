@@ -31,7 +31,7 @@ export const updateSecretCommand = async (
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

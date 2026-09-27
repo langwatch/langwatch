@@ -30,7 +30,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
 
   try {
     const response = await langwatchFetch(
-      `${endpoint}/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId)}`,
+      `${endpoint}/api/v1/secrets?projectId=${encodeURIComponent(credentials.projectId)}`,
       {
         method: "GET",
         headers: {

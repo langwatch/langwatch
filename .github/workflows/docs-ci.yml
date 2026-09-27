@@ -54,7 +54,7 @@ jobs:
               # The docs site ships a copy of the canonical OpenAPI document and
               # generates its api-reference pages from it, so a spec change has
               # to re-run this job or the copy silently falls behind.
-              - 'apps/api/src/features/discovery/openapi-document.json'
+              - 'specs/api-reference/openapi-document.json'
               # The structure checker and the rules it applies.
               - 'pkg/docsscan/**'
               - 'tools/docscheck/**'
