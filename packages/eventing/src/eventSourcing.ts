@@ -8,6 +8,10 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { KillSwitch } from "./kill-switch/index.ts";
+import {
+  type SealedPipelineDefinition,
+  sealPipelineDefinition,
+} from "./pipeline/sealedPipeline.ts";
 import type {
   NoCommands,
   RegisteredCommand,
@@ -107,7 +111,7 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
 export class EventSourcing {
   private readonly tracer = getLangWatchTracer("langwatch.event-sourcing.runtime");
   private readonly pipelines = new Map<string, RegisteredCommandSenders>();
-  private readonly _definitions: StaticPipelineDefinition<any, any, any>[] = [];
+  private readonly _definitions: SealedPipelineDefinition[] = [];
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -242,7 +246,7 @@ export class EventSourcing {
   }
 
   /** Returns the static definitions captured during register() calls. */
-  get definitions(): readonly StaticPipelineDefinition<any, any, any>[] {
+  get definitions(): readonly SealedPipelineDefinition[] {
     return this._definitions;
   }
 
@@ -291,7 +295,7 @@ export class EventSourcing {
     );
     return [
       `Pipeline "${incoming.metadata.name}" is already registered on this runtime.`,
-      `Already registered: ${this.describeDefinition(existing)}.`,
+      `Already registered: ${existing ? existing.open((definition) => this.describeDefinition(definition)) : this.describeDefinition(undefined)}.`,
       `Refused: ${this.describeDefinition(incoming)}.`,
       "One runtime registers one pipeline per name - compose exactly one of them in this process.",
     ].join(" ");
@@ -358,7 +362,7 @@ export class EventSourcing {
         : CommandsToProcessors<Commands>
     >;
     this.assertRegistrable(definition);
-    this._definitions.push(definition);
+    this._definitions.push(sealPipelineDefinition(definition));
 
     if (!this._enabled || !this.eventStore) {
       logger.warn(

@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AggregateSearchResult } from "@langwatch/ops-contract";
 import { toEpochMs } from "@langwatch/time";
@@ -180,7 +181,7 @@ export class EventExplorerService {
         id: row.eventId,
         aggregateId: params.aggregateId,
         aggregateType: projection.aggregateType,
-        tenantId: params.tenantId,
+        tenantId: createTenantId(params.tenantId),
         createdAt: parseInt(row.eventTimestamp, 10),
         occurredAt: parseInt(row.eventTimestamp, 10),
         type: row.eventType,

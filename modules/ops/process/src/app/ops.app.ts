@@ -15,6 +15,7 @@ import { DashboardApi } from "@langwatch/dashboard-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type {
+  Event,
   RegisteredFoldProjection,
   RegisteredMapProjection,
   RegisteredStateProjection,
@@ -1854,7 +1855,7 @@ export interface OpsProcessManagerMetadata {
 /** One fold's init and apply, typed over the state it folds. */
 export interface OpsDejaViewFold<State> {
   init(): State;
-  apply(state: State, event: { type: string }): State;
+  apply(state: State, event: Event): State;
 }
 
 export interface OpsDejaViewProjection {

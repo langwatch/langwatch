@@ -159,7 +159,7 @@ describe("the worker process installation", () => {
       expect(
         eventing.definitions
           .find((definition) => definition.metadata.name === "pulled_usage_processing")
-          ?.foldProjections.has("governanceCostRollup"),
+          ?.open((definition) => definition.foldProjections.has("governanceCostRollup")),
       ).toBe(true);
       expect(pipelines).toContain("ingestion_pull_processing");
       expect(pipelines).toContain("ingestion_pull_reconcile");
@@ -205,9 +205,11 @@ describe("the worker process installation", () => {
       for (const name of ["identity", "join-requests", "scim-sync", "sso-connections"]) {
         expect(byName.has(name)).toBe(true);
       }
-      expect(byName.get("sso-connections")?.eventSubscribers.has("scimDirectoryMove")).toBe(true);
+      const subscribes = (pipeline: string, subscriber: string) =>
+        byName.get(pipeline)?.open((definition) => definition.eventSubscribers.has(subscriber));
+      expect(subscribes("sso-connections", "scimDirectoryMove")).toBe(true);
       expect(byName.get("join-requests")?.processManagers.size).toBeGreaterThan(0);
-      expect(byName.get("scim_directory")?.eventSubscribers.has("moveDirectory")).toBe(true);
+      expect(subscribes("scim_directory", "moveDirectory")).toBe(true);
     } finally {
       await runtime.stop();
     }
@@ -221,15 +223,21 @@ describe("the worker process installation", () => {
       const byName = new Map(
         eventing.definitions.map((definition) => [definition.metadata.name, definition]),
       );
-      expect([...(byName.get("trace_processing")?.eventSubscribers.keys() ?? [])]).toContain(
-        "codingAgentSpanFactsDispatch",
-      );
-      expect([...(byName.get("log_processing")?.eventSubscribers.keys() ?? [])]).toContain(
-        "codingAgentLogFactsDispatch",
-      );
-      expect([...(byName.get("metric_processing")?.eventSubscribers.keys() ?? [])]).toContain(
-        "codingAgentMetricFactsDispatch",
-      );
+      expect([
+        ...(byName
+          .get("trace_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).toContain("codingAgentSpanFactsDispatch");
+      expect([
+        ...(byName
+          .get("log_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).toContain("codingAgentLogFactsDispatch");
+      expect([
+        ...(byName
+          .get("metric_processing")
+          ?.open((definition) => [...definition.eventSubscribers.keys()]) ?? []),
+      ]).toContain("codingAgentMetricFactsDispatch");
     } finally {
       await runtime.stop();
     }

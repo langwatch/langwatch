@@ -57,6 +57,11 @@ export {
   type EventingModule,
   type EventingSetup,
 } from "./pipeline/eventingModule.ts";
+export {
+  type OpenPipelineDefinition,
+  type SealedPipelineDefinition,
+  sealPipelineDefinition,
+} from "./pipeline/sealedPipeline.ts";
 export type {
   CommandHandlerOptions,
   NoCommands,
@@ -100,6 +105,7 @@ export type {
 export {
   sealFoldProjection,
   sealMapProjection,
+  projectionConsumes,
   sealStateProjection,
 } from "./projections/sealedProjection.ts";
 export type {
