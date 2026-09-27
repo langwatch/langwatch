@@ -1,16 +1,11 @@
-// Build SuiteApp collaborators; `execution` field is deliberately refused.
+// Build SuiteApp collaborators over its own reads and its peers.
 import type { AgentApi } from "@langwatch/agent-contract";
-import { SuiteExecutionUnavailableError, type SuiteRunResult } from "@langwatch/suite-contract";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
-import type { SuiteExecution } from "./suite.app.ts";
-
-/** Refuses every run by name, rather than crashing on an absent collaborator. */
-class UnavailableSuiteExecution implements SuiteExecution {
-  execute(): Promise<SuiteRunResult> {
-    return Promise.reject(new SuiteExecutionUnavailableError());
-  }
-}
+import { SuiteExecutionService } from "../services/suite-execution.service.ts";
+import type { SuiteRunModelsResolver } from "../services/suite-run-models.service.ts";
+import type { SuiteExecution, SuiteRunCommands } from "./suite.app.ts";
 
 /**
  * What `SuiteApp.create` builds for itself, over its own reads and its
@@ -24,15 +19,22 @@ export interface SuiteAppInfrastructure {
 }
 
 /**
- * Builds {@link SuiteAppInfrastructure} from this App's own config and the
- * ONE peer it already depends on for agent presence.
+ * Builds {@link SuiteAppInfrastructure}: a run starts on `suite_run_processing`
+ * and each of its scenario runs is queued by the scenario owner (main's `SuiteRunService`).
  */
 export function buildSuiteInfrastructure(input: {
   agents: Pick<AgentApi, "getPresence">;
+  scenarios: Pick<ScenarioApi, "resolveRunParametersForScenarios" | "queueSimulationRun">;
+  commands: SuiteRunCommands;
+  resolveRunModels?: SuiteRunModelsResolver;
   publicBaseUrl: string | undefined;
 }): SuiteAppInfrastructure {
   return {
-    execution: new UnavailableSuiteExecution(),
+    execution: SuiteExecutionService.create({
+      commands: input.commands,
+      scenarios: input.scenarios,
+      ...(input.resolveRunModels ? { resolveRunModels: input.resolveRunModels } : {}),
+    }),
     // The agent directory this App already depends on answers presence
     // directly; no member and no optional bag are needed to ask it.
     connectedPresence: (presenceInput) => input.agents.getPresence(presenceInput),

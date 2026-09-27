@@ -335,6 +335,42 @@ describe("ScenarioApp.queueSimulationRun", () => {
   });
 });
 
+describe("given a run a suite queued", () => {
+  /** @scenario "A suite run's target key, target overrides and plan models reach the queued run" */
+  it("records the target key, the target's overrides and the plan's models in the reserved namespace", async () => {
+    const { queue, metadata } = await harness();
+
+    await queue({
+      targetKey: "http:agent-1:model=gpt-5-mini",
+      targetParameters: { model: "gpt-5-mini" },
+      simulatorModel: "openai/gpt-5-mini",
+      judgeModel: "openai/gpt-5",
+    });
+
+    expect(metadata().langwatch).toEqual({
+      targetReferenceId: "agent-1",
+      targetType: "http",
+      targetKey: "http:agent-1:model=gpt-5-mini",
+      targetParameters: { model: "gpt-5-mini" },
+      simulatorModel: "openai/gpt-5-mini",
+      judgeModel: "openai/gpt-5",
+    });
+  });
+
+  it("records no plan model the plan left unset", async () => {
+    const { queue, metadata } = await harness();
+
+    await queue({ targetKey: "http:agent-1", simulatorModel: null, judgeModel: "openai/gpt-5" });
+
+    expect(metadata().langwatch).toEqual({
+      targetReferenceId: "agent-1",
+      targetType: "http",
+      targetKey: "http:agent-1",
+      judgeModel: "openai/gpt-5",
+    });
+  });
+});
+
 describe("ScenarioApp.getRunDataForAllSuites", () => {
   describe("given a process that composed no simulation reads", () => {
     it("refuses the read by name instead of crashing on the missing member", async () => {

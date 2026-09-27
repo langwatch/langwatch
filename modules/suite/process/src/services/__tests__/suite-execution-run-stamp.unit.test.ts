@@ -1,39 +1,45 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { targetKeyOf } from "@langwatch/suite-contract";
+import type { QueueSimulationRunInput, ScenarioApi } from "@langwatch/scenario-contract";
+import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-version-on-runs.feature
  */
 import { describe, expect, it } from "vitest";
 
-import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
-const noopScenarios = createApiFixture<ScenarioApi>({
-  resolveRunParametersForScenarios: async ({ scenarios }) =>
-    scenarios.map((scenario) => ({
-      scenarioId: scenario.id,
-      parameters: {},
-      secretParameters: {},
-      scenarioVersion: 1,
-    })),
-});
+/** A scenario owner that resolves `resolve`'s values and records every run it is asked to queue. */
+function recordingScenarios(
+  queued: QueueSimulationRunInput[],
+  resolve: (
+    values: Record<string, string | number | boolean>,
+  ) => Record<string, string> = () => ({}),
+): ScenarioApi {
+  return createApiFixture<ScenarioApi>({
+    resolveRunParametersForScenarios: async ({ scenarios, values }) =>
+      scenarios.map((scenario) => ({
+        scenarioId: scenario.id,
+        parameters: resolve(values ?? {}),
+        secretParameters: {},
+        scenarioVersion: 1,
+      })),
+    queueSimulationRun: async (input) => {
+      queued.push(input);
+    },
+  });
+}
 
-async function queueOne(input: {
+async function executeAgainst(input: {
   scenarioId: string;
   version: number;
-  target: { type: string; referenceId: string };
-}): Promise<QueueSimulationRunCommandData> {
-  const queued: QueueSimulationRunCommandData[] = [];
+  targets: SuiteTarget[];
+  resolve?: (values: Record<string, string | number | boolean>) => Record<string, string>;
+}): Promise<QueueSimulationRunInput[]> {
+  const queued: QueueSimulationRunInput[] = [];
   const service = SuiteExecutionService.create({
-    commands: {
-      startSuiteRun: async () => {},
-      queueSimulationRun: async (data) => {
-        queued.push(data);
-      },
-    },
-    scenarios: noopScenarios,
+    commands: { startSuiteRun: async () => {} },
+    scenarios: recordingScenarios(queued, input.resolve),
   });
 
   await service.execute({
@@ -52,7 +58,7 @@ async function queueOne(input: {
         parameters: {},
       },
     ],
-    activeTargets: [input.target] as never,
+    activeTargets: input.targets,
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: `idem-${Math.random().toString(36).slice(2)}`,
@@ -60,118 +66,73 @@ async function queueOne(input: {
     judgeModel: null,
   });
 
-  const command = queued[0];
-  if (!command) throw new Error("execute dispatched no queued command");
-  return command;
+  return queued;
 }
 
-function reservedNamespace(command: QueueSimulationRunCommandData): Record<string, unknown> {
-  return (command.metadata as { langwatch: Record<string, unknown> }).langwatch;
+async function queueOne(input: {
+  scenarioId: string;
+  version: number;
+  target: SuiteTarget;
+}): Promise<QueueSimulationRunInput> {
+  const [queued] = await executeAgainst({ ...input, targets: [input.target] });
+  if (!queued) throw new Error("execute queued no run");
+  return queued;
 }
 
 describe("given a run plan whose scenarios are read once at queue time", () => {
   /** @scenario "The version stamped is the version read when the batch was queued" */
   it("carries the version read in that same read", async () => {
-    const command = await queueOne({
+    const queued = await queueOne({
       scenarioId: "scenario_1",
       version: 7,
       target: { type: "http", referenceId: "agent_1" },
     });
 
-    expect(reservedNamespace(command).scenarioVersion).toBe(7);
+    expect(queued.scenarioVersion).toBe(7);
   });
 });
 
 describe("given a suite run against a prompt target", () => {
   /** @scenario "A suite run records the kind of target as well as the target" */
-  it("records the target it ran against and the kind of that target", async () => {
-    const command = await queueOne({
+  it("hands the scenario owner the target it ran against and the kind of that target", async () => {
+    const queued = await queueOne({
       scenarioId: "scenario_1",
       version: 1,
       target: { type: "prompt", referenceId: "prompt_9" },
     });
 
-    expect(reservedNamespace(command)).toMatchObject({
-      targetType: "prompt",
-      targetReferenceId: "prompt_9",
-    });
-    expect(command.target).toEqual({ type: "prompt", referenceId: "prompt_9" });
+    expect(queued.target).toEqual({ type: "prompt", referenceId: "prompt_9" });
   });
 });
 
 describe("given a batch run against one agent twice, once with an override", () => {
   /** @scenario The target key and its parameters travel in the run metadata */
   it("stamps every run with its target key and carries the override on the variant alone", async () => {
-    const scenarioId = "scenario_1";
-    const plain = { type: "http", referenceId: "prod-agent" } as const;
-    const variant = {
+    const plain: SuiteTarget = { type: "http", referenceId: "prod-agent" };
+    const variant: SuiteTarget = {
       type: "http",
       referenceId: "prod-agent",
       runParameters: { model: "gpt-5-mini" },
-    } as const;
-    const queued: QueueSimulationRunCommandData[] = [];
+    };
 
-    const service = SuiteExecutionService.create({
-      commands: {
-        startSuiteRun: async () => {},
-        queueSimulationRun: async (data) => {
-          queued.push(data);
-        },
-      },
-      scenarios: createApiFixture<ScenarioApi>({
-        resolveRunParametersForScenarios: async ({ scenarios, values }) =>
-          scenarios.map((scenario) => ({
-            scenarioId: scenario.id,
-            parameters: { region: "eu", model: "gpt-5", ...values },
-            secretParameters: {},
-            scenarioVersion: 1,
-          })),
-      }),
+    const queued = await executeAgainst({
+      scenarioId: "scenario_1",
+      version: 1,
+      targets: [plain, variant],
+      resolve: (values) => ({ region: "eu", model: "gpt-5", ...values }),
     });
 
-    await service.execute({
-      suiteId: "suite_1",
-      projectId: "project_1",
-      activeScenarioIds: [scenarioId],
-      scenarioNames: new Map([[scenarioId, "A scenario"]]),
-      scenarioVersions: new Map([[scenarioId, 1]]),
-      scenarioConfigs: [
-        {
-          id: scenarioId,
-          name: "A scenario",
-          version: 1,
-          situation: "A situation",
-          criteria: [],
-          parameters: {},
-        },
-      ],
-      activeTargets: [plain, variant] as never,
-      repeatCount: 1,
-      skippedArchived: { scenarios: [], targets: [] },
-      idempotencyKey: "idem-target-1",
-      simulatorModel: null,
-      judgeModel: null,
-    });
-
-    const byTargetKey = new Map(
-      queued.map((command) => [reservedNamespace(command).targetKey, command.metadata]),
-    );
+    const byTargetKey = new Map(queued.map((run) => [run.targetKey, run]));
     expect([...byTargetKey.keys()]).toEqual(
-      expect.arrayContaining([targetKeyOf(plain as never), targetKeyOf(variant as never)]),
+      expect.arrayContaining([targetKeyOf(plain), targetKeyOf(variant)]),
     );
 
-    const plainMetadata = byTargetKey.get(targetKeyOf(plain as never)) as {
-      langwatch: Record<string, unknown>;
-      parameters?: Record<string, unknown>;
-    };
-    expect(plainMetadata.langwatch).not.toHaveProperty("targetParameters");
-    expect(plainMetadata.parameters).toEqual({ region: "eu", model: "gpt-5" });
+    const plainRun = byTargetKey.get(targetKeyOf(plain));
+    expect(plainRun).not.toHaveProperty("targetParameters");
+    expect(plainRun?.parameters).toEqual({ region: "eu", model: "gpt-5" });
 
-    const variantMetadata = byTargetKey.get(targetKeyOf(variant as never)) as {
-      langwatch: Record<string, unknown>;
-      parameters?: Record<string, unknown>;
-    };
-    expect(variantMetadata.langwatch.targetParameters).toEqual({ model: "gpt-5-mini" });
-    expect(variantMetadata.parameters).toEqual({ region: "eu", model: "gpt-5-mini" });
+    const variantRun = byTargetKey.get(targetKeyOf(variant));
+    expect(variantRun?.targetParameters).toEqual({ model: "gpt-5-mini" });
+    expect(variantRun?.parameters).toEqual({ region: "eu", model: "gpt-5-mini" });
   });
 });

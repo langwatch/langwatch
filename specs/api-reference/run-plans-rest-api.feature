@@ -43,6 +43,22 @@ Feature: The run plans REST API
     When I read that test suite id through the run plans route
     Then the response is 404 with the code suite_not_found
 
+  Scenario: Reading a run plan answers the plan's own evaluators
+    Given the project holds a run plan with one evaluator attached to it
+    When I read that run plan
+    Then the response lists that evaluator with its mappings
+    And listing the run plans answers the same evaluator on that plan
+
+  Scenario: A run plan links into Agent Testing when the project reads it
+    Given the project reads the Agent Testing interface
+    When I read a run plan
+    Then its platformUrl opens /agent-testing/results/<slug> under the project
+
+  Scenario: A run plan links into the Simulations pages otherwise
+    Given the project does not read the Agent Testing interface
+    When I list the run plans
+    Then each platformUrl opens /simulations/run-plans/<slug> under the project
+
   Scenario: Running a configuration creates the run plan its name resolves
     Given the project holds one scenario and one agent
     When I run a configuration under the name "Nightly"

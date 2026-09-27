@@ -1,13 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import {
-  type ResolvedRunModels,
-  type RunActor,
-  type RunSecretCiphertext,
-  type ScenarioRunConfig,
-  type ScenarioApi,
-  withActor,
-  withNote,
-  withResolvedModels,
+import type {
+  ResolvedRunModels,
+  RunActor,
+  ScenarioRunConfig,
+  ScenarioApi,
 } from "@langwatch/scenario-contract";
 import type { SuiteRunParameters, SuiteRunResult, SuiteTarget } from "@langwatch/suite-contract";
 import { getSuiteSetId, hasParameterOverrides, targetKeyOf } from "@langwatch/suite-contract";
@@ -19,7 +15,6 @@ import type { SuiteRunModelsResolver } from "./suite-run-models.service.ts";
 
 const logger = createLogger("langwatch:suite-run:service");
 
-/** Turns a validated Suite request into durable Suite-run and Simulation commands. */
 /** Everything one suite run needs, resolved by the caller before it starts. */
 export type SuiteExecutionRequest = {
   suiteId: string;
@@ -53,10 +48,17 @@ type SuiteExecutionItem = {
   scenarioRunId: string;
 };
 
+/** What the service asks of the scenario owner: resolving a run's values, and queueing each run. */
+type SuiteExecutionScenarios = Pick<
+  ScenarioApi,
+  "resolveRunParametersForScenarios" | "queueSimulationRun"
+>;
+
+/** Starts the suite run on its own pipeline, then has the scenario owner queue each run of it. */
 export class SuiteExecutionService implements SuiteExecution {
   static create(input: {
     commands: SuiteRunCommands;
-    scenarios: ScenarioApi;
+    scenarios: SuiteExecutionScenarios;
     /**
      * Reads, once per batch, the models each queued run really runs on. Absent in a context
      * with no model-default resolution behind it; the runs then record no resolved model, the
@@ -69,7 +71,7 @@ export class SuiteExecutionService implements SuiteExecution {
 
   private constructor(
     private readonly commands: SuiteRunCommands,
-    private readonly scenarios: ScenarioApi,
+    private readonly scenarios: SuiteExecutionScenarios,
     private readonly resolveRunModels?: SuiteRunModelsResolver,
   ) {}
 
@@ -100,19 +102,33 @@ export class SuiteExecutionService implements SuiteExecution {
     });
 
     const items = SuiteExecutionService.planItems({ input, batchRunId });
-    await this.queueAll({ input, items, batchRunId, setId, parameters, secrets });
+    // A run the queue refused has no run and never will, so it is reported
+    // neither in the count nor in the list.
+    const queuedItems = await this.queueAll({
+      input,
+      items,
+      batchRunId,
+      setId,
+      parameters,
+      secrets,
+    });
 
     logger.debug(
-      { suiteId: input.suiteId, batchRunId, itemCount: items.length },
+      {
+        suiteId: input.suiteId,
+        batchRunId,
+        itemCount: items.length,
+        queuedCount: queuedItems.length,
+      },
       "Suite run queued via event-sourcing",
     );
 
     return {
       batchRunId,
       setId,
-      jobCount: items.length,
+      jobCount: queuedItems.length,
       skippedArchived: input.skippedArchived,
-      items: items.map((item) => ({
+      items: queuedItems.map((item) => ({
         scenarioRunId: item.scenarioRunId,
         scenarioId: item.scenarioId,
         target: item.target,
@@ -182,8 +198,8 @@ export class SuiteExecutionService implements SuiteExecution {
   }
 
   /**
-   * Queues every run against one timestamp, and settles rather than races: one
-   * scenario failing to queue must not strand the rest of the suite.
+   * Settles rather than races: one scenario failing to queue must not strand
+   * the rest of the suite. Answers the items that were queued.
    */
   private async queueAll({
     input,
@@ -199,9 +215,7 @@ export class SuiteExecutionService implements SuiteExecution {
     setId: string;
     parameters: Map<string, Map<string, SuiteRunParameters>>;
     secrets: Map<string, Record<string, string>>;
-  }): Promise<void> {
-    const now = nowInstant().epochMilliseconds;
-    const simulationModels = SuiteExecutionService.withSimulationModels(input);
+  }): Promise<SuiteExecutionItem[]> {
     // Read before the first run is queued: every run of the batch says which
     // models it ran on, and the answer must not change part way through it.
     const resolvedModelsByScenarioId: Map<string, ResolvedRunModels> =
@@ -214,40 +228,61 @@ export class SuiteExecutionService implements SuiteExecution {
         },
       })) ?? new Map();
 
-    await Promise.allSettled(
+    const enqueued = await Promise.allSettled(
       items.map((item) => {
-        const secretParameters = secrets.get(item.scenarioId);
         const targetKey = targetKeyOf(item.target);
-        const targetParameters = parameters.get(targetKey)?.get(item.scenarioId);
 
-        return this.commands.queueSimulationRun({
-          tenantId: input.projectId,
-          scenarioRunId: item.scenarioRunId,
+        return this.scenarios.queueSimulationRun({
+          projectId: input.projectId,
           scenarioId: item.scenarioId,
+          scenarioRunId: item.scenarioRunId,
           batchRunId,
-          scenarioSetId: setId,
+          setId,
           name: input.scenarioNames.get(item.scenarioId),
-          metadata: {
-            langwatch: {
-              targetReferenceId: item.target.referenceId,
-              targetType: item.target.type,
-              targetKey,
-              ...SuiteExecutionService.withTargetParameters(item.target.runParameters),
-              scenarioVersion: input.scenarioVersions.get(item.scenarioId),
-              ...withActor(input.actor),
-              ...simulationModels,
-              ...withResolvedModels(resolvedModelsByScenarioId.get(item.scenarioId)),
-            },
-            ...withNote(input.note),
-            ...SuiteExecutionService.withParameters(targetParameters),
-            ...SuiteExecutionService.withSecretParameterNames(secretParameters),
-          },
-          ...SuiteExecutionService.withSecretParameters(secretParameters),
           target: { type: item.target.type, referenceId: item.target.referenceId },
-          occurredAt: now,
+          targetKey,
+          ...SuiteExecutionService.withTargetParameters(item.target.runParameters),
+          parameters: parameters.get(targetKey)?.get(item.scenarioId) ?? {},
+          secretParameters: secrets.get(item.scenarioId) ?? {},
+          note: input.note,
+          scenarioVersion: input.scenarioVersions.get(item.scenarioId),
+          actor: input.actor,
+          simulatorModel: input.simulatorModel,
+          judgeModel: input.judgeModel,
+          resolvedModels: resolvedModelsByScenarioId.get(item.scenarioId) ?? null,
         });
       }),
     );
+    SuiteExecutionService.logRejected({ items, enqueued, suiteId: input.suiteId, batchRunId });
+
+    return items.filter((_, index) => enqueued[index]?.status === "fulfilled");
+  }
+
+  /** A partial enqueue is otherwise invisible: the batch reads smaller with no record of why. */
+  private static logRejected({
+    items,
+    enqueued,
+    suiteId,
+    batchRunId,
+  }: {
+    items: readonly SuiteExecutionItem[];
+    enqueued: readonly PromiseSettledResult<unknown>[];
+    suiteId: string;
+    batchRunId: string;
+  }): void {
+    enqueued.forEach((result, index) => {
+      if (result.status !== "rejected") return;
+      logger.error(
+        {
+          suiteId,
+          batchRunId,
+          scenarioRunId: items[index]?.scenarioRunId,
+          scenarioId: items[index]?.scenarioId,
+          error: result.reason,
+        },
+        "Failed to queue a simulation run; it is left out of the batch",
+      );
+    });
   }
 
   /**
@@ -256,33 +291,5 @@ export class SuiteExecutionService implements SuiteExecution {
    */
   private static withTargetParameters(runParameters: SuiteTarget["runParameters"]) {
     return hasParameterOverrides(runParameters) ? { targetParameters: runParameters } : {};
-  }
-
-  private static withParameters(parameters: Record<string, string | number | boolean> | undefined) {
-    return parameters && Object.keys(parameters).length > 0 ? { parameters } : {};
-  }
-
-  /**
-   * The simulation models the plan was configured with, or nothing at all.
-   * @see specs/scenarios/run-configuration-on-runs.feature
-   */
-  private static withSimulationModels(models: {
-    simulatorModel?: string | null;
-    judgeModel?: string | null;
-  }): { simulatorModel?: string; judgeModel?: string } {
-    return {
-      ...(models.simulatorModel ? { simulatorModel: models.simulatorModel } : {}),
-      ...(models.judgeModel ? { judgeModel: models.judgeModel } : {}),
-    };
-  }
-
-  private static withSecretParameterNames(secretParameters: RunSecretCiphertext | undefined) {
-    const names = Object.keys(secretParameters ?? {});
-
-    return names.length > 0 ? { secretParameterNames: names } : {};
-  }
-
-  private static withSecretParameters(secretParameters: RunSecretCiphertext | undefined) {
-    return secretParameters && Object.keys(secretParameters).length > 0 ? { secretParameters } : {};
   }
 }

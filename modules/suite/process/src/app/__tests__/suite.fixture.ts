@@ -6,6 +6,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -69,6 +70,7 @@ export function createSuiteTestApp(
           findOrganizationId: async () => "organization-1",
         }),
       evaluators: input.dependencies?.evaluators ?? createApiFixture<EvaluatorApi>({}),
+      featureFlags: createApiFixture<FeatureFlagApi>({}),
     },
     infrastructure: { execution: input.execution ?? new RecordingSuiteExecution() },
   });

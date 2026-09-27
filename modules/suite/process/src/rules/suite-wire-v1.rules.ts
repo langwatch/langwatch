@@ -6,19 +6,21 @@
 import { defineRestMiddleware } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import {
-  evaluatorAttachmentSchema,
-  MAX_EVALUATOR_ATTACHMENTS,
+  type EvaluatorAttachment,
   MAX_SUITE_FIELDS,
   runNoteSchema,
   runParameterValuesSchema,
-  scenarioMappingSchema,
   suiteFieldDefinitionSchema,
 } from "@langwatch/scenario-contract";
 import {
+  evaluatorAttachmentsWireSchema,
   MAX_PLAN_NAME_LENGTH,
   MAX_REPEAT_COUNT,
-  suiteScopeSchema,
+  parseSuiteScope,
+  runPlanScopeSchema,
   suiteTargetSchema,
+  type RunPlanWire,
+  type Suite,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
@@ -40,35 +42,6 @@ export const suiteFieldsWireSchema = z
   .describe(
     `The fields the test suite declares, in the order the platform shows them. Up to ${MAX_SUITE_FIELDS}. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.`,
   );
-
-export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
-  "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
-);
-
-export const evaluatorAttachmentWireSchema = z
-  .object({
-    ...evaluatorAttachmentSchema.shape,
-    mappings: z
-      .record(z.string().min(1).max(128), scenarioMappingWireSchema)
-      .describe(
-        "Where each evaluator input reads its value, keyed by input name. Inputs left out are unmapped; a required input left unmapped refuses the run.",
-      ),
-  })
-  .describe(
-    "One evaluator that runs after every scenario run, with where each of its inputs reads from.",
-  );
-
-export const evaluatorAttachmentsWireSchema = z
-  .array(evaluatorAttachmentWireSchema)
-  .max(MAX_EVALUATOR_ATTACHMENTS)
-  .describe(
-    `The evaluators that run after every scenario run. Up to ${MAX_EVALUATOR_ATTACHMENTS}. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.`,
-  );
-
-/** What a run plan covers. */
-export const runPlanScopeSchema = suiteScopeSchema.describe(
-  "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
-);
 
 /** The configuration a run plan holds, as a caller sends it. */
 export const runPlanConfigWireSchema = z.object({
@@ -187,52 +160,6 @@ export const testSuiteRunInputSchema = z.object({
     ),
   ...runValuesShape,
 });
-
-/** One run plan, as the API publishes it. */
-export const runPlanWireSchema = z.object({
-  id: z.string().describe("The run plan id."),
-  name: z
-    .string()
-    .describe(
-      "The run plan name. This is the plan's identity: a run started under this name joins this plan.",
-    ),
-  slug: z
-    .string()
-    .describe(
-      "The plan's address in the platform. It is kept when the plan is renamed, so run history never moves.",
-    ),
-  scope: runPlanScopeSchema,
-  scenarioIds: z.array(z.string()).describe("The scenarios the last run of this plan covered."),
-  targets: z
-    .array(suiteTargetSchema)
-    .describe(
-      "What the plan runs against, in the order the results show. A target carrying runParameters runs with those values.",
-    ),
-  repeatCount: z.number().describe("How many times each scenario and target pairing runs."),
-  simulatorModel: z
-    .string()
-    .nullable()
-    .describe("The model that plays the user, or null for the scenario or project default."),
-  judgeModel: z
-    .string()
-    .nullable()
-    .describe("The model that judges the run, or null for the scenario or project default."),
-  labels: z.array(z.string()).describe("The labels the plan carries."),
-  evaluators: evaluatorAttachmentsWireSchema
-    .optional()
-    .describe(
-      "The plan's own evaluators. Absent on servers that predate evaluators on this family.",
-    ),
-  archivedAt: z
-    .string()
-    .nullable()
-    .describe("When the plan was archived, or null while it is active."),
-  createdAt: z.string().describe("When the plan was created."),
-  updatedAt: z.string().describe("When the plan was last written."),
-  platformUrl: z.string().url().describe("Where to open this run plan in the LangWatch platform."),
-});
-
-export type RunPlanWire = z.infer<typeof runPlanWireSchema>;
 
 /** What a run answers with, whichever way the run was started. */
 export const runPlanRunResultSchema = z.object({
@@ -363,4 +290,35 @@ export function toRunItemsWire(
     target: { type: item.target.type, referenceId: item.target.referenceId },
     name: item.name ?? null,
   }));
+}
+
+/** One run plan as the API publishes it (main's `toRunPlanWire`). */
+export function toRunPlanWire({
+  suite,
+  evaluators,
+  platformUrl,
+}: {
+  suite: Suite;
+  evaluators: EvaluatorAttachment[];
+  platformUrl: string;
+}): RunPlanWire {
+  return {
+    id: suite.id,
+    name: suite.name,
+    slug: suite.slug,
+    // A row stored before scopes carries null and runs its stored
+    // `scenarioIds`; the wire always answers the concrete scope that means.
+    scope: parseSuiteScope(suite.scope),
+    scenarioIds: suite.scenarioIds,
+    targets: suite.targets,
+    repeatCount: suite.repeatCount,
+    simulatorModel: suite.simulatorModel,
+    judgeModel: suite.judgeModel,
+    labels: suite.labels,
+    evaluators,
+    archivedAt: suite.archivedAt?.toISOString() ?? null,
+    createdAt: suite.createdAt.toISOString(),
+    updatedAt: suite.updatedAt.toISOString(),
+    platformUrl,
+  };
 }

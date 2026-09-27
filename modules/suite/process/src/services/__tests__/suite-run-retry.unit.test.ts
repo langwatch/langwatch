@@ -12,7 +12,7 @@ import { SuiteExecutionService } from "../suite-execution.service.ts";
 const AGENT: SuiteTarget = { type: "http", referenceId: "agent_1" };
 const OTHER_AGENT: SuiteTarget = { type: "http", referenceId: "agent_2" };
 
-function scenarios(): ScenarioApi {
+function scenarios(commands: CollapsingRunCommands): ScenarioApi {
   return createApiFixture<ScenarioApi>({
     resolveRunParametersForScenarios: async (input) =>
       input.scenarios.map((scenario) => ({
@@ -21,6 +21,7 @@ function scenarios(): ScenarioApi {
         parameters: {},
         secretParameters: {},
       })),
+    queueSimulationRun: (input) => commands.queueSimulationRun(input),
   });
 }
 
@@ -58,7 +59,7 @@ function execution() {
 
   return {
     commands,
-    service: SuiteExecutionService.create({ commands, scenarios: scenarios() }),
+    service: SuiteExecutionService.create({ commands, scenarios: scenarios(commands) }),
   };
 }
 

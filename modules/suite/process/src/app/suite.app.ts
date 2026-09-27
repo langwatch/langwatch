@@ -14,8 +14,13 @@ import {
   type EventingCommands,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
+import {
+  FeatureFlagApi,
+  type FeatureFlagApi as FeatureFlagApiType,
+} from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import {
@@ -45,6 +50,7 @@ import {
   type CompleteSuiteRunItemCommandData,
   type RecordSuiteRunItemStartedCommandData,
   type RegradeSuiteRunItemCommandData,
+  type RunPlanWire,
   type StartSuiteRunCommandData,
   type Suite,
   type SuiteArchivedNamesInput,
@@ -68,7 +74,10 @@ import { ClickhouseSuiteEventingRepository } from "../repositories/clickhouse/cl
 import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.suite-run-processing.repository.ts";
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
+import { RunPlanReadService } from "../services/run-plan-read.service.ts";
+import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
+import { SuiteRunModelsService } from "../services/suite-run-models.service.ts";
 import { SuiteService } from "../services/suite.service.ts";
 import {
   buildSuiteInfrastructure,
@@ -90,6 +99,7 @@ export interface SuiteAppDependencies {
   prompts: PromptApiType;
   projects: ProjectApiType;
   evaluators: EvaluatorApiType;
+  featureFlags: FeatureFlagApiType;
 }
 
 /**
@@ -126,14 +136,25 @@ export class SuiteApp implements SuiteApi {
     evaluators: EvaluatorApi,
     /** Owns `LANGWATCH_DEFAULT_RETENTION_DAYS`; a suite run is stamped with its default. */
     retention: DataRetentionApi,
+    /** Decides which testing interface a run plan's platform link opens in. */
+    featureFlags: FeatureFlagApi,
+    /** The project's default model per role, stamped on each queued run as main did. */
+    modelProviders: ModelProviderApi,
   };
   /** Every name is from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
 
   static create(setup: SuiteSetup): SuiteApp {
     const { members, dependencies, repositories } = setup;
+    const runItems = SuiteRunItemCommandsService.create();
     const infrastructure = buildSuiteInfrastructure({
       agents: dependencies.agents,
+      scenarios: dependencies.scenarios,
+      commands: runItems,
+      resolveRunModels: SuiteRunModelsService.create({
+        scenarios: dependencies.scenarios,
+        modelProviders: dependencies.modelProviders,
+      }).resolve,
       publicBaseUrl: members.publicBaseUrl,
     });
     const defaultRetentionDays = () => dependencies.retention.getPlatformDefaultRetentionDays();
@@ -151,7 +172,12 @@ export class SuiteApp implements SuiteApi {
     return new SuiteApp({
       ...dependencies,
       suites,
-      runItems: SuiteRunItemCommandsService.create(),
+      runItems,
+      runPlans: SuiteApp.buildRunPlans({
+        repositories,
+        dependencies,
+        publicBaseUrl: infrastructure.publicBaseUrl,
+      }),
       publicBaseUrl: infrastructure.publicBaseUrl,
       pipeline: SuiteApp.buildEventingPipeline({
         clickhouse: members.clickhouse,
@@ -188,6 +214,21 @@ export class SuiteApp implements SuiteApi {
     return buildSuiteRunProcessingPipeline({ suiteRunStateFoldStore });
   }
 
+  private static buildRunPlans(input: {
+    repositories: SuiteRepositories;
+    dependencies: Pick<SuiteAppDependencies, "featureFlags" | "projects">;
+    publicBaseUrl: string | undefined;
+  }): RunPlanReadService {
+    return RunPlanReadService.create({
+      repository: input.repositories.suites,
+      links: SuitePlatformLinkService.create({
+        featureFlags: input.dependencies.featureFlags,
+        projects: input.dependencies.projects,
+        publicBaseUrl: input.publicBaseUrl,
+      }),
+    });
+  }
+
   // Test-only construction with overridable collaborators and in-memory run projection.
   static createForTesting(setup: {
     repositories: SuiteRepositories;
@@ -197,8 +238,11 @@ export class SuiteApp implements SuiteApi {
     generateId?: () => string;
     now?: () => Instant;
   }): SuiteApp {
+    const runItems = SuiteRunItemCommandsService.create();
     const defaults = buildSuiteInfrastructure({
       agents: setup.dependencies.agents,
+      scenarios: setup.dependencies.scenarios,
+      commands: runItems,
       publicBaseUrl: undefined,
     });
     const infrastructure = { ...defaults, ...setup.infrastructure };
@@ -218,7 +262,12 @@ export class SuiteApp implements SuiteApi {
     return new SuiteApp({
       ...setup.dependencies,
       suites,
-      runItems: SuiteRunItemCommandsService.create(),
+      runItems,
+      runPlans: SuiteApp.buildRunPlans({
+        repositories: setup.repositories,
+        dependencies: setup.dependencies,
+        publicBaseUrl: infrastructure.publicBaseUrl,
+      }),
       publicBaseUrl: infrastructure.publicBaseUrl,
     });
   }
@@ -227,19 +276,22 @@ export class SuiteApp implements SuiteApi {
   readonly #publicBaseUrl: string | undefined;
   readonly #pipeline: SuiteRunProcessingPipeline | undefined;
   readonly #runItems: SuiteRunItemCommandsService;
+  readonly #runPlans: RunPlanReadService;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
       suites: SuiteService;
       runItems: SuiteRunItemCommandsService;
+      runPlans: RunPlanReadService;
       publicBaseUrl: string | undefined;
       pipeline?: SuiteRunProcessingPipeline;
     },
   ) {
-    const { publicBaseUrl, pipeline, runItems, ...rest } = dependencies;
+    const { publicBaseUrl, pipeline, runItems, runPlans, ...rest } = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
     this.#pipeline = pipeline;
     this.#runItems = runItems;
+    this.#runPlans = runPlans;
     this.#dependencies = rest;
   }
 
@@ -304,6 +356,20 @@ export class SuiteApp implements SuiteApi {
     );
 
     return suites.filter((suite) => suite !== null);
+  }
+
+  /** The project's run plans as the run-plans family publishes them, linked for its interface. */
+  listRunPlans(input: {
+    projectId: string;
+    projectSlug: string;
+    includeArchived?: boolean;
+  }): Promise<RunPlanWire[]> {
+    return this.#runPlans.list(input);
+  }
+
+  /** One run plan as the run-plans family publishes it; a test suite id is not found. */
+  getRunPlan(input: { projectId: string; projectSlug: string; id: string }): Promise<RunPlanWire> {
+    return this.#runPlans.get(input);
   }
 
   /** The project's test-suite testSuites. */
@@ -554,22 +620,6 @@ function refuseExecutionSettings(input: UpdateSuiteCommand): void {
   });
 }
 
-export type QueueSimulationRunCommandData = {
-  tenantId: string;
-  scenarioRunId: string;
-  scenarioId: string;
-  batchRunId: string;
-  scenarioSetId: string;
-  name?: string;
-  metadata?: Record<string, unknown>;
-  secretParameters?: Record<string, string>;
-  target?: {
-    type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
-    referenceId: string;
-  };
-  occurredAt: number;
-};
-
 /**
  * The application-specific boundary for turning a validated suite run into
  * durable events and queued work. Event sourcing remains application
@@ -600,9 +650,7 @@ export interface SuiteExecution {
   }): Promise<SuiteRunResult>;
 }
 
-/** Durable Eventing commands supplied by the process composition root. */
+/** The suite run's own start command; each scenario run is queued by the scenario owner. */
 export interface SuiteRunCommands {
   startSuiteRun(data: StartSuiteRunCommandData): Promise<void>;
-
-  queueSimulationRun(data: QueueSimulationRunCommandData): Promise<void>;
 }

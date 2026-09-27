@@ -2,20 +2,28 @@ import type {
   CompleteSuiteRunItemCommandData,
   RecordSuiteRunItemStartedCommandData,
   RegradeSuiteRunItemCommandData,
+  StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
 import { describe, expect, it } from "vitest";
 
 import { SuiteRunItemCommandsService } from "../suite-run-item-commands.service.ts";
 
 function recordingSenders() {
+  const runs: StartSuiteRunCommandData[] = [];
   const started: RecordSuiteRunItemStartedCommandData[] = [];
   const completed: CompleteSuiteRunItemCommandData[] = [];
   const regraded: RegradeSuiteRunItemCommandData[] = [];
   return {
+    runs,
     started,
     completed,
     regraded,
     senders: {
+      startSuiteRun: {
+        send: async (payload: StartSuiteRunCommandData) => {
+          runs.push(payload);
+        },
+      },
       recordSuiteRunItemStarted: {
         send: async (payload: RecordSuiteRunItemStartedCommandData) => {
           started.push(payload);
@@ -52,6 +60,30 @@ const itemCompleted: CompleteSuiteRunItemCommandData = {
 
 describe("SuiteRunItemCommandsService", () => {
   describe("given the pipeline connected its senders", () => {
+    describe("when a suite run starts", () => {
+      it("sends startSuiteRun with the run as given", async () => {
+        const recording = recordingSenders();
+        const service = SuiteRunItemCommandsService.create();
+        service.connect(recording.senders);
+        const run: StartSuiteRunCommandData = {
+          tenantId: "project-1",
+          batchRunId: "batch-1",
+          scenarioSetId: "__internal__suite-1__suite",
+          suiteId: "suite-1",
+          total: 1,
+          scenarioIds: ["scenario-1"],
+          targetIds: ["agent-1"],
+          idempotencyKey: "request-1",
+          occurredAt: 1_790_000_000_000,
+        };
+
+        await service.startSuiteRun(run);
+
+        expect(recording.runs).toEqual([run]);
+        expect(recording.started).toEqual([]);
+      });
+    });
+
     describe("when a scenario run starts", () => {
       it("sends recordSuiteRunItemStarted with the item as given", async () => {
         const recording = recordingSenders();
