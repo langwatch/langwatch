@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   EventSourcing,
@@ -16,6 +17,7 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import { langySecrets } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { OnboardingApi } from "@langwatch/onboarding-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -25,6 +27,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
+import { LangyConversationUpdateService } from "../../services/langy-conversation-update.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
 import { LangyApp } from "../langy.app.ts";
 
@@ -164,23 +167,42 @@ function fakePresence(): PresenceApi {
   };
 }
 
+/** One tenant fabric, publishing the way presence's relays a project event to its listeners. */
+function fabricPresence(fabric: EventEmitter): PresenceApi {
+  return {
+    ...fakePresence(),
+    getTenantEmitter: () => fabric,
+    publishProjectEvent: async ({ channel, event }) => {
+      fabric.emit(channel, { event, timestamp: 0 });
+    },
+  };
+}
+
+async function untilListening(fabric: EventEmitter, count: number): Promise<void> {
+  while (fabric.listenerCount("langy_conversation_updated") < count) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
+
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 type LangySetupResources = Parameters<typeof LangyApp.create>[0]["resources"];
 
-function createApp({
+async function createApp({
+  presence = fakePresence(),
   secrets = noSecrets,
   resources = { own: () => void 0, ownService: () => void 0 },
   repositories = MemoryLangyRepositories.create(),
 }: {
+  presence?: PresenceApi;
   secrets?: ScopedSecrets;
   resources?: LangySetupResources;
   repositories?: ReturnType<typeof MemoryLangyRepositories.create>;
 } = {}): Promise<LangyApp> {
-  return LangyApp.create({
+  const app = await LangyApp.create({
     dependencies: {
-      presence: fakePresence(),
+      presence,
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
       users: createApiFixture<UserApi>(),
       github: createApiFixture<GithubApi>(),
@@ -194,6 +216,8 @@ function createApp({
         getOrganizationId: async () => "org_1",
       }),
       plans: createApiFixture<EntitlementApi>(),
+      onboarding: createApiFixture<OnboardingApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
     },
     members: {
       publicBaseUrl: undefined,
@@ -201,7 +225,6 @@ function createApp({
       // A throwing double rather than a Redis-less build: the reads this
       // suite exercises never reach the member, and a reach is a loud failure.
       redis: createApiFixture<RedisConnection>(),
-      eventing: producerEventing(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
     config: {
@@ -217,4 +240,46 @@ function createApp({
     secrets,
     repositories,
   });
+  const registered = producerEventing().register(
+    app.conversationPipeline({ participation: "produce" }),
+  );
+  app.connectConversationCommands(registered.commands);
+  return app;
 }
+
+describe("given a private conversation's update published through presence", () => {
+  /** @scenario "A private conversation's updates stay with its owner" */
+  it("reaches the owner's watch and not another member's in the same project", async () => {
+    const fabric = new EventEmitter();
+    const presence = fabricPresence(fabric);
+    const app = await createApp({ presence });
+    const stop = new AbortController();
+    const watch = (userId: string) =>
+      app.watchConversationUpdates({
+        projectId: "project_1",
+        caller: { userId, name: null, email: null },
+        signal: stop.signal,
+      });
+    const owner = watch("user_owner")[Symbol.asyncIterator]().next();
+    const other = watch("user_other")[Symbol.asyncIterator]().next();
+    await untilListening(fabric, 2);
+
+    await LangyConversationUpdateService.create({ presence }).broadcastToTenant(
+      "project_1",
+      JSON.stringify({
+        event: "langy_conversation_updated",
+        conversationId: "langyconv_1",
+        ownerUserId: "user_owner",
+        isShared: false,
+      }),
+      "langy_conversation_updated",
+    );
+
+    await expect(owner).resolves.toMatchObject({
+      done: false,
+      value: { event: expect.stringContaining("langyconv_1") },
+    });
+    stop.abort();
+    await expect(other).resolves.toEqual({ done: true, value: undefined });
+  });
+});

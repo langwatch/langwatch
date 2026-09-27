@@ -1,46 +1,71 @@
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
  * A retry-fixable generation failure must reach the outbox, not vanish silently.
  * @see specs/langy/langy-conversation-title.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/api-fixture";
+import {
+  ModelNotConfiguredError,
+  type ModelProviderApi,
+  type ModelProviderResolution,
+} from "@langwatch/model-provider-contract";
+import { describe, expect, it, vi } from "vitest";
 
-import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
+import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 
-const generateText = vi.fn();
-vi.mock("ai", () => ({ generateText: (args: unknown) => generateText(args) }));
-
-const records = [{ id: "msg_1", role: "user", content: "instrument my traces with langwatch" }];
-
-function messages(rows = records): LangyTrustedMessageReader {
-  return {
-    getRecordsByConversation: vi.fn().mockResolvedValue(rows),
-  };
-}
-
-/** A model resolver standing in for the project's own model configuration. */
-function resolver(impl: () => unknown) {
-  return { resolveTitleModel: vi.fn(impl) } as never;
-}
-
+const records: LangyMessageRecord[] = [
+  { id: "msg_1", role: "user", content: "instrument my traces with langwatch" },
+];
 const args = { projectId: "project_1", conversationId: "langyconv_1" };
 
-beforeEach(() => {
-  vi.clearAllMocks();
-});
+const RESOLVED: ModelProviderResolution = {
+  model: "openai/gpt-5-mini",
+  source: "role_default",
+  scope: "project",
+  feature: {
+    key: "langy.conversation_title",
+    role: "FAST",
+    displayName: "Langy chat titles",
+    description: "Names each Langy conversation from its messages.",
+  },
+};
+
+function messages(rows = records): LangyTrustedMessageReader {
+  return { getRecordsByConversation: async () => rows };
+}
+
+function unconfigured(): ModelNotConfiguredError {
+  return new ModelNotConfiguredError({
+    featureKey: "langy.conversation_title",
+    role: "FAST",
+    featureDisplayName: "Langy chat titles",
+    projectId: "project_1",
+  });
+}
+
+/** The project's model configuration, as model-provider answers for it. */
+function modelProviders(
+  answers: Partial<Pick<ModelProviderApi, "resolveModelForFeature" | "generateText">>,
+) {
+  const generateText = vi.fn(answers.generateText ?? (async () => ({ text: "A title" })));
+  const api = createApiFixture<ModelProviderApi>({
+    resolveModelForFeature: answers.resolveModelForFeature ?? (async () => RESOLVED),
+    generateText,
+  });
+  return { api, generateText };
+}
 
 describe("LangyTitleGeneratorService", () => {
   describe("given the model answers", () => {
     /** @scenario "A title in title case is rewritten in sentence case" */
     it("returns the normalized title and the model that produced it", async () => {
-      generateText.mockResolvedValue({
-        text: "Instrument Traces With LangWatch",
+      const { api } = modelProviders({
+        generateText: async () => ({ text: "Instrument Traces With LangWatch" }),
       });
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
-        models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
+        models: api,
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({
@@ -54,12 +79,14 @@ describe("LangyTitleGeneratorService", () => {
   describe("when the model call fails on a provider blip", () => {
     /** @scenario "A model failure is retried instead of losing the title" */
     it("raises the failure so the process outbox retries it", async () => {
-      generateText.mockRejectedValue(
-        new Error('Model "openai/gpt-5-mini" provider "openai" is disabled.'),
-      );
+      const { api } = modelProviders({
+        generateText: async () => {
+          throw new Error('Model "openai/gpt-5-mini" provider "openai" is disabled.');
+        },
+      });
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
-        models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
+        models: api,
       }).generator();
 
       await expect(generate(args)).rejects.toThrow(/disabled/);
@@ -68,11 +95,14 @@ describe("LangyTitleGeneratorService", () => {
 
   describe("when resolving the model fails for a reason a retry could fix", () => {
     it("raises that too", async () => {
+      const { api } = modelProviders({
+        resolveModelForFeature: async () => {
+          throw new Error("provider openai is currently disabled");
+        },
+      });
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
-        models: resolver(() => {
-          throw new Error("provider openai is currently disabled");
-        }),
+        models: api,
       }).generator();
 
       await expect(generate(args)).rejects.toThrow(/currently disabled/);
@@ -82,16 +112,14 @@ describe("LangyTitleGeneratorService", () => {
   describe("when the project has no model configured for titles", () => {
     /** @scenario "A project with no model for titles is not retried" */
     it("produces no title and raises nothing", async () => {
+      const { api, generateText } = modelProviders({
+        resolveModelForFeature: async () => {
+          throw unconfigured();
+        },
+      });
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
-        models: resolver(() => {
-          throw new ModelNotConfiguredError({
-            featureKey: "langy.conversation_title",
-            role: "FAST",
-            featureDisplayName: "Langy chat titles",
-            projectId: "project_1",
-          });
-        }),
+        models: api,
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
@@ -102,9 +130,10 @@ describe("LangyTitleGeneratorService", () => {
   describe("when the transcript holds no text", () => {
     /** @scenario "A conversation with nothing to read is not retried" */
     it("produces no title and never asks the model", async () => {
+      const { api, generateText } = modelProviders({});
       const generate = LangyTitleGeneratorService.create({
         messages: messages([]),
-        models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
+        models: api,
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
@@ -114,10 +143,10 @@ describe("LangyTitleGeneratorService", () => {
 
   describe("when the model answers with nothing usable", () => {
     it("produces no title", async () => {
-      generateText.mockResolvedValue({ text: "   " });
+      const { api } = modelProviders({ generateText: async () => ({ text: "   " }) });
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
-        models: resolver(() => ({ modelId: "openai/gpt-5-mini" })),
+        models: api,
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });

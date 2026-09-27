@@ -102,7 +102,11 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
   async publish(input: {
     projectId: string;
     event: string;
-    channel: "presence_updated" | "presence_cursor";
+    channel:
+      | "presence_updated"
+      | "presence_cursor"
+      | "export_progress"
+      | "langy_conversation_updated";
     rateLimited: boolean;
   }): Promise<void> {
     if (input.rateLimited) {

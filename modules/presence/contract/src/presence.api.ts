@@ -13,9 +13,13 @@ import type {
 
 /** Portable cancellation shape; browser and Node AbortSignals satisfy it. */
 export type PresenceStreamSignal = unknown;
+/**
+ * A project-wide signal a peer publishes on the tenant fabric. The consumer filters per user:
+ * a `langy_conversation_updated` payload carries its owner, and langy's watch drops it for others.
+ */
 export type PresenceProjectEvent = Readonly<{
   projectId: string;
-  channel: "export_progress";
+  channel: "export_progress" | "langy_conversation_updated";
   event: string;
 }>;
 

@@ -9077,6 +9077,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/data-retention-contract':
+        specifier: workspace:*
+        version: link:../../data-retention/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -9113,6 +9116,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/onboarding-contract':
+        specifier: workspace:*
+        version: link:../../onboarding/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -10362,6 +10368,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets

@@ -32,7 +32,7 @@ export interface PresenceBroadcast {
   publish(input: {
     projectId: string;
     event: string;
-    channel: "presence_updated" | "presence_cursor" | "export_progress";
+    channel: "presence_updated" | "presence_cursor" | PresenceProjectEvent["channel"];
     rateLimited: boolean;
   }): Promise<void>;
 }

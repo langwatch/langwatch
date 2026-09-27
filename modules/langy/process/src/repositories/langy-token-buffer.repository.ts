@@ -43,6 +43,13 @@ export abstract class LangyTokenBufferRepository {
     backstopSilentTurn?: boolean;
   }): Promise<{ backstopped: boolean; text?: string }>;
 
+  /** Ends the turn's live edge on an error entry, after whatever it had buffered. */
+  abstract markError(input: {
+    conversationId: string;
+    turnId: string;
+    error: string;
+  }): Promise<void>;
+
   /** Puts one local call's permission card on the live edge (ADR-129). */
   abstract appendLocalPermission(input: {
     conversationId: string;

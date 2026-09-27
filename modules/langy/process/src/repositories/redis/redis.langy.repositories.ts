@@ -1,6 +1,10 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 
+import {
+  LangyAnalyticsEventClickHouseRepository,
+  type LangyAnalyticsClickHouseMember,
+} from "../clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyRepositories } from "../langy-repositories.registry.ts";
 import { LangyFeedbackPromptRedisRepository } from "./redis.langy-feedback-prompt.repository.ts";
 import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
@@ -17,9 +21,11 @@ import { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repo
  * the store: every row here lives in the process's Redis.
  */
 export class PostgresLangyRepositories {
-  static readonly requires = ["redis"] as const;
+  static readonly requires = ["redis", "clickhouse"] as const;
 
-  static create(members: Readonly<{ redis: RedisConnection }>): LangyRepositories {
+  static create(
+    members: Readonly<{ redis: RedisConnection; clickhouse: LangyAnalyticsClickHouseMember }>,
+  ): LangyRepositories {
     const redis = members.redis;
     const sessionState = SessionStateStoreFactory.redis(redis);
 
@@ -36,6 +42,7 @@ export class PostgresLangyRepositories {
       // own connection per stream, so every call builds a fresh repository
       // over whatever connection the caller borrowed for that stream.
       tokenBuffer: { open: (connection) => LangyTokenBufferRedisRepository.create(connection) },
+      analyticsEvents: LangyAnalyticsEventClickHouseRepository.overMember(members.clickhouse),
     };
   }
 }

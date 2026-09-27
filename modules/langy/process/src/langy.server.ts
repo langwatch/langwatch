@@ -3,10 +3,7 @@ import { defineServerModule } from "@langwatch/kernel";
 
 import { LangyApp } from "./app/langy.app.ts";
 import type { LangyTitleGenerator, LangySessionKeyMetrics } from "./app/langy.members.ts";
-import {
-  EventingLangyConversationAdapter,
-  type EventingLangyConversationAdapterOptions,
-} from "./eventing/langy-conversation-runtime.pipeline.ts";
+import { langyConversationEventing } from "./eventing/langy-conversation.pipeline.ts";
 import { langyMaintenanceEventing } from "./eventing/langy-maintenance.pipeline.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
@@ -49,13 +46,6 @@ export function createLangyAnalyticsEventClickHouseSink(
   resolveClient: LangyAnalyticsClickHouseClientResolver,
 ): LangyAnalyticsEventClickHouseRepository {
   return LangyAnalyticsEventClickHouseRepository.create(resolveClient);
-}
-
-/** Langy's conversation pipeline and the worker-facing capability that composes it. */
-export function createEventingLangyConversationAdapter(
-  options: EventingLangyConversationAdapterOptions,
-): EventingLangyConversationAdapter {
-  return EventingLangyConversationAdapter.create(options);
 }
 
 /** The turn's live-edge token buffer, over the process's own Redis connection. */
@@ -114,4 +104,5 @@ export const langyServer = defineServerModule("langy")
       bindRestCredential("sessionKey", () => app.sessionKeyDoor),
     ];
   })
+  .withEventing(langyConversationEventing)
   .withEventing(langyMaintenanceEventing);

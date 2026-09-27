@@ -7,6 +7,7 @@ import type {
 } from "@langwatch/langy-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
+import type { LangyAnalyticsEventRepository } from "./langy-analytics-event.repository.ts";
 import type { LangyConversationRepository } from "./langy-conversation-projection.repository.ts";
 import type { LangyCredentialRepository } from "./langy-credential.repository.ts";
 import type { LangyFeedbackPromptRepository } from "./langy-feedback-prompt.repository.ts";
@@ -54,6 +55,8 @@ export interface LangyRepositories {
   readonly tokenBuffer: {
     open(connection: LangyTokenBufferConnection): LangyTokenBufferRepository;
   };
+  /** Where the content-free analytics grain the worker folds lands. */
+  readonly analyticsEvents: LangyAnalyticsEventRepository;
 }
 
 export const langyRepositories = defineRepositories({

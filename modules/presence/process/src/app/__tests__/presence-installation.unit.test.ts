@@ -40,6 +40,38 @@ describe("given a process that installs presence", () => {
       ]);
     });
 
+    /** @scenario "A langy conversation update reaches only the project it was published for" */
+    it("relays a langy conversation update to its own project's tenant emitter only", async () => {
+      const runtime = await bootPresence();
+      await runtime.start();
+      const presence = runtime.service(PresenceApi);
+      const own: unknown[] = [];
+      const other: unknown[] = [];
+      presence.getTenantEmitter("project-1").on("langy_conversation_updated", (frame) => {
+        own.push(frame);
+      });
+      presence.getTenantEmitter("project-2").on("langy_conversation_updated", (frame) => {
+        other.push(frame);
+      });
+
+      try {
+        await presence.publishProjectEvent({
+          projectId: "project-1",
+          channel: "langy_conversation_updated",
+          event: JSON.stringify({ conversationId: "conv-1", ownerUserId: "user-1" }),
+        });
+
+        expect(own).toEqual([
+          expect.objectContaining({
+            event: JSON.stringify({ conversationId: "conv-1", ownerUserId: "user-1" }),
+          }),
+        ]);
+        expect(other).toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
     it("mounts presence over sessions no database was needed for", async () => {
       const runtime = await bootPresence();
 

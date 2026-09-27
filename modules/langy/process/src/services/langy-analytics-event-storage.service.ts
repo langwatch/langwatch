@@ -6,12 +6,13 @@ import type { LangyAnalyticsEventRepository } from "../repositories/langy-analyt
 export class LangyAnalyticsEventStorageService {
   private constructor(
     private readonly sink: LangyAnalyticsEventRepository,
-    private readonly defaultRetentionDays: number,
+    private readonly defaultRetentionDays: () => number,
   ) {}
 
   static create(input: {
     sink: LangyAnalyticsEventRepository;
-    defaultRetentionDays: number;
+    /** Read per write: the platform default is data-retention's, and a peer answers it late. */
+    defaultRetentionDays: () => number;
   }): LangyAnalyticsEventStorageService {
     return new LangyAnalyticsEventStorageService(input.sink, input.defaultRetentionDays);
   }
@@ -22,7 +23,7 @@ export class LangyAnalyticsEventStorageService {
   ): Promise<void> {
     await this.sink.insert(
       { tenantId: String(context.tenantId), ...record },
-      context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+      context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
     );
   }
 
@@ -37,7 +38,7 @@ export class LangyAnalyticsEventStorageService {
     const tenantId = String(context.tenantId);
     await this.sink.insertBatch(
       records.map((record) => ({ tenantId, ...record })),
-      context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+      context.retentionPolicy?.traces ?? this.defaultRetentionDays(),
     );
   }
 }

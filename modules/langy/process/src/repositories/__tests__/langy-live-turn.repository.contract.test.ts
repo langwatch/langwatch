@@ -216,6 +216,7 @@ describe("given the langy repository registry", () => {
       });
 
       expect(Object.keys(repositories).toSorted()).toEqual([
+        "analyticsEvents",
         "feedbackPrompts",
         "frameDedup",
         "githubPrCounts",
@@ -226,6 +227,12 @@ describe("given the langy repository registry", () => {
         "turnAccess",
         "turnHandoff",
       ]);
+    });
+  });
+
+  describe("when the live tier is selected", () => {
+    it("asks for the process's ClickHouse beside its Redis, for the analytics grain", () => {
+      expect(langyRepositories.definitions.live.requires).toEqual(["redis", "clickhouse"]);
     });
   });
 });

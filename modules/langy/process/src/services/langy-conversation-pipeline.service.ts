@@ -94,6 +94,13 @@ export interface LangyConversationProcessingPipelineDeps {
   langyProcessPorts: LangyEffectMembers;
 }
 
+/** The langy_conversation_processing definition, whichever half of it a role registers. */
+export type LangyConversationDefinition = StaticPipelineDefinition<
+  LangyConversationProcessingEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
 /**
  * Aggregate: `langy_conversation` (aggregateId = conversationId, TenantId = projectId).
  * Creates the langy-conversation-processing pipeline definition (ADR-046).
@@ -101,11 +108,7 @@ export interface LangyConversationProcessingPipelineDeps {
  */
 function buildLangyConversationPipeline(
   deps: LangyConversationProcessingPipelineDeps,
-): StaticPipelineDefinition<
-  LangyConversationProcessingEvent,
-  Record<string, Projection>,
-  RegisteredCommand
-> {
+): LangyConversationDefinition {
   let builder = definePipeline({
     name: "langy_conversation_processing",
     aggregate: defineAggregate({

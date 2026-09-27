@@ -23,6 +23,23 @@ export type GuidedOnboardingStateWithInstance = GuidedOnboardingState &
 export type GuidedOnboardingStateWithVariant = GuidedOnboardingStateWithInstance &
   Readonly<{ variant: OnboardingVariant | null }>;
 
+/** The guided onboarding of the organization behind a project, read with no caller to authorize. */
+export type GuidedOnboardingForProject = Readonly<{
+  organizationId: string;
+  variant: OnboardingVariant | null;
+  state: GuidedOnboardingState;
+}>;
+
+/** One product-analytics event about guided onboarding, tracked against a person. */
+export type GuidedOnboardingTrackedEvent = Readonly<{
+  userId: string;
+  event: string;
+  projectId?: string;
+  properties: Readonly<Record<string, unknown>>;
+  /** The same for every delivery of one source event, so the sink keeps one. */
+  uuid?: string;
+}>;
+
 /** The onboarding capability. Operations arrive with the port of the process half. */
 export interface OnboardingApi {
   getGuidedState(
@@ -58,6 +75,12 @@ export interface OnboardingApi {
   recordIntegrationMethod(
     input: Readonly<{ userId: string; selection: OnboardingIntegrationMethod }>,
   ): void;
+  /** Throws `project_not_found` when the project is gone. */
+  getGuidedStateByProject(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<GuidedOnboardingForProject>;
+  /** Fire and forget: the reaction that tracks it must not fail on it. */
+  trackGuidedOnboardingEvent(input: GuidedOnboardingTrackedEvent): void;
 }
 
 export const OnboardingApi = moduleApi<OnboardingApi>()("onboarding");

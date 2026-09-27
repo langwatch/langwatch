@@ -29,6 +29,7 @@
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "posthog-node": "catalog:",

@@ -68,6 +68,10 @@ export class LangyTokenBufferMemoryRepository extends LangyTokenBufferRepository
     return { backstopped: true, text: LANGY_EMPTY_TURN_FALLBACK };
   }
 
+  async markError(input: { conversationId: string; turnId: string; error: string }): Promise<void> {
+    this.append(input, { type: "error", error: input.error });
+  }
+
   async appendLocalPermission(input: {
     conversationId: string;
     turnId: string;

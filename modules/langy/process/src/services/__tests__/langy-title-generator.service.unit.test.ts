@@ -1,144 +1,96 @@
 /**
  * @vitest-environment node
  * Title generator behavior once the model answers: transcript, stripped
- * shapes, and never failing the turn that asked for a title.
+ * shapes, and the key the project's model is resolved by.
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  ModelDefaultResolveInput,
+  ModelProviderApi,
+  ModelProviderTextGenerationInput,
+} from "@langwatch/model-provider-contract";
+import { describe, expect, it } from "vitest";
 
-vi.mock("ai", () => ({ generateText: vi.fn() }));
-
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { generateText } from "ai";
-
-import type { LangyTitleModelResolver } from "../../app/langy.members.ts";
-import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
+import type { LangyTrustedMessageReader } from "../langy-message.service.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
-
-const mockGenerateText = vi.mocked(generateText);
 
 const PROJECT_ID = "project-1";
 const CONVERSATION_ID = "conversation-1";
 
-/** The resolver, recording what the service asked it for. */
-class RecordingTitleModel implements LangyTitleModelResolver {
-  readonly asked: { projectId: string; featureKey: string; fallbackModel: string }[] = [];
-
-  constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {}
-
-  resolveTitleModel(input: {
-    projectId: string;
-    featureKey: string;
-    fallbackModel: string;
-  }): Promise<never> {
-    this.asked.push(input);
-    return Promise.resolve(this.answer) as Promise<never>;
-  }
-}
-
-/** A resolver that cannot answer, for the failure contract. */
-class RefusingTitleModel implements LangyTitleModelResolver {
-  resolveTitleModel(): Promise<never> {
-    return Promise.reject(new Error("no model gateway on this deployment"));
-  }
-}
-
-/** A project with no cheap model configured: nothing to retry. */
-class UnconfiguredTitleModel implements LangyTitleModelResolver {
-  resolveTitleModel(): Promise<never> {
-    return Promise.reject(
-      new ModelNotConfiguredError({
-        featureKey: "langy_title",
-        role: "FAST",
-        featureDisplayName: "Langy titles",
-        projectId: PROJECT_ID,
-      }),
-    );
-  }
-}
-
-function messagesOf(records: { role: string; content: string }[]): LangyTrustedMessageReader {
-  return {
+function messagesOf(records: { role: "user" | "assistant"; content: string }[]) {
+  const reader: LangyTrustedMessageReader = {
     getRecordsByConversation: async () =>
-      records.map((record, index) => ({
-        id: `message-${index}`,
-        role: record.role,
-        content: record.content,
-      })) as LangyMessageRecord[],
+      records.map((record, index) => ({ id: `message-${index}`, ...record })),
   };
+  return reader;
 }
 
+/** model-provider, answering one text and recording what it was asked. */
 function generatorOver(input: {
-  records: { role: string; content: string }[];
-  models?: LangyTitleModelResolver;
+  records: { role: "user" | "assistant"; content: string }[];
+  text?: string;
 }) {
-  const models = input.models ?? new RecordingTitleModel();
-  return {
+  const resolved: ModelDefaultResolveInput[] = [];
+  const completions: ModelProviderTextGenerationInput[] = [];
+  const models = createApiFixture<ModelProviderApi>({
+    resolveModelForFeature: async (request) => {
+      resolved.push(request);
+      return {
+        model: "openai/gpt-5-mini",
+        source: "role_default",
+        scope: "project",
+        feature: {
+          key: request.featureKey,
+          role: "FAST",
+          displayName: "Langy chat titles",
+          description: "Names each Langy conversation from its messages.",
+        },
+      };
+    },
+    generateText: async (request) => {
+      completions.push(request);
+      return { text: input.text ?? "A Title" };
+    },
+  });
+  const service = LangyTitleGeneratorService.create({
+    messages: messagesOf(input.records),
     models,
-    service: LangyTitleGeneratorService.create({
-      messages: messagesOf(input.records),
-      models,
-    }),
-  };
+  });
+  return { service, resolved, completions };
 }
+
+const call = { projectId: PROJECT_ID, conversationId: CONVERSATION_ID };
 
 describe("given a conversation the customer never named", () => {
-  beforeEach(() => {
-    mockGenerateText.mockReset();
-  });
-
   describe("when the model answers with a usable title", () => {
-    it("returns it with the model that wrote it", async () => {
-      mockGenerateText.mockResolvedValue({ text: "Debugging a failing evaluation" } as never);
-      const { service } = generatorOver({
-        records: [{ role: "user", content: "why did my evaluation fail" }],
-      });
-
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({
-        outcome: "generated",
-        title: "Debugging a failing evaluation",
-        model: "openai/gpt-5-mini",
-      });
-    });
-
-    it("asks the cascade for the conversation-title key, naming the fallback", async () => {
-      mockGenerateText.mockResolvedValue({ text: "A Title" } as never);
-      const { service, models } = generatorOver({
+    it("asks model-provider for the conversation-title key", async () => {
+      const { service, resolved, completions } = generatorOver({
         records: [{ role: "user", content: "hello" }],
       });
 
-      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.generate(call);
 
-      expect((models as RecordingTitleModel).asked).toEqual([
-        {
-          projectId: PROJECT_ID,
-          featureKey: "langy.conversation_title",
-          fallbackModel: LANGY_TITLE_GENERATION.MODEL,
-        },
+      expect(resolved).toEqual([{ projectId: PROJECT_ID, featureKey: "langy.conversation_title" }]);
+      expect(completions).toMatchObject([
+        { projectId: PROJECT_ID, featureKey: "langy.conversation_title", temperature: 0.2 },
       ]);
     });
 
     it("sends only the last few messages, each truncated", async () => {
-      mockGenerateText.mockResolvedValue({ text: "A Title" } as never);
       const overLimit = LANGY_TITLE_GENERATION.PROMPT_MESSAGE_LIMIT + 3;
-      const { service } = generatorOver({
+      const { service, completions } = generatorOver({
         records: Array.from({ length: overLimit }, (_, index) => ({
-          role: "user",
+          role: "user" as const,
           content: `${index}`.padEnd(LANGY_TITLE_GENERATION.PROMPT_CHARS_PER_MESSAGE + 50, "x"),
         })),
       });
 
-      await service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID });
+      await service.generate(call);
 
-      const sentPrompt = mockGenerateText.mock.calls[0]?.[0]?.prompt;
-      const prompt = typeof sentPrompt === "string" ? sentPrompt : "";
+      const prompt = completions[0]?.messages[0]?.content ?? "";
       const lines = prompt.split("\n").filter((line) => line.startsWith("user: "));
       expect(lines).toHaveLength(LANGY_TITLE_GENERATION.PROMPT_MESSAGE_LIMIT);
-      // The first message kept is the one `PROMPT_MESSAGE_LIMIT` from the end,
-      // so an hour-old conversation cannot turn one title call into the most
-      // expensive request the deployment makes.
       expect(lines[0]).toContain(`${overLimit - LANGY_TITLE_GENERATION.PROMPT_MESSAGE_LIMIT}`);
       for (const line of lines) {
         expect(line.length).toBeLessThanOrEqual(
@@ -155,84 +107,26 @@ describe("given a conversation the customer never named", () => {
       ["```\nFenced Answer\n```", "Fenced answer"],
       ["Trailing Punctuation.", "Trailing punctuation"],
     ])("reduces %j to the title itself", async (raw, expected) => {
-      mockGenerateText.mockResolvedValue({ text: raw } as never);
-      const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
+      const { service } = generatorOver({
+        records: [{ role: "user", content: "hello" }],
+        text: raw,
+      });
 
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toMatchObject({ title: expected });
+      await expect(service.generate(call)).resolves.toMatchObject({ title: expected });
     });
 
     it("holds the title inside the character budget", async () => {
-      mockGenerateText.mockResolvedValue({
+      const { service } = generatorOver({
+        records: [{ role: "user", content: "hello" }],
         text: "x".repeat(LANGY_TITLE_GENERATION.MAX_TITLE_CHARS + 40),
-      } as never);
-      const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
-
-      const generated = await service.generate({
-        projectId: PROJECT_ID,
-        conversationId: CONVERSATION_ID,
       });
+
+      const generated = await service.generate(call);
 
       expect(generated.outcome).toBe("generated");
       expect("title" in generated && generated.title.length).toBe(
         LANGY_TITLE_GENERATION.MAX_TITLE_CHARS,
       );
-    });
-  });
-
-  describe("when there is nothing to summarise", () => {
-    it("answers nothing without calling a model at all", async () => {
-      const { service } = generatorOver({ records: [{ role: "user", content: "   " }] });
-
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({ outcome: "unchanged" });
-      expect(mockGenerateText).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("when the project has no model to ask", () => {
-    /**
-     * Half the error contract: there is nothing to retry, so the title stays
-     * unchanged and the turn that asked for one is unaffected.
-     */
-    it("leaves the title unchanged rather than failing the turn", async () => {
-      const { service } = generatorOver({
-        records: [{ role: "user", content: "hello" }],
-        models: new UnconfiguredTitleModel(),
-      });
-
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({ outcome: "unchanged" });
-    });
-  });
-
-  describe("when the model call fails for any other reason", () => {
-    /**
-     * The other half: this attempt's own blip throws, so the process outbox
-     * retries it. Swallowed, it left the conversation on its raw first message
-     * for ever.
-     */
-    it("throws, so the outbox tries again", async () => {
-      const { service } = generatorOver({
-        records: [{ role: "user", content: "hello" }],
-        models: new RefusingTitleModel(),
-      });
-
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).rejects.toThrow("no model gateway on this deployment");
-    });
-
-    it("does the same when the model answers with nothing usable", async () => {
-      mockGenerateText.mockResolvedValue({ text: "  \n  " } as never);
-      const { service } = generatorOver({ records: [{ role: "user", content: "hello" }] });
-
-      await expect(
-        service.generate({ projectId: PROJECT_ID, conversationId: CONVERSATION_ID }),
-      ).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 });
