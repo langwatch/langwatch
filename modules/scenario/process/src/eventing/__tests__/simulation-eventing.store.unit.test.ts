@@ -11,11 +11,11 @@ import type {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
+import { SimulationRunStateStore } from "../simulation-eventing.store.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../../../eventing/simulation-run-state.projection.ts";
-import { SimulationRunStateStoreAdapter } from "../clickhouse.simulation-eventing.repository.ts";
+} from "../simulation-run-state.projection.ts";
 
 const TENANT_ID = createTenantId("project-acme");
 const RUN_ID = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";
@@ -80,11 +80,11 @@ function startedEvent(): SimulationRunStartedEvent {
   };
 }
 
-describe("SimulationRunStateStoreAdapter fold store", () => {
+describe("SimulationRunStateStore fold store", () => {
   describe("given an aggregate with no lifecycle event", () => {
     /** @scenario "Cost metrics for an unknown run write no run row" */
     it("writes no run row for cost metrics alone", async () => {
-      const adapter = SimulationRunStateStoreAdapter.create({ type: "memory" });
+      const adapter = SimulationRunStateStore.create({ type: "memory" });
       const store = adapter.createFoldStore();
       const projection = SimulationRunStateFoldProjection.create({ store });
 
@@ -101,7 +101,7 @@ describe("SimulationRunStateStoreAdapter fold store", () => {
   describe("when cost metrics arrive before the run", () => {
     /** @scenario "Cost that arrives before the run starts reaches the row" */
     it("carries the cost into the row the started event writes", async () => {
-      const adapter = SimulationRunStateStoreAdapter.create({ type: "memory" });
+      const adapter = SimulationRunStateStore.create({ type: "memory" });
       const store = adapter.createFoldStore();
       const projection = SimulationRunStateFoldProjection.create({ store });
 
@@ -124,7 +124,7 @@ describe("SimulationRunStateStoreAdapter fold store", () => {
   describe("given a run that has been queued", () => {
     /** @scenario "A run with a lifecycle event keeps writing its row" */
     it("writes the row with the cost", async () => {
-      const adapter = SimulationRunStateStoreAdapter.create({ type: "memory" });
+      const adapter = SimulationRunStateStore.create({ type: "memory" });
       const store = adapter.createFoldStore();
       const projection = SimulationRunStateFoldProjection.create({ store });
 

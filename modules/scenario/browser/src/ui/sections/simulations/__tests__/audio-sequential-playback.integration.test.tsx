@@ -11,6 +11,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
+// Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
+vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
+}));
+
 // --------------------------------------------------------------------------- jsdom
 // HTMLMediaElement stubs
 

@@ -4,13 +4,16 @@
 
 import { AgentRole } from "@langwatch/scenario";
 import type * as scenarioModule from "@langwatch/scenario";
+import {
+  VoicePhoneTransportUnavailableError,
+  PHONE_NO_BROWSER_CALL_MESSAGE,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { VoiceTransportCredential } from "../../voice-transport.registry.ts";
+import type { VoiceTransportCredential } from "../../voice-transport.channel.ts";
 import {
   createPhoneTransport,
   PHONE_CONNECT_REJECTED_PREFIX,
-  PHONE_NO_BROWSER_CALL_MESSAGE,
   PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
   resolveHttpPort,
   type PhoneTransportEnvironment,
@@ -19,9 +22,8 @@ import {
   type PhoneAgentAdapter,
   type TwilioAdapterLike,
   type TwilioAgentFactory,
-  VoicePhoneTransportUnavailableError,
   VoicePublicBaseUrlMissingError,
-} from "../phone.transport.ts";
+} from "../http.phone-voice-transport.channel.ts";
 
 const twilioAgentMock = vi.hoisted(() => vi.fn());
 

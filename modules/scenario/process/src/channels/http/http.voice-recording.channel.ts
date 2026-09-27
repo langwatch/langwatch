@@ -1,5 +1,7 @@
-import { VOICE_HTTP_TIMEOUT_MS } from "@langwatch/scenario-contract";
-import { VoiceRecordingUnavailableError } from "@langwatch/scenario-contract/voice-runtime";
+import {
+  VOICE_HTTP_TIMEOUT_MS,
+  VoiceRecordingUnavailableError,
+} from "@langwatch/scenario-contract";
 
 import { twilioBasicAuthHeader } from "../../rules/twilio-auth.rules.ts";
 import type { VoiceRecordingChannel } from "../voice-recording.channel.ts";

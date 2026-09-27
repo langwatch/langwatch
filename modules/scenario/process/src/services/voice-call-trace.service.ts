@@ -4,17 +4,17 @@
  * Best effort; recordSpan failures logged but swallowed.
  */
 
-import { createHash } from "node:crypto";
-
 import { createLogger } from "@langwatch/observability";
-import type {
-  CallRecord,
-  CallTurn,
-  VoiceSessionInfrastructure,
-} from "@langwatch/scenario-contract";
+import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import { DEFAULT_PII_REDACTION_LEVEL, type RecordSpanCommandData } from "@langwatch/trace-contract";
 
-import { HUMAN_CALLER_KIND } from "./voice-run-writer.ts";
+import {
+  groupTurnsIntoExchanges,
+  HUMAN_CALLER_KIND,
+  voiceCallTraceIds,
+  type VoiceExchange,
+} from "../rules/voice-call-trace.rules.ts";
+import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
 
 /**
  * What recording a call's traces reaches outside itself: the trace ingress
@@ -32,93 +32,6 @@ const logger = createLogger("langwatch:voice:call-trace-writer");
 export interface VoiceTraceScenario {
   scenarioId: string;
   scenarioSetId: string;
-}
-
-/**
- * One exchange: a caller utterance and the agent utterances answering it.
- * `callerText` is absent for a leading agent greeting; `agentText` is absent
- * when the caller spoke and the agent has not answered yet.
- */
-export interface VoiceExchange {
-  index: number;
-  /** Indices into `record.turns` that belong to this exchange, in order. */
-  turnIndices: number[];
-  callerText?: string;
-  agentText?: string;
-  startMs?: number;
-  endMs?: number;
-}
-
-function isCallerTurn(turn: CallTurn): boolean {
-  return turn.role === "caller";
-}
-
-function openExchange(exchanges: VoiceExchange[]): VoiceExchange {
-  const exchange: VoiceExchange = {
-    index: exchanges.length,
-    turnIndices: [],
-  };
-  exchanges.push(exchange);
-  return exchange;
-}
-
-/** Fold a turn's text into its exchange: a caller utterance is the input, agent
- *  utterances are joined into the output. */
-function applyTurnContent(exchange: VoiceExchange, turn: CallTurn): void {
-  if (isCallerTurn(turn)) {
-    // At most one caller turn reaches an exchange: groupTurnsIntoExchanges opens
-    // a new exchange on every caller turn, so this never overwrites.
-    exchange.callerText = turn.text;
-    return;
-  }
-  exchange.agentText =
-    exchange.agentText === undefined ? turn.text : `${exchange.agentText}\n${turn.text}`;
-}
-
-function applyTurnTiming(exchange: VoiceExchange, turn: CallTurn): void {
-  if (turn.startMs !== undefined) {
-    exchange.startMs = Math.min(exchange.startMs ?? turn.startMs, turn.startMs);
-  }
-  if (turn.endMs !== undefined) {
-    exchange.endMs = Math.max(exchange.endMs ?? turn.endMs, turn.endMs);
-  }
-}
-
-/**
- * Group a call's turns into exchanges. A caller turn opens a new exchange; agent
- * turns append to the open one, or open exchange 0 when they lead the call (a
- * greeting before the caller speaks).
- */
-export function groupTurnsIntoExchanges(turns: CallTurn[]): VoiceExchange[] {
-  const exchanges: VoiceExchange[] = [];
-  let open: VoiceExchange | undefined;
-  turns.forEach((turn, index) => {
-    const current = isCallerTurn(turn) || open === undefined ? openExchange(exchanges) : open;
-    open = current;
-    current.turnIndices.push(index);
-    applyTurnContent(current, turn);
-    applyTurnTiming(current, turn);
-  });
-  return exchanges;
-}
-
-/**
- * The deterministic trace and root-span ids for an exchange, derived from the
- * conversation id and the exchange index alone (mirrors
- * `scenarioRunIdForConversation`). A trace id is 32 hex chars, a span id 16.
- */
-export function voiceCallTraceIds({
-  conversationId,
-  exchangeIndex,
-}: {
-  conversationId: string;
-  exchangeIndex: number;
-}): { traceId: string; spanId: string } {
-  const sha = (input: string) => createHash("sha256").update(input).digest("hex");
-  return {
-    traceId: sha(`${conversationId}:${exchangeIndex}`).slice(0, 32),
-    spanId: sha(`${conversationId}:${exchangeIndex}:root`).slice(0, 16),
-  };
 }
 
 type OtlpAttribute = {
@@ -319,7 +232,7 @@ async function recordExchangeSpan({
  * per `record.turns[i]`, in order). Failures are logged and swallowed; the ids
  * are returned regardless (decision 7).
  */
-export function createVoiceCallTraceRecorder(
+function createVoiceCallTraceRecorder(
   collaborators: VoiceCallTraceRecorderCollaborators,
 ): VoiceSessionInfrastructure["recordCallTraces"] {
   return async function recordVoiceCallTraces({
@@ -373,4 +286,17 @@ export function createVoiceCallTraceRecorder(
 
     return { turnTraceIds };
   };
+}
+
+/** Records one trace per exchange of a finished call, bound to the trace ingress it writes to. */
+export class VoiceCallTraceService {
+  static create(collaborators: VoiceCallTraceRecorderCollaborators): VoiceCallTraceService {
+    return new VoiceCallTraceService(collaborators);
+  }
+
+  readonly recordCallTraces: VoiceSessionInfrastructure["recordCallTraces"];
+
+  private constructor(collaborators: VoiceCallTraceRecorderCollaborators) {
+    this.recordCallTraces = createVoiceCallTraceRecorder(collaborators);
+  }
 }

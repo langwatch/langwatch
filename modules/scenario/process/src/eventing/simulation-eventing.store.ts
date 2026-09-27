@@ -13,24 +13,24 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
 
-import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
-import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
-import {
-  SimulationRunStateFoldProjection,
-  type SimulationRunStateData,
-} from "../../eventing/simulation-run-state.projection.ts";
-import { MemorySimulationRunStateRepository } from "../memory/memory.simulation-run-state.repository.ts";
-import {
-  BACKFILL_STALE_THRESHOLD_MS,
-  type StalledHistoricalRun,
-} from "../stalled-simulation-run.repository.ts";
-import { ClickHouseSimulationRunMetricsRepository } from "./clickhouse.simulation-run-metrics.repository.ts";
-import { ClickHouseSimulationRunStateRepository } from "./clickhouse.simulation-run-state.repository.ts";
-import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
+import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts";
+import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "../repositories/clickhouse/clickhouse.simulation-session.store.ts";
 import {
   ClickHouseStalledSimulationRunRepository,
   type StalledSimulationRunClickHouseClient,
-} from "./clickhouse.stalled-simulation-run.repository.ts";
+} from "../repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts";
+import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository.ts";
+import {
+  BACKFILL_STALE_THRESHOLD_MS,
+  type StalledHistoricalRun,
+} from "../repositories/stalled-simulation-run.repository.ts";
+import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metrics.projection.ts";
+import { SimulationRunMetricsAppendStore } from "./simulation-run-metrics.store.ts";
+import {
+  SimulationRunStateFoldProjection,
+  type SimulationRunStateData,
+} from "./simulation-run-state.projection.ts";
 
 const logger = createLogger("scenario:simulation-run-state-fold-store");
 
@@ -96,7 +96,7 @@ type SimulationRunMetricsAppend = {
   ): Promise<void>;
 };
 
-export class SimulationRunStateStoreAdapter implements ProjectionStore {
+export class SimulationRunStateStore implements ProjectionStore {
   static create(
     options:
       | {
@@ -105,13 +105,13 @@ export class SimulationRunStateStoreAdapter implements ProjectionStore {
           defaultRetentionDays: () => number;
         }
       | { type: "memory" },
-  ): SimulationRunStateStoreAdapter {
+  ): SimulationRunStateStore {
     const store =
       options.type === "clickhouse"
         ? ClickHouseSimulationRunStateRepository.create(options)
         : MemorySimulationRunStateRepository.create();
 
-    return new SimulationRunStateStoreAdapter(store);
+    return new SimulationRunStateStore(store);
   }
 
   private constructor(private readonly store: ProjectionStore) {}
@@ -151,7 +151,7 @@ export class SimulationRunStateStoreAdapter implements ProjectionStore {
   }
 }
 
-export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationRunMetricsProjectionRecord> {
+export class SimulationRunMetricsStore implements AppendStore<SimulationRunMetricsProjectionRecord> {
   static create(
     options:
       | {
@@ -159,9 +159,9 @@ export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationR
           resolveClient: SimulationEventingClickHouseResolver;
         }
       | { type: "null" },
-  ): SimulationRunMetricsStoreAdapter {
+  ): SimulationRunMetricsStore {
     if (options.type === "null") {
-      return new SimulationRunMetricsStoreAdapter({
+      return new SimulationRunMetricsStore({
         async append() {},
         async bulkAppend() {},
       });
@@ -169,7 +169,7 @@ export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationR
 
     const repository = ClickHouseSimulationRunMetricsRepository.create(options.resolveClient);
     const store = SimulationRunMetricsAppendStore.create(repository);
-    return new SimulationRunMetricsStoreAdapter(store);
+    return new SimulationRunMetricsStore(store);
   }
 
   private constructor(private readonly store: SimulationRunMetricsAppend) {}
@@ -189,9 +189,9 @@ export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationR
   }
 }
 
-export class SimulationStalledRunAdapter {
-  static create(client: StalledSimulationRunClickHouseClient): SimulationStalledRunAdapter {
-    return new SimulationStalledRunAdapter(ClickHouseStalledSimulationRunRepository.create(client));
+export class SimulationStalledRunStore {
+  static create(client: StalledSimulationRunClickHouseClient): SimulationStalledRunStore {
+    return new SimulationStalledRunStore(ClickHouseStalledSimulationRunRepository.create(client));
   }
 
   private constructor(private readonly repository: ClickHouseStalledSimulationRunRepository) {}

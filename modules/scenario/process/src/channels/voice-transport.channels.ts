@@ -1,14 +1,21 @@
-/**
- * Serialized voice adapter factory: must receive SDK's own adapter instance (not wrapper).
- * Credential handling mirrors http adapter: key from pre-fetched data, never in events/logs.
- */
-
 import type { AgentAdapter } from "@langwatch/scenario";
-import type { VoiceAgentData } from "@langwatch/scenario-contract";
-import type {
-  VoiceTransport,
-  VoiceTransportRunner,
-} from "@langwatch/scenario-contract/voice-runtime";
+import type { VoiceAgentData, VoiceTransport } from "@langwatch/scenario-contract";
+
+import { elevenLabsConvaiTransport } from "./http/http.elevenlabs-voice-transport.channel.ts";
+import {
+  createPhoneTransport,
+  type PhoneTransportEnvironment,
+} from "./http/http.phone-voice-transport.channel.ts";
+import type { VoiceTransportRunner } from "./voice-transport.channel.ts";
+
+export function createVoiceTransportRegistry(
+  environment: PhoneTransportEnvironment,
+): Record<VoiceTransport, VoiceTransportRunner> {
+  return {
+    elevenlabs_convai: elevenLabsConvaiTransport,
+    phone: createPhoneTransport({ environment }),
+  };
+}
 
 /**
  * Shown on a voice run whose project has no OpenAI key: the SDK builds its

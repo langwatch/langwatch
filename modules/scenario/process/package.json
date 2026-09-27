@@ -20,9 +20,9 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./child": {
-      "types": "./dist/child.d.ts",
-      "default": "./src/child.ts"
+    "./scenario-child": {
+      "types": "./dist/scenario-child.server.d.ts",
+      "default": "./src/scenario-child.server.ts"
     },
     "./composition/scenario-failure-handler": {
       "types": "./dist/services/scenario-failure-handler.service.d.ts",
@@ -31,10 +31,6 @@
     "./composition/simulation-clickhouse": {
       "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
       "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
-    },
-    "./composition/simulation-eventing": {
-      "types": "./dist/repositories/clickhouse/clickhouse.simulation-eventing.repository.d.ts",
-      "default": "./src/repositories/clickhouse/clickhouse.simulation-eventing.repository.ts"
     },
     "./composition/simulation-execution": {
       "types": "./dist/repositories/simulation-execution.repository.d.ts",

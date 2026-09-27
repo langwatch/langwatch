@@ -77,19 +77,21 @@ export * from "./voice/voice-transport.ts";
 // Pure, dependency-free math and constants the browser panel also needs:
 // remaining-time countdown and the operator's default call-length limit.
 export * from "./voice/voice-countdown.ts";
-export { VOICE_CALL_MAX_SECONDS_DEFAULT, VOICE_HTTP_TIMEOUT_MS } from "./voice/voice-limits.ts";
+export {
+  VOICE_CALL_MAX_SECONDS_DEFAULT,
+  VOICE_HTTP_TIMEOUT_MS,
+  voiceCallMaxSeconds,
+} from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
-export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
+export * from "./voice/voice-session.errors.ts";
+export {
+  browserTranscriptToCallRecord,
+  VOICE_RUN_ID_PREFIX,
+  type BrowserTranscriptTurn,
+  type CallRecordSource,
+  type CallTurnRole,
+} from "./voice/call-record.ts";
 export * from "./voice/voice-session.schemas.ts";
-// Types only. The transports themselves live behind
-// `@langwatch/scenario-contract/voice-runtime`, because value-importing them
-// drags the ElevenLabs SDK, grpc and ffmpeg-static into every browser bundle
-// that imports this contract for a type.
-export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
-// The worker's public media listener hands the accepted upgrade socket to
-// the owning child and authenticates its nonce — worker-side concerns built
-// on these contract primitives, reached through the public surface, not a
-// deep relative import across the module boundary.
 export { VoiceNonceRegistry } from "./voice/voice-nonce-registry.ts";
 export { handOffVoiceSocket } from "./voice/voice-socket-handoff.ts";
 export {

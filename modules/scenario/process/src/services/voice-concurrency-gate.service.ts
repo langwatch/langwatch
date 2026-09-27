@@ -3,11 +3,15 @@
  * In-memory semaphore `voice:<projectId>`, limits concurrent runs; text runs never touch it.
  */
 
-export class VoiceConcurrencyGate {
+export class VoiceConcurrencyGateService {
+  static create(input: { max: number }): VoiceConcurrencyGateService {
+    return new VoiceConcurrencyGateService(input);
+  }
+
   private readonly max: number;
   private readonly active = new Map<string, number>();
 
-  constructor({ max }: { max: number }) {
+  private constructor({ max }: { max: number }) {
     this.max = max;
   }
 

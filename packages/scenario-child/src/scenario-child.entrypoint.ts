@@ -17,7 +17,7 @@ import {
   SCENARIO_EGRESS_POLICY_ENV,
   type ScenarioHttp,
   type ScenarioHttpResponse,
-} from "@langwatch/scenario-process/child";
+} from "@langwatch/scenario-process/scenario-child";
 
 import {
   readScenarioChildEnvironment,

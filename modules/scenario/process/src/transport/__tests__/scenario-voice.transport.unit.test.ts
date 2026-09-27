@@ -9,7 +9,7 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   VoiceRecordingKeyMissingError,
   VoiceRecordingUnavailableError,
-} from "@langwatch/scenario-contract/voice-runtime";
+} from "@langwatch/scenario-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 

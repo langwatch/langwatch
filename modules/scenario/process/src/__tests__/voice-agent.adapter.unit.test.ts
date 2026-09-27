@@ -1,15 +1,12 @@
 import { AgentRole, type AgentAdapter } from "@langwatch/scenario";
-import type { VoiceAgentData } from "@langwatch/scenario-contract";
-import type {
-  VoiceTransport,
-  VoiceTransportRunner,
-} from "@langwatch/scenario-contract/voice-runtime";
+import { type VoiceAgentData, type VoiceTransport } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { type VoiceTransportRunner } from "../channels/voice-transport.channel.ts";
 import {
   createSerializedVoiceAgentAdapter,
   NO_OPENAI_KEY_MESSAGE,
-} from "../voice-agent.adapter.ts";
+} from "../channels/voice-transport.channels.ts";
 
 const fakeAdapter: AgentAdapter = { role: AgentRole.AGENT, call: async () => "" };
 

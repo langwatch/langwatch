@@ -8,17 +8,14 @@
 import type { CallRecord, CallTurn } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  createVoiceCallTraceRecorder,
-  groupTurnsIntoExchanges,
-  voiceCallTraceIds,
-} from "../voice-call-trace-writer.ts";
+import { groupTurnsIntoExchanges, voiceCallTraceIds } from "../../rules/voice-call-trace.rules.ts";
+import { VoiceCallTraceService } from "../voice-call-trace.service.ts";
 
 const mockRecordSpan = vi.fn().mockResolvedValue(undefined);
 
 // Composed over an in-memory span collector, the same way the module's
 // composition composes it over the real trace ingress command.
-const recordVoiceCallTraces = createVoiceCallTraceRecorder({
+const { recordCallTraces: recordVoiceCallTraces } = VoiceCallTraceService.create({
   traces: {
     recordSpan: async (input) => {
       await mockRecordSpan(input);

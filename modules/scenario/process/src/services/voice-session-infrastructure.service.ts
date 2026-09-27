@@ -5,25 +5,27 @@
  */
 
 import { generate } from "@langwatch/ksuid";
-import type {
-  CallRecord,
-  SimulationService,
-  VoiceSessionInfrastructure,
-} from "@langwatch/scenario-contract";
 import {
   getOnPlatformSetId,
   parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
-  voiceAgentExternalId,
-} from "@langwatch/scenario-contract";
-import {
-  type VoiceTransport,
-  type VoiceTransportRunner,
   VoiceAgentRowNotFoundError,
+  voiceAgentExternalId,
   VoiceKeyMissingError,
-} from "@langwatch/scenario-contract/voice-runtime";
+  type CallRecord,
+  type SimulationService,
+  type VoiceTransport,
+} from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
+
+import { type VoiceTransportRunner } from "../channels/voice-transport.channel.ts";
+import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
+
+/** The project's ElevenLabs key and host; a project with none configured answers `found: false`. */
+export type ElevenLabsCredentialLookup =
+  | { found: true; credential: { apiKey: string; baseUrl: string } }
+  | { found: false };
 
 /**
  * The narrow slice of the Agent, Scenario, Gateway and Simulation surfaces the
@@ -62,15 +64,13 @@ export interface VoiceSessionServices {
    *  configured. Owned by the Gateway feature; handed in as one read so this
    *  package never depends on that module's server package. */
   elevenLabsCredentials: {
-    resolveForProject(input: {
-      projectId: string;
-    }): Promise<{ apiKey: string; baseUrl: string } | null>;
+    readForProject(input: { projectId: string }): Promise<ElevenLabsCredentialLookup>;
   };
   /** The run read a retried finish checks against. */
   simulations: Pick<SimulationService, "findScenarioRunData">;
-  /** Records one trace per exchange — `createVoiceCallTraceRecorder`. */
+  /** Records one trace per exchange — `VoiceCallTraceService`. */
   recordCallTraces: VoiceSessionInfrastructure["recordCallTraces"];
-  /** Writes the finished call down as a run — `createVoiceCallRunWriter`. */
+  /** Writes the finished call down as a run — `VoiceCallRunService`. */
   writeCallRun: VoiceSessionInfrastructure["writeCallRun"];
   /** Signs the claims a browser carries from mint to finish. The deployment's
    *  secret is resolved once, at composition, and travels as a value. */
@@ -105,12 +105,12 @@ function createCredentialReader(
   registry: VoiceSessionServices["registry"],
 ): VoiceSessionInfrastructure["getCredential"] {
   return async ({ projectId, transport }) => {
-    const credential =
+    const lookup =
       VOICE_TRANSPORT_PROVIDER[transport] === "elevenlabs"
-        ? await credentials.resolveForProject({ projectId })
-        : null;
-    if (!credential) throw new VoiceKeyMissingError(registry[transport].missingKeyMessage);
-    return { kind: "elevenlabs", ...credential };
+        ? await credentials.readForProject({ projectId })
+        : { found: false as const };
+    if (!lookup.found) throw new VoiceKeyMissingError(registry[transport].missingKeyMessage);
+    return { kind: "elevenlabs", ...lookup.credential };
   };
 }
 
@@ -119,7 +119,7 @@ function createCredentialReader(
  * production caller goes through the module's composition, which supplies the
  * Prisma-backed services; a unit test supplies in-memory fakes instead.
  */
-export function createVoiceSessionInfrastructureFromServices({
+function createVoiceSessionInfrastructureFromServices({
   agentService,
   scenarioService,
   elevenLabsCredentials,
@@ -219,4 +219,17 @@ export function createVoiceSessionInfrastructureFromServices({
     newSessionId: () => generate("scenario").toString(),
     registry,
   };
+}
+
+/** The call infrastructure composed from already-built collaborators. */
+export class VoiceSessionInfrastructureService {
+  static create(services: VoiceSessionServices): VoiceSessionInfrastructureService {
+    return new VoiceSessionInfrastructureService(services);
+  }
+
+  readonly infrastructure: VoiceSessionInfrastructure;
+
+  private constructor(services: VoiceSessionServices) {
+    this.infrastructure = createVoiceSessionInfrastructureFromServices(services);
+  }
 }

@@ -1,14 +1,6 @@
-// Registry of voice transports: one interface per transport. Vendors stay inside transports/.
-
+/** The voice transports a call runs over: one runner per vendor, the vendor kept inside it. */
 import type { AgentAdapter } from "@langwatch/scenario";
-
-import type { CallRecord } from "./call-record.ts";
-import { elevenLabsConvaiTransport } from "./transports/elevenlabs-convai.transport.ts";
-import {
-  createPhoneTransport,
-  type PhoneTransportEnvironment,
-} from "./transports/phone.transport.ts";
-import type { VoiceTransport } from "./voice-transport.ts";
+import type { CallRecord } from "@langwatch/scenario-contract";
 
 // Credential for reading/dialing. Never reaches browser (stays with runner).
 // Discriminated union: ElevenLabs (key + host) vs Twilio (SID + token + number).
@@ -71,13 +63,4 @@ export interface VoiceTransportRunner {
   endCall(adapter: AgentAdapter): Promise<void>;
   /** Customer-facing failure when the project has no key for this transport. */
   readonly missingKeyMessage: string;
-}
-
-export function createVoiceTransportRegistry(
-  environment: PhoneTransportEnvironment,
-): Record<VoiceTransport, VoiceTransportRunner> {
-  return {
-    elevenlabs_convai: elevenLabsConvaiTransport,
-    phone: createPhoneTransport({ environment }),
-  };
 }

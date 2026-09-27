@@ -7,7 +7,7 @@
 import type { CallRecord } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVoiceCallRunWriter } from "../voice-run-writer.ts";
+import { VoiceCallRunService } from "../voice-call-run.service.ts";
 
 const mockFindById = vi.fn();
 const mockStartRun = vi.fn().mockResolvedValue(undefined);
@@ -16,7 +16,7 @@ const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
 // The writer is composed over in-memory collaborators, the same way the
 // module's composition composes it over the real ones.
-const writeVoiceCallRun = createVoiceCallRunWriter({
+const { writeCallRun: writeVoiceCallRun } = VoiceCallRunService.create({
   agents: { findById: (input) => mockFindById(input) },
   simulations: {
     startRun: async (input) => {

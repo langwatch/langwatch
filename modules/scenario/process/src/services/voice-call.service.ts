@@ -1,162 +1,77 @@
-// Service for "Talk to it": mint browser call sessions and ingest finished calls as runs.
+// "Talk to it": mint browser call sessions and ingest finished calls as runs.
 // Infrastructure injection enables unit testing with fakes; transports plugged via registry.
 
-import { VOICE_AGENTS_DISABLED_MESSAGE } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
-
-import { ScenarioRunStatus } from "../scenario-run.ts";
 import {
-  type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
+  ScenarioRunStatus,
+  type BrowserTranscriptTurn,
   type CallRecord,
-  scenarioRunIdForConversation,
-} from "./call-record.ts";
-import type { VoiceSessionTokenPayload } from "./voice-session-token.payload.ts";
-import type { VoiceSessionFinishResult, VoiceSessionMintResult } from "./voice-session.schemas.ts";
+  type VoiceSessionFinishResult,
+  type VoiceSessionMintResult,
+  type VoiceSessionTokenPayload,
+  type VoiceTransport,
+  VoiceConversationMismatchError,
+  VoiceMintFailedError,
+  VoiceNameRequiredError,
+  VoiceRecordingKeyMissingError,
+  VoiceRecordingUnavailableError,
+  VoiceScenarioNotFoundError,
+} from "@langwatch/scenario-contract";
+
 import {
   type ElevenLabsCredential,
   type VoiceTransportCredential,
   type VoiceTransportRunner,
-} from "./voice-transport.registry.ts";
-import type { VoiceTransport } from "./voice-transport.ts";
+} from "../channels/voice-transport.channel.ts";
+import { scenarioRunIdForConversation } from "../rules/voice-call-record.rules.ts";
 
-/** The project has no key for this transport, so no session can be minted. */
-export class VoiceKeyMissingError extends HandledError {
-  declare readonly code: "voice_key_missing";
-  constructor(message: string) {
-    super("voice_key_missing", message, { httpStatus: 400 });
-    this.name = "VoiceKeyMissingError";
-  }
-}
+export type VoiceCallMintInput = {
+  projectId: string;
+  transport: VoiceTransport;
+  /** The vendor agent id from the form. Used only when there is no saved
+   *  row yet — a saved row's own vendor id always wins. */
+  agentId: string;
+  /** The saved agent row id, when the drawer already has one. */
+  agentRowId?: string;
+  maxDurationSeconds: number;
+};
 
-/** A run cannot be created for an unsaved agent without a name to save it
- *  under. The panel collects one and retries. */
-export class VoiceNameRequiredError extends HandledError {
-  declare readonly code: "voice_name_required";
-  constructor() {
-    super("voice_name_required", "A name is required to save the agent", {
-      httpStatus: 400,
-    });
-    this.name = "VoiceNameRequiredError";
-  }
-}
+export type VoiceCallFinishInput = {
+  /** The verified session token: the project, transport, agent row and
+   *  vendor agent id are read from here, never from the request body. */
+  token: VoiceSessionTokenPayload;
+  projectId: string;
+  name?: string;
+  transcript: BrowserTranscriptTurn[];
+  startedAt: number;
+  endedAt: number;
+  isCutAtLimit: boolean;
+  conversationId?: string;
+  /** Set for a "Call it myself" run: the scenario the call is scored under
+   *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
+  scenarioId?: string;
+};
 
-/** The provider refused the mint (bad agent id, network, API error). */
-export class VoiceMintFailedError extends HandledError {
-  declare readonly code: "voice_mint_failed";
-  constructor(message: string) {
-    super("voice_mint_failed", message, { httpStatus: 400 });
-    this.name = "VoiceMintFailedError";
-  }
-}
+export type VoiceCallPlaybackInput = {
+  projectId: string;
+  conversationId: string;
+};
 
-/**
- * The finished conversation ran against a different vendor agent than the
- * session token was minted for. Reported without writing anything, so one
- * project cannot pull another's conversation into its runs.
- */
-export class VoiceConversationMismatchError extends HandledError {
-  declare readonly code: "voice_conversation_mismatch";
-  constructor() {
-    super(
-      "voice_conversation_mismatch",
-      "This conversation does not belong to the minted session",
-      { httpStatus: 400 },
-    );
-    this.name = "VoiceConversationMismatchError";
-  }
-}
-
-/**
- * The mint request named an agent row that does not exist in this project, or
- * exists but is not a voice agent. Minting never trusts a client-supplied
- * vendor agent id (AC13/AC29) — the row is the only source of it.
- */
-export class VoiceAgentRowNotFoundError extends HandledError {
-  declare readonly code: "agent_not_found";
-  constructor() {
-    super("agent_not_found", "The voice agent was not found in this project", {
-      httpStatus: 404,
-    });
-    this.name = "VoiceAgentRowNotFoundError";
-  }
-}
-
-/**
- * A "Call it myself" finish named a scenario that no longer resolves to a
- * set: archived, removed, or another project's. Nothing is written rather
- * than silently downgrading to an unjudged drawer call (#8019).
- */
-export class VoiceScenarioNotFoundError extends HandledError {
-  declare readonly code: "scenario_not_found";
-  constructor() {
-    super("scenario_not_found", "The scenario was not found in this project", {
-      httpStatus: 404,
-    });
-    this.name = "VoiceScenarioNotFoundError";
-  }
-}
-
-/** The session token failed verification, or was minted for another project. */
-export class VoiceSessionInvalidError extends HandledError {
-  declare readonly code: "voice_session_invalid";
-  constructor() {
-    super("voice_session_invalid", "The session is invalid or has expired", {
-      httpStatus: 400,
-    });
-    this.name = "VoiceSessionInvalidError";
-  }
-}
-
-/** No live auth session behind a voice request. */
-export class VoiceUnauthenticatedError extends HandledError {
-  declare readonly code: "unauthorized";
-  constructor() {
-    super("unauthorized", "Sign in to continue", { httpStatus: 401 });
-    this.name = "VoiceUnauthenticatedError";
-  }
-}
-
-/**
- * The whole "Talk to it" door is behind the product flag: a project without it
- * turned on gets the same 404 the drawer and the run dialog render for, not a
- * 403 that would leak that the door exists at all (AC29).
- */
-export class VoiceAgentsGateDisabledError extends HandledError {
-  declare readonly code: "voice_agents_disabled";
-  constructor() {
-    super("voice_agents_disabled", VOICE_AGENTS_DISABLED_MESSAGE, {
-      httpStatus: 404,
-    });
-    this.name = "VoiceAgentsGateDisabledError";
-  }
-}
-
-/**
- * The audio proxy found no run for this conversation, or the provider had
- * nothing to stream back. Kept 404, not 400, matching the flag-off and
- * row-not-found responses on the same door.
- */
-export class VoiceRecordingUnavailableError extends HandledError {
-  declare readonly code: "voice_recording_unavailable";
-  constructor() {
-    super("voice_recording_unavailable", "The call recording is not available", {
-      httpStatus: 404,
-    });
-    this.name = "VoiceRecordingUnavailableError";
-  }
-}
-
-/** The audio proxy has no provider key to fetch the recording with. */
-export class VoiceRecordingKeyMissingError extends HandledError {
-  declare readonly code: "voice_recording_key_missing";
-  constructor() {
-    super("voice_recording_key_missing", "The call recording is not available", {
-      httpStatus: 404,
-    });
-    this.name = "VoiceRecordingKeyMissingError";
-  }
-}
+/** A run already written for a conversation, as a finish or a replay reads it back. */
+export type VoiceSessionExistingRun = {
+  agentId: string | null;
+  status: ScenarioRunStatus;
+  source: CallRecord["source"] | null;
+  audioUrl: string | null;
+  /** The scenario the run was written under, reused on a re-drive so a
+   *  scenario archived between attempts cannot break the retry (#7973 AC1).
+   *  Null when the run carries none (a drawer call). */
+  scenarioId: string | null;
+  /** The set the run landed in, so a terminal retry deep-links it (AC14).
+   *  Null when the run carries none (a drawer call). */
+  scenarioSetId: string | null;
+};
 
 export interface VoiceSessionInfrastructure {
   /** The provider key and host for this project's transport. Throws
@@ -185,19 +100,10 @@ export interface VoiceSessionInfrastructure {
    *  finish short-circuits on a written run but re-drives a half-written one
    *  (#7973). Also returns the persisted scenario and set so a re-drive reuses
    *  them rather than re-resolving a scenario that may since be archived. */
-  findExistingRun(input: { projectId: string; scenarioRunId: string }): Promise<{
-    agentId: string | null;
-    status: ScenarioRunStatus;
-    source: CallRecord["source"] | null;
-    audioUrl: string | null;
-    /** The scenario the run was written under, reused on a re-drive so a
-     *  scenario archived between attempts cannot break the retry (#7973 AC1).
-     *  Null when the run carries none (a drawer call). */
-    scenarioId: string | null;
-    /** The set the run landed in, so a terminal retry deep-links it (AC14).
-     *  Null when the run carries none (a drawer call). */
-    scenarioSetId: string | null;
-  } | null>;
+  findExistingRun(input: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<VoiceSessionExistingRun | null>;
   /** Create the voice agent row on hang-up when the drawer had none yet. */
   createVoiceAgent(input: {
     projectId: string;
@@ -255,28 +161,18 @@ function runnerFor(
 
 /** Extra grace beyond the call budget before a session token expires: a call
  *  runs at most the budget, and finish arrives soon after. */
-export const VOICE_SESSION_TOKEN_GRACE_MS = 10 * 60 * 1000;
+const VOICE_SESSION_TOKEN_GRACE_MS = 10 * 60 * 1000;
 
 // Ask transport for signed URL. Vendor agent id from saved row if present; from request if draft.
 // Throws VoiceAgentRowNotFoundError, VoiceKeyMissingError, or VoiceMintFailedError.
-export async function mintVoiceSession({
+async function mintVoiceSession({
   ports,
   projectId,
   transport,
   agentId: bodyAgentId,
   agentRowId,
   maxDurationSeconds,
-}: {
-  ports: VoiceSessionInfrastructure;
-  projectId: string;
-  transport: VoiceTransport;
-  /** The vendor agent id from the form. Used only when there is no saved
-   *  row yet — a saved row's own vendor id always wins. */
-  agentId: string;
-  /** The saved agent row id, when the drawer already has one. */
-  agentRowId?: string;
-  maxDurationSeconds: number;
-}): Promise<VoiceSessionMintResult> {
+}: VoiceCallMintInput & { ports: VoiceSessionInfrastructure }): Promise<VoiceSessionMintResult> {
   const row = agentRowId ? await ports.getVoiceAgentRow({ projectId, agentRowId }) : undefined;
   const agentId = row?.agentExternalId ?? bodyAgentId;
 
@@ -410,7 +306,7 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
-type ExistingRun = NonNullable<Awaited<ReturnType<VoiceSessionInfrastructure["findExistingRun"]>>>;
+type ExistingRun = VoiceSessionExistingRun;
 
 /**
  * The result for a terminal run returned untouched: a duplicate finish
@@ -627,22 +523,9 @@ async function finishDrawerCall(
 
 // Ingest finished call: drawer (traces only) or scenario (run written and judged).
 // Fully written runs returned untouched (AC14); half-written re-driven (#7973).
-export async function finishVoiceSession(input: {
-  ports: VoiceSessionInfrastructure;
-  /** The verified session token: the project, transport, agent row and
-   *  vendor agent id are read from here, never from the request body. */
-  token: VoiceSessionTokenPayload;
-  projectId: string;
-  name?: string;
-  transcript: BrowserTranscriptTurn[];
-  startedAt: number;
-  endedAt: number;
-  isCutAtLimit: boolean;
-  conversationId?: string;
-  /** Set for a "Call it myself" run: the scenario the call is scored under
-   *  (AC23). Absent for a drawer call, which is not written as a run (#8020). */
-  scenarioId?: string;
-}): Promise<VoiceSessionFinishResult> {
+async function finishVoiceSession(
+  input: VoiceCallFinishInput & { ports: VoiceSessionInfrastructure },
+): Promise<VoiceSessionFinishResult> {
   const { ports, token } = input;
   const transport = token.transport;
   const conversationId = input.conversationId?.trim() || token.sessionId;
@@ -756,15 +639,11 @@ async function drawerRecordingBelongsToProject(
 
 // Authorize recording playback and return provider credential. Scenario runs authorize directly;
 // drawer calls (#8020) authorized only if conversation ran against saved voice agent.
-export async function authorizeRecordingPlayback({
+async function authorizeRecordingPlayback({
   ports,
   projectId,
   conversationId,
-}: {
-  ports: VoiceSessionInfrastructure;
-  projectId: string;
-  conversationId: string;
-}): Promise<ElevenLabsCredential> {
+}: VoiceCallPlaybackInput & { ports: VoiceSessionInfrastructure }): Promise<ElevenLabsCredential> {
   const transport: VoiceTransport = "elevenlabs_convai";
   const existing = await ports.findExistingRun({
     projectId,
@@ -800,4 +679,25 @@ export async function authorizeRecordingPlayback({
   });
   if (!allowed) throw new VoiceRecordingUnavailableError();
   return credential;
+}
+
+/** The call lifecycle behind a browser session: mint, ingest the finished call, gate playback. */
+export class VoiceCallService {
+  static create(ports: VoiceSessionInfrastructure): VoiceCallService {
+    return new VoiceCallService(ports);
+  }
+
+  private constructor(private readonly ports: VoiceSessionInfrastructure) {}
+
+  mint(input: VoiceCallMintInput): Promise<VoiceSessionMintResult> {
+    return mintVoiceSession({ ...input, ports: this.ports });
+  }
+
+  finish(input: VoiceCallFinishInput): Promise<VoiceSessionFinishResult> {
+    return finishVoiceSession({ ...input, ports: this.ports });
+  }
+
+  authorizeRecordingPlayback(input: VoiceCallPlaybackInput): Promise<ElevenLabsCredential> {
+    return authorizeRecordingPlayback({ ...input, ports: this.ports });
+  }
 }

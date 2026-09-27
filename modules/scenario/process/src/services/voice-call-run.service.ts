@@ -9,8 +9,10 @@ import {
   type CallRecord,
   type SimulationMessage,
   type SimulationService,
-  type VoiceSessionInfrastructure,
 } from "@langwatch/scenario-contract";
+
+import { HUMAN_CALLER_KIND } from "../rules/voice-call-trace.rules.ts";
+import type { VoiceSessionInfrastructure } from "./voice-call.service.ts";
 
 /**
  * What the write reaches outside itself: the project's agent rows and the
@@ -23,9 +25,6 @@ export interface VoiceCallRunWriterCollaborators {
   };
   simulations: Pick<SimulationService, "startRun" | "messageSnapshot" | "finishRun">;
 }
-
-/** How the run records who spoke as the caller: a person, not a simulator. */
-export const HUMAN_CALLER_KIND = "human";
 
 /**
  * Message ids derive from the run id and turn index, not anything random,
@@ -63,7 +62,7 @@ export interface VoiceRunScenario {
  * {@link VoiceSessionInfrastructure.writeCallRun} the voice session service
  * calls.
  */
-export function createVoiceCallRunWriter(
+function createVoiceCallRunWriter(
   collaborators: VoiceCallRunWriterCollaborators,
 ): VoiceSessionInfrastructure["writeCallRun"] {
   return async function writeVoiceCallRun({
@@ -155,4 +154,17 @@ export function createVoiceCallRunWriter(
       occurredAt: record.endedAt,
     });
   };
+}
+
+/** Writes a finished call down as a run, bound to the collaborators it runs against. */
+export class VoiceCallRunService {
+  static create(collaborators: VoiceCallRunWriterCollaborators): VoiceCallRunService {
+    return new VoiceCallRunService(collaborators);
+  }
+
+  readonly writeCallRun: VoiceSessionInfrastructure["writeCallRun"];
+
+  private constructor(collaborators: VoiceCallRunWriterCollaborators) {
+    this.writeCallRun = createVoiceCallRunWriter(collaborators);
+  }
 }

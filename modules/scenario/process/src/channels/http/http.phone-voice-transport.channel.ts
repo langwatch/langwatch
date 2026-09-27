@@ -2,16 +2,16 @@
  * no browser paths; headless dial through createAgentAdapter.
  */
 
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
+import { VoicePhoneTransportUnavailableError } from "@langwatch/scenario-contract";
 
 import type {
   VoiceAgentAdapterRequest,
   VoiceTransportCredential,
   VoiceTransportRunner,
-} from "../voice-transport.registry.ts";
+} from "../voice-transport.channel.ts";
 
 const logger = createLogger("langwatch:scenarios:voice:phone");
 
@@ -22,13 +22,6 @@ const logger = createLogger("langwatch:scenarios:voice:phone");
  */
 export const PHONE_NO_CREDENTIAL_MESSAGE =
   "No Twilio credentials in this project. Add them under Settings > Model Providers.";
-
-/**
- * Shown on the browser-driven paths (availability, mint, record), which a phone
- * target has no meaning in: a phone call has no browser leg.
- */
-export const PHONE_NO_BROWSER_CALL_MESSAGE =
-  "Phone targets have no browser call. Run a scenario against the phone number instead.";
 
 /** Prefix for a run whose Twilio connect or a-leg dial failed. */
 export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
@@ -46,19 +39,6 @@ export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
  * ceiling). 0.8s, not the SDK's 0.6s default, since phone pauses run longer.
  */
 export const PHONE_RESPONSE_TAIL_SILENCE_SECONDS = 0.8;
-
-/**
- * A phone target was exercised on a path it has no meaning on (a browser
- * mint, record, or availability guard). One code, so the failure reads the
- * same everywhere; extends the same HandledError base as voice-session.
- */
-export class VoicePhoneTransportUnavailableError extends HandledError {
-  declare readonly code: "voice_phone_transport_unavailable";
-  constructor(message: string = PHONE_NO_BROWSER_CALL_MESSAGE) {
-    super("voice_phone_transport_unavailable", message, { httpStatus: 400 });
-    this.name = "VoicePhoneTransportUnavailableError";
-  }
-}
 
 /** The narrow slice of `TwilioAgentAdapter` the runner drives. A fake standing
  *  in for it in a test implements just these three methods. */

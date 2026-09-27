@@ -7,15 +7,15 @@
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
+import {
+  VOICE_HTTP_TIMEOUT_MS,
+  VoiceCallRecordNotReadyError,
+  type CallRecord,
+  type CallTurn,
+} from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { VoiceCallRecordNotReadyError } from "../../scenario.errors.ts";
-import type { CallRecord, CallTurn } from "../call-record.ts";
-import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
-import type {
-  VoiceTransportCredential,
-  VoiceTransportRunner,
-} from "../voice-transport.registry.ts";
+import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.channel.ts";
 
 const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
 
@@ -82,7 +82,7 @@ async function withTimeout<T>(
   timeoutMs: number,
   onTimeout?: () => void,
 ): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timer: NodeJS.Timeout | undefined;
   try {
     return await Promise.race([
       promise,

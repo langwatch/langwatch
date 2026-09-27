@@ -2,32 +2,45 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import { ScenarioRunStatus } from "../../scenario-run.ts";
-import { VoiceCallRecordNotReadyError } from "../../scenario.errors.ts";
-import type { CallRecord } from "../call-record.ts";
 import {
-  createPhoneTransport,
   VoicePhoneTransportUnavailableError,
-} from "../transports/phone.transport.ts";
-import type { VoiceSessionTokenPayload } from "../voice-session-token.payload.ts";
-import {
-  authorizeRecordingPlayback,
-  finishVoiceSession,
-  mintVoiceSession,
+  ScenarioRunStatus,
   VoiceAgentRowNotFoundError,
+  VoiceCallRecordNotReadyError,
   VoiceConversationMismatchError,
   VoiceKeyMissingError,
   VoiceRecordingKeyMissingError,
   VoiceRecordingUnavailableError,
   VoiceScenarioNotFoundError,
-  type VoiceSessionInfrastructure,
-} from "../voice-session.service.ts";
+  type CallRecord,
+  type VoiceSessionTokenPayload,
+} from "@langwatch/scenario-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { createPhoneTransport } from "../../channels/http/http.phone-voice-transport.channel.ts";
 import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
-} from "../voice-transport.registry.ts";
+} from "../../channels/voice-transport.channel.ts";
+import {
+  VoiceCallService,
+  type VoiceCallFinishInput,
+  type VoiceCallMintInput,
+  type VoiceCallPlaybackInput,
+  type VoiceSessionInfrastructure,
+} from "../voice-call.service.ts";
+
+type WithInfrastructure<Input> = Input & { ports: VoiceSessionInfrastructure };
+
+const mintVoiceSession = ({ ports, ...input }: WithInfrastructure<VoiceCallMintInput>) =>
+  VoiceCallService.create(ports).mint(input);
+const finishVoiceSession = ({ ports, ...input }: WithInfrastructure<VoiceCallFinishInput>) =>
+  VoiceCallService.create(ports).finish(input);
+const authorizeRecordingPlayback = ({
+  ports,
+  ...input
+}: WithInfrastructure<VoiceCallPlaybackInput>) =>
+  VoiceCallService.create(ports).authorizeRecordingPlayback(input);
 
 const CREDENTIAL: VoiceTransportCredential = {
   kind: "elevenlabs",

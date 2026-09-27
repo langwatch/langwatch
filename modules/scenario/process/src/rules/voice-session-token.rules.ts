@@ -9,8 +9,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   type VoiceSessionTokenPayload,
   voiceSessionTokenPayloadSchema,
+  VoiceSessionInvalidError,
 } from "@langwatch/scenario-contract";
-import { VoiceSessionInvalidError } from "@langwatch/scenario-contract/voice-runtime";
 
 function sign(body: string, secret: string): string {
   return createHmac("sha256", secret).update(body).digest("base64url");

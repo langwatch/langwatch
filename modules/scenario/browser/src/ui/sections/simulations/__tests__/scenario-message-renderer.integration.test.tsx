@@ -9,6 +9,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
+// Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
+vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
+}));
+
 // RunTurnSeparator internally calls useOrganizationTeamProject() and
 // api.traces.getById.useQuery, neither of which is available in this jsdom
 // harness — mock the module so the renderer's grouping contract (one

@@ -35,11 +35,11 @@ export * from "./channels/http/http.serialized-prompt-config.channel.ts";
 export * from "./channels/http/http.serialized-workflow-agent.channel.ts";
 export {
   BACKFILL_STALE_THRESHOLD_MS,
-  SimulationRunMetricsStoreAdapter,
-  SimulationRunStateStoreAdapter,
-  SimulationStalledRunAdapter,
+  SimulationRunMetricsStore,
+  SimulationRunStateStore,
+  SimulationStalledRunStore,
   type SimulationStalledRun,
-} from "./repositories/clickhouse/clickhouse.simulation-eventing.repository.ts";
+} from "./eventing/simulation-eventing.store.ts";
 export * from "./eventing/simulation-processing.commands.ts";
 export {
   SimulationProcessingPipelineAdapter,

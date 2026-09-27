@@ -2,6 +2,7 @@
 
 import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
 import {
+  type UiConversationThreadProps,
   type UiSetupWithAgentButtonProps,
   type UiTracePreviewHoverCardProps,
 } from "@langwatch/browser-host/declarations";
@@ -40,6 +41,24 @@ export function TracePreviewHoverCard(props: UiTracePreviewHoverCardProps) {
   if (lent.length === 0) return props.children;
   return lent.map(({ key, Lent }) => (
     <Suspense key={key} fallback={props.children}>
+      <Lent {...props} />
+    </Suspense>
+  ));
+}
+
+/** Trace's conversation renderer, rendered as trace lends it. */
+export function ConversationThread(props: UiConversationThreadProps) {
+  const declarations = useUiDeclarations();
+  // `lazy` once per declaration, never per render, so it is not remounted.
+  const lent = useMemo(
+    () =>
+      declarations
+        .declared("conversationThread")
+        .map(({ module, capability }) => ({ key: module, Lent: lazy(capability.load) })),
+    [declarations],
+  );
+  return lent.map(({ key, Lent }) => (
+    <Suspense key={key} fallback={null}>
       <Lent {...props} />
     </Suspense>
   ));

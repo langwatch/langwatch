@@ -14,33 +14,32 @@ import type {
   VoiceSessionAudioRequest,
   VoiceSessionFinishRequest,
   VoiceSessionFinishResult,
-  VoiceSessionInfrastructure,
   VoiceSessionMintRequest,
   VoiceSessionMintResult,
   VoiceSessionTokenPayload,
   SimulationService,
 } from "@langwatch/scenario-contract";
 import {
-  authorizeRecordingPlayback,
-  createVoiceTransportRegistry,
   voiceCallMaxSeconds,
-  finishVoiceSession,
-  mintVoiceSession,
   VoiceAgentsGateDisabledError,
   VoiceRecordingKeyMissingError,
   VoiceSessionInvalidError,
-} from "@langwatch/scenario-contract/voice-runtime";
+} from "@langwatch/scenario-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { VoiceRecordingChannel } from "../channels/voice-recording.channel.ts";
+import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
 import { twilioBasicAuthHeader } from "../rules/twilio-auth.rules.ts";
 import { voicePermissionsFor } from "../rules/voice-permissions.rules.ts";
+import {
+  signVoiceSessionToken,
+  verifyVoiceSessionToken,
+} from "../rules/voice-session-token.rules.ts";
 import type { ScenarioService } from "./scenario.service.ts";
-import { createVoiceCallTraceRecorder } from "./voice-call-trace-writer.ts";
-import { createVoiceCallRunWriter } from "./voice-run-writer.ts";
-import { signVoiceSessionToken, verifyVoiceSessionToken } from "./voice-session-token.ts";
-import { createVoiceSessionInfrastructureFromServices } from "./voice-session.infrastructure.ts";
-import { createWholeCallAudioInfrastructure } from "./whole-call-audio.infrastructure.ts";
+import { VoiceCallRunService } from "./voice-call-run.service.ts";
+import { VoiceCallTraceService } from "./voice-call-trace.service.ts";
+import { VoiceCallService, type VoiceSessionInfrastructure } from "./voice-call.service.ts";
+import { VoiceSessionInfrastructureService } from "./voice-session-infrastructure.service.ts";
 import {
   WholeCallAudioService,
   type WholeCallAudioInfrastructure,
@@ -101,7 +100,7 @@ export class VoiceSessionService {
     recordings: VoiceRecordingChannel;
   }): VoiceSessionService {
     const { peers, signingSecret } = input;
-    const infrastructure = createVoiceSessionInfrastructureFromServices({
+    const { infrastructure } = VoiceSessionInfrastructureService.create({
       agentService: {
         getById: (agent) => peers.agents.getById(agent),
         createVoiceAgent: (agent) => peers.agents.createVoiceAgent(agent),
@@ -109,28 +108,33 @@ export class VoiceSessionService {
       },
       scenarioService: { getById: (scenario) => input.scenarios.getById(scenario) },
       elevenLabsCredentials: {
-        async resolveForProject({ projectId }) {
+        async readForProject({ projectId }) {
           const rows = await peers.modelProviders.findAllAccessibleForProject({ projectId });
           const row = rows.find((r) => r.provider === "elevenlabs" && r.enabled);
-          if (!row?.id) return null;
+          if (!row?.id) return { found: false };
           try {
-            return await peers.gateway.getElevenLabsApiCredential({ modelProviderId: row.id });
+            const credential = await peers.gateway.getElevenLabsApiCredential({
+              modelProviderId: row.id,
+            });
+            return { found: true, credential };
           } catch (error) {
-            if (HandledError.isHandled(error) && error.code === "voice_key_missing") return null;
+            if (HandledError.isHandled(error) && error.code === "voice_key_missing") {
+              return { found: false };
+            }
             throw error;
           }
         },
       },
       simulations: input.simulations,
-      recordCallTraces: createVoiceCallTraceRecorder({
+      recordCallTraces: VoiceCallTraceService.create({
         traces: { recordSpan: (span) => peers.traces.recordSpan(span) },
-      }),
-      writeCallRun: createVoiceCallRunWriter({
+      }).recordCallTraces,
+      writeCallRun: VoiceCallRunService.create({
         agents: {
           findById: async (agent) => ((await peers.agents.exists(agent)) ? { id: agent.id } : null),
         },
         simulations: input.simulations,
-      }),
+      }).writeCallRun,
       signSessionToken: (payload) =>
         signVoiceSessionToken({ payload, secret: getSigningSecret(signingSecret) }),
       registry: createVoiceTransportRegistry({ voicePublicBaseUrl: input.voicePublicBaseUrl }),
@@ -141,7 +145,7 @@ export class VoiceSessionService {
       authz: peers.authz,
       featureFlags: peers.featureFlags,
       recordings: input.recordings,
-      wholeCallAudio: createWholeCallAudioInfrastructure({
+      wholeCallAudio: WholeCallAudioService.infrastructureFrom({
         simulations: input.simulations,
         traces: peers.traces,
       }),
@@ -174,8 +178,7 @@ export class VoiceSessionService {
       permissions: voicePermissionsFor({ createsAgent: !input.agentRowId }),
     });
 
-    return mintVoiceSession({
-      ports: this.options.infrastructure,
+    return VoiceCallService.create(this.options.infrastructure).mint({
       projectId: input.projectId,
       transport: input.transport,
       agentId: input.agentId,
@@ -198,8 +201,7 @@ export class VoiceSessionService {
       permissions: voicePermissionsFor({ createsAgent: !token.agentId }),
     });
 
-    return finishVoiceSession({
-      ports: this.options.infrastructure,
+    return VoiceCallService.create(this.options.infrastructure).finish({
       token,
       projectId: input.projectId,
       transcript: input.transcript,
@@ -219,8 +221,9 @@ export class VoiceSessionService {
       projectId: input.projectId,
       permissions: ["scenarios:view"],
     });
-    const credential = await authorizeRecordingPlayback({
-      ports: this.options.infrastructure,
+    const credential = await VoiceCallService.create(
+      this.options.infrastructure,
+    ).authorizeRecordingPlayback({
       projectId: input.projectId,
       conversationId: input.conversationId,
     });

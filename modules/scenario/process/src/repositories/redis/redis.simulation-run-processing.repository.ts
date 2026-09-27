@@ -1,9 +1,9 @@
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 
+import { SimulationRunStateStore } from "../../eventing/simulation-eventing.store.ts";
 import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
 import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
-import { SimulationRunStateStoreAdapter } from "../clickhouse/clickhouse.simulation-eventing.repository.ts";
 import { ClickHouseSimulationRunMetricsRepository } from "../clickhouse/clickhouse.simulation-run-metrics.repository.ts";
 import {
   ClickHouseSimulationSession,
@@ -37,7 +37,7 @@ export class RedisSimulationRunProcessingRepository implements SimulationRunProc
   }: {
     defaultRetentionDays: () => number;
   }): FoldProjectionStore<SimulationRunStateData> {
-    const durable = SimulationRunStateStoreAdapter.create({
+    const durable = SimulationRunStateStore.create({
       type: "clickhouse",
       resolveClient: this.resolveClient,
       defaultRetentionDays,
