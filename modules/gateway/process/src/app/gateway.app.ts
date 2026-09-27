@@ -580,6 +580,12 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     scopes: readonly GatewayVirtualKeyScope[];
     permission: AuthzPermission;
   }): Promise<void>;
+  /** One named permission at the organization; a legacy project key passes, as on main. */
+  assertCanOperateAtOrganization(input: {
+    actor: GatewayActor;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<void>;
   /** Anchors every scope in the set to this organization. */
   assertScopesBelongToOrganization(input: {
     organizationId: string;
@@ -2279,10 +2285,6 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     organizationId: string;
     permission: AuthzPermission;
   }): Promise<void> {
-    await this.#dependencies.assertCanOperateOnAnyScope({
-      actor: input.actor,
-      scopes: [{ scopeType: "ORGANIZATION", scopeId: input.organizationId }],
-      permission: input.permission,
-    });
+    await this.#dependencies.assertCanOperateAtOrganization(input);
   }
 }

@@ -91,8 +91,9 @@ describe("assertActorCanCreateScopes", () => {
           callerProjectId: "proj_demo",
         }),
       ).rejects.toMatchObject({
-        code: "FORBIDDEN",
-        message: "permission_denied: virtualKeys:create at PROJECT:proj_demo",
+        code: "permission_denied",
+        httpStatus: 403,
+        meta: { permission: "virtualKeys:create", scopeType: "project" },
       });
     });
   });
@@ -104,7 +105,8 @@ describe("assertActorCanCreateScopes", () => {
       await expect(
         service.assertActorCanCreateScopes(ctx, { scopes: [TEAM], callerProjectId: "proj_demo" }),
       ).rejects.toMatchObject({
-        message: "permission_denied: virtualKeys:manage at TEAM:team_demo",
+        code: "permission_denied",
+        meta: { permission: "virtualKeys:manage", scopeType: "team" },
       });
     });
 
@@ -117,7 +119,8 @@ describe("assertActorCanCreateScopes", () => {
           callerProjectId: "proj_demo",
         }),
       ).rejects.toMatchObject({
-        message: "permission_denied: virtualKeys:manage at PROJECT:proj_other",
+        code: "permission_denied",
+        meta: { permission: "virtualKeys:manage", scopeType: "project" },
       });
     });
 
@@ -130,7 +133,8 @@ describe("assertActorCanCreateScopes", () => {
           callerProjectId: "proj_demo",
         }),
       ).rejects.toMatchObject({
-        message: "permission_denied: virtualKeys:manage at PROJECT:proj_demo",
+        code: "permission_denied",
+        meta: { permission: "virtualKeys:manage", scopeType: "project" },
       });
     });
   });

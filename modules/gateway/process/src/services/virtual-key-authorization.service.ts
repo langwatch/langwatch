@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
 import type { VirtualKeyWithScopes, GuardrailAttachment } from "@langwatch/gateway-contract";
 import {
   GatewayGuardrailProjectMismatchError,
@@ -6,7 +6,6 @@ import {
   GuardrailAttachForbiddenError,
   VirtualKeyNotFoundError,
 } from "@langwatch/gateway-contract";
-import { TRPCError } from "@trpc/server";
 
 import type { GatewayScopePermissions } from "../app/gateway.members.ts";
 import type { VirtualKeyAuthorizationRepository } from "../repositories/virtual-key-authorization.repository.ts";
@@ -58,8 +57,21 @@ export type GuardrailProjectKey = {
   traceProjectId?: string | null;
 };
 
-function scopeLabel(scope: Scope): string {
-  return `${scope.scopeType}:${scope.scopeId}`;
+const AUTHZ_TIER = {
+  ORGANIZATION: "organization",
+  TEAM: "team",
+  PROJECT: "project",
+} as const satisfies Record<Scope["scopeType"], "organization" | "team" | "project">;
+
+/** The one denial error (ADR-092 §2), at the scope the grant was missing from. */
+function permissionDenied(permission: AuthzPermission, scope: Scope | undefined) {
+  return new PermissionDeniedError({
+    permission,
+    scope: scope
+      ? { type: AUTHZ_TIER[scope.scopeType], id: scope.scopeId }
+      : { type: "organization", id: "" },
+    denialReason: "no-binding",
+  });
 }
 
 /**
@@ -189,7 +201,7 @@ export class VirtualKeyAuthorizationService {
 
   /**
    * Create gate: require `virtualKeys:manage` on every requested scope.
-   * Throws FORBIDDEN naming the first unauthorized scope so the caller sees
+   * Throws permission_denied at the first unauthorized scope so the caller sees
    * exactly which grant is missing.
    */
   async assertActorCanManageAllScopes(ctx: ActorContext, scopes: Scope[]): Promise<void> {
@@ -198,20 +210,13 @@ export class VirtualKeyAuthorizationService {
     // the one permission check in the file that grants by default. Its sibling
     // `assertActorCanOperateOnAnyScope` already denies an empty list, and two
     // gates in one file with opposite empty-input answers is the trap.
-    if (scopes.length === 0) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
-    }
-
-    if (ctx.actor.kind === "session" && !ctx.actor.session) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
+    if (scopes.length === 0 || (ctx.actor.kind === "session" && !ctx.actor.session)) {
+      throw permissionDenied("virtualKeys:manage", scopes[0]);
     }
 
     for (const scope of scopes) {
       if (!(await this.actorHasPermissionAtScope(ctx, scope, "virtualKeys:manage"))) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `permission_denied: virtualKeys:manage at ${scopeLabel(scope)}`,
-        });
+        throw permissionDenied("virtualKeys:manage", scope);
       }
     }
   }
@@ -234,21 +239,17 @@ export class VirtualKeyAuthorizationService {
       return this.assertActorCanManageAllScopes(ctx, scopes);
     }
 
-    if (ctx.actor.kind === "session" && !ctx.actor.session) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "permission_denied" });
-    }
-
-    if (!(await this.actorHasPermissionAtScope(ctx, only, "virtualKeys:create"))) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `permission_denied: virtualKeys:create at ${scopeLabel(only)}`,
-      });
+    if (
+      (ctx.actor.kind === "session" && !ctx.actor.session) ||
+      !(await this.actorHasPermissionAtScope(ctx, only, "virtualKeys:create"))
+    ) {
+      throw permissionDenied("virtualKeys:create", only);
     }
   }
 
   /**
    * Update / rotate / delete gate: require the op permission on at least one
-   * of the key's existing scopes. Throws FORBIDDEN when the caller holds it
+   * of the key's existing scopes. Throws permission_denied when the caller holds it
    * on none of them.
    */
   async assertActorCanOperateOnAnyScope(
@@ -262,10 +263,24 @@ export class VirtualKeyAuthorizationService {
       }
     }
 
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `permission_denied: ${permission} at one of the virtual key's scopes`,
-    });
+    throw permissionDenied(permission, scopes[0]);
+  }
+
+  /**
+   * Gate for an organization-owned gateway row (budgets, cache rules). A legacy
+   * project key passes, as on main: it carries full access by its class alone.
+   */
+  async assertActorCanOperateAtOrganization(
+    ctx: ActorContext,
+    { organizationId, permission }: { organizationId: string; permission: AuthzPermission },
+  ): Promise<void> {
+    if (ctx.actor.kind === "legacyProjectKey") return;
+
+    await this.assertActorCanOperateOnAnyScope(
+      ctx,
+      [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+      permission,
+    );
   }
 
   /** Session-shaped wrapper over {@link assertActorCanManageAllScopes}. */
@@ -283,10 +298,7 @@ export class VirtualKeyAuthorizationService {
     permission: AuthzPermission,
   ): Promise<void> {
     if (!ctx.session) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `permission_denied: ${permission} at one of the virtual key's scopes`,
-      });
+      throw permissionDenied(permission, scopes[0]);
     }
 
     return this.assertActorCanOperateOnAnyScope(

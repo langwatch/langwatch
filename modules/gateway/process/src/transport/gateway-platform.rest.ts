@@ -2,6 +2,7 @@ import {
   apiErrorSchema,
   canonicalBaseResponses,
   canonicalConflictResponses,
+  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   RequestValidationError,
@@ -35,8 +36,8 @@ import {
   gatewayEnableVirtualKeyBodySchema,
   gatewayRevokeVirtualKeyBodySchema,
   gatewayRetiredProviderBindingBodySchema,
+  gatewayRequestCredentialSchema,
   GatewayProviderBindingsGoneError,
-  type GatewayCaller,
   type GatewayCacheRuleResource,
   type GatewayMintedVirtualKey,
   type GatewayVirtualKeySnakeDto,
@@ -67,7 +68,12 @@ const canonicalGoneResponses = {
   },
 } as const;
 
-/** The stable actor id every write records, from the door's resolved caller. */
+/** The credential this request arrived on, as the project door resolved it. */
+export const gatewayRestCredential = defineRestMiddleware(
+  "gatewayRestCredential",
+  gatewayRequestCredentialSchema,
+);
+
 /** With `reveal_once` the response withholds the secret and names the reveal instead. */
 function createdVirtualKeyWire(
   virtualKey: GatewayVirtualKeySnakeDto,
@@ -81,14 +87,6 @@ function createdVirtualKeyWire(
   if (reveal)
     return { virtual_key: virtualKey, reveal_id: reveal.revealId, preview: reveal.preview };
   return { virtual_key: virtualKey, secret };
-}
-
-function actorUserIdOf(actor: GatewayCaller): string {
-  const caller = actor as { type?: string; id?: string } | null;
-  if (caller && (caller.type === "user" || caller.type === "api_key") && caller.id) {
-    return caller.id;
-  }
-  throw new Error("gateway platform route resolved no actor id");
 }
 
 function scopesFromWire(
@@ -259,9 +257,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Mints a new virtual key and returns the secret exactly once. With `reveal_once` the response withholds the secret and carries `reveal_id` and `preview` instead: the secret is parked for 24 hours and served once, to the person the key is for, through the LangWatch app. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     const scopes = scopesFromWire(input.scopes, scope.id);
     await app.authorizeVirtualKeyCreate({
       actor,
@@ -352,7 +351,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Partial update: send only the fields you want to change.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
     const scopes = input.scopes ? scopesFromWire(input.scopes, scope.id) : undefined;
     await app.authorizeVirtualKeyUpdate({
@@ -366,7 +367,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const updated = await app.updateVirtualKey({
       id: input.id,
       organizationId,
-      actorUserId: actorUserIdOf(actor),
+      actorUserId,
       name: input.name,
       description: input.description,
       scopes,
@@ -394,9 +395,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Mints a fresh secret for an existing VK. The old secret remains valid for 24h.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -422,9 +424,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Reversible stop: requests on the key are rejected with virtual_key_disabled until it is enabled again. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -450,9 +453,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Reverses disable: the key returns to active exactly as it was. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -473,9 +477,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Marks the virtual key as revoked and archives its own budgets. Idempotent.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeVirtualKeyOperation({
       actor,
       organizationId,
@@ -556,9 +561,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Creates an organization-owned budget across all seven scope types.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -603,9 +609,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Partial update. Scope, window and cycle_anchor_at are immutable after create.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -637,9 +644,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       "Soft-delete: the row is marked archived and no longer counted by the budget engine.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -660,9 +668,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Moves the budget's period boundary to now; recorded spend is never mutated.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -739,9 +748,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Matchers are ANDed across non-null fields; at least one matcher is required.",
     responses: { ...canonicalBaseResponses, ...canonicalConflictResponses },
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -770,9 +780,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Partial update. matchers and action REPLACE the stored value when provided.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
@@ -801,9 +812,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     description: "Soft-delete: sets archivedAt. The rule stops matching new requests.",
     responses: canonicalBaseResponses,
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(gatewayRestCredential)
+  .handle(async ({ app, input, scope }, credential) => {
+    const { actor, actorUserId } = app.actorForCredential({ projectId: scope.id, credential });
     const organizationId = await app.organizationIdForProject(scope.id);
-    const actorUserId = actorUserIdOf(actor);
     await app.authorizeOrganizationWideOperation({
       actor,
       organizationId,
