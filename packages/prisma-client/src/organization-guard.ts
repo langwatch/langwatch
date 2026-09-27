@@ -190,12 +190,12 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // an inline scope) on every call site.
   CustomRole: {},
   Group: {},
-  // A request to join one organization (D12). It carries `organizationId`, and
-  // every read is either an admin listing that organization's queue or a
-  // lookup of one request by its own id — so the ordinary guard fits, and a
-  // bare `findMany()` over everybody's pending requests is exactly what it
-  // should refuse.
-  JoinRequest: {},
+  // A request to join one organization (D12), read by organization or row id,
+  // plus one read bounded by subject: "what am I waiting on" spans every
+  // organization one named user asked. A bare `findMany()` stays refused.
+  JoinRequest: {
+    extraBound: ({ clause }) => typeof clauseField(clause, "userId") === "string",
+  },
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.

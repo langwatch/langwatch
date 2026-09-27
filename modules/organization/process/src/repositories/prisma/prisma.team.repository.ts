@@ -234,14 +234,20 @@ export class PrismaTeamRepository extends TeamRepository {
     userId: string;
     activeOnly?: boolean;
   }): Promise<string[]> {
-    const memberships = await this.database.organizationUser.findMany({
+    // Asked of Organization: membership rows keyed only by a user span every
+    // organization, which the org-tenancy guard refuses (ADR-021).
+    const organizations = await this.database.organization.findMany({
       where: {
-        userId: input.userId,
-        ...(input.activeOnly === false ? {} : { disabledAt: null }),
+        members: {
+          some: {
+            userId: input.userId,
+            ...(input.activeOnly === false ? {} : { disabledAt: null }),
+          },
+        },
       },
-      select: { organizationId: true },
+      select: { id: true },
     });
-    return memberships.map(({ organizationId }) => organizationId);
+    return organizations.map(({ id }) => id);
   }
 
   async fenceMembershipChange(input: {

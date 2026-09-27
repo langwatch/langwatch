@@ -148,3 +148,23 @@ Feature: Join before create - the choice happens before an organization is minte
     When the sign-up health reporting is read
     Then those organizations are reported as the rate this step exists to reduce
     And the rate is readable for the period before this step existed
+
+  @integration
+  Scenario: A person's organizations are read across tenants through the guarded client
+    Given a person who is a member of two organizations, one membership disabled
+    When creating an organization asks which organizations they already belong to
+    Then the answer comes back through the org-tenancy guard instead of a refusal
+    And only the active membership counts unless disabled ones are asked for
+
+  @integration
+  Scenario: A domain's candidate organizations are read across tenants through the guarded client
+    Given verified colleagues on one domain in two organizations
+    When the join screen looks up where that domain could join
+    Then both organizations come back through the org-tenancy guard
+
+  @unit
+  Scenario: A person's own pending join requests are read across organizations
+    Given a signed-in person with requests to several organizations
+    When the join screen asks what they are waiting on
+    Then a read bounded by that one user passes the org-tenancy guard
+    And a read naming neither an organization nor a user is still refused
