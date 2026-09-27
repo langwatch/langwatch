@@ -27,7 +27,8 @@ function findRepoRoot(): string {
 
 export const REPO_ROOT = findRepoRoot();
 
-const SEED_FILE = resolve(REPO_ROOT, "packages/prisma-client/prisma/seed.ts");
+const SEED_FILE = resolve(REPO_ROOT, "apps/tasks/src/storage-seed/storage-seed.ts");
+const SEED_IDENTITY_FILE = resolve(REPO_ROOT, "apps/tasks/src/storage-seed/seed-identity.ts");
 const API_KEY_TOKENS_FILE = resolve(REPO_ROOT, "modules/api-key/contract/src/api-key.tokens.ts");
 
 /** A stack a suite can talk to, and the way to put it back down. */
@@ -292,11 +293,11 @@ export type SeededProject = Readonly<{
   adminPassword: string;
 }>;
 
-function seedConstant(source: string, name: string): string {
-  const match = new RegExp(`^const ${name} = "([^"]*)";`, "m").exec(source);
+function seedConstant(source: string, name: string, file: string = SEED_FILE): string {
+  const match = new RegExp(`^(?:export )?const ${name} = "([^"]*)";`, "m").exec(source);
   if (!match?.[1]) {
     throw new Error(
-      `${name} is no longer a top-level string constant in ${SEED_FILE}; ` +
+      `${name} is no longer a top-level string constant in ${file}; ` +
         `update seededProject() to match the seed rather than retyping its values`,
     );
   }
@@ -317,7 +318,11 @@ export function seededProject(): SeededProject {
     projectSlug: seedConstant(source, "PROJECT_SLUG"),
     apiKey: seedConstant(source, "DEFAULT_INGESTION_KEY"),
     organizationApiKey: seededOrganizationToken(source),
-    adminEmail: seedConstant(source, "ADMIN_EMAIL"),
+    adminEmail: `${seedConstant(source, "ADMIN_LOCAL_PART")}@${seedConstant(
+      readFileSync(SEED_IDENTITY_FILE, "utf8"),
+      "DEFAULT_SEED_EMAIL_DOMAIN",
+      SEED_IDENTITY_FILE,
+    )}`,
     adminPassword: seedConstant(source, "ADMIN_PASSWORD"),
   };
 }

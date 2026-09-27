@@ -11,7 +11,7 @@ import (
 )
 
 // DefaultProjectKey is the deterministic project key the repository's Prisma
-// seed writes (packages/prisma-client/prisma/seed.ts). Both stacks share one
+// seed writes (apps/tasks/src/storage-seed/storage-seed.ts). Both stacks share one
 // database, so one key seeds fixtures both of them can read.
 const DefaultProjectKey = "sk-lw-local-development-key"
 
