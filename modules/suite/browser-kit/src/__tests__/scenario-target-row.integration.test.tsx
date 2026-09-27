@@ -273,6 +273,64 @@ describe("<ScenarioTargetRow/>", () => {
     });
   });
 
+  describe("given a run that can still be stopped", () => {
+    function renderStoppable({ isCancelling = false } = {}) {
+      const onClick = vi.fn();
+      const onCancel = vi.fn();
+      render(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.IN_PROGRESS })}
+          targetName="Prod Agent"
+          onClick={onClick}
+          onCancel={onCancel}
+          isCancelling={isCancelling}
+        />,
+        { wrapper: Wrapper },
+      );
+      return { onClick, onCancel };
+    }
+
+    it("offers stop as its own button beside the row's button", () => {
+      renderStoppable();
+
+      const open = screen.getByRole("button", {
+        name: "View details for Prod Agent: Angry refund request",
+      });
+      const stop = screen.getByRole("button", { name: "Stop run" });
+      expect(open.contains(stop)).toBe(false);
+    });
+
+    it("stops the run without opening it", async () => {
+      const user = userEvent.setup();
+      const { onClick, onCancel } = renderStoppable();
+
+      await user.click(screen.getByRole("button", { name: "Stop run" }));
+
+      expect(onCancel).toHaveBeenCalledOnce();
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("stops the run from the keyboard", async () => {
+      const user = userEvent.setup();
+      const { onCancel } = renderStoppable();
+
+      screen.getByRole("button", { name: "Stop run" }).focus();
+      await user.keyboard("{Enter}");
+
+      expect(onCancel).toHaveBeenCalledOnce();
+    });
+
+    it("disables stop while the run is being stopped", async () => {
+      const user = userEvent.setup();
+      const { onCancel } = renderStoppable({ isCancelling: true });
+
+      const stop = screen.getByRole("button", { name: "Stop run" });
+      expect(stop).toBeDisabled();
+      await user.click(stop);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the user hovers a row", () => {
     /** @scenario "Hovering a run pre-loads its details" */
     it("prefetches the run state for the hovered run", async () => {

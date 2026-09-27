@@ -6,9 +6,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/navigation-browser/surfaces/command-bar", () => ({
-  CommandPalette: () => <input placeholder="ask" />,
-  useCommandBar: () => ({ registerInlinePalette: () => () => undefined }),
+vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
+  InlineCommandPalette: () => <input placeholder="ask" />,
 }));
 
 const askLangy = vi.fn();

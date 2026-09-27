@@ -51,7 +51,6 @@
     "@langwatch/workflow-browser": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "@microsoft/fetch-event-source": "^2.0.1",
     "@xyflow/react": "catalog:",
     "ajv": "catalog:",
     "clsx": "2.1.1",

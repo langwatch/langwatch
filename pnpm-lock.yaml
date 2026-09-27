@@ -7384,6 +7384,9 @@ importers:
       '@langwatch/langy-browser-kit':
         specifier: workspace:*
         version: link:../../langy/browser-kit
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
       '@langwatch/prompt-browser-kit':
         specifier: workspace:*
         version: link:../../prompt/browser-kit
@@ -11565,9 +11568,6 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
-      '@microsoft/fetch-event-source':
-        specifier: ^2.0.1
-        version: 2.0.1
       '@xyflow/react':
         specifier: 'catalog:'
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -14455,9 +14455,6 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../contract
-      '@microsoft/fetch-event-source':
-        specifier: ^2.0.1
-        version: 2.0.1
       '@monaco-editor/react':
         specifier: 'catalog:'
         version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -15040,6 +15037,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
+      '@langwatch/dashboard-contract':
+        specifier: workspace:*
+        version: link:../../modules/dashboard/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../modules/dataset/contract
@@ -15085,6 +15085,9 @@ importers:
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../modules/workflow/contract
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)

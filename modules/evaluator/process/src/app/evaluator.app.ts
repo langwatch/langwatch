@@ -48,6 +48,7 @@ import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
+import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts";
@@ -133,9 +134,9 @@ export class EvaluatorApp implements EvaluatorApi {
   static readonly reads = ["prisma", "publicBaseUrl"] as const;
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
-    const graph = EvaluatorGraphAdapter.create({
-      prisma: setup.members.prisma,
+    const graph = EvaluatorLinkedRowsService.create({
       workflows: setup.dependencies.workflows,
+      monitors: EvaluatorGraphAdapter.create({ prisma: setup.members.prisma }),
     });
 
     return EvaluatorApp.createWithGraph(setup, graph);

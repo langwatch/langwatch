@@ -16,7 +16,6 @@ import {
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
-  DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   projectApiKeyRotationSchema,
@@ -244,24 +243,20 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
       PROJECT_NOT_FOUND,
     ],
   })
-  .handle(async ({ app, input, scope }) => {
-    try {
-      return projectResponse(
-        await app.updateInOrganization({
-          projectId: input.id,
-          organizationId: scope.id,
-          data: {
-            ...(input.name !== undefined && { name: input.name }),
-            ...(input.language !== undefined && { language: input.language }),
-            ...(input.framework !== undefined && { framework: input.framework }),
-            ...(input.teamId !== undefined && { teamId: input.teamId }),
-          },
-        }),
-      );
-    } catch (error) {
-      throw asProjectUpdateHttpError(error);
-    }
-  })
+  .handle(async ({ app, input, scope }) =>
+    projectResponse(
+      await app.updateInOrganization({
+        projectId: input.id,
+        organizationId: scope.id,
+        data: {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.language !== undefined && { language: input.language }),
+          ...(input.framework !== undefined && { framework: input.framework }),
+          ...(input.teamId !== undefined && { teamId: input.teamId }),
+        },
+      }),
+    ),
+  )
 
   .delete("/:id", "archiveProject")
   .withParams(projectRestParamsSchema)
@@ -421,15 +416,6 @@ async function archiveProject({
 
     throw error;
   }
-}
-
-/** The service's update failures, as the status codes they mean. */
-function asProjectUpdateHttpError(error: unknown): unknown {
-  if (error instanceof ProjectNotFoundError) return new NotFoundError("Project not found");
-  if (error instanceof DestinationTeamNotFoundError) return new BadRequestError(error.message);
-  if (error instanceof PersonalWorkspaceBoundaryError) return new ForbiddenError(error.message);
-
-  return error;
 }
 
 /**

@@ -120,21 +120,18 @@ export async function recordExecuteStreams(page: Page): Promise<ExecuteStreamRec
   };
 }
 
-/**
- * Runs one column the way a reader does: its header's run button. Target columns
- * render in saved-state order, so the column is found by its index there.
- */
+/** Runs one column the way a reader does: its header's own run button. */
 export async function runColumnOnPage({
   page,
   streams,
-  columnIndex,
+  targetId,
 }: {
   page: Page;
   streams: ExecuteStreamRecorder;
-  columnIndex: number;
+  targetId: string;
 }): Promise<WorkbenchPageRun> {
   const body = streams.next();
-  await page.getByTestId("target-play-button").nth(columnIndex).click();
+  await page.locator(`[data-target-id="${targetId}"]`).getByTestId("target-play-button").click();
   return runFromStream(await body);
 }
 

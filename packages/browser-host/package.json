@@ -66,6 +66,10 @@
       "types": "./dist/errors.d.ts",
       "default": "./src/errors.ts"
     },
+    "./fetch-sse": {
+      "types": "./dist/fetch-sse.d.ts",
+      "default": "./src/fetch-sse.ts"
+    },
     "./query-retry": {
       "types": "./dist/query-retry.d.ts",
       "default": "./src/query-retry.ts"
@@ -179,6 +183,7 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/config": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -194,6 +199,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",

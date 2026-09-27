@@ -26,4 +26,10 @@ export const navigationWeb = defineWebModule("navigation")
   })
   .withCapabilities({
     sidebar: { load: () => import("./behavior/sidebar-capability.ts") },
+    /** The palette drawn inline in a landing hero, lent to project (§3.4 rule 7). */
+    inlineCommandPalette: {
+      load: async () => ({
+        default: (await import("./ui/sections/inline-command-palette.tsx")).InlineCommandPalette,
+      }),
+    },
   });

@@ -18,20 +18,10 @@
       "types": "./dist/hoverable-big-text.d.ts",
       "default": "./src/hoverable-big-text.ts"
     },
-    "./surfaces/deja-view-link": {
-      "langwatch-declaration-source": "./src/behavior/use-deja-view-link.ts",
-      "types": "./dist/behavior/use-deja-view-link.d.ts",
-      "default": "./src/behavior/use-deja-view-link.ts"
-    },
     "./feature-flag": {
       "langwatch-declaration-source": "./src/feature-flag.ts",
       "types": "./dist/feature-flag.d.ts",
       "default": "./src/feature-flag.ts"
-    },
-    "./fetch-sse": {
-      "langwatch-declaration-source": "./src/fetch-sse.ts",
-      "types": "./dist/fetch-sse.d.ts",
-      "default": "./src/fetch-sse.ts"
     }
   },
   "scripts": {
@@ -70,7 +60,6 @@
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",

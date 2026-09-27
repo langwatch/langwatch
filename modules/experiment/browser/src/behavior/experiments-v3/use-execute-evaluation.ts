@@ -1,4 +1,5 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
@@ -10,7 +11,6 @@ import {
   createExecutionCellSet,
 } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
-import { fetchSSE } from "@langwatch/workflow-browser/fetch-sse";
 import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 

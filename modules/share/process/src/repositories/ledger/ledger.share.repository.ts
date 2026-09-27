@@ -3,6 +3,8 @@
  * reads use the compatible ShareLink head. GrantUsage owns view counts; the
  * ShareLink count is its rollback-safe mirror (ADR-092, decision 22).
  */
+import { randomBytes } from "node:crypto";
+
 import type { LedgerActor } from "@langwatch/actor";
 import {
   AUTHZ_SHARE_PERMISSION,
@@ -11,7 +13,6 @@ import {
 } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareLink, ShareResourceType, ShareWithProject } from "@langwatch/share-contract";
-import { nanoid } from "nanoid";
 
 import type { ShareGrantRepository } from "../share-grant.repository.ts";
 import type {
@@ -21,6 +22,9 @@ import type {
   ShareRepository,
   ShareResourceScope,
 } from "../share.repository.ts";
+
+/** The link id keeps the 21-character URL-safe shape every existing ShareLink row carries. */
+const LINK_ID_ALPHABET = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
 
 /** Revocations are system actions; link authorship remains on the mint fact. */
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };
@@ -89,7 +93,7 @@ export class LedgerShareRepository implements ShareRepository {
     const organizationId = await this.#ledgerOrganizationFor(params.projectId);
     if (!organizationId) return this.#head.create(params);
 
-    const id = nanoid();
+    const id = Array.from(randomBytes(21), (byte) => LINK_ID_ALPHABET[byte & 63]).join("");
     const visibility = params.visibility ?? "PUBLIC";
     await this.#authz.attachResourceGrant({
       organizationId,

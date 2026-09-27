@@ -19,10 +19,6 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import { TechStackSelector } from "@langwatch/onboarding-browser-kit";
-import {
-  DepartmentPicker,
-  useDepartmentColumn,
-} from "@langwatch/organization-browser/surfaces/department-picker";
 import isEqual from "lodash-es/isEqual";
 import { Lock } from "lucide-react";
 import { useState } from "react";
@@ -34,6 +30,7 @@ import {
   useForm,
 } from "react-hook-form";
 
+import { ProjectDepartmentField } from "../../../behavior/lent-peers.tsx";
 import { api } from "../../../behavior/project-api.ts";
 import type { OrganizationIntent } from "../../../model/prisma-types.ts";
 import {
@@ -548,10 +545,6 @@ type ProjectFormData = {
 function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
   const host = useProjectHost();
   const organization = host.organization();
-  const department = useDepartmentColumn(
-    organization?.id ?? "",
-    host.isFeatureEnabled("release_ui_ai_governance_enabled"),
-  );
   const hasPermission = (permission: string) => host.hasPermission(permission);
   const userIsAdmin = hasPermission("project:manage");
 
@@ -661,21 +654,11 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
             />
             <Field.ErrorText>Name is required</Field.ErrorText>
           </HorizontalFormControl>
-          {department.show && (
-            <HorizontalFormControl
-              label="Department"
-              helper="Agent spend with no human principal rolls up to this department"
-            >
-              <DepartmentPicker
-                organizationId={organization?.id ?? ""}
-                kind="project"
-                entityId={project.id}
-                value={department.byProject.get(project.id) ?? null}
-                departments={department.departments}
-                onAssigned={department.refetch}
-              />
-            </HorizontalFormControl>
-          )}
+          <ProjectDepartmentField
+            organizationId={organization?.id ?? ""}
+            projectId={project.id}
+            governanceEnabled={host.isFeatureEnabled("release_ui_ai_governance_enabled")}
+          />
           <HorizontalFormControl
             label="Tech Stack"
             helper="The project language and framework"

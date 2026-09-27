@@ -5,10 +5,8 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -22,7 +20,7 @@ import type { AgentRepositories } from "../../repositories/agent.repositories.ts
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
 import { AgentApp } from "../agent.app.ts";
 
-type AgentAppMembers = Readonly<{ redis: RedisConnection; publicBaseUrl: string | undefined }>;
+type AgentAppMembers = Readonly<{ publicBaseUrl: string | undefined }>;
 
 export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   return agentSchema.parse({
@@ -37,24 +35,6 @@ export function agentFixture(overrides: Partial<Agent> = {}): Agent {
     createdAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     updatedAt: toDate(Temporal.Instant.fromEpochMilliseconds(0)),
     ...overrides,
-  });
-}
-
-/** The in-memory Redis, plus the one compare-and-set script session ownership runs. */
-function claimingRedisDouble(): ReturnType<typeof memoryRedisDouble> {
-  const store = memoryRedisStore();
-  const plain = memoryRedisDouble({ store });
-  return memoryRedisDouble({
-    store,
-    script: {
-      eval: async (_script, _keys, ...args) => {
-        const [key = "", value = "", ttl = "0"] = args.map(String);
-        const current = await plain.get(key);
-        if (current && current !== value) return 0;
-        await plain.set(key, value, "EX", Number(ttl));
-        return 1;
-      },
-    },
   });
 }
 
@@ -87,7 +67,6 @@ export function createAgentAppFixture(
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),
     },
     members: {
-      redis: claimingRedisDouble(),
       publicBaseUrl: "https://langwatch.test",
       ...options.members,
     },

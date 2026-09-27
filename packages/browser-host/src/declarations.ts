@@ -9,7 +9,7 @@ import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
-import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type {
@@ -37,6 +37,16 @@ export type UiAuthenticationOverviewCardProps = {
 
 /** What a landing hero hands project's lent inline command palette. */
 export type UiHeroAskFieldProps = { placeholder: string };
+
+/** What a surface hands navigation's lent command palette, drawn inline rather than as the bar. */
+export type UiInlineCommandPaletteProps = { placeholder: string };
+
+/** What project's settings form hands organization's lent department row. */
+export type UiProjectDepartmentFieldProps = {
+  organizationId: string;
+  projectId: string;
+  governanceEnabled: boolean;
+};
 
 /** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
 export type UiParameterLineFieldProps = {
@@ -534,6 +544,7 @@ export type UiDeclaredCapabilities = {
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
+  inlineCommandPalette: UiDeclaredComponent<UiInlineCommandPaletteProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   comparisonConfigForm: UiDeclaredComponent<UiComparisonConfigFormProps>;
@@ -545,10 +556,12 @@ export type UiDeclaredCapabilities = {
   httpConfigEditor: UiDeclaredComponent<UiHttpConfigEditorProps>;
   llmConfigField: UiDeclaredComponent<UiLlmConfigFieldProps>;
   llmConfigPopover: UiDeclaredComponent<UiLlmConfigPopoverProps>;
+  mediaPart: UiDeclaredComponent<MediaPartProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   outputsSection: UiDeclaredComponent<UiOutputsSectionProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
+  projectDepartmentField: UiDeclaredComponent<UiProjectDepartmentFieldProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;

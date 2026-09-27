@@ -67,6 +67,9 @@
       "path": "../../langy/browser-kit/tsconfig.build.json"
     },
     {
+      "path": "../../ops/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/browser-kit/tsconfig.build.json"
     },
     {

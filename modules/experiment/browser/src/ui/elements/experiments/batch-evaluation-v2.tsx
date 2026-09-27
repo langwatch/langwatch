@@ -23,7 +23,6 @@ import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 import { FormatMoney } from "@langwatch/workflow-browser-kit";
-import { useDejaViewLink } from "@langwatch/workflow-browser/surfaces/deja-view-link";
 import type { Experiment } from "@langwatch/workflow-contract";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -36,6 +35,7 @@ import {
 } from "../../../behavior/experiments/use-batch-evaluation-run-results.ts";
 import { useBatchEvaluationState } from "../../../behavior/experiments/use-batch-evaluation-runs.ts";
 import { VersionBox } from "../../../behavior/lent-workflow.tsx";
+import { useDejaViewLink } from "../../../behavior/use-deja-view-link.ts";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,

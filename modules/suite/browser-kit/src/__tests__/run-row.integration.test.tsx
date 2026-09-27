@@ -3,6 +3,7 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -129,6 +130,54 @@ describe("<RunRow/>", () => {
       const header = screen.getByRole("button", { name: /Run from/ });
       await user.click(header);
       expect(onToggle).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a batch with runs that can still be stopped", () => {
+    function renderStoppable({ isCancellingBatch = false } = {}) {
+      const onToggle = vi.fn();
+      const onCancelAll = vi.fn();
+      render(
+        <RunRow
+          batchRun={makeBatchRun({
+            scenarioRuns: [makeScenarioRunData({ status: ScenarioRunStatus.IN_PROGRESS })],
+          })}
+          summary={makeSummary()}
+          isExpanded={false}
+          onToggle={onToggle}
+          resolveTargetName={() => "Prod Agent"}
+          onScenarioRunClick={vi.fn()}
+          onCancelAll={onCancelAll}
+          isCancellingBatch={isCancellingBatch}
+        />,
+        { wrapper: Wrapper },
+      );
+      return { onToggle, onCancelAll };
+    }
+
+    it("offers stop as its own button beside the header's toggle", () => {
+      renderStoppable();
+
+      const toggle = screen.getByRole("button", { name: /Run from/ });
+      const stop = screen.getByRole("button", { name: "Stop all remaining runs" });
+      expect(toggle.contains(stop)).toBe(false);
+    });
+
+    it("asks to confirm the stop without toggling the run", async () => {
+      const user = userEvent.setup();
+      const { onToggle, onCancelAll } = renderStoppable();
+
+      await user.click(screen.getByRole("button", { name: "Stop all remaining runs" }));
+      await user.click(await screen.findByTestId("confirm-cancel-all-button"));
+
+      expect(onCancelAll).toHaveBeenCalledOnce();
+      expect(onToggle).not.toHaveBeenCalled();
+    });
+
+    it("disables stop while the batch is being stopped", () => {
+      renderStoppable({ isCancellingBatch: true });
+
+      expect(screen.getByRole("button", { name: "Stop all remaining runs" })).toBeDisabled();
     });
   });
 

@@ -11,7 +11,7 @@ import { usePromptExecution } from "../use-prompt-execution.ts";
 
 const { fetchSSEMock } = vi.hoisted(() => ({ fetchSSEMock: vi.fn() }));
 
-vi.mock("../fetch-sse.ts", () => ({ fetchSSE: fetchSSEMock }));
+vi.mock("@langwatch/browser-host/fetch-sse", () => ({ fetchSSE: fetchSSEMock }));
 
 const formValues: PromptConfigFormValues = {
   handle: null,

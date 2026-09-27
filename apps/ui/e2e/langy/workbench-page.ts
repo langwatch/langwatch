@@ -3,11 +3,11 @@
  * session. With an adapter it opens the adapter's conversation in its Langy panel,
  * so the page itself claims and carries out the turn's `ui` entries.
  */
+import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { type Browser, chromium, type Page } from "playwright";
 
 import { APP_BASE, CONFIG } from "./config";
 import type { LangyAdapter } from "./langy-agent";
-import { getWorkbenchState } from "./seed-optimization-workbench";
 import { getSessionCookie } from "./trpc";
 import {
   type ObservedAction,
@@ -21,9 +21,6 @@ import {
   runColumnOnPage,
   type WorkbenchPageRun,
 } from "./workbench-page-runs";
-
-/** langy-contract's `LANGY_CONVERSATION_PARAM`; apps/ui does not depend on that contract yet. */
-const CONVERSATION_PARAM = "langyConversation";
 
 const PAGE_READY_TIMEOUT_MS = 60_000;
 
@@ -75,8 +72,11 @@ async function followConversation({
   url: string;
   conversationId: string;
 }): Promise<void> {
-  await openWorkbench(page, `${url}?${CONVERSATION_PARAM}=${encodeURIComponent(conversationId)}`);
-  await page.waitForURL((address) => !address.searchParams.has(CONVERSATION_PARAM), {
+  await openWorkbench(
+    page,
+    `${url}?${LANGY_CONVERSATION_PARAM}=${encodeURIComponent(conversationId)}`,
+  );
+  await page.waitForURL((address) => !address.searchParams.has(LANGY_CONVERSATION_PARAM), {
     timeout: PAGE_READY_TIMEOUT_MS,
   });
 }
@@ -125,14 +125,12 @@ function buildPageFacade({
   browser,
   log,
   streams,
-  experimentSlug,
   detach,
 }: {
   page: Page;
   browser: Browser;
   log: PageActionLog;
   streams: ExecuteStreamRecorder;
-  experimentSlug: string;
   detach: () => void;
 }): WorkbenchPage {
   const runs: WorkbenchPageRun[] = [];
@@ -152,10 +150,7 @@ function buildPageFacade({
     },
     filledCells: (targetId) => filledCellsOnPage({ page, targetId }),
     runColumn: async (targetId) => {
-      const { state } = await getWorkbenchState(experimentSlug);
-      const columnIndex = state.targets.findIndex((target) => target.id === targetId);
-      if (columnIndex < 0) throw new Error(`the workbench has no column ${targetId}`);
-      const run = await runColumnOnPage({ page, streams, columnIndex });
+      const run = await runColumnOnPage({ page, streams, targetId });
       runs.push(run);
       return run;
     },
@@ -194,7 +189,7 @@ export async function openWorkbenchPage({
     const url = workbenchUrl(experimentSlug);
     await openWorkbench(page, url);
     const detach = adapter ? await attachAdapter({ adapter, page, url, log }) : () => undefined;
-    return buildPageFacade({ page, browser, log, streams, experimentSlug, detach });
+    return buildPageFacade({ page, browser, log, streams, detach });
   } catch (error) {
     await browser.close();
     throw error;

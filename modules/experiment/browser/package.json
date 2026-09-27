@@ -41,6 +41,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
     "@langwatch/langy-browser-kit": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-browser-kit": "workspace:*",

@@ -1,3 +1,4 @@
+import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
 import { generate } from "@langwatch/ksuid";
 import {
   type ParsedLLMError,
@@ -15,7 +16,6 @@ import type { ChatMessage } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 
-import { fetchSSE } from "./fetch-sse.ts";
 import { useConversationState } from "./use-conversation-state.ts";
 import { useDeltaBuffer } from "./use-delta-buffer.ts";
 

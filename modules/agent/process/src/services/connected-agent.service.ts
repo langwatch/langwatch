@@ -14,10 +14,8 @@ import {
 } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentConnectionService } from "./connected-agent-connection.service.ts";
@@ -32,7 +30,7 @@ export type ConnectedAgentOptions = {
   apiKeys: ApiKeyApi;
   authz: AuthzApi;
   projects: ProjectApi;
-  redis: RedisConnection | null;
+  sessionState: SessionStateStore;
   config: AgentServerConfig;
   publicBaseUrl: string;
 };
@@ -49,7 +47,7 @@ export class ConnectedAgentService {
 
   private constructor(options: ConnectedAgentOptions) {
     this.#runtime = ConnectedAgentRuntimeService.create({
-      store: options.redis ? SessionStateStoreFactory.redis(options.redis) : memorySessionState(),
+      store: options.sessionState,
     });
     const session = AgentSessionService.create({
       runtime: this.#runtime,

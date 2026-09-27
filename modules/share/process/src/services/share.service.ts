@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -30,16 +30,27 @@ import {
   type TracePinInput,
 } from "@langwatch/share-contract";
 import { fromDate, type Instant, nowInstant, toEpochMs } from "@langwatch/time";
-import { customAlphabet } from "nanoid";
 
 import type { ShareCacheRepository } from "../repositories/share-cache.repository.ts";
 import type { ShareRepository } from "../repositories/share.repository.ts";
 
 const logger = createLogger("langwatch:share-service");
-const generateShareToken = customAlphabet(
-  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-  32,
-);
+const SHARE_TOKEN_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const SHARE_TOKEN_CHARS = 32;
+
+/** Unbiased: a byte is masked to six bits and redrawn when it falls past the alphabet. */
+function generateShareToken(): string {
+  let token = "";
+  while (token.length < SHARE_TOKEN_CHARS) {
+    for (const byte of randomBytes(SHARE_TOKEN_CHARS)) {
+      const index = byte & 63;
+      if (index < SHARE_TOKEN_ALPHABET.length && token.length < SHARE_TOKEN_CHARS) {
+        token += SHARE_TOKEN_ALPHABET[index];
+      }
+    }
+  }
+  return token;
+}
 
 /**
  * The project peer, narrowed to the one answer a mint is refused by. The
