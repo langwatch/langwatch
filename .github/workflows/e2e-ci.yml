@@ -302,6 +302,8 @@ jobs:
           WORKERS_IN_PROCESS: "1"
           # Launch the runner's preinstalled Google Chrome (no browser download)
           E2E_BROWSER_CHANNEL: chrome
+          # The api started below serves the suite; the e2e stack borrows it instead of booting its own.
+          LANGWATCH_E2E_BASE_URL: "http://localhost:5570"
         run: |
           # Start the API process in the background. It serves the REST and
           # tRPC families AND the browser bundle built above, so one process
