@@ -19,16 +19,25 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../modules/agent/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/annotation/contract/tsconfig.build.json"
     },
     {
       "path": "../api/tsconfig.build.json"
     },
     {
+      "path": "../../modules/automation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../browser-trpc/tsconfig.build.json"
     },
     {
       "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../design-system/tsconfig.build.json"
@@ -38,6 +47,12 @@
     },
     {
       "path": "../error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/experiment/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"

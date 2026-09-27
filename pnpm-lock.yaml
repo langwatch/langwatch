@@ -15016,18 +15016,27 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../modules/agent/contract
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../modules/annotation/contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../modules/automation/contract
       '@langwatch/browser-trpc':
         specifier: workspace:*
         version: link:../browser-trpc
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../modules/dataset/contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
@@ -15037,6 +15046,12 @@ importers:
       '@langwatch/error-presentation':
         specifier: workspace:*
         version: link:../error-presentation
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../modules/evaluator/contract
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../modules/experiment/contract
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../modules/feature-flag/contract
