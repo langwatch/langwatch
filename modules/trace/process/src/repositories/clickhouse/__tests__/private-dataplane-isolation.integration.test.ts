@@ -145,6 +145,7 @@ describe("given one organization on a private ClickHouse instance and one on the
     const [shared, isolated] = await startTestClickHouseEndpoints({
       suite: "ch-isolation",
       names: ["shared", "private"],
+      environment: process.env,
     });
     if (!shared || !isolated) throw new Error("Two ClickHouse endpoints were not provisioned");
 

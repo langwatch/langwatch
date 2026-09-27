@@ -16,21 +16,24 @@ type ScriptFailureRecord = {
 
 /**
  * Runs `main`, and turns any failure into one structured line plus exit
- * code 1. The stack is left off unless LOG_LEVEL=debug asked for it — it
- * costs a terminal twenty lines and tells a developer nothing new.
+ * code 1. The stack is left off unless the caller's log level is debug or
+ * trace — it costs a terminal twenty lines and tells a developer nothing new.
  */
 export async function runScript({
   name,
   main,
+  logLevel,
 }: {
   name: string;
   main: () => unknown;
+  /** The process's LOG_LEVEL, read by the script's own entry. */
+  logLevel?: string;
 }): Promise<void> {
   try {
     await main();
   } catch (error: unknown) {
     process.stdout.write(
-      `${JSON.stringify(scriptFailureRecord({ name, error, withStack: wantsStack() }))}\n`,
+      `${JSON.stringify(scriptFailureRecord({ name, error, withStack: wantsStack(logLevel) }))}\n`,
     );
     process.exitCode = 1;
   }
@@ -61,8 +64,8 @@ export function writeScriptWarning({
 }
 
 /** Whether the process asked for stacks. Only `debug` and `trace` do. */
-function wantsStack(): boolean {
-  const level = (process.env.LOG_LEVEL ?? "").trim().toLowerCase();
+function wantsStack(logLevel: string | undefined): boolean {
+  const level = (logLevel ?? "").trim().toLowerCase();
   return level === "debug" || level === "trace";
 }
 

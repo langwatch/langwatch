@@ -33,6 +33,7 @@ export async function startMigratedGatewayClickHouse(): Promise<MigratedClickHou
   const [provisioned] = await startTestClickHouseEndpoints({
     suite: MIGRATED_ENDPOINT_SUITE,
     names: ["schema"],
+    environment: process.env,
   });
   if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the gateway suite");
 

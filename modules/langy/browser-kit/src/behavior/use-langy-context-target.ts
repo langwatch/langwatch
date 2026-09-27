@@ -75,21 +75,7 @@ export function useLangyContextTarget(
   const register = useLangyContextTargetStore((state) => state.register);
   const unregister = useLangyContextTargetStore((state) => state.unregister);
 
-  // "Added" means the composer is actually SHOWING this chip — which covers the ones
-  // Langy auto-derived from the route / open drawer, not just the ones the user picked.
-  const isAdded = useLangyContextTargetStore((state) =>
-    isActive && id ? state.activeChipIds.has(id) : false,
-  );
-  // Lit by request rather than by the pointer — the composer's `#trace` →
-  // "Show traces on this page" gesture. A brief, self-ending arm: same ring,
-  // same click, same drag, released by a timer instead of a keystroke.
-  const isRevealed = useLangyContextTargetStore((state) =>
-    isActive && id ? state.revealedIds.has(id) : false,
-  );
-  const isArmed = useLangyContextTargetStore((state) => state.armSource !== null);
-  const isHovered = useLangyContextTargetStore((state) =>
-    isActive && id ? state.hoveredId === id : false,
-  );
+  const { isAdded, isRevealed, isArmed, isHovered } = useTargetFlags({ isActive, id });
 
   useEffect(() => {
     const registrable = isActive && id && kind && label;
@@ -98,6 +84,70 @@ export function useLangyContextTarget(
     return () => unregister(id);
   }, [isActive, id, kind, label, chipRef, register, unregister]);
 
+  const { toggle, onDragStart, onClickCapture } = useTargetGestures({ id, kind, label, chipRef });
+
+  // Armed OR revealed: the target is being OFFERED, and an offer the user can
+  // see has to be an offer they can take. The two differ only in what ends them
+  // — a keystroke, or a timer.
+  const isOffered = isArmed || isRevealed;
+
+  const targetProps = useMemo<LangyContextTargetProps>(
+    () =>
+      targetPropsFor({
+        id: isActive ? id : undefined,
+        isOffered,
+        isAdded,
+        isHovered,
+        onDragStart,
+        onClickCapture,
+      }),
+    [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture],
+  );
+
+  return { targetProps, isActive, isAdded, toggle };
+}
+
+/** What the store says about this target: shown in the composer, revealed, armed, hovered. */
+function useTargetFlags({ isActive, id }: { isActive: boolean; id: string | undefined }): {
+  isAdded: boolean;
+  isRevealed: boolean;
+  isArmed: boolean;
+  isHovered: boolean;
+} {
+  const shown = isActive ? id : undefined;
+  // "Added" means the composer is actually SHOWING this chip — which covers the ones
+  // Langy auto-derived from the route / open drawer, not just the ones the user picked.
+  const isAdded = useLangyContextTargetStore((state) =>
+    shown ? state.activeChipIds.has(shown) : false,
+  );
+  // Lit by request rather than by the pointer (the composer's `#trace` gesture): the
+  // same ring, click and drag as arming, released by a timer instead of a keystroke.
+  const isRevealed = useLangyContextTargetStore((state) =>
+    shown ? state.revealedIds.has(shown) : false,
+  );
+  const isArmed = useLangyContextTargetStore((state) => state.armSource !== null);
+  const isHovered = useLangyContextTargetStore((state) =>
+    shown ? state.hoveredId === shown : false,
+  );
+  return { isAdded, isRevealed, isArmed, isHovered };
+}
+
+/** Clicking toggles the target in or out of context; dragging carries it to the composer. */
+function useTargetGestures({
+  id,
+  kind,
+  label,
+  chipRef,
+}: {
+  id: string | undefined;
+  kind: LangyContextTargetDescriptor["kind"] | undefined;
+  label: string | undefined;
+  chipRef: LangyContextTargetDescriptor["ref"];
+}): {
+  toggle: () => void;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onClickCapture: (event: MouseEvent<HTMLElement>) => void;
+} {
   const toggle = useCallback(() => {
     if (!id || !kind || !label) return;
     const targets = useLangyContextTargetStore.getState();
@@ -132,37 +182,40 @@ export function useLangyContextTarget(
     [toggle],
   );
 
-  // Armed OR revealed: the target is being OFFERED, and an offer the user can
-  // see has to be an offer they can take. The two differ only in what ends them
-  // — a keystroke, or a timer.
-  const isOffered = isArmed || isRevealed;
+  return { toggle, onDragStart, onClickCapture };
+}
 
-  const targetProps = useMemo<LangyContextTargetProps>(() => {
-    if (!isActive || !id) return NO_PROPS;
-    // Not offered, the page is the page: no ring, no drag, no intercepted
-    // click. Only the locating id, which nothing paints and nothing listens to
-    // — see the ZERO COST note above for why it cannot wait for arming.
-    if (!isOffered) return { "data-langy-target": id };
-    return {
-      className: "langy-target",
-      style: shimmerStyleFor(id),
-      "data-langy-target": id,
-      // Offered, EVERY target lights up — the point of the mode is to answer
-      // "what can I even give it?" at a glance. That is the christmas tree the
-      // earlier always-on design was right to refuse; what makes it fine here
-      // is that it is modal, brief, and asked for.
-      "data-langy-target-state": visualState({
-        isAdded,
-        isHovered,
-        isNear: true,
-      }),
-      draggable: true,
-      onDragStart,
-      onClickCapture,
-    };
-  }, [isActive, id, isOffered, isAdded, isHovered, onDragStart, onClickCapture]);
-
-  return { targetProps, isActive, isAdded, toggle };
+/**
+ * Not offered, the page is the page: only the locating id, which nothing paints and nothing
+ * listens to (see the ZERO COST note above). Offered, EVERY target lights up — modal, brief,
+ * and asked for.
+ */
+function targetPropsFor({
+  id,
+  isOffered,
+  isAdded,
+  isHovered,
+  onDragStart,
+  onClickCapture,
+}: {
+  id: string | undefined;
+  isOffered: boolean;
+  isAdded: boolean;
+  isHovered: boolean;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onClickCapture: (event: MouseEvent<HTMLElement>) => void;
+}): LangyContextTargetProps {
+  if (!id) return NO_PROPS;
+  if (!isOffered) return { "data-langy-target": id };
+  return {
+    className: "langy-target",
+    style: shimmerStyleFor(id),
+    "data-langy-target": id,
+    "data-langy-target-state": visualState({ isAdded, isHovered, isNear: true }),
+    draggable: true,
+    onDragStart,
+    onClickCapture,
+  };
 }
 
 /**

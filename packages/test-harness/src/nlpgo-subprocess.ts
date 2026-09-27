@@ -40,7 +40,13 @@ export function hasGo(): boolean {
  * Builds and caches nlpgo binary by content (not mtime which breaks CI). See
  * specs/ci/nlpgo-test-binary-reuse.feature.
  */
-export function ensureNlpgoBinary(timeoutMs = 600_000): string {
+export function ensureNlpgoBinary({
+  timeoutMs = 600_000,
+  isLogged = false,
+}: {
+  timeoutMs?: number;
+  isLogged?: boolean;
+} = {}): string {
   fs.mkdirSync(NLPGO_TEST_BIN_DIR, { recursive: true });
 
   const watchDirs = [
@@ -79,7 +85,7 @@ export function ensureNlpgoBinary(timeoutMs = 600_000): string {
   // (CodeQL js/shell-command-injection-from-environment).
   execFileSync("go", ["build", "-o", NLPGO_TEST_BIN, "./cmd/service"], {
     cwd: REPO_ROOT,
-    stdio: process.env.NLPGO_TEST_LOG === "1" ? "inherit" : "pipe",
+    stdio: isLogged ? "inherit" : "pipe",
     timeout: timeoutMs,
   });
   // Stamp only after the build succeeds, so a failed compile leaves the old
@@ -121,17 +127,20 @@ async function waitForNlpgoHealth(port: number, timeoutMs: number): Promise<void
  */
 export async function startNlpgoSubprocess(opts: {
   port: number;
+  /** The test process's environment, read once by the caller; the child inherits it. */
+  environment: Readonly<Record<string, string | undefined>>;
   env?: Record<string, string>;
   /** Build-budget for a cold `go build` (default 600s). */
   buildTimeoutMs?: number;
   /** Health-poll budget once spawned (default 30s; binary boots ~1s). */
   healthTimeoutMs?: number;
 }): Promise<NlpgoSubprocess> {
-  const binary = ensureNlpgoBinary(opts.buildTimeoutMs ?? 600_000);
+  const isLogged = opts.environment.NLPGO_TEST_LOG === "1";
+  const binary = ensureNlpgoBinary({ timeoutMs: opts.buildTimeoutMs ?? 600_000, isLogged });
   const child = spawn(binary, ["nlpgo"], {
     cwd: REPO_ROOT,
     env: {
-      ...process.env,
+      ...opts.environment,
       NLPGO_CHILD_BYPASS: "true",
       SERVER_ADDR: `:${opts.port}`,
       ...opts.env,
@@ -140,7 +149,7 @@ export async function startNlpgoSubprocess(opts: {
     detached: true,
   });
   const drain = (label: "out" | "err", chunk: Buffer) => {
-    if (process.env.NLPGO_TEST_LOG === "1") {
+    if (isLogged) {
       process.stderr.write(`[nlpgo:${label}] ${chunk.toString()}`);
     }
   };

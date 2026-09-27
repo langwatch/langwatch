@@ -99,6 +99,7 @@ if (isMain) {
   // structured line every other lane writes, not a Node stack trace.
   await runScript({
     name: "codegen",
+    logLevel: process.env.LOG_LEVEL,
     main: () => {
       // The published @langwatch/server artifact excludes the skills tree,
       // so the committed bodies are the source there.

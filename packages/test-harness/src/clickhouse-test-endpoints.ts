@@ -88,9 +88,11 @@ export function privateRouteOrgId(name: string): string {
  * null to fall back to containers. The single place that decides whether
  * native mode is on — globalSetup.ts reads it too — and never active in CI.
  */
-export function nativeClickHouseBaseUrl(): string | null {
-  if (process.env.CI) return null;
-  return process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? null;
+export function nativeClickHouseBaseUrl(
+  environment: Readonly<Record<string, string | undefined>>,
+): string | null {
+  if (environment.CI) return null;
+  return environment.LANGWATCH_TEST_CLICKHOUSE_URL ?? null;
 }
 
 /**
@@ -125,11 +127,14 @@ export async function migrateTestClickHouseOnce({
 export async function startTestClickHouseEndpoints({
   suite,
   names,
+  environment,
 }: {
   suite: string;
   names: string[];
+  /** The test process's environment, read once by the caller (native server or containers). */
+  environment: Readonly<Record<string, string | undefined>>;
 }): Promise<TestClickHouseEndpoint[]> {
-  const baseUrl = nativeClickHouseBaseUrl();
+  const baseUrl = nativeClickHouseBaseUrl(environment);
   return baseUrl
     ? startNativeEndpoints({ suite, names, baseUrl })
     : startContainerEndpoints({ suite, names });

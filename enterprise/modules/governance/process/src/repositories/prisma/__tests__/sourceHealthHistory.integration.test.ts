@@ -61,6 +61,7 @@ describe("source health during a historical provider import", () => {
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "governance-source-health",
       names: ["health"],
+      environment: process.env,
     });
     if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the health suite");
     await migrateTestClickHouseOnce({

@@ -169,6 +169,7 @@ describe.skipIf(!hasGo())("the oversized nlpgo invoke round trip", () => {
   beforeAll(async () => {
     const origin = await store.start();
     nlpgo = await startNlpgoSubprocess({
+      environment: process.env,
       port: NLPGO_PORT,
       env: { ENVIRONMENT: "test", NLPGO_TEST_ONLY_STAGED_PAYLOAD_ORIGIN: origin },
     });

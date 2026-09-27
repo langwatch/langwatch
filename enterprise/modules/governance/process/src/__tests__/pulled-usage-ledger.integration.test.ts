@@ -188,6 +188,7 @@ describe.skipIf(!databaseUrl)(
       const [endpoint] = await startTestClickHouseEndpoints({
         suite: "governance-pulled-usage",
         names: ["ledger"],
+        environment: process.env,
       });
       if (!endpoint)
         throw new Error("No ClickHouse endpoint was provisioned for the pulled-usage suite");

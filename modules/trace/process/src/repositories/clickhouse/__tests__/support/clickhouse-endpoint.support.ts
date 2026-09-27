@@ -27,7 +27,7 @@ function jobSuppliedUrl(): URL | null {
 
 /** Whether any ClickHouse is reachable for these suites, checked at collect time. */
 export function testClickHouseConfigured(): boolean {
-  return Boolean(jobSuppliedUrl() ?? nativeClickHouseBaseUrl());
+  return Boolean(jobSuppliedUrl() ?? nativeClickHouseBaseUrl(process.env));
 }
 
 let localClient: ClickHouseClient | undefined;
@@ -42,7 +42,7 @@ export async function startMigratedTraceClickHouse(): Promise<ClickHouseClient> 
   if (supplied) return clientFor(supplied.toString());
   if (localClient) return localClient;
 
-  const baseUrl = nativeClickHouseBaseUrl();
+  const baseUrl = nativeClickHouseBaseUrl(process.env);
   if (!baseUrl) {
     throw new Error(
       "No ClickHouse is configured: set LANGWATCH_TEST_CLICKHOUSE_URL, TEST_CLICKHOUSE_URL or CI_CLICKHOUSE_URL.",
@@ -52,6 +52,7 @@ export async function startMigratedTraceClickHouse(): Promise<ClickHouseClient> 
   const [provisioned] = await startTestClickHouseEndpoints({
     suite: MIGRATED_ENDPOINT_SUITE,
     names: ["schema"],
+    environment: process.env,
   });
   if (!provisioned) throw new Error("No ClickHouse endpoint was provisioned for the trace suites");
 

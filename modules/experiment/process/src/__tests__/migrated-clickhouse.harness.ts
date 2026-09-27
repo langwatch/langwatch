@@ -32,6 +32,7 @@ export async function startMigratedClickHouse(): Promise<MigratedClickHouse> {
   const [provisioned] = await startTestClickHouseEndpoints({
     suite: MIGRATED_ENDPOINT_SUITE,
     names: ["schema"],
+    environment: process.env,
   });
   if (!provisioned) {
     throw new Error("No ClickHouse endpoint was provisioned for the experiment schema suite");
