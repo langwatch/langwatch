@@ -20,7 +20,12 @@ import {
   convertToUIMapping,
 } from "../../model/experiments-v3/field-mapping-converters.ts";
 import { createPromptEditorCallbacks } from "../../model/experiments-v3/prompt-editor-callbacks.ts";
-import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types.ts";
+import type {
+  ComparisonEvaluatorConfig,
+  DatasetReference,
+  FieldMapping,
+  TargetConfig,
+} from "../../model/experiments-v3/types.ts";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
@@ -87,6 +92,81 @@ export const scrollToTargetColumn = (targetId: string) => {
     left: scrollDelta,
     behavior: "smooth",
   });
+};
+
+/**
+ * The drawer an agent target edits in. A workflow agent points at a Studio graph
+ * (no inline code); a connected agent is registered from the customer's own code
+ * (nothing to edit, only its declared inputs); http and code agents edit here.
+ */
+const agentEditorDrawerFor = (
+  agentType: string | undefined,
+): "agentWorkflowTargetEditor" | "agentConnectedDetail" | "agentHttpEditor" | "agentCodeEditor" => {
+  if (agentType === "workflow") return "agentWorkflowTargetEditor";
+  if (agentType === "connected") return "agentConnectedDetail";
+  if (agentType === "http") return "agentHttpEditor";
+  return "agentCodeEditor";
+};
+
+/**
+ * A target input's mapping edits, written to the dataset active when the drawer
+ * opened: these drawers are not modal, so the reader may switch datasets meanwhile.
+ */
+const targetMappingChangeHandler =
+  ({
+    targetId,
+    datasetId,
+    isDatasetSource,
+  }: {
+    targetId: string;
+    datasetId: string;
+    isDatasetSource: (sourceId: string) => boolean;
+  }) =>
+  (identifier: string, mapping: UIFieldMapping | undefined): void => {
+    const store = useEvaluationsV3Store.getState();
+    if (!mapping) {
+      store.removeTargetMapping(targetId, datasetId, identifier);
+      return;
+    }
+    store.setTargetMapping({
+      targetId,
+      datasetId,
+      inputField: identifier,
+      mapping: convertFromUIMapping(mapping, isDatasetSource),
+    });
+  };
+
+/**
+ * The evaluator drawer's props for a comparison column-target: the comparison form
+ * (variants and golden field) in place of per-row mappings. A legacy pairwise
+ * target keeps its own evaluatorType so the drawer loads that row's settings.
+ */
+const comparisonEditorProps = ({
+  target,
+  targetComparison,
+  datasets,
+  activeDatasetId,
+  targets,
+}: {
+  target: TargetConfig & { targetEvaluatorId?: string };
+  targetComparison: ComparisonEvaluatorConfig;
+  datasets: DatasetReference[];
+  activeDatasetId: string;
+  targets: TargetConfig[];
+}) => {
+  const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+  return {
+    evaluatorId: target.targetEvaluatorId,
+    evaluatorType: target.comparison ? COMPARISON_EVALUATOR_TYPE : LEGACY_PAIRWISE_EVALUATOR_TYPE,
+    initialLocalConfig: target.localEvaluatorConfig,
+    comparisonContext: {
+      initialComparison: targetComparison,
+      targets: targets.filter((t) => t.type !== "evaluator" && t.id !== target.id),
+      datasetColumns: activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [],
+      datasetName: activeDataset?.name,
+    },
+    urlParams: { targetId: target.id },
+  };
 };
 
 export const useOpenTargetEditor = () => {
@@ -186,162 +266,25 @@ export const useOpenTargetEditor = () => {
           scrollToTargetColumn(target.id);
         });
       } else if (target.type === "agent" && target.dbAgentId) {
-        // Fetch the agent to determine its type
         try {
           const agent = await trpcUtils.agents.getById.fetch({
             projectId: project?.id ?? "",
             id: target.dbAgentId,
           });
-
-          if (agent?.type === "workflow") {
-            // A workflow-type agent has no code of its own to edit inline — it's a
-            // pointer to a Studio graph, which can't be edited meaningfully inside a
-            // narrow sidebar.
-            const availableSources = buildAvailableSources(target.id);
-            const uiMappings = buildUIMappings(target, activeDatasetId);
-
-            setFlowCallbacks("agentWorkflowTargetEditor", {
-              // Capture activeDatasetId at open time, not edit time, since this drawer
-              // isn't modal and the user may switch datasets while it's open.
-              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-                if (mapping) {
-                  setTargetMapping({
-                    targetId: target.id,
-                    datasetId: activeDatasetId,
-                    inputField: identifier,
-                    mapping: convertFromUIMapping(mapping, isDatasetSource),
-                  });
-                } else {
-                  removeTargetMapping(target.id, activeDatasetId, identifier);
-                }
-              },
-            });
-
-            openDrawer("agentWorkflowTargetEditor", {
-              availableSources,
-              inputMappings: uiMappings,
-              urlParams: {
-                targetId: target.id,
-                agentId: target.dbAgentId ?? "",
-              },
-            });
-
-            requestAnimationFrame(() => {
-              scrollToTargetColumn(target.id);
-            });
-          } else if (agent?.type === "connected") {
-            // A connected agent is registered from the customer's own code,
-            // so there is nothing here to edit: the drawer reads what the
-            // function declares, and the column maps its inputs to the
-            // dataset the same way every other target does.
-            const availableSources = buildAvailableSources(target.id);
-            const uiMappings = buildUIMappings(target, activeDatasetId);
-
-            setFlowCallbacks("agentConnectedDetail", {
-              // See the workflow-agent branch above for why this captures
-              // activeDatasetId/isDatasetSource instead of reading the store
-              // live: this drawer isn't modal either.
-              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-                if (mapping) {
-                  setTargetMapping({
-                    targetId: target.id,
-                    datasetId: activeDatasetId,
-                    inputField: identifier,
-                    mapping: convertFromUIMapping(mapping, isDatasetSource),
-                  });
-                } else {
-                  removeTargetMapping(target.id, activeDatasetId, identifier);
-                }
-              },
-            });
-
-            openDrawer("agentConnectedDetail", {
-              availableSources,
-              inputMappings: uiMappings,
-              urlParams: {
-                targetId: target.id,
-                agentId: target.dbAgentId ?? "",
-              },
-            });
-
-            requestAnimationFrame(() => {
-              scrollToTargetColumn(target.id);
-            });
-          } else if (agent?.type === "http") {
-            // HTTP agent - open HTTP editor drawer
-            const availableSources = buildAvailableSources(target.id);
-            const uiMappings = buildUIMappings(target, activeDatasetId);
-
-            // Set flow callbacks for the HTTP editor
-            setFlowCallbacks("agentHttpEditor", {
-              // See the workflow-agent branch above for why this captures
-              // activeDatasetId/isDatasetSource instead of reading the store
-              // live: this drawer isn't modal either.
-              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-                if (mapping) {
-                  setTargetMapping({
-                    targetId: target.id,
-                    datasetId: activeDatasetId,
-                    inputField: identifier,
-                    mapping: convertFromUIMapping(mapping, isDatasetSource),
-                  });
-                } else {
-                  removeTargetMapping(target.id, activeDatasetId, identifier);
-                }
-              },
-            });
-
-            openDrawer("agentHttpEditor", {
-              availableSources,
-              inputMappings: uiMappings,
-              urlParams: {
-                targetId: target.id,
-                agentId: target.dbAgentId ?? "",
-              },
-            });
-
-            // Scroll to position the target column next to the drawer
-            requestAnimationFrame(() => {
-              scrollToTargetColumn(target.id);
-            });
-          } else {
-            // Code agent - open code editor drawer
-            const availableSources = buildAvailableSources(target.id);
-            const uiMappings = buildUIMappings(target, activeDatasetId);
-
-            // Set flow callbacks for the code editor. See the workflow-agent
-            // branch above for why this captures
-            // activeDatasetId/isDatasetSource instead of reading the store
-            // live: this drawer isn't modal either.
-            setFlowCallbacks("agentCodeEditor", {
-              onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-                if (mapping) {
-                  setTargetMapping({
-                    targetId: target.id,
-                    datasetId: activeDatasetId,
-                    inputField: identifier,
-                    mapping: convertFromUIMapping(mapping, isDatasetSource),
-                  });
-                } else {
-                  removeTargetMapping(target.id, activeDatasetId, identifier);
-                }
-              },
-            });
-
-            openDrawer("agentCodeEditor", {
-              availableSources,
-              inputMappings: uiMappings,
-              urlParams: {
-                targetId: target.id,
-                agentId: target.dbAgentId ?? "",
-              },
-            });
-
-            // Scroll to position the target column next to the drawer
-            requestAnimationFrame(() => {
-              scrollToTargetColumn(target.id);
-            });
-          }
+          const drawer = agentEditorDrawerFor(agent?.type);
+          setFlowCallbacks(drawer, {
+            onInputMappingsChange: targetMappingChangeHandler({
+              targetId: target.id,
+              datasetId: activeDatasetId,
+              isDatasetSource,
+            }),
+          });
+          openDrawer(drawer, {
+            availableSources: buildAvailableSources(target.id),
+            inputMappings: buildUIMappings(target, activeDatasetId),
+            urlParams: { targetId: target.id, agentId: target.dbAgentId ?? "" },
+          });
+          requestAnimationFrame(() => scrollToTargetColumn(target.id));
         } catch (error) {
           console.error("Failed to fetch agent:", error);
         }
@@ -351,13 +294,6 @@ export const useOpenTargetEditor = () => {
         // instead of the per-row mappings UI.
         const targetComparison = toComparisonConfig(target);
         if (targetComparison) {
-          const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-          const datasetColumns =
-            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
-          const variantOptions = targets.filter(
-            (t) => t.type !== "evaluator" && t.id !== target.id,
-          );
-
           setFlowCallbacks(
             "evaluatorEditor",
             createEvaluatorEditorCallbacks({
@@ -369,25 +305,10 @@ export const useOpenTargetEditor = () => {
             }),
           );
 
-          const initialLocalConfig = target.localEvaluatorConfig;
-
-          openDrawer("evaluatorEditor", {
-            evaluatorId: target.targetEvaluatorId,
-            // A legacy pairwise column-target keeps its own evaluatorType so
-            // the drawer loads that DB row's settings; the form it renders is
-            // the same one either way.
-            evaluatorType: target.comparison
-              ? COMPARISON_EVALUATOR_TYPE
-              : LEGACY_PAIRWISE_EVALUATOR_TYPE,
-            initialLocalConfig,
-            comparisonContext: {
-              initialComparison: targetComparison,
-              targets: variantOptions,
-              datasetColumns,
-              datasetName: activeDataset?.name,
-            },
-            urlParams: { targetId: target.id },
-          });
+          openDrawer(
+            "evaluatorEditor",
+            comparisonEditorProps({ target, targetComparison, datasets, activeDatasetId, targets }),
+          );
 
           requestAnimationFrame(() => {
             scrollToTargetColumn(target.id);
@@ -399,21 +320,11 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources(target.id);
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
-        // See the workflow-agent branch above for why this captures
-        // activeDatasetId/isDatasetSource instead of reading the store live:
-        // this drawer isn't modal either.
-        const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
-          if (mapping) {
-            setTargetMapping({
-              targetId: target.id,
-              datasetId: activeDatasetId,
-              inputField: identifier,
-              mapping: convertFromUIMapping(mapping, isDatasetSource),
-            });
-          } else {
-            removeTargetMapping(target.id, activeDatasetId, identifier);
-          }
-        };
+        const handleMappingChange = targetMappingChangeHandler({
+          targetId: target.id,
+          datasetId: activeDatasetId,
+          isDatasetSource,
+        });
 
         // Set flow callbacks for the evaluator editor using the centralized helper.
         // onMappingChange is registered here (durable) instead of inside mappingsConfig
