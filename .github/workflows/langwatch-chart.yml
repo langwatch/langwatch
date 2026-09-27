@@ -264,7 +264,7 @@ jobs:
           pnpm --filter @langwatch/evaluation-process exec vitest run \
             src/__tests__/helm-langevals-memory.unit.test.ts
           pnpm --filter @langwatch/auth-process exec vitest run \
-            src/transport/better-auth/__tests__/helm-auth-base-url.unit.test.ts
+            src/transport/__tests__/helm-auth-base-url.unit.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"
