@@ -8,7 +8,7 @@ import React, { lazy, Suspense } from "react";
 import {
   collectMediaParts,
   type MediaPartData,
-} from "../../../behavior/shared/traces/media-parts.ts";
+} from "@langwatch/trace-browser-kit";
 import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output.tsx";
 import { CopyIcon } from "../../elements/icons/copy.tsx";
 import { showErrorToast } from "../errors/index.ts";

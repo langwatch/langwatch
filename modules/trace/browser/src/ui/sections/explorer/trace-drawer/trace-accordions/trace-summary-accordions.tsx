@@ -7,7 +7,7 @@ import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import { mediaRefToMediaData } from "../../../../../behavior/shared/traces/media-parts.ts";
+import { mediaRefToMediaData } from "@langwatch/trace-browser-kit";
 import {
   mediaRefBelongsToSide,
   parseMediaRefs,

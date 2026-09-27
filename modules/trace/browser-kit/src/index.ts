@@ -39,3 +39,11 @@ export * from "./model/display-formatters.ts";
 export * from "./behavior/ui.store.ts";
 export * from "./ui/sections/explorer/filter-sidebar/utils.ts";
 export * from "./behavior/explorer/filter-sidebar/types.ts";
+export * from "./model/conversation/flatten-messages.ts";
+export * from "./model/conversation/media-parts.ts";
+export type {
+  ConversationRoleMode,
+  ConversationTurn,
+  DisplayPart,
+  MediaPartData,
+} from "@langwatch/trace-contract/conversation";

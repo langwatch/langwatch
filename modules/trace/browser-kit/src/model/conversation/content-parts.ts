@@ -1,13 +1,13 @@
-import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
-import { convertMediaPartToMediaData } from "../../../behavior/shared/traces/media-parts.ts";
+import type { ContentPartVisitor } from "@langwatch/trace-contract";
+import { visitContentPart } from "@langwatch/trace-contract";
+import type { DisplayPart, MediaPartData } from "@langwatch/trace-contract/conversation";
+
+import { convertMediaPartToMediaData } from "./media-parts.ts";
 /**
  * Decoding one message's `content` into display parts. Split from the
  * message-level walk so each file answers one question: this is "what is
  * inside a message", `flattenMessages` is "what is in the conversation".
  */
-import type { ContentPartVisitor } from "../../../model/shared/content-parts/visit-content-part.ts";
-import { visitContentPart } from "../../../model/shared/content-parts/visit-content-part.ts";
-import type { DisplayPart } from "./conversation.types.ts";
 
 /** Identity a decoded part inherits from the message it came from. */
 export interface PartContext {

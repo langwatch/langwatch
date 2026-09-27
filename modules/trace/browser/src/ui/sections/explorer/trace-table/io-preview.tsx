@@ -6,8 +6,8 @@ import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
-import type { MediaPartData } from "../../../../behavior/shared/traces/media-parts.ts";
-import { collectMediaParts } from "../../../../behavior/shared/traces/media-parts.ts";
+import type { MediaPartData } from "@langwatch/trace-browser-kit";
+import { collectMediaParts } from "@langwatch/trace-browser-kit";
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 

@@ -1,4 +1,4 @@
-import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
+import type { MediaPartData } from "@langwatch/trace-browser-kit";
 import { TraceMediaStrip as TraceMediaStripView } from "../../elements/trace-media-strip.tsx";
 import { TraceMediaPart } from "./trace-media-part.tsx";
 

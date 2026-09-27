@@ -40,6 +40,15 @@ type PrereqTools interface {
 	Install(ctx context.Context, command string) error
 }
 
+// platform is the GOOS prerequisites are planned for: the pinned one, else
+// the running one.
+func (o *Orchestrator) platform() string {
+	if o.goos != "" {
+		return o.goos
+	}
+	return runtime.GOOS
+}
+
 // CheckPrereqs probes the machine and returns the full report, in catalogue
 // order. Every entry is reported, including the satisfied and the
 // not-applicable ones: the value of this command is that the list is always
@@ -47,7 +56,7 @@ type PrereqTools interface {
 func (o *Orchestrator) CheckPrereqs(ctx context.Context) []domain.PrereqStatus {
 	found := map[string]domain.Found{}
 	for _, p := range domain.Prereqs {
-		if p.DarwinOnly && runtime.GOOS != "darwin" {
+		if p.DarwinOnly && o.platform() != "darwin" {
 			// Nothing to probe for: PlanPrereqs reports these not-applicable,
 			// and a `brew list` on a machine with no brew is a slow no.
 			continue
@@ -56,7 +65,7 @@ func (o *Orchestrator) CheckPrereqs(ctx context.Context) []domain.PrereqStatus {
 			found[c.Key] = o.probeCandidate(ctx, c)
 		}
 	}
-	return domain.PlanPrereqs(found, o.PrereqSkips(), runtime.GOOS)
+	return domain.PlanPrereqs(found, o.PrereqSkips(), o.platform())
 }
 
 // probeCandidate answers one candidate. portless is the one entry with no
@@ -271,7 +280,7 @@ func (o *Orchestrator) installPrereqsTo(ctx context.Context, w io.Writer, chosen
 			}
 			continue
 		}
-		command, manual := candidate.InstallOn(runtime.GOOS)
+		command, manual := candidate.InstallOn(o.platform())
 		if command == "" {
 			fmt.Fprintf(w, "\n· %s — haven does not install this one for you. Run:\n    %s\n", p.Name, manual)
 			// Carrying on past a REQUIRED one haven cannot install is how the

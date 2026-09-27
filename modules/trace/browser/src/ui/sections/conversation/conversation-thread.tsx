@@ -6,7 +6,7 @@ import type {
   ConversationRoleMode,
   DisplayPart,
 } from "./conversation.types.ts";
-import { groupIntoTurns } from "./flatten-messages.ts";
+import { groupIntoTurns } from "@langwatch/trace-browser-kit";
 import {
   ErrorPart,
   ImagePart,

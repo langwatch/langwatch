@@ -63,7 +63,7 @@ import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
 } from "../../../model/experiments-v3/http-agent-utils.ts";
-import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
+import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
 import {

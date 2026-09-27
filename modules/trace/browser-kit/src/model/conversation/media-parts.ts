@@ -15,31 +15,11 @@ import {
   parseBase64DataUri,
   type ContentPartVisitor,
   visitContentPart,
-} from "../../../model/shared/content-parts/visit-content-part.ts";
-import { containsMediaMarkers } from "../content-parts/media-markers.ts";
+} from "@langwatch/trace-contract";
+import type { MediaPartData } from "@langwatch/trace-contract/conversation";
 
-/**
- * A single renderable media content part, as produced after content
- * extraction. This matches the subset of InputContentPart shapes the
- * `MediaPart` component renders.
- */
-export type MediaPartData =
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "url"; value: string; mimeType?: string };
-    }
-  | {
-      type: "image" | "audio" | "video";
-      source: { type: "data"; value: string; mimeType: string };
-    }
-  | {
-      type: "binary";
-      mimeType: string;
-      id?: string;
-      url?: string;
-      data?: string;
-      filename?: string;
-    };
+import { containsMediaMarkers } from "./media-markers.ts";
+
 
 /**
  * Shared recursion ceiling for media walks — identical on the render-side collector

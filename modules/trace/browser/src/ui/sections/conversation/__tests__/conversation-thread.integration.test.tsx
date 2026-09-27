@@ -9,7 +9,7 @@ import type { ReactElement } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConversationThread } from "../conversation-thread.tsx";
-import { type FlattenableMessage, flattenMessages } from "../flatten-messages.ts";
+import { type FlattenableMessage, flattenMessages } from "@langwatch/trace-browser-kit";
 
 const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
 

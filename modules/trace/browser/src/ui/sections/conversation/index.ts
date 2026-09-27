@@ -4,7 +4,7 @@ export {
   flattenMessages,
   groupIntoTurns,
   type StreamingPart,
-} from "./flatten-messages.ts";
+} from "@langwatch/trace-browser-kit";
 export { ErrorMessage } from "./error-message.tsx";
 export { findStructuredOutput } from "./structured-output.ts";
 export type { RenderMediaPart } from "./parts.tsx";
