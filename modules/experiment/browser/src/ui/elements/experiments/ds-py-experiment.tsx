@@ -52,6 +52,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type {
+  Formatter,
+  NameType,
+  ValueType,
+} from "recharts/types/component/DefaultTooltipContent";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
@@ -616,6 +621,239 @@ function LoadedRunSummary({
   );
 }
 
+type DSPyPredictorEntry = DSPyStep["predictors"][number];
+type DSPyExample = DSPyStep["examples"][number];
+type DSPyLLMCall = DSPyStep["llm_calls"][number];
+
+const stepCostOf = (summary: DSPyStepSummary) =>
+  formatMoney({ amount: summary.llm_calls_summary.total_cost, currency: "USD" }, "$0.00[00]");
+
+const stepTokensOf = (summary: DSPyStepSummary) =>
+  numeral(summary.llm_calls_summary.total_tokens).format("0a");
+
+const stepScoreOf = (summary: DSPyStepSummary) => numeral(summary.score).format("0.[00]");
+
+/** The loading, error and empty rows of a step table; nothing once it has entries. */
+const QueryStatusRows = ({
+  view,
+  skeletonCells,
+  colSpan,
+}: {
+  view: QueryView;
+  skeletonCells: number;
+  colSpan: number;
+}) => {
+  if (view === "loading") {
+    return Array.from({ length: 3 }).map((_, index) => (
+      <Table.Row key={index}>
+        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
+        {Array.from({ length: skeletonCells }).map((_, cell) => (
+          <Table.Cell key={cell}>
+            <Skeleton width="100%" height="30px" />
+          </Table.Cell>
+        ))}
+      </Table.Row>
+    ));
+  }
+  if (view === "error") {
+    return (
+      <Table.Row>
+        <Table.Cell colSpan={colSpan} color="red.600">
+          Error loading step data
+        </Table.Cell>
+      </Table.Row>
+    );
+  }
+  if (view === "empty") {
+    return (
+      <Table.Row>
+        <Table.Cell colSpan={colSpan}>No entries</Table.Cell>
+      </Table.Row>
+    );
+  }
+  return null;
+};
+
+const PredictorRow = ({
+  index,
+  name,
+  predictor,
+}: {
+  index: number;
+  name: DSPyPredictorEntry["name"];
+  predictor: DSPyPredictorEntry["predictor"];
+}) => {
+  const signature = predictor?.extended_signature ?? predictor?.signature;
+  return (
+    <Table.Row>
+      <Table.Cell background="gray.50" textAlign="center">
+        {index + 1}
+      </Table.Cell>
+      <Table.Cell>{name}</Table.Cell>
+      <Table.Cell whiteSpace="pre-wrap">{signature?.instructions ?? "-"}</Table.Cell>
+      <Table.Cell>
+        <CollapsableSignature signature={signature} />
+      </Table.Cell>
+      <Table.Cell>
+        {predictor?.demos ? (
+          <RenderInputOutput
+            value={JSON.stringify(
+              predictor.demos.map((demo: unknown) => readKey(demo, "_store") || demo),
+            )}
+            collapseStringsAfterLength={140}
+            shouldCollapse={(field) => field.type === "array"}
+            displayObjectSize={true}
+          />
+        ) : (
+          "-"
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
+};
+
+const ExampleRow = ({
+  index,
+  example,
+  hasTrace,
+}: {
+  index: number;
+  example: DSPyExample;
+  hasTrace: boolean;
+}) => (
+  <Table.Row>
+    <Table.Cell background="gray.50" textAlign="center">
+      {index + 1}
+    </Table.Cell>
+    <Table.Cell>
+      <RenderInputOutput value={JSON.stringify(example.example)} collapseStringsAfterLength={140} />
+    </Table.Cell>
+    <Table.Cell>
+      <RenderInputOutput value={JSON.stringify(example.pred)} collapseStringsAfterLength={140} />
+    </Table.Cell>
+    <Table.Cell>{example.score}</Table.Cell>
+    {hasTrace && (
+      <Table.Cell>
+        <RenderInputOutput
+          value={JSON.stringify(example.trace)}
+          collapseStringsAfterLength={140}
+          collapsed={true}
+        />
+      </Table.Cell>
+    )}
+  </Table.Row>
+);
+
+const LLMCallRow = ({ index, llmCall }: { index: number; llmCall: DSPyLLMCall }) => {
+  const response = llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
+  return (
+    <Table.Row>
+      <Table.Cell background="gray.50" textAlign="center">
+        {index + 1}
+      </Table.Cell>
+      <Table.Cell>{llmCall.model}</Table.Cell>
+      <Table.Cell>
+        <RenderInputOutput
+          value={JSON.stringify(llmCall.response?.prompt ?? llmCall.response?.messages)}
+          collapseStringsAfterLength={140}
+          collapsed={true}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        {response ? (
+          response
+        ) : (
+          <RenderInputOutput
+            value={JSON.stringify(llmCall.response)}
+            collapseStringsAfterLength={140}
+            collapsed={true}
+          />
+        )}
+      </Table.Cell>
+      <Table.Cell>
+        {llmCall.cost ? (
+          formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
+        ) : (
+          <ZeroCallCost cached={!!llmCall.response.cached} />
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
+};
+
+const RunColorMark = ({
+  runId,
+  workflowVersion,
+}: {
+  runId: string;
+  workflowVersion?: ExperimentRunWorkflowVersion;
+}) => {
+  const color = getColorForString("colors", runId).color;
+  if (!workflowVersion) {
+    return <Box width="24px" height="24px" borderRadius="100%" background={color} />;
+  }
+  return (
+    <>
+      <VersionBox version={workflowVersion} />
+      <Box
+        width="18px"
+        height="18px"
+        background="gray.300"
+        borderRadius="100%"
+        backgroundColor={color}
+      />
+    </>
+  );
+};
+
+const RunDetailsHeader = ({
+  dspyStepSummary,
+  workflowVersion,
+}: {
+  dspyStepSummary: DSPyStepSummary;
+  workflowVersion?: ExperimentRunWorkflowVersion;
+}) => {
+  const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
+  const { label } = dspyStepSummary;
+  return (
+    <HStack width="full" gap={8} padding={4}>
+      <HStack gap={3}>
+        <RunColorMark runId={dspyStepSummary.run_id} workflowVersion={workflowVersion} />
+        <Heading as="h2" size="md" marginTop="-1px">
+          {runName} (step {dspyStepSummary.index})
+        </Heading>
+      </HStack>
+      <Spacer />
+      <HStack>
+        <MetadataTag label="Step Cost" value={stepCostOf(dspyStepSummary)} />
+        <MetadataTag label="Step Tokens" value={stepTokensOf(dspyStepSummary)} />
+        <MetadataTag
+          label={label === "score" ? "Step " + titleCase(label) : titleCase(label)}
+          value={stepScoreOf(dspyStepSummary)}
+        />
+      </HStack>
+    </HStack>
+  );
+};
+
+const StepSummaryInline = ({ dspyStepSummary }: { dspyStepSummary: DSPyStepSummary }) => (
+  <>
+    <Spacer />
+    <HStack paddingX={4} color="fg.muted" fontSize="12px" textTransform="uppercase">
+      <Text>Step Cost: {stepCostOf(dspyStepSummary)}</Text>
+      <Separator orientation="vertical" />
+      <Text>Step Tokens: {stepTokensOf(dspyStepSummary)}</Text>
+      <Separator orientation="vertical" />
+      <Text>
+        {dspyStepSummary.label === "score"
+          ? "Step " + dspyStepSummary.label
+          : dspyStepSummary.label}
+        : {stepScoreOf(dspyStepSummary)}
+      </Text>
+    </HStack>
+  </>
+);
+
 export const RunDetails = React.memo(
   function RunDetails({
     project,
@@ -645,7 +883,6 @@ export const RunDetails = React.memo(
     const [tabIndex, setTabIndex] = useState(0);
     const [displayRawParams, setDisplayRawParams] = useState(false);
     const hasTrace = dspyStep.data?.examples.some((example) => example.trace);
-    const runName = workflowVersion?.commitMessage ?? dspyStepSummary.run_id;
     const stepView = queryViewOf({
       isLoading: dspyStep.isLoading,
       error: dspyStep.error,
@@ -670,57 +907,7 @@ export const RunDetails = React.memo(
     return (
       <VStack width="full" height="full" gap={0} minWidth="0">
         {size !== "sm" && (
-          <HStack width="full" gap={8} padding={4}>
-            <HStack gap={3}>
-              {workflowVersion ? (
-                <>
-                  <VersionBox version={workflowVersion} />
-                  <Box
-                    width="18px"
-                    height="18px"
-                    background="gray.300"
-                    borderRadius="100%"
-                    backgroundColor={getColorForString("colors", dspyStepSummary.run_id).color}
-                  />
-                </>
-              ) : (
-                <Box
-                  width="24px"
-                  height="24px"
-                  borderRadius="100%"
-                  background={getColorForString("colors", dspyStepSummary.run_id).color}
-                />
-              )}
-              <Heading as="h2" size="md" marginTop="-1px">
-                {runName} (step {dspyStepSummary.index})
-              </Heading>
-            </HStack>
-            <Spacer />
-            <HStack>
-              <MetadataTag
-                label="Step Cost"
-                value={formatMoney(
-                  {
-                    amount: dspyStepSummary.llm_calls_summary.total_cost,
-                    currency: "USD",
-                  },
-                  "$0.00[00]",
-                )}
-              />
-              <MetadataTag
-                label="Step Tokens"
-                value={numeral(dspyStepSummary.llm_calls_summary.total_tokens).format("0a")}
-              />
-              <MetadataTag
-                label={
-                  dspyStepSummary.label === "score"
-                    ? "Step " + titleCase(dspyStepSummary.label)
-                    : titleCase(dspyStepSummary.label)
-                }
-                value={numeral(dspyStepSummary.score).format("0.[00]")}
-              />
-            </HStack>
-          </HStack>
+          <RunDetailsHeader dspyStepSummary={dspyStepSummary} workflowVersion={workflowVersion} />
         )}
         <Tabs.Root
           value={tabIndex.toString()}
@@ -773,35 +960,7 @@ export const RunDetails = React.memo(
             <Tabs.Trigger value="2">
               LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
             </Tabs.Trigger>
-            {size === "sm" && (
-              <>
-                <Spacer />
-                <HStack paddingX={4} color="fg.muted" fontSize="12px" textTransform="uppercase">
-                  <Text>
-                    Step Cost:{" "}
-                    {formatMoney(
-                      {
-                        amount: dspyStepSummary.llm_calls_summary.total_cost,
-                        currency: "USD",
-                      },
-                      "$0.00[00]",
-                    )}
-                  </Text>
-                  <Separator orientation="vertical" />
-                  <Text>
-                    Step Tokens:{" "}
-                    {numeral(dspyStepSummary.llm_calls_summary.total_tokens).format("0a")}
-                  </Text>
-                  <Separator orientation="vertical" />
-                  <Text>
-                    {dspyStepSummary.label === "score"
-                      ? "Step " + dspyStepSummary.label
-                      : dspyStepSummary.label}
-                    : {numeral(dspyStepSummary.score).format("0.[00]")}
-                  </Text>
-                </HStack>
-              </>
-            )}
+            {size === "sm" && <StepSummaryInline dspyStepSummary={dspyStepSummary} />}
           </Tabs.List>
 
           <Tabs.Content
@@ -859,73 +1018,12 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {predictorsView === "loading" &&
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <Table.Row key={index}>
-                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  {predictorsView === "error" && (
-                    <Table.Row>
-                      <Table.Cell colSpan={5} color="red.600">
-                        Error loading step data
-                      </Table.Cell>
-                    </Table.Row>
-                  )}
-                  {predictorsView === "empty" && (
-                    <Table.Row>
-                      <Table.Cell colSpan={5}>No entries</Table.Cell>
-                    </Table.Row>
-                  )}
+                  <QueryStatusRows view={predictorsView} skeletonCells={4} colSpan={5} />
                   {predictorsView === "ready" &&
                     dspyStep.data &&
-                    dspyStep.data.predictors.map(({ name, predictor }, index) => {
-                      const signature = predictor?.extended_signature ?? predictor?.signature;
-                      return (
-                        <Table.Row key={index}>
-                          <Table.Cell background="gray.50" textAlign="center">
-                            {index + 1}
-                          </Table.Cell>
-                          <Table.Cell>{name}</Table.Cell>
-                          <Table.Cell whiteSpace="pre-wrap">
-                            {signature?.instructions ?? "-"}
-                          </Table.Cell>
-                          <Table.Cell>
-                            <CollapsableSignature signature={signature} />
-                          </Table.Cell>
-                          <Table.Cell>
-                            {predictor?.demos ? (
-                              <RenderInputOutput
-                                value={JSON.stringify(
-                                  predictor.demos.map(
-                                    (demo: unknown) => readKey(demo, "_store") || demo,
-                                  ),
-                                )}
-                                collapseStringsAfterLength={140}
-                                shouldCollapse={(field) => {
-                                  return field.type === "array";
-                                }}
-                                displayObjectSize={true}
-                              />
-                            ) : (
-                              "-"
-                            )}
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })}
+                    dspyStep.data.predictors.map(({ name, predictor }, index) => (
+                      <PredictorRow key={index} index={index} name={name} predictor={predictor} />
+                    ))}
                 </Table.Body>
               </Table.Root>
             )}
@@ -973,63 +1071,16 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {examplesView === "loading" &&
-                    Array.from({ length: 3 }).map((_, index) => (
-                      <Table.Row key={index}>
-                        <Table.Cell background="gray.50">&nbsp;</Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Skeleton width="100%" height="30px" />
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  {examplesView === "error" && (
-                    <Table.Row>
-                      <Table.Cell colSpan={4} color="red.600">
-                        Error loading step data
-                      </Table.Cell>
-                    </Table.Row>
-                  )}
-                  {examplesView === "empty" && (
-                    <Table.Row>
-                      <Table.Cell colSpan={4}>No entries</Table.Cell>
-                    </Table.Row>
-                  )}
+                  <QueryStatusRows view={examplesView} skeletonCells={3} colSpan={4} />
                   {examplesView === "ready" &&
                     dspyStep.data &&
                     dspyStep.data.examples.map((example, index) => (
-                      <Table.Row key={index}>
-                        <Table.Cell background="gray.50" textAlign="center">
-                          {index + 1}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <RenderInputOutput
-                            value={JSON.stringify(example.example)}
-                            collapseStringsAfterLength={140}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <RenderInputOutput
-                            value={JSON.stringify(example.pred)}
-                            collapseStringsAfterLength={140}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>{example.score}</Table.Cell>
-                        {hasTrace && (
-                          <Table.Cell>
-                            <RenderInputOutput
-                              value={JSON.stringify(example.trace)}
-                              collapseStringsAfterLength={140}
-                              collapsed={true}
-                            />
-                          </Table.Cell>
-                        )}
-                      </Table.Row>
+                      <ExampleRow
+                        key={index}
+                        index={index}
+                        example={example}
+                        hasTrace={!!hasTrace}
+                      />
                     ))}
                 </Table.Body>
               </Table.Root>
@@ -1075,77 +1126,12 @@ export const RunDetails = React.memo(
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {llmCallsView === "loading" &&
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <Table.Row key={index}>
-                      <Table.Cell background="gray.50">&nbsp;</Table.Cell>
-                      <Table.Cell>
-                        <Skeleton width="100%" height="30px" />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Skeleton width="100%" height="30px" />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Skeleton width="100%" height="30px" />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Skeleton width="100%" height="30px" />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                {llmCallsView === "error" && (
-                  <Table.Row>
-                    <Table.Cell colSpan={6} color="red.600">
-                      Error loading step data
-                    </Table.Cell>
-                  </Table.Row>
-                )}
-                {llmCallsView === "empty" && (
-                  <Table.Row>
-                    <Table.Cell colSpan={6}>No entries</Table.Cell>
-                  </Table.Row>
-                )}
+                <QueryStatusRows view={llmCallsView} skeletonCells={4} colSpan={6} />
                 {llmCallsView === "ready" &&
                   dspyStep.data &&
-                  dspyStep.data.llm_calls.map((llmCall, index) => {
-                    const response =
-                      llmCall.response?.choices?.[0]?.message?.content ?? llmCall.response?.output;
-                    return (
-                      <Table.Row key={index}>
-                        <Table.Cell background="gray.50" textAlign="center">
-                          {index + 1}
-                        </Table.Cell>
-                        <Table.Cell>{llmCall.model}</Table.Cell>
-                        <Table.Cell>
-                          <RenderInputOutput
-                            value={JSON.stringify(
-                              llmCall.response?.prompt ?? llmCall.response?.messages,
-                            )}
-                            collapseStringsAfterLength={140}
-                            collapsed={true}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>
-                          {response ? (
-                            response
-                          ) : (
-                            <RenderInputOutput
-                              value={JSON.stringify(llmCall.response)}
-                              collapseStringsAfterLength={140}
-                              collapsed={true}
-                            />
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          {llmCall.cost ? (
-                            formatMoney({ amount: llmCall.cost, currency: "USD" }, "$0.00[0000]")
-                          ) : (
-                            <ZeroCallCost cached={!!llmCall.response.cached} />
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
+                  dspyStep.data.llm_calls.map((llmCall, index) => (
+                    <LLMCallRow key={index} index={index} llmCall={llmCall} />
+                  ))}
               </Table.Body>
             </Table.Root>
           </Tabs.Content>
@@ -1205,6 +1191,98 @@ function CollapsableSignature({
   );
 }
 
+type StepPoint = { index: string } & Record<string, number>;
+type ChartPoint = { runId: string; index: string };
+
+/** A highlighted run shows alone; otherwise the selected runs, or every run. */
+const isRunVisible = ({
+  runId,
+  selectedRuns,
+  highlightedRun,
+}: {
+  runId: string;
+  selectedRuns: string[] | null;
+  highlightedRun: string | null;
+}) => {
+  if (highlightedRun) return highlightedRun === runId;
+  return !selectedRuns || selectedRuns.includes(runId);
+};
+
+/** One chart point per step index, carrying each run's score, label and version. */
+const stepsByIndexOf = (runs: DSPyRunsSummary[]) =>
+  runs.reduce(
+    (acc, run) => {
+      run.steps.forEach((step) => {
+        acc[step.index] = {
+          ...acc[step.index],
+          index: step.index,
+          [run.runId]: step.score,
+          [`${run.runId}_label`]: step.label,
+          [`${run.runId}_version`]: run.workflow_version?.version,
+        } as StepPoint;
+      });
+      return acc;
+    },
+    {} as Record<string, StepPoint>,
+  );
+
+/** Step indexes are dotted ("1.2.3"); compare them part by part. */
+const compareStepIndex = (a: StepPoint, b: StepPoint) => {
+  const aParts = a.index.split(".").map(Number);
+  const bParts = b.index.split(".").map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (aParts[i] ?? 0) - (bParts[i] ?? 0);
+    if (diff !== 0) return Math.sign(diff);
+  }
+  return 0;
+};
+
+const runColorOf = (runId: string) => {
+  const [name, number] = getColorForString("colors", runId).color.split(".");
+  return getRawColorValue(name && number ? `${name}.${number}` : "gray.300");
+};
+
+const bestScoreOf = (data: StepPoint[], runId: string | undefined) =>
+  data.reduce(
+    (best, point) => {
+      const score = point[runId ?? ""];
+      return score !== undefined && score > best.score ? { score, index: point.index } : best;
+    },
+    { score: -Infinity, index: "" },
+  );
+
+/** Clicking the selected point again, or empty space, clears the selection. */
+const nextSelectedPoint = (hovered: ChartPoint | null, selected: ChartPoint | null) => {
+  if (!hovered) return null;
+  const isSame = hovered.runId === selected?.runId && hovered.index === selected?.index;
+  return isSame ? null : hovered;
+};
+
+const hoveredPointOf = (
+  state: {
+    isTooltipActive: boolean;
+    activeIndex: number | string | null | undefined;
+    activeLabel: string | number | undefined;
+  },
+  data: StepPoint[],
+): ChartPoint | null => {
+  const { activeIndex, activeLabel } = state;
+  if (!state.isTooltipActive || activeIndex === undefined || activeIndex === null) return null;
+  const runId = data[Number(activeIndex)]?.runId;
+  if (!runId || activeLabel === undefined) return null;
+  return { runId: runId.toString(), index: activeLabel.toString() };
+};
+
+const scoreTooltipFormatter: Formatter<ValueType, NameType> = (value, name, item) => {
+  const label: unknown = item.payload[`${name}_label`];
+  const version: unknown = item.payload[`${name}_version`];
+  const versionTag = typeof version === "string" || typeof version === "number" ? version : null;
+  return [
+    numeral(value).format("0.[00]"),
+    [versionTag ? `[${versionTag}]` : name, label].filter((x) => x).join(" "),
+  ];
+};
+
 export function DSPyRunsScoresChart({
   dspyRuns,
   selectedPoint,
@@ -1222,50 +1300,11 @@ export function DSPyRunsScoresChart({
   stepToDisplay: DSPyStepSummary | undefined;
   labelNames: string[];
 }) {
-  const runIsVisible = (runId: string) =>
-    (!selectedRuns && !highlightedRun) ||
-    (!!highlightedRun && highlightedRun === runId) ||
-    (!highlightedRun && !!selectedRuns && selectedRuns.includes(runId));
+  const runIsVisible = (runId: string) => isRunVisible({ runId, selectedRuns, highlightedRun });
+  const stepsFlattenedByIndex = stepsByIndexOf(dspyRuns.filter((run) => runIsVisible(run.runId)));
+  const data = Object.values(stepsFlattenedByIndex).toSorted(compareStepIndex);
 
-  const stepsFlattenedByIndex = dspyRuns.reduce(
-    (acc, run) => {
-      if (!runIsVisible(run.runId)) return acc;
-      run.steps.forEach((step) => {
-        acc[step.index] = {
-          ...acc[step.index],
-          index: step.index,
-          [run.runId]: step.score,
-          [`${run.runId}_label`]: step.label,
-          [`${run.runId}_version`]: run.workflow_version?.version,
-        } as { index: string } & Record<string, number>;
-      });
-      return acc;
-    },
-    {} as Record<string, { index: string } & Record<string, number>>,
-  );
-
-  const data = Object.values(stepsFlattenedByIndex).toSorted((a, b) => {
-    const aParts = a.index.split(".").map(Number);
-    const bParts = b.index.split(".").map(Number);
-
-    for (let i = 0; i < 3; i++) {
-      const aPart = aParts[i] ?? 0;
-      const bPart = bParts[i] ?? 0;
-      if (aPart < bPart) return -1;
-      if (aPart > bPart) return 1;
-    }
-
-    return 0;
-  });
-
-  const getColor = (runId: string) => {
-    const [name, number] = getColorForString("colors", runId).color.split(".");
-    if (!name || !number) {
-      return getRawColorValue("gray.300");
-    }
-
-    return getRawColorValue(`${name}.${number}`);
-  };
+  const getColor = runColorOf;
 
   const [hoveredRunIndex, setHoveredRunIndex] = useState<{
     runId: string;
@@ -1274,18 +1313,7 @@ export function DSPyRunsScoresChart({
 
   const firstSelectedRun = selectedRuns?.[0];
 
-  const bestScore = useMemo(() => {
-    return data.reduce(
-      (best, point) => {
-        const score = point[firstSelectedRun ?? ""];
-        if (score === undefined) {
-          return best;
-        }
-        return score > best.score ? { score, index: point.index } : best;
-      },
-      { score: -Infinity, index: "" },
-    );
-  }, [data, firstSelectedRun]);
+  const bestScore = useMemo(() => bestScoreOf(data, firstSelectedRun), [data, firstSelectedRun]);
 
   return (
     <Box width="100%" position="relative">
@@ -1303,33 +1331,8 @@ export function DSPyRunsScoresChart({
           style={{
             cursor: hoveredRunIndex ? "pointer" : "default",
           }}
-          onClick={() => {
-            if (
-              hoveredRunIndex &&
-              (hoveredRunIndex.runId !== selectedPoint?.runId ||
-                hoveredRunIndex.index !== selectedPoint?.index)
-            ) {
-              setSelectedPoint(hoveredRunIndex);
-            } else {
-              setSelectedPoint(null);
-            }
-          }}
-          onMouseMove={(state) => {
-            if (state.isTooltipActive && state.activeIndex !== undefined) {
-              const runId = data[state.activeIndex as number]?.runId;
-              const index = state.activeLabel;
-              if (runId && index !== undefined) {
-                setHoveredRunIndex({
-                  runId: runId.toString(),
-                  index: index.toString(),
-                });
-              } else {
-                setHoveredRunIndex(null);
-              }
-            } else {
-              setHoveredRunIndex(null);
-            }
-          }}
+          onClick={() => setSelectedPoint(nextSelectedPoint(hoveredRunIndex, selectedPoint))}
+          onMouseMove={(state) => setHoveredRunIndex(hoveredPointOf(state, data))}
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
@@ -1355,14 +1358,7 @@ export function DSPyRunsScoresChart({
           <Tooltip
             content={<ChartTooltip />}
             labelFormatter={(value) => `Step ${value}`}
-            formatter={(value, name, props) => {
-              const label = props.payload[`${name}_label`];
-              const version = props.payload[`${name}_version`];
-              return [
-                numeral(value).format("0.[00]"),
-                [version ? `[${version}]` : name, label].filter((x) => x).join(" "),
-              ];
-            }}
+            formatter={scoreTooltipFormatter}
           />
           {bestScore.index && (
             <ReferenceDot x={bestScore.index} y={bestScore.score} r={8} fill="gold" stroke="none">

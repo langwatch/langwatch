@@ -133,6 +133,207 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
   );
 }
 
+const TASK_TYPE_LABELS: Record<keyof typeof LEGACY_EXPERIMENT_TASK_TYPES, string> = {
+  real_time: "Legacy live workflow",
+  llm_app: "LLM App Experiment",
+  prompt_creation: "Prompt Experiment",
+  custom_evaluator: "Evaluator Experiment",
+  scan: "Vulnerability Scan",
+};
+
+const EXPERIMENT_TYPE_LABELS: Record<ExperimentType, string> = {
+  BATCH_EVALUATION_V2: "Experiment (SDK)",
+  BATCH_EVALUATION: "Batch Experiment",
+  DSPY: "DSPy Optimization",
+  EVALUATIONS_V3: "Experiment (UI)",
+};
+
+const workbenchPathOf = (projectSlug: string, experiment: ExperimentListRow) =>
+  `/${projectSlug}/experiments/workbench/${experiment.slug}`;
+
+const resultsPathOf = (projectSlug: string, experiment: ExperimentListRow) =>
+  `/${projectSlug}/experiments/${experiment.slug}`;
+
+/** Workbench-backed experiments (current and legacy wizard) open in the workbench. */
+const opensInWorkbench = (experiment: ExperimentListRow) =>
+  experiment.type === "EVALUATIONS_V3" || !!experiment.workbenchState;
+
+/** The SDK's experiments have no workbench to edit in. */
+const isEditable = (experiment: ExperimentListRow) =>
+  experiment.type === "EVALUATIONS_V3" ||
+  (experiment.type !== "BATCH_EVALUATION_V2" && !!experiment.workbenchState);
+
+type ExperimentPermissions = { canEdit: boolean; canReplicate: boolean; canDelete: boolean };
+
+const ExperimentActionsMenu = ({
+  experiment,
+  projectSlug,
+  permissions,
+  onOpen,
+  onReplicate,
+  onDelete,
+}: {
+  experiment: ExperimentListRow;
+  projectSlug: string;
+  permissions: ExperimentPermissions;
+  onOpen: (path: string) => void;
+  onReplicate: () => void;
+  onDelete: () => void;
+}) => (
+  <Menu.Root>
+    <Menu.Trigger
+      aria-label={`Actions for ${experiment.name ?? experiment.slug}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <MoreVertical size={16} />
+    </Menu.Trigger>
+    <Menu.Content>
+      {permissions.canEdit && isEditable(experiment) && (
+        <Menu.Item
+          value="edit"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(workbenchPathOf(projectSlug, experiment));
+          }}
+        >
+          <LuPencil size={16} />
+          Edit
+        </Menu.Item>
+      )}
+      <Menu.Item
+        value="view-results"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpen(resultsPathOf(projectSlug, experiment));
+        }}
+      >
+        <LuEye size={16} />
+        View Results
+      </Menu.Item>
+      {permissions.canReplicate && (
+        <Menu.Item
+          value="replicate"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReplicate();
+          }}
+        >
+          <Copy size={16} />
+          Replicate to another project
+        </Menu.Item>
+      )}
+      {permissions.canDelete && (
+        <Menu.Item
+          value="delete"
+          color="red.500"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <LuTrash size={16} />
+          Delete
+        </Menu.Item>
+      )}
+    </Menu.Content>
+  </Menu.Root>
+);
+
+const PrimaryMetric = ({
+  metric,
+}: {
+  metric: ExperimentListRow["runsSummary"]["primaryMetric"];
+}) =>
+  metric ? (
+    <>
+      <Text as="span" fontSize="xs" color="fg.muted">
+        {metric.name}: &nbsp;
+      </Text>
+      <Text as="span" fontWeight="semibold">
+        {formatEvaluationSummary(metric, true)}
+      </Text>
+    </>
+  ) : (
+    "-"
+  );
+
+/**
+ * One experiment, pointable by Langy with the same chip id the `/experiments/<slug>` route
+ * derives, so pointing at a row and then opening it yields one chip, not two.
+ */
+const ExperimentRow = ({
+  experiment,
+  projectSlug,
+  permissions,
+  onOpen,
+  onReplicate,
+  onDelete,
+}: {
+  experiment: ExperimentListRow;
+  projectSlug: string;
+  permissions: ExperimentPermissions;
+  onOpen: (path: string) => void;
+  onReplicate: () => void;
+  onDelete: () => void;
+}) => (
+  <LangyContextTarget
+    target={experimentContextChip({ slug: experiment.slug, name: experiment.name })}
+  >
+    <Table.Row
+      cursor="pointer"
+      onClick={() =>
+        onOpen(
+          opensInWorkbench(experiment)
+            ? workbenchPathOf(projectSlug, experiment)
+            : resultsPathOf(projectSlug, experiment),
+        )
+      }
+    >
+      <Table.Cell>
+        <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+          {experiment.name ?? experiment.slug}
+        </OverflownTextWithTooltip>
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
+        <Badge colorPalette="gray" variant="outline">
+          {experiment.workbenchState?.task
+            ? TASK_TYPE_LABELS[experiment.workbenchState.task]
+            : EXPERIMENT_TYPE_LABELS[experiment.type]}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+          {experiment.dataset?.name ?? "-"}
+        </OverflownTextWithTooltip>
+      </Table.Cell>
+      <Table.Cell>
+        <PrimaryMetric metric={experiment.runsSummary.primaryMetric} />
+      </Table.Cell>
+      <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
+      <Table.Cell>
+        <HStack gap={1}>
+          <ExperimentRunStatus runsSummary={experiment.runsSummary} />
+        </HStack>
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
+        {readableDate(experiment.updatedAt).toLocaleString()}
+      </Table.Cell>
+      <Table.Cell>
+        <Box width="full" height="full" display="flex" justifyContent="end">
+          <ExperimentActionsMenu
+            experiment={experiment}
+            projectSlug={projectSlug}
+            permissions={permissions}
+            onOpen={onOpen}
+            onReplicate={onReplicate}
+            onDelete={onDelete}
+          />
+        </Box>
+      </Table.Cell>
+    </Table.Row>
+  </LangyContextTarget>
+);
+
 export function ExperimentsPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
@@ -193,21 +394,6 @@ export function ExperimentsPage() {
   };
 
   if (!project) return null;
-
-  const taskTypeToLabel: Record<keyof typeof LEGACY_EXPERIMENT_TASK_TYPES, string> = {
-    real_time: "Legacy live workflow",
-    llm_app: "LLM App Experiment",
-    prompt_creation: "Prompt Experiment",
-    custom_evaluator: "Evaluator Experiment",
-    scan: "Vulnerability Scan",
-  };
-
-  const experimentTypeToLabel: Record<ExperimentType, string> = {
-    BATCH_EVALUATION_V2: "Experiment (SDK)",
-    BATCH_EVALUATION: "Batch Experiment",
-    DSPY: "DSPy Optimization",
-    EVALUATIONS_V3: "Experiment (UI)",
-  };
 
   const pageState = experimentsPageState(experiments);
 
@@ -282,201 +468,38 @@ export function ExperimentsPage() {
                   {experiments.isLoading || experiments.isFetching
                     ? Array.from({ length: 3 }).map((_, i) => (
                         <Table.Row key={i}>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
+                          {Array.from({ length: 8 }).map((_, cell) => (
+                            <Table.Cell key={cell}>
+                              <Skeleton height="20px" />
+                            </Table.Cell>
+                          ))}
                         </Table.Row>
                       ))
                     : experiments.data?.experiments.map((experiment) => (
-                        // Point Langy at an experiment. Same chip id the
-                        // `/experiments/<slug>` route derives, so pointing
-                        // at a row and then opening it yields one chip, not
-                        // two. Closed, this is the plain clickable row.
-                        <LangyContextTarget
+                        <ExperimentRow
                           key={experiment.id}
-                          target={experimentContextChip({
-                            slug: experiment.slug,
-                            name: experiment.name,
-                          })}
-                        >
-                          <Table.Row
-                            cursor="pointer"
-                            onClick={() => {
-                              // Workbench-backed experiments (current and
-                              // legacy wizard) open in the workbench;
-                              // everything else in the experiment view.
-                              if (
-                                experiment.type === "EVALUATIONS_V3" ||
-                                experiment.workbenchState
-                              ) {
-                                void router.push({
-                                  pathname: `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                });
-                              } else {
-                                void router.push({
-                                  pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                });
-                              }
-                            }}
-                          >
-                            <Table.Cell>
-                              <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-                                {experiment.name ?? experiment.slug}
-                              </OverflownTextWithTooltip>
-                            </Table.Cell>
-                            <Table.Cell whiteSpace="nowrap">
-                              <Badge colorPalette="gray" variant="outline">
-                                {experiment.workbenchState?.task
-                                  ? taskTypeToLabel[experiment.workbenchState.task]
-                                  : experimentTypeToLabel[experiment.type]}
-                              </Badge>
-                            </Table.Cell>
-                            <Table.Cell>
-                              <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-                                {experiment.dataset?.name ?? "-"}
-                              </OverflownTextWithTooltip>
-                            </Table.Cell>
-                            <Table.Cell>
-                              {experiment.runsSummary.primaryMetric ? (
-                                <>
-                                  <Text as="span" fontSize="xs" color="fg.muted">
-                                    {experiment.runsSummary.primaryMetric.name}: &nbsp;
-                                  </Text>
-                                  <Text as="span" fontWeight="semibold">
-                                    {formatEvaluationSummary(
-                                      experiment.runsSummary.primaryMetric,
-                                      true,
-                                    )}
-                                  </Text>
-                                </>
-                              ) : (
-                                "-"
-                              )}
-                            </Table.Cell>
-                            <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
-                            <Table.Cell>
-                              <HStack gap={1}>
-                                <ExperimentRunStatus runsSummary={experiment.runsSummary} />
-                              </HStack>
-                            </Table.Cell>
-                            <Table.Cell whiteSpace="nowrap">
-                              {readableDate(experiment.updatedAt).toLocaleString()}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Box width="full" height="full" display="flex" justifyContent="end">
-                                <Menu.Root>
-                                  <Menu.Trigger
-                                    aria-label={`Actions for ${experiment.name ?? experiment.slug}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                    }}
-                                  >
-                                    <MoreVertical size={16} />
-                                  </Menu.Trigger>
-                                  <Menu.Content>
-                                    {hasPermission("workflows:create") &&
-                                      experiment.type === "EVALUATIONS_V3" && (
-                                        <Menu.Item
-                                          value="edit"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void router.push(
-                                              `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                            );
-                                          }}
-                                        >
-                                          <LuPencil size={16} />
-                                          Edit
-                                        </Menu.Item>
-                                      )}
-                                    {hasPermission("workflows:create") &&
-                                      experiment.type !== "EVALUATIONS_V3" &&
-                                      experiment.type !== "BATCH_EVALUATION_V2" &&
-                                      experiment.workbenchState && (
-                                        <Menu.Item
-                                          value="edit"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void router.push(
-                                              `/${project?.slug}/experiments/workbench/${experiment.slug}`,
-                                            );
-                                          }}
-                                        >
-                                          <LuPencil size={16} />
-                                          Edit
-                                        </Menu.Item>
-                                      )}
-                                    <Menu.Item
-                                      value="view-results"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        void router.push(
-                                          `/${project?.slug}/experiments/${experiment.slug}`,
-                                        );
-                                      }}
-                                    >
-                                      <LuEye size={16} />
-                                      View Results
-                                    </Menu.Item>
-                                    {hasPermission("evaluations:manage") && (
-                                      <Menu.Item
-                                        value="replicate"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setCopyDialogState({
-                                            open: true,
-                                            experimentId: experiment.id,
-                                            experimentName: experiment.name ?? experiment.slug,
-                                          });
-                                        }}
-                                      >
-                                        <Copy size={16} />
-                                        Replicate to another project
-                                      </Menu.Item>
-                                    )}
-                                    {hasPermission("workflows:delete") && (
-                                      <Menu.Item
-                                        value="delete"
-                                        color="red.500"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteExperiment(
-                                            experiment.id,
-                                            experiment.name ?? experiment.slug,
-                                          );
-                                        }}
-                                      >
-                                        <LuTrash size={16} />
-                                        Delete
-                                      </Menu.Item>
-                                    )}
-                                  </Menu.Content>
-                                </Menu.Root>
-                              </Box>
-                            </Table.Cell>
-                          </Table.Row>
-                        </LangyContextTarget>
+                          experiment={experiment}
+                          projectSlug={project.slug}
+                          permissions={{
+                            canEdit: hasPermission("workflows:create"),
+                            canReplicate: hasPermission("evaluations:manage"),
+                            canDelete: hasPermission("workflows:delete"),
+                          }}
+                          onOpen={(path) => void router.push(path)}
+                          onReplicate={() =>
+                            setCopyDialogState({
+                              open: true,
+                              experimentId: experiment.id,
+                              experimentName: experiment.name ?? experiment.slug,
+                            })
+                          }
+                          onDelete={() =>
+                            handleDeleteExperiment(
+                              experiment.id,
+                              experiment.name ?? experiment.slug,
+                            )
+                          }
+                        />
                       ))}
                 </Table.Body>
               </ListTable>

@@ -551,6 +551,71 @@ const GroupSection = ({
   </tbody>
 );
 
+/**
+ * A group-by key only counts if this comparison has it: the value comes from the URL, and
+ * a shared `?groupBy=input` into a run without that field would make every row a singleton.
+ * Aggregates are computed here, not per render: grouped mode mounts every group at once.
+ */
+const useGroupedRows = ({
+  comparisonRows,
+  comparisonData,
+  requestedGroupBy,
+}: {
+  comparisonRows: ComparisonRow[];
+  comparisonData: ComparisonRunData[];
+  requestedGroupBy: string | null;
+}) => {
+  const { availableKeys } = useResultsGrouping({ source: "dataset-entry", comparisonData });
+  const effectiveGroupBy =
+    requestedGroupBy && availableKeys.includes(requestedGroupBy) ? requestedGroupBy : null;
+  return useMemo(() => {
+    if (!effectiveGroupBy) return null;
+    return bucketRowsByGroup(comparisonRows, effectiveGroupBy).map((group) => ({
+      ...group,
+      aggregates: computeGroupAggregates(group.rows, comparisonData),
+    }));
+  }, [comparisonRows, effectiveGroupBy, comparisonData]);
+};
+
+const useCollapsedGroups = () => {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const toggleCollapse = useCallback((value: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(value)) next.add(value);
+      return next;
+    });
+  }, []);
+  return { collapsedGroups, toggleCollapse };
+};
+
+/** Minimum table width from the first run with data. */
+const minTableWidthOf = ({
+  comparisonData,
+  hiddenColumns,
+  showsTargets,
+}: {
+  comparisonData: ComparisonRunData[];
+  hiddenColumns: Set<string>;
+  showsTargets: boolean;
+}) => {
+  const data = comparisonData.find((run) => run.data !== null)?.data;
+  const datasetColCount =
+    data?.datasetColumns.filter((c) => !hiddenColumns.has(c.name)).length ?? 0;
+  const targetColCount = showsTargets ? (data?.targetColumns.length ?? 0) : 0;
+  return calculateMinTableWidth(datasetColCount, targetColCount);
+};
+
+/** Padding that keeps the scroll position while virtualizing. */
+const virtualPaddingOf = (virtualRows: { start: number; end: number }[], totalSize: number) => {
+  const first = virtualRows[0];
+  const last = virtualRows[virtualRows.length - 1];
+  return {
+    paddingTop: first?.start ?? 0,
+    paddingBottom: last ? totalSize - last.end : 0,
+  };
+};
+
 export function ComparisonTable({
   comparisonData,
   isLoading,
@@ -608,42 +673,8 @@ export function ComparisonTable({
     getCoreRowModel: coreRowModel,
   });
 
-  const { availableKeys } = useResultsGrouping({
-    source: "dataset-entry",
-    comparisonData,
-  });
-
-  // A group-by key only means something if this comparison actually has it.
-  // The value comes from the URL, so `?groupBy=input` survives a link being
-  // shared into a run that has no such field — grouping on it would put every
-  // row in its own singleton group and read as a broken table rather than as a
-  // stale parameter.
-  const effectiveGroupBy =
-    requestedGroupBy && availableKeys.includes(requestedGroupBy) ? requestedGroupBy : null;
-
-  // Collapse state for grouped sections.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
-  const toggleCollapse = useCallback((value: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) next.delete(value);
-      else next.add(value);
-      return next;
-    });
-  }, []);
-
-  // Bucket rows when grouping is active.
-  // Aggregates are computed here rather than in the render body: grouped mode
-  // turns the virtualizer off, so every group is mounted at once and a call
-  // per group would re-run an O(groups x rows x targets x evaluators) pass on
-  // each render — including renders that only opened a dropdown.
-  const groupedRows = useMemo(() => {
-    if (!effectiveGroupBy) return null;
-    return bucketRowsByGroup(comparisonRows, effectiveGroupBy).map((group) => ({
-      ...group,
-      aggregates: computeGroupAggregates(group.rows, comparisonData),
-    }));
-  }, [comparisonRows, effectiveGroupBy, comparisonData]);
+  const { collapsedGroups, toggleCollapse } = useCollapsedGroups();
+  const groupedRows = useGroupedRows({ comparisonRows, comparisonData, requestedGroupBy });
 
   // State for scroll container - using state triggers re-render when mounted
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
@@ -690,15 +721,11 @@ export function ComparisonTable({
     );
   }
 
-  // Calculate minimum table width from first run with data
-  const firstRunWithData = comparisonData.find((run) => run.data !== null);
-  const datasetColCount =
-    firstRunWithData?.data?.datasetColumns.filter((c) => !hiddenColumns.has(c.name)).length ?? 0;
-  const targetColCount =
-    showOutputs || showEvaluations || showCostAndLatency
-      ? (firstRunWithData?.data?.targetColumns.length ?? 0)
-      : 0;
-  const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
+  const minTableWidth = minTableWidthOf({
+    comparisonData,
+    hiddenColumns,
+    showsTargets: showOutputs || showEvaluations || showCostAndLatency,
+  });
 
   const tableStyles = getTableStyles(minTableWidth);
   const virtualRows = rowVirtualizer.getVirtualItems();
@@ -710,10 +737,7 @@ export function ComparisonTable({
   // TanStack's column model without rebuilding cells from scratch.
   const tableRowByIndex = new Map(tableRows.map((r) => [r.original.index, r] as const));
 
-  // Calculate padding to maintain scroll position (only when virtualizing)
-  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
-  const paddingBottom =
-    virtualRows.length > 0 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0) : 0;
+  const { paddingTop, paddingBottom } = virtualPaddingOf(virtualRows, totalSize);
 
   return (
     <VStack align="stretch" width="100%" height="100%" gap={0}>

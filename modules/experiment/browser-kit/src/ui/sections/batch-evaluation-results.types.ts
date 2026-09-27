@@ -270,235 +270,237 @@ const resolvePredictedOutputForTarget = ({
   return null;
 };
 
-export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
-  const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
+type RunDatasetEntry = ExperimentRunWithItems["dataset"][number];
+type RunEvaluation = ExperimentRunWithItems["evaluations"][number];
+type RunTargets = NonNullable<ExperimentRunWithItems["targets"]>;
 
-  // Detect dataset columns from all entries
-  const datasetColumnSet = new Set<string>();
-  for (const entry of dataset) {
-    for (const key of Object.keys(entry.entry ?? {})) {
-      datasetColumnSet.add(key);
-    }
+const EVALUATOR_TARGET_PREFIX = "_eval_";
+
+const datasetColumnsOf = (dataset: RunDatasetEntry[]): BatchDatasetColumn[] => {
+  const names = new Set(dataset.flatMap((entry) => Object.keys(entry.entry ?? {})));
+  return [...names].map((name) => ({ name, hasImages: detectHasImages(dataset, name) }));
+};
+
+/**
+ * V3 targets: the ones this run holds data for, else all. A comparison wired as its own
+ * column-target hosts a verdict, not an output, so its evaluator id counts as data. Names
+ * are numbered across the whole declared board so compare mode's by-id merge stays stable.
+ */
+const declaredTargetColumnsOf = ({
+  targets,
+  dataset,
+  evaluations,
+}: {
+  targets: RunTargets;
+  dataset: RunDatasetEntry[];
+  evaluations: RunEvaluation[];
+}): BatchTargetColumn[] => {
+  const targetIdsWithData = new Set<string>();
+  for (const entry of dataset) if (entry.targetId) targetIdsWithData.add(entry.targetId);
+  for (const evaluation of evaluations) {
+    if (evaluation.targetId) targetIdsWithData.add(evaluation.targetId);
+    targetIdsWithData.add(evaluation.evaluator);
   }
-
-  // Check for image URLs in dataset entries for each column
-  const datasetColumns: BatchDatasetColumn[] = Array.from(datasetColumnSet).map((name) => ({
-    name,
-    hasImages: detectHasImages(dataset, name),
+  const withData = targets.filter((target) => targetIdsWithData.has(target.id));
+  const runTargets = withData.length > 0 ? withData : targets;
+  const boardNames = disambiguateNames(targets.map((t) => t.name));
+  const displayNameById = new Map(
+    targets.map((target, index) => [target.id, boardNames[index] ?? target.name]),
+  );
+  return runTargets.map((target) => ({
+    id: target.id,
+    name: target.name,
+    displayName: displayNameById.get(target.id) ?? target.name,
+    type: target.type === "custom" ? "custom" : (target.type as BatchTargetColumn["type"]),
+    promptId: target.promptId,
+    promptVersion: target.promptVersion,
+    agentId: target.agentId,
+    evaluatorId: target.evaluatorId,
+    model: target.model,
+    metadata: target.metadata,
+    outputFields: detectOutputFields(dataset, target.id),
   }));
+};
 
-  // Build target columns
-  // For V3: use targets array
-  // For V2: create a single "legacy" target from predicted columns
-  // For API evaluations without targets/predicted: derive a virtual target
-  let targetColumns: BatchTargetColumn[] = [];
-
-  // Check if there are row-level errors without any target_id
-  const hasRowLevelErrorsWithoutTarget = dataset.some((entry) => entry.error && !entry.targetId);
-
-  if (targets && targets.length > 0) {
-    // V3 style with explicit targets.
-    const targetIdsWithData = new Set<string>();
-    for (const entry of dataset) {
-      if (entry.targetId) targetIdsWithData.add(entry.targetId);
-    }
-    for (const evaluation of evaluations) {
-      if (evaluation.targetId) targetIdsWithData.add(evaluation.targetId);
-      // A comparison wired as its own column-target hosts a verdict rather
-      // than an output, so it owns no dataset row. Its target id is the
-      // evaluator id.
-      targetIdsWithData.add(evaluation.evaluator);
-    }
-    const withData = targets.filter((target) => targetIdsWithData.has(target.id));
-    const runTargets = withData.length > 0 ? withData : targets;
-
-    // Number the whole declared board, not only the targets this run holds
-    // rows for. Compare mode merges columns by target id across runs, so a
-    // label worked out from one run's subset would move: the same target reads
-    // `classifier (2)` beside a sibling and plain `classifier` in a run that
-    // covers it alone.
-    const boardNames = disambiguateNames(targets.map((t) => t.name));
-    const displayNameById = new Map(
-      targets.map((target, index) => [target.id, boardNames[index] ?? target.name]),
-    );
-
-    targetColumns = runTargets.map((target) => ({
-      id: target.id,
-      name: target.name,
-      displayName: displayNameById.get(target.id) ?? target.name,
-      type: target.type === "custom" ? "custom" : (target.type as BatchTargetColumn["type"]),
-      promptId: target.promptId,
-      promptVersion: target.promptVersion,
-      agentId: target.agentId,
-      evaluatorId: target.evaluatorId,
-      model: target.model,
-      metadata: target.metadata,
-      outputFields: detectOutputFields(dataset, target.id),
-    }));
-  } else {
-    // V2 style: infer from predicted columns
-    // Retrocompatibility: handle old format where predicted is flat vs nested
-    const predictedColumns = detectPredictedColumns(dataset);
-    if (Object.keys(predictedColumns).length > 0) {
-      targetColumns = Object.entries(predictedColumns).map(([node, fields]) => ({
-        id: node || "output",
-        name: node === "end" || node === "" ? "Output" : node,
-        type: "legacy" as const,
-        outputFields: Array.from(fields),
-      }));
-    } else if (evaluations.length > 0) {
-      // API evaluations: no targets, no predicted - create one virtual target per evaluator
-      // Each evaluator's inputs (data=) will be displayed as the target output
-      const uniqueEvaluators = new Map<string, string>();
-      for (const evaluation of evaluations) {
-        if (!uniqueEvaluators.has(evaluation.evaluator)) {
-          uniqueEvaluators.set(evaluation.evaluator, evaluation.name ?? evaluation.evaluator);
-        }
-      }
-
-      // Create a virtual target for each evaluator
-      targetColumns = Array.from(uniqueEvaluators.entries()).map(
-        ([evaluatorId, evaluatorName]) => ({
-          id: `_eval_${evaluatorId}`,
-          name: evaluatorName,
-          type: "legacy" as const,
-          outputFields: detectEvaluatorOutputFieldsForEvaluator(evaluations, evaluatorId),
-        }),
-      );
-    } else if (hasRowLevelErrorsWithoutTarget) {
-      // SDK evaluations with errors but no targets defined - create a virtual "Output" target
-      // This ensures errors are visible in the table
-      targetColumns = [
-        {
-          id: "_default",
-          name: "Output",
-          type: "custom" as const,
-          outputFields: [],
-        },
-      ];
+/** API evaluations with no targets and no predictions: one virtual target per evaluator. */
+const evaluatorTargetColumnsOf = (evaluations: RunEvaluation[]): BatchTargetColumn[] => {
+  const uniqueEvaluators = new Map<string, string>();
+  for (const evaluation of evaluations) {
+    if (!uniqueEvaluators.has(evaluation.evaluator)) {
+      uniqueEvaluators.set(evaluation.evaluator, evaluation.name ?? evaluation.evaluator);
     }
   }
+  return [...uniqueEvaluators.entries()].map(([evaluatorId, evaluatorName]) => ({
+    id: `${EVALUATOR_TARGET_PREFIX}${evaluatorId}`,
+    name: evaluatorName,
+    type: "legacy" as const,
+    outputFields: detectEvaluatorOutputFieldsForEvaluator(evaluations, evaluatorId),
+  }));
+};
 
-  // Build evaluator info
-  const evaluatorMap = new Map<string, string>();
+/**
+ * Target columns without declared targets: V2 predicted columns (flat or nested), else one
+ * virtual target per evaluator, else a lone "Output" so SDK row errors stay visible.
+ */
+const inferredTargetColumnsOf = ({
+  dataset,
+  evaluations,
+}: {
+  dataset: RunDatasetEntry[];
+  evaluations: RunEvaluation[];
+}): BatchTargetColumn[] => {
+  const predictedColumns = detectPredictedColumns(dataset);
+  if (Object.keys(predictedColumns).length > 0) {
+    return Object.entries(predictedColumns).map(([node, fields]) => ({
+      id: node || "output",
+      name: node === "end" || node === "" ? "Output" : node,
+      type: "legacy" as const,
+      outputFields: Array.from(fields),
+    }));
+  }
+  if (evaluations.length > 0) return evaluatorTargetColumnsOf(evaluations);
+  if (dataset.some((entry) => entry.error && !entry.targetId)) {
+    return [{ id: "_default", name: "Output", type: "custom" as const, outputFields: [] }];
+  }
+  return [];
+};
+
+const evaluatorNamesOf = (evaluations: RunEvaluation[]): Map<string, string> => {
+  const names = new Map<string, string>();
   for (const evaluation of evaluations) {
     const key = evaluation.targetId
       ? `${evaluation.targetId}:${evaluation.evaluator}`
       : evaluation.evaluator;
-    if (!evaluatorMap.has(key)) {
-      evaluatorMap.set(key, evaluation.name ?? evaluation.evaluator);
-    }
+    if (!names.has(key)) names.set(key, evaluation.name ?? evaluation.evaluator);
   }
+  return names;
+};
 
-  // Group dataset by index
-  const datasetByIndex = new Map<number, (typeof dataset)[number]>();
+/** The run's entries and evaluations indexed by row, and by `row:target`. */
+type RunIndex = {
+  isV3: boolean;
+  entryByRow: Map<number, RunDatasetEntry>;
+  entryByRowTarget: Map<string, RunDatasetEntry>;
+  evaluationsByRowTarget: Map<string, RunEvaluation[]>;
+};
+
+/** A V3 row can hold one entry per target; the row's base entry is its target-less one. */
+const runIndexOf = ({
+  dataset,
+  evaluations,
+  isV3,
+}: {
+  dataset: RunDatasetEntry[];
+  evaluations: RunEvaluation[];
+  isV3: boolean;
+}): RunIndex => {
+  const entryByRow = new Map<number, RunDatasetEntry>();
+  const entryByRowTarget = new Map<string, RunDatasetEntry>();
   for (const entry of dataset) {
-    // For V3, we might have multiple entries per index (one per target)
-    // We need to handle this appropriately
-    if (!datasetByIndex.has(entry.index) || !entry.targetId) {
-      datasetByIndex.set(entry.index, entry);
-    }
+    if (!entryByRow.has(entry.index) || !entry.targetId) entryByRow.set(entry.index, entry);
+    entryByRowTarget.set(`${entry.index}:${entry.targetId ?? ""}`, entry);
   }
-
-  // Group evaluations by index and target
-  const evaluationsByIndexAndTarget = new Map<string, (typeof evaluations)[number][]>();
+  const evaluationsByRowTarget = new Map<string, RunEvaluation[]>();
   for (const evaluation of evaluations) {
     const key = `${evaluation.index}:${evaluation.targetId ?? ""}`;
-    const existing = evaluationsByIndexAndTarget.get(key) ?? [];
-    existing.push(evaluation);
-    evaluationsByIndexAndTarget.set(key, existing);
+    evaluationsByRowTarget.set(key, [...(evaluationsByRowTarget.get(key) ?? []), evaluation]);
   }
+  return { isV3, entryByRow, entryByRowTarget, evaluationsByRowTarget };
+};
 
-  // Group dataset entries by index and target for V3
-  const datasetByIndexAndTarget = new Map<string, (typeof dataset)[number]>();
-  for (const entry of dataset) {
-    const key = `${entry.index}:${entry.targetId ?? ""}`;
-    datasetByIndexAndTarget.set(key, entry);
-  }
+const evaluatorResultOf = (ev: RunEvaluation): BatchEvaluatorResult => ({
+  evaluatorId: ev.evaluator,
+  evaluatorName: ev.name ?? ev.evaluator,
+  status: ev.status,
+  score: ev.score,
+  passed: ev.passed,
+  label: ev.label,
+  details: ev.details,
+  cost: ev.cost,
+  duration: ev.duration,
+  inputs: ev.inputs ?? void 0,
+});
 
-  // Determine the total number of rows
-  // When dataset is empty, rowCount should be 0
+/** A virtual evaluator target's cell: that evaluator's inputs are the output. */
+const evaluatorTargetOutputOf = ({
+  index,
+  row,
+  evaluatorId,
+}: {
+  index: RunIndex;
+  row: number;
+  evaluatorId: string;
+}): { output: unknown; evaluations: RunEvaluation[] } => {
+  const rowEvaluations = index.evaluationsByRowTarget.get(`${row}:`) ?? [];
+  return {
+    output: extractOutputFromEvaluatorInputsForEvaluator(rowEvaluations, evaluatorId),
+    evaluations: rowEvaluations.filter((ev) => ev.evaluator === evaluatorId),
+  };
+};
+
+/** One target's cell in one row; V2 rows fall back to the row's untargeted evaluations. */
+const targetOutputOf = ({
+  index,
+  row,
+  targetId,
+}: {
+  index: RunIndex;
+  row: number;
+  targetId: string;
+}): BatchTargetOutput => {
+  const baseEntry = index.entryByRow.get(row);
+  const targetEntry = index.isV3
+    ? (index.entryByRowTarget.get(`${row}:${targetId}`) ?? baseEntry)
+    : baseEntry;
+  const untargeted = index.isV3 ? [] : (index.evaluationsByRowTarget.get(`${row}:`) ?? []);
+  const { output, evaluations } = targetId.startsWith(EVALUATOR_TARGET_PREFIX)
+    ? evaluatorTargetOutputOf({
+        index,
+        row,
+        evaluatorId: targetId.slice(EVALUATOR_TARGET_PREFIX.length),
+      })
+    : {
+        output: targetEntry?.predicted
+          ? resolvePredictedOutputForTarget({
+              predicted: targetEntry.predicted,
+              targetId,
+              isV3: index.isV3,
+            })
+          : null,
+        evaluations: index.evaluationsByRowTarget.get(`${row}:${targetId}`) ?? untargeted,
+      };
+  return {
+    targetId,
+    output,
+    cost: targetEntry?.cost ?? null,
+    duration: targetEntry?.duration ?? null,
+    error: targetEntry?.error ?? null,
+    domainError: targetEntry?.domainError,
+    traceId: targetEntry?.traceId ?? null,
+    evaluatorResults: evaluations.map(evaluatorResultOf),
+  };
+};
+
+export const transformBatchEvaluationData = (data: ExperimentRunWithItems): BatchEvaluationData => {
+  const { experimentId, runId, dataset, evaluations, targets, timestamps, progress, total } = data;
+  const isV3 = !!targets && targets.length > 0;
+  const targetColumns = isV3
+    ? declaredTargetColumnsOf({ targets, dataset, evaluations })
+    : inferredTargetColumnsOf({ dataset, evaluations });
+  const evaluatorNames = evaluatorNamesOf(evaluations);
+  const index = runIndexOf({ dataset, evaluations, isV3 });
   const rowCount = dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
 
-  // Build rows
-  const rows: BatchResultRow[] = [];
-  for (let i = 0; i < rowCount; i++) {
-    const baseEntry = datasetByIndex.get(i);
-    const datasetEntry = baseEntry?.entry ?? {};
-
-    // Build targets for this row
-    const rowTargets: Record<string, BatchTargetOutput> = {};
-
-    for (const targetCol of targetColumns) {
-      const targetId = targetCol.id;
-
-      // Get dataset entry for this target (V3) or base entry (V2)
-      const targetEntry =
-        targets && targets.length > 0
-          ? (datasetByIndexAndTarget.get(`${i}:${targetId}`) ?? baseEntry)
-          : baseEntry;
-
-      // Extract output for this target
-      let output: unknown = null;
-
-      if (targetId.startsWith("_eval_")) {
-        // Virtual evaluator target: extract output from this specific evaluator's inputs
-        const evaluatorId = targetId.slice(6); // Remove "_eval_" prefix
-        const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
-        output = extractOutputFromEvaluatorInputsForEvaluator(rowEvaluations, evaluatorId);
-      } else if (targetEntry?.predicted) {
-        output = resolvePredictedOutputForTarget({
-          predicted: targetEntry.predicted,
-          targetId,
-          isV3: !!(targets && targets.length > 0),
-        });
-      }
-
-      // Get evaluator results for this target
-      let targetEvaluations: (typeof evaluations)[number][];
-
-      if (targetId.startsWith("_eval_")) {
-        // Virtual evaluator target: only include this specific evaluator
-        const evaluatorId = targetId.slice(6);
-        const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
-        targetEvaluations = rowEvaluations.filter((ev) => ev.evaluator === evaluatorId);
-      } else {
-        targetEvaluations =
-          evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
-          (targets && targets.length > 0 ? [] : (evaluationsByIndexAndTarget.get(`${i}:`) ?? []));
-      }
-
-      const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map((ev) => ({
-        evaluatorId: ev.evaluator,
-        evaluatorName: ev.name ?? ev.evaluator,
-        status: ev.status,
-        score: ev.score,
-        passed: ev.passed,
-        label: ev.label,
-        details: ev.details,
-        cost: ev.cost,
-        duration: ev.duration,
-        inputs: ev.inputs ?? void 0,
-      }));
-
-      rowTargets[targetId] = {
-        targetId,
-        output,
-        cost: targetEntry?.cost ?? null,
-        duration: targetEntry?.duration ?? null,
-        error: targetEntry?.error ?? null,
-        domainError: targetEntry?.domainError,
-        traceId: targetEntry?.traceId ?? null,
-        evaluatorResults,
-      };
-    }
-
-    rows.push({
-      index: i,
-      datasetEntry,
-      targets: rowTargets,
-    });
-  }
+  const rows: BatchResultRow[] = Array.from({ length: rowCount }, (_, row) => ({
+    index: row,
+    datasetEntry: index.entryByRow.get(row)?.entry ?? {},
+    targets: Object.fromEntries(
+      targetColumns.map((column) => [
+        column.id,
+        targetOutputOf({ index, row, targetId: column.id }),
+      ]),
+    ),
+  }));
 
   return {
     runId,
@@ -509,10 +511,10 @@ export const transformBatchEvaluationData = (data: ExperimentRunWithItems): Batc
     stoppedAt: timestamps.stoppedAt,
     progress,
     total,
-    datasetColumns,
+    datasetColumns: datasetColumnsOf(dataset),
     targetColumns,
-    evaluatorIds: Array.from(evaluatorMap.keys()),
-    evaluatorNames: Object.fromEntries(evaluatorMap),
+    evaluatorIds: Array.from(evaluatorNames.keys()),
+    evaluatorNames: Object.fromEntries(evaluatorNames),
     comparisonColumns: detectComparisonColumns(evaluations, targetColumns, rows),
     rows,
   };
@@ -565,253 +567,276 @@ const readCandidateIds = (inputs: Record<string, unknown>): string[] => {
   );
 };
 
+/** Every way a verdict label can name a target: its id, display name or prompt handle. */
+type TargetLookup = {
+  nameById: Map<string, string>;
+  idByAnyKey: Map<string, string>;
+  /** Target columns of type "evaluator" are comparison columns whatever they report. */
+  forcedComparisonIds: Set<string>;
+};
+
 /**
- * Detect comparison evaluators by observing their per-row label shapes.
+ * Langevals echoes back the variant's display identifier as the verdict label (for prompt
+ * targets the prompt handle, e.g. "say-hi", not the `target_XYZ` id), so resolve any of them.
+ */
+const targetLookupOf = (targetColumns: BatchTargetColumn[]): TargetLookup => {
+  const idByAnyKey = new Map<string, string>();
+  for (const t of targetColumns) {
+    for (const key of [t.id, t.name, t.promptId]) if (key) idByAnyKey.set(key, t.id);
+  }
+  return {
+    nameById: new Map(targetColumns.map((t) => [t.id, t.name])),
+    idByAnyKey,
+    forcedComparisonIds: new Set(
+      targetColumns.filter((t) => t.type === "evaluator").map((t) => t.id),
+    ),
+  };
+};
+
+const isSlotLabel = (v: string): v is "A" | "B" | "tie" => v === "A" || v === "B" || v === "tie";
+
+/** "tie" is valid under both the two-slot and the N-way contract; only "A"/"B" are legacy. */
+const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
+
+/** An evaluator whose type or display name reads as a comparison judge. */
+const looksLikeComparisonJudge = (ev: RunEvaluation) =>
+  [ev.evaluator ?? "", ev.name ?? ""]
+    .map((f) => f.toLowerCase())
+    .some(
+      (field) =>
+        field.includes("pairwise") || field.includes("select_best") || field.includes("comparison"),
+    );
+
+/** Separate comparison instances: the same evaluator type wired against different variant sets. */
+const comparisonKeyOf = (ev: RunEvaluation) =>
+  ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
+
+type ComparisonReading = "skipped" | "labelled" | "unlabelled";
+
+/** How one evaluation reads as a comparison verdict, or null when it is not one. */
+const comparisonReadingOf = (ev: RunEvaluation, lookup: TargetLookup): ComparisonReading | null => {
+  const isComparison = looksLikeComparisonJudge(ev) || lookup.forcedComparisonIds.has(ev.evaluator);
+  if (ev.status === "skipped" && isComparison) return "skipped";
+  if (ev.status !== "processed") return null;
+  const label = ev.label ?? "";
+  if (label.length === 0) return isComparison ? "unlabelled" : null;
+  const isRelated = isSlotLabel(label) || lookup.idByAnyKey.has(label);
+  return isRelated || isComparison ? "labelled" : null;
+};
+
+type BucketVerdict = {
+  rowIndex: number;
+  rawLabel: string;
+  reasoning: string | null;
+  candidateIds: string[];
+  /** No verdict for the row; carried straight through to the verdict's own `isUnsettled`. */
+  isUnsettled?: boolean;
+};
+
+type ComparisonBucket = {
+  key: string;
+  evaluatorId: string;
+  name: string;
+  /** First-seen judge order of the candidates, from the judge's inputs. */
+  candidateIds: string[];
+  /** Non-tie labels observed as winners, in first-seen order. */
+  winningLabels: string[];
+  sawSlotLabels: boolean;
+  verdicts: BucketVerdict[];
+};
+
+/**
+ * The bucket for an evaluation's comparison, created on first sight. A null name prefers the
+ * target column's display name, so a column-target reads "Comparison", not `target_XYZ`.
+ */
+const bucketFor = (
+  buckets: Map<string, ComparisonBucket>,
+  ev: RunEvaluation,
+  lookup: TargetLookup,
+): ComparisonBucket => {
+  const key = comparisonKeyOf(ev);
+  const existing = buckets.get(key);
+  if (existing) return existing;
+  const bucket: ComparisonBucket = {
+    key,
+    evaluatorId: ev.evaluator,
+    name: ev.name ?? lookup.nameById.get(ev.evaluator) ?? ev.evaluator,
+    candidateIds: [],
+    winningLabels: [],
+    sawSlotLabels: false,
+    verdicts: [],
+  };
+  buckets.set(key, bucket);
+  return bucket;
+};
+
+const pushUnique = (list: string[], value: string) => {
+  if (!list.includes(value)) list.push(value);
+};
+
+/**
+ * Records one evaluation into its bucket. The judge's inputs are authoritative on who it
+ * compared: they name every candidate even when only one ever wins.
+ */
+const recordComparison = ({
+  bucket,
+  ev,
+  reading,
+  lookup,
+}: {
+  bucket: ComparisonBucket;
+  ev: RunEvaluation;
+  reading: ComparisonReading;
+  lookup: TargetLookup;
+}) => {
+  const candidateIds = readCandidateIds(ev.inputs ?? {}).map(
+    (id) => lookup.idByAnyKey.get(id) ?? id,
+  );
+  for (const id of candidateIds) pushUnique(bucket.candidateIds, id);
+  const reasoning = ev.details ?? null;
+  const rowIndex = ev.index;
+
+  // Skipped: the row had too few outputs to judge, or the answer could not be used.
+  if (reading === "skipped") {
+    bucket.verdicts.push({ rowIndex, rawLabel: "", reasoning, candidateIds, isUnsettled: true });
+    return;
+  }
+  if (reading === "unlabelled") return;
+
+  const label = ev.label ?? "";
+  if (isLegacySlotLabel(label)) bucket.sawSlotLabels = true;
+  else if (!isSlotLabel(label)) {
+    pushUnique(bucket.winningLabels, lookup.idByAnyKey.get(label) ?? label);
+  }
+  bucket.verdicts.push({ rowIndex, rawLabel: label, reasoning, candidateIds });
+};
+
+/**
+ * Judge inputs first, then any winner they did not cover (a variant the run's target
+ * snapshot has since lost). A legacy two-slot run with no candidate ids falls back to
+ * target-column order, and slot letters always get two positions to resolve against.
+ */
+const comparisonVariantsOf = ({
+  bucket,
+  lookup,
+  targetColumns,
+}: {
+  bucket: ComparisonBucket;
+  lookup: TargetLookup;
+  targetColumns: BatchTargetColumn[];
+}): BatchComparisonVariant[] => {
+  const variantIds = [...bucket.candidateIds];
+  for (const label of bucket.winningLabels) pushUnique(variantIds, label);
+  if (variantIds.length === 0 && bucket.sawSlotLabels) {
+    variantIds.push(...targetColumns.slice(0, 2).map((t) => t.id));
+  }
+  const variants: BatchComparisonVariant[] = variantIds.map((id, index) => ({
+    id,
+    name: lookup.nameById.get(id) ?? id ?? `Variant ${index + 1}`,
+  }));
+  while (bucket.sawSlotLabels && variants.length < 2) {
+    variants.push({ id: null, name: `Variant ${String.fromCharCode(65 + variants.length)}` });
+  }
+  return variants;
+};
+
+/**
+ * A real tie is 0.5/0.5 evidence for Bradley-Terry aggregation; an unresolved label is no
+ * evidence at all. Both leave winnerId null. Resolution reuses resolveVerdictLabel's mapping.
+ */
+const verdictWinnerOf = ({
+  rawLabel,
+  variants,
+  lookup,
+}: {
+  rawLabel: string;
+  variants: BatchComparisonVariant[];
+  lookup: TargetLookup;
+}): { winnerId: string | null; isUnresolved: boolean } => {
+  if (rawLabel === "tie") return { winnerId: null, isUnresolved: false };
+  const resolved = resolveExperimentVerdictLabel({
+    label: rawLabel,
+    variants: variants.map((v) => v.id ?? ""),
+  });
+  const isUnresolved = resolved === "" || resolved === "A" || resolved === "B";
+  return {
+    winnerId: isUnresolved ? null : (lookup.idByAnyKey.get(resolved) ?? resolved),
+    isUnresolved,
+  };
+};
+
+/** A row's verdict, with the winner's output so the cell shows "what was right" beside "why". */
+const comparisonVerdictOf = ({
+  verdict,
+  variants,
+  lookup,
+  rows,
+}: {
+  verdict: BucketVerdict;
+  variants: BatchComparisonVariant[];
+  lookup: TargetLookup;
+  rows: BatchResultRow[];
+}): BatchComparisonVerdict => {
+  const { rowIndex, rawLabel, reasoning, candidateIds } = verdict;
+  if (verdict.isUnsettled) {
+    return {
+      rowIndex,
+      winnerId: null,
+      reasoning,
+      winnerOutput: null,
+      candidateIds,
+      isUnsettled: true,
+    };
+  }
+  const { winnerId, isUnresolved } = verdictWinnerOf({ rawLabel, variants, lookup });
+  const winnerCell = winnerId ? rows[rowIndex]?.targets[winnerId] : void 0;
+  return {
+    rowIndex,
+    winnerId,
+    reasoning,
+    winnerOutput: winnerCell ? extractOutputText(winnerCell.output) : null,
+    candidateIds,
+    isUnresolved,
+  };
+};
+
+/**
+ * Detect comparison evaluators by observing their per-row label shapes. Declined comparisons
+ * are counted apart from the buckets: a run where every row was declined has no bucket.
  */
 const detectComparisonColumns = (
   evaluations: ExperimentRunWithItems["evaluations"],
   targetColumns: BatchTargetColumn[],
   rows: BatchResultRow[],
 ): BatchComparisonColumn[] => {
-  const targetNameById = new Map(targetColumns.map((t) => [t.id, t.name]));
-  // Langevals echoes back the variant's DISPLAY IDENTIFIER as the verdict
-  // label — for prompt targets that's the prompt handle (e.g. "say-hi"), not
-  // the internal `target_XYZ` id. Build a lookup that accepts either shape so
-  // detection resolves either to the underlying target id.
-  const targetIdByAnyKey = new Map<string, string>();
-  for (const t of targetColumns) {
-    targetIdByAnyKey.set(t.id, t.id);
-    if (t.name) targetIdByAnyKey.set(t.name, t.id);
-    if (t.promptId) targetIdByAnyKey.set(t.promptId, t.id);
-  }
-  const resolveToTargetId = (identifier: string): string | undefined =>
-    targetIdByAnyKey.get(identifier);
-
-  // Target columns with type "evaluator" are treated as comparison columns.
-  const forcedComparisonEvaluatorIds = new Set(
-    targetColumns.filter((t) => t.type === "evaluator").map((t) => t.id),
-  );
-
-  const isSlotLabel = (v: string): v is "A" | "B" | "tie" => v === "A" || v === "B" || v === "tie";
-
-  // "tie" is valid vocabulary under BOTH the legacy 2-slot and current N-way contract,
-  // so seeing it alone is not evidence of the legacy shape — only "A"/"B" are.
-  const isLegacySlotLabel = (v: string): v is "A" | "B" => v === "A" || v === "B";
-
-  // Also treat any evaluator whose type or display name looks like a comparison judge
-  // as one, even if this row's label doesn't match a known target id or slot letter.
-  const isComparisonEvaluator = (ev: ExperimentRunWithItems["evaluations"][number]) => {
-    const fields = [ev.evaluator ?? "", ev.name ?? ""].map((f) => f.toLowerCase());
-    return fields.some(
-      (field) =>
-        field.includes("pairwise") || field.includes("select_best") || field.includes("comparison"),
-    );
-  };
-
-  // Comparisons the judge ran and declined to call, per bucket key. Kept
-  // outside `buckets` because they are counted before a bucket exists — a run
-  // where EVERY row was declined has a count and no bucket at all.
+  const lookup = targetLookupOf(targetColumns);
   const skippedByKey = new Map<string, number>();
-
-  // Group by evaluator id + name so different comparison instances (same
-  // evaluator type wired against different variant sets) stay separate.
-  const buckets = new Map<
-    string,
-    {
-      /** The map key, carried so a column can find its own skipped count. */
-      key: string;
-      evaluatorId: string;
-      name: string;
-      /** First-seen judge order of the candidates, from the judge's inputs. */
-      candidateIds: string[];
-      /** Non-tie labels observed as winners, in first-seen order. */
-      winningLabels: string[];
-      sawSlotLabels: boolean;
-      verdicts: {
-        rowIndex: number;
-        rawLabel: string;
-        reasoning: string | null;
-        candidateIds: string[];
-        /**
-         * The comparison produced no verdict for the row. Carried straight
-         * through to the verdict's own `isUnsettled`, whose doc names the
-         * causes.
-         */
-        isUnsettled?: boolean;
-      }[];
-    }
-  >();
+  const buckets = new Map<string, ComparisonBucket>();
 
   for (const ev of evaluations) {
-    const isForced = forcedComparisonEvaluatorIds.has(ev.evaluator);
-    const isSkippedComparison = ev.status === "skipped" && (isComparisonEvaluator(ev) || isForced);
-    if (ev.status !== "processed" && !isSkippedComparison) {
-      continue;
+    const reading = comparisonReadingOf(ev, lookup);
+    if (!reading) continue;
+    if (reading === "skipped") {
+      const key = comparisonKeyOf(ev);
+      skippedByKey.set(key, (skippedByKey.get(key) ?? 0) + 1);
     }
-    if (isSkippedComparison) {
-      // A comparison that reached no verdict: the row had too few outputs to judge, or
-      // it was judged and the answer could not be used.
-      const skippedKey = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
-      skippedByKey.set(skippedKey, (skippedByKey.get(skippedKey) ?? 0) + 1);
-    }
-    const hasLabel = typeof ev.label === "string" && ev.label.length > 0;
-    if (!hasLabel && !isComparisonEvaluator(ev) && !isForced) continue;
-
-    const label = ev.label ?? "";
-    const hasUnrelatedLabel = hasLabel && !isSlotLabel(label) && !resolveToTargetId(label);
-    if (hasUnrelatedLabel && !isComparisonEvaluator(ev) && !isForced) {
-      continue;
-    }
-
-    const key = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
-    let bucket = buckets.get(key);
-    if (!bucket) {
-      // Prefer the target column's display name when the evaluator id matches
-      // a column-target (comparison column-target case) — this keeps the chart
-      // / winner column labeled "Comparison" instead of the raw `target_XYZ`
-      // id when ev.name is null.
-      bucket = {
-        key,
-        evaluatorId: ev.evaluator,
-        name: ev.name ?? targetNameById.get(ev.evaluator) ?? ev.evaluator,
-        candidateIds: [],
-        winningLabels: [],
-        sawSlotLabels: false,
-        verdicts: [],
-      };
-      buckets.set(key, bucket);
-    }
-
-    // Snapshot the judge's own view of who it compared. Authoritative: it names every
-    // candidate even when only one of them ever wins.
-    const rowCandidateIds = readCandidateIds(ev.inputs ?? {}).map(
-      (id) => resolveToTargetId(id) ?? id,
-    );
-    for (const resolved of rowCandidateIds) {
-      if (!bucket.candidateIds.includes(resolved)) {
-        bucket.candidateIds.push(resolved);
-      }
-    }
-
-    if (isSkippedComparison) {
-      // No label to resolve and none coming: this row's whole content is the
-      // judge's account of why it reached no verdict.
-      bucket.verdicts.push({
-        rowIndex: ev.index,
-        rawLabel: "",
-        reasoning: ev.details ?? null,
-        candidateIds: rowCandidateIds,
-        isUnsettled: true,
-      });
-      continue;
-    }
-
-    if (!hasLabel) continue;
-    if (isLegacySlotLabel(label)) {
-      bucket.sawSlotLabels = true;
-    } else if (!isSlotLabel(label)) {
-      const resolved = resolveToTargetId(label) ?? label;
-      if (!bucket.winningLabels.includes(resolved)) {
-        bucket.winningLabels.push(resolved);
-      }
-    }
-    bucket.verdicts.push({
-      rowIndex: ev.index,
-      rawLabel: label,
-      reasoning: ev.details ?? null,
-      candidateIds: rowCandidateIds,
-    });
+    recordComparison({ bucket: bucketFor(buckets, ev, lookup), ev, reading, lookup });
   }
 
-  const columns: BatchComparisonColumn[] = [];
-  for (const bucket of buckets.values()) {
-    // Judge inputs first; then any winner we saw that they didn't cover
-    // (a variant the run's target snapshot has since lost). Never drop one.
-    const variantIds = [...bucket.candidateIds];
-    for (const label of bucket.winningLabels) {
-      if (!variantIds.includes(label)) variantIds.push(label);
-    }
-
-    // A legacy two-slot run whose inputs carried no candidate ids: the slot
-    // letters are all we have, so fall back to target-column order.
-    if (variantIds.length === 0 && bucket.sawSlotLabels) {
-      variantIds.push(...targetColumns.slice(0, 2).map((t) => t.id));
-    }
-
-    const variants: BatchComparisonVariant[] = variantIds.map((id, index) => ({
-      id,
-      name: targetNameById.get(id) ?? id ?? `Variant ${index + 1}`,
-    }));
-    // Slot letters must always have two positions to resolve against, even
-    // when the run only ever produced one target column.
-    while (bucket.sawSlotLabels && variants.length < 2) {
-      variants.push({
-        id: null,
-        name: `Variant ${String.fromCharCode(65 + variants.length)}`,
-      });
-    }
-
+  return [...buckets.values()].map((bucket) => {
+    const variants = comparisonVariantsOf({ bucket, lookup, targetColumns });
     const verdictsByRow: Record<number, BatchComparisonVerdict> = {};
-    for (const { rowIndex, rawLabel, reasoning, candidateIds, isUnsettled } of bucket.verdicts) {
-      if (isUnsettled) {
-        // Never runs through the label resolution below: there is no label,
-        // and the two states it can produce (tie, unresolved) are both claims
-        // about an answer this row never got.
-        verdictsByRow[rowIndex] = {
-          rowIndex,
-          winnerId: null,
-          reasoning,
-          winnerOutput: null,
-          candidateIds,
-          isUnsettled: true,
-        };
-        continue;
-      }
-
-      let winnerId: string | null;
-      // Distinguished from a genuinely unresolved label below — both leave
-      // winnerId null for every existing (bar-chart) consumer, but a real
-      // tie is 0.5/0.5 evidence for Bradley-Terry aggregation while an
-      // unresolved label is no evidence at all and must be excluded.
-      let isUnresolved = false;
-      if (rawLabel === "tie") {
-        winnerId = null;
-      } else {
-        // Reuse the same A/B-position mapping every other surface uses
-        // (resolveVerdictLabel) instead of re-deriving it here, so the two never drift.
-        const resolved = resolveExperimentVerdictLabel({
-          label: rawLabel,
-          variants: variants.map((v) => v.id ?? ""),
-        });
-        const isUnresolvedSlot = resolved === "" || resolved === "A" || resolved === "B";
-        isUnresolved = isUnresolvedSlot;
-        winnerId = isUnresolvedSlot ? null : (resolveToTargetId(resolved) ?? resolved);
-      }
-
-      // Look up the winning variant's actual output text so the row cell can
-      // show "what was right" alongside "why". Ties get no winner output —
-      // there was no definitively-right answer to surface.
-      const winnerCell = winnerId ? rows[rowIndex]?.targets[winnerId] : void 0;
-
-      verdictsByRow[rowIndex] = {
-        rowIndex,
-        winnerId,
-        reasoning,
-        winnerOutput: winnerCell ? extractOutputText(winnerCell.output) : null,
-        candidateIds,
-        isUnresolved,
-      };
+    for (const verdict of bucket.verdicts) {
+      verdictsByRow[verdict.rowIndex] = comparisonVerdictOf({ verdict, variants, lookup, rows });
     }
-
-    columns.push({
+    return {
       evaluatorId: bucket.evaluatorId,
       name: bucket.name,
       variants,
       verdictsByRow,
       rowsWithoutVerdict: skippedByKey.get(bucket.key) ?? 0,
-    });
-  }
-  return columns;
+    };
+  });
 };
 
 /**

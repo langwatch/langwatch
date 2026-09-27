@@ -6,6 +6,7 @@ import {
   Box,
   Button,
   Checkbox,
+  chakra,
   HStack,
   Skeleton,
   Spinner,
@@ -117,26 +118,164 @@ const resolveRunColor = ({
   return runColors[run.runId] ?? getColorForString("colors", run.runId).color;
 };
 
-/**
- * Format evaluation summary for display
- */
-const formatEvalSummary = (
-  evaluation: {
-    name: string;
-    averageScore?: number | null;
-    averagePassed?: number | null;
-  },
-  compact = false,
-): string => {
-  if (evaluation.averagePassed !== undefined && evaluation.averagePassed !== null) {
-    const pct = Math.round(evaluation.averagePassed * 100);
-    return compact ? `${pct}%` : `${pct}% passed`;
+/** Runs newest-first for display, numbered oldest-first so "Run #N" stays stable. */
+const runListOf = (runs: BatchRunSummary[]) => {
+  const chronological = runs.toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
+  return {
+    sortedRuns: chronological.toReversed(),
+    chronologicalIndexMap: new Map(chronological.map((run, i) => [run.runId, i])),
+  };
+};
+
+const SidebarSkeleton = () => (
+  <VStack gap={0.5} align="stretch" paddingX={2}>
+    {Array.from({ length: 6 }).map((_, index) => (
+      <HStack key={index} paddingX={2} paddingY={2} gap={2}>
+        <VStack align="start" gap={1} flex={1} minWidth={0}>
+          <HStack gap={1} width="100%">
+            <Skeleton width="10px" height="10px" borderRadius="sm" />
+            <Skeleton height="13px" width="calc(100% - 14px)" />
+          </HStack>
+          <Skeleton height="12px" width="full" />
+        </VStack>
+      </HStack>
+    ))}
+  </VStack>
+);
+
+const CompareToggle = ({
+  compareMode,
+  canCompare,
+  onToggle,
+}: {
+  compareMode: boolean;
+  canCompare: boolean;
+  onToggle: () => void;
+}) => {
+  if (compareMode) {
+    return (
+      <Button size="xs" variant="outline" onClick={onToggle} data-testid="exit-compare-button">
+        <X size={14} />
+        Exit
+      </Button>
+    );
   }
-  if (evaluation.averageScore !== undefined && evaluation.averageScore !== null) {
-    const score = evaluation.averageScore.toFixed(2);
-    return compact ? score : `avg ${score}`;
-  }
-  return "-";
+  return (
+    <Tooltip
+      content={
+        canCompare ? "Compare runs (or Shift+click another run)" : "Need at least 2 runs to compare"
+      }
+      positioning={{ placement: "right" }}
+    >
+      <Button
+        size="xs"
+        variant="outline"
+        onClick={onToggle}
+        disabled={!canCompare}
+        data-testid="compare-button"
+      >
+        <GitCompare size={14} />
+        Compare
+      </Button>
+    </Tooltip>
+  );
+};
+
+type RunItemProps = {
+  run: BatchRunSummary;
+  chronologicalIndex: number;
+  isHighlighted: boolean;
+  isSelectedForComparison: boolean;
+  runColors: Record<string, string>;
+  onClick: (event: React.MouseEvent) => void;
+  onToggleSelection?: () => void;
+};
+
+const RunItem = ({
+  run,
+  chronologicalIndex,
+  isHighlighted,
+  isSelectedForComparison,
+  runColors,
+  onClick,
+  onToggleSelection,
+}: RunItemProps) => {
+  const interrupted = isRunInterrupted(run.timestamps);
+  const runColor = resolveRunColor({ run, interrupted, runColors });
+  const runName = getRunDisplayName({
+    commitMessage: run.workflowVersion?.commitMessage,
+    runId: run.runId,
+    index: chronologicalIndex,
+  });
+  return (
+    <HStack
+      bg={isHighlighted ? "blue.subtle" : "transparent"}
+      color={isHighlighted ? "blue.fg" : "fg"}
+      borderRadius="md"
+      _hover={{ bg: isHighlighted ? "blue.muted" : "bg.muted" }}
+      gap={0}
+      data-testid={`run-item-${run.runId}`}
+    >
+      {onToggleSelection && (
+        <Checkbox.Root
+          size="sm"
+          paddingLeft={2}
+          checked={isSelectedForComparison}
+          onCheckedChange={onToggleSelection}
+          data-testid={`run-checkbox-${run.runId}`}
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+        </Checkbox.Root>
+      )}
+      <chakra.button
+        type="button"
+        onClick={onClick}
+        display="flex"
+        flexDirection="column"
+        alignItems="start"
+        textAlign="left"
+        flex={1}
+        minWidth={0}
+        paddingX={2}
+        paddingY={2}
+        cursor="pointer"
+      >
+        <HStack gap={1} width="100%">
+          <Tooltip content={runName} positioning={{ placement: "top" }} openDelay={500}>
+            <HStack gap={1} flex={1} minWidth={0} width="100%">
+              <Box width="10px" height="10px" borderRadius="sm" bg={runColor} flexShrink={0} />
+              <Text
+                fontSize="13px"
+                fontWeight="medium"
+                lineClamp={1}
+                wordBreak="break-all"
+                flex={1}
+                minWidth={0}
+              >
+                <RunDisplayName
+                  commitMessage={run.workflowVersion?.commitMessage}
+                  runId={run.runId}
+                  index={chronologicalIndex}
+                />
+              </Text>
+            </HStack>
+          </Tooltip>
+          {run.workflowVersion?.version && (
+            <Text fontSize="10px" fontWeight="600" color="fg.muted" flexShrink={0}>
+              v{run.workflowVersion.version}
+            </Text>
+          )}
+          {!isRunFinished(run.timestamps) && <Spinner size="xs" color="blue.500" flexShrink={0} />}
+        </HStack>
+        <Text color="fg.muted" fontSize="12px">
+          {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
+          {run.timestamps.stoppedAt && " · stopped"}
+          {interrupted && " · interrupted"}
+        </Text>
+      </chakra.button>
+    </HStack>
+  );
 };
 
 export function BatchRunsSidebar({
@@ -157,15 +296,7 @@ export function BatchRunsSidebar({
 
   // Sort runs newest-first for display, and build a chronological index map
   // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
-  const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
-    const sorted = [...runs].toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt);
-    const chronological = [...runs].toSorted(
-      (a, b) => a.timestamps.createdAt - b.timestamps.createdAt,
-    );
-    const indexMap = new Map<string, number>();
-    chronological.forEach((run, i) => void indexMap.set(run.runId, i));
-    return { sortedRuns: sorted, chronologicalIndexMap: indexMap };
-  }, [runs]);
+  const { sortedRuns, chronologicalIndexMap } = useMemo(() => runListOf(runs), [runs]);
 
   // Handle click with shift key for compare mode
   const handleRunClick = (runId: string, event: React.MouseEvent) => {
@@ -206,59 +337,17 @@ export function BatchRunsSidebar({
         <Text fontSize="sm" fontWeight="semibold" color="fg">
           Experiment Runs
         </Text>
-        {onToggleCompareMode &&
-          (compareMode ? (
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={onToggleCompareMode}
-              data-testid="exit-compare-button"
-            >
-              <X size={14} />
-              Exit
-            </Button>
-          ) : (
-            <Tooltip
-              content={
-                canCompare
-                  ? "Compare runs (or Shift+click another run)"
-                  : "Need at least 2 runs to compare"
-              }
-              positioning={{ placement: "right" }}
-            >
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={onToggleCompareMode}
-                disabled={!canCompare}
-                data-testid="compare-button"
-              >
-                <GitCompare size={14} />
-                Compare
-              </Button>
-            </Tooltip>
-          ))}
+        {onToggleCompareMode && (
+          <CompareToggle
+            compareMode={compareMode}
+            canCompare={canCompare}
+            onToggle={onToggleCompareMode}
+          />
+        )}
       </HStack>
 
       {/* Loading state */}
-      {isLoading && (
-        <VStack gap={0.5} align="stretch" paddingX={2}>
-          {Array.from({ length: 6 }).map((_, index) => (
-            // Its for skeleton data.
-            <HStack key={index} paddingX={2} paddingY={2} gap={2}>
-              <VStack align="start" gap={1} flex={1} minWidth={0}>
-                {/* Line 1: Color square + name + version */}
-                <HStack gap={1} width="100%">
-                  <Skeleton width="10px" height="10px" borderRadius="sm" />
-                  <Skeleton height="13px" width="calc(100% - 14px)" />
-                </HStack>
-                {/* Line 2: Time ago */}
-                <Skeleton height="12px" width="full" />
-              </VStack>
-            </HStack>
-          ))}
-        </VStack>
-      )}
+      {isLoading && <SidebarSkeleton />}
 
       {/* Error state */}
       {error && (
@@ -282,114 +371,24 @@ export function BatchRunsSidebar({
         {!isLoading &&
           !error &&
           sortedRuns.map((run) => {
-            const isSelected = selectedRunId === run.runId;
-            const isFinished = isRunFinished(run.timestamps);
-            const _runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
-
-            const chronologicalIndex = chronologicalIndexMap.get(run.runId) ?? 0;
-            const runName = getRunDisplayName({
-              commitMessage: run.workflowVersion?.commitMessage,
-              runId: run.runId,
-              index: chronologicalIndex,
-            });
-
-            // Build summary line: evaluator scores + cost (filter out "-" values)
-            const summaryParts: string[] = [];
-            Object.values(run.summary.evaluations)
-              .slice(0, 2)
-              .forEach((ev) => {
-                const summary = formatEvalSummary(ev, true);
-                if (summary !== "-") {
-                  summaryParts.push(summary);
-                }
-              });
-
             const isSelectedForComparison = selectedRunIds.includes(run.runId);
-            const interrupted = isRunInterrupted(run.timestamps);
-
-            const runColor = resolveRunColor({
-              run,
-              interrupted,
-              runColors,
-            });
-            const isHighlighted = (compareMode && isSelectedForComparison) || isSelected;
-
             return (
-              <HStack
+              <RunItem
                 key={run.runId}
-                paddingX={2}
-                paddingY={2}
-                cursor="pointer"
-                role="button"
-                bg={isHighlighted ? "blue.subtle" : "transparent"}
-                color={isHighlighted ? "blue.fg" : "fg"}
-                borderRadius="md"
-                _hover={{
-                  bg: isHighlighted ? "blue.muted" : "bg.muted",
-                }}
+                run={run}
+                chronologicalIndex={chronologicalIndexMap.get(run.runId) ?? 0}
+                isHighlighted={
+                  (compareMode && isSelectedForComparison) || selectedRunId === run.runId
+                }
+                isSelectedForComparison={isSelectedForComparison}
+                runColors={runColors}
                 onClick={(e) => handleRunClick(run.runId, e)}
-                gap={2}
-                data-testid={`run-item-${run.runId}`}
-              >
-                {/* Checkbox in compare mode */}
-                {compareMode && onToggleRunSelection && (
-                  <Checkbox.Root
-                    size="sm"
-                    checked={isSelectedForComparison}
-                    onCheckedChange={() => onToggleRunSelection(run.runId)}
-                    onClick={(e) => e.stopPropagation()}
-                    data-testid={`run-checkbox-${run.runId}`}
-                  >
-                    <Checkbox.HiddenInput />
-                    <Checkbox.Control />
-                  </Checkbox.Root>
-                )}
-
-                <VStack align="start" gap={0} flex={1} minWidth={0}>
-                  {/* Line 1: Name + version badge + spinner */}
-                  <HStack gap={1} width="100%">
-                    <Tooltip content={runName} positioning={{ placement: "top" }} openDelay={500}>
-                      <HStack gap={1} flex={1} minWidth={0} width="100%">
-                        {/* Small color indicator square */}
-                        <Box
-                          width="10px"
-                          height="10px"
-                          borderRadius="sm"
-                          bg={runColor}
-                          flexShrink={0}
-                        />
-                        <Text
-                          fontSize="13px"
-                          fontWeight="medium"
-                          lineClamp={1}
-                          wordBreak="break-all"
-                          flex={1}
-                          minWidth={0}
-                        >
-                          <RunDisplayName
-                            commitMessage={run.workflowVersion?.commitMessage}
-                            runId={run.runId}
-                            index={chronologicalIndex}
-                          />
-                        </Text>
-                      </HStack>
-                    </Tooltip>
-                    {run.workflowVersion?.version && (
-                      <Text fontSize="10px" fontWeight="600" color="fg.muted" flexShrink={0}>
-                        v{run.workflowVersion.version}
-                      </Text>
-                    )}
-                    {!isFinished && <Spinner size="xs" color="blue.500" flexShrink={0} />}
-                  </HStack>
-
-                  {/* Line 2: Time ago + status */}
-                  <Text color="fg.muted" fontSize="12px">
-                    {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
-                    {run.timestamps.stoppedAt && " · stopped"}
-                    {interrupted && " · interrupted"}
-                  </Text>
-                </VStack>
-              </HStack>
+                onToggleSelection={
+                  compareMode && onToggleRunSelection
+                    ? () => onToggleRunSelection(run.runId)
+                    : undefined
+                }
+              />
             );
           })}
       </VStack>

@@ -178,6 +178,129 @@ export function BatchEvaluationV2({
   );
 }
 
+type RunListSize = "sm" | "md";
+
+const runItemPadding = (size: RunListSize) => ({
+  paddingX: size === "sm" ? 2 : 4,
+  paddingY: size === "sm" ? 2 : 3,
+});
+
+/** A placeholder for the selected run while it has not been listed yet. */
+const PendingRunItem = ({ size, hasAnyVersion }: { size: RunListSize; hasAnyVersion: boolean }) => (
+  <HStack
+    {...runItemPadding(size)}
+    width="100%"
+    cursor="pointer"
+    as="button"
+    background="gray.200"
+    _hover={{ background: "gray.100" }}
+    gap={3}
+  >
+    <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
+    <VStack align="start" gap={2} width="100%" paddingRight={2}>
+      <HStack width="100%">
+        <Skeleton height="12px" background="gray.400" flexGrow={1} />
+        <Spinner size="xs" flexShrink={0} />
+      </HStack>
+      <Skeleton width="100%" height="12px" background="gray.400" />
+    </VStack>
+  </HStack>
+);
+
+const RunVersionMark = ({ run, hasAnyVersion }: { run: ExperimentRun; hasAnyVersion: boolean }) => {
+  const minWidth = hasAnyVersion ? "48px" : "0";
+  if (run.workflowVersion) return <VersionBox version={run.workflowVersion} minWidth={minWidth} />;
+  const color = run.timestamps.stoppedAt ? "red.200" : getColorForString("colors", run.runId).color;
+  return <VersionBox minWidth={minWidth} backgroundColor={color} />;
+};
+
+/** The run's first two evaluation results, then its cost. */
+const RunSummaryLine = ({ run, size }: { run: ExperimentRun; size: RunListSize }) => {
+  const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
+  const hasEvaluations = Object.keys(run.summary.evaluations).length > 0;
+  return (
+    <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
+      {Object.values(run.summary.evaluations)
+        .slice(0, 2)
+        .map((evaluation, index) => (
+          <React.Fragment key={evaluation.name}>
+            {index > 0 && <Text>·</Text>}
+            <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>
+              <Text>{formatEvaluationSummary(evaluation, true)}</Text>
+            </Tooltip>
+          </React.Fragment>
+        ))}
+      {!!runCost && (
+        <>
+          {hasEvaluations && <Text>·</Text>}
+          <Text whiteSpace="nowrap">
+            <FormatMoney amount={runCost} currency="USD" format="$0.00[0]" />
+          </Text>
+        </>
+      )}
+    </HStack>
+  );
+};
+
+const RunListItem = ({
+  run,
+  index,
+  size,
+  hasAnyVersion,
+  isSelected,
+  onSelect,
+}: {
+  run: ExperimentRun;
+  index: number;
+  size: RunListSize;
+  hasAnyVersion: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
+}) => {
+  const runName = getRunDisplayName({ commitMessage: run.workflowVersion?.commitMessage, index });
+  const isRunning = getFinishedAt(run.timestamps, nowInstant().epochMilliseconds) === undefined;
+  return (
+    <HStack
+      {...runItemPadding(size)}
+      width="100%"
+      cursor="pointer"
+      as="button"
+      background={isSelected ? "gray.200" : "none"}
+      _hover={{ background: isSelected ? "gray.200" : "gray.100" }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      gap={3}
+    >
+      <RunVersionMark run={run} hasAnyVersion={hasAnyVersion} />
+      <VStack align="start" gap={0}>
+        <OverflownTextWithTooltip
+          fontSize={size === "sm" ? "13px" : "14px"}
+          lineClamp={1}
+          wordBreak="break-all"
+        >
+          {runName}
+          {isRunning && (
+            <Spinner size="xs" display="inline-block" marginLeft={2} marginBottom="-2px" />
+          )}
+        </OverflownTextWithTooltip>
+        <RunSummaryLine run={run} size={size} />
+        <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
+          <Text whiteSpace="nowrap" lineClamp={1}>
+            {run.timestamps.createdAt
+              ? formatTimeAgo(run.timestamps.createdAt, "yyyy-MM-dd HH:mm", 5)
+              : "Waiting for steps..."}
+          </Text>
+          {run.timestamps.stoppedAt && (
+            <Box width="6px" height="6px" background="red.300" borderRadius="full" />
+          )}
+        </HStack>
+      </VStack>
+    </HStack>
+  );
+};
+
 export function BatchEvaluationV2RunList({
   batchEvaluationRuns,
   selectedRun,
@@ -249,119 +372,19 @@ export function BatchEvaluationV2RunList({
       {showRuns && (
         <>
           {!runs?.find((r) => r.runId === selectedRunId) && (
-            <HStack
-              paddingX={size === "sm" ? 2 : 4}
-              paddingY={size === "sm" ? 2 : 3}
-              width="100%"
-              cursor="pointer"
-              as="button"
-              background="gray.200"
-              _hover={{
-                background: "gray.100",
-              }}
-              gap={3}
-            >
-              <VersionBox minWidth={hasAnyVersion ? "48px" : "0"} />
-              <VStack align="start" gap={2} width="100%" paddingRight={2}>
-                <HStack width="100%">
-                  <Skeleton height="12px" background="gray.400" flexGrow={1} />
-                  <Spinner size="xs" flexShrink={0} />
-                </HStack>
-                <Skeleton width="100%" height="12px" background="gray.400" />
-              </VStack>
-            </HStack>
+            <PendingRunItem size={size} hasAnyVersion={!!hasAnyVersion} />
           )}
-          {runs?.map((run, index) => {
-            const runCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
-            const runName = getRunDisplayName({
-              commitMessage: run.workflowVersion?.commitMessage,
-              index,
-            });
-
-            return (
-              <HStack
-                key={run?.runId ?? "new"}
-                paddingX={size === "sm" ? 2 : 4}
-                paddingY={size === "sm" ? 2 : 3}
-                width="100%"
-                cursor="pointer"
-                as="button"
-                background={selectedRun?.runId === run.runId ? "gray.200" : "none"}
-                _hover={{
-                  background: selectedRun?.runId === run.runId ? "gray.200" : "gray.100",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedRunId(run.runId);
-                }}
-                gap={3}
-              >
-                {run.workflowVersion ? (
-                  <VersionBox
-                    version={run.workflowVersion}
-                    minWidth={hasAnyVersion ? "48px" : "0"}
-                  />
-                ) : (
-                  <VersionBox
-                    minWidth={hasAnyVersion ? "48px" : "0"}
-                    backgroundColor={
-                      run.timestamps.stoppedAt
-                        ? "red.200"
-                        : getColorForString("colors", run.runId).color
-                    }
-                  />
-                )}
-                <VStack align="start" gap={0}>
-                  <OverflownTextWithTooltip
-                    fontSize={size === "sm" ? "13px" : "14px"}
-                    lineClamp={1}
-                    wordBreak="break-all"
-                  >
-                    {runName}
-                    {getFinishedAt(run.timestamps, nowInstant().epochMilliseconds) ===
-                      undefined && (
-                      <Spinner
-                        size="xs"
-                        display="inline-block"
-                        marginLeft={2}
-                        marginBottom="-2px"
-                      />
-                    )}
-                  </OverflownTextWithTooltip>
-                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"} gap={1}>
-                    {Object.values(run.summary.evaluations)
-                      .slice(0, 2)
-                      .map((evaluation, index) => (
-                        <React.Fragment key={evaluation.name}>
-                          {index > 0 && <Text>·</Text>}
-                          <Tooltip content={evaluation.name} positioning={{ placement: "top" }}>
-                            <Text>{formatEvaluationSummary(evaluation, true)}</Text>
-                          </Tooltip>
-                        </React.Fragment>
-                      ))}
-                    {!!runCost && (
-                      <>
-                        {Object.keys(run.summary.evaluations).length > 0 && <Text>·</Text>}
-                        <Text whiteSpace="nowrap">
-                          <FormatMoney amount={runCost} currency="USD" format="$0.00[0]" />
-                        </Text>
-                      </>
-                    )}
-                  </HStack>
-                  <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
-                    <Text whiteSpace="nowrap" lineClamp={1}>
-                      {run.timestamps.createdAt
-                        ? formatTimeAgo(run.timestamps.createdAt, "yyyy-MM-dd HH:mm", 5)
-                        : "Waiting for steps..."}
-                    </Text>
-                    {run.timestamps.stoppedAt && (
-                      <Box width="6px" height="6px" background="red.300" borderRadius="full" />
-                    )}
-                  </HStack>
-                </VStack>
-              </HStack>
-            );
-          })}
+          {runs?.map((run, index) => (
+            <RunListItem
+              key={run?.runId ?? "new"}
+              run={run}
+              index={index}
+              size={size}
+              hasAnyVersion={!!hasAnyVersion}
+              isSelected={selectedRun?.runId === run.runId}
+              onSelect={() => setSelectedRunId(run.runId)}
+            />
+          ))}
         </>
       )}
     </VStack>
