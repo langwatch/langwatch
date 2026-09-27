@@ -1,8 +1,13 @@
-import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
+import {
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  type SpanFactsContributedEvent,
+} from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import type {
   CodingAgentProjectActivity,
   CodingAgentPullRequestMapping,
@@ -16,8 +21,6 @@ import {
   type CodingAgentProcessingPipeline,
   EventingCodingAgentProcessingAdapter,
 } from "../coding-agent-processing.pipeline.ts";
-import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
-import { type CodingAgentSessionState } from "../coding-agent-session.projection.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -68,23 +71,36 @@ class MappingEverything implements CodingAgentPullRequestMapping {
   async requestBranchMapping(): Promise<void> {}
 }
 
-function foldedSession(): CodingAgentSessionState {
+/**
+ * One model call on session_1: enough to make the fold persistable, since a
+ * state with no signal at all is dropped before it reaches ClickHouse by design.
+ */
+function modelCallEvent(): SpanFactsContributedEvent {
   return {
-    ...CodingAgentSessionStateProjection.create().createInitCodingAgentSession(),
-    sessionId: "session_1",
-    agent: "claude_code",
-    // One model call is what makes the fold persistable; a state with no
-    // signal at all is dropped before it reaches ClickHouse by design.
-    modelCalls: 1,
-    inputTokens: 10,
-    outputTokens: 5,
-    sessionKeySource: "provider",
-    traceIds: ["trace_1"],
-    startedAtMs: 1_800_000_000_000,
+    id: "evt-1",
+    aggregateId: "session_1",
+    aggregateType: "coding_agent_session",
     createdAt: 1_800_000_000_000,
-    updatedAt: 1_800_000_000_500,
-    LastEventOccurredAt: 1_800_000_000_400,
-  } as CodingAgentSessionState;
+    occurredAt: 1_800_000_000_000,
+    version: "2025-01-01",
+    tenantId: createTenantId("project_alpha"),
+    type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "project_alpha",
+      sessionId: "session_1",
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: 1_800_000_000_000,
+      traceId: "trace_1",
+      spanId: "llm-1",
+      name: "claude_code.llm_request",
+      startTimeUnixMs: 1_800_000_000_000,
+      endTimeUnixMs: 1_800_000_000_500,
+      statusCode: 0,
+      facts: { input_tokens: 10, output_tokens: 5 },
+      scopeName: "com.anthropic.claude_code.tracing",
+    },
+  };
 }
 
 function compose(
@@ -106,6 +122,8 @@ function compose(
 
   const repositories = LiveCodingAgentRepositories.create({
     clickhouse: clickhouse as never,
+    clock: new TestClock(),
+    telemetry: { observe: () => undefined },
     redis: redis as never,
   });
   const github =
@@ -126,20 +144,16 @@ function compose(
   return { pipeline, insert, redis, set, projectActivity };
 }
 
-function sessionFoldStore(
-  pipeline: CodingAgentProcessingPipeline,
-): FoldProjectionStore<CodingAgentSessionState> {
+/** One model call, folded and stored through the fold the pipeline registered. */
+async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<void> {
   const fold = pipeline.foldProjections.get("codingAgentSession");
   expect(fold, "the pipeline registered no codingAgentSession fold").toBeDefined();
-  return (fold!.definition as unknown as { store: FoldProjectionStore<CodingAgentSessionState> })
-    .store;
-}
-
-async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<void> {
-  await sessionFoldStore(pipeline).store(foldedSession(), {
-    aggregateId: "session_1",
-    tenantId: createTenantId("project_alpha"),
-  });
+  await fold!.open((definition) =>
+    definition.store.store(definition.apply(definition.init(), modelCallEvent()), {
+      aggregateId: "session_1",
+      tenantId: createTenantId("project_alpha"),
+    }),
+  );
 }
 
 describe("coding_agent_processing over the live repositories", () => {

@@ -404,6 +404,619 @@ function prefixedAverages(
   return result;
 }
 
+/** A value the parent may control; without an `onChange` it is kept here. */
+const useControllable = <T,>({
+  value,
+  onChange,
+  initial,
+}: {
+  value: T | undefined;
+  onChange: ((next: T) => void) | undefined;
+  initial: T;
+}): [T, (next: T) => void] => {
+  const [internal, setInternal] = useState<T>(initial);
+  return [value ?? internal, onChange ?? setInternal];
+};
+
+/**
+ * "runs" for several runs; "target" for one run with several real (non-evaluator)
+ * targets, since grouping evaluator-only columns by target says nothing.
+ */
+const defaultXAxisOf = (comparisonData: ComparisonRunData[]): XAxisOption => {
+  if (comparisonData.length >= 2) return "runs";
+  const targets = comparisonData[0]?.data?.targetColumns ?? [];
+  const hasRealTarget = targets.some((t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"));
+  return targets.length >= 2 && hasRealTarget ? "target" : "runs";
+};
+
+type RunMetricsEntry = {
+  runId: string;
+  runName: ComparisonRunData["runName"];
+  color: string;
+  createdAt: number;
+  metrics: RunMetricsResult;
+  metadata: NonNullable<BatchTargetColumn["metadata"]>;
+  targetColumns: BatchTargetColumn[];
+  rows: BatchResultRow[];
+};
+
+/** Each loaded run's metrics, oldest first. */
+const runMetricsOf = (comparisonData: ComparisonRunData[]): RunMetricsEntry[] =>
+  comparisonData
+    .flatMap((run) => (run.data ? [{ run, data: run.data }] : []))
+    .map(({ run, data }) => ({
+      runId: run.runId,
+      runName: run.runName,
+      color: run.color,
+      createdAt: data.createdAt,
+      metrics: computeRunMetrics(data),
+      metadata: data.targetColumns[0]?.metadata ?? {},
+      targetColumns: data.targetColumns,
+      rows: data.rows,
+    }))
+    .toSorted((a, b) => a.createdAt - b.createdAt);
+
+/** One color per distinct target id, in first-seen order. */
+const targetColorsOf = (runMetrics: RunMetricsEntry[]): Record<string, string> => {
+  const ids = [...new Set(runMetrics.flatMap((run) => run.targetColumns.map((t) => t.id)))];
+  return Object.fromEntries(ids.map((id, index) => [id, RUN_COLORS[index % RUN_COLORS.length]!]));
+};
+
+type MetricGroup = {
+  displayName: string;
+  costs: number[];
+  latencies: number[];
+  scores: Record<string, number[]>;
+  passRates: Record<string, number[]>;
+};
+
+const emptyGroup = (displayName: string): MetricGroup => ({
+  displayName,
+  costs: [],
+  latencies: [],
+  scores: {},
+  passRates: {},
+});
+
+const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / (values.length || 1);
+
+const groupRow = (group: MetricGroup, color: string) => ({
+  name: group.displayName,
+  color,
+  cost: mean(group.costs),
+  latency: mean(group.latencies),
+  ...prefixedAverages(group.scores, "score"),
+  ...prefixedAverages(group.passRates, "pass"),
+});
+
+/** Per-target metrics folded into groups, keyed by `keyOf`; a target with no key is skipped. */
+const groupedTargetMetrics = ({
+  runMetrics,
+  keyOf,
+  displayNameOf,
+}: {
+  runMetrics: RunMetricsEntry[];
+  keyOf: (target: BatchTargetColumn) => string | undefined;
+  displayNameOf: (key: string, target: BatchTargetColumn) => string;
+}): Map<string, MetricGroup> => {
+  const groups = new Map<string, MetricGroup>();
+  for (const run of runMetrics) {
+    for (const target of run.targetColumns) {
+      const key = keyOf(target);
+      if (!key) continue;
+      const group = groups.get(key) ?? emptyGroup(displayNameOf(key, target));
+      // Per-target metrics, never the run's global ones.
+      accumulateGroupMetrics(group, computeTargetMetrics(run.rows, target.id));
+      groups.set(key, group);
+    }
+  }
+  return groups;
+};
+
+/** A prompt target's group: its prompt id, with the version when it has one. */
+const promptGroupKey = (target: BatchTargetColumn): string | undefined => {
+  const promptId = target.promptId ?? target.metadata?.prompt_id;
+  if (!promptId) return undefined;
+  const version = target.promptId
+    ? target.promptVersion
+    : (target.promptVersion ?? target.metadata?.version);
+  return version !== undefined && version !== null ? `${promptId}::v${version}` : String(promptId);
+};
+
+/** The group a target falls in for a property axis: model, prompt, or a metadata key. */
+const propertyGroupKey = (
+  target: BatchTargetColumn,
+  xAxisOption: XAxisOption,
+): string | undefined => {
+  if (xAxisOption === "model") {
+    if (target.model) return target.model;
+    return target.metadata?.model ? String(target.metadata.model) : undefined;
+  }
+  if (xAxisOption === "prompt") return promptGroupKey(target);
+  const value = target.metadata?.[xAxisOption];
+  return value !== undefined ? String(value) : undefined;
+};
+
+/** The chart rows for the chosen x-axis: one per run, per target, or per property value. */
+const chartRowsFor = ({
+  runMetrics,
+  xAxisOption,
+  promptNames,
+  comparisonEvaluatorIds,
+  targetColors,
+}: {
+  runMetrics: RunMetricsEntry[];
+  xAxisOption: XAxisOption;
+  promptNames: Record<string, string>;
+  comparisonEvaluatorIds: Set<string>;
+  targetColors: Record<string, string>;
+}) => {
+  if (xAxisOption === "runs") {
+    return runMetrics.map((run) => ({
+      name: run.runName,
+      color: run.color,
+      cost: run.metrics.totalCost,
+      latency: run.metrics.avgLatency,
+      ...Object.fromEntries(
+        Object.entries(run.metrics.avgScores).map(([k, v]) => [`score_${k}`, v]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(run.metrics.passRates).map(([k, v]) => [`pass_${k}`, v]),
+      ),
+    }));
+  }
+  if (xAxisOption === "target") {
+    const groups = groupedTargetMetrics({
+      runMetrics,
+      keyOf: (target) => (comparisonEvaluatorIds.has(target.id) ? undefined : target.id),
+      displayNameOf: (_key, target) => target.displayName ?? target.name,
+    });
+    return [...groups.entries()].map(([id, group], index) =>
+      groupRow(group, targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!),
+    );
+  }
+  const groups = groupedTargetMetrics({
+    runMetrics,
+    keyOf: (target) => propertyGroupKey(target, xAxisOption),
+    displayNameOf: (key, target) => {
+      if (xAxisOption !== "prompt") return key;
+      const [promptId, versionPart] = key.split("::");
+      const name = promptNames[promptId ?? ""] ?? target.name ?? promptId ?? key;
+      return versionPart ? `${name} (${versionPart})` : name;
+    },
+  });
+  return [...groups.values()].map((group, index) =>
+    groupRow(group, RUN_COLORS[index % RUN_COLORS.length]!),
+  );
+};
+
+/** Every evaluator some run reports `valuesOf` for, in first-seen order. */
+const evaluatorsReporting = ({
+  runMetrics,
+  valuesOf,
+  excluded,
+}: {
+  runMetrics: RunMetricsEntry[];
+  valuesOf: (metrics: RunMetricsResult) => Record<string, number>;
+  excluded: Set<string>;
+}): { id: string; name: string }[] => {
+  const byId = new Map<string, string>();
+  for (const run of runMetrics) {
+    for (const evalId of Object.keys(valuesOf(run.metrics))) {
+      if (excluded.has(evalId) || byId.has(evalId)) continue;
+      byId.set(evalId, run.metrics.evaluatorNames[evalId] ?? evalId);
+    }
+  }
+  return [...byId.entries()].map(([id, name]) => ({ id, name }));
+};
+
+/**
+ * The group-by choices: runs; targets from two up; model and prompt when any target
+ * carries one (as a column or a metadata alias); then each generic metadata key.
+ */
+const xAxisOptionsOf = (
+  runMetrics: RunMetricsEntry[],
+  metadataKeys: readonly string[],
+): { value: XAxisOption; label: string }[] => {
+  const targets = runMetrics.flatMap((run) => run.targetColumns);
+  const hasModel = targets.some((t) => !!t.model || (!!t.metadata && "model" in t.metadata));
+  const hasPrompt = targets.some(
+    (t) => !!t.promptId || (!!t.metadata && ("prompt_id" in t.metadata || "prompt" in t.metadata)),
+  );
+  return [
+    { value: "runs", label: "Runs" },
+    ...((runMetrics[0]?.targetColumns.length ?? 0) >= 2
+      ? [{ value: "target", label: "Target" }]
+      : []),
+    ...(hasModel ? [{ value: "model", label: "Model" }] : []),
+    ...(hasPrompt ? [{ value: "prompt", label: "Prompt" }] : []),
+    ...metadataKeys.map((key) => ({ value: key, label: key })),
+  ];
+};
+
+type ChartRow = { name: unknown; color?: string } & Record<string, unknown>;
+
+/**
+ * One bar chart in the row: a titled card, bars colored per row. `formatValue` formats
+ * both the axis and the tooltip; `formatTooltip` alone leaves the axis as numbers.
+ */
+function MetricBarChart({
+  testId,
+  title,
+  dataKey,
+  barName,
+  data,
+  height,
+  axis,
+  formatAxisTick,
+  yAxisWidth,
+  yDomain,
+  formatValue,
+  formatTooltip,
+}: {
+  testId: string;
+  title: string;
+  dataKey: string;
+  barName?: string;
+  data: ChartRow[];
+  height: number;
+  axis: ReturnType<typeof axisLabelProps>;
+  formatAxisTick: (value: unknown, index: number) => string;
+  yAxisWidth: number;
+  yDomain?: [number, number];
+  formatValue?: (value: number) => string;
+  formatTooltip?: (value: number) => string;
+}) {
+  const tooltipFormat = formatTooltip ?? formatValue;
+  return (
+    <Box
+      minWidth="280px"
+      width="280px"
+      flexShrink={0}
+      bg="bg.subtle"
+      border="1px solid"
+      borderColor="border"
+      borderRadius="md"
+      padding={3}
+      paddingBottom={1}
+      data-testid={testId}
+    >
+      <Text fontSize="xs" fontWeight="medium" marginBottom={2} lineClamp={1} title={title}>
+        {title}
+      </Text>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={data} margin={{ left: 10, right: 10 }}>
+          <CartesianGrid
+            horizontal={true}
+            vertical={false}
+            stroke="var(--chakra-colors-border)"
+            strokeDasharray="0"
+          />
+          <XAxis
+            dataKey="name"
+            style={{ fontSize: "11px" }}
+            axisLine={false}
+            tickLine={false}
+            angle={axis.angle}
+            textAnchor={axis.textAnchor}
+            height={axis.height}
+            tickFormatter={formatAxisTick}
+          />
+          <YAxis
+            style={{ fontSize: "11px" }}
+            width={yAxisWidth}
+            {...(yDomain ? { domain: yDomain } : {})}
+            {...(formatValue ? { tickFormatter: (value: number) => formatValue(value) } : {})}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip
+            content={<ChartTooltip />}
+            {...(tooltipFormat ? { formatter: (value) => tooltipFormat(value as number) } : {})}
+            cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
+          />
+          <Bar dataKey={dataKey} {...(barName ? { name: barName } : {})}>
+            {data.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={entry.color ?? RUN_COLORS[index % RUN_COLORS.length]}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </Box>
+  );
+}
+
+/**
+ * A portaled dropdown anchored to its trigger: the rect is captured on open (not
+ * tracked on scroll), and closing returns focus to the trigger.
+ */
+const useAnchoredDropdown = () => {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const openDropdown = () => {
+    setRect(buttonRef.current?.getBoundingClientRect() ?? null);
+    setOpen(true);
+  };
+  const closeDropdown = () => {
+    setOpen(false);
+    buttonRef.current?.focus();
+  };
+  return { open, setOpen, rect, buttonRef, openDropdown, closeDropdown };
+};
+
+/** The group-by selector. */
+function GroupByDropdown({
+  options,
+  value,
+  onSelect,
+}: {
+  options: { value: XAxisOption; label: string }[];
+  value: XAxisOption;
+  onSelect: (option: XAxisOption) => void;
+}) {
+  const { open, setOpen, rect, buttonRef, openDropdown, closeDropdown } = useAnchoredDropdown();
+  return (
+    <Box data-testid="xaxis-selector">
+      <Button
+        ref={buttonRef}
+        size="xs"
+        variant="outline"
+        onClick={() => (open ? setOpen(false) : openDropdown())}
+        data-testid="group-by-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Group by: {options.find((o) => o.value === value)?.label ?? "Runs"}
+      </Button>
+      {open && rect && (
+        <Portal>
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={1000}
+            onClick={() => setOpen(false)}
+            data-testid="group-by-backdrop"
+          />
+          <Box
+            position="fixed"
+            top={`${rect.bottom + 4}px`}
+            left={`${rect.left}px`}
+            bg="bg.panel"
+            border="1px solid"
+            borderColor="border"
+            borderRadius="md"
+            boxShadow="md"
+            zIndex={1001}
+            minWidth="150px"
+            padding={2}
+            style={{
+              maxHeight: `calc(100vh - ${rect.bottom + 16}px)`,
+              overflowY: "auto",
+            }}
+            data-testid="group-by-dropdown"
+            role="menu"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeDropdown();
+              }
+            }}
+          >
+            <VStack align="stretch" gap={1}>
+              {options.map((opt) => (
+                <HStack
+                  key={opt.value}
+                  padding={1}
+                  borderRadius="sm"
+                  cursor="pointer"
+                  bg={value === opt.value ? "blue.subtle" : "transparent"}
+                  _hover={{
+                    bg: value === opt.value ? "blue.muted" : "bg.subtle",
+                  }}
+                  onClick={() => {
+                    onSelect(opt.value);
+                    setOpen(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onSelect(opt.value);
+                      setOpen(false);
+                    }
+                  }}
+                  role="menuitem"
+                  tabIndex={0}
+                  data-testid={`xaxis-option-${opt.value}`}
+                >
+                  <Text
+                    fontSize="sm"
+                    fontWeight={value === opt.value ? "medium" : "normal"}
+                    color={value === opt.value ? "blue.fg" : "inherit"}
+                  >
+                    {opt.label}
+                  </Text>
+                </HStack>
+              ))}
+            </VStack>
+          </Box>
+        </Portal>
+      )}
+    </Box>
+  );
+}
+
+/** The metrics selector: a checkbox per metric the run offers. */
+function MetricsDropdown({
+  availableMetrics,
+  visibleMetrics,
+  onToggle,
+}: {
+  availableMetrics: MetricDefinition[];
+  visibleMetrics: Set<MetricType>;
+  onToggle: (metric: MetricType) => void;
+}) {
+  const { open, setOpen, rect, buttonRef, openDropdown, closeDropdown } = useAnchoredDropdown();
+  return (
+    <Box>
+      <Button
+        ref={buttonRef}
+        size="xs"
+        variant="outline"
+        onClick={() => (open ? setOpen(false) : openDropdown())}
+        data-testid="metrics-selector-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Metrics ({visibleMetrics.size}/{availableMetrics.length})
+      </Button>
+      {open && rect && (
+        <Portal>
+          <Box
+            position="fixed"
+            inset={0}
+            zIndex={1000}
+            onClick={() => setOpen(false)}
+            data-testid="metrics-backdrop"
+          />
+          <Box
+            position="fixed"
+            top={`${rect.bottom + 4}px`}
+            // Right-align to the trigger button so the dropdown
+            // extends leftward, matching the pre-fix visual placement.
+            left={`${rect.right}px`}
+            transform="translateX(-100%)"
+            bg="bg.panel"
+            border="1px solid"
+            borderColor="border"
+            borderRadius="md"
+            boxShadow="md"
+            zIndex={1001}
+            minWidth="200px"
+            padding={2}
+            style={{
+              maxHeight: `calc(100vh - ${rect.bottom + 16}px)`,
+              overflowY: "auto",
+            }}
+            data-testid="metrics-dropdown"
+            role="menu"
+            tabIndex={-1}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeDropdown();
+              }
+            }}
+          >
+            <VStack align="stretch" gap={1}>
+              {availableMetrics.map((metric) => (
+                <HStack
+                  key={metric.id}
+                  padding={1}
+                  borderRadius="sm"
+                  cursor="pointer"
+                  _hover={{ bg: "bg.subtle" }}
+                  onClick={() => onToggle(metric.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onToggle(metric.id);
+                    }
+                  }}
+                  role="menuitemcheckbox"
+                  tabIndex={0}
+                  aria-checked={visibleMetrics.has(metric.id)}
+                >
+                  <Box
+                    width="16px"
+                    height="16px"
+                    minWidth="16px"
+                    minHeight="16px"
+                    flexShrink={0}
+                    border="1px solid"
+                    borderColor="border.emphasized"
+                    borderRadius="sm"
+                    bg={visibleMetrics.has(metric.id) ? "blue.500" : "transparent"}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    {visibleMetrics.has(metric.id) && (
+                      <Text color="white" fontSize="xs" fontWeight="bold">
+                        ✓
+                      </Text>
+                    )}
+                  </Box>
+                  <Text fontSize="sm" whiteSpace="nowrap">
+                    {metric.name}
+                  </Text>
+                </HStack>
+              ))}
+            </VStack>
+          </Box>
+        </Portal>
+      )}
+    </Box>
+  );
+}
+
+const EMPTY_COLORS: Record<string, string> = {};
+
+/** Reports target colors to the parent, only when their value actually changes. */
+const useReportedTargetColors = ({
+  onTargetColorsChange,
+  colors,
+}: {
+  onTargetColorsChange: ((colors: Record<string, string>) => void) | undefined;
+  colors: Record<string, string>;
+}) => {
+  const reportedRef = useRef<string>(JSON.stringify({}));
+  useEffect(() => {
+    if (!onTargetColorsChange) return;
+    const json = JSON.stringify(colors);
+    if (json === reportedRef.current) return;
+    reportedRef.current = json;
+    onTargetColorsChange(colors);
+  }, [colors, onTargetColorsChange]);
+};
+
+/**
+ * Which metrics show: the parent's set when it controls one, else cost and latency
+ * plus every metric the run offers, including ones that appear later.
+ */
+const useVisibleMetrics = ({
+  controlled,
+  onChange,
+  availableMetrics,
+}: {
+  controlled: Set<MetricType> | undefined;
+  onChange: ((metrics: Set<MetricType>) => void) | undefined;
+  availableMetrics: MetricDefinition[];
+}) => {
+  const [internal, setInternal] = useState<Set<MetricType>>(
+    () => new Set(["cost", "latency"] as MetricType[]),
+  );
+  const seenRef = useRef<Set<MetricType>>(new Set());
+  useEffect(() => {
+    const unseen = availableMetrics.map((m) => m.id).filter((id) => !seenRef.current.has(id));
+    if (unseen.length === 0) return;
+    for (const id of unseen) seenRef.current.add(id);
+    setInternal((current) => new Set([...current, ...unseen]));
+  }, [availableMetrics]);
+
+  const visibleMetrics = controlled ?? internal;
+  const toggleMetric = (metricId: MetricType) => {
+    const next = new Set(visibleMetrics);
+    if (!next.delete(metricId)) next.add(metricId);
+    (onChange ?? setInternal)(next);
+  };
+  return { visibleMetrics, toggleMetric };
+};
+
 export const ComparisonCharts = ({
   comparisonData,
   isVisible: controlledVisible,
@@ -435,43 +1048,26 @@ export const ComparisonCharts = ({
     [comparisonData],
   );
   // Determine default visibility based on target count
-  const shouldShowByDefault = useMemo(() => {
-    if (defaultVisible !== undefined) return defaultVisible;
-    // Show by default if there are 2+ targets
-    const targetCount = comparisonData[0]?.data?.targetColumns.length ?? 0;
-    return targetCount >= 2;
-  }, [comparisonData, defaultVisible]);
+  // Shown by default from two targets up.
+  const shouldShowByDefault =
+    defaultVisible ?? (comparisonData[0]?.data?.targetColumns.length ?? 0) >= 2;
 
-  const [internalVisible, setInternalVisible] = useState(shouldShowByDefault);
-  const isVisible = controlledVisible ?? internalVisible;
-  const _setIsVisible = (visible: boolean) => {
-    if (onVisibilityChange) {
-      onVisibilityChange(visible);
-    } else {
-      setInternalVisible(visible);
-    }
-  };
+  const [isVisible] = useControllable({
+    value: controlledVisible,
+    onChange: onVisibilityChange,
+    initial: shouldShowByDefault,
+  });
 
   // Default X-axis: "runs" if multiple runs, "target" if single run with multiple real targets.
   // When all targets are evaluators (simple evaluations without a prompt/agent target),
   // each evaluator gets its own column but grouping by "target" is not useful — default to "runs".
-  const defaultXAxis = useMemo((): XAxisOption => {
-    if (comparisonData.length >= 2) return "runs";
-    const targets = comparisonData[0]?.data?.targetColumns ?? [];
-    const hasRealTarget = targets.some((t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"));
-    if (targets.length >= 2 && hasRealTarget) return "target";
-    return "runs";
-  }, [comparisonData]);
+  const defaultXAxis = useMemo(() => defaultXAxisOf(comparisonData), [comparisonData]);
 
-  const [internalXAxisOption, setInternalXAxisOption] = useState<XAxisOption>(defaultXAxis);
-  const xAxisOption = controlledXAxisOption ?? internalXAxisOption;
-  const setXAxisOption = (option: XAxisOption) => {
-    if (onXAxisOptionChange) {
-      onXAxisOptionChange(option);
-    } else {
-      setInternalXAxisOption(option);
-    }
-  };
+  const [xAxisOption, setXAxisOption] = useControllable<XAxisOption>({
+    value: controlledXAxisOption,
+    onChange: onXAxisOptionChange,
+    initial: defaultXAxis,
+  });
 
   const applyDefaultXAxis = useEffectEvent((option: XAxisOption) => setXAxisOption(option));
   // Update X-axis when default changes (e.g., entering/exiting compare mode)
@@ -479,277 +1075,24 @@ export const ComparisonCharts = ({
     applyDefaultXAxis(defaultXAxis);
   }, [defaultXAxis]);
 
-  // Metrics selector state
-  const [internalVisibleMetrics, setInternalVisibleMetrics] = useState<Set<MetricType>>(
-    () => new Set(["cost", "latency"] as MetricType[]),
-  );
-  const [metricsDropdownOpen, setMetricsDropdownOpen] = useState(false);
-  const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
-  const metricsBtnRef = useRef<HTMLButtonElement>(null);
-  const groupByBtnRef = useRef<HTMLButtonElement>(null);
-  // Captured on open so the portaled menu can pin itself to the trigger.
-  // Recomputed each open; we do not track scroll/resize (matches sister
-  // BatchTargetCell behavior — close-and-reopen if you want to reposition).
-  const [metricsBtnRect, setMetricsBtnRect] = useState<DOMRect | null>(null);
-  const [groupByBtnRect, setGroupByBtnRect] = useState<DOMRect | null>(null);
-
-  const openMetricsDropdown = () => {
-    const rect = metricsBtnRef.current?.getBoundingClientRect() ?? null;
-    setMetricsBtnRect(rect);
-    setMetricsDropdownOpen(true);
-  };
-  const openGroupByDropdown = () => {
-    const rect = groupByBtnRef.current?.getBoundingClientRect() ?? null;
-    setGroupByBtnRect(rect);
-    setGroupByDropdownOpen(true);
-  };
-  // Focus-return on close keeps assistive-tech users oriented — without it,
-  // focus disappears into the void when the portaled menu unmounts.
-  const closeMetricsDropdown = () => {
-    setMetricsDropdownOpen(false);
-    metricsBtnRef.current?.focus();
-  };
-  const closeGroupByDropdown = () => {
-    setGroupByDropdownOpen(false);
-    groupByBtnRef.current?.focus();
-  };
-
-  const visibleMetrics = controlledVisibleMetrics ?? internalVisibleMetrics;
-  const setVisibleMetrics = (metrics: Set<MetricType>) => {
-    if (onVisibleMetricsChange) {
-      onVisibleMetricsChange(metrics);
-    } else {
-      setInternalVisibleMetrics(metrics);
-    }
-  };
-
-  const toggleMetric = (metricId: MetricType) => {
-    const newSet = new Set(visibleMetrics);
-    if (newSet.has(metricId)) {
-      newSet.delete(metricId);
-    } else {
-      newSet.add(metricId);
-    }
-    setVisibleMetrics(newSet);
-  };
-
   // Compute metrics for each run, sorted by creation time (oldest first)
-  const runMetrics = useMemo(() => {
-    return comparisonData
-      .filter((run) => run.data !== null)
-      .map((run) => ({
-        runId: run.runId,
-        runName: run.runName,
-        color: run.color,
-        createdAt: run.data!.createdAt,
-        metrics: computeRunMetrics(run.data!),
-        metadata: run.data!.targetColumns[0]?.metadata ?? {},
-        targetColumns: run.data!.targetColumns,
-        rows: run.data!.rows,
-      }))
-      .toSorted((a, b) => a.createdAt - b.createdAt); // Sort by creation time, oldest first
-  }, [comparisonData]);
+  const runMetrics = useMemo(() => runMetricsOf(comparisonData), [comparisonData]);
 
   // Compute target colors (assign color per unique target ID)
-  const targetColors = useMemo(() => {
-    const colors: Record<string, string> = {};
-    const seenIds = new Set<string>();
-    let colorIndex = 0;
+  const targetColors = useMemo(() => targetColorsOf(runMetrics), [runMetrics]);
 
-    for (const run of runMetrics) {
-      for (const targetCol of run.targetColumns) {
-        if (!seenIds.has(targetCol.id)) {
-          seenIds.add(targetCol.id);
-          colors[targetCol.id] = RUN_COLORS[colorIndex % RUN_COLORS.length]!;
-          colorIndex++;
-        }
-      }
-    }
-
-    return colors;
-  }, [runMetrics]);
-
-  // Report target colors when X-axis is "target" AND charts are visible
-  // Only call callback when the effective value changes
-  const prevTargetColorsRef = useRef<Record<string, string> | null>(null);
-  useEffect(() => {
-    if (!onTargetColorsChange) return;
-
-    // Only show target colors when charts are visible and X-axis is "target"
-    const newColors = isVisible && xAxisOption === "target" ? targetColors : {};
-    const prevColors = prevTargetColorsRef.current;
-
-    // Compare by JSON to detect actual changes
-    const prevJson = JSON.stringify(prevColors ?? {});
-    const newJson = JSON.stringify(newColors);
-
-    if (prevJson !== newJson) {
-      prevTargetColorsRef.current = newColors;
-      onTargetColorsChange(newColors);
-    }
-  }, [isVisible, xAxisOption, targetColors, onTargetColorsChange]);
+  useReportedTargetColors({
+    onTargetColorsChange,
+    // Target colors only mean something while the charts show and group by target.
+    colors: isVisible && xAxisOption === "target" ? targetColors : EMPTY_COLORS,
+  });
 
   // Build chart data based on X-axis selection
-  const chartData = useMemo(() => {
-    if (xAxisOption === "runs") {
-      return runMetrics.map((run) => ({
-        name: run.runName,
-        color: run.color,
-        cost: run.metrics.totalCost,
-        latency: run.metrics.avgLatency,
-        ...Object.fromEntries(
-          Object.entries(run.metrics.avgScores).map(([k, v]) => [`score_${k}`, v]),
-        ),
-        ...Object.fromEntries(
-          Object.entries(run.metrics.passRates).map(([k, v]) => [`pass_${k}`, v]),
-        ),
-      }));
-    }
-
-    // Handle "target" X-axis option - group by target ID (unique), display name
-    // IMPORTANT: We compute per-target metrics, NOT global run metrics!
-    if (xAxisOption === "target") {
-      const targetGroups = new Map<
-        string,
-        {
-          displayName: string;
-          costs: number[];
-          latencies: number[];
-          scores: Record<string, number[]>;
-          passRates: Record<string, number[]>;
-        }
-      >();
-
-      for (const run of runMetrics) {
-        for (const targetCol of run.targetColumns) {
-          if (comparisonEvaluatorIds.has(targetCol.id)) continue;
-          // Compute metrics for THIS target only (not global run metrics!)
-          const targetMetrics = computeTargetMetrics(run.rows, targetCol.id);
-
-          // Use ID as key for uniqueness
-          const existing = targetGroups.get(targetCol.id) ?? {
-            displayName: targetCol.displayName ?? targetCol.name,
-            costs: [],
-            latencies: [],
-            scores: {},
-            passRates: {},
-          };
-
-          // Add this target's metrics (per-target, NOT global run.metrics!)
-          accumulateGroupMetrics(existing, targetMetrics);
-
-          targetGroups.set(targetCol.id, existing);
-        }
-      }
-
-      // Use the display name, include color from targetColors
-      return Array.from(targetGroups.entries()).map(([id, data], index) => ({
-        name: data.displayName,
-        color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
-        cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
-        latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
-        ...prefixedAverages(data.scores, "score"),
-        ...prefixedAverages(data.passRates, "pass"),
-      }));
-    }
-
-    // Group by target property or metadata value (model, prompt, custom metadata)
-    // This works per-target (like "target" grouping), grouping by the property value
-    // E.g., for "model": all targets with model="openai/gpt-4" are grouped together
-    const propertyGroups = new Map<
-      string,
-      {
-        displayName: string;
-        costs: number[];
-        latencies: number[];
-        scores: Record<string, number[]>;
-        passRates: Record<string, number[]>;
-      }
-    >();
-
-    // Helper to get the grouping key from a target
-    const getGroupKey = (
-      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
-    ): string | undefined => {
-      // Check top-level model property first
-      if (xAxisOption === "model") {
-        if (targetCol.model) return targetCol.model;
-        if (targetCol.metadata?.model) return String(targetCol.metadata.model);
-        return undefined;
-      }
-
-      // For prompt, combine promptId and version
-      if (xAxisOption === "prompt") {
-        if (!targetCol.promptId) {
-          // Check metadata for prompt_id
-          if (targetCol.metadata?.prompt_id) {
-            const version = targetCol.promptVersion ?? targetCol.metadata?.version;
-            return version !== undefined && version !== null
-              ? `${targetCol.metadata.prompt_id}::v${version}`
-              : String(targetCol.metadata.prompt_id);
-          }
-          return undefined;
-        }
-        const version = targetCol.promptVersion;
-        return version !== undefined && version !== null
-          ? `${targetCol.promptId}::v${version}`
-          : targetCol.promptId;
-      }
-
-      // For custom metadata keys
-      if (targetCol.metadata?.[xAxisOption] !== undefined) {
-        return String(targetCol.metadata[xAxisOption]);
-      }
-
-      return undefined;
-    };
-
-    // Helper to get display name for a group key
-    const getDisplayName = (
-      key: string,
-      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
-    ): string => {
-      if (xAxisOption === "prompt") {
-        // Key is in format "promptId::vN" or just "promptId"
-        const [promptId, versionPart] = key.split("::");
-        const resolvedPromptName = promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
-        return versionPart ? `${resolvedPromptName} (${versionPart})` : resolvedPromptName;
-      }
-      return key;
-    };
-
-    for (const run of runMetrics) {
-      for (const targetCol of run.targetColumns) {
-        const key = getGroupKey(targetCol);
-        if (!key) continue;
-
-        // Compute metrics for THIS target only
-        const targetMetrics = computeTargetMetrics(run.rows, targetCol.id);
-
-        const existing = propertyGroups.get(key) ?? {
-          displayName: getDisplayName(key, targetCol),
-          costs: [],
-          latencies: [],
-          scores: {},
-          passRates: {},
-        };
-
-        // Add this target's metrics
-        accumulateGroupMetrics(existing, targetMetrics);
-
-        propertyGroups.set(key, existing);
-      }
-    }
-
-    return Array.from(propertyGroups.entries()).map(([_key, data], index) => ({
-      name: data.displayName,
-      color: RUN_COLORS[index % RUN_COLORS.length]!,
-      cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
-      latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
-      ...prefixedAverages(data.scores, "score"),
-      ...prefixedAverages(data.passRates, "pass"),
-    }));
-  }, [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds, targetColors]);
+  const chartData = useMemo(
+    () =>
+      chartRowsFor({ runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds, targetColors }),
+    [runMetrics, xAxisOption, promptNames, comparisonEvaluatorIds, targetColors],
+  );
 
   // Calculate dynamic Y-axis widths based on data
   const yAxisWidths = useMemo(() => {
@@ -787,41 +1130,24 @@ export const ComparisonCharts = ({
   );
 
   // Get all evaluators with scores (for score chart)
-  const scoreEvaluators = useMemo(() => {
-    const evaluators: { id: string; name: string }[] = [];
-    const seen = new Set<string>();
-    for (const run of runMetrics) {
-      for (const evalId of Object.keys(run.metrics.avgScores)) {
-        if (comparisonEvaluatorIds.has(evalId)) continue;
-        if (!seen.has(evalId)) {
-          seen.add(evalId);
-          evaluators.push({
-            id: evalId,
-            name: run.metrics.evaluatorNames[evalId] ?? evalId,
-          });
-        }
-      }
-    }
-    return evaluators;
-  }, [runMetrics, comparisonEvaluatorIds]);
-
-  // Get all evaluators with pass rates (for pass rate chart)
-  const passRateEvaluators = useMemo(() => {
-    const evaluators: { id: string; name: string }[] = [];
-    const seen = new Set<string>();
-    for (const run of runMetrics) {
-      for (const evalId of Object.keys(run.metrics.passRates)) {
-        if (!seen.has(evalId)) {
-          seen.add(evalId);
-          evaluators.push({
-            id: evalId,
-            name: run.metrics.evaluatorNames[evalId] ?? evalId,
-          });
-        }
-      }
-    }
-    return evaluators;
-  }, [runMetrics]);
+  const scoreEvaluators = useMemo(
+    () =>
+      evaluatorsReporting({
+        runMetrics,
+        valuesOf: (metrics) => metrics.avgScores,
+        excluded: comparisonEvaluatorIds,
+      }),
+    [runMetrics, comparisonEvaluatorIds],
+  );
+  const passRateEvaluators = useMemo(
+    () =>
+      evaluatorsReporting({
+        runMetrics,
+        valuesOf: (metrics) => metrics.passRates,
+        excluded: new Set(),
+      }),
+    [runMetrics],
+  );
 
   // Build available metrics list
   const availableMetrics: MetricDefinition[] = useMemo(
@@ -848,21 +1174,11 @@ export const ComparisonCharts = ({
     [scoreEvaluators, passRateEvaluators, comparisonColumns, showComparisonLeaderboard],
   );
 
-  // Show every metric the run offers, including ones that appear later.
-  const seenMetricIdsRef = useRef<Set<MetricType>>(new Set());
-  useEffect(() => {
-    const unseen = availableMetrics
-      .map((m) => m.id)
-      .filter((id) => !seenMetricIdsRef.current.has(id));
-    if (unseen.length === 0) return;
-
-    for (const id of unseen) seenMetricIdsRef.current.add(id);
-    setInternalVisibleMetrics((current) => {
-      const next = new Set(current);
-      for (const id of unseen) next.add(id);
-      return next;
-    });
-  }, [availableMetrics]);
+  const { visibleMetrics, toggleMetric } = useVisibleMetrics({
+    controlled: controlledVisibleMetrics,
+    onChange: onVisibleMetricsChange,
+    availableMetrics,
+  });
 
   // Generic metadata keys come from the shared hook so the chart and
   // ComparisonTable use identical discovery (and adding a third surface
@@ -875,41 +1191,10 @@ export const ComparisonCharts = ({
   });
 
   // Get available X-axis options from target properties and metadata
-  const xAxisOptions = useMemo(() => {
-    const options: { value: XAxisOption; label: string }[] = [{ value: "runs", label: "Runs" }];
-
-    // Add "Target" option if there are 2+ targets
-    const targetCount = runMetrics[0]?.targetColumns?.length ?? 0;
-    if (targetCount >= 2) {
-      options.push({ value: "target", label: "Target" });
-    }
-
-    // Detect "Model" and "Prompt" — these reserve their own labels and
-    // can come from top-level columns or metadata aliases.
-    let hasModel = false;
-    let hasPrompt = false;
-    for (const run of runMetrics) {
-      for (const targetCol of run.targetColumns) {
-        if (targetCol.model) hasModel = true;
-        if (targetCol.promptId) hasPrompt = true;
-        if (targetCol.metadata) {
-          if ("model" in targetCol.metadata) hasModel = true;
-          if ("prompt_id" in targetCol.metadata || "prompt" in targetCol.metadata) {
-            hasPrompt = true;
-          }
-        }
-      }
-    }
-
-    if (hasModel) options.push({ value: "model", label: "Model" });
-    if (hasPrompt) options.push({ value: "prompt", label: "Prompt" });
-
-    for (const key of targetMetadataKeys) {
-      options.push({ value: key, label: key });
-    }
-
-    return options;
-  }, [runMetrics, targetMetadataKeys]);
+  const xAxisOptions = useMemo(
+    () => xAxisOptionsOf(runMetrics, targetMetadataKeys),
+    [runMetrics, targetMetadataKeys],
+  );
 
   // Show charts if:
   // 1. Multiple runs (compare mode)
@@ -929,199 +1214,18 @@ export const ComparisonCharts = ({
           <HStack wrap="wrap" gap={2} paddingX={2}>
             {/* Group by dropdown */}
             {xAxisOptions.length > 0 && (
-              <Box data-testid="xaxis-selector">
-                <Button
-                  ref={groupByBtnRef}
-                  size="xs"
-                  variant="outline"
-                  onClick={() =>
-                    groupByDropdownOpen ? setGroupByDropdownOpen(false) : openGroupByDropdown()
-                  }
-                  data-testid="group-by-button"
-                  aria-haspopup="menu"
-                  aria-expanded={groupByDropdownOpen}
-                >
-                  Group by: {xAxisOptions.find((o) => o.value === xAxisOption)?.label ?? "Runs"}
-                </Button>
-                {groupByDropdownOpen && groupByBtnRect && (
-                  <Portal>
-                    <Box
-                      position="fixed"
-                      inset={0}
-                      zIndex={1000}
-                      onClick={() => setGroupByDropdownOpen(false)}
-                      data-testid="group-by-backdrop"
-                    />
-                    <Box
-                      position="fixed"
-                      top={`${groupByBtnRect.bottom + 4}px`}
-                      left={`${groupByBtnRect.left}px`}
-                      bg="bg.panel"
-                      border="1px solid"
-                      borderColor="border"
-                      borderRadius="md"
-                      boxShadow="md"
-                      zIndex={1001}
-                      minWidth="150px"
-                      padding={2}
-                      style={{
-                        maxHeight: `calc(100vh - ${groupByBtnRect.bottom + 16}px)`,
-                        overflowY: "auto",
-                      }}
-                      data-testid="group-by-dropdown"
-                      role="menu"
-                      tabIndex={-1}
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          closeGroupByDropdown();
-                        }
-                      }}
-                    >
-                      <VStack align="stretch" gap={1}>
-                        {xAxisOptions.map((opt) => (
-                          <HStack
-                            key={opt.value}
-                            padding={1}
-                            borderRadius="sm"
-                            cursor="pointer"
-                            bg={xAxisOption === opt.value ? "blue.subtle" : "transparent"}
-                            _hover={{
-                              bg: xAxisOption === opt.value ? "blue.muted" : "bg.subtle",
-                            }}
-                            onClick={() => {
-                              setXAxisOption(opt.value);
-                              setGroupByDropdownOpen(false);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                setXAxisOption(opt.value);
-                                setGroupByDropdownOpen(false);
-                              }
-                            }}
-                            role="menuitem"
-                            tabIndex={0}
-                            data-testid={`xaxis-option-${opt.value}`}
-                          >
-                            <Text
-                              fontSize="sm"
-                              fontWeight={xAxisOption === opt.value ? "medium" : "normal"}
-                              color={xAxisOption === opt.value ? "blue.fg" : "inherit"}
-                            >
-                              {opt.label}
-                            </Text>
-                          </HStack>
-                        ))}
-                      </VStack>
-                    </Box>
-                  </Portal>
-                )}
-              </Box>
+              <GroupByDropdown
+                options={xAxisOptions}
+                value={xAxisOption}
+                onSelect={setXAxisOption}
+              />
             )}
 
-            {/* Metrics selector dropdown */}
-            <Box>
-              <Button
-                ref={metricsBtnRef}
-                size="xs"
-                variant="outline"
-                onClick={() =>
-                  metricsDropdownOpen ? setMetricsDropdownOpen(false) : openMetricsDropdown()
-                }
-                data-testid="metrics-selector-button"
-                aria-haspopup="menu"
-                aria-expanded={metricsDropdownOpen}
-              >
-                Metrics ({visibleMetrics.size}/{availableMetrics.length})
-              </Button>
-              {metricsDropdownOpen && metricsBtnRect && (
-                <Portal>
-                  <Box
-                    position="fixed"
-                    inset={0}
-                    zIndex={1000}
-                    onClick={() => setMetricsDropdownOpen(false)}
-                    data-testid="metrics-backdrop"
-                  />
-                  <Box
-                    position="fixed"
-                    top={`${metricsBtnRect.bottom + 4}px`}
-                    // Right-align to the trigger button so the dropdown
-                    // extends leftward, matching the pre-fix visual placement.
-                    left={`${metricsBtnRect.right}px`}
-                    transform="translateX(-100%)"
-                    bg="bg.panel"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    boxShadow="md"
-                    zIndex={1001}
-                    minWidth="200px"
-                    padding={2}
-                    style={{
-                      maxHeight: `calc(100vh - ${metricsBtnRect.bottom + 16}px)`,
-                      overflowY: "auto",
-                    }}
-                    data-testid="metrics-dropdown"
-                    role="menu"
-                    tabIndex={-1}
-                    onKeyDown={(e) => {
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        closeMetricsDropdown();
-                      }
-                    }}
-                  >
-                    <VStack align="stretch" gap={1}>
-                      {availableMetrics.map((metric) => (
-                        <HStack
-                          key={metric.id}
-                          padding={1}
-                          borderRadius="sm"
-                          cursor="pointer"
-                          _hover={{ bg: "bg.subtle" }}
-                          onClick={() => toggleMetric(metric.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleMetric(metric.id);
-                            }
-                          }}
-                          role="menuitemcheckbox"
-                          tabIndex={0}
-                          aria-checked={visibleMetrics.has(metric.id)}
-                        >
-                          <Box
-                            width="16px"
-                            height="16px"
-                            minWidth="16px"
-                            minHeight="16px"
-                            flexShrink={0}
-                            border="1px solid"
-                            borderColor="border.emphasized"
-                            borderRadius="sm"
-                            bg={visibleMetrics.has(metric.id) ? "blue.500" : "transparent"}
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                          >
-                            {visibleMetrics.has(metric.id) && (
-                              <Text color="white" fontSize="xs" fontWeight="bold">
-                                ✓
-                              </Text>
-                            )}
-                          </Box>
-                          <Text fontSize="sm" whiteSpace="nowrap">
-                            {metric.name}
-                          </Text>
-                        </HStack>
-                      ))}
-                    </VStack>
-                  </Box>
-                </Portal>
-              )}
-            </Box>
+            <MetricsDropdown
+              availableMetrics={availableMetrics}
+              visibleMetrics={visibleMetrics}
+              onToggle={toggleMetric}
+            />
           </HStack>
 
           {/* Charts in horizontal scroll container */}
@@ -1133,208 +1237,54 @@ export const ComparisonCharts = ({
             paddingBottom={2}
             data-testid="charts-container"
           >
-            {/* Cost chart */}
             {visibleMetrics.has("cost") && (
-              <Box
-                minWidth="280px"
-                width="280px"
-                flexShrink={0}
-                bg="bg.subtle"
-                border="1px solid"
-                borderColor="border"
-                borderRadius="md"
-                padding={3}
-                paddingBottom={1}
-                data-testid="chart-cost"
-              >
-                <Text
-                  fontSize="xs"
-                  fontWeight="medium"
-                  marginBottom={2}
-                  lineClamp={1}
-                  title="Total Cost"
-                >
-                  Total Cost
-                </Text>
-                <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
-                    <CartesianGrid
-                      horizontal={true}
-                      vertical={false}
-                      stroke="var(--chakra-colors-border)"
-                      strokeDasharray="0"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      style={{ fontSize: "11px" }}
-                      axisLine={false}
-                      tickLine={false}
-                      angle={axis.angle}
-                      textAnchor={axis.textAnchor}
-                      height={axis.height}
-                      tickFormatter={formatAxisTick}
-                    />
-                    <YAxis
-                      style={{ fontSize: "11px" }}
-                      width={yAxisWidths.cost}
-                      tickFormatter={(value) => formatCost(value as number)}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      content={<ChartTooltip />}
-                      formatter={(value) => formatCost(value as number)}
-                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
-                    />
-                    <Bar dataKey="cost" name="Cost">
-                      {chartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
+              <MetricBarChart
+                testId="chart-cost"
+                title="Total Cost"
+                dataKey="cost"
+                barName="Cost"
+                data={chartData}
+                height={chartHeight}
+                axis={axis}
+                formatAxisTick={formatAxisTick}
+                yAxisWidth={yAxisWidths.cost}
+                formatValue={formatCost}
+              />
             )}
 
-            {/* Latency chart */}
             {visibleMetrics.has("latency") && (
-              <Box
-                minWidth="280px"
-                width="280px"
-                flexShrink={0}
-                bg="bg.subtle"
-                border="1px solid"
-                borderColor="border"
-                borderRadius="md"
-                padding={3}
-                paddingBottom={1}
-                data-testid="chart-latency"
-              >
-                <Text
-                  fontSize="xs"
-                  fontWeight="medium"
-                  marginBottom={2}
-                  lineClamp={1}
-                  title="Avg Latency"
-                >
-                  Avg Latency
-                </Text>
-                <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
-                    <CartesianGrid
-                      horizontal={true}
-                      vertical={false}
-                      stroke="var(--chakra-colors-border)"
-                      strokeDasharray="0"
-                    />
-                    <XAxis
-                      dataKey="name"
-                      style={{ fontSize: "11px" }}
-                      axisLine={false}
-                      tickLine={false}
-                      angle={axis.angle}
-                      textAnchor={axis.textAnchor}
-                      height={axis.height}
-                      tickFormatter={formatAxisTick}
-                    />
-                    <YAxis
-                      style={{ fontSize: "11px" }}
-                      width={yAxisWidths.latency}
-                      tickFormatter={(value) => formatLatency(value as number)}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      content={<ChartTooltip />}
-                      formatter={(value) => formatLatency(value as number)}
-                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
-                    />
-                    <Bar dataKey="latency" name="Latency">
-                      {chartData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Box>
+              <MetricBarChart
+                testId="chart-latency"
+                title="Avg Latency"
+                dataKey="latency"
+                barName="Latency"
+                data={chartData}
+                height={chartHeight}
+                axis={axis}
+                formatAxisTick={formatAxisTick}
+                yAxisWidth={yAxisWidths.latency}
+                formatValue={formatLatency}
+              />
             )}
 
-            {/* Per-evaluator score charts */}
             {scoreEvaluators.map(
               (ev) =>
                 visibleMetrics.has(`score_${ev.id}` as MetricType) && (
-                  <Box
+                  <MetricBarChart
                     key={`score-${ev.id}`}
-                    minWidth="280px"
-                    width="280px"
-                    flexShrink={0}
-                    bg="bg.subtle"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    padding={3}
-                    paddingBottom={1}
-                    data-testid={`chart-score-${ev.id}`}
-                  >
-                    <Text
-                      fontSize="xs"
-                      fontWeight="medium"
-                      marginBottom={2}
-                      lineClamp={1}
-                      title={`${ev.name} (Score)`}
-                    >
-                      {ev.name} (Score)
-                    </Text>
-                    <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid
-                          horizontal={true}
-                          vertical={false}
-                          stroke="var(--chakra-colors-border)"
-                          strokeDasharray="0"
-                        />
-                        <XAxis
-                          dataKey="name"
-                          style={{ fontSize: "11px" }}
-                          axisLine={false}
-                          tickLine={false}
-                          angle={axis.angle}
-                          textAnchor={axis.textAnchor}
-                          height={axis.height}
-                          tickFormatter={formatAxisTick}
-                        />
-                        <YAxis
-                          style={{ fontSize: "11px" }}
-                          width={40}
-                          domain={[0, 1]}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip
-                          content={<ChartTooltip />}
-                          formatter={(value) => (value as number).toFixed(2)}
-                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
-                        />
-                        <Bar dataKey={`score_${ev.id}`}>
-                          {chartData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Box>
+                    testId={`chart-score-${ev.id}`}
+                    title={`${ev.name} (Score)`}
+                    dataKey={`score_${ev.id}`}
+                    data={chartData}
+                    height={chartHeight}
+                    axis={axis}
+                    formatAxisTick={formatAxisTick}
+                    yAxisWidth={40}
+                    yDomain={[0, 1]}
+                    formatTooltip={(value) => value.toFixed(2)}
+                  />
                 ),
             )}
-
             {/* Win-rate charts — one per detected comparison
                 evaluator. Rendered inside the same flex row as Cost / Latency
                 so they read as siblings, not a separate section below.
@@ -1375,74 +1325,22 @@ export const ComparisonCharts = ({
                   ),
               )}
 
-            {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(
               (ev) =>
                 visibleMetrics.has(`pass_${ev.id}` as MetricType) && (
-                  <Box
+                  <MetricBarChart
                     key={`pass-${ev.id}`}
-                    minWidth="280px"
-                    width="280px"
-                    flexShrink={0}
-                    bg="bg.subtle"
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="md"
-                    padding={3}
-                    paddingBottom={1}
-                    data-testid={`chart-pass-${ev.id}`}
-                  >
-                    <Text
-                      fontSize="xs"
-                      fontWeight="medium"
-                      marginBottom={2}
-                      lineClamp={1}
-                      title={`${ev.name} (Pass Rate)`}
-                    >
-                      {ev.name} (Pass Rate)
-                    </Text>
-                    <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData} margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid
-                          horizontal={true}
-                          vertical={false}
-                          stroke="var(--chakra-colors-border)"
-                          strokeDasharray="0"
-                        />
-                        <XAxis
-                          dataKey="name"
-                          style={{ fontSize: "11px" }}
-                          axisLine={false}
-                          tickLine={false}
-                          angle={axis.angle}
-                          textAnchor={axis.textAnchor}
-                          height={axis.height}
-                          tickFormatter={formatAxisTick}
-                        />
-                        <YAxis
-                          style={{ fontSize: "11px" }}
-                          width={40}
-                          domain={[0, 1]}
-                          tickFormatter={(value) => `${Math.round((value as number) * 100)}%`}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip
-                          content={<ChartTooltip />}
-                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
-                          formatter={(value) => `${Math.round((value as number) * 100)}%`}
-                        />
-                        <Bar dataKey={`pass_${ev.id}`}>
-                          {chartData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={entry.color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Box>
+                    testId={`chart-pass-${ev.id}`}
+                    title={`${ev.name} (Pass Rate)`}
+                    dataKey={`pass_${ev.id}`}
+                    data={chartData}
+                    height={chartHeight}
+                    axis={axis}
+                    formatAxisTick={formatAxisTick}
+                    yAxisWidth={40}
+                    yDomain={[0, 1]}
+                    formatValue={(value) => `${Math.round(value * 100)}%`}
+                  />
                 ),
             )}
           </HStack>

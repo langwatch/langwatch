@@ -32,12 +32,12 @@ export class CryptoIdentifierIdentityService implements IdentifierIdentity {
     );
     const sequenceId = digest.readUInt32BE(8);
     const timestampSeconds = Math.floor(occurredAtMs / 1000);
-    return new Ksuid(
-      IDENTIFIER_ID_ENVIRONMENT,
-      "idf",
-      timestampSeconds,
+    return new Ksuid({
+      environment: IDENTIFIER_ID_ENVIRONMENT,
+      resource: "idf",
+      timestamp: timestampSeconds,
       instance,
       sequenceId,
-    ).toString();
+    }).toString();
   }
 }

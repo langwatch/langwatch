@@ -22,7 +22,7 @@ describe.skipIf(!hasGo())(
     let nlpgo: NlpgoSubprocess;
 
     beforeAll(async () => {
-      nlpgo = await startNlpgoSubprocess({ port: NLPGO_PORT });
+      nlpgo = await startNlpgoSubprocess({ port: NLPGO_PORT, environment: process.env });
     }, 700_000); // cold go build budget + boot + health
 
     afterAll(async () => {

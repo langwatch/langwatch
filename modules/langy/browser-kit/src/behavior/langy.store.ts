@@ -510,6 +510,233 @@ function freshCopy(value: unknown): unknown {
   return value;
 }
 
+function followedConversationModel(
+  state: LangyState,
+  { conversationId, model }: { conversationId: string; model: string },
+): Partial<LangyState> {
+  if (state.activeConversationId !== conversationId) return state;
+  if (state.modelSeededForConversationId === conversationId) return state;
+  return state.isModelPickedByUser
+    ? { modelSeededForConversationId: conversationId }
+    : {
+        modelOverride: model,
+        modelSeededForConversationId: conversationId,
+      };
+}
+
+function withChipChosen(state: LangyState, id: string): Partial<LangyState> {
+  if (state.chosenChipIds.has(id)) return state;
+  const next = new Set(state.chosenChipIds);
+  next.add(id);
+  return { chosenChipIds: next };
+}
+
+function withChipDismissed(state: LangyState, id: string): Partial<LangyState> {
+  if (!state.chosenChipIds.has(id)) return state;
+  const next = new Set(state.chosenChipIds);
+  next.delete(id);
+  return { chosenChipIds: next };
+}
+
+function withContextAttached(state: LangyState, item: LangyAttachedContext): Partial<LangyState> {
+  const existingIndex = state.attachedContext.findIndex((attached) => attached.id === item.id);
+  // Re-attaching an id is a refresh, not a duplicate: replace in place so
+  // a label/meta that changed (a title subscriber landed) updates without
+  // stacking a second chip or losing the item's position.
+  if (existingIndex >= 0) {
+    const next = [...state.attachedContext];
+    next[existingIndex] = item;
+    return { attachedContext: next };
+  }
+  return { attachedContext: [...state.attachedContext, item] };
+}
+
+function withContextDetached(state: LangyState, id: string): Partial<LangyState> {
+  if (!state.attachedContext.some((item) => item.id === id)) {
+    return state;
+  }
+  return {
+    attachedContext: state.attachedContext.filter((item) => item.id !== id),
+  };
+}
+
+function withSkillChip(
+  state: LangyState,
+  skill: { id: string; label: string },
+): Partial<LangyState> {
+  // Idempotent: summoning the same skill twice is a no-op, not a
+  // duplicate chip. `/gh` then `/github` is one intent.
+  if (state.skillChips.some((chip) => chip.id === skill.id)) {
+    return state;
+  }
+  return {
+    skillChips: [...state.skillChips, { id: skill.id, label: skill.label, targetChipId: null }],
+  };
+}
+
+function withProposalApplyingCleared(state: LangyState, id: string): Partial<LangyState> {
+  if (!state.applyingProposalIds.has(id)) return state;
+  const next = new Set(state.applyingProposalIds);
+  next.delete(id);
+  return { applyingProposalIds: next };
+}
+
+function beganTurn(
+  s: LangyState,
+  { conversationId, turnId }: { conversationId: string; turnId: string },
+): Partial<LangyState> {
+  return {
+    ...reduceBeginTurn(s, turnId),
+    // The phase transition adopts the turn; the store rides alongside it,
+    // adopting the conversation and clearing the previous turn's live
+    // signals (status / progress / reasoning / plan).
+    activeConversationId: conversationId,
+    // A conversation this dispatch just MINTED (the tab pointed at
+    // nothing, or at another conversation) starts unconfirmed: its
+    // projection may lag the accepted command, and a not-found read in
+    // that window must present as pending, not as an error.
+    unconfirmedConversations:
+      s.activeConversationId === conversationId
+        ? s.unconfirmedConversations
+        : { ...s.unconfirmedConversations, [conversationId]: true },
+    turnStatus: null,
+    turnStatusIsReadiness: false,
+    turnProgress: null,
+    turnProgressSample: null,
+    turnReasoning: null,
+    turnPlan: null,
+    interruptedConversationId: null,
+    // The warmed id is spent: this turn either adopted it or the server
+    // minted its own. Keeping it would let the NEXT new chat send its
+    // first message into this conversation, because the create path
+    // reads the pending id whenever no conversation is active.
+    pendingConversationId: null,
+  };
+}
+
+function withConversationConfirmed(s: LangyState, id: string): Partial<LangyState> {
+  if (!s.unconfirmedConversations[id]) return s;
+  const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
+  return { unconfirmedConversations: rest };
+}
+
+function stopRequested(
+  s: LangyState,
+  args: { dispatched?: boolean } | undefined,
+): Partial<LangyState> {
+  return {
+    ...reduceRequestStop(s, args ?? {}),
+    // Only a stop that actually moved the machine counts as an
+    // interruption — requestStop is a no-op outside `active`.
+    interruptedConversationId:
+      s.turnPhase === "active" ? s.activeConversationId : s.interruptedConversationId,
+  };
+}
+
+function stopWasDispatched(s: LangyState): Partial<LangyState> {
+  return {
+    ...reduceStopDispatched(s),
+    // The kept stop is real now, and the reply it cuts short belongs to
+    // this conversation: without this an empty stopped reply would read
+    // "No content" rather than "Interrupted".
+    interruptedConversationId: s.stopPending ? s.activeConversationId : s.interruptedConversationId,
+  };
+}
+
+function sendAbandoned(s: LangyState): Partial<LangyState> {
+  return {
+    ...reduceAbandonSend(s),
+    // Nothing ran, so nothing was interrupted.
+    interruptedConversationId: s.activeTurnId === null ? null : s.interruptedConversationId,
+  };
+}
+
+function seededTurnProjection(
+  s: LangyState,
+  snapshot: Parameters<LangyState["seedTurnProjection"]>[0],
+): Partial<LangyState> {
+  const turnProjection = seedLangyTurnProjection(s.turnProjection, snapshot);
+  // Refresh-resume: the durable record names a turn in flight and this tab
+  // tracks none — adopt it so Stop targets it and live signals route to it.
+  const adoptTurnId =
+    snapshot.currentTurnId && s.activeTurnId === null && turnProjection !== s.turnProjection
+      ? snapshot.currentTurnId
+      : null;
+  // The phase reducers return the WHOLE state (`{...state, ...}`), so
+  // the fresh projection must be spread AFTER them or the old one
+  // rides back in — same override-after-spread shape as beginTurn.
+  return {
+    ...(adoptTurnId
+      ? {
+          ...reduceObserveBackendTurn(s, true),
+          activeTurnId: adoptTurnId,
+        }
+      : {}),
+    turnProjection,
+  };
+}
+
+function turnEventsApplied(
+  s: LangyState,
+  events: readonly LangyConversationTurnWireEvent[],
+): Partial<LangyState> {
+  const turnProjection = applyLangyTurnEvents(s.turnProjection, events);
+  if (turnProjection === s.turnProjection) return {};
+  if (isLangyTurnProjectionTerminal(turnProjection)) {
+    // The recorded terminal settles the machine — same effect as the
+    // stream's end frame, but driven by the durable record, so it
+    // lands even when this tab never had the stream.
+    return {
+      ...reduceSettleTurn(s, turnProjection.turnId),
+      turnProjection,
+    };
+  }
+  if (turnProjection.turn?.Status === "running") {
+    // The settle marker exists to gag the fold RE-ASSERTING the turn whose end
+    // frame already landed (its projection lags).
+    const base =
+      s.settledTurnId !== null && turnProjection.turnId !== s.settledTurnId
+        ? {
+            ...s,
+            settledTurnId: null,
+            activeTurnId: s.activeTurnId === s.settledTurnId ? null : s.activeTurnId,
+          }
+        : s;
+    return {
+      ...reduceObserveBackendTurn(base, true),
+      // Adopt a running turn this tab doesn't track (another tab's
+      // send, a re-driven turn) so Stop and live signals target it.
+      activeTurnId: base.activeTurnId ?? turnProjection.turnId,
+      turnProjection,
+    };
+  }
+  return { turnProjection };
+}
+
+function resetScope(state: LangyState, scope: Partial<LangyScope>): Partial<LangyState> {
+  const current = state.activeConversationScope;
+  const merged = mergeScope(current, scope);
+  const unchanged = !!current && isSameScope(current, merged);
+  // A re-announcement of the scope we are already in is a heartbeat, not a move
+  // — the org/project hook re-fires on every refetch (window focus included)
+  // with the same three ids.
+  if (unchanged && state.scopeAnnounced) return state;
+  // Keep the SAME object when nothing moved. Two callers announce the
+  // scope — the layout, which knows all three ids, and the panel, which
+  // knows the project — and the sibling stores follow this reference.
+  // Handing them a fresh-but-equal object would empty the target
+  // registry out from under the rows that had just registered in it.
+  return {
+    ...scopedInitialState(),
+    // AFTER the spread: the sweep resets it, announcing sets it.
+    scopeAnnounced: true,
+    activeConversationScope: unchanged ? current : merged,
+    activeConversationId: unchanged ? state.activeConversationId : null,
+    historyLoadConversationId: unchanged ? state.activeConversationId : null,
+    conversationEpoch: unchanged ? state.conversationEpoch : state.conversationEpoch + 1,
+  };
+}
+
 export const useLangyStore = create<LangyState>()(
   persist(
     (set, get) => ({
@@ -651,79 +878,23 @@ export const useLangyStore = create<LangyState>()(
       isModelPickedByUser: false,
       modelSeededForConversationId: null,
       followConversationModel: ({ conversationId, model }) =>
-        set((state) => {
-          if (state.activeConversationId !== conversationId) return state;
-          if (state.modelSeededForConversationId === conversationId) return state;
-          return state.isModelPickedByUser
-            ? { modelSeededForConversationId: conversationId }
-            : {
-                modelOverride: model,
-                modelSeededForConversationId: conversationId,
-              };
-        }),
+        set((state) => followedConversationModel(state, { conversationId, model })),
       followCodingDefaultChange: ({ nextDefault }) =>
         set((state) => (state.isModelPickedByUser ? state : { modelOverride: nextDefault })),
 
       chosenChipIds: new Set<string>(),
-      chooseChip: (id) =>
-        set((state) => {
-          if (state.chosenChipIds.has(id)) return state;
-          const next = new Set(state.chosenChipIds);
-          next.add(id);
-          return { chosenChipIds: next };
-        }),
-      dismissChip: (id) =>
-        set((state) => {
-          if (!state.chosenChipIds.has(id)) return state;
-          const next = new Set(state.chosenChipIds);
-          next.delete(id);
-          return { chosenChipIds: next };
-        }),
+      chooseChip: (id) => set((state) => withChipChosen(state, id)),
+      dismissChip: (id) => set((state) => withChipDismissed(state, id)),
       resetChosenChips: () => set({ chosenChipIds: new Set<string>() }),
 
       attachedContext: [],
-      attachContext: (item) =>
-        set((state) => {
-          const existingIndex = state.attachedContext.findIndex(
-            (attached) => attached.id === item.id,
-          );
-          // Re-attaching an id is a refresh, not a duplicate: replace in place so
-          // a label/meta that changed (a title subscriber landed) updates without
-          // stacking a second chip or losing the item's position.
-          if (existingIndex >= 0) {
-            const next = [...state.attachedContext];
-            next[existingIndex] = item;
-            return { attachedContext: next };
-          }
-          return { attachedContext: [...state.attachedContext, item] };
-        }),
-      detachContext: (id) =>
-        set((state) => {
-          if (!state.attachedContext.some((item) => item.id === id)) {
-            return state;
-          }
-          return {
-            attachedContext: state.attachedContext.filter((item) => item.id !== id),
-          };
-        }),
+      attachContext: (item) => set((state) => withContextAttached(state, item)),
+      detachContext: (id) => set((state) => withContextDetached(state, id)),
       clearAttachedContext: () =>
         set((state) => (state.attachedContext.length === 0 ? state : { attachedContext: [] })),
 
       skillChips: [],
-      addSkillChip: (skill) =>
-        set((state) => {
-          // Idempotent: summoning the same skill twice is a no-op, not a
-          // duplicate chip. `/gh` then `/github` is one intent.
-          if (state.skillChips.some((chip) => chip.id === skill.id)) {
-            return state;
-          }
-          return {
-            skillChips: [
-              ...state.skillChips,
-              { id: skill.id, label: skill.label, targetChipId: null },
-            ],
-          };
-        }),
+      addSkillChip: (skill) => set((state) => withSkillChip(state, skill)),
       removeSkillChip: (id) =>
         set((state) => ({
           skillChips: state.skillChips.filter((chip) => chip.id !== id),
@@ -749,13 +920,7 @@ export const useLangyStore = create<LangyState>()(
         set((state) => ({
           appliedOutcomes: { ...state.appliedOutcomes, [id]: outcome },
         })),
-      clearProposalApplying: (id) =>
-        set((state) => {
-          if (!state.applyingProposalIds.has(id)) return state;
-          const next = new Set(state.applyingProposalIds);
-          next.delete(id);
-          return { applyingProposalIds: next };
-        }),
+      clearProposalApplying: (id) => set((state) => withProposalApplyingCleared(state, id)),
       discardProposal: (id) =>
         set((state) => {
           const next = new Set(state.discardedProposalIds);
@@ -800,65 +965,13 @@ export const useLangyStore = create<LangyState>()(
           interruptedConversationId: null,
         })),
       beginTurn: ({ conversationId, turnId }) =>
-        set((s) => ({
-          ...reduceBeginTurn(s, turnId),
-          // The phase transition adopts the turn; the store rides alongside it,
-          // adopting the conversation and clearing the previous turn's live
-          // signals (status / progress / reasoning / plan).
-          activeConversationId: conversationId,
-          // A conversation this dispatch just MINTED (the tab pointed at
-          // nothing, or at another conversation) starts unconfirmed: its
-          // projection may lag the accepted command, and a not-found read in
-          // that window must present as pending, not as an error.
-          unconfirmedConversations:
-            s.activeConversationId === conversationId
-              ? s.unconfirmedConversations
-              : { ...s.unconfirmedConversations, [conversationId]: true },
-          turnStatus: null,
-          turnStatusIsReadiness: false,
-          turnProgress: null,
-          turnProgressSample: null,
-          turnReasoning: null,
-          turnPlan: null,
-          interruptedConversationId: null,
-          // The warmed id is spent: this turn either adopted it or the server
-          // minted its own. Keeping it would let the NEXT new chat send its
-          // first message into this conversation, because the create path
-          // reads the pending id whenever no conversation is active.
-          pendingConversationId: null,
-        })),
+        set((s) => beganTurn(s, { conversationId, turnId })),
       unconfirmedConversations: {},
-      confirmConversation: (id) =>
-        set((s) => {
-          if (!s.unconfirmedConversations[id]) return s;
-          const { [id]: _confirmed, ...rest } = s.unconfirmedConversations;
-          return { unconfirmedConversations: rest };
-        }),
+      confirmConversation: (id) => set((s) => withConversationConfirmed(s, id)),
       interruptedConversationId: null,
-      requestStop: (args) =>
-        set((s) => ({
-          ...reduceRequestStop(s, args ?? {}),
-          // Only a stop that actually moved the machine counts as an
-          // interruption — requestStop is a no-op outside `active`.
-          interruptedConversationId:
-            s.turnPhase === "active" ? s.activeConversationId : s.interruptedConversationId,
-        })),
-      stopDispatched: () =>
-        set((s) => ({
-          ...reduceStopDispatched(s),
-          // The kept stop is real now, and the reply it cuts short belongs to
-          // this conversation: without this an empty stopped reply would read
-          // "No content" rather than "Interrupted".
-          interruptedConversationId: s.stopPending
-            ? s.activeConversationId
-            : s.interruptedConversationId,
-        })),
-      abandonSend: () =>
-        set((s) => ({
-          ...reduceAbandonSend(s),
-          // Nothing ran, so nothing was interrupted.
-          interruptedConversationId: s.activeTurnId === null ? null : s.interruptedConversationId,
-        })),
+      requestStop: (args) => set((s) => stopRequested(s, args)),
+      stopDispatched: () => set((s) => stopWasDispatched(s)),
+      abandonSend: () => set((s) => sendAbandoned(s)),
       abandonStop: () =>
         set((s) => ({
           ...reduceAbandonStop(s),
@@ -872,62 +985,8 @@ export const useLangyStore = create<LangyState>()(
       // @langwatch/langy, composed with the phase machine in the two places
       // durable truth arrives: the snapshot seed and the folded tail.
       turnProjection: initialLangyTurnProjection,
-      seedTurnProjection: (snapshot) =>
-        set((s) => {
-          const turnProjection = seedLangyTurnProjection(s.turnProjection, snapshot);
-          // Refresh-resume: the durable record names a turn in flight and this tab
-          // tracks none — adopt it so Stop targets it and live signals route to it.
-          const adoptTurnId =
-            snapshot.currentTurnId && s.activeTurnId === null && turnProjection !== s.turnProjection
-              ? snapshot.currentTurnId
-              : null;
-          // The phase reducers return the WHOLE state (`{...state, ...}`), so
-          // the fresh projection must be spread AFTER them or the old one
-          // rides back in — same override-after-spread shape as beginTurn.
-          return {
-            ...(adoptTurnId
-              ? {
-                  ...reduceObserveBackendTurn(s, true),
-                  activeTurnId: adoptTurnId,
-                }
-              : {}),
-            turnProjection,
-          };
-        }),
-      applyTurnEvents: (events) =>
-        set((s) => {
-          const turnProjection = applyLangyTurnEvents(s.turnProjection, events);
-          if (turnProjection === s.turnProjection) return {};
-          if (isLangyTurnProjectionTerminal(turnProjection)) {
-            // The recorded terminal settles the machine — same effect as the
-            // stream's end frame, but driven by the durable record, so it
-            // lands even when this tab never had the stream.
-            return {
-              ...reduceSettleTurn(s, turnProjection.turnId),
-              turnProjection,
-            };
-          }
-          if (turnProjection.turn?.Status === "running") {
-            // The settle marker exists to gag the fold RE-ASSERTING the turn whose end
-            // frame already landed (its projection lags).
-            const base =
-              s.settledTurnId !== null && turnProjection.turnId !== s.settledTurnId
-                ? {
-                    ...s,
-                    settledTurnId: null,
-                    activeTurnId: s.activeTurnId === s.settledTurnId ? null : s.activeTurnId,
-                  }
-                : s;
-            return {
-              ...reduceObserveBackendTurn(base, true),
-              // Adopt a running turn this tab doesn't track (another tab's
-              // send, a re-driven turn) so Stop and live signals target it.
-              activeTurnId: base.activeTurnId ?? turnProjection.turnId,
-              turnProjection,
-            };
-          }
-          return { turnProjection };
-        }),
+      seedTurnProjection: (snapshot) => set((s) => seededTurnProjection(s, snapshot)),
+      applyTurnEvents: (events) => set((s) => turnEventsApplied(s, events)),
       turnStatus: null,
       turnStatusIsReadiness: false,
       turnProgress: null,
@@ -963,30 +1022,7 @@ export const useLangyStore = create<LangyState>()(
       /**
        * Called when the panel enters a scope — a user, an organization, a project.
        */
-      resetForScope: (scope) =>
-        set((state) => {
-          const current = state.activeConversationScope;
-          const merged = mergeScope(current, scope);
-          const unchanged = !!current && isSameScope(current, merged);
-          // A re-announcement of the scope we are already in is a heartbeat, not a move
-          // — the org/project hook re-fires on every refetch (window focus included)
-          // with the same three ids.
-          if (unchanged && state.scopeAnnounced) return state;
-          // Keep the SAME object when nothing moved. Two callers announce the
-          // scope — the layout, which knows all three ids, and the panel, which
-          // knows the project — and the sibling stores follow this reference.
-          // Handing them a fresh-but-equal object would empty the target
-          // registry out from under the rows that had just registered in it.
-          return {
-            ...scopedInitialState(),
-            // AFTER the spread: the sweep resets it, announcing sets it.
-            scopeAnnounced: true,
-            activeConversationScope: unchanged ? current : merged,
-            activeConversationId: unchanged ? state.activeConversationId : null,
-            historyLoadConversationId: unchanged ? state.activeConversationId : null,
-            conversationEpoch: unchanged ? state.conversationEpoch : state.conversationEpoch + 1,
-          };
-        }),
+      resetForScope: (scope) => set((state) => resetScope(state, scope)),
 
       // Through `get()` rather than the exported hook: referring to the store
       // from inside its own initializer makes its type circular, and TypeScript

@@ -8,9 +8,10 @@ import { type ComponentProps, type ComponentType, lazy } from "react";
 
 /**
  * `ComponentType`, not `FC`: mounted by the host's feature wrapper
- * (`withEvaluatorHost` and siblings), whose return type is `ComponentType`.
+ * (`withEvaluatorHost` and siblings), whose return type is `ComponentType`. Over `object`, so
+ * a drawer with a required prop is refused: the address bar can open any drawer bare.
  */
-export type UiDrawerComponent = ComponentType<any>;
+export type UiDrawerComponent = ComponentType<object>;
 
 /**
  * What a feature package publishes and the host spreads together.
@@ -34,10 +35,10 @@ export const lazyDrawer = <K extends string, T extends { [P in K]: UiDrawerCompo
   factory: () => Promise<T>;
   key: K;
 }): UiDrawerComponent => {
-  const Component = lazy(() => factory().then((m) => ({ default: m[key] })));
+  const Component = lazy<UiDrawerComponent>(() => factory().then((m) => ({ default: m[key] })));
   Object.defineProperty(Component, "name", { value: key });
   chunkFactories.set(Component, factory);
-  return Component as UiDrawerComponent;
+  return Component;
 };
 
 /**

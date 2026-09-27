@@ -140,6 +140,9 @@
       "path": "../../packages/react-rum/tsconfig.build.json"
     },
     {
+      "path": "../../modules/rum/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/scenario/contract/tsconfig.build.json"
     },
     {

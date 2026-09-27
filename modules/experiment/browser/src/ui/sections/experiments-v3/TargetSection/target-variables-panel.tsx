@@ -7,6 +7,7 @@ import {
   type FieldMapping as VariableFieldMapping,
   type Variable,
 } from "@langwatch/prompt-browser-kit";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type { Field } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
@@ -107,6 +108,7 @@ export function TargetVariablesPanel({
   return (
     <VStack align="stretch" gap={4}>
       <VariablesSection
+        renderSourceIcon={renderSourceTypeIcon}
         variables={variables}
         onChange={(next: Variable[]) =>
           onInputsChange(

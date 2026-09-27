@@ -25,7 +25,8 @@ export interface PullRequestDetailDrawerProps {
   projectId: string;
   repositoryHost: string;
   repositoryFullName: string;
-  prNumber: number;
+  /** From the address it arrives as text; either way it is read as a number. */
+  prNumber: number | string;
   /**
    * Takes the drawer back off. The caller owns the address the drawer opens
    * from, so it also owns closing it — the drawer never reaches for a registry

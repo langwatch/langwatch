@@ -2,20 +2,14 @@ import type { Logger } from "@langwatch/observability";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { TaskCatalogue } from "../task-catalogue.ts";
-import { TaskHost } from "../task-host.port.ts";
+import { TaskHost } from "../task-host.ts";
 import { runTask } from "../task-launcher.ts";
 import { TaskInfrastructureUnavailableError } from "../task.errors.ts";
 import { Task } from "../task.ts";
 
 /** A minimal fake — the launcher only ever calls `.info` and `.error`. */
-function silentLogger(): Logger & {
-  info: ReturnType<typeof vi.fn>;
-  error: ReturnType<typeof vi.fn>;
-} {
-  return { info: vi.fn(), error: vi.fn() } as unknown as Logger & {
-    info: ReturnType<typeof vi.fn>;
-    error: ReturnType<typeof vi.fn>;
-  };
+function silentLogger() {
+  return { info: vi.fn<Logger["info"]>(), error: vi.fn<Logger["error"]>() };
 }
 
 class RecordingTask extends Task {

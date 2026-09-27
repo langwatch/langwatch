@@ -94,14 +94,6 @@ export const mePersonalCredentialSchema = z.discriminatedUnion("kind", [
 
 export type MePersonalCredential = z.infer<typeof mePersonalCredentialSchema>;
 
-/** Who the avatar door's dual-credential verifier let in. */
-export const userAvatarCallerSchema = z.object({
-  apiKeyProjectId: z.string().nullable(),
-  userId: z.string().nullable(),
-});
-
-export type UserAvatarCaller = z.infer<typeof userAvatarCallerSchema>;
-
 /** The path params the avatar byte door reads: whose avatar, in which project. */
 export const userAvatarRestParamsSchema = z.object({
   projectId: z.string(),

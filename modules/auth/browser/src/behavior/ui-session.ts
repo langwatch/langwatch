@@ -23,7 +23,7 @@ import {
   UI_SESSION_QUERY_KEY,
   type UiAuthClient,
   type UiSessionReading as UiSessionResponse,
-} from "../session";
+} from "./ui-session-client";
 import {
   useUiEffectivePermissions,
   useUiFeatureFlags,

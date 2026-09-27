@@ -18,11 +18,13 @@ import {
   isClaimAbandoned,
   RECEIPT_TTL_MS,
   TAKEOVER_AFTER_MS,
-  type IdempotencyReceiptCreateInput,
-  type IdempotencyReceiptPersistence,
-  type IdempotencyReceiptRecord,
   type IdempotencyResponseCipher,
 } from "../idempotency.ts";
+import type {
+  IdempotencyReceiptCreateInput,
+  IdempotencyReceiptPersistence,
+  IdempotencyReceiptRecord,
+} from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import { bodyLimit, validator as zValidator } from "../request.ts";
 import { readFencedReceiptWrite } from "./support/fenced-receipt-write.ts";
 

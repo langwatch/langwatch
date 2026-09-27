@@ -1,7 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { VariablesSection } from "@langwatch/prompt-browser-kit";
 import { OutputsSection } from "@langwatch/prompt-browser/outputs-section";
-import { InsideDrawerProvider } from "@langwatch/workflow-browser-kit";
+import { InsideDrawerProvider, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {
   AgentComponent,
   Component,
@@ -49,7 +49,9 @@ function CodePropertiesPanel({ node }: { node: Node<Component> }) {
       node={node}
       renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
       renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => (
+        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
+      )}
       renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
     />
   );
@@ -60,7 +62,9 @@ function EndPropertiesPanel({ node }: { node: Node<End> }) {
     <WorkflowEndPropertiesPanel
       node={node}
       renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => (
+        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
+      )}
     />
   );
 }
@@ -73,7 +77,9 @@ function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
       node={node}
       datasetTotal={total}
       renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => (
+        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
+      )}
       renderDatasetModal={DatasetModal}
       renderPropertySectionTitle={PropertySectionTitle}
     />
@@ -87,7 +93,9 @@ function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
       useHttpTest={(config: WorkflowHttpTestConfig) => useHttpTest(config)}
       renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
       renderHttpConfig={(props: WorkflowHttpConfigProps) => <HttpConfigEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => (
+        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
+      )}
       renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
     />
   );
@@ -99,7 +107,9 @@ function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
       node={node}
       renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
       renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
-      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => (
+        <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />
+      )}
       renderPropertySectionTitle={PropertySectionTitle}
       renderLiquidConditionEditor={LiquidConditionEditor}
     />

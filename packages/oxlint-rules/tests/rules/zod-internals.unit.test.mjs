@@ -96,30 +96,43 @@ describe("given a governed contract source file", () => {
   });
 });
 
-describe("given the tRPC host file", () => {
-  describe("when it reads a router's def to classify a procedure", () => {
-    /** @scenario "the tRPC host's def reads are left alone" */
+describe("given a governed source that reads ._def off something that is not a Zod schema", () => {
+  describe("when it reads a tRPC router's def to classify a procedure", () => {
+    /** @scenario "a def read off something that is not a Zod schema is left alone" */
     it("reports nothing", () => {
       expect(
         report(
           "const procedures = router._def.procedures;\nconst type = procedures[path]?._def?.type;",
-          "apps/api/src/app-trpc/api-trpc.host.ts",
+          "packages/api/src/trpc/host.ts",
         ),
       ).toEqual([]);
     });
   });
 
-  describe("when the same router shape is read outside that file", () => {
+  describe("when it reads a procedure's def after narrowing an unknown value", () => {
+    /** @scenario "a def read off something that is not a Zod schema is left alone" */
+    it("reports nothing", () => {
+      expect(
+        report(
+          'export function middlewaresOf(value) {\n  if ("_def" in value) return value._def.middlewares;\n  return [];\n}',
+          "packages/api/src/trpc/policy.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+});
+
+describe("given a governed source that reads ._def off a Zod-typed parameter", () => {
+  describe("when the parameter is annotated with a Zod type", () => {
     /** @scenario "an aliased schema's def is reported too" */
     it("reports defAccess", () => {
       const found = report(
-        "export const procedures = router._def.procedures;",
+        "export function innerOf(s: z.ZodTypeAny) {\n  return s._def.innerType;\n}",
         "modules/agent/contract/src/agent.schema.ts",
       );
 
       expect(found).toHaveLength(1);
-      expect(found[0].messageId).toBe("defAccess");
-      expect(found[0].data.object).toBe("router");
+      expect(found[0].data.object).toBe("s");
     });
   });
 });

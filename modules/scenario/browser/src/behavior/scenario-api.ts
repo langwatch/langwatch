@@ -8,6 +8,7 @@ import { type ContractApiMap, createModuleApi, type OutputsFromMap } from "@lang
 import type { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
+import type { opsDashboardTrpc } from "@langwatch/ops-contract";
 import type {
   OrganizationWithMembersAndTheirTeams,
   organizationTrpc,
@@ -58,6 +59,7 @@ export type ScenarioApiMap = ContractApiMap<typeof scenarioTrpc> &
   ContractApiMap<typeof tracesTrpc> &
   ContractApiMap<typeof workflowTrpc> &
   ContractApiMap<typeof evaluatorTrpc> &
+  ContractApiMap<typeof opsDashboardTrpc> &
   AuthzProcedures &
   OrganizationMembersProcedure;
 

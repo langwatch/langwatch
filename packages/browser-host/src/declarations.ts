@@ -8,7 +8,12 @@ import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
-import type { AvailableSource, FieldMapping } from "@langwatch/workflow-contract";
+import type {
+  AvailableSource,
+  FieldMapping,
+  LocalPromptConfig,
+  Signature,
+} from "@langwatch/workflow-contract";
 import type { ComponentType, ReactNode } from "react";
 
 /** A component a module declares, loaded the first time something draws it. */
@@ -295,6 +300,36 @@ export type UiEvaluatorSettingsFormProps = {
   onChange: (settings: Record<string, unknown>) => void;
 };
 
+/** One declared prompt input or output, as the prompt editor reports it. */
+export type UiPromptIOField = { identifier: string; type: string };
+
+/** What the studio hands prompt's editor, embedded in a signature node's panel. */
+export type UiStudioPromptEditorProps = {
+  nodeData: Signature;
+  onClose: () => void;
+  promptId: string | undefined;
+  promptVersionId: string | undefined;
+  initialLocalConfig: LocalPromptConfig | undefined;
+  onLocalConfigChange: (config: LocalPromptConfig | undefined) => void;
+  onSave: (prompt: {
+    id: string;
+    name: string;
+    version?: number;
+    versionId?: string;
+    inputs?: UiPromptIOField[];
+    outputs?: UiPromptIOField[];
+  }) => void;
+  onVersionChange: (prompt: {
+    version: number;
+    versionId: string;
+    inputs?: UiPromptIOField[];
+    outputs?: UiPromptIOField[];
+  }) => void;
+  availableSources: AvailableSource[];
+  inputMappings: Record<string, FieldMapping>;
+  onInputMappingsChange: (identifier: string, mapping: FieldMapping | undefined) => void;
+};
+
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
   surface: "simulations" | "simulationRuns" | "connectedAgents";
@@ -415,6 +450,7 @@ export type UiDeclaredCapabilities = {
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
+  studioPromptEditor: UiDeclaredComponent<UiStudioPromptEditorProps>;
   talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;
   traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;

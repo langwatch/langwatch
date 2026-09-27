@@ -2,12 +2,12 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
-import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";
 import {
   type GithubBranchCheckRow,
   NullGithubPullRequestsRepository,
 } from "../../repositories/github-pull-requests.repository.ts";
+import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
 import { GithubBranchMaintenanceService } from "../github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../github-branch-mapping.service.ts";
 import { GithubHostService } from "../github-host.service.ts";
@@ -47,7 +47,7 @@ class MaintenanceRepository extends NullGithubPullRequestsRepository {
  * that is the point — the sweep spans every tenant and has neither in hand.
  */
 function service(repository: MaintenanceRepository) {
-  const appTokens = RedisGithubAppTokenCache.create({
+  const appTokens = GithubAppTokenService.create({
     appId: "app",
     privateKey: "test-key",
     tokenCache: unansweredRedisRepositories().tokenCache,

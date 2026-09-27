@@ -75,8 +75,6 @@ describe("given the page the api serves", () => {
         mode: "production",
         deployment: "saas",
         nlp: false,
-        browserTracing: false,
-        sampleRatio: 1,
       });
       expect(
         parsePublicConfigSlice({ config: served, owner: "mail", schema: mailWebConfigSchema }),

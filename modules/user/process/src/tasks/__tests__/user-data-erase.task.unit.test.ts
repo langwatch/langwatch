@@ -1,15 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { GdprUserDataEraseRepository } from "../../repositories/prisma/prisma.user-data-erase.repository.ts";
+import type { GdprUserDataEraseRepository } from "../../repositories/user-data-erase.repository.ts";
 import { runGdprUserDataErase, UserDataEraseTask } from "../user-data-erase.task.ts";
 
-/**
- * A repository double with no organizations, teams or projects for the
- * user. Built untyped and cast once at the seam, the same pattern this
- * repo's repository unit tests use for a `PrismaClient` double.
- */
-function emptyRepository(overrides: Record<string, unknown> = {}) {
-  const base: Record<string, unknown> = {
+/** A repository double with no organizations, teams or projects for the user. */
+function emptyRepository(overrides: Partial<GdprUserDataEraseRepository> = {}) {
+  const base = {
     // "email" lookup finds the user; "id" lookup (post-deletion
     // verification) finds nothing — the happy path already deleted them.
     findUserByEmail: vi.fn(async (email: string) => ({ id: "user_1", email, name: "Ada" })),
@@ -23,9 +19,9 @@ function emptyRepository(overrides: Record<string, unknown> = {}) {
     countOtherAdmins: vi.fn(async () => 0),
     findTeamsUnderSoleOrgsWithOtherMembers: vi.fn(async () => []),
     eraseUserAndOwnedResources: vi.fn(async () => undefined),
-    ...overrides,
   };
-  return { double: base as unknown as GdprUserDataEraseRepository, mocks: base };
+  const double: GdprUserDataEraseRepository = { ...base, ...overrides };
+  return { double, mocks: { ...base, ...overrides } };
 }
 
 describe("runGdprUserDataErase", () => {

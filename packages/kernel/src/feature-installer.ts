@@ -145,7 +145,7 @@ export type ModuleTaskBinder<Dependencies extends TokenMap, Members, Repositorie
 
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
-  readonly protocol: "rest" | "trpc" | "websocket" | "rawsocket";
+  readonly protocol: "rest" | "trpc" | "websocket" | "rawsocket" | "rawhttp";
   /** The family's path segment, or the tRPC namespace the record keys it by. */
   readonly namespace?: string;
   readonly router: (...args: never[]) => object;
@@ -326,6 +326,18 @@ export type ModuleConfigFor<Modules extends readonly unknown[]> = {
   ]: ConfiguredModuleConfig<Module>;
 };
 
+/** A module name that is a literal, not a widened `string` or `number` index. */
+type IsNamedKey<Name> = string extends Name ? false : number extends Name ? false : true;
+
+/** The module's name when the supplied config lacks its slice or gives one of the wrong shape. */
+type UncoveredSlice<Name, Required, Supplied> = Name extends keyof Supplied
+  ? Name extends keyof Required
+    ? Supplied[Name] extends Required[Name]
+      ? never
+      : Name
+    : Name
+  : Name;
+
 /**
  * Every module whose slice the supplied config does not cover. A guard that cannot
  * know must not refuse: a module name widened to `string`, and a config typed as an
@@ -334,15 +346,9 @@ export type ModuleConfigFor<Modules extends readonly unknown[]> = {
 type ModulesMissingConfig<Required, Supplied> = string extends keyof Supplied
   ? never
   : {
-      [Name in keyof Required]: string extends Name
-        ? never
-        : number extends Name
-          ? never
-          : Name extends keyof Supplied
-            ? Supplied[Name] extends Required[Name]
-              ? never
-              : Name
-            : Name;
+      [Name in keyof Required]: IsNamedKey<Name> extends true
+        ? UncoveredSlice<Name, Required, Supplied>
+        : never;
     }[keyof Required];
 
 /** Guard type refusing processes that didn't state a module's config. */

@@ -667,17 +667,19 @@ const LinkRepositoryButton: React.FC<{
 
   return (
     <Tooltip content="Ask an administrator to link this repository.">
-      {/* A disabled button fires no pointer events at all, so the hover would
-          never reach the tooltip and the reason would go unsaid. The span
-          carries the events, and a tab stop so it is reachable without a
-          pointer. It also swallows the click: the button under it is inert,
-          and a click meant for it must not fall through to the row. */}
-      <span tabIndex={0} onClick={(event) => event.stopPropagation()}>
-        <Button size="xs" variant="outline" disabled flexShrink={0}>
-          <GitHubIcon size={12} />
-          Link this repo
-        </Button>
-      </span>
+      {/* aria-disabled, not disabled: a disabled button fires no pointer events and takes no
+          focus, so the tooltip holding the reason could never open. It swallows the click, so a
+          click meant for it does not fall through to the row. */}
+      <Button
+        size="xs"
+        variant="outline"
+        aria-disabled="true"
+        flexShrink={0}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <GitHubIcon size={12} />
+        Link this repo
+      </Button>
     </Tooltip>
   );
 };

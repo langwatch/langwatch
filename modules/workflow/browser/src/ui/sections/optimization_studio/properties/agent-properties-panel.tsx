@@ -24,7 +24,7 @@ import {
   OutputsSection,
   type OutputType,
 } from "@langwatch/prompt-browser/outputs-section";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
+import { useRegisterDrawerFooter, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import type {
   HttpAuth,
   HttpComponentConfig,
@@ -521,6 +521,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
       {/* Inputs with mappings */}
       <Box width="full" paddingX={4}>
         <VariablesSection
+          renderSourceIcon={renderSourceTypeIcon}
           variables={inputs}
           onChange={handleInputsChange}
           showMappings={true}

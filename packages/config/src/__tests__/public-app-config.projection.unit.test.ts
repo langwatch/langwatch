@@ -29,9 +29,8 @@ describe("public application configuration projection", () => {
       process: {
         appBaseUrl: "https://app.example.test",
         deployment: "self-hosted",
-        browserTracing: true,
-        sampleRatio: 1,
       },
+      rum: { enabled: true, sampleRatio: 1 },
       gateway: { gatewayBaseUrl: "https://gateway.example.test" },
       notification: { email: true },
     });

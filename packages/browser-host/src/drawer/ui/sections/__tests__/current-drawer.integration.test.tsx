@@ -17,6 +17,7 @@ import {
   installDrawerOpenRewrite,
   useDrawer,
 } from "../../../behavior/use-drawer.ts";
+import type { DrawerPropsMapOf } from "../../../model/drawer-map.ts";
 import { CurrentDrawer } from "../current-drawer.tsx";
 
 function ReadableDrawer({ subject }: { subject?: string }) {
@@ -53,7 +54,7 @@ function OtherDrawer() {
 const drawers = { readable: ReadableDrawer, other: OtherDrawer };
 
 function Opener() {
-  const { openDrawer } = useDrawer<typeof drawers>();
+  const { openDrawer } = useDrawer<DrawerPropsMapOf<typeof drawers>>();
   return (
     <>
       <button type="button" onClick={() => openDrawer("readable", { subject: "a trace" })}>

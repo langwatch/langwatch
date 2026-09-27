@@ -49,9 +49,6 @@ import type {
   UnlinkUserAccountOutcome,
   UserAccountInfo,
   UserApiRequestBudgetIncreaseInput,
-  UserAvatarCaller,
-  UserAvatarObjectRead,
-  UserAvatarReadAllowance,
   UserAvatarResult,
   UserBrowserSession,
   UserBrowserSessionEnded,
@@ -80,6 +77,7 @@ import {
   EmailAlreadyRegisteredError,
   ImpersonationCannotChangeCredentialsError,
   UserAccountAccessDeniedError,
+  UserAvatarNotFoundError,
   UserAvatarRateLimitedError,
   UserBudgetRequestNotDeliveredError,
   UserFederatedPasswordAccountMissingError,
@@ -99,6 +97,7 @@ import {
 
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
+import { isServableUserAvatar, type ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
 import { UserService } from "../services/user.service.ts";
@@ -1017,35 +1016,14 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * Counts a caller's avatar reads, keyed on their own identity, so id probes
-   * are throttled BEFORE any object is looked up.
+   * `GET /api/user-avatar/...`: a missing row, a foreign object and lost bytes
+   * earn one refusal, so the route never confirms an id exists.
    */
-  countAvatarRead({
-    caller,
-    windowSeconds,
-    max,
-  }: {
-    caller: UserAvatarCaller;
-    windowSeconds: number;
-    max: number;
-  }): Promise<UserAvatarReadAllowance> {
-    const key = caller.apiKeyProjectId ?? caller.userId;
+  async getAvatarBytes(input: { projectId: string; id: string }): Promise<ServableUserAvatar> {
+    const read = await this.#members.avatarObjects.findById(input);
+    if (!isServableUserAvatar(read)) throw new UserAvatarNotFoundError(input.id);
 
-    // The verifier sets one of the two on every request it admits; reaching
-    // here with neither means that contract broke. Refuse rather than fall back
-    // to a bucket every caller would share.
-    if (!key) throw new Error("the avatar door resolved neither an API key nor a person");
-
-    return this.#members.rateLimit({
-      key: `user-avatar:caller:${key}`,
-      windowSeconds,
-      max,
-    });
-  }
-
-  /** One avatar's row and, when the bytes are there, a stream of them. */
-  readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead> {
-    return this.#members.avatarObjects.findById(input);
+    return read;
   }
 
   // -- private -------------------------------------------------------------

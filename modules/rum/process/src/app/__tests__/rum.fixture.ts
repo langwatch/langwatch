@@ -43,7 +43,9 @@ export function rumInstallation({
 }>) {
   return createApp({ role: "api", secrets: collectorSecrets(collectorHeaders) })
     .withModules([withMemoryRepositories(rumServer)])
-    .withConfig({ rum: { collectorEndpoint } })
+    .withConfig({
+      rum: { enabled: false, sampleRatio: 1, collectorEndpoint, telemetryEndpoint },
+    })
     .withObservability((observability) => observability.withLogging(logger))
     .withMembers({ telemetryExporter: telemetryExporter(telemetryEndpoint, telemetryHeaders) });
 }

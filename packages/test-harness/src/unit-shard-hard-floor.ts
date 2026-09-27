@@ -19,8 +19,10 @@ const DEFAULT_HARD_FLOOR_MS = 4 * 60 * 1000;
  * disarmed. LANGWATCH_UNIT_HARD_FLOOR_MS shortens it and arms it outside CI; a
  * value that is not positive is announced rather than silently dropped.
  */
-export function resolveHardFloorMs(): number | null {
-  const raw = process.env.LANGWATCH_UNIT_HARD_FLOOR_MS?.trim();
+export function resolveHardFloorMs(
+  environment: Readonly<Record<string, string | undefined>>,
+): number | null {
+  const raw = environment.LANGWATCH_UNIT_HARD_FLOOR_MS?.trim();
   const override = Number(raw);
   if (Number.isFinite(override) && override > 0) return override;
 
@@ -30,7 +32,7 @@ export function resolveHardFloorMs(): number | null {
     );
   }
 
-  return process.env.CI ? DEFAULT_HARD_FLOOR_MS : null;
+  return environment.CI ? DEFAULT_HARD_FLOOR_MS : null;
 }
 
 /**
@@ -111,8 +113,12 @@ export function hardFloorReport({
  * Arms the floor for a shard, as a vitest `globalSetup`. Unref'd, so a healthy
  * shard exits on its own and the timer only fires on the wedge.
  */
-export async function armUnitShardHardFloor(): Promise<void> {
-  const hardFloorMs = resolveHardFloorMs();
+export async function armUnitShardHardFloor({
+  environment,
+}: {
+  environment: Readonly<Record<string, string | undefined>>;
+}): Promise<void> {
+  const hardFloorMs = resolveHardFloorMs(environment);
   if (hardFloorMs === null) return;
 
   const timer = setTimeout(() => {

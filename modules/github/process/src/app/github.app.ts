@@ -33,8 +33,9 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 import { Secret } from "@langwatch/secrets";
 
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
-import { GithubPullRequestEventRules } from "../rules/github-pull-request-event.rules.ts";
+import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
+import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
+import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
@@ -52,7 +53,6 @@ import {
   type GithubBranchDemand,
   type GithubBranchMaintenance,
 } from "./github.members.ts";
-import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 
 export type GithubInstallationToken = {
   token: string;
@@ -255,7 +255,7 @@ export class GithubApp implements GithubApiContract {
    */
   static composeApi(parts: GithubComposition): GithubFeatureService {
     const host = GithubHostService.create(parts.hostConfig);
-    const appTokens = RedisGithubAppTokenCache.create({
+    const appTokens = GithubAppTokenService.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
       tokenCache: parts.repositories.tokenCache,
@@ -314,8 +314,8 @@ export class GithubApp implements GithubApiContract {
         signingKey: parts.config.signingKey,
         nonces: parts.repositories.installNonces,
       }),
-      installResponse: GithubInstallResponseRules.create(),
-      pullRequestEvents: GithubPullRequestEventRules.create(),
+      installResponse: { successHtml: installSuccessHtml, errorHtml: installErrorHtml },
+      pullRequestEvents: { parse: parsePullRequestEvent },
     });
   }
 
@@ -328,7 +328,7 @@ export class GithubApp implements GithubApiContract {
     parts: GithubBranchMaintenanceComposition,
   ): GithubBranchMaintenance {
     const host = GithubHostService.create(parts.hostConfig);
-    const appTokens = RedisGithubAppTokenCache.create({
+    const appTokens = GithubAppTokenService.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
       tokenCache: parts.repositories.tokenCache,
@@ -353,7 +353,7 @@ export class GithubApp implements GithubApiContract {
    */
   static composeBranchDemand(parts: GithubBranchDemandComposition): GithubBranchDemand {
     const host = GithubHostService.create(parts.hostConfig);
-    const appTokens = RedisGithubAppTokenCache.create({
+    const appTokens = GithubAppTokenService.create({
       appId: parts.config.appId,
       privateKey: parts.config.privateKey,
       tokenCache: parts.repositories.tokenCache,
@@ -418,8 +418,16 @@ export class GithubApp implements GithubApiContract {
   canManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean> {
     return this.#permissions.hasPermission({ ...input, permission: "organization:manage" });
   }
-  findOrganizationForProject(projectId: string): Promise<string | undefined> {
-    return this.#projects.findOrganizationId(projectId);
+  /** The organization is derived from the project, never taken from the caller. */
+  async getProjectPullRequestLiveStatuses(input: {
+    projectId: string;
+    refs: readonly GithubPullRequestRef[];
+  }): Promise<{ statuses: GithubPullRequestLiveStatus[] }> {
+    const organizationId = await this.#projects.findOrganizationId(input.projectId);
+    if (!organizationId) return { statuses: [] };
+
+    const statuses = await this.getLivePullRequestStatuses({ organizationId, refs: input.refs });
+    return { statuses: [...statuses] };
   }
   /** Whether the person who started the install flow is the one signed in on this request. */
   async isSignedInAs(input: { request: Request; userId: string }): Promise<boolean> {

@@ -292,7 +292,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
       vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "1500");
       vi.stubEnv("CI", "");
 
-      expect(resolveHardFloorMs()).toBe(1500);
+      expect(resolveHardFloorMs(process.env)).toBe(1500);
     });
   });
 
@@ -302,7 +302,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
       vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", undefined);
       vi.stubEnv("CI", "");
 
-      expect(resolveHardFloorMs()).toBeNull();
+      expect(resolveHardFloorMs(process.env)).toBeNull();
       expect(warn).not.toHaveBeenCalled();
     });
   });
@@ -313,7 +313,7 @@ describe("given how long the shard may stay alive before the floor fires", () =>
       vi.stubEnv("LANGWATCH_UNIT_HARD_FLOOR_MS", "4m");
       vi.stubEnv("CI", "1");
 
-      expect(resolveHardFloorMs()).toBe(4 * 60 * 1000);
+      expect(resolveHardFloorMs(process.env)).toBe(4 * 60 * 1000);
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]?.[0])).toContain('"4m"');
     });

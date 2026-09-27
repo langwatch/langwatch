@@ -12,7 +12,13 @@ describe("Ksuid", () => {
 
   describe("constructor()", () => {
     it("creates a valid Ksuid", () => {
-      const ksuid = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
 
       expect(ksuid.environment).toBe("prod");
       expect(ksuid.resource).toBe("user");
@@ -23,44 +29,86 @@ describe("Ksuid", () => {
 
     it("throws an error for invalid environment", () => {
       expect(() => {
-        new Ksuid("invalid-env!", "user", 1234567890, testInstance, 0);
+        new Ksuid({
+          environment: "invalid-env!",
+          resource: "user",
+          timestamp: 1234567890,
+          instance: testInstance,
+          sequenceId: 0,
+        });
       }).toThrow("environment contains invalid characters");
     });
 
     it("throws an error for invalid resource", () => {
       expect(() => {
-        new Ksuid("prod", "invalid-resource!", 1234567890, testInstance, 0);
+        new Ksuid({
+          environment: "prod",
+          resource: "invalid-resource!",
+          timestamp: 1234567890,
+          instance: testInstance,
+          sequenceId: 0,
+        });
       }).toThrow("resource contains invalid characters");
     });
 
     it("throws an error for negative timestamp", () => {
       expect(() => {
-        new Ksuid("prod", "user", -1, testInstance, 0);
+        new Ksuid({
+          environment: "prod",
+          resource: "user",
+          timestamp: -1,
+          instance: testInstance,
+          sequenceId: 0,
+        });
       }).toThrow("timestamp must be positive");
     });
 
     it("throws an error for timestamp too large", () => {
       expect(() => {
-        new Ksuid("prod", "user", 2 ** 48, testInstance, 0);
+        new Ksuid({
+          environment: "prod",
+          resource: "user",
+          timestamp: 2 ** 48,
+          instance: testInstance,
+          sequenceId: 0,
+        });
       }).toThrow("timestamp must be a uint48");
     });
 
     it("throws an error for negative sequence ID", () => {
       expect(() => {
-        new Ksuid("prod", "user", 1234567890, testInstance, -1);
+        new Ksuid({
+          environment: "prod",
+          resource: "user",
+          timestamp: 1234567890,
+          instance: testInstance,
+          sequenceId: -1,
+        });
       }).toThrow("sequenceId must be positive");
     });
 
     it("throws an error for sequence ID too large", () => {
       expect(() => {
-        new Ksuid("prod", "user", 1234567890, testInstance, 2 ** 32);
+        new Ksuid({
+          environment: "prod",
+          resource: "user",
+          timestamp: 1234567890,
+          instance: testInstance,
+          sequenceId: 2 ** 32,
+        });
       }).toThrow("sequenceId must be a uint32");
     });
   });
 
   describe("toString()", () => {
     it("generates correct string representation for production", () => {
-      const ksuid = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const result = ksuid.toString();
 
       expect(result).toMatch(/^user_[A-Za-z0-9]{29}$/);
@@ -68,14 +116,26 @@ describe("Ksuid", () => {
     });
 
     it("generates correct string representation for non-production", () => {
-      const ksuid = new Ksuid("dev", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "dev",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const result = ksuid.toString();
 
       expect(result).toMatch(/^dev_user_[A-Za-z0-9]{29}$/);
     });
 
     it("caches the string representation", () => {
-      const ksuid = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const first = ksuid.toString();
       const second = ksuid.toString();
 
@@ -85,7 +145,13 @@ describe("Ksuid", () => {
 
   describe("parse()", () => {
     it("parses valid production KSUID", () => {
-      const original = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const original = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const parsed = Ksuid.parse(original.toString());
 
       expect(parsed.environment).toBe(original.environment);
@@ -96,7 +162,13 @@ describe("Ksuid", () => {
     });
 
     it("parses valid non-production KSUID", () => {
-      const original = new Ksuid("dev", "user", 1234567890, testInstance, 0);
+      const original = new Ksuid({
+        environment: "dev",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const parsed = Ksuid.parse(original.toString());
 
       expect(parsed.environment).toBe(original.environment);
@@ -143,7 +215,13 @@ describe("Ksuid", () => {
   describe("when reading date", () => {
     it("returns correct date", () => {
       const timestamp = 1234567890;
-      const ksuid = new Ksuid("prod", "user", timestamp, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp,
+        instance: testInstance,
+        sequenceId: 0,
+      });
 
       expect(ksuid.date.getTime()).toBe(timestamp * 1000);
     });
@@ -151,21 +229,51 @@ describe("Ksuid", () => {
 
   describe("equals()", () => {
     it("returns true for identical KSUIDs", () => {
-      const ksuid1 = new Ksuid("prod", "user", 1234567890, testInstance, 0);
-      const ksuid2 = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid1 = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
+      const ksuid2 = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
 
       expect(ksuid1.equals(ksuid2)).toBe(true);
     });
 
     it("returns false for different KSUIDs", () => {
-      const ksuid1 = new Ksuid("prod", "user", 1234567890, testInstance, 0);
-      const ksuid2 = new Ksuid("prod", "user", 1234567891, testInstance, 0);
+      const ksuid1 = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
+      const ksuid2 = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567891,
+        instance: testInstance,
+        sequenceId: 0,
+      });
 
       expect(ksuid1.equals(ksuid2)).toBe(false);
     });
 
     it("returns false for non-Ksuid objects", () => {
-      const ksuid = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
 
       expect(ksuid.equals({} as never)).toBe(false);
     });
@@ -173,7 +281,13 @@ describe("Ksuid", () => {
 
   describe("toJSON()", () => {
     it("returns correct JSON representation", () => {
-      const ksuid = new Ksuid("prod", "user", 1234567890, testInstance, 0);
+      const ksuid = new Ksuid({
+        environment: "prod",
+        resource: "user",
+        timestamp: 1234567890,
+        instance: testInstance,
+        sequenceId: 0,
+      });
       const json = ksuid.toJSON();
 
       expect(json).toEqual({

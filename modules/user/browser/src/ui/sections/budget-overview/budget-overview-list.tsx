@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
@@ -134,20 +134,17 @@ export function BudgetOverviewList({ items }: { items: BudgetOverviewItemView[] 
                 positioning={{ placement: "top" }}
                 content={<BudgetTooltip item={item} />}
               >
-                <Box
-                  as="span"
+                <chakra.button
+                  type="button"
                   color="fg.muted"
                   cursor="default"
                   display="inline-flex"
-                  // A span takes no focus of its own, so without tabIndex a
-                  // keyboard user can never open the tooltip that holds the
+                  // A button, so a keyboard user can reach the tooltip that holds the
                   // budget's name, provider filter and reset time.
-                  tabIndex={0}
-                  role="img"
                   aria-label={`About ${item.name}`}
                 >
                   <Info size={13} />
-                </Box>
+                </chakra.button>
               </Tooltip>
               {resetDay && (
                 <Text fontSize="xs" color="fg.muted" marginLeft="auto">

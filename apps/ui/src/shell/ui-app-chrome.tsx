@@ -9,13 +9,13 @@ import {
   useOptionalUiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-browser/chrome";
-import { useUiOrgQueryParamSelection } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
 
 import { UiNavigationHost } from "./navigation-host-provider";
+import type { UiRootCapabilities } from "./ui-root-capabilities";
 import { useAnalyticsIdentity } from "./use-analytics-identity";
 
-export default function UiAppChrome() {
+export default function UiAppChrome({ capabilities: root }: { capabilities: UiRootCapabilities }) {
   const capabilities = useOptionalUiCapabilities();
   // Mounted outside an application shell, or inside one that declared no
   // scope — a route-table test, never the product, where the composition
@@ -25,17 +25,17 @@ export default function UiAppChrome() {
   if (!capabilities || capabilities.scope === UNAVAILABLE_UI_SCOPE) return <UiRouteOutlet />;
 
   return (
-    <UiNavigationHost commandBar>
-      <UiAppChromeFrame />
+    <UiNavigationHost commandBar capabilities={root}>
+      <UiAppChromeFrame scope={root.scope} />
     </UiNavigationHost>
   );
 }
 
 /** Split so the hooks that read the host run only beneath it. */
-function UiAppChromeFrame() {
+function UiAppChromeFrame({ scope }: Pick<UiRootCapabilities, "scope">) {
   useAnalyticsIdentity();
   useNavigationTracking();
-  useUiOrgQueryParamSelection();
+  scope.useUiOrgQueryParamSelection();
   return (
     <NavigationShell>
       <UiRouteOutlet />

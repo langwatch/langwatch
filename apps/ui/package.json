@@ -79,6 +79,7 @@
     "@langwatch/prompt-browser": "workspace:*",
     "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
+    "@langwatch/rum-contract": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/secret-browser": "workspace:*",

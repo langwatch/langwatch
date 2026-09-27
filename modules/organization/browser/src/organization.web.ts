@@ -84,6 +84,10 @@ export const organizationWeb = defineWebModule("organization")
    * onboarding welcome): it RUNS joinRequests queries, so it is declared, not kitted.
    */
   .withCapabilities({
+    /** Where they are standing: the composition root awaits this before it renders. */
+    scope: { load: () => import("./behavior/scope-capability.ts") },
+    /** The organization graph the chrome draws its switchers from. */
+    organizationFacts: { load: () => import("./behavior/ui-organization-facts.ts") },
     joinOffer: {
       load: () => import("./features/join-offer/ui/sections/join-your-team-takeover.tsx"),
     },

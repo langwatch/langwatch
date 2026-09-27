@@ -105,6 +105,7 @@ beforeAll(async () => {
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "webhook-events-repository",
     names: ["shared"],
+    environment: process.env,
   });
   client = createClient({ url: endpoint!.url });
   // The endpoint is reused across runs, so start from an empty table.

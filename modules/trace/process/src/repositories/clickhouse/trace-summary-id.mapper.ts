@@ -21,11 +21,11 @@ export function createTraceSummaryProjectionId(input: {
   const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(hash.subarray(0, 8)));
   const sequence = ((hash[8]! << 24) | (hash[9]! << 16) | (hash[10]! << 8) | hash[11]!) >>> 0;
 
-  return new Ksuid(
-    getEnvironment(),
-    TRACE_SUMMARY_RESOURCE,
-    Math.floor(input.occurredAtMs / 1000),
+  return new Ksuid({
+    environment: getEnvironment(),
+    resource: TRACE_SUMMARY_RESOURCE,
+    timestamp: Math.floor(input.occurredAtMs / 1000),
     instance,
-    sequence,
-  ).toString();
+    sequenceId: sequence,
+  }).toString();
 }

@@ -29,6 +29,7 @@ describe("given a ClickHouse database the migrations have run against", () => {
     const [provisioned] = await startTestClickHouseEndpoints({
       suite: "clickhouse-client-migrated",
       names: ["schema"],
+      environment: process.env,
     });
     if (!provisioned)
       throw new Error("No ClickHouse endpoint was provisioned for the schema suite");

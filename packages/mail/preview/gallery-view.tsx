@@ -1,13 +1,6 @@
 import { Box, chakra, Grid, HStack, Text } from "@chakra-ui/react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type JSX,
-  type KeyboardEvent,
-  type SyntheticEvent,
-} from "react";
+import { useEffect, useRef, useState, type JSX, type SyntheticEvent } from "react";
 
 import { prepareMailDocument, WIDTHS, type GalleryEntry } from "./studio-shared.ts";
 
@@ -162,12 +155,6 @@ const GalleryCard = ({
   }, []);
 
   const open = () => onOpen(entry.template, entry.fixture);
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      open();
-    }
-  };
   const onIframeLoad = (event: SyntheticEvent<HTMLIFrameElement>) => {
     const doc = event.currentTarget.contentDocument;
     const body = doc?.body;
@@ -185,12 +172,10 @@ const GalleryCard = ({
   const html = prepareMailDocument(entry.html, previewDark);
 
   return (
-    <Box
-      role="button"
-      tabIndex={0}
+    <chakra.button
+      type="button"
       aria-label={`Open ${entry.title} — ${entry.fixture} in Inspect`}
       onClick={open}
-      onKeyDown={onKeyDown}
       cursor="pointer"
       textAlign="left"
       display="flex"
@@ -253,6 +238,6 @@ const GalleryCard = ({
           />
         </Box>
       </Box>
-    </Box>
+    </chakra.button>
   );
 };

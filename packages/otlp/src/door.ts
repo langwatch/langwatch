@@ -170,7 +170,12 @@ export function applyReceiverProvenance({
   }
 
   const policy = isIngestionKey && source?.status === "ready" ? source.policies[signal] : void 0;
-  const { droppedScopes } = applyOtlpReceiverPolicy(request, signal, identity.apiKeyId, policy);
+  const { droppedScopes } = applyOtlpReceiverPolicy({
+    request,
+    signal,
+    apiKeyId: identity.apiKeyId,
+    policy,
+  });
 
   if (droppedScopes > 0) {
     logger.warn(

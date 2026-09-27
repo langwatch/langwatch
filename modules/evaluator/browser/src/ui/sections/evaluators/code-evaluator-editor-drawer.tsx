@@ -20,7 +20,7 @@ import {
   type Variable,
   VariablesSection,
 } from "@langwatch/prompt-browser-kit";
-import { rewriteCodeSignature } from "@langwatch/workflow-browser-kit";
+import { rewriteCodeSignature, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
@@ -415,6 +415,7 @@ function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
         mappingsConfig
           ? ({ inputs, onInputsChange }) => (
               <VariablesSection
+                renderSourceIcon={renderSourceTypeIcon}
                 title="Inputs"
                 variables={inputs.map((field) => ({
                   identifier: field.identifier,

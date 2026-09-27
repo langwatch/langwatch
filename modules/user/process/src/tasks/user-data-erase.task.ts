@@ -2,9 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
 import {
-  GdprUserDataEraseRepository,
+  PrismaGdprUserDataEraseRepository,
   type GdprUserDataEraseDatabase,
 } from "../repositories/prisma/prisma.user-data-erase.repository.ts";
+import type { GdprUserDataEraseRepository } from "../repositories/user-data-erase.repository.ts";
 
 const logger = createLogger("langwatch:task:user-data-erase");
 
@@ -178,6 +179,6 @@ export function createGdprUserDataEraseRunner(options: {
   database: GdprUserDataEraseDatabase;
 }): UserDataEraseTask {
   return UserDataEraseTask.create({
-    repository: () => GdprUserDataEraseRepository.create({ database: options.database }),
+    repository: () => PrismaGdprUserDataEraseRepository.create({ database: options.database }),
   });
 }

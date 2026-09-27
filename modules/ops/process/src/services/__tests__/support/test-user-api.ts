@@ -199,12 +199,6 @@ export class TestUserApi implements UserApi {
   getKeyProject: UserApi["getKeyProject"] = (input) =>
     this.overrides.getKeyProject?.(input) ?? this.unimplemented("getKeyProject");
 
-  countAvatarRead: UserApi["countAvatarRead"] = (input) =>
-    this.overrides.countAvatarRead?.(input) ?? this.unimplemented("countAvatarRead");
-
-  readAvatarObject: UserApi["readAvatarObject"] = (input) =>
-    this.overrides.readAvatarObject?.(input) ?? this.unimplemented("readAvatarObject");
-
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(new Error(`TestUserApi does not implement ${operation}`));
   }

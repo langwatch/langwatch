@@ -24,10 +24,11 @@ afterEach(async () => {
 async function runtime() {
   const endpoint = await TestClickHouseEndpoint.create();
   endpoints.push(endpoint);
-  const repositories = ClickHouseCodingAgentRepositories.createWith({
+  const repositories = ClickHouseCodingAgentRepositories.create({
     clickhouse: endpoint.clickhouse,
     defaultRetentionDays: 30,
     clock: new TestClock(),
+    telemetry: { observe: () => undefined },
   });
   return {
     endpoint,

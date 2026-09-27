@@ -60,6 +60,7 @@ describe("given an evaluation whose row was rewritten as it progressed", () => {
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "evaluation-run-read-dedup",
       names: ["shared"],
+      environment: process.env,
     });
     client = createClient({ url: endpoint!.url });
     // The endpoint is reused across runs, so start from an empty table.

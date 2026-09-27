@@ -64,12 +64,17 @@ export interface OtlpReceiverRequest {
   resourceMetrics?: (ReceiverResourceGroup | null)[] | null;
 }
 
-export function applyOtlpReceiverPolicy(
-  request: OtlpReceiverRequest,
-  signal: Signal,
-  apiKeyId: string | null,
-  policy?: OtlpReceiverPolicy,
-): { droppedScopes: number } {
+export function applyOtlpReceiverPolicy({
+  request,
+  signal,
+  apiKeyId,
+  policy,
+}: {
+  request: OtlpReceiverRequest;
+  signal: Signal;
+  apiKeyId: string | null;
+  policy?: OtlpReceiverPolicy;
+}): { droppedScopes: number } {
   const keys = SIGNAL_KEYS[signal];
   const resources = request[keys.resources] ?? [];
   const scopeNames = {

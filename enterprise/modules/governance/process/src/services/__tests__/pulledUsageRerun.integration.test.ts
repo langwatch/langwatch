@@ -116,6 +116,7 @@ describe("given a read that recorded part of a period and then failed", () => {
     const [endpoint] = await startTestClickHouseEndpoints({
       suite: "governance-pulled-usage-rerun",
       names: ["rerun"],
+      environment: process.env,
     });
     if (!endpoint) throw new Error("No ClickHouse endpoint was provisioned for the rerun suite");
     await migrateTestClickHouseOnce({

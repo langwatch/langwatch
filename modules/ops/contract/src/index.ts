@@ -123,3 +123,4 @@ export {
   type CheckupAnswer,
   type UsageReportAnswer,
 } from "./checkup.trpc.ts";
+export * from "./dejaview-link.ts";

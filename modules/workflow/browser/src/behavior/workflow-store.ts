@@ -382,660 +382,863 @@ export const updateOutputFields = (
   });
 };
 
-export const store = (
-  set: (
-    partial:
-      | WorkflowStore
-      | Partial<WorkflowStore>
-      | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>),
-    replace?: boolean,
-  ) => void,
-  get: () => WorkflowStore,
-): WorkflowStore => ({
+type StoreSet = (
+  partial:
+    | WorkflowStore
+    | Partial<WorkflowStore>
+    | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>),
+  replace?: boolean,
+) => void;
+
+export const store = (set: StoreSet, get: () => WorkflowStore): WorkflowStore => ({
   ...initialState,
-  reset() {
-    set(initialState);
-  },
-  getWorkflow: () => {
-    const state = get();
-    return getWorkflow(state);
-  },
-  getAutosavedWorkflow: () => {
-    return get().autosavedWorkflow;
-  },
-  hasPendingChanges: () => {
-    const autosavedWorkflow = get().autosavedWorkflow;
-    const currentWorkflow = get().getWorkflow();
-    if (!autosavedWorkflow || !currentWorkflow) {
-      return false;
-    }
-    return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
-  },
-  setWorkflow: (
-    workflow: Partial<StudioWorkflow> | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
-  ) => {
-    const resolved = typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
-    // The entry node was historically named "Entry" and styled as a
-    // dataset grid, which made dataset columns read as the workflow's
-    // inputs. It now presents as "Entry point" everywhere - normalize
-    // legacy names on load so canvas and drawer agree (persisted on the
-    // next autosave).
-    if ("nodes" in resolved && resolved.nodes) {
-      resolved.nodes = resolved.nodes.map((node) =>
-        node.type === "entry" && node.data.name === "Entry"
-          ? { ...node, data: { ...node.data, name: "Entry point" } }
-          : node,
-      );
-    }
-    const keys = Object.keys(resolved);
-    logger.debug({ keys }, "setWorkflow: updating workflow");
-    if ("edges" in resolved) {
+  ...workflowStateSlice(set, get),
+  ...setWorkflowSlice(set, get),
+  ...graphChangeSlice(set, get),
+  ...connectSlice(set, get),
+  ...setEdgesSlice(set, get),
+  ...newHandleSlice(set, get),
+  ...setNodeSlice(set, get),
+  ...nodeParameterSlice(set, get),
+  ...duplicateNodeSlice(set, get),
+  ...executionSlice(set, get),
+  ...optimizationSlice(set, get),
+  ...selectionSlice(set, get),
+  ...runControlSlice(set, get),
+});
+
+function workflowStateSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<
+  WorkflowStore,
+  | "reset"
+  | "getWorkflow"
+  | "getAutosavedWorkflow"
+  | "hasPendingChanges"
+  | "setAutosavedWorkflow"
+  | "setLastCommittedWorkflow"
+  | "setCurrentVersionId"
+  | "checkCanCommitNewVersion"
+  | "setSocketStatus"
+> {
+  return {
+    reset() {
+      set(initialState);
+    },
+    getWorkflow: () => {
+      const state = get();
+      return getWorkflow(state);
+    },
+    getAutosavedWorkflow: () => {
+      return get().autosavedWorkflow;
+    },
+    hasPendingChanges: () => {
+      const autosavedWorkflow = get().autosavedWorkflow;
+      const currentWorkflow = get().getWorkflow();
+      if (!autosavedWorkflow || !currentWorkflow) {
+        return false;
+      }
+      return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
+    },
+    setAutosavedWorkflow: (workflow: StudioWorkflow | undefined) => {
+      set({ autosavedWorkflow: workflow });
+    },
+    setLastCommittedWorkflow: (workflow: StudioWorkflow | undefined) => {
+      set({ lastCommittedWorkflow: workflow });
+    },
+    setCurrentVersionId: (id: string | undefined) => {
+      set({ currentVersionId: id });
+    },
+    checkCanCommitNewVersion: () => {
+      const lastCommitted = get().lastCommittedWorkflow;
+      const currentWorkflow = get().getWorkflow();
+      if (!lastCommitted || !currentWorkflow) {
+        return false;
+      }
+      return hasDSLChanged(currentWorkflow, lastCommitted, false);
+    },
+    setSocketStatus: (status: SocketStatus | ((status: SocketStatus) => SocketStatus)) => {
+      set({
+        socketStatus: typeof status === "function" ? status(get().socketStatus) : status,
+      });
+    },
+  };
+}
+
+function setWorkflowSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "setWorkflow"> {
+  return {
+    setWorkflow: (
+      workflow: Partial<StudioWorkflow> | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
+    ) => {
+      const resolved = typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
+      // The entry node was historically named "Entry" and styled as a
+      // dataset grid, which made dataset columns read as the workflow's
+      // inputs. It now presents as "Entry point" everywhere - normalize
+      // legacy names on load so canvas and drawer agree (persisted on the
+      // next autosave).
+      if ("nodes" in resolved && resolved.nodes) {
+        resolved.nodes = resolved.nodes.map((node) =>
+          node.type === "entry" && node.data.name === "Entry"
+            ? { ...node, data: { ...node.data, name: "Entry point" } }
+            : node,
+        );
+      }
+      const keys = Object.keys(resolved);
+      logger.debug({ keys }, "setWorkflow: updating workflow");
+      if ("edges" in resolved) {
+        warnOnEdgeLoss({
+          label: "setWorkflow",
+          current: get().edges,
+          next: (resolved as { edges: Edge[] }).edges,
+        });
+      }
+      set(resolved);
+    },
+  };
+}
+
+function graphChangeSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<
+  WorkflowStore,
+  | "onNodesChange"
+  | "onNodesDelete"
+  | "onEdgesChange"
+  | "onConnectStart"
+  | "onConnectEnd"
+  | "setNodes"
+> {
+  return {
+    onNodesChange: (changes: NodeChange[]) => {
+      const removeChanges = changes.filter((c) => c.type === "remove");
+      if (removeChanges.length > 0) {
+        logger.warn({ removeChanges }, "onNodesChange: REMOVING nodes");
+      }
+      const hasDeselection = changes.some((c) => c.type === "select" && !c.selected);
+      set({
+        nodes: applyNodeChanges(changes, get().nodes),
+        ...(hasDeselection ? { clickedNodeId: null } : {}),
+      });
+    },
+    onNodesDelete: () => {
+      set({
+        nodes: removeInvalidDecorations(get().nodes),
+      });
+    },
+    onEdgesChange: (changes: EdgeChange[]) => {
+      const removeChanges = changes.filter((c) => c.type === "remove");
+      if (removeChanges.length > 0) {
+        logger.warn(
+          {
+            removeChanges,
+            totalChanges: changes.length,
+          },
+          "onEdgesChange: REMOVING edges",
+        );
+      }
+      set({
+        edges: applyEdgeChanges(changes, get().edges),
+      });
+    },
+    onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => {
+      const node = get().nodes.find((n) => n.id === params.nodeId);
+      const fromBranch = isBranchConnectionOrigin({
+        node,
+        handleId: params.handleId,
+      });
+      set({
+        branchConnectionInProgress: fromBranch,
+        branchConnectionSourceId: fromBranch ? (params.nodeId ?? null) : null,
+      });
+    },
+    onConnectEnd: () => {
+      if (get().branchConnectionInProgress) {
+        set({
+          branchConnectionInProgress: false,
+          branchConnectionSourceId: null,
+        });
+      }
+    },
+    setNodes: (nodes: Node[]) => {
+      set({ nodes });
+    },
+  };
+}
+
+function connectSlice(set: StoreSet, get: () => WorkflowStore): Pick<WorkflowStore, "onConnect"> {
+  return {
+    onConnect: (connection: Connection) => {
       const currentEdges = get().edges;
-      const newEdges = (resolved as { edges: Edge[] }).edges;
-      if (newEdges && newEdges.length < currentEdges.length) {
+      const nodes = get().nodes;
+      const fromBranch = isBranchConnectionOrigin({
+        node: nodes.find((n) => n.id === connection.source),
+        handleId: connection.sourceHandle,
+      });
+      // Dropping a branch onto a node's temporary gate: materialize a real
+      // "gate" bool input on the target and wire the branch into it. The branch
+      // carries its boolean value like a normal edge; the engine gates the node
+      // on the branch and plumbs that value into the gate input.
+      const gatePatch = fromBranch
+        ? gateConnectionPatch({ nodes, currentEdges, connection })
+        : undefined;
+      if (gatePatch) {
+        set(gatePatch);
+        return;
+      }
+      const existingConnection = currentEdges.find(
+        (edge) =>
+          edge.target === connection.target && edge.targetHandle === connection.targetHandle,
+      );
+      // An input takes one source, except across mutually exclusive If/Else
+      // branches: only one of them ever runs, so they may converge on the
+      // same input. Sources that can run together stay blocked.
+      if (existingConnection && !canConvergeOnInput({ nodes, edges: currentEdges, connection })) {
+        return {
+          error:
+            "These two values can run at the same time, so they can't feed the same input. Only mutually exclusive If/Else branches can converge on one input.",
+        };
+      }
+      set({
+        branchConnectionInProgress: false,
+        branchConnectionSourceId: null,
+        edges: addEdge(connection, currentEdges).map((edge) => ({
+          ...edge,
+          type: edge.type ?? "default",
+        })),
+      });
+      // The connection was made, so there is no error to report. Stated rather
+      // than fallen through: every other exit from this function returns, and
+      // `apps/ui` compiles this source under `noImplicitReturns`.
+      return undefined;
+    },
+  };
+}
+
+function setEdgesSlice(set: StoreSet, get: () => WorkflowStore): Pick<WorkflowStore, "setEdges"> {
+  return {
+    setEdges: (edges: Edge[]) => {
+      const currentEdges = get().edges;
+      if (edges.length < currentEdges.length) {
         logger.warn(
           {
             before: currentEdges.length,
-            after: newEdges.length,
+            after: edges.length,
             removed: currentEdges
-              .filter((e) => !newEdges.some((ne: Edge) => ne.id === e.id))
+              .filter((e) => !edges.some((ne) => ne.id === e.id))
               .map((e) => ({
                 id: e.id,
                 source: e.source,
                 target: e.target,
+                sourceHandle: e.sourceHandle,
+                targetHandle: e.targetHandle,
               })),
           },
-          "setWorkflow: edges count decreased",
+          "setEdges: edges count decreased",
         );
       }
-    }
-    set(resolved);
-  },
-  setAutosavedWorkflow: (workflow: StudioWorkflow | undefined) => {
-    set({ autosavedWorkflow: workflow });
-  },
-  setLastCommittedWorkflow: (workflow: StudioWorkflow | undefined) => {
-    set({ lastCommittedWorkflow: workflow });
-  },
-  setCurrentVersionId: (id: string | undefined) => {
-    set({ currentVersionId: id });
-  },
-  checkCanCommitNewVersion: () => {
-    const lastCommitted = get().lastCommittedWorkflow;
-    const currentWorkflow = get().getWorkflow();
-    if (!lastCommitted || !currentWorkflow) {
-      return false;
-    }
-    return hasDSLChanged(currentWorkflow, lastCommitted, false);
-  },
-  setSocketStatus: (status: SocketStatus | ((status: SocketStatus) => SocketStatus)) => {
-    set({
-      socketStatus: typeof status === "function" ? status(get().socketStatus) : status,
-    });
-  },
-  onNodesChange: (changes: NodeChange[]) => {
-    const removeChanges = changes.filter((c) => c.type === "remove");
-    if (removeChanges.length > 0) {
-      logger.warn({ removeChanges }, "onNodesChange: REMOVING nodes");
-    }
-    const hasDeselection = changes.some((c) => c.type === "select" && !c.selected);
-    set({
-      nodes: applyNodeChanges(changes, get().nodes),
-      ...(hasDeselection ? { clickedNodeId: null } : {}),
-    });
-  },
-  onNodesDelete: () => {
-    set({
-      nodes: removeInvalidDecorations(get().nodes),
-    });
-  },
-  onEdgesChange: (changes: EdgeChange[]) => {
-    const removeChanges = changes.filter((c) => c.type === "remove");
-    if (removeChanges.length > 0) {
-      logger.warn(
-        {
-          removeChanges,
-          totalChanges: changes.length,
-        },
-        "onEdgesChange: REMOVING edges",
-      );
-    }
-    set({
-      edges: applyEdgeChanges(changes, get().edges),
-    });
-  },
-  onConnect: (connection: Connection) => {
-    const currentEdges = get().edges;
-    const nodes = get().nodes;
-    const fromBranch = isBranchConnectionOrigin({
-      node: nodes.find((n) => n.id === connection.source),
-      handleId: connection.sourceHandle,
-    });
-    // Dropping a branch onto a node's temporary gate: materialize a real
-    // "gate" bool input on the target and wire the branch into it. The branch
-    // carries its boolean value like a normal edge; the engine gates the node
-    // on the branch and plumbs that value into the gate input.
-    if (fromBranch && connection.targetHandle === GATE_HANDLE_ID && connection.target) {
-      const targetNode = nodes.find((n) => n.id === connection.target);
-      if (targetNode && !nodeHasGateInput(targetNode)) {
-        const inputs: Field[] = [
-          ...((targetNode.data as { inputs?: Field[] }).inputs ?? []),
-          { identifier: GATE_FIELD, type: "bool" },
-        ];
-        set({
-          branchConnectionInProgress: false,
-          branchConnectionSourceId: null,
-          nodes: nodes.map((n) =>
-            n.id === targetNode.id
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    inputs,
-                    // A code node's entrypoint signature is derived from its
-                    // inputs, so the new gate field has to be threaded into
-                    // the parameters too or the engine calls __call__ with an
-                    // unexpected `gate` keyword. setNode does the same.
-                    ...(n.type === "code"
-                      ? {
-                          parameters: updateInputFields(
-                            (n.data as { parameters?: Field[] }).parameters ?? [],
-                            inputs,
-                          ),
-                        }
-                      : {}),
-                  },
-                }
-              : n,
-          ),
-          edges: addEdge({ ...connection, type: "default" }, currentEdges),
-        });
-        return;
-      }
-    }
-    const existingConnection = currentEdges.find(
-      (edge) => edge.target === connection.target && edge.targetHandle === connection.targetHandle,
-    );
-    // An input takes one source, except across mutually exclusive If/Else
-    // branches: only one of them ever runs, so they may converge on the
-    // same input. Sources that can run together stay blocked.
-    if (existingConnection && !canConvergeOnInput({ nodes, edges: currentEdges, connection })) {
-      return {
-        error:
-          "These two values can run at the same time, so they can't feed the same input. Only mutually exclusive If/Else branches can converge on one input.",
-      };
-    }
-    set({
-      branchConnectionInProgress: false,
-      branchConnectionSourceId: null,
-      edges: addEdge(connection, currentEdges).map((edge) => ({
-        ...edge,
-        type: edge.type ?? "default",
-      })),
-    });
-    // The connection was made, so there is no error to report. Stated rather
-    // than fallen through: every other exit from this function returns, and
-    // `apps/ui` compiles this source under `noImplicitReturns`.
-    return undefined;
-  },
-  onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => {
-    const node = get().nodes.find((n) => n.id === params.nodeId);
-    const fromBranch = isBranchConnectionOrigin({
-      node,
-      handleId: params.handleId,
-    });
-    set({
-      branchConnectionInProgress: fromBranch,
-      branchConnectionSourceId: fromBranch ? (params.nodeId ?? null) : null,
-    });
-  },
-  onConnectEnd: () => {
-    if (get().branchConnectionInProgress) {
-      set({
-        branchConnectionInProgress: false,
-        branchConnectionSourceId: null,
-      });
-    }
-  },
-  setNodes: (nodes: Node[]) => {
-    set({ nodes });
-  },
-  setEdges: (edges: Edge[]) => {
-    const currentEdges = get().edges;
-    if (edges.length < currentEdges.length) {
-      logger.warn(
-        {
-          before: currentEdges.length,
-          after: edges.length,
-          removed: currentEdges
-            .filter((e) => !edges.some((ne) => ne.id === e.id))
-            .map((e) => ({
-              id: e.id,
-              source: e.source,
-              target: e.target,
-              sourceHandle: e.sourceHandle,
-              targetHandle: e.targetHandle,
-            })),
-        },
-        "setEdges: edges count decreased",
-      );
-    }
-    set({ edges });
-  },
-  edgeConnectToNewHandle: (source: string, sourceHandle: string, target: string) => {
-    const nodes = get().nodes;
-    const edges = get().edges;
-    const inputs = edges
-      .filter((edge) => edge.target === target)
-      ?.map((edge) => edge.targetHandle?.split(".")[1]);
-
-    let inc = 2;
-    let newHandle = nameToId(sourceHandle);
-    while (inputs?.includes(newHandle)) {
-      newHandle = `${nameToId(sourceHandle)}${inc}`;
-      inc++;
-    }
-
-    const sourceField = nodes
-      .find((node) => node.id === source)
-      ?.data.outputs?.find((output) => output.identifier === sourceHandle);
-    let type = sourceField?.type;
-    if (type === "json_schema") {
-      type = "dict";
-    }
-    if (!type || !(type in LlmConfigInputTypes)) {
-      type = "str";
-    }
-
-    const existingInputs = nodes
-      .find((node) => node.id === target)
-      ?.data.inputs?.map((input) => input.identifier);
-    set({
-      nodes: nodes.map((node) => {
-        if (node.id !== target) return node;
-        const newInputs = existingInputs?.includes(newHandle)
-          ? (node.data.inputs ?? [])
-          : [...(node.data.inputs ?? []), { identifier: newHandle, type }];
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            inputs: newInputs,
-            // Keep a code node's entrypoint signature in sync with the
-            // freshly wired input, mirroring setNode - otherwise the engine
-            // passes a keyword the __call__ signature does not accept.
-            ...(node.type === "code"
-              ? {
-                  parameters: updateInputFields(
-                    (node.data as { parameters?: Field[] }).parameters ?? [],
-                    newInputs as Field[],
-                  ),
-                }
-              : {}),
-          } as Component,
-        };
-      }),
-      edges: [
-        ...edges,
-        {
-          id: generateWorkflowEdgeId(),
-          source,
-          target,
-          sourceHandle: `outputs.${sourceHandle}`,
-          targetHandle: `inputs.${newHandle}`,
-          type: "default",
-        },
-      ],
-    });
-
-    return newHandle;
-  },
-  setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
-    const oldId = node.id;
-    const dataEntries = Object.entries(node.data ?? {});
-    logger.debug(
-      { nodeId: oldId, newId, dataKeys: dataEntries.map(([k]) => k) },
-      "setNode: updating node",
-    );
-    const updatedNodes = get().nodes.map((n) => {
-      if (n.id !== oldId) return n;
-
-      // Only filter out undefined when the existing field is an Array, to
-      // prevent accidental overwrites of arrays (e.g., inputs/outputs).
-      // Non-array fields allow undefined through so callers can intentionally
-      // clear fields like localConfig and localPromptConfig.
-      const existingData = n.data as Record<string, unknown>;
-      const arrayPreservedKeys = dataEntries
-        .filter(([k, v]) => v === undefined && Array.isArray(existingData[k]))
-        .map(([k]) => k);
-      if (arrayPreservedKeys.length > 0) {
-        logger.warn(
-          { nodeId: oldId, arrayPreservedKeys },
-          "setNode: undefined values filtered to preserve existing arrays",
-        );
-      }
-      const filteredDataEntries = dataEntries.filter(
-        ([k, v]) => v !== undefined || !Array.isArray(existingData[k]),
-      );
-
-      return {
-        ...n,
-        ...node,
-        data: {
-          ...n.data,
-          ...Object.fromEntries(filteredDataEntries),
-          ...(newId && n.type === "code"
-            ? {
-                parameters: updateCodeClassName(
-                  (node.data?.parameters as Field[]) ?? n.data?.parameters ?? [],
-                  n.id,
-                  newId,
-                ),
-              }
-            : {}),
-          ...((node.data?.inputs || node.data?.outputs) && n.type === "code"
-            ? {
-                parameters: updateOutputFields(
-                  updateInputFields(
-                    (node.data?.parameters as Field[]) ?? n.data?.parameters ?? [],
-                    (node.data?.inputs ?? []) as Field[],
-                  ),
-                  n.data.outputs ?? [],
-                  (node.data?.outputs ?? []) as Field[],
-                ),
-              }
-            : {}),
-        },
-        id: newId ? newId : n.id,
-      };
-    });
-
-    // When renaming, update edges and parameter refs that reference the old ID
-    const updatedEdges = newId
-      ? get().edges.map((edge) => ({
-          ...edge,
-          source: edge.source === oldId ? newId : edge.source,
-          target: edge.target === oldId ? newId : edge.target,
-        }))
-      : get().edges;
-
-    const nodesWithUpdatedRefs = newId
-      ? updatedNodes.map((n) => {
-          if (n.id === newId || !n.data.parameters) return n;
-          return {
-            ...n,
-            data: {
-              ...n.data,
-              parameters: (n.data.parameters as Field[]).map((p) =>
-                (p.value as { ref: string })?.ref === oldId ? { ...p, value: { ref: newId } } : p,
-              ),
-            },
-          };
-        })
-      : updatedNodes;
-
-    set(
-      removeInvalidEdges({
-        nodes: nodesWithUpdatedRefs,
-        edges: updatedEdges,
-      }),
-    );
-  },
-  setNodeParameter: (
-    nodeId: string,
-    parameter: Partial<Omit<Field, "value">> & {
-      identifier: string;
-      type: Field["type"];
-      value?: unknown;
+      set({ edges });
     },
-  ) => {
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id !== nodeId) {
-          return node;
-        }
+  };
+}
 
-        const existingParameter = node.data.parameters?.find(
-          (p) => p.identifier === parameter.identifier,
-        );
+function newHandleSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "edgeConnectToNewHandle"> {
+  return {
+    edgeConnectToNewHandle: (source: string, sourceHandle: string, target: string) => {
+      const nodes = get().nodes;
+      const edges = get().edges;
+      const inputs = edges
+        .filter((edge) => edge.target === target)
+        ?.map((edge) => edge.targetHandle?.split(".")[1]);
 
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            parameters: existingParameter
-              ? (node.data.parameters ?? []).map((p) =>
-                  p.identifier === parameter.identifier ? { ...p, ...parameter } : p,
-                )
-              : [...(node.data.parameters ?? []), parameter],
-          },
-        };
-      }) as Node<Component>[],
-    });
-  },
-  deleteNode: (id: string) => {
-    logger.info({ nodeId: id }, "deleteNode: deleting node");
-    set(
-      removeInvalidEdges({
-        nodes: removeInvalidDecorations(get().nodes.filter((node) => node.id !== id)),
-        edges: get().edges,
-      }),
-    );
-  },
-  duplicateNode: (id: string) => {
-    const currentNode = get().nodes.find((node) => node.id === id);
-    if (!currentNode) {
-      return;
-    }
+      const newHandle = nextFreeHandle(inputs ?? [], sourceHandle);
 
-    const { name: newName, id: newId } = findLowestAvailableName(
-      get().nodes.map((node) => node.id),
-      currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component",
-    );
+      const sourceField = nodes
+        .find((node) => node.id === source)
+        ?.data.outputs?.find((output) => output.identifier === sourceHandle);
+      const type = inputTypeFor(sourceField?.type);
 
-    const newNode = {
-      ...currentNode,
-      id: newId,
-      selected: false,
-      dragging: false,
-      measured: undefined,
-      position: {
-        x: currentNode.position.x + 250 + Math.round(Math.random() * 20),
-        y: currentNode.position.y + Math.round(Math.random() * 20),
-      },
-      data: {
-        ...currentNode.data,
-        name: newName,
-        execution_state: undefined,
-        ...(currentNode.type === "code" && currentNode.data.parameters
-          ? {
-              parameters: updateCodeClassName(
-                currentNode.data.parameters as Field[],
-                currentNode.id,
-                newId,
-              ),
-            }
-          : {}),
-      },
-    };
-    set({
-      nodes: [...get().nodes, newNode],
-    });
-  },
-  setComponentExecutionState: (id: string, executionState: BaseComponent["execution_state"]) => {
-    logger.debug(
-      { componentId: id, status: executionState?.status },
-      "setComponentExecutionState: execution state changed",
-    );
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id === id) {
-          const current_execution_state = node.data.execution_state;
-          const timestamps = current_execution_state?.timestamps;
+      const existingInputs = nodes
+        .find((node) => node.id === target)
+        ?.data.inputs?.map((input) => input.identifier);
+      set({
+        nodes: nodes.map((node) => {
+          if (node.id !== target) return node;
+          const newInputs = existingInputs?.includes(newHandle)
+            ? (node.data.inputs ?? [])
+            : [...(node.data.inputs ?? []), { identifier: newHandle, type }];
           return {
             ...node,
             data: {
               ...node.data,
-              execution_state: {
-                ...current_execution_state,
-                ...executionState,
-                ...(executionState?.error ? { error: executionState.error.slice(0, 2048) } : {}),
-                timestamps: {
-                  ...timestamps,
-                  ...executionState?.timestamps,
-                },
-              },
-            },
-          } as Node<Component>;
-        }
-        return node;
-      }),
-    });
-  },
-  setWorkflowExecutionState: (
-    executionState: Partial<NonNullable<StudioWorkflow["state"]["execution"]>>,
-  ) => {
-    const currentExecution = get().state.execution;
-    const execution = {
-      status: executionState.status ?? currentExecution?.status ?? "idle",
-      ...currentExecution,
-      ...executionState,
-      ...(executionState.error ? { error: executionState.error.slice(0, 140) } : {}),
-    };
-    set({
-      state: {
-        ...get().state,
-        execution,
-      },
-    });
-  },
-  setEvaluationState: (evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>) => {
-    set({
-      state: {
-        ...get().state,
-        evaluation: {
-          ...get().state.evaluation,
-          ...evaluationState,
-          ...(evaluationState?.error ? { error: evaluationState.error.slice(0, 140) } : {}),
-        },
-      },
-    });
-  },
-  setOptimizationState: (optimizationState: Partial<StudioWorkflow["state"]["optimization"]>) => {
-    set({
-      state: {
-        ...get().state,
-        optimization: {
-          ...get().state.optimization,
-          ...optimizationState,
-          ...(optimizationState?.error ? { error: optimizationState.error.slice(0, 140) } : {}),
-          ...(optimizationState?.stdout
-            ? {
-                stdout: (() => {
-                  const stdout = get().state.optimization?.stdout?.trimStart() ?? "";
-                  const hasCarriageReturn =
-                    optimizationState.stdout?.startsWith("\r") || stdout.endsWith("\r\n");
-
-                  if (hasCarriageReturn) {
-                    return (
-                      stdout.split("\n").slice(0, -2).join("\n").replaceAll("\r", "") +
-                      "\n" +
-                      optimizationState.stdout +
-                      "\n"
-                    );
+              inputs: newInputs,
+              // Keep a code node's entrypoint signature in sync with the
+              // freshly wired input, mirroring setNode - otherwise the engine
+              // passes a keyword the __call__ signature does not accept.
+              ...(node.type === "code"
+                ? {
+                    parameters: updateInputFields(
+                      (node.data as { parameters?: Field[] }).parameters ?? [],
+                      newInputs as Field[],
+                    ),
                   }
+                : {}),
+            } as Component,
+          };
+        }),
+        edges: [
+          ...edges,
+          {
+            id: generateWorkflowEdgeId(),
+            source,
+            target,
+            sourceHandle: `outputs.${sourceHandle}`,
+            targetHandle: `inputs.${newHandle}`,
+            type: "default",
+          },
+        ],
+      });
 
-                  return stdout + optimizationState.stdout + "\n";
-                })(),
+      return newHandle;
+    },
+  };
+}
+
+function setNodeSlice(set: StoreSet, get: () => WorkflowStore): Pick<WorkflowStore, "setNode"> {
+  return {
+    setNode: (node: Partial<Node> & { id: string }, newId?: string) => {
+      const oldId = node.id;
+      const dataEntries = Object.entries(node.data ?? {});
+      logger.debug(
+        { nodeId: oldId, newId, dataKeys: dataEntries.map(([k]) => k) },
+        "setNode: updating node",
+      );
+      const updatedNodes = get().nodes.map((n) =>
+        n.id === oldId ? mergeNodeUpdate({ current: n, update: node, dataEntries, newId }) : n,
+      );
+      const updatedEdges = newId ? renamedEdges(get().edges, oldId, newId) : get().edges;
+      const nodesWithUpdatedRefs = newId
+        ? withRenamedRefs(updatedNodes, oldId, newId)
+        : updatedNodes;
+
+      set(
+        removeInvalidEdges({
+          nodes: nodesWithUpdatedRefs,
+          edges: updatedEdges,
+        }),
+      );
+    },
+  };
+}
+
+function nodeParameterSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "setNodeParameter" | "deleteNode"> {
+  return {
+    setNodeParameter: (
+      nodeId: string,
+      parameter: Partial<Omit<Field, "value">> & {
+        identifier: string;
+        type: Field["type"];
+        value?: unknown;
+      },
+    ) => {
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id !== nodeId) {
+            return node;
+          }
+
+          const existingParameter = node.data.parameters?.find(
+            (p) => p.identifier === parameter.identifier,
+          );
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              parameters: existingParameter
+                ? (node.data.parameters ?? []).map((p) =>
+                    p.identifier === parameter.identifier ? { ...p, ...parameter } : p,
+                  )
+                : [...(node.data.parameters ?? []), parameter],
+            },
+          };
+        }) as Node<Component>[],
+      });
+    },
+    deleteNode: (id: string) => {
+      logger.info({ nodeId: id }, "deleteNode: deleting node");
+      set(
+        removeInvalidEdges({
+          nodes: removeInvalidDecorations(get().nodes.filter((node) => node.id !== id)),
+          edges: get().edges,
+        }),
+      );
+    },
+  };
+}
+
+function duplicateNodeSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "duplicateNode"> {
+  return {
+    duplicateNode: (id: string) => {
+      const currentNode = get().nodes.find((node) => node.id === id);
+      if (!currentNode) {
+        return;
+      }
+
+      const { name: newName, id: newId } = findLowestAvailableName(
+        get().nodes.map((node) => node.id),
+        currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component",
+      );
+
+      const newNode = {
+        ...currentNode,
+        id: newId,
+        selected: false,
+        dragging: false,
+        measured: undefined,
+        position: {
+          x: currentNode.position.x + 250 + Math.round(Math.random() * 20),
+          y: currentNode.position.y + Math.round(Math.random() * 20),
+        },
+        data: {
+          ...currentNode.data,
+          name: newName,
+          execution_state: undefined,
+          ...(currentNode.type === "code" && currentNode.data.parameters
+            ? {
+                parameters: updateCodeClassName(
+                  currentNode.data.parameters as Field[],
+                  currentNode.id,
+                  newId,
+                ),
               }
             : {}),
         },
-      },
-    });
-  },
-  setHoveredNodeId: (nodeId: string | undefined) => {
-    set({ hoveredNodeId: nodeId });
-  },
-  attachEntryDataset: (nodeId: string, dataset: Entry["dataset"], columns: Field[]) => {
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id !== nodeId) return node;
-        const existing = node.data.outputs ?? [];
-        const existingIds = new Set(existing.map((f) => f.identifier));
-        const merged = [...existing, ...columns.filter((c) => !existingIds.has(c.identifier))];
-        return {
-          ...node,
-          data: { ...node.data, outputs: merged, dataset } as Component,
-        };
-      }),
-    });
-  },
-  setSelectedNode: (nodeId: string) => {
-    set({
-      nodes: get().nodes.map((node) => {
-        if (node.id === nodeId) {
-          return { ...node, selected: true };
+      };
+      set({
+        nodes: [...get().nodes, newNode],
+      });
+    },
+  };
+}
+
+function executionSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<
+  WorkflowStore,
+  "setComponentExecutionState" | "setWorkflowExecutionState" | "setEvaluationState"
+> {
+  return {
+    setComponentExecutionState: (id: string, executionState: BaseComponent["execution_state"]) => {
+      logger.debug(
+        { componentId: id, status: executionState?.status },
+        "setComponentExecutionState: execution state changed",
+      );
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id === id) {
+            const current_execution_state = node.data.execution_state;
+            const timestamps = current_execution_state?.timestamps;
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                execution_state: {
+                  ...current_execution_state,
+                  ...executionState,
+                  ...(executionState?.error ? { error: executionState.error.slice(0, 2048) } : {}),
+                  timestamps: {
+                    ...timestamps,
+                    ...executionState?.timestamps,
+                  },
+                },
+              },
+            } as Node<Component>;
+          }
+          return node;
+        }),
+      });
+    },
+    setWorkflowExecutionState: (
+      executionState: Partial<NonNullable<StudioWorkflow["state"]["execution"]>>,
+    ) => {
+      const currentExecution = get().state.execution;
+      const execution = {
+        status: executionState.status ?? currentExecution?.status ?? "idle",
+        ...currentExecution,
+        ...executionState,
+        ...(executionState.error ? { error: executionState.error.slice(0, 140) } : {}),
+      };
+      set({
+        state: {
+          ...get().state,
+          execution,
+        },
+      });
+    },
+    setEvaluationState: (evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>) => {
+      set({
+        state: {
+          ...get().state,
+          evaluation: {
+            ...get().state.evaluation,
+            ...evaluationState,
+            ...(evaluationState?.error ? { error: evaluationState.error.slice(0, 140) } : {}),
+          },
+        },
+      });
+    },
+  };
+}
+
+function optimizationSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "setOptimizationState" | "setHoveredNodeId" | "attachEntryDataset"> {
+  return {
+    setOptimizationState: (optimizationState: Partial<StudioWorkflow["state"]["optimization"]>) => {
+      set({
+        state: {
+          ...get().state,
+          optimization: {
+            ...get().state.optimization,
+            ...optimizationState,
+            ...(optimizationState?.error ? { error: optimizationState.error.slice(0, 140) } : {}),
+            ...(optimizationState?.stdout
+              ? {
+                  stdout: (() => {
+                    const stdout = get().state.optimization?.stdout?.trimStart() ?? "";
+                    const hasCarriageReturn =
+                      optimizationState.stdout?.startsWith("\r") || stdout.endsWith("\r\n");
+
+                    if (hasCarriageReturn) {
+                      return (
+                        stdout.split("\n").slice(0, -2).join("\n").replaceAll("\r", "") +
+                        "\n" +
+                        optimizationState.stdout +
+                        "\n"
+                      );
+                    }
+
+                    return stdout + optimizationState.stdout + "\n";
+                  })(),
+                }
+              : {}),
+          },
+        },
+      });
+    },
+    setHoveredNodeId: (nodeId: string | undefined) => {
+      set({ hoveredNodeId: nodeId });
+    },
+    attachEntryDataset: (nodeId: string, dataset: Entry["dataset"], columns: Field[]) => {
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id !== nodeId) return node;
+          const existing = node.data.outputs ?? [];
+          const existingIds = new Set(existing.map((f) => f.identifier));
+          const merged = [...existing, ...columns.filter((c) => !existingIds.has(c.identifier))];
+          return {
+            ...node,
+            data: { ...node.data, outputs: merged, dataset } as Component,
+          };
+        }),
+      });
+    },
+  };
+}
+
+function selectionSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<
+  WorkflowStore,
+  | "setSelectedNode"
+  | "deselectAllNodes"
+  | "setPropertiesExpanded"
+  | "setTriggerValidation"
+  | "setOpenResultsPanelRequest"
+  | "setIsDraggingNode"
+  | "setClickedNodeId"
+> {
+  return {
+    setSelectedNode: (nodeId: string) => {
+      set({
+        nodes: get().nodes.map((node) => {
+          if (node.id === nodeId) {
+            return { ...node, selected: true };
+          }
+          if (node.selected) {
+            return { ...node, selected: false };
+          }
+          return node;
+        }),
+        clickedNodeId: nodeId,
+      });
+    },
+    deselectAllNodes: () => {
+      set({
+        nodes: get().nodes.map((node) => ({ ...node, selected: false })),
+        clickedNodeId: null,
+      });
+    },
+    setPropertiesExpanded: (expanded: boolean) => {
+      set({ propertiesExpanded: expanded });
+    },
+    setTriggerValidation: (triggerValidation: boolean) => {
+      set({ triggerValidation });
+    },
+    setOpenResultsPanelRequest: (request) => {
+      set({ openResultsPanelRequest: request });
+    },
+    setIsDraggingNode: (dragging: boolean) => {
+      set({
+        isDraggingNode: dragging,
+        ...(dragging ? { clickedNodeId: null } : {}),
+      });
+    },
+    setClickedNodeId: (id: string | null) => {
+      set({ clickedNodeId: id });
+    },
+    /**
+     * Fails the run and every node still running, with the SAME failure.
+     */
+  };
+}
+
+function runControlSlice(
+  set: StoreSet,
+  get: () => WorkflowStore,
+): Pick<WorkflowStore, "stopWorkflowIfRunning" | "checkIfUnreachableErrorMessage"> {
+  return {
+    stopWorkflowIfRunning: (failure: CodedExecutionFailure | undefined) => {
+      const cause = {
+        error: failure?.error,
+        error_type: failure?.error_type,
+        upstream_status: failure?.upstream_status,
+      };
+      get().setWorkflowExecutionState({
+        status: "error",
+        ...cause,
+        timestamps: { finished_at: nowInstant().epochMilliseconds },
+      });
+      for (const node of get().nodes) {
+        if (node.data.execution_state?.status === "running") {
+          get().setComponentExecutionState(node.id, {
+            status: "error",
+            ...cause,
+            timestamps: { finished_at: nowInstant().epochMilliseconds },
+          });
         }
-        if (node.selected) {
-          return { ...node, selected: false };
-        }
-        return node;
-      }),
-      clickedNodeId: nodeId,
-    });
-  },
-  deselectAllNodes: () => {
-    set({
-      nodes: get().nodes.map((node) => ({ ...node, selected: false })),
-      clickedNodeId: null,
-    });
-  },
-  setPropertiesExpanded: (expanded: boolean) => {
-    set({ propertiesExpanded: expanded });
-  },
-  setTriggerValidation: (triggerValidation: boolean) => {
-    set({ triggerValidation });
-  },
-  setOpenResultsPanelRequest: (request) => {
-    set({ openResultsPanelRequest: request });
-  },
-  setIsDraggingNode: (dragging: boolean) => {
-    set({
-      isDraggingNode: dragging,
-      ...(dragging ? { clickedNodeId: null } : {}),
-    });
-  },
-  setClickedNodeId: (id: string | null) => {
-    set({ clickedNodeId: id });
-  },
-  /**
-   * Fails the run and every node still running, with the SAME failure.
-   */
-  stopWorkflowIfRunning: (failure: CodedExecutionFailure | undefined) => {
-    const cause = {
-      error: failure?.error,
-      error_type: failure?.error_type,
-      upstream_status: failure?.upstream_status,
-    };
-    get().setWorkflowExecutionState({
-      status: "error",
-      ...cause,
-      timestamps: { finished_at: nowInstant().epochMilliseconds },
-    });
-    for (const node of get().nodes) {
-      if (node.data.execution_state?.status === "running") {
-        get().setComponentExecutionState(node.id, {
-          status: "error",
-          ...cause,
-          timestamps: { finished_at: nowInstant().epochMilliseconds },
-        });
       }
-    }
-  },
-  checkIfUnreachableErrorMessage: (message: string | undefined) => {
-    const socketStatus = get().socketStatus;
-    if (socketStatus === "connected" && message?.toLowerCase().includes("runtime is unreachable")) {
-      get().setSocketStatus("connecting-python");
-    }
-  },
-});
+    },
+    checkIfUnreachableErrorMessage: (message: string | undefined) => {
+      const socketStatus = get().socketStatus;
+      if (
+        socketStatus === "connected" &&
+        message?.toLowerCase().includes("runtime is unreachable")
+      ) {
+        get().setSocketStatus("connecting-python");
+      }
+    },
+  };
+}
+
+function warnOnEdgeLoss({
+  label,
+  current,
+  next,
+}: {
+  label: string;
+  current: Edge[];
+  next: Edge[];
+}) {
+  if (!next || next.length >= current.length) return;
+  logger.warn(
+    {
+      before: current.length,
+      after: next.length,
+      removed: current
+        .filter((e) => !next.some((ne) => ne.id === e.id))
+        .map((e) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          sourceHandle: e.sourceHandle,
+          targetHandle: e.targetHandle,
+        })),
+    },
+    `${label}: edges count decreased`,
+  );
+}
+
+/**
+ * A branch dropped on a node's temporary gate materializes a real "gate" bool input and wires
+ * into it; the engine gates the node on the branch and plumbs its value into that input.
+ */
+function gateConnectionPatch({
+  nodes,
+  currentEdges,
+  connection,
+}: {
+  nodes: WorkflowStore["nodes"];
+  currentEdges: Edge[];
+  connection: Connection;
+}): Partial<WorkflowStore> | undefined {
+  if (connection.targetHandle !== GATE_HANDLE_ID || !connection.target) return undefined;
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  if (!targetNode || nodeHasGateInput(targetNode)) return undefined;
+  const inputs: Field[] = [
+    ...((targetNode.data as { inputs?: Field[] }).inputs ?? []),
+    { identifier: GATE_FIELD, type: "bool" },
+  ];
+  return {
+    branchConnectionInProgress: false,
+    branchConnectionSourceId: null,
+    nodes: nodes.map((n) =>
+      n.id === targetNode.id
+        ? {
+            ...n,
+            data: {
+              ...n.data,
+              inputs,
+              // A code node's entrypoint signature is derived from its
+              // inputs, so the new gate field has to be threaded into
+              // the parameters too or the engine calls __call__ with an
+              // unexpected `gate` keyword. setNode does the same.
+              ...(n.type === "code"
+                ? {
+                    parameters: updateInputFields(
+                      (n.data as { parameters?: Field[] }).parameters ?? [],
+                      inputs,
+                    ),
+                  }
+                : {}),
+            },
+          }
+        : n,
+    ),
+    edges: addEdge({ ...connection, type: "default" }, currentEdges),
+  };
+}
+
+function nextFreeHandle(inputs: (string | undefined)[], sourceHandle: string): string {
+  let inc = 2;
+  let newHandle = nameToId(sourceHandle);
+  while (inputs.includes(newHandle)) {
+    newHandle = `${nameToId(sourceHandle)}${inc}`;
+    inc++;
+  }
+  return newHandle;
+}
+
+/** JSON-schema outputs arrive as dicts; anything not an LLM input type falls back to str. */
+function inputTypeFor(sourceType: Field["type"] | undefined): Field["type"] {
+  const type = sourceType === "json_schema" ? "dict" : sourceType;
+  if (!type || !(type in LlmConfigInputTypes)) return "str";
+  return type;
+}
+
+/**
+ * Undefined never overwrites an existing array (inputs/outputs), but may clear other fields such
+ * as localConfig. Code nodes keep their class name and signature in step with renames and I/O.
+ */
+function mergeNodeUpdate({
+  current: n,
+  update: node,
+  dataEntries,
+  newId,
+}: {
+  current: WorkflowStore["nodes"][number];
+  update: Partial<Node> & { id: string };
+  dataEntries: [string, unknown][];
+  newId: string | undefined;
+}): WorkflowStore["nodes"][number] {
+  const existingData = n.data as Record<string, unknown>;
+  const arrayPreservedKeys = dataEntries
+    .filter(([k, v]) => v === undefined && Array.isArray(existingData[k]))
+    .map(([k]) => k);
+  if (arrayPreservedKeys.length > 0) {
+    logger.warn(
+      { nodeId: node.id, arrayPreservedKeys },
+      "setNode: undefined values filtered to preserve existing arrays",
+    );
+  }
+  const filteredDataEntries = dataEntries.filter(
+    ([k, v]) => v !== undefined || !Array.isArray(existingData[k]),
+  );
+  return {
+    ...n,
+    ...node,
+    data: {
+      ...n.data,
+      ...Object.fromEntries(filteredDataEntries),
+      ...codeParameterPatch({ current: n, update: node, newId }),
+    },
+    id: newId ? newId : n.id,
+  };
+}
+
+function codeParameterPatch({
+  current: n,
+  update: node,
+  newId,
+}: {
+  current: WorkflowStore["nodes"][number];
+  update: Partial<Node> & { id: string };
+  newId: string | undefined;
+}) {
+  if (n.type !== "code") return {};
+  const baseParameters = (node.data?.parameters as Field[]) ?? n.data?.parameters ?? [];
+  const renamed = newId ? { parameters: updateCodeClassName(baseParameters, n.id, newId) } : {};
+  if (!node.data?.inputs && !node.data?.outputs) return renamed;
+  return {
+    parameters: updateOutputFields(
+      updateInputFields(baseParameters, (node.data?.inputs ?? []) as Field[]),
+      n.data.outputs ?? [],
+      (node.data?.outputs ?? []) as Field[],
+    ),
+  };
+}
+
+function renamedEdges(edges: Edge[], oldId: string, newId: string): Edge[] {
+  return edges.map((edge) => ({
+    ...edge,
+    source: edge.source === oldId ? newId : edge.source,
+    target: edge.target === oldId ? newId : edge.target,
+  }));
+}
+
+/** Parameters that reference the renamed node by id follow it. */
+function withRenamedRefs(
+  nodes: WorkflowStore["nodes"],
+  oldId: string,
+  newId: string,
+): WorkflowStore["nodes"] {
+  return nodes.map((n) => {
+    if (n.id === newId || !n.data.parameters) return n;
+    return {
+      ...n,
+      data: {
+        ...n.data,
+        parameters: (n.data.parameters as Field[]).map((p) =>
+          (p.value as { ref: string })?.ref === oldId ? { ...p, value: { ref: newId } } : p,
+        ),
+      },
+    };
+  });
+}

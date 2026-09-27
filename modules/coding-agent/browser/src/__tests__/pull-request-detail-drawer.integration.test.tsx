@@ -460,7 +460,7 @@ describe("the pull request detail drawer", () => {
           projectId="proj-personal"
           repositoryHost="github.com"
           repositoryFullName="acme/widgets"
-          prNumber={"4218" as unknown as number}
+          prNumber="4218"
           onClose={mockOnClose}
         />,
         { wrapper: codingAgentHostWrapper(fakeCodingAgentActivityHost()) },

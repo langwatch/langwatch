@@ -21,7 +21,7 @@ describe.skipIf(!hasGo())("the engine's staged-payload guard", () => {
   let nlpgo: NlpgoSubprocess;
 
   beforeAll(async () => {
-    nlpgo = await startNlpgoSubprocess({ port: NLPGO_PORT });
+    nlpgo = await startNlpgoSubprocess({ port: NLPGO_PORT, environment: process.env });
   }, 700_000);
 
   afterAll(async () => {

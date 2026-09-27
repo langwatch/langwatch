@@ -26,6 +26,7 @@ export {
   LOCAL_GATEWAY_URL,
   SAAS_GATEWAY_URL,
   signInProviders,
+  telemetryExporterEndpoint,
 } from "./deployment-facts.ts";
 export {
   environmentBooleanSchema,

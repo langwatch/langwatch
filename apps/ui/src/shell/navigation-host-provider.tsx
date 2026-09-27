@@ -5,7 +5,6 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { signOutUi } from "@langwatch/auth-browser/session";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
@@ -25,16 +24,6 @@ import {
   getCommandBarShortcut,
   openCommandBar,
 } from "@langwatch/navigation-browser/surfaces/command-bar";
-import {
-  UI_ORGANIZATIONS_PROCEDURE,
-  useUiOrganizationFacts,
-} from "@langwatch/organization-browser/surfaces/organization-facts";
-import {
-  organizationRoleOf,
-  rememberUiScopeSelection,
-  useUiRouteReading,
-  useUiScopeMemory,
-} from "@langwatch/organization-browser/surfaces/scope-capability";
 import { PresenceMenuItem } from "@langwatch/trace-browser/surfaces/presence-menu-item";
 import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
@@ -50,6 +39,7 @@ import {
   toNavigationOrganizations,
   type NavigationGraphRead,
 } from "./navigation-host-graph";
+import type { UiRootCapabilities } from "./ui-root-capabilities";
 import { useUiShellFailure } from "./ui-shell-failure";
 
 /** The gradient the palette's own Langy mark paints with. */
@@ -58,8 +48,14 @@ const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 const ORGANIZATIONS_INPUT = { isDemo: false };
 
 /** The port's scope write, in the shell's own storage vocabulary. */
-function rememberScope(write: NavigationScopeWrite): void {
-  rememberUiScopeSelection({
+function rememberScope({
+  write,
+  remember,
+}: {
+  write: NavigationScopeWrite;
+  remember: UiRootCapabilities["scope"]["rememberUiScopeSelection"];
+}): void {
+  remember({
     writes: [
       ...(write.organizationId !== void 0
         ? [{ key: "organizationId" as const, value: write.organizationId }]
@@ -79,15 +75,18 @@ function rememberScope(write: NavigationScopeWrite): void {
 export function UiNavigationHost({
   children,
   commandBar = false,
+  capabilities,
 }: {
   children: ReactNode;
+  /** Auth's session and organization's scope, loaded before the shell rendered. */
+  capabilities: UiRootCapabilities;
   /**
    * Whether this mount carries the search palette — a singleton (one
    * document, one Cmd+K), so only the chrome layout route asks for it.
    */
   commandBar?: boolean;
 }) {
-  const { host, failure } = useNavigationHostReading(commandBar);
+  const { host, failure } = useNavigationHostReading({ commandBar, capabilities });
 
   if (failure.departing) return <LoadingScreen />;
   if (failure.copy) {
@@ -106,28 +105,39 @@ export function UiNavigationHost({
   );
 }
 
-function useNavigationHostReading(commandBar: boolean) {
+function useNavigationHostReading({
+  commandBar,
+  capabilities: { session: auth, scope: scopeCapability, organizationFacts },
+}: {
+  commandBar: boolean;
+  capabilities: UiRootCapabilities;
+}) {
   const { session, navigation, documentTitle, route } = useUiCapabilities();
   const activeScope = useUiScope().activeScope();
-  const memory = useUiScopeMemory();
-  const facts = useUiOrganizationFacts();
-  const routeReading = useUiRouteReading();
+  const memory = scopeCapability.useUiScopeMemory();
+  const facts = organizationFacts.useUiOrganizationFacts();
+  const routeReading = scopeCapability.useUiRouteReading();
   const address = useUiAddress();
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
   const organizations = useQuery({
-    queryKey: trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, {
+    queryKey: trpcQueryKey(organizationFacts.UI_ORGANIZATIONS_PROCEDURE, {
       input: ORGANIZATIONS_INPUT,
       type: "query",
     }),
     queryFn: () =>
-      rpc.query(UI_ORGANIZATIONS_PROCEDURE, ORGANIZATIONS_INPUT) as Promise<NavigationGraphRead>,
+      rpc.query(
+        organizationFacts.UI_ORGANIZATIONS_PROCEDURE,
+        ORGANIZATIONS_INPUT,
+      ) as Promise<NavigationGraphRead>,
   });
 
   const failure = useUiShellFailure({
     error: organizations.error,
     fallbackTitle: "We couldn't open your workspace",
+    isPublicRoute: routeReading.isPublicRoute,
+    signInPath: auth.UI_SIGN_IN_PATH,
   });
 
   const read: NavigationGraphRead = useMemo(() => organizations.data ?? [], [organizations.data]);
@@ -137,8 +147,9 @@ function useNavigationHostReading(commandBar: boolean) {
     [graph, activeScope.organizationId],
   );
   const organizationRole = useMemo(
-    () => organizationRoleOf(read.find((one) => one.id === activeScope.organizationId)),
-    [read, activeScope.organizationId],
+    () =>
+      scopeCapability.organizationRoleOf(read.find((one) => one.id === activeScope.organizationId)),
+    [read, activeScope.organizationId, scopeCapability],
   );
   const team = useMemo(
     () => teamHoldingProject(graph, activeScope.projectId),
@@ -275,8 +286,9 @@ function useNavigationHostReading(commandBar: boolean) {
           navigate: (to) => navigation.navigate(to),
           replace: (to) => navigation.replace(to),
           back: () => navigation.back(),
-          rememberScope,
-          signOut: () => void signOutUi(),
+          rememberScope: (write: NavigationScopeWrite) =>
+            rememberScope({ write, remember: scopeCapability.rememberUiScopeSelection }),
+          signOut: () => void auth.signOutUi(),
           setDocumentTitle,
           openDrawer: openDrawerByName,
         },
@@ -302,6 +314,8 @@ function useNavigationHostReading(commandBar: boolean) {
       langy,
       accountMenu,
       navigation,
+      auth,
+      scopeCapability,
       setDocumentTitle,
       openDrawerByName,
     ],

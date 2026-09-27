@@ -26,11 +26,7 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
 }));
 
 import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
-import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "@langwatch/auth-browser/session";
-import {
-  useBrowserUiSession,
-  useUiSessionReading,
-} from "@langwatch/auth-browser/session-capability";
+import type { UiAuthClient } from "@langwatch/auth-browser/session";
 import {
   UiFeedback,
   type UiFailureNotice,
@@ -39,15 +35,13 @@ import {
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "@langwatch/browser-host/navigation";
 import type * as navigationModule from "@langwatch/browser-host/navigation";
 import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
-import { UI_ORGANIZATIONS_PROCEDURE } from "@langwatch/organization-browser/surfaces/organization-facts";
-import {
-  createBrowserUiScope,
-  isUiPublicRoute,
-  useUiScopeReading,
-} from "@langwatch/organization-browser/surfaces/scope-capability";
 import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "@langwatch/ui-kernel/api-waiting-screen";
 import { createUiFeatureShell } from "@langwatch/ui-kernel/feature-shell";
+
+import { loadUiRootCapabilities } from "../shell/ui-root-capabilities";
+
+const root = await loadUiRootCapabilities();
 
 /** The graph `organization.getAll` returns, only as far as this gate reads it. */
 const JANE = "user-jane";
@@ -136,7 +130,10 @@ const answeringLink: TRPCLink<RouterFromMap<ModuleApiMap>> =
       observer.next({
         result: {
           type: "data",
-          data: op.path === UI_ORGANIZATIONS_PROCEDURE ? ACME : { permissions: [], enabled: false },
+          data:
+            op.path === root.organizationFacts.UI_ORGANIZATIONS_PROCEDURE
+              ? ACME
+              : { permissions: [], enabled: false },
         },
       });
       observer.complete();
@@ -174,25 +171,31 @@ function renderShell({
   page: ReactNode;
 }) {
   const Shell = createUiFeatureShell({
-    sessionQueryKey: UI_SESSION_QUERY_KEY,
+    sessionQueryKey: root.session.UI_SESSION_QUERY_KEY,
     apis: [],
     capabilities: { feedback },
     transport: answeringTransport,
     // The composition root's four calls, with the recorded session client
     // drilled in — see `useBrowserUiCapabilities` in main.tsx.
     session: ({ transport: mounted, feedback: told }) => {
-      const sessionReading = useUiSessionReading({
+      const sessionReading = root.session.useUiSessionReading({
         feedback: told,
-        isPublicRoute: isUiPublicRoute(path),
+        isPublicRoute: root.scope.isUiPublicRoute(path),
         authClient,
       });
-      const scopeReading = useUiScopeReading({ transport: mounted, session: sessionReading });
-      const session = useBrowserUiSession({
+      const scopeReading = root.scope.useUiScopeReading({
+        transport: mounted,
+        session: sessionReading,
+      });
+      const session = root.session.useBrowserUiSession({
         transport: mounted,
         session: sessionReading,
         scope: scopeReading.scope,
       });
-      return { session, scope: createBrowserUiScope({ reading: scopeReading, session }) };
+      return {
+        session,
+        scope: root.scope.createBrowserUiScope({ reading: scopeReading, session }),
+      };
     },
   });
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });

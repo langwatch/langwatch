@@ -1,3 +1,4 @@
+import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
 import type { output, ZodType } from "zod";
 
 import type { Merge } from "./ui-supply.types.ts";
@@ -216,7 +217,11 @@ export class WebModule<
 
   withDrawers<const Drawers extends WebDrawers>(
     drawers: Drawers,
-    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never] ? [never] : []
+    ..._checked: [CheckedKeyedRecord<Drawers>] extends [never]
+      ? [never]
+      : [DrawersDifferingFromMap<Drawers>] extends [never]
+        ? []
+        : [drawerPropsDifferFromTheMap: DrawersDifferingFromMap<Drawers>]
   ): WebModule<
     Name,
     Requirements,

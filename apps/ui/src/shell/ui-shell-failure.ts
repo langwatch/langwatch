@@ -3,12 +3,10 @@
  * Spec: specs/auth/session-failure.feature
  */
 
-import { UI_SIGN_IN_PATH } from "@langwatch/auth-browser/session-capability";
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { isUiNavigatingAway, uiLeaveTo } from "@langwatch/browser-host/navigation";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { useUiRouteReading } from "@langwatch/organization-browser/surfaces/scope-capability";
 import { useEffect } from "react";
 
 /**
@@ -31,15 +29,17 @@ export function uiShellFailureDeparture({
   isPublicRoute,
   isOnline,
   address,
+  signInPath,
 }: {
   error: unknown;
   isPublicRoute: boolean;
   isOnline: boolean;
   address: string;
+  signInPath: string;
 }): string | null {
   if (!error || isPublicRoute || !isOnline) return null;
   if (!isUiSessionRefusal(error)) return null;
-  return `${UI_SIGN_IN_PATH}?callbackUrl=${encodeURIComponent(address)}`;
+  return `${signInPath}?callbackUrl=${encodeURIComponent(address)}`;
 }
 
 /**
@@ -53,18 +53,24 @@ export type UiShellFailureState = {
 export function useUiShellFailure({
   error,
   fallbackTitle,
+  isPublicRoute,
+  signInPath,
 }: {
   error: unknown;
   fallbackTitle: string;
+  /** From organization's route reading: a public page never departs to sign in. */
+  isPublicRoute: boolean;
+  /** Auth's sign-in address. */
+  signInPath: string;
 }): UiShellFailureState {
   const address = useUiAddress();
-  const route = useUiRouteReading();
 
   const departure = uiShellFailureDeparture({
     error,
-    isPublicRoute: route.isPublicRoute,
+    isPublicRoute,
     isOnline: navigator.onLine,
     address,
+    signInPath,
   });
 
   useEffect(() => {

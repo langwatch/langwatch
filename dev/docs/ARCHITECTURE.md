@@ -913,7 +913,8 @@ an `undefined` deep in a component. The same drilling rule applies on the
 browser: screens receive values as props, nothing reads the injected blob
 directly. The contract exports `xBrowserConfig = defineBrowserConfig({ schema: xWebConfigSchema,
 project })`; the App attaches `static readonly publicConfig = xBrowserConfig.project`. The process
-owner's slice is `process` (address, mode, deployment, nlp, browser tracing). A browser module reads
+owner's slice is `process` (address, mode, deployment, nlp); rum owns the browser tracing
+switch and projects `rum` (enabled, sampleRatio) (Alex, 2026-09-27). A browser module reads
 any owner's slice by that owner's name: `withConfig({ process: schema })` (2026-09-25).
 
 **No config endpoint: the page carries it** (Alex, 2026-09-25: "for public

@@ -1,5 +1,13 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import type {
+  GdprOrganizationRow,
+  GdprOrganizationWithMemberCount,
+  GdprProjectRow,
+  GdprUser,
+  GdprUserDataEraseRepository,
+} from "../user-data-erase.repository.ts";
+
 /**
  * Exactly the model delegate methods this task calls, picked from the real `PrismaClient`
  * rather than hand-typed, so a real `PrismaClient` satisfies this narrower shape for free.
@@ -51,28 +59,16 @@ export type GdprUserDataEraseDatabase = {
   $transaction: PrismaClient["$transaction"];
 };
 
-export type GdprUser = NonNullable<
-  Awaited<ReturnType<GdprUserDataEraseDatabase["user"]["findUnique"]>>
->;
-export type GdprOrganizationRow = { id: string; name: string };
-export type GdprOrganizationWithMemberCount = GdprOrganizationRow & {
-  _count: { members: number };
-};
-
-/**
- * The read/erase surface `runGdprUserDataErase` needs, fronting the raw
- * `GdprUserDataEraseDatabase` delegates behind named queries plus the one
- * cross-table erase transaction.
- */
-export class GdprUserDataEraseRepository {
+/** The erasure's queries over the raw `GdprUserDataEraseDatabase` delegates. */
+export class PrismaGdprUserDataEraseRepository implements GdprUserDataEraseRepository {
   private constructor(private readonly database: GdprUserDataEraseDatabase) {}
 
   static create({
     database,
   }: {
     database: GdprUserDataEraseDatabase;
-  }): GdprUserDataEraseRepository {
-    return new GdprUserDataEraseRepository(database);
+  }): PrismaGdprUserDataEraseRepository {
+    return new PrismaGdprUserDataEraseRepository(database);
   }
 
   findUserByEmail(email: string): Promise<GdprUser | null> {
@@ -135,9 +131,7 @@ export class GdprUserDataEraseRepository {
     }));
   }
 
-  findProjectsUnderTeams(
-    teamIds: string[],
-  ): Promise<{ id: string; name: string; slug: string; teamId: string | null }[]> {
+  findProjectsUnderTeams(teamIds: string[]): Promise<GdprProjectRow[]> {
     if (teamIds.length === 0) return Promise.resolve([]);
     return this.database.project.findMany({
       where: { teamId: { in: teamIds } },

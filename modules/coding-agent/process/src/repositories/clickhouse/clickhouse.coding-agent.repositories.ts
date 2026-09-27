@@ -1,8 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { Instant } from "@langwatch/time";
 
-import type { CodingAgentReadMetrics, CodingAgentClock } from "../../app/coding-agent.members.ts";
-import { SystemCodingAgentClockService } from "../../services/coding-agent-clock.service.ts";
-import { NoopCodingAgentReadMetricsService } from "../../services/coding-agent-read-metrics-noop.service.ts";
+import { CODING_AGENT_SESSION_LIST_READ_METRIC_NAME } from "../../rules/coding-agent-read-metrics.rules.ts";
 import type { CodingAgentProjectionRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "./clickhouse.coding-agent-session.repository.ts";
@@ -13,44 +12,49 @@ import { SessionMetricSeriesClickHouseRepository } from "./clickhouse.session-me
 // so tests override via createWith().
 const DEFAULT_RETENTION_DAYS = 308;
 
-/** What a process hands the live tier: the one client it routes through. */
+/** The process's clock member, as far as this tier reads it. */
+export type CodingAgentProcessClock = Readonly<{ now(): Instant }>;
+
+/** The process's telemetry member, as far as this tier reports to it. */
+export type CodingAgentProcessTelemetry = Readonly<{
+  observe(name: string, value: number, attributes?: Readonly<Record<string, string>>): void;
+}>;
+
+/** What a process hands this tier: the one client it routes through, its clock and telemetry. */
 export type ClickHouseCodingAgentInfrastructure = Readonly<{
   clickhouse: ClickHouseQueryClient;
+  clock: CodingAgentProcessClock;
+  telemetry: CodingAgentProcessTelemetry;
 }>;
 
 /**
- * The live tier: every coding-agent row is a projection in one tenant-keyed
+ * The ClickHouse tier: every coding-agent row is a projection in one tenant-keyed
  * ClickHouse, reached through the process's single client. No endpoint or
  * per-tenant client here — every statement names its own tenant.
  */
 export class ClickHouseCodingAgentRepositories {
-  static create(members: ClickHouseCodingAgentInfrastructure): CodingAgentProjectionRepositories {
-    return ClickHouseCodingAgentRepositories.createWith(members);
-  }
+  static readonly requires = ["clickhouse", "clock", "telemetry"] as const;
 
-  /**
-   * The same tier with retention default, read metrics and clock named. The
-   * provider entry above takes members alone — a boot selection carries only
-   * what the process declared; a test controlling time or retention says so here.
-   */
-  static createWith(
-    options: ClickHouseCodingAgentInfrastructure &
-      Readonly<{
-        defaultRetentionDays?: number;
-        metrics?: CodingAgentReadMetrics;
-        clock?: CodingAgentClock;
-      }>,
+  /** A test states a retention default; a boot selection carries only the members. */
+  static create(
+    members: ClickHouseCodingAgentInfrastructure & Readonly<{ defaultRetentionDays?: number }>,
   ): CodingAgentProjectionRepositories {
     const storage = {
-      clickhouse: options.clickhouse,
-      defaultTraceRetentionDays: options.defaultRetentionDays ?? DEFAULT_RETENTION_DAYS,
+      clickhouse: members.clickhouse,
+      defaultTraceRetentionDays: members.defaultRetentionDays ?? DEFAULT_RETENTION_DAYS,
     };
 
     return {
       sessions: CodingAgentSessionClickHouseRepository.create({
         ...storage,
-        metrics: options.metrics ?? NoopCodingAgentReadMetricsService.create(),
-        clock: options.clock ?? SystemCodingAgentClockService.create(),
+        metrics: {
+          observeSessionListRead: ({ table, outcome, durationMs }) =>
+            members.telemetry.observe(CODING_AGENT_SESSION_LIST_READ_METRIC_NAME, durationMs, {
+              table,
+              outcome,
+            }),
+        },
+        clock: { nowMs: () => members.clock.now().epochMilliseconds },
       }),
       traceSessions: CodingAgentTraceSessionClickHouseRepository.create(storage),
       metricSeries: SessionMetricSeriesClickHouseRepository.create(storage),

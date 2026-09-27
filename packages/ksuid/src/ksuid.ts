@@ -1,7 +1,7 @@
 import { encode, decode } from "./base62.ts";
 import { DECODED_LEN, ENCODED_LEN, KSUID_REGEX } from "./constants.ts";
 import { checkInstance, Instance } from "./instance.ts";
-import type { ParsedKsuid } from "./types.ts";
+import type { KsuidComponents, ParsedKsuid } from "./types.ts";
 import { checkPrefix, checkUint } from "./validation.ts";
 
 /**
@@ -26,13 +26,7 @@ export class Ksuid {
    * @param sequenceId - Sequence number for collision avoidance
    * @throws {ValidationError} If any parameter is invalid
    */
-  constructor(
-    environment: string,
-    resource: string,
-    timestamp: number,
-    instance: Instance,
-    sequenceId: number,
-  ) {
+  constructor({ environment, resource, timestamp, instance, sequenceId }: KsuidComponents) {
     checkPrefix("environment", environment);
     checkPrefix("resource", resource);
     checkUint("timestamp", timestamp, 6);
@@ -161,7 +155,7 @@ export class Ksuid {
     const sequenceId =
       (fullDecoded[17] << 24) | (fullDecoded[18] << 16) | (fullDecoded[19] << 8) | fullDecoded[20];
 
-    return new Ksuid(environment, resource, timestamp, instance, sequenceId);
+    return new Ksuid({ environment, resource, timestamp, instance, sequenceId });
   }
 
   /**

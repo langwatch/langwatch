@@ -50,10 +50,13 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     publicUrl: c.env("LW_GATEWAY_PUBLIC_URL", optionalUrl),
     legacyUrl: c.env("LW_GATEWAY_BASE_URL", optionalUrl),
   },
-  telemetry: {
-    rumEnabled: c.env("RUM_ENABLED", exactTrue),
+  rum: {
+    enabled: c.env("RUM_ENABLED", exactTrue),
     sampleRatio: c.env("RUM_SAMPLE_RATIO", sampleRatio),
-    otlpEndpoint: c.env("OTEL_EXPORTER_OTLP_ENDPOINT", z.string().optional()),
+    collectorEndpoint: c.env("RUM_COLLECTOR_ENDPOINT", z.string().optional()),
+    telemetryEndpoint: c.env("OTEL_EXPORTER_OTLP_ENDPOINT", z.string().optional()),
+  },
+  telemetry: {
     posthogKey: c.env("POSTHOG_KEY", z.string().min(1).optional()),
     posthogHost: c.env("POSTHOG_HOST", z.string().min(1).optional()),
   },
@@ -127,6 +130,7 @@ export type PublicAppConfigSource = Readonly<{
   POSTHOG_HOST?: string;
   RUM_ENABLED?: string | boolean;
   RUM_SAMPLE_RATIO?: string | number;
+  RUM_COLLECTOR_ENDPOINT?: string;
   OTEL_EXPORTER_OTLP_ENDPOINT?: string;
   LANGWATCH_NLP_SERVICE?: string;
   LANGWATCH_NLP_LAMBDA_CONFIG?: string;
@@ -226,8 +230,6 @@ function projectPublicAppConfig(
       mode: config.nodeEnvironment,
       deployment: config.isSaas ? "saas" : "self-hosted",
       nlp: Boolean(config.capabilities.nlpService || credentials.nlpLambdaConfig),
-      browserTracing: config.telemetry.rumEnabled && Boolean(config.telemetry.otlpEndpoint),
-      sampleRatio: config.telemetry.sampleRatio,
       ...(config.hideDevIndicator ? { hideDevIndicator: true } : {}),
     }),
     auth: {
@@ -240,6 +242,11 @@ function projectPublicAppConfig(
     evaluation: { langevals: Boolean(config.capabilities.langevalsEndpoint) },
     gateway: { gatewayBaseUrl: resolveGatewayBaseUrl(config) },
     notification: { email: hasConfiguredEmailDelivery(config, credentials) },
+    rum: {
+      enabled:
+        config.rum.enabled && Boolean(config.rum.collectorEndpoint || config.rum.telemetryEndpoint),
+      sampleRatio: config.rum.sampleRatio,
+    },
     ops: config.telemetry.posthogKey
       ? { posthog: { key: config.telemetry.posthogKey, host: config.telemetry.posthogHost } }
       : {},

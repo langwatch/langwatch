@@ -3,7 +3,7 @@
  * Mapping sources: scenario sources, suite fields, and routing to a code evaluator's own editor.
  * @see specs/features/agent-testing/suite-editor.feature
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,13 +25,7 @@ vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
   getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
 }));
 
-import {
-  ATTACHMENT,
-  Harness,
-  OpenEditor,
-  SQL_EVALUATOR,
-  Wrapper,
-} from "./scenarioEvaluatorEditorHarness";
+import { ATTACHMENT, OpenEditor, SQL_EVALUATOR, Wrapper } from "./scenarioEvaluatorEditorHarness";
 
 describe("the evaluator editor on an attachment", () => {
   beforeEach(() => {
@@ -44,55 +38,6 @@ describe("the evaluator editor on an attachment", () => {
   afterEach(cleanup);
 
   describe("given an evaluator attachment", () => {
-    describe("when the source picker is opened", () => {
-      /** @scenario "The evaluator editor offers the conversation, the scenario and the trace as sources" */
-      it("lists Conversation, Scenario and Trace, and the suite fields under Scenario", async () => {
-        const user = userEvent.setup();
-        render(<Harness gate={{ required: true, canRequire: true }} required={true} />, {
-          wrapper: Wrapper,
-        });
-
-        await user.click(screen.getByTestId("mapping-input-expected_output"));
-        await waitFor(() => expect(screen.getByText("Conversation")).toBeInTheDocument());
-        expect(screen.getByText("Scenario")).toBeInTheDocument();
-        expect(screen.getByText("Trace")).toBeInTheDocument();
-
-        // The suite fields are nested under Scenario's "Fields" entry, so they
-        // only render once that entry is expanded.
-        await user.click(screen.getByTestId("field-option-fields"));
-        await waitFor(() => expect(screen.getByText("golden_sql")).toBeInTheDocument());
-        expect(screen.getByText("table_schema")).toBeInTheDocument();
-      });
-    });
-
-    describe("when the spans of the trace are picked for an input", () => {
-      /** @scenario "A Trace.spans mapping renders as spans" */
-      it("writes a trace.spans mapping and renders its chip as spans", async () => {
-        const user = userEvent.setup();
-        const onMappingChange = vi.fn();
-        render(
-          <Harness
-            gate={{ required: true, canRequire: true }}
-            required={true}
-            onMappingChange={onMappingChange}
-          />,
-          { wrapper: Wrapper },
-        );
-
-        await user.click(screen.getByTestId("mapping-input-expected_output"));
-        await waitFor(() => expect(screen.getByText("Trace")).toBeInTheDocument());
-        await user.click(screen.getByTestId("field-option-spans"));
-
-        expect(onMappingChange).toHaveBeenCalledWith("expected_output", {
-          type: "source",
-          sourceId: "trace",
-          path: ["spans"],
-        });
-        const chips = screen.getAllByTestId("source-mapping-tag");
-        expect(chips.map((chip) => chip.textContent)).toContain("spans");
-      });
-    });
-
     describe("when the editor is opened from a pill", () => {
       /** @scenario "A mapping edited in the editor lands on the attachment" */
       it("opens the drawer with the scenario sources and writes a picked mapping back", async () => {

@@ -95,6 +95,7 @@ describe("given an organization served by its own ClickHouse instance", () => {
     const [shared, isolated] = await startTestClickHouseEndpoints({
       suite: "ch-routing",
       names: ["shared", "private"],
+      environment: process.env,
     });
     if (!shared || !isolated) throw new Error("Two ClickHouse endpoints were not provisioned");
 

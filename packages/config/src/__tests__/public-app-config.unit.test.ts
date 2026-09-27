@@ -17,8 +17,6 @@ const config: PublicAppConfig = {
     mode: "production",
     deployment: "self-hosted",
     nlp: false,
-    browserTracing: false,
-    sampleRatio: 1,
   },
   notification: { email: true },
 };
