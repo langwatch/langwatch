@@ -27,6 +27,7 @@
     "**/__fixtures__/**",
     "charts/**/templates/**",
     "docs/docs.json",
+    "**/*.mdx",
     "specs/langy/langy-keys-plan.md",
     "specs/langy/langy-pr4-plan.md",
     "**/vendor/**",

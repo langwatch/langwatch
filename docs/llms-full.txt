@@ -31490,7 +31490,8 @@ See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-s
 
 The same steps work in Claude Cowork and in Claude chat on the web.
 
-_Requires a paid Claude plan._
+*Requires a paid Claude plan.*
+
 
 ### Claude Code
 
@@ -31527,10 +31528,12 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 
 ### Cursor
 
-  1. Open Cursor Settings 2. Navigate to the **Tools and MCP** section in the sidebar 3. Add the
-  LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these
-  fields: - `command`: `npx` - `args`: `-y`, then the package name `@langwatch/mcp-server` on a
-  separate token - `env.LANGWATCH_API_KEY`: your LangWatch API key
+1. Open Cursor Settings
+2. Navigate to the **Tools and MCP** section in the sidebar
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+   - `command`: `npx`
+   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
+   - `env.LANGWATCH_API_KEY`: your LangWatch API key
 
 
 ### ChatGPT
@@ -31540,7 +31543,8 @@ Under the `servers` object, add an entry named `langwatch` with these fields:
 3. Enter the server URL: `https://app.langwatch.ai/sse`
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
-_Requires a Plus or Team plan._
+*Requires a Plus or Team plan.*
+
 
 ### BoltAI, Other MCP Clients
 
@@ -31552,6 +31556,7 @@ For any MCP client that supports remote servers with OAuth:
 4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
 
 The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+
 
 ### Other
 
@@ -31572,9 +31577,9 @@ Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shif
 
 ### Configuration
 
-| Environment Variable | CLI Argument | Description                                        |
-| -------------------- | ------------ | -------------------------------------------------- |
-| `LANGWATCH_API_KEY`  | `--apiKey`   | API key for authentication                         |
+| Environment Variable | CLI Argument | Description |
+|---------------------|-------------|-------------|
+| `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
@@ -31602,11 +31607,9 @@ Ask your AI assistant to write scenario tests for your agents:
 ```plaintext Edge cases
 "Write scenario tests for my customer support agent covering refund requests and policy questions"
 ```
-
 </CodeGroup>
 
 The AI assistant will:
-
 1. Fetch the Scenario documentation and best practices
 2. Create test files with proper imports and setup
 3. Write scenario scripts that simulate user interactions
@@ -31674,11 +31677,9 @@ Ask your AI assistant to add LangWatch tracking to your existing code:
 ```plaintext Framework-specific
 "Instrument this LangChain agent with LangWatch, including all tool calls"
 ```
-
 </CodeGroup>
 
 The AI assistant will:
-
 1. Fetch the relevant LangWatch documentation for your framework
 2. Add the necessary imports and setup code
 3. Wrap your functions with `@langwatch.trace()` decorators
@@ -31688,7 +31689,6 @@ The AI assistant will:
 **Example transformation:**
 
 Before:
-
 ```python
 from openai import OpenAI
 
@@ -31703,7 +31703,6 @@ def chat(message: str):
 ```
 
 After (automatically added by AI assistant):
-
 ```python
 from openai import OpenAI
 import langwatch
@@ -31734,7 +31733,6 @@ Ask your AI assistant to set up evaluation code for your LLM outputs:
 ```
 
 The AI assistant will:
-
 1. Fetch the relevant LangWatch evaluation documentation
 2. Create evaluation notebooks or scripts with proper setup
 3. Add evaluation metrics and criteria for your use case
@@ -31756,7 +31754,6 @@ Ask your AI assistant to find and analyze traces from your project:
 ```plaintext Analyze a conversation thread
 "Find all traces for thread thread_xyz and show me the full conversation flow"
 ```
-
 </CodeGroup>
 
 The AI assistant will use `search_traces` to find matching traces and `get_trace` to drill into individual ones. Traces are returned as AI-readable digests by default, showing the full span hierarchy with timing, inputs, outputs, and errors.
@@ -31777,7 +31774,6 @@ Ask about performance trends, costs, and usage patterns:
 ```plaintext Usage trends
 "How many traces have we had per day this week?"
 ```
-
 </CodeGroup>
 
 The assistant starts with `discover_schema` to understand available metrics and filters, then uses `get_analytics` to query timeseries data.
@@ -31798,7 +31794,6 @@ Ask your AI assistant to work with prompts:
 ```plaintext Update with versioning
 "Update the pdf-parser prompt to also handle images, and create a new version"
 ```
-
 </CodeGroup>
 
 The AI assistant will guide you through creating, versioning, and using prompts from LangWatch's [Prompt Management](/prompt-management/overview).
@@ -31808,15 +31803,15 @@ The AI assistant will guide you through creating, versioning, and using prompts 
 An AI agent can use the LangWatch MCP to instrument itself while it is being built, which lets it track and debug its own behavior.
 
 <Frame>
-  <iframe
-    width="720"
-    height="460"
-    src="https://www.youtube.com/embed/ZPaG9H-N0uY"
-    title="AI Agent that vibe-codes itself - YouTube video player"
-    frameborder="0"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowFullScreen
-  ></iframe>
+<iframe
+  width="720"
+  height="460"
+  src="https://www.youtube.com/embed/ZPaG9H-N0uY"
+  title="AI Agent that vibe-codes itself - YouTube video player"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
 </Frame>
 
 ## MCP Tools Reference
@@ -31825,20 +31820,20 @@ The MCP server provides tools organized into categories. Your AI assistant autom
 
 ### Documentation and Support
 
-| Tool                   | Description                                                                                                                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fetch_langwatch_docs` | Fetch LangWatch integration docs                                                                                                                                                                         |
-| `fetch_scenario_docs`  | Fetch Scenario agent testing docs                                                                                                                                                                        |
-| `report_issue`         | Report anything that did not work to the LangWatch team (no API key needed, user permission required, secrets redacted locally). See the [reporting guide](/support#reporting-issues-from-coding-agents) |
+| Tool | Description |
+|------|-------------|
+| `fetch_langwatch_docs` | Fetch LangWatch integration docs |
+| `fetch_scenario_docs` | Fetch Scenario agent testing docs |
+| `report_issue` | Report anything that did not work to the LangWatch team (no API key needed, user permission required, secrets redacted locally). See the [reporting guide](/support#reporting-issues-from-coding-agents) |
 
 ### Observability (requires API key)
 
-| Tool              | Description                                                                                    |
-| ----------------- | ---------------------------------------------------------------------------------------------- |
-| `discover_schema` | Explore available filter fields, metrics, aggregation types, and group-by options              |
-| `search_traces`   | Search traces with filters, text query, and date range. Returns AI-readable digests by default |
-| `get_trace`       | Get full trace details by ID with span hierarchy, evaluations, and metadata                    |
-| `get_analytics`   | Query timeseries analytics (costs, latency, token usage, etc.)                                 |
+| Tool | Description |
+|------|-------------|
+| `discover_schema` | Explore available filter fields, metrics, aggregation types, and group-by options |
+| `search_traces` | Search traces with filters, text query, and date range. Returns AI-readable digests by default |
+| `get_trace` | Get full trace details by ID with span hierarchy, evaluations, and metadata |
+| `get_analytics` | Query timeseries analytics (costs, latency, token usage, etc.) |
 
 ### Prompts (requires API key)
 
@@ -31873,20 +31868,19 @@ Dataset tools are listed on the [datasets page](/datasets/programmatic-access#mc
 
 ### Organization Management (requires org-level API key)
 
-| Tool                       | Description                                                   |
-| -------------------------- | ------------------------------------------------------------- |
-| `platform_list_projects`   | List all projects in the organization                         |
-| `platform_get_project`     | Get project details by ID                                     |
-| `platform_create_project`  | Create a new project (returns a one-time service API key)     |
-| `platform_update_project`  | Update a project's name, language, framework, or PII settings |
-| `platform_archive_project` | Archive a project (soft-delete)                               |
-| `platform_list_api_keys`   | List all API keys in the organization                         |
-| `platform_create_api_key`  | Create a personal or service API key                          |
-| `platform_revoke_api_key`  | Revoke an API key                                             |
+| Tool | Description |
+|------|-------------|
+| `platform_list_projects` | List all projects in the organization |
+| `platform_get_project` | Get project details by ID |
+| `platform_create_project` | Create a new project (returns a one-time service API key) |
+| `platform_update_project` | Update a project's name, language, framework, or PII settings |
+| `platform_archive_project` | Archive a project (soft-delete) |
+| `platform_list_api_keys` | List all API keys in the organization |
+| `platform_create_api_key` | Create a personal or service API key |
+| `platform_revoke_api_key` | Revoke an API key |
 
 <Info>
-  Organization management tools require an API key with org-level permissions. If the configured key
-  lacks organization permissions, these tools will return a clear error message.
+Organization management tools require an API key with org-level permissions. If the configured key lacks organization permissions, these tools will return a clear error message.
 </Info>
 
 ### Tool Details
@@ -31896,7 +31890,6 @@ Dataset tools are listed on the [datasets page](/datasets/programmatic-access#mc
 Discover available filter fields, metrics, aggregation types, and group-by options for LangWatch queries. Call this before using `search_traces` or `get_analytics` to understand available options.
 
 **Parameters:**
-
 - `category` (required): One of `"filters"`, `"metrics"`, `"aggregations"`, `"groups"`, or `"all"`
 
 #### `search_traces`
@@ -31904,7 +31897,6 @@ Discover available filter fields, metrics, aggregation types, and group-by optio
 Search traces with filters, text query, and date range. Returns AI-readable trace digests by default.
 
 **Parameters:**
-
 - `query` (optional): Text search query
 - `startDate` (optional): Start date, ISO string or relative like `"24h"`, `"7d"`, `"30d"`. Default: 24h ago
 - `endDate` (optional): End date, ISO string or relative. Default: now
@@ -31918,7 +31910,6 @@ Search traces with filters, text query, and date range. Returns AI-readable trac
 Get full details of a single trace by ID. Returns AI-readable trace digest by default.
 
 **Parameters:**
-
 - `traceId` (required): The trace ID to retrieve
 - `format` (optional): `"digest"` (default, AI-readable) or `"json"` (full raw data)
 
@@ -31927,7 +31918,6 @@ Get full details of a single trace by ID. Returns AI-readable trace digest by de
 Query analytics timeseries from LangWatch. Metrics use `"category.name"` format (e.g., `"performance.completion_time"`).
 
 **Parameters:**
-
 - `metric` (required): Metric in `"category.name"` format (e.g., `"metadata.trace_id"`, `"performance.total_cost"`)
 - `aggregation` (optional): `avg`, `sum`, `min`, `max`, `median`, `p90`, `p95`, `p99`, `cardinality`, `terms`. Default: `avg`
 - `startDate` (optional): Start date, ISO string or relative. Default: 7 days ago
@@ -31945,7 +31935,6 @@ List all prompts configured in the LangWatch project. No parameters required.
 Get a specific prompt by ID or handle, including messages, model config, and version history.
 
 **Parameters:**
-
 - `idOrHandle` (required): Prompt ID or handle
 - `version` (optional): Specific version number (default: latest)
 
@@ -31954,7 +31943,6 @@ Get a specific prompt by ID or handle, including messages, model config, and ver
 Create a new prompt in the LangWatch project.
 
 **Parameters:**
-
 - `name` (required): Prompt name
 - `messages` (required): Array of `{role, content}` messages
 - `model` (required): Model name (e.g., `"gpt-5-mini"`, `"claude-sonnet-4-5-20250929"`)
@@ -31967,7 +31955,6 @@ Create a new prompt in the LangWatch project.
 Update an existing prompt or create a new version.
 
 **Parameters:**
-
 - `idOrHandle` (required): Prompt ID or handle to update
 - `messages` (optional): Updated messages array
 - `model` (optional): Updated model name
@@ -31980,7 +31967,6 @@ Update an existing prompt or create a new version.
 Fetches LangWatch documentation pages to understand how to implement features.
 
 **Parameters:**
-
 - `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
 
 #### `fetch_scenario_docs`
@@ -31988,12 +31974,10 @@ Fetches LangWatch documentation pages to understand how to implement features.
 Fetches Scenario documentation pages to understand how to write agent tests.
 
 **Parameters:**
-
 - `url` (optional): The full URL of a specific doc page. If not provided, fetches the docs index.
 
 <Info>
-  Your AI assistant will automatically choose the right tools based on your request. You don't need
-  to call these tools manually.
+Your AI assistant will automatically choose the right tools based on your request. You don't need to call these tools manually.
 </Info>
 
 <Note>
@@ -38755,13 +38739,12 @@ Include these files in your deployment package:
 ### 3. Deploy to Air-Gapped Environment
 
 The application runs entirely offline, using only materialized prompts. No LangWatch API access required.
-{/\*
-
+{/*
 ## Advanced Fetch Policies (Future Feature)
 
 <Note>
-  **Coming Soon**: Advanced fetch policies will provide fine-grained control over when prompts are
-  fetched vs. using materialized versions.
+  **Coming Soon**: Advanced fetch policies will provide fine-grained control
+  over when prompts are fetched vs. using materialized versions.
 </Note>
 
 
@@ -38832,11 +38815,11 @@ The application runs entirely offline, using only materialized prompts. No LangW
 ### Fetch Policy Options
 
 | Policy               | Behavior                                              | Use Case                                         |
-| -------------------- | ----------------------------------------------------- | ------------------------------------------------ | ---- |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------ |
 | `MATERIALIZED_FIRST` | Use local file if available, otherwise fetch from API | Default behavior, best for most applications     |
 | `ALWAYS_FETCH`       | Always try API first, fall back to materialized       | Live updates with offline fallback               |
 | `CACHE_TTL`          | Fetch every X minutes, use materialized between       | Hot deployments with controlled update frequency |
-| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | \*/} |
+| `MATERIALIZED_ONLY`  | Never fetch, use materialized files only              | Air-gapped or strict offline environments        | */}
 
 ## CI/CD Integration
 
@@ -38854,7 +38837,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: '18'
 
       - name: Install LangWatch CLI
         run: npm install -g langwatch
@@ -41810,22 +41793,21 @@ LangWatch provides a library of ready-to-use evaluators for common evaluation ta
 - You want to use well-tested, standardized evaluation methods
 
 **See also:**
-
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
 - [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send scores from your own evaluation logic
-  </Info>
+</Info>
 
 ## Available Evaluators
 
 The evaluators are grouped in the same five categories the platform shows:
 
-| Category            | Examples                                                                                | Use Case                                                    |
-| ------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **Expected Answer** | `langevals/exact_match`, `langevals/llm_answer_match`, `ragas/factual_correctness`      | Compare the output with a known answer                      |
-| **LLM as Judge**    | `langevals/llm_boolean`, `langevals/llm_score`, `langevals/llm_category`                | Apply your own criteria with a model                        |
-| **RAG Quality**     | `ragas/faithfulness`, `ragas/response_context_precision`                                | Evaluate retrieval-augmented generation                     |
-| **Quality Aspects** | `langevals/valid_format`, `lingua/language_detection`, `langevals/sentiment`            | Check format, language and tone                             |
-| **Safety**          | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
+| Category | Examples | Use Case |
+|----------|----------|----------|
+| **Expected Answer** | `langevals/exact_match`, `langevals/llm_answer_match`, `ragas/factual_correctness` | Compare the output with a known answer |
+| **LLM as Judge** | `langevals/llm_boolean`, `langevals/llm_score`, `langevals/llm_category` | Apply your own criteria with a model |
+| **RAG Quality** | `ragas/faithfulness`, `ragas/response_context_precision` | Evaluate retrieval-augmented generation |
+| **Quality Aspects** | `langevals/valid_format`, `lingua/language_detection`, `langevals/sentiment` | Check format, language and tone |
+| **Safety** | `presidio/pii_detection`, `langwatch/api_keys_and_secrets_detection`, `azure/jailbreak` | Detect PII, leaked credentials, jailbreaks, harmful content |
 
 [Browse all evaluators →](/evaluations/evaluators/list)
 
@@ -41857,8 +41839,9 @@ df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("my-experiment")
 
-for index, row in experiment.loop(df.iterrows()): # Your LLM call
-output = my_llm(row["input"])
+for index, row in experiment.loop(df.iterrows()):
+    # Your LLM call
+    output = my_llm(row["input"])
 
     # Run built-in evaluator
     experiment.evaluate(
@@ -41870,8 +41853,7 @@ output = my_llm(row["input"])
             "contexts": row["contexts"],
         },
     )
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -41899,8 +41881,7 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-````
-
+```
 </CodeGroup>
 
 ### In Online Evaluation
@@ -41912,8 +41893,9 @@ Run evaluators on production traces in real-time:
 import langwatch
 
 @langwatch.span()
-def my_llm_step(user_input: str): # Your LLM call
-output = my_llm(user_input)
+def my_llm_step(user_input: str):
+    # Your LLM call
+    output = my_llm(user_input)
 
     # Run evaluator on production traffic
     result = langwatch.evaluation.evaluate(
@@ -41926,8 +41908,7 @@ output = my_llm(user_input)
     )
 
     return output
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -41949,8 +41930,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-````
-
+```
 </CodeGroup>
 
 ### As Guardrails
@@ -41962,21 +41942,21 @@ Use evaluators to block harmful content before responding:
 import langwatch
 
 @langwatch.span()
-def my_llm_step(user_input: str): # Check input before processing
-guardrail = langwatch.evaluation.evaluate(
-"azure/jailbreak", # Built-in evaluator slug
-name="Jailbreak Detection",
-data={"input": user_input},
-as_guardrail=True,
-)
+def my_llm_step(user_input: str):
+    # Check input before processing
+    guardrail = langwatch.evaluation.evaluate(
+        "azure/jailbreak",  # Built-in evaluator slug
+        name="Jailbreak Detection",
+        data={"input": user_input},
+        as_guardrail=True,
+    )
 
     if not guardrail.passed:
         return "I can't help with that request."
 
     # Safe to proceed
     return my_llm(user_input)
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -41998,21 +41978,20 @@ async function myLLMStep(userInput: string): Promise<string> {
   // Safe to proceed
   return await myLLM(userInput);
 }
-````
-
+```
 </CodeGroup>
 
 ## Evaluator Inputs
 
 Different evaluators require different inputs. Check the [evaluator list](/evaluations/evaluators/list) for each evaluator's requirements.
 
-| Input               | Description                                   | Example Evaluators                                   |
-| ------------------- | --------------------------------------------- | ---------------------------------------------------- |
-| `input`             | User question/prompt                          | Jailbreak Detection, Off Topic Evaluator             |
-| `output`            | LLM response                                  | PII Detection, Valid Format Evaluator                |
-| `contexts`          | Retrieved documents (array)                   | Ragas Faithfulness, Ragas Response Context Precision |
-| `expected_output`   | Ground truth answer                           | LLM Answer Match, Exact Match Evaluator              |
-| `expected_contexts` | The documents that should have been retrieved | Context F1, Ragas Response Context Recall            |
+| Input | Description | Example Evaluators |
+|-------|-------------|-------------------|
+| `input` | User question/prompt | Jailbreak Detection, Off Topic Evaluator |
+| `output` | LLM response | PII Detection, Valid Format Evaluator |
+| `contexts` | Retrieved documents (array) | Ragas Faithfulness, Ragas Response Context Precision |
+| `expected_output` | Ground truth answer | LLM Answer Match, Exact Match Evaluator |
+| `expected_contexts` | The documents that should have been retrieved | Context F1, Ragas Response Context Recall |
 
 ## Configuring Settings
 
@@ -42041,14 +42020,12 @@ await experiment.evaluate("langevals/llm_boolean", {
   },
 });
 ```
-
 </CodeGroup>
 
 ## The `name` Parameter
 
 <Warning>
-  Always provide a descriptive `name` when using evaluators in online evaluation. This helps track
-  results in Analytics.
+Always provide a descriptive `name` when using evaluators in online evaluation. This helps track results in Analytics.
 </Warning>
 
 ```python
@@ -42115,15 +42092,13 @@ Custom scoring lets you send evaluation results from your own code to LangWatch.
 - You want to track any custom metric alongside your traces
 
 **See also:**
-
 - [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use LangWatch's ready-made evaluators
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
-  </Info>
+</Info>
 
 ## How It Works
 
 With custom scoring, you:
-
 1. Run your own evaluation logic
 2. Send the results (score, passed, label, details) to LangWatch
 3. View results in traces, analytics, and dashboards
@@ -42188,7 +42163,7 @@ async function myLLMStep(userInput: string): Promise<string> {
       name: "my_custom_metric",
       passed: isValid,
       score: score,
-      details: "Custom evaluation based on domain rules",
+      details: "Custom evaluation based on domain rules"
     });
 
     return output;
@@ -42230,7 +42205,7 @@ import langwatch
 experiment = langwatch.experiment.init("my-experiment")
 
 for index, row in experiment.loop(df.iterrows()):
-output = my_llm(row["input"])
+    output = my_llm(row["input"])
 
     # Run your custom evaluation
     score = my_custom_evaluator(row["input"], output, row["expected"])
@@ -42244,8 +42219,7 @@ output = my_llm(row["input"])
         passed=score > 0.7,
         details="Custom domain-specific evaluation"
     )
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -42271,22 +42245,21 @@ await experiment.run(
     });
   }
 );
-````
-
+```
 </CodeGroup>
 
 ## Evaluation Result Fields
 
-| Field     | Type    | Required | Description                                   |
-| --------- | ------- | -------- | --------------------------------------------- |
-| `name`    | string  | Yes      | Identifier for this evaluation (shows in UI)  |
-| `passed`  | boolean | No       | Whether the evaluation passed                 |
-| `score`   | number  | No       | Numeric score (typically 0-1)                 |
-| `label`   | string  | No       | Category label (e.g., "positive", "negative") |
-| `details` | string  | No       | Human-readable explanation                    |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Identifier for this evaluation (shows in UI) |
+| `passed` | boolean | No | Whether the evaluation passed |
+| `score` | number | No | Numeric score (typically 0-1) |
+| `label` | string | No | Category label (e.g., "positive", "negative") |
+| `details` | string | No | Human-readable explanation |
 
 <Note>
-  At least one of `passed`, `score`, or `label` should be provided for meaningful results.
+At least one of `passed`, `score`, or `label` should be provided for meaningful results.
 </Note>
 
 ## Example Use Cases
@@ -42398,7 +42371,6 @@ def my_llm_step(user_input: str):
 ## Viewing Custom Scores
 
 Custom scores appear in:
-
 - **Trace Details** - Under the Evaluations section
 - **Analytics Dashboard** - Filterable by evaluation name
 - **Experiments** - In the results table alongside other evaluators
@@ -42670,15 +42642,20 @@ You can score an output in three ways:
 
 ### Which should I use?
 
-| Approach                | Slug Format                                         | Best For                                   |
-| ----------------------- | --------------------------------------------------- | ------------------------------------------ |
-| **Built-in Evaluators** | `provider/evaluator` (e.g., `ragas/faithfulness`)   | Quick setup, standard evaluation methods   |
-| **Saved Evaluators**    | `evaluators/{slug}` (e.g., `evaluators/my-checker`) | Team collaboration, UI-based configuration |
-| **Custom Scoring**      | N/A - you send the score directly                   | Proprietary logic, domain-specific metrics |
+| Approach | Slug Format | Best For |
+|----------|-------------|----------|
+| **Built-in Evaluators** | `provider/evaluator` (e.g., `ragas/faithfulness`) | Quick setup, standard evaluation methods |
+| **Saved Evaluators** | `evaluators/{slug}` (e.g., `evaluators/my-checker`) | Team collaboration, UI-based configuration |
+| **Custom Scoring** | N/A - you send the score directly | Proprietary logic, domain-specific metrics |
 
 <Accordion title="Decision flowchart">
-  ``` Do you have your own evaluation logic? ├─ Yes → Use Custom Scoring └─ No → Do you want to
-  configure via UI and reuse? ├─ Yes → Use Saved Evaluators └─ No → Use Built-in Evaluators ```
+```
+Do you have your own evaluation logic?
+├─ Yes → Use Custom Scoring
+└─ No → Do you want to configure via UI and reuse?
+         ├─ Yes → Use Saved Evaluators
+         └─ No → Use Built-in Evaluators
+```
 </Accordion>
 
 ## What is an Evaluator?
@@ -42830,8 +42807,7 @@ Check each evaluator's documentation for required and optional inputs.
 ## The `name` Parameter
 
 <Warning>
-  **Important:** Always provide a descriptive `name` when running evaluators. This helps identify
-  evaluation results in Analytics and traces.
+**Important:** Always provide a descriptive `name` when running evaluators. This helps identify evaluation results in Analytics and traces.
 </Warning>
 
 ```python
@@ -42898,10 +42874,9 @@ Saved evaluators are pre-configured evaluation setups that you create on the Lan
 - You need consistent evaluation settings across your team
 
 **See also:**
-
 - [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use evaluators directly without platform setup
 - [Custom Scoring](/evaluations/evaluators/custom-scoring) - Send scores from your own evaluation logic
-  </Info>
+</Info>
 
 ## Creating a Saved Evaluator
 
@@ -42944,7 +42919,7 @@ df = langwatch.dataset.get_dataset("my-dataset").to_pandas()
 experiment = langwatch.experiment.init("my-experiment")
 
 for index, row in experiment.loop(df.iterrows()):
-output = my_llm(row["input"])
+    output = my_llm(row["input"])
 
     # Use your saved evaluator
     experiment.evaluate(
@@ -42955,8 +42930,7 @@ output = my_llm(row["input"])
             "output": output,
         },
     )
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -42982,8 +42956,7 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-````
-
+```
 </CodeGroup>
 
 ### In Online Evaluation
@@ -42994,7 +42967,7 @@ import langwatch
 
 @langwatch.span()
 def my_llm_step(user_input: str):
-output = my_llm(user_input)
+    output = my_llm(user_input)
 
     # Use your saved evaluator
     result = langwatch.evaluation.evaluate(
@@ -43007,8 +42980,7 @@ output = my_llm(user_input)
     )
 
     return output
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -43029,8 +43001,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return output;
 }
-````
-
+```
 </CodeGroup>
 
 ### As Guardrails
@@ -43040,20 +43011,20 @@ async function myLLMStep(userInput: string): Promise<string> {
 import langwatch
 
 @langwatch.span()
-def my_llm_step(user_input: str): # Use your saved evaluator as a guardrail
-guardrail = langwatch.evaluation.evaluate(
-"evaluators/my-safety-check", # Your saved evaluator slug
-name="Safety Check",
-data={"input": user_input},
-as_guardrail=True,
-)
+def my_llm_step(user_input: str):
+    # Use your saved evaluator as a guardrail
+    guardrail = langwatch.evaluation.evaluate(
+        "evaluators/my-safety-check",  # Your saved evaluator slug
+        name="Safety Check",
+        data={"input": user_input},
+        as_guardrail=True,
+    )
 
     if not guardrail.passed:
         return "I can't help with that request."
 
     return my_llm(user_input)
-
-````
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -43074,8 +43045,7 @@ async function myLLMStep(userInput: string): Promise<string> {
 
   return await myLLM(userInput);
 }
-````
-
+```
 </CodeGroup>
 
 ### Via cURL
@@ -43101,13 +43071,13 @@ EOF
 
 ## Saved vs Built-in Evaluators
 
-| Aspect            | Built-in Evaluators                               | Saved Evaluators                                    |
-| ----------------- | ------------------------------------------------- | --------------------------------------------------- |
-| **Slug format**   | `provider/evaluator` (e.g., `ragas/faithfulness`) | `evaluators/{slug}` (e.g., `evaluators/my-checker`) |
-| **Configuration** | In code via `settings` parameter                  | Pre-configured on platform                          |
-| **Reusability**   | Copy settings across code                         | Reference by slug anywhere                          |
-| **Management**    | In codebase                                       | In LangWatch platform UI                            |
-| **Team access**   | Developers only                                   | Anyone with platform access                         |
+| Aspect | Built-in Evaluators | Saved Evaluators |
+|--------|---------------------|------------------|
+| **Slug format** | `provider/evaluator` (e.g., `ragas/faithfulness`) | `evaluators/{slug}` (e.g., `evaluators/my-checker`) |
+| **Configuration** | In code via `settings` parameter | Pre-configured on platform |
+| **Reusability** | Copy settings across code | Reference by slug anywhere |
+| **Management** | In codebase | In LangWatch platform UI |
+| **Team access** | Developers only | Anyone with platform access |
 
 ## Best Practices
 
@@ -43124,7 +43094,6 @@ Use descriptive, consistent names for your saved evaluators:
 ### When to Save an Evaluator
 
 Save an evaluator when you:
-
 - Use the same configuration in multiple places
 - Want to manage settings from the UI
 - Need non-developers to configure evaluations
@@ -43769,7 +43738,6 @@ description: Evaluate image generation, document parsing, and other multimodal A
 The built-in LLM-as-a-Judge evaluators accept images as inputs and outputs. Any vision-capable model (GPT-5.2, Claude Sonnet, Gemini and others) reads the images and scores them against the criteria in your prompt.
 
 This covers common multimodal use cases:
-
 - **Image generation quality**: score outputs of image generation models
 - **Document parsing**: evaluate extracted metadata from PDFs and scanned documents
 - **Content moderation**: detect NSFW or low-quality uploaded images
@@ -43783,31 +43751,27 @@ This covers common multimodal use cases:
 - **Category**: classification evaluation (e.g. "Classify the image as: excellent, good, poor")
 
 **See also:**
-
 - [Images and files in datasets](/datasets/dataset-images): Setting up image and file columns in datasets
 - [Saved Evaluators](/evaluations/evaluators/saved-evaluators): Reuse evaluators via API
-  </Info>
+</Info>
 
 ## Supported Image Formats
 
 Images can be provided in any of these formats:
 
-| Format              | Example                                        |
-| ------------------- | ---------------------------------------------- |
-| **Image URL**       | `https://example.com/photo.png`                |
-| **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...`         |
-| **Uploaded file**   | `/api/files/{projectId}/{objectId}/{fileName}` |
-| **Markdown image**  | `![alt text](https://example.com/photo.png)`   |
+| Format | Example |
+|--------|---------|
+| **Image URL** | `https://example.com/photo.png` |
+| **Base64 data URI** | `data:image/png;base64,iVBORw0KGgo...` |
+| **Uploaded file** | `/api/files/{projectId}/{objectId}/{fileName}` |
+| **Markdown image** | `![alt text](https://example.com/photo.png)` |
 
 Supported extensions: `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.bmp`, `.tiff`
 
 SVG is not accepted for an uploaded file: an SVG runs script in the browser, so the upload refuses `image/svg+xml`. A legacy `svg` URL a row already holds is still read as an image address.
 
 <Note>
-  Image detection is strict by design, a field is treated as an image only when the **entire value**
-  is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This
-  prevents unintended multipart content when a field happens to contain an image URL as part of a
-  longer string.
+Image detection is strict by design, a field is treated as an image only when the **entire value** is an image URL or base64 string. Mixed text-and-image content is sent as plain text. This prevents unintended multipart content when a field happens to contain an image URL as part of a longer string.
 </Note>
 
 ## Evaluating Images via UI
@@ -43820,10 +43784,7 @@ SVG is not accepted for an uploaded file: an SVG runs script in the browser, so 
 4. Click **Upload** in a cell to send a picture from disk, or click **or enter URL** to type an image URL or a base64 data URI. The grid renders them as thumbnails you can click to expand.
 
 <Frame caption="A dataset with an image column rendered as thumbnails">
-  <img
-    src="/images/datasets/dataset-image-column.png"
-    alt="A dataset grid with an image column showing thumbnails"
-  />
+  <img src="/images/datasets/dataset-image-column.png" alt="A dataset grid with an image column showing thumbnails" />
 </Frame>
 
 ### Step 2: Add an LLM-as-a-Judge Evaluator
@@ -43836,14 +43797,10 @@ SVG is not accepted for an uploaded file: an SVG runs script in the browser, so 
 The evaluator automatically detects image values and sends them as multipart content to the vision model. No special configuration needed.
 
 <Frame caption="Image evaluation workbench, LLM-as-a-Judge scoring virtual try-on quality with three image columns mapped to evaluator variables">
-  <img
-    src="/images/evaluations/multimodal-image-evaluation-workbench.png"
-    alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator"
-  />
+  <img src="/images/evaluations/multimodal-image-evaluation-workbench.png" alt="LangWatch experiments workbench showing image evaluation with LLM-as-a-Judge score evaluator" />
 </Frame>
 
 In this example, a virtual try-on pipeline is evaluated with three image columns:
-
 - **original** → mapped to `contexts` (the person's photo)
 - **request** → mapped to `input` (the clothing item)
 - **generated** → mapped to `output` (the try-on result)
@@ -43861,14 +43818,10 @@ Use this workflow to **iterate on your evaluator prompt** until you have reliabl
 For more advanced evaluation pipelines, you can create a **Custom Workflow Evaluator** in the Evaluators page. This gives you a visual workflow builder where you can chain multiple LLM nodes, add image variables to prompts, and build multi-step evaluation logic.
 
 <Frame caption="Custom workflow evaluator with image variables mapped to prompt template fields">
-  <img
-    src="/images/evaluations/multimodal-custom-workflow-evaluator.png"
-    alt="LangWatch custom workflow evaluator showing image variables in prompt template"
-  />
+  <img src="/images/evaluations/multimodal-custom-workflow-evaluator.png" alt="LangWatch custom workflow evaluator showing image variables in prompt template" />
 </Frame>
 
 In the workflow builder:
-
 1. Add **image-typed variables** to your prompt node inputs
 2. Use `{{ "{{variable_name}}" }}` syntax to reference images in the prompt template
 3. Map dataset columns to the image variables in the entry node
@@ -43892,18 +43845,18 @@ df = langwatch.dataset.get_dataset("my-image-dataset").to_pandas()
 
 experiment = langwatch.experiment.init("image-quality-evaluation")
 
-for index, row in experiment.loop(df.iterrows()): # Use your saved image evaluator
-experiment.evaluate(
-"evaluators/image-quality-scorer", # Your saved evaluator slug
-index=index,
-data={
-"input": row["request_image"], # Image URL or base64
-"output": row["generated_image"], # Image URL or base64
-"contexts": [row["original_photo"]], # List of context images
-},
-)
-
-````
+for index, row in experiment.loop(df.iterrows()):
+    # Use your saved image evaluator
+    experiment.evaluate(
+        "evaluators/image-quality-scorer",  # Your saved evaluator slug
+        index=index,
+        data={
+            "input": row["request_image"],      # Image URL or base64
+            "output": row["generated_image"],    # Image URL or base64
+            "contexts": [row["original_photo"]], # List of context images
+        },
+    )
+```
 
 ```typescript TypeScript
 import { LangWatch } from "langwatch";
@@ -43928,8 +43881,7 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-````
-
+```
 </CodeGroup>
 
 ### Custom Scoring with Vision Models
@@ -44033,23 +43985,21 @@ EOF
 ```
 
 <Warning>
-  Base64 image payloads can be large. The evaluator API supports request bodies up to **30 MB**. If
-  you are working with many high-resolution images, prefer using image URLs over base64 encoding.
+Base64 image payloads can be large. The evaluator API supports request bodies up to **30 MB**. If you are working with many high-resolution images, prefer using image URLs over base64 encoding.
 </Warning>
 
 ## Model Compatibility
 
 Image evaluation requires a **vision-capable model**. Any model supported by [litellm](https://docs.litellm.ai/docs/providers) with vision capabilities works, including:
 
-| Provider  | Models                                          |
-| --------- | ----------------------------------------------- |
-| OpenAI    | `gpt-4o`, `gpt-4o-mini`, `gpt-5.2`              |
+| Provider | Models |
+|----------|--------|
+| OpenAI | `gpt-4o`, `gpt-4o-mini`, `gpt-5.2` |
 | Anthropic | `claude-sonnet-4-5-20250929`, `claude-opus-4-6` |
-| Google    | `gemini-2.0-flash`, `gemini-2.5-pro`            |
+| Google | `gemini-2.0-flash`, `gemini-2.5-pro` |
 
 <Note>
-  The evaluator sends every detected image as image content to the model you select, whether or not
-  that model reads images. Pick a vision-capable model, or the provider can reject the request.
+The evaluator sends every detected image as image content to the model you select, whether or not that model reads images. Pick a vision-capable model, or the provider can reject the request.
 </Note>
 
 ## Next Steps
@@ -50611,10 +50561,10 @@ description: "Get started with LangWatch in seconds. Install a skill, and your A
 sidebarTitle: "Skills Directory"
 ---
 
-{/_ The accordion blocks between lw-generated markers are produced by
-docs/scripts/sync-prompts.sh from docs/skills/skills-pages-manifest.json.
-Edit the manifest (titles, skills, ordering) or the static content here,
-then rerun the script. Do not hand-edit the generated blocks. _/}
+{/* The accordion blocks between lw-generated markers are produced by
+    docs/scripts/sync-prompts.sh from docs/skills/skills-pages-manifest.json.
+    Edit the manifest (titles, skills, ordering) or the static content here,
+    then rerun the script. Do not hand-edit the generated blocks. */}
 
 ## Core Skills
 
@@ -58227,10 +58177,10 @@ description: "Skills for PMs and domain experts to collaborate with their team u
 sidebarTitle: "PM & Domain Experts"
 ---
 
-{/_ The accordion blocks between lw-generated markers are produced by
-docs/scripts/sync-prompts.sh from docs/skills/skills-pages-manifest.json.
-Edit the manifest (titles, skills, ordering) or the static content here,
-then rerun the script. Do not hand-edit the generated blocks. _/}
+{/* The accordion blocks between lw-generated markers are produced by
+    docs/scripts/sync-prompts.sh from docs/skills/skills-pages-manifest.json.
+    Edit the manifest (titles, skills, ordering) or the static content here,
+    then rerun the script. Do not hand-edit the generated blocks. */}
 
 {/* lw-generated:platform:start */}
 
@@ -59555,42 +59505,12 @@ Do not recreate the companion skill's instructions from memory. Load the focused
 ### Use the Platform Directly
 
 <CardGroup cols={2}>
-  <Card
-    title="Experiments"
-    description="Batch test your prompts and models on datasets."
-    icon="flask"
-    href="/evaluations/experiments/overview"
-  />
-  <Card
-    title="Scenarios"
-    description="Define simulation tests for your agent."
-    icon="play"
-    href="/agent-testing/overview"
-  />
-  <Card
-    title="Prompt Playground"
-    description="Edit, test, and iterate on prompts."
-    icon="code"
-    href="/prompt-management/prompt-playground"
-  />
-  <Card
-    title="Datasets"
-    description="Create and manage test datasets."
-    icon="table"
-    href="/datasets/overview"
-  />
-  <Card
-    title="Evaluators"
-    description="Browse and configure scoring functions."
-    icon="check-double"
-    href="/evaluations/evaluators/overview"
-  />
-  <Card
-    title="Analytics"
-    description="View costs, latency, and usage trends."
-    icon="chart-line"
-    href="/observability/overview"
-  />
+  <Card title="Experiments" description="Batch test your prompts and models on datasets." icon="flask" href="/evaluations/experiments/overview" />
+  <Card title="Scenarios" description="Define simulation tests for your agent." icon="play" href="/agent-testing/overview" />
+  <Card title="Prompt Playground" description="Edit, test, and iterate on prompts." icon="code" href="/prompt-management/prompt-playground" />
+  <Card title="Datasets" description="Create and manage test datasets." icon="table" href="/datasets/overview" />
+  <Card title="Evaluators" description="Browse and configure scoring functions." icon="check-double" href="/evaluations/evaluators/overview" />
+  <Card title="Analytics" description="View costs, latency, and usage trends." icon="chart-line" href="/observability/overview" />
 </CardGroup>
 
 ---
@@ -68776,24 +68696,6 @@ Query analytics timeseries data with metrics, aggregations, and filters.
 
 ---
 
-# FILE: ./api-reference/analytics/post-create-timeseries-timeseries.mdx
-
----
-title: "Create Timeseries"
-openapi: "POST /api/v1/analytics/timeseries"
----
-
----
-
-# FILE: ./api-reference/analytics/post-create-timeseries.mdx
-
----
-title: "Create Timeseries"
-openapi: "POST /api/v1/analytics/latest/timeseries"
----
-
----
-
 # FILE: ./api-reference/analytics/query-analytics-timeseries-legacy-path.mdx
 
 ---
@@ -68883,15 +68785,6 @@ openapi: "PATCH /api/v1/annotations/{id}"
 
 ---
 
-# FILE: ./api-reference/api-keys/create-an-api-key.mdx
-
----
-title: "Create an API key"
-openapi: "POST /api/v1/api-keys/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/api-keys/create-api-key.mdx
 
 ---
@@ -68901,56 +68794,11 @@ openapi: "POST /api/v1/api-keys"
 
 ---
 
-# FILE: ./api-reference/api-keys/delete-revoke-an-api-key.mdx
-
----
-title: "Revoke an API key"
-openapi: "DELETE /api/v1/api-keys/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/api-keys/get-an-api-key.mdx
-
----
-title: "Get an API key"
-openapi: "GET /api/v1/api-keys/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/api-keys/get-api-key.mdx
 
 ---
 title: "Get an API key"
 openapi: "GET /api/v1/api-keys/{id}"
----
-
----
-
-# FILE: ./api-reference/api-keys/get-get-an-api-key.mdx
-
----
-title: "Get an API key"
-openapi: "GET /api/v1/api-keys/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/api-keys/get-list-api-keys-.mdx
-
----
-title: "List API keys"
-openapi: "GET /api/v1/api-keys/latest/"
----
-
----
-
-# FILE: ./api-reference/api-keys/get-list-api-keys.mdx
-
----
-title: "List API keys"
-openapi: "GET /api/v1/api-keys/2026-08-07/"
 ---
 
 ---
@@ -69081,33 +68929,6 @@ A key can never grant more than the person or organization behind it already has
 
 ---
 
-# FILE: ./api-reference/api-keys/patch-update-an-api-key.mdx
-
----
-title: "Update an API key"
-openapi: "PATCH /api/v1/api-keys/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/api-keys/post-create-an-api-key.mdx
-
----
-title: "Create an API key"
-openapi: "POST /api/v1/api-keys/latest/"
----
-
----
-
-# FILE: ./api-reference/api-keys/revoke-an-api-key.mdx
-
----
-title: "Revoke an API key"
-openapi: "DELETE /api/v1/api-keys/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/api-keys/revoke-api-key.mdx
 
 ---
@@ -69117,38 +68938,11 @@ openapi: "DELETE /api/v1/api-keys/{id}"
 
 ---
 
-# FILE: ./api-reference/api-keys/update-an-api-key.mdx
-
----
-title: "Update an API key"
-openapi: "PATCH /api/v1/api-keys/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/api-keys/update-api-key.mdx
 
 ---
 title: "Update an API key"
 openapi: "PATCH /api/v1/api-keys/{id}"
----
-
----
-
-# FILE: ./api-reference/coding-agents/get-list-coding-agent-session-events-events.mdx
-
----
-title: "List coding agent session events"
-openapi: "GET /api/v1/coding-agent/sessions/{sessionId}/events"
----
-
----
-
-# FILE: ./api-reference/coding-agents/get-list-coding-agent-session-events.mdx
-
----
-title: "List coding agent session events"
-openapi: "GET /api/v1/coding-agent/latest/sessions/{sessionId}/events"
 ---
 
 ---
@@ -69198,38 +68992,11 @@ The same data renders in the product on the [sessions](/coding-agents/sessions) 
 
 ---
 
-# FILE: ./api-reference/dashboards/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/dashboards/create-dashboards.mdx
 
 ---
 title: "Create a new dashboard"
 openapi: "POST /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/create-latest.mdx
-
----
-title: "Create a new dashboard"
-openapi: "POST /api/v1/dashboards/latest/"
----
-
----
-
-# FILE: ./api-reference/dashboards/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/2026-08-07/{id}"
 ---
 
 ---
@@ -69243,24 +69010,6 @@ openapi: "DELETE /api/v1/dashboards/{id}"
 
 ---
 
-# FILE: ./api-reference/dashboards/delete-latest.mdx
-
----
-title: "Delete a dashboard and its graphs"
-openapi: "DELETE /api/v1/dashboards/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/dashboards/get-dashboards.mdx
 
 ---
@@ -69270,38 +69019,11 @@ openapi: "GET /api/v1/dashboards/{id}"
 
 ---
 
-# FILE: ./api-reference/dashboards/get-latest.mdx
-
----
-title: "Get a dashboard by its id, including its graphs"
-openapi: "GET /api/v1/dashboards/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/dashboards/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/dashboards/list-dashboards.mdx
 
 ---
 title: "List Dashboards"
 openapi: "GET /api/v1/dashboards"
----
-
----
-
-# FILE: ./api-reference/dashboards/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/dashboards/latest/"
 ---
 
 ---
@@ -69328,47 +69050,11 @@ openapi: "PUT /api/v1/dashboards/reorder"
 
 ---
 
-# FILE: ./api-reference/dashboards/put-update-reorder.mdx
-
----
-title: "Update Reorder"
-openapi: "PUT /api/v1/dashboards/latest/reorder"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/dashboards/update-dashboards.mdx
 
 ---
 title: "Rename a dashboard"
 openapi: "PATCH /api/v1/dashboards/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-latest.mdx
-
----
-title: "Rename a dashboard"
-openapi: "PATCH /api/v1/dashboards/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/dashboards/update-reorder.mdx
-
----
-title: "Reorder dashboards"
-openapi: "PUT /api/v1/dashboards/reorder"
 ---
 
 ---
@@ -69584,38 +69270,11 @@ openapi: "POST /api/v1/evaluations/{evaluator}/evaluate"
 
 ---
 
-# FILE: ./api-reference/evaluators-config/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new evaluator"
-openapi: "POST /api/v1/evaluators/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/evaluators-config/create-evaluators.mdx
 
 ---
 title: "Create a new evaluator"
 openapi: "POST /api/v1/evaluators"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/create-latest.mdx
-
----
-title: "Create a new evaluator"
-openapi: "POST /api/v1/evaluators/latest/"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/evaluators/2026-08-07/{id}"
 ---
 
 ---
@@ -69629,24 +69288,6 @@ openapi: "DELETE /api/v1/evaluators/{id}"
 
 ---
 
-# FILE: ./api-reference/evaluators-config/delete-latest.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/evaluators/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a specific evaluator by ID or slug"
-openapi: "GET /api/v1/evaluators/2026-08-07/{idOrSlug}"
----
-
----
-
 # FILE: ./api-reference/evaluators-config/get-evaluators.mdx
 
 ---
@@ -69656,38 +69297,11 @@ openapi: "GET /api/v1/evaluators/{idOrSlug}"
 
 ---
 
-# FILE: ./api-reference/evaluators-config/get-latest.mdx
-
----
-title: "Get a specific evaluator by ID or slug"
-openapi: "GET /api/v1/evaluators/latest/{idOrSlug}"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/list-2026-08-07-2026-08-07.mdx
-
----
-title: "Get all evaluators for a project"
-openapi: "GET /api/v1/evaluators/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/evaluators-config/list-evaluators.mdx
 
 ---
 title: "Get all evaluators for a project"
 openapi: "GET /api/v1/evaluators"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/list-latest.mdx
-
----
-title: "Get all evaluators for a project"
-openapi: "GET /api/v1/evaluators/latest/"
 ---
 
 ---
@@ -69705,29 +69319,11 @@ Manage evaluator configurations for your project. Create, update, and organize e
 
 ---
 
-# FILE: ./api-reference/evaluators-config/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update an existing evaluator"
-openapi: "PUT /api/v1/evaluators/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/evaluators-config/update-evaluators.mdx
 
 ---
 title: "Update an existing evaluator"
 openapi: "PUT /api/v1/evaluators/{id}"
----
-
----
-
-# FILE: ./api-reference/evaluators-config/update-latest.mdx
-
----
-title: "Update an existing evaluator"
-openapi: "PUT /api/v1/evaluators/latest/{id}"
 ---
 
 ---
@@ -70231,164 +69827,11 @@ Record customer events against a trace or thread, so behaviour like a thumbs-up,
 
 ---
 
-# FILE: ./api-reference/events/post-create-track-track.mdx
-
----
-title: "Record a user event"
-openapi: "POST /api/v1/events/latest/track"
----
-
----
-
-# FILE: ./api-reference/events/post-create-track.mdx
-
----
-title: "Record a user event"
-openapi: "POST /api/v1/events/2026-08-07/track"
----
-
----
-
-# FILE: ./api-reference/experiments/create-an-experiment-and-its-setup.mdx
-
----
-title: "Create an experiment and its setup"
-openapi: "POST /api/v1/experiments/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/experiments/create-an-experiment.mdx
 
 ---
 title: "Create an experiment"
 openapi: "POST /api/v1/experiment/init"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-an-experiment-s-versions-versions.mdx
-
----
-title: "List an experiment's versions"
-openapi: "GET /api/v1/experiments/latest/{slug}/versions"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-an-experiment-s-versions.mdx
-
----
-title: "List an experiment's versions"
-openapi: "GET /api/v1/experiments/2026-08-07/{slug}/versions"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-experiments-for-the-project-.mdx
-
----
-title: "List experiments for the project"
-openapi: "GET /api/v1/experiments/latest/"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-experiments-for-the-project.mdx
-
----
-title: "List experiments for the project"
-openapi: "GET /api/v1/experiments/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-runs-of-an-experiment-runs.mdx
-
----
-title: "List runs of an experiment"
-openapi: "GET /api/v1/experiments/latest/runs"
----
-
----
-
-# FILE: ./api-reference/experiments/get-list-runs-of-an-experiment.mdx
-
----
-title: "List runs of an experiment"
-openapi: "GET /api/v1/experiments/2026-08-07/runs"
----
-
----
-
-# FILE: ./api-reference/experiments/get-poll-a-run-runId.mdx
-
----
-title: "Poll a run"
-openapi: "GET /api/v1/experiments/latest/runs/{runId}"
----
-
----
-
-# FILE: ./api-reference/experiments/get-poll-a-run.mdx
-
----
-title: "Poll a run"
-openapi: "GET /api/v1/experiments/2026-08-07/runs/{runId}"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-an-experiment-s-setup-workbench-state.mdx
-
----
-title: "Read an experiment's setup"
-openapi: "GET /api/v1/experiments/latest/{slug}/workbench-state"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-an-experiment-s-setup.mdx
-
----
-title: "Read an experiment's setup"
-openapi: "GET /api/v1/experiments/2026-08-07/{slug}/workbench-state"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-one-experiment-slug.mdx
-
----
-title: "Read one experiment"
-openapi: "GET /api/v1/experiments/latest/{slug}"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-one-experiment.mdx
-
----
-title: "Read one experiment"
-openapi: "GET /api/v1/experiments/2026-08-07/{slug}"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-run-results-results.mdx
-
----
-title: "Read run results"
-openapi: "GET /api/v1/experiments/latest/runs/{runId}/results"
----
-
----
-
-# FILE: ./api-reference/experiments/get-read-run-results.mdx
-
----
-title: "Read run results"
-openapi: "GET /api/v1/experiments/2026-08-07/runs/{runId}/results"
 ---
 
 ---
@@ -70442,74 +69885,11 @@ openapi: "GET /api/v1/experiments/runs/{runId}"
 
 ---
 
-# FILE: ./api-reference/experiments/post-create-an-experiment-and-its-setup.mdx
-
----
-title: "Create an experiment and its setup"
-openapi: "POST /api/v1/experiments/latest/"
----
-
----
-
 # FILE: ./api-reference/experiments/post-create-an-experiment.mdx
 
 ---
 title: "Create an experiment and its setup"
 openapi: "POST /api/v1/experiments"
----
-
----
-
-# FILE: ./api-reference/experiments/post-restore-an-experiment-version-restore.mdx
-
----
-title: "Restore an experiment version"
-openapi: "POST /api/v1/experiments/latest/{slug}/versions/{version}/restore"
----
-
----
-
-# FILE: ./api-reference/experiments/post-restore-an-experiment-version.mdx
-
----
-title: "Restore an experiment version"
-openapi: "POST /api/v1/experiments/2026-08-07/{slug}/versions/{version}/restore"
----
-
----
-
-# FILE: ./api-reference/experiments/post-run-an-experiment-run.mdx
-
----
-title: "Run an experiment"
-openapi: "POST /api/v1/experiments/latest/{slug}/run"
----
-
----
-
-# FILE: ./api-reference/experiments/post-run-an-experiment.mdx
-
----
-title: "Run an experiment"
-openapi: "POST /api/v1/experiments/2026-08-07/{slug}/run"
----
-
----
-
-# FILE: ./api-reference/experiments/put-save-an-experiment-s-setup-workbench-state.mdx
-
----
-title: "Save an experiment's setup"
-openapi: "PUT /api/v1/experiments/latest/{slug}/workbench-state"
----
-
----
-
-# FILE: ./api-reference/experiments/put-save-an-experiment-s-setup.mdx
-
----
-title: "Save an experiment's setup"
-openapi: "PUT /api/v1/experiments/2026-08-07/{slug}/workbench-state"
 ---
 
 ---
@@ -70845,38 +70225,11 @@ openapi: "PATCH /api/gateway/v1/virtual-keys/{id}"
 
 ---
 
-# FILE: ./api-reference/graphs/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a custom graph on a dashboard"
-openapi: "POST /api/v1/graphs/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/graphs/create-graphs.mdx
 
 ---
 title: "Create a custom graph on a dashboard"
 openapi: "POST /api/v1/graphs"
----
-
----
-
-# FILE: ./api-reference/graphs/create-latest.mdx
-
----
-title: "Create a custom graph on a dashboard"
-openapi: "POST /api/v1/graphs/latest/"
----
-
----
-
-# FILE: ./api-reference/graphs/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a custom graph"
-openapi: "DELETE /api/v1/graphs/2026-08-07/{id}"
 ---
 
 ---
@@ -70890,24 +70243,6 @@ openapi: "DELETE /api/v1/graphs/{id}"
 
 ---
 
-# FILE: ./api-reference/graphs/delete-latest.mdx
-
----
-title: "Delete a custom graph"
-openapi: "DELETE /api/v1/graphs/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/graphs/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a custom graph by its ID"
-openapi: "GET /api/v1/graphs/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/graphs/get-graphs.mdx
 
 ---
@@ -70917,38 +70252,11 @@ openapi: "GET /api/v1/graphs/{id}"
 
 ---
 
-# FILE: ./api-reference/graphs/get-latest.mdx
-
----
-title: "Get a custom graph by its ID"
-openapi: "GET /api/v1/graphs/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/graphs/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/graphs/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/graphs/list-graphs.mdx
 
 ---
 title: "List Graphs"
 openapi: "GET /api/v1/graphs"
----
-
----
-
-# FILE: ./api-reference/graphs/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/graphs/latest/"
 ---
 
 ---
@@ -70966,47 +70274,11 @@ Manage custom analytics graphs within dashboards. Create, update, and configure 
 
 ---
 
-# FILE: ./api-reference/graphs/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update 2026 08 07"
-openapi: "PATCH /api/v1/graphs/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/graphs/update-graphs.mdx
 
 ---
 title: "Update Graphs"
 openapi: "PATCH /api/v1/graphs/{id}"
----
-
----
-
-# FILE: ./api-reference/graphs/update-latest.mdx
-
----
-title: "Update Latest"
-openapi: "PATCH /api/v1/graphs/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/action-bindings.mdx
-
----
-title: "Add a role binding to a group"
-openapi: "POST /api/v1/groups/2026-08-07/{id}/bindings"
----
-
----
-
-# FILE: ./api-reference/groups/action-members.mdx
-
----
-title: "Add a member to a group"
-openapi: "POST /api/v1/groups/2026-08-07/{id}/members"
 ---
 
 ---
@@ -71029,65 +70301,11 @@ openapi: "POST /api/v1/groups/{id}/members"
 
 ---
 
-# FILE: ./api-reference/groups/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new group"
-openapi: "POST /api/v1/groups/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/groups/create-group.mdx
 
 ---
 title: "Create group"
 openapi: "POST /api/v1/groups"
----
-
----
-
-# FILE: ./api-reference/groups/create-latest.mdx
-
----
-title: "Create a new group"
-openapi: "POST /api/v1/groups/latest/"
----
-
----
-
-# FILE: ./api-reference/groups/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a group"
-openapi: "DELETE /api/v1/groups/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/delete-bindings.mdx
-
----
-title: "Remove a role binding from a group"
-openapi: "DELETE /api/v1/groups/2026-08-07/{id}/bindings/{bindingId}"
----
-
----
-
-# FILE: ./api-reference/groups/delete-delete-bindings.mdx
-
----
-title: "Remove a role binding from a group"
-openapi: "DELETE /api/v1/groups/latest/{id}/bindings/{bindingId}"
----
-
----
-
-# FILE: ./api-reference/groups/delete-delete-members.mdx
-
----
-title: "Remove a member from a group"
-openapi: "DELETE /api/v1/groups/latest/{id}/members/{userId}"
 ---
 
 ---
@@ -71101,92 +70319,11 @@ openapi: "DELETE /api/v1/groups/{id}"
 
 ---
 
-# FILE: ./api-reference/groups/delete-latest.mdx
-
----
-title: "Delete a group"
-openapi: "DELETE /api/v1/groups/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/delete-members.mdx
-
----
-title: "Remove a member from a group"
-openapi: "DELETE /api/v1/groups/2026-08-07/{id}/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/groups/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a group with members and bindings"
-openapi: "GET /api/v1/groups/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/get-bindings.mdx
-
----
-title: "List role bindings for a group"
-openapi: "GET /api/v1/groups/2026-08-07/{id}/bindings"
----
-
----
-
-# FILE: ./api-reference/groups/get-get-bindings.mdx
-
----
-title: "List role bindings for a group"
-openapi: "GET /api/v1/groups/latest/{id}/bindings"
----
-
----
-
-# FILE: ./api-reference/groups/get-get-members.mdx
-
----
-title: "List members of a group"
-openapi: "GET /api/v1/groups/latest/{id}/members"
----
-
----
-
 # FILE: ./api-reference/groups/get-group.mdx
 
 ---
 title: "Get group"
 openapi: "GET /api/v1/groups/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/get-latest.mdx
-
----
-title: "Get a group with members and bindings"
-openapi: "GET /api/v1/groups/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/get-members.mdx
-
----
-title: "List members of a group"
-openapi: "GET /api/v1/groups/2026-08-07/{id}/members"
----
-
----
-
-# FILE: ./api-reference/groups/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List all groups for the organization"
-openapi: "GET /api/v1/groups/2026-08-07/"
 ---
 
 ---
@@ -71205,15 +70342,6 @@ openapi: "GET /api/v1/groups/{id}/bindings"
 ---
 title: "List groups"
 openapi: "GET /api/v1/groups"
----
-
----
-
-# FILE: ./api-reference/groups/list-latest.mdx
-
----
-title: "List all groups for the organization"
-openapi: "GET /api/v1/groups/latest/"
 ---
 
 ---
@@ -71343,24 +70471,6 @@ Available roles: `ADMIN`, `MEMBER`, `VIEWER`, `CUSTOM` (requires `customRoleId`)
 
 ---
 
-# FILE: ./api-reference/groups/post-action-bindings.mdx
-
----
-title: "Add a role binding to a group"
-openapi: "POST /api/v1/groups/latest/{id}/bindings"
----
-
----
-
-# FILE: ./api-reference/groups/post-action-members.mdx
-
----
-title: "Add a member to a group"
-openapi: "POST /api/v1/groups/latest/{id}/members"
----
-
----
-
 # FILE: ./api-reference/groups/remove-binding.mdx
 
 ---
@@ -71384,24 +70494,6 @@ openapi: "DELETE /api/v1/groups/{id}/members/{userId}"
 ---
 title: "Rename group"
 openapi: "PATCH /api/v1/groups/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Rename a group"
-openapi: "PATCH /api/v1/groups/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/groups/update-latest.mdx
-
----
-title: "Rename a group"
-openapi: "PATCH /api/v1/groups/latest/{id}"
 ---
 
 ---
@@ -71859,24 +70951,6 @@ openapi: "PATCH /api/v1/organization/members/{userId}"
 
 ---
 
-# FILE: ./api-reference/model-providers/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/model-providers/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/model-providers/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/model-providers/latest/"
----
-
----
-
 # FILE: ./api-reference/model-providers/list-model-providers.mdx
 
 ---
@@ -71899,24 +70973,6 @@ Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used
 
 ---
 
-# FILE: ./api-reference/model-providers/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Create or update a model provider"
-openapi: "PUT /api/v1/model-providers/2026-08-07/{provider}"
----
-
----
-
-# FILE: ./api-reference/model-providers/update-latest.mdx
-
----
-title: "Create or update a model provider"
-openapi: "PUT /api/v1/model-providers/latest/{provider}"
----
-
----
-
 # FILE: ./api-reference/model-providers/update-model-providers.mdx
 
 ---
@@ -71935,47 +70991,11 @@ openapi: "POST /api/v1/monitors/{id}/toggle"
 
 ---
 
-# FILE: ./api-reference/monitors/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new online evaluation monitor"
-openapi: "POST /api/v1/monitors/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/monitors/create-latest.mdx
-
----
-title: "Create a new online evaluation monitor"
-openapi: "POST /api/v1/monitors/latest/"
----
-
----
-
 # FILE: ./api-reference/monitors/create-monitors.mdx
 
 ---
 title: "Create a new online evaluation monitor"
 openapi: "POST /api/v1/monitors"
----
-
----
-
-# FILE: ./api-reference/monitors/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a monitor"
-openapi: "DELETE /api/v1/monitors/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/monitors/delete-latest.mdx
-
----
-title: "Delete a monitor"
-openapi: "DELETE /api/v1/monitors/latest/{id}"
 ---
 
 ---
@@ -71989,47 +71009,11 @@ openapi: "DELETE /api/v1/monitors/{id}"
 
 ---
 
-# FILE: ./api-reference/monitors/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a monitor by its ID"
-openapi: "GET /api/v1/monitors/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/monitors/get-latest.mdx
-
----
-title: "Get a monitor by its ID"
-openapi: "GET /api/v1/monitors/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/monitors/get-monitors.mdx
 
 ---
 title: "Get a monitor by its ID"
 openapi: "GET /api/v1/monitors/{id}"
----
-
----
-
-# FILE: ./api-reference/monitors/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/monitors/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/monitors/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/monitors/latest/"
 ---
 
 ---
@@ -72056,42 +71040,6 @@ Manage online evaluation monitors that automatically evaluate traces as they arr
 
 ---
 
-# FILE: ./api-reference/monitors/post-action-toggle-toggle.mdx
-
----
-title: "Enable or disable a monitor"
-openapi: "POST /api/v1/monitors/latest/{id}/toggle"
----
-
----
-
-# FILE: ./api-reference/monitors/post-action-toggle.mdx
-
----
-title: "Enable or disable a monitor"
-openapi: "POST /api/v1/monitors/2026-08-07/{id}/toggle"
----
-
----
-
-# FILE: ./api-reference/monitors/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update a monitor"
-openapi: "PATCH /api/v1/monitors/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/monitors/update-latest.mdx
-
----
-title: "Update a monitor"
-openapi: "PATCH /api/v1/monitors/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/monitors/update-monitors.mdx
 
 ---
@@ -72101,146 +71049,11 @@ openapi: "PATCH /api/v1/monitors/{id}"
 
 ---
 
-# FILE: ./api-reference/organization/create-invites.mdx
-
----
-title: "Create Invites"
-openapi: "POST /api/v1/organization/2026-08-07/invites"
----
-
----
-
-# FILE: ./api-reference/organization/delete-delete-invites.mdx
-
----
-title: "Revoke a pending invite"
-openapi: "DELETE /api/v1/organization/latest/invites/{id}"
----
-
----
-
-# FILE: ./api-reference/organization/delete-delete-members.mdx
-
----
-title: "Delete Members"
-openapi: "DELETE /api/v1/organization/latest/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/organization/delete-invites.mdx
-
----
-title: "Revoke a pending invite"
-openapi: "DELETE /api/v1/organization/2026-08-07/invites/{id}"
----
-
----
-
-# FILE: ./api-reference/organization/delete-members.mdx
-
----
-title: "Delete Members"
-openapi: "DELETE /api/v1/organization/2026-08-07/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/organization/get-access.mdx
-
----
-title: "Get Access"
-openapi: "GET /api/v1/organization/2026-08-07/members/{userId}/access"
----
-
----
-
-# FILE: ./api-reference/organization/get-get-access.mdx
-
----
-title: "Get Access"
-openapi: "GET /api/v1/organization/latest/members/{userId}/access"
----
-
----
-
-# FILE: ./api-reference/organization/get-get-members.mdx
-
----
-title: "Get Members"
-openapi: "GET /api/v1/organization/latest/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/organization/get-list-invites.mdx
-
----
-title: "List pending invites"
-openapi: "GET /api/v1/organization/latest/invites"
----
-
----
-
-# FILE: ./api-reference/organization/get-list-members.mdx
-
----
-title: "List Members"
-openapi: "GET /api/v1/organization/latest/members"
----
-
----
-
-# FILE: ./api-reference/organization/get-members.mdx
-
----
-title: "Get Members"
-openapi: "GET /api/v1/organization/2026-08-07/members/{userId}"
----
-
----
-
 # FILE: ./api-reference/organization/get-organization.mdx
 
 ---
 title: "Get organization"
 openapi: "GET /api/v1/organization"
----
-
----
-
-# FILE: ./api-reference/organization/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/organization/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/organization/list-invites.mdx
-
----
-title: "List pending invites"
-openapi: "GET /api/v1/organization/2026-08-07/invites"
----
-
----
-
-# FILE: ./api-reference/organization/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/organization/latest/"
----
-
----
-
-# FILE: ./api-reference/organization/list-members.mdx
-
----
-title: "List Members"
-openapi: "GET /api/v1/organization/2026-08-07/members"
 ---
 
 ---
@@ -72307,51 +71120,6 @@ Setting `traceSharingEnabled` to `false` revokes every trace share link already 
 
 ---
 
-# FILE: ./api-reference/organization/patch-update-members.mdx
-
----
-title: "Update Members"
-openapi: "PATCH /api/v1/organization/latest/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/organization/post-create-invites.mdx
-
----
-title: "Create Invites"
-openapi: "POST /api/v1/organization/latest/invites"
----
-
----
-
-# FILE: ./api-reference/organization/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update the organization profile"
-openapi: "PATCH /api/v1/organization/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/organization/update-latest.mdx
-
----
-title: "Update the organization profile"
-openapi: "PATCH /api/v1/organization/latest/"
----
-
----
-
-# FILE: ./api-reference/organization/update-members.mdx
-
----
-title: "Update Members"
-openapi: "PATCH /api/v1/organization/2026-08-07/members/{userId}"
----
-
----
-
 # FILE: ./api-reference/organization/update-organization.mdx
 
 ---
@@ -72361,56 +71129,11 @@ openapi: "PATCH /api/v1/organization"
 
 ---
 
-# FILE: ./api-reference/organizations/create-an-organization.mdx
-
----
-title: "Create an organization"
-openapi: "POST /api/v1/organizations/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/organizations/create-organization.mdx
 
 ---
 title: "Create an organization"
 openapi: "POST /api/v1/organizations"
----
-
----
-
-# FILE: ./api-reference/organizations/get-an-organization.mdx
-
----
-title: "Get an organization"
-openapi: "GET /api/v1/organizations/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/organizations/get-get-an-organization.mdx
-
----
-title: "Get an organization"
-openapi: "GET /api/v1/organizations/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/organizations/get-list-organizations-.mdx
-
----
-title: "List organizations"
-openapi: "GET /api/v1/organizations/latest/"
----
-
----
-
-# FILE: ./api-reference/organizations/get-list-organizations.mdx
-
----
-title: "List organizations"
-openapi: "GET /api/v1/organizations/2026-08-07/"
 ---
 
 ---
@@ -72508,107 +71231,11 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 
-# FILE: ./api-reference/organizations/post-create-an-organization.mdx
-
----
-title: "Create an organization"
-openapi: "POST /api/v1/organizations/latest/"
----
-
----
-
-# FILE: ./api-reference/platform-health/overview.mdx
-
----
-title: "Platform Health"
-description: "One endpoint an external monitor polls to learn whether LangWatch is working right now."
----
-
-## What it answers
-
-`GET /api/v1/platform-health` runs every subsystem probe this deployment has and reports what each one said. It is built for an uptime monitor such as Better Stack: one URL, one status code to alert on, and a body that names which subsystem is at fault.
-
-Each subsystem is also reachable on its own path, for a monitor that wants a separate check per subsystem:
-
-```
-GET /api/v1/platform-health/collector
-GET /api/v1/platform-health/evaluations
-GET /api/v1/platform-health/processor
-GET /api/v1/platform-health/triggers
-GET /api/v1/platform-health/workflows
-```
-
-## Authentication
-
-The family takes a deployment-wide monitoring key, not a project API key: a monitor is not a tenant, and the answer carries no tenant data.
-
-```
-Authorization: Bearer <PLATFORM_HEALTH_API_KEY>
-```
-
-A missing or wrong key answers `401` with the code `platform_health_unauthorized`, and no probe runs. On a deployment that configured no monitoring key the endpoints are not served at all, so an unconfigured instance answers `404` rather than opening a platform-wide probe to anyone.
-
-## The response
-
-```json
-{
-  "status": "healthy",
-  "checkedAt": "2026-09-07T10:15:03.412Z",
-  "checks": [
-    { "name": "collector", "status": "healthy", "durationMs": 412 },
-    { "name": "processor", "status": "healthy", "durationMs": 2106 },
-    {
-      "name": "triggers",
-      "status": "not_configured",
-      "detail": "this request named no target for the probe to check"
-    }
-  ]
-}
-```
-
-| Overall status | Status code | What it means                                                                 |
-| -------------- | ----------- | ----------------------------------------------------------------------------- |
-| `healthy`      | `200`       | Every subsystem answered.                                                     |
-| `degraded`     | `200`       | Nothing is broken, but at least one probe was pointed at nothing to check.    |
-| `unhealthy`    | `503`       | At least one subsystem did not answer. Alert on this.                         |
-
-A subsystem entry carries `name`, its own `status` of `healthy`, `unhealthy` or `not_configured`, how long the probe took in `durationMs`, and, where it did not pass, a short `detail` in LangWatch's own words. A probe that fails never takes the others down, so one broken subsystem still leaves you a full report.
-
-## Pointing the trigger and workflow probes
-
-Those two probes check something specific, so name it in the request:
-
-```
-GET /api/v1/platform-health?triggerId=trigger_abc&workflowId=workflow_xyz
-```
-
-Named nothing, they report `not_configured` and the overall status becomes `degraded`. That is deliberate: an unpointed probe is a gap in your monitoring configuration, not an outage.
-
----
-
-# FILE: ./api-reference/projects/archive-a-project.mdx
-
----
-title: "Archive a project"
-openapi: "DELETE /api/projects/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/projects/archive-project.mdx
 
 ---
 title: "Archive project"
 openapi: "DELETE /api/projects/{id}"
----
-
----
-
-# FILE: ./api-reference/projects/create-a-project.mdx
-
----
-title: "Create a project"
-openapi: "POST /api/projects/2026-08-07/"
 ---
 
 ---
@@ -72622,24 +71249,6 @@ openapi: "POST /api/projects"
 
 ---
 
-# FILE: ./api-reference/projects/delete-archive-a-project.mdx
-
----
-title: "Archive a project"
-openapi: "DELETE /api/projects/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/projects/get-a-project.mdx
-
----
-title: "Get a project"
-openapi: "GET /api/projects/2026-08-07/{id}"
----
-
----
-
 # FILE: ./api-reference/projects/get-api-key.mdx
 
 ---
@@ -72649,56 +71258,11 @@ openapi: "GET /api/projects/{id}/api-key"
 
 ---
 
-# FILE: ./api-reference/projects/get-get-a-project.mdx
-
----
-title: "Get a project"
-openapi: "GET /api/projects/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/projects/get-get-the-project-api-key.mdx
-
----
-title: "Get the project API key"
-openapi: "GET /api/projects/latest/{id}/api-key"
----
-
----
-
-# FILE: ./api-reference/projects/get-list-projects-.mdx
-
----
-title: "List projects"
-openapi: "GET /api/projects/latest/"
----
-
----
-
-# FILE: ./api-reference/projects/get-list-projects.mdx
-
----
-title: "List projects"
-openapi: "GET /api/projects/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/projects/get-project.mdx
 
 ---
 title: "Get project"
 openapi: "GET /api/projects/{id}"
----
-
----
-
-# FILE: ./api-reference/projects/get-the-project-api-key.mdx
-
----
-title: "Get the project API key"
-openapi: "GET /api/projects/2026-08-07/{id}/api-key"
 ---
 
 ---
@@ -72783,56 +71347,11 @@ LANGWATCH_PROJECT_ID=<project id>
 
 ---
 
-# FILE: ./api-reference/projects/patch-update-a-project.mdx
-
----
-title: "Update a project"
-openapi: "PATCH /api/projects/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/projects/post-create-a-project.mdx
-
----
-title: "Create a project"
-openapi: "POST /api/projects/latest/"
----
-
----
-
-# FILE: ./api-reference/projects/post-regenerate-the-project-api-key.mdx
-
----
-title: "Regenerate the project API key"
-openapi: "POST /api/projects/latest/{id}/regenerate-api-key"
----
-
----
-
 # FILE: ./api-reference/projects/regenerate-api-key.mdx
 
 ---
 title: "Regenerate project API key"
 openapi: "POST /api/projects/{id}/regenerate-api-key"
----
-
----
-
-# FILE: ./api-reference/projects/regenerate-the-project-api-key.mdx
-
----
-title: "Regenerate the project API key"
-openapi: "POST /api/projects/2026-08-07/{id}/regenerate-api-key"
----
-
----
-
-# FILE: ./api-reference/projects/update-a-project.mdx
-
----
-title: "Update a project"
-openapi: "PATCH /api/projects/2026-08-07/{id}"
 ---
 
 ---
@@ -73489,24 +72008,6 @@ openapi: "POST /api/v1/query"
 
 ---
 
-# FILE: ./api-reference/role-bindings/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create 2026 08 07"
-openapi: "POST /api/v1/role-bindings/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/role-bindings/create-latest.mdx
-
----
-title: "Create Latest"
-openapi: "POST /api/v1/role-bindings/latest/"
----
-
----
-
 # FILE: ./api-reference/role-bindings/create-role-binding.mdx
 
 ---
@@ -73516,47 +72017,11 @@ openapi: "POST /api/v1/role-bindings"
 
 ---
 
-# FILE: ./api-reference/role-bindings/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a role binding"
-openapi: "DELETE /api/v1/role-bindings/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/role-bindings/delete-latest.mdx
-
----
-title: "Delete a role binding"
-openapi: "DELETE /api/v1/role-bindings/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/role-bindings/delete-role-binding.mdx
 
 ---
 title: "Delete role binding"
 openapi: "DELETE /api/v1/role-bindings/{id}"
----
-
----
-
-# FILE: ./api-reference/role-bindings/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/role-bindings/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/role-bindings/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/role-bindings/latest/"
 ---
 
 ---
@@ -73677,47 +72142,11 @@ A create response can carry `hasLegacyAccessNotice: true`. It means this is the 
 
 ---
 
-# FILE: ./api-reference/role-bindings/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Change a binding's role"
-openapi: "PATCH /api/v1/role-bindings/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/role-bindings/update-latest.mdx
-
----
-title: "Change a binding's role"
-openapi: "PATCH /api/v1/role-bindings/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/role-bindings/update-role-binding.mdx
 
 ---
 title: "Update role binding"
 openapi: "PATCH /api/v1/role-bindings/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create 2026 08 07"
-openapi: "POST /api/v1/roles/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/roles/create-latest.mdx
-
----
-title: "Create Latest"
-openapi: "POST /api/v1/roles/latest/"
 ---
 
 ---
@@ -73731,24 +72160,6 @@ openapi: "POST /api/v1/roles"
 
 ---
 
-# FILE: ./api-reference/roles/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete a custom role"
-openapi: "DELETE /api/v1/roles/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/delete-latest.mdx
-
----
-title: "Delete a custom role"
-openapi: "DELETE /api/v1/roles/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/roles/delete-role.mdx
 
 ---
@@ -73758,65 +72169,11 @@ openapi: "DELETE /api/v1/roles/{id}"
 
 ---
 
-# FILE: ./api-reference/roles/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Read one custom role"
-openapi: "GET /api/v1/roles/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/get-latest.mdx
-
----
-title: "Read one custom role"
-openapi: "GET /api/v1/roles/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/get-list-permissions-permissions.mdx
-
----
-title: "List Permissions"
-openapi: "GET /api/v1/roles/latest/permissions"
----
-
----
-
-# FILE: ./api-reference/roles/get-list-permissions.mdx
-
----
-title: "List Permissions"
-openapi: "GET /api/v1/roles/2026-08-07/permissions"
----
-
----
-
 # FILE: ./api-reference/roles/get-role.mdx
 
 ---
 title: "Get role"
 openapi: "GET /api/v1/roles/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/roles/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/roles/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/roles/latest/"
 ---
 
 ---
@@ -73934,24 +72291,6 @@ A role that a role binding or a team assignment still points at cannot be delete
 
 ---
 
-# FILE: ./api-reference/roles/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update a custom role"
-openapi: "PATCH /api/v1/roles/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/roles/update-latest.mdx
-
----
-title: "Update a custom role"
-openapi: "PATCH /api/v1/roles/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/roles/update-role.mdx
 
 ---
@@ -74019,24 +72358,6 @@ openapi: "POST /api/v1/run-plans/{id}/run"
 
 ---
 
-# FILE: ./api-reference/scenario-events/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new scenario event"
-openapi: "POST /api/v1/scenario-events/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/scenario-events/create-browser-tab-browser-tab.mdx
-
----
-title: "Create Browser Tab"
-openapi: "POST /api/v1/scenario-events/2026-08-07/browser-tab"
----
-
----
-
 # FILE: ./api-reference/scenario-events/create-browser-tab.mdx
 
 ---
@@ -74046,38 +72367,11 @@ openapi: "POST /api/v1/scenario-events/browser-tab"
 
 ---
 
-# FILE: ./api-reference/scenario-events/create-latest.mdx
-
----
-title: "Create a new scenario event"
-openapi: "POST /api/v1/scenario-events/latest/"
----
-
----
-
 # FILE: ./api-reference/scenario-events/create-scenario-events.mdx
 
 ---
 title: "Create a new scenario event"
 openapi: "POST /api/v1/scenario-events"
----
-
----
-
-# FILE: ./api-reference/scenario-events/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Archive simulation runs"
-openapi: "DELETE /api/v1/scenario-events/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/scenario-events/delete-latest.mdx
-
----
-title: "Archive simulation runs"
-openapi: "DELETE /api/v1/scenario-events/latest/"
 ---
 
 ---
@@ -74154,56 +72448,11 @@ This event marks the end of a scenario run and includes the final results.
 
 ---
 
-# FILE: ./api-reference/scenario-events/post-create-browser-tab-browser-tab.mdx
-
----
-title: "Create Browser Tab"
-openapi: "POST /api/v1/scenario-events/latest/browser-tab"
----
-
----
-
-# FILE: ./api-reference/scenarios/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new scenario"
-openapi: "POST /api/v1/scenarios/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/scenarios/create-latest.mdx
-
----
-title: "Create a new scenario"
-openapi: "POST /api/v1/scenarios/latest/"
----
-
----
-
 # FILE: ./api-reference/scenarios/create-scenarios.mdx
 
 ---
 title: "Create a new scenario"
 openapi: "POST /api/v1/scenarios"
----
-
----
-
-# FILE: ./api-reference/scenarios/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/scenarios/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/scenarios/delete-latest.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/scenarios/latest/{id}"
 ---
 
 ---
@@ -74217,51 +72466,6 @@ openapi: "DELETE /api/v1/scenarios/{id}"
 
 ---
 
-# FILE: ./api-reference/scenarios/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a specific scenario by ID"
-openapi: "GET /api/v1/scenarios/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/scenarios/get-get-versions-version.mdx
-
----
-title: "Get Versions"
-openapi: "GET /api/v1/scenarios/latest/{id}/versions/{version}"
----
-
----
-
-# FILE: ./api-reference/scenarios/get-get-versions-versions.mdx
-
----
-title: "Get Versions"
-openapi: "GET /api/v1/scenarios/latest/{id}/versions"
----
-
----
-
-# FILE: ./api-reference/scenarios/get-get-versions.mdx
-
----
-title: "Get Versions"
-openapi: "GET /api/v1/scenarios/2026-08-07/{id}/versions/{version}"
----
-
----
-
-# FILE: ./api-reference/scenarios/get-latest.mdx
-
----
-title: "Get a specific scenario by ID"
-openapi: "GET /api/v1/scenarios/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/scenarios/get-scenarios.mdx
 
 ---
@@ -74271,38 +72475,11 @@ openapi: "GET /api/v1/scenarios/{id}"
 
 ---
 
-# FILE: ./api-reference/scenarios/get-versions.mdx
-
----
-title: "Get Versions"
-openapi: "GET /api/v1/scenarios/2026-08-07/{id}/versions"
----
-
----
-
-# FILE: ./api-reference/scenarios/list-2026-08-07-2026-08-07.mdx
-
----
-title: "Get all scenarios for a project"
-openapi: "GET /api/v1/scenarios/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/scenarios/list-a-scenario-s-versions.mdx
 
 ---
 title: "List a scenario's versions"
 openapi: "GET /api/v1/scenarios/{id}/versions"
----
-
----
-
-# FILE: ./api-reference/scenarios/list-latest.mdx
-
----
-title: "Get all scenarios for a project"
-openapi: "GET /api/v1/scenarios/latest/"
 ---
 
 ---
@@ -74329,24 +72506,6 @@ Manage test scenarios for agent simulations. Create, update, and organize scenar
 
 ---
 
-# FILE: ./api-reference/scenarios/patch-update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update an existing scenario"
-openapi: "PATCH /api/v1/scenarios/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/scenarios/patch-update-latest.mdx
-
----
-title: "Update an existing scenario"
-openapi: "PATCH /api/v1/scenarios/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/scenarios/patch-update-scenarios.mdx
 
 ---
@@ -74365,24 +72524,6 @@ openapi: "GET /api/v1/scenarios/{id}/versions/{version}"
 
 ---
 
-# FILE: ./api-reference/scenarios/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update an existing scenario"
-openapi: "PUT /api/v1/scenarios/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/scenarios/update-latest.mdx
-
----
-title: "Update an existing scenario"
-openapi: "PUT /api/v1/scenarios/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/scenarios/update-scenarios.mdx
 
 ---
@@ -74392,65 +72533,11 @@ openapi: "PUT /api/v1/scenarios/{id}"
 
 ---
 
-# FILE: ./api-reference/scim-tokens/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create 2026 08 07"
-openapi: "POST /api/v1/scim-tokens/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/scim-tokens/create-latest.mdx
-
----
-title: "Create Latest"
-openapi: "POST /api/v1/scim-tokens/latest/"
----
-
----
-
 # FILE: ./api-reference/scim-tokens/create-scim-token.mdx
 
 ---
 title: "Create SCIM token"
 openapi: "POST /api/v1/scim-tokens"
----
-
----
-
-# FILE: ./api-reference/scim-tokens/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete 2026 08 07"
-openapi: "DELETE /api/v1/scim-tokens/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/scim-tokens/delete-latest.mdx
-
----
-title: "Delete Latest"
-openapi: "DELETE /api/v1/scim-tokens/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/scim-tokens/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/scim-tokens/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/scim-tokens/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/scim-tokens/latest/"
 ---
 
 ---
@@ -74765,29 +72852,11 @@ openapi: "POST /api/v1/secrets"
 
 ---
 
-# FILE: ./api-reference/secrets/create-secrets.mdx
-
----
-title: "Create a new project secret"
-openapi: "POST /api/secrets"
----
-
----
-
 # FILE: ./api-reference/secrets/delete-a-project-secret.mdx
 
 ---
 title: "Delete a project secret"
 openapi: "DELETE /api/v1/secrets/{id}"
----
-
----
-
-# FILE: ./api-reference/secrets/delete-secrets.mdx
-
----
-title: "Delete a secret"
-openapi: "DELETE /api/secrets/{id}"
 ---
 
 ---
@@ -74801,29 +72870,11 @@ openapi: "GET /api/v1/secrets/{id}"
 
 ---
 
-# FILE: ./api-reference/secrets/get-secrets.mdx
-
----
-title: "Get a secret by its ID"
-openapi: "GET /api/secrets/{id}"
----
-
----
-
 # FILE: ./api-reference/secrets/list-project-secrets.mdx
 
 ---
 title: "List project secrets"
 openapi: "GET /api/v1/secrets"
----
-
----
-
-# FILE: ./api-reference/secrets/list-secrets.mdx
-
----
-title: "List all secrets for the project"
-openapi: "GET /api/secrets"
 ---
 
 ---
@@ -74850,65 +72901,11 @@ openapi: "PUT /api/v1/secrets/{id}"
 
 ---
 
-# FILE: ./api-reference/secrets/update-secrets.mdx
-
----
-title: "Update a secret's value"
-openapi: "PUT /api/secrets/{id}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a single simulation run by its ID"
-openapi: "GET /api/v1/simulation-runs/2026-08-07/{scenarioRunId}"
----
-
----
-
 # FILE: ./api-reference/simulation-runs/get-batches.mdx
 
 ---
 title: "Get Batches"
 openapi: "GET /api/v1/simulation-runs/batches/{batchRunId}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/get-get-batches-batchRunId.mdx
-
----
-title: "Get Batches"
-openapi: "GET /api/v1/simulation-runs/latest/batches/{batchRunId}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/get-get-batches.mdx
-
----
-title: "Get Batches"
-openapi: "GET /api/v1/simulation-runs/batches/{batchRunId}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/get-latest.mdx
-
----
-title: "Get a single simulation run by its ID"
-openapi: "GET /api/v1/simulation-runs/latest/{scenarioRunId}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/get-list-list-list.mdx
-
----
-title: "List batch summaries for a scenario set"
-openapi: "GET /api/v1/simulation-runs/latest/batches/list"
 ---
 
 ---
@@ -74927,33 +72924,6 @@ openapi: "GET /api/v1/simulation-runs/batches/list"
 ---
 title: "Get a single simulation run by its ID"
 openapi: "GET /api/v1/simulation-runs/{scenarioRunId}"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/simulation-runs/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/simulation-runs/latest/"
----
-
----
-
-# FILE: ./api-reference/simulation-runs/list-list.mdx
-
----
-title: "List batch summaries for a scenario set"
-openapi: "GET /api/v1/simulation-runs/batches/list"
 ---
 
 ---
@@ -74998,47 +72968,11 @@ openapi: "POST /api/v1/suites/{id}/run"
 
 ---
 
-# FILE: ./api-reference/suites/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create 2026 08 07"
-openapi: "POST /api/v1/suites/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/suites/create-latest.mdx
-
----
-title: "Create Latest"
-openapi: "POST /api/v1/suites/latest/"
----
-
----
-
 # FILE: ./api-reference/suites/create-suites.mdx
 
 ---
 title: "Create a new suite"
 openapi: "POST /api/v1/suites"
----
-
----
-
-# FILE: ./api-reference/suites/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete 2026 08 07"
-openapi: "DELETE /api/v1/suites/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/suites/delete-latest.mdx
-
----
-title: "Delete Latest"
-openapi: "DELETE /api/v1/suites/latest/{id}"
 ---
 
 ---
@@ -75052,47 +72986,11 @@ openapi: "DELETE /api/v1/suites/{id}"
 
 ---
 
-# FILE: ./api-reference/suites/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get 2026 08 07"
-openapi: "GET /api/v1/suites/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/suites/get-latest.mdx
-
----
-title: "Get Latest"
-openapi: "GET /api/v1/suites/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/suites/get-suites.mdx
 
 ---
 title: "Get a suite"
 openapi: "GET /api/v1/suites/{id}"
----
-
----
-
-# FILE: ./api-reference/suites/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List 2026 08 07"
-openapi: "GET /api/v1/suites/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/suites/list-latest.mdx
-
----
-title: "List Latest"
-openapi: "GET /api/v1/suites/latest/"
 ---
 
 ---
@@ -75119,74 +73017,11 @@ Deprecated. The `/api/v1/suites` family stays for the clients that already call 
 
 ---
 
-# FILE: ./api-reference/suites/post-action-duplicate-duplicate.mdx
-
----
-title: "Create Duplicate"
-openapi: "POST /api/v1/suites/latest/{id}/duplicate"
----
-
----
-
-# FILE: ./api-reference/suites/post-action-duplicate.mdx
-
----
-title: "Create Duplicate"
-openapi: "POST /api/v1/suites/2026-08-07/{id}/duplicate"
----
-
----
-
-# FILE: ./api-reference/suites/post-action-run-run.mdx
-
----
-title: "Create Run"
-openapi: "POST /api/v1/suites/latest/{id}/run"
----
-
----
-
-# FILE: ./api-reference/suites/post-action-run.mdx
-
----
-title: "Create Run"
-openapi: "POST /api/v1/suites/2026-08-07/{id}/run"
----
-
----
-
-# FILE: ./api-reference/suites/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update 2026 08 07"
-openapi: "PATCH /api/v1/suites/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/suites/update-latest.mdx
-
----
-title: "Update Latest"
-openapi: "PATCH /api/v1/suites/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/suites/update-suites.mdx
 
 ---
 title: "Update a suite"
 openapi: "PATCH /api/v1/suites/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/action-members.mdx
-
----
-title: "Add a member to a team"
-openapi: "POST /api/v1/teams/2026-08-07/{id}/members"
 ---
 
 ---
@@ -75209,24 +73044,6 @@ openapi: "DELETE /api/v1/teams/{id}"
 
 ---
 
-# FILE: ./api-reference/teams/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create 2026 08 07"
-openapi: "POST /api/v1/teams/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/teams/create-latest.mdx
-
----
-title: "Create Latest"
-openapi: "POST /api/v1/teams/latest/"
----
-
----
-
 # FILE: ./api-reference/teams/create-team.mdx
 
 ---
@@ -75236,119 +73053,11 @@ openapi: "POST /api/v1/teams"
 
 ---
 
-# FILE: ./api-reference/teams/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Archive a team"
-openapi: "DELETE /api/v1/teams/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/delete-delete-members.mdx
-
----
-title: "Remove a member from a team"
-openapi: "DELETE /api/v1/teams/latest/{id}/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/teams/delete-latest.mdx
-
----
-title: "Archive a team"
-openapi: "DELETE /api/v1/teams/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/delete-members.mdx
-
----
-title: "Remove a member from a team"
-openapi: "DELETE /api/v1/teams/2026-08-07/{id}/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/teams/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a team by its id"
-openapi: "GET /api/v1/teams/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/get-get-members.mdx
-
----
-title: "List members of a team"
-openapi: "GET /api/v1/teams/latest/{id}/members"
----
-
----
-
-# FILE: ./api-reference/teams/get-get-projects.mdx
-
----
-title: "List projects in a team"
-openapi: "GET /api/v1/teams/latest/{id}/projects"
----
-
----
-
-# FILE: ./api-reference/teams/get-latest.mdx
-
----
-title: "Get a team by its id"
-openapi: "GET /api/v1/teams/latest/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/get-members.mdx
-
----
-title: "List members of a team"
-openapi: "GET /api/v1/teams/2026-08-07/{id}/members"
----
-
----
-
-# FILE: ./api-reference/teams/get-projects.mdx
-
----
-title: "List projects in a team"
-openapi: "GET /api/v1/teams/2026-08-07/{id}/projects"
----
-
----
-
 # FILE: ./api-reference/teams/get-team.mdx
 
 ---
 title: "Get team"
 openapi: "GET /api/v1/teams/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List all non-archived teams for the organization"
-openapi: "GET /api/v1/teams/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/teams/list-latest.mdx
-
----
-title: "List all non-archived teams for the organization"
-openapi: "GET /api/v1/teams/latest/"
 ---
 
 ---
@@ -75456,38 +73165,11 @@ curl -X POST https://app.langwatch.ai/api/projects \
 
 ---
 
-# FILE: ./api-reference/teams/post-action-members.mdx
-
----
-title: "Add a member to a team"
-openapi: "POST /api/v1/teams/latest/{id}/members"
----
-
----
-
 # FILE: ./api-reference/teams/remove-member.mdx
 
 ---
 title: "Remove team member"
 openapi: "DELETE /api/v1/teams/{id}/members/{userId}"
----
-
----
-
-# FILE: ./api-reference/teams/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update a team by its id"
-openapi: "PATCH /api/v1/teams/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/teams/update-latest.mdx
-
----
-title: "Update a team by its id"
-openapi: "PATCH /api/v1/teams/latest/{id}"
 ---
 
 ---
@@ -75568,11 +73250,20 @@ openapi: "PATCH /api/v1/test-suites/{id}"
 
 ---
 
-# FILE: ./api-reference/traces/create-search.mdx
+# FILE: ./api-reference/traces/action-share.mdx
 
 ---
-title: "Search traces for a project"
-openapi: "POST /api/v1/traces/2026-08-07/search"
+title: "Returns a public path for a trace"
+openapi: "POST /api/trace/{id}/share"
+---
+
+---
+
+# FILE: ./api-reference/traces/action-unshare.mdx
+
+---
+title: "Deletes a public path for a trace"
+openapi: "POST /api/trace/{id}/unshare"
 ---
 
 ---
@@ -75586,29 +73277,20 @@ openapi: "GET /api/traces/facets"
 
 ---
 
-# FILE: ./api-reference/traces/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a single trace by ID"
-openapi: "GET /api/v1/traces/2026-08-07/{traceId}"
----
-
----
-
-# FILE: ./api-reference/traces/get-latest.mdx
-
----
-title: "Get a single trace by ID"
-openapi: "GET /api/v1/traces/latest/{traceId}"
----
-
----
-
 # FILE: ./api-reference/traces/get-trace.mdx
 
 ---
 title: "Get trace details"
 openapi: "GET /api/v1/traces/{traceId}"
+---
+
+---
+
+# FILE: ./api-reference/traces/get-transcript.mdx
+
+---
+title: "Get Transcript"
+openapi: "GET /api/v1/traces/{traceId}/transcript"
 ---
 
 ---
@@ -75656,33 +73338,6 @@ Pass your LangWatch API key in the `X-Auth-Token` header. Your API key can be fo
   Migrate to `/api/v1/traces/search` and `/api/v1/traces/{traceId}` for the improved `format` parameter
   and AI-readable digests.
 </Info>
-
----
-
-# FILE: ./api-reference/traces/patch-update-trace-metadata-metadata.mdx
-
----
-title: "Update trace metadata"
-openapi: "PATCH /api/v1/traces/latest/{traceId}/metadata"
----
-
----
-
-# FILE: ./api-reference/traces/patch-update-trace-metadata.mdx
-
----
-title: "Update trace metadata"
-openapi: "PATCH /api/v1/traces/2026-08-07/{traceId}/metadata"
----
-
----
-
-# FILE: ./api-reference/traces/post-create-search.mdx
-
----
-title: "Search traces for a project"
-openapi: "POST /api/v1/traces/latest/search"
----
 
 ---
 
@@ -75934,29 +73589,11 @@ openapi: "PATCH /api/v1/traces/{traceId}/metadata"
 
 ---
 
-# FILE: ./api-reference/triggers/create-2026-08-07-2026-08-07.mdx
-
----
-title: "Create a new trigger"
-openapi: "POST /api/v1/triggers/2026-08-07/"
----
-
----
-
 # FILE: ./api-reference/triggers/create-a-slack-alert-trigger.mdx
 
 ---
 title: "Create a Slack alert trigger"
 openapi: "POST /api/v1/trigger/slack"
----
-
----
-
-# FILE: ./api-reference/triggers/create-latest.mdx
-
----
-title: "Create a new trigger"
-openapi: "POST /api/v1/triggers/latest/"
 ---
 
 ---
@@ -75970,24 +73607,6 @@ openapi: "POST /api/v1/triggers"
 
 ---
 
-# FILE: ./api-reference/triggers/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Delete"
-openapi: "DELETE /api/v1/triggers/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/triggers/delete-latest.mdx
-
----
-title: "Delete"
-openapi: "DELETE /api/v1/triggers/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/triggers/delete-triggers.mdx
 
 ---
@@ -75997,47 +73616,11 @@ openapi: "DELETE /api/v1/triggers/{id}"
 
 ---
 
-# FILE: ./api-reference/triggers/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a trigger by its ID"
-openapi: "GET /api/v1/triggers/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/triggers/get-latest.mdx
-
----
-title: "Get a trigger by its ID"
-openapi: "GET /api/v1/triggers/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/triggers/get-triggers.mdx
 
 ---
 title: "Get a trigger by its ID"
 openapi: "GET /api/v1/triggers/{id}"
----
-
----
-
-# FILE: ./api-reference/triggers/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List all active triggers"
-openapi: "GET /api/v1/triggers/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/triggers/list-latest.mdx
-
----
-title: "List all active triggers"
-openapi: "GET /api/v1/triggers/latest/"
 ---
 
 ---
@@ -76061,24 +73644,6 @@ description: "Manage automation triggers that fire actions based on trace events
 ## Intro
 
 Manage automation triggers that fire actions based on trace events. Create Slack notifications, webhooks, and other automated responses.
-
----
-
-# FILE: ./api-reference/triggers/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update a trigger"
-openapi: "PATCH /api/v1/triggers/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/triggers/update-latest.mdx
-
----
-title: "Update a trigger"
-openapi: "PATCH /api/v1/triggers/latest/{id}"
----
 
 ---
 
@@ -76221,24 +73786,6 @@ openapi: "POST /api/v1/workflows/{id}/evaluate"
 
 ---
 
-# FILE: ./api-reference/workflows/delete-2026-08-07-2026-08-07.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/workflows/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/workflows/delete-latest.mdx
-
----
-title: "Archive"
-openapi: "DELETE /api/v1/workflows/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/workflows/delete-workflows.mdx
 
 ---
@@ -76248,47 +73795,11 @@ openapi: "DELETE /api/v1/workflows/{id}"
 
 ---
 
-# FILE: ./api-reference/workflows/get-2026-08-07-2026-08-07.mdx
-
----
-title: "Get a workflow by its ID"
-openapi: "GET /api/v1/workflows/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/workflows/get-latest.mdx
-
----
-title: "Get a workflow by its ID"
-openapi: "GET /api/v1/workflows/latest/{id}"
----
-
----
-
 # FILE: ./api-reference/workflows/get-workflows.mdx
 
 ---
 title: "Get a workflow by its ID"
 openapi: "GET /api/v1/workflows/{id}"
----
-
----
-
-# FILE: ./api-reference/workflows/list-2026-08-07-2026-08-07.mdx
-
----
-title: "List all non-archived workflows for the project"
-openapi: "GET /api/v1/workflows/2026-08-07/"
----
-
----
-
-# FILE: ./api-reference/workflows/list-latest.mdx
-
----
-title: "List all non-archived workflows for the project"
-openapi: "GET /api/v1/workflows/latest/"
 ---
 
 ---
@@ -76315,24 +73826,6 @@ List, run and archive the workflows you build in the LangWatch workflow editor, 
 
 ---
 
-# FILE: ./api-reference/workflows/post-action-evaluate-evaluate.mdx
-
----
-title: "Create Evaluate"
-openapi: "POST /api/v1/workflows/latest/{id}/evaluate"
----
-
----
-
-# FILE: ./api-reference/workflows/post-action-evaluate.mdx
-
----
-title: "Create Evaluate"
-openapi: "POST /api/v1/workflows/2026-08-07/{id}/evaluate"
----
-
----
-
 # FILE: ./api-reference/workflows/run-a-specific-workflow-version.mdx
 
 ---
@@ -76356,24 +73849,6 @@ openapi: "POST /api/v1/optimization/{workflowId}/{versionId}"
 ---
 title: "Run a workflow"
 openapi: "POST /api/v1/workflows/{workflowId}/run"
----
-
----
-
-# FILE: ./api-reference/workflows/update-2026-08-07-2026-08-07.mdx
-
----
-title: "Update a workflow's metadata"
-openapi: "PATCH /api/v1/workflows/2026-08-07/{id}"
----
-
----
-
-# FILE: ./api-reference/workflows/update-latest.mdx
-
----
-title: "Update a workflow's metadata"
-openapi: "PATCH /api/v1/workflows/latest/{id}"
 ---
 
 ---
