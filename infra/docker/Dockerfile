@@ -44,6 +44,8 @@ COPY feature-map.json ./feature-map.json
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
 # The lockfile resolves @langwatch/scenario to a vendored tarball.
 COPY vendor ./vendor
+# The root postinstall runs this script.
+COPY dev/scripts/install-check-shims.mjs ./dev/scripts/install-check-shims.mjs
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
