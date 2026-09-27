@@ -119,6 +119,7 @@ async function bootWorker({ live = false }: { live?: boolean } = {}) {
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
+        voicePublicUrl: { unavailable: "no media door in a test process" },
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },
@@ -207,6 +208,28 @@ describe("the worker process installation", () => {
       expect(byName.get("sso-connections")?.eventSubscribers.has("scimDirectoryMove")).toBe(true);
       expect(byName.get("join-requests")?.processManagers.size).toBeGreaterThan(0);
       expect(byName.get("scim_directory")?.eventSubscribers.has("moveDirectory")).toBe(true);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "The worker forwards coding-agent spans, logs and metric points to coding-agent" */
+  it("hosts a coding-agent dispatch on the trace, log and metric pipelines", async () => {
+    const { runtime, eventing } = await bootWorker();
+
+    try {
+      const byName = new Map(
+        eventing.definitions.map((definition) => [definition.metadata.name, definition]),
+      );
+      expect([...(byName.get("trace_processing")?.eventSubscribers.keys() ?? [])]).toContain(
+        "codingAgentSpanFactsDispatch",
+      );
+      expect([...(byName.get("log_processing")?.eventSubscribers.keys() ?? [])]).toContain(
+        "codingAgentLogFactsDispatch",
+      );
+      expect([...(byName.get("metric_processing")?.eventSubscribers.keys() ?? [])]).toContain(
+        "codingAgentMetricFactsDispatch",
+      );
     } finally {
       await runtime.stop();
     }

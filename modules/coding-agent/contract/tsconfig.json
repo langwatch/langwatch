@@ -15,6 +15,12 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
+      "path": "../../metric/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../log/contract/tsconfig.build.json"
+    },
+    {
       "path": "tsconfig.build.json"
     },
     {

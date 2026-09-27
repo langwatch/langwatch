@@ -1,5 +1,5 @@
 /**
- * The metric→session dispatcher, driven with canonical datapoints — the
+ * The metric→session lift, driven with canonical datapoints — the
  * shape metric-processing actually stores. Temporality decides the converged
  * unit: cumulative → the series (replace), delta → the point (sum once).
  * @see specs/coding-agent/session-aggregate.feature
@@ -7,15 +7,10 @@
  */
 
 import type { ContributeMetricFactsCommandData } from "@langwatch/coding-agent-contract";
-import { createTenantId } from "@langwatch/eventing";
-import {
-  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
-  type MetricProcessingEvent,
-  type CanonicalMetricDataPoint,
-} from "@langwatch/metric-contract";
+import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
 
-import { createCodingAgentMetricFactsDispatchSubscriber } from "../coding-agent-metric-facts-dispatch.subscriber.ts";
+import { liftMetricContribution } from "../coding-agent-metric-facts.rules.ts";
 
 const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);
@@ -90,7 +85,7 @@ const BASE_DATA_POINT: CanonicalMetricDataPoint = {
   acceptedAt: 1_500,
 };
 
-function dataPointEvent({
+function dataPoint({
   metricName,
   attributes = {},
   temporality = "cumulative",
@@ -108,59 +103,46 @@ function dataPointEvent({
   pointId?: string;
   seriesId?: string;
   resourceAttributes?: Record<string, unknown>;
-}): MetricProcessingEvent {
+}): CanonicalMetricDataPoint {
   return {
-    id: "event-1",
-    aggregateId: seriesId,
-    aggregateType: "metric_series",
-    createdAt: 1_500,
-    version: "2025-01-01",
-    tenantId: createTenantId("tenant-1"),
-    type: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
-    occurredAt: 1_500,
-    data: {
-      ...BASE_DATA_POINT,
-      pointId,
-      seriesId,
-      metricName,
-      metricUnit: "USD",
-      metricKind: "sum",
-      aggregationTemporality: temporality,
-      scopeName: "com.anthropic.claude_code",
-      pointAttributesJson: encodeAttributes(attributes),
-      resourceAttributesJson: encodeAttributes(resourceAttributes),
-      timeUnixMs: 1_500,
-      valueType: valueTypeOf(valueDouble, valueInt),
-      valueDouble,
-      valueInt,
-    },
+    ...BASE_DATA_POINT,
+    pointId,
+    seriesId,
+    metricName,
+    metricUnit: "USD",
+    metricKind: "sum",
+    aggregationTemporality: temporality,
+    scopeName: "com.anthropic.claude_code",
+    pointAttributesJson: encodeAttributes(attributes),
+    resourceAttributesJson: encodeAttributes(resourceAttributes),
+    timeUnixMs: 1_500,
+    valueType: valueTypeOf(valueDouble, valueInt),
+    valueDouble,
+    valueInt,
   };
 }
 
-function makeSubscriber() {
+function makeLift() {
   const dispatched: ContributeMetricFactsCommandData[] = [];
-  const subscriber = createCodingAgentMetricFactsDispatchSubscriber({
-    contributeMetricFacts: async (data) => {
-      dispatched.push(data);
-    },
-  });
-  return { subscriber, dispatched };
+  const lift = (point: CanonicalMetricDataPoint): void => {
+    const lifted = liftMetricContribution(point);
+    if (lifted.outcome === "contributes") dispatched.push(lifted.contribution);
+  };
+  return { lift, dispatched };
 }
 
-const context = { tenantId: "tenant-1", aggregateId: POINT_ID };
-
-describe("codingAgentMetricFactsDispatch", () => {
-  describe("when the same canonical metric point is redelivered", () => {
-    it("resolves to one converged series contribution", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
-      const event = dataPointEvent({
+describe("liftMetricContribution", () => {
+  describe("when the same canonical metric point is lifted twice", () => {
+    it("resolves to one converged series contribution", () => {
+      const { lift, dispatched } = makeLift();
+      const event = dataPoint({
         metricName: "claude_code.cost.usage",
         attributes: { "session.id": "sess-redelivery" },
         valueDouble: 1.25,
       });
 
-      await subscriber.handle(event, context);
-      await subscriber.handle(event, context);
+      lift(event);
+      lift(event);
 
       const durable = new Map(
         dispatched.map((contribution) => [
@@ -175,21 +157,20 @@ describe("codingAgentMetricFactsDispatch", () => {
 
   describe("when a Cowork session's metric arrives", () => {
     /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
-    it("labels the contribution claude_cowork from the resource service", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("labels the contribution claude_cowork from the resource service", () => {
+      const { lift, dispatched } = makeLift();
 
       // Claude Code's metric vocabulary and scope; only the resource-level
       // service.name says cowork. Without the service signal this would
       // first-writer-win the session's agent to claude_code.
-      await subscriber.handle(
-        dataPointEvent({
+      lift(
+        dataPoint({
           metricName: "claude_code.cost.usage",
           attributes: { "session.id": "cw-sess-1" },
           temporality: "cumulative",
           valueDouble: 0.5,
           resourceAttributes: { "service.name": "cowork" },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -200,17 +181,16 @@ describe("codingAgentMetricFactsDispatch", () => {
 
   describe("when a cumulative coding-agent metric carries the session key", () => {
     /** @scenario a session that sent only metrics still appears */
-    it("contributes the series' converged total, keyed by the series", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("contributes the series' converged total, keyed by the series", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        dataPointEvent({
+      lift(
+        dataPoint({
           metricName: "claude_code.cost.usage",
           attributes: { "session.id": "sess-1", model: "claude-fable-5" },
           temporality: "cumulative",
           valueDouble: 1.25,
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -226,17 +206,16 @@ describe("codingAgentMetricFactsDispatch", () => {
   describe("when the same counter arrives as delta points", () => {
     // A delta must sum exactly once, so each point is its own converged
     // unit — a re-delivery replaces that one row instead of adding to it.
-    it("keys the contribution by the point, not the series", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("keys the contribution by the point, not the series", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        dataPointEvent({
+      lift(
+        dataPoint({
           metricName: "claude_code.lines_of_code.count",
           attributes: { "session.id": "sess-1", type: "added" },
           temporality: "delta",
           valueInt: "42",
         }),
-        context,
       );
 
       expect(dispatched[0]!.seriesId).toBe(POINT_ID);
@@ -247,16 +226,15 @@ describe("codingAgentMetricFactsDispatch", () => {
   describe("when a coding-agent metric carries no session key", () => {
     // Codex and Copilot metrics are fleet-level by design upstream; they
     // stay in the canonical metric tables.
-    it("contributes nothing", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("contributes nothing", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        dataPointEvent({
+      lift(
+        dataPoint({
           metricName: "claude_code.token.usage",
           attributes: { type: "input" },
           valueInt: "100",
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);
@@ -264,16 +242,15 @@ describe("codingAgentMetricFactsDispatch", () => {
   });
 
   describe("when an unrelated metric passes by", () => {
-    it("is ignored", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("is ignored", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        dataPointEvent({
+      lift(
+        dataPoint({
           metricName: "http.server.duration",
           attributes: { "session.id": "sess-1" },
           valueDouble: 12,
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);

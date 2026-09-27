@@ -1,5 +1,5 @@
 /**
- * The log→session dispatcher, driven with canonical log records — the shape
+ * The log→session lift, driven with canonical log records — the shape
  * log-processing actually stores (attributes flattened as JSON).
  *
  * @see specs/coding-agent/session-aggregate.feature
@@ -11,16 +11,11 @@ import {
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
 } from "@langwatch/coding-agent-contract";
-import { createTenantId } from "@langwatch/eventing";
-import {
-  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
-  type LogProcessingEvent,
-  type CanonicalLogRecord,
-} from "@langwatch/log-contract";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-process/testing";
 import { describe, expect, it } from "vitest";
 
-import { createCodingAgentLogFactsDispatchSubscriber } from "../coding-agent-log-facts-dispatch.subscriber.ts";
+import { liftLogContribution } from "../coding-agent-log-facts.rules.ts";
 
 const WIRE_TRACE = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
 const traceCanonicalisation = TraceCanonicalisationService.create();
@@ -72,7 +67,7 @@ const BASE_LOG_RECORD: CanonicalLogRecord = {
   acceptedAt: 1_500,
 };
 
-function canonicalLogEvent({
+function canonicalLogRecord({
   attributes,
   scopeName = "com.anthropic.claude_code.events",
   eventName = "",
@@ -90,53 +85,39 @@ function canonicalLogEvent({
   providerSessionId?: string;
   recordId?: string;
   resourceAttributes?: Record<string, unknown>;
-}): LogProcessingEvent {
+}): CanonicalLogRecord {
   return {
-    id: "event-1",
-    aggregateId: recordId,
-    aggregateType: "log_record",
-    createdAt: 1_500,
-    version: "2025-01-01",
-    tenantId: createTenantId("tenant-1"),
-    type: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+    ...BASE_LOG_RECORD,
+    recordId,
+    scopeName,
+    eventName,
+    attributesFlatJson: JSON.stringify(attributes),
+    resourceAttributesFlatJson: JSON.stringify(resourceAttributes),
+    correlationTraceId,
+    correlationSpanId: "",
+    correlationSource,
+    providerKind: "claude_code",
+    providerSessionId,
+    timeUnixMs: 1_500,
+    severityNumber: 9,
     occurredAt: 1_500,
-    data: {
-      ...BASE_LOG_RECORD,
-      recordId,
-      scopeName,
-      eventName,
-      attributesFlatJson: JSON.stringify(attributes),
-      resourceAttributesFlatJson: JSON.stringify(resourceAttributes),
-      correlationTraceId,
-      correlationSpanId: "",
-      correlationSource,
-      providerKind: "claude_code",
-      providerSessionId,
-      timeUnixMs: 1_500,
-      severityNumber: 9,
-      occurredAt: 1_500,
-    },
   };
 }
 
-function makeSubscriber() {
+function makeLift() {
   const dispatched: ContributeLogFactsCommandData[] = [];
-  const subscriber = createCodingAgentLogFactsDispatchSubscriber({
-    traceCanonicalisation,
-    contributeLogFacts: async (data) => {
-      dispatched.push(data);
-    },
-  });
-  return { subscriber, dispatched };
+  const lift = (record: CanonicalLogRecord): void => {
+    const lifted = liftLogContribution({ record, traces: traceCanonicalisation });
+    if (lifted.outcome === "contributes") dispatched.push(lifted.contribution);
+  };
+  return { lift, dispatched };
 }
 
-const context = { tenantId: "tenant-1", aggregateId: "rec-1" };
-
-describe("codingAgentLogFactsDispatch", () => {
-  describe("when the same canonical log is redelivered", () => {
-    it("resolves to one durable contribution identity", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
-      const event = canonicalLogEvent({
+describe("liftLogContribution", () => {
+  describe("when the same canonical log is lifted twice", () => {
+    it("resolves to one durable contribution identity", () => {
+      const { lift, dispatched } = makeLift();
+      const event = canonicalLogRecord({
         attributes: {
           "event.name": "claude_code.tool_decision",
           "session.id": "sess-redelivery",
@@ -145,8 +126,8 @@ describe("codingAgentLogFactsDispatch", () => {
         recordId: "record-redelivery",
       });
 
-      await subscriber.handle(event, context);
-      await subscriber.handle(event, context);
+      lift(event);
+      lift(event);
 
       const durable = new Map(
         dispatched.map((contribution) => [
@@ -161,11 +142,11 @@ describe("codingAgentLogFactsDispatch", () => {
 
   describe("when a denied tool's decision log arrives", () => {
     /** @scenario a denied tool is part of the session story */
-    it("contributes the lifted facts keyed by the provider session", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("contributes the lifted facts keyed by the provider session", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: {
             "event.name": "claude_code.tool_decision",
             "session.id": "sess-1",
@@ -173,7 +154,6 @@ describe("codingAgentLogFactsDispatch", () => {
             tool_name: "Bash",
           },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -193,14 +173,14 @@ describe("codingAgentLogFactsDispatch", () => {
   describe("when a Cowork session's events arrive", () => {
     /** @scenario a Cowork session is an agent session */
     /** @scenario Cowork telemetry that shares Claude Code's event vocabulary is still Cowork */
-    it("labels the contribution claude_cowork and lifts its correlation facts", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("labels the contribution claude_cowork and lifts its correlation facts", () => {
+      const { lift, dispatched } = makeLift();
 
       // Real Cowork wire shape: Claude Code's runtime scope and event
       // vocabulary, service.name `cowork`, logs-only (no spans, no wire
       // correlation), per-prompt correlation via prompt.id + event.sequence.
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: {
             "event.name": "claude_code.user_prompt",
             "session.id": "cw-sess-1",
@@ -215,7 +195,6 @@ describe("codingAgentLogFactsDispatch", () => {
             "service.version": "1.1.4173",
           },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -233,11 +212,11 @@ describe("codingAgentLogFactsDispatch", () => {
   });
 
   describe("when the record carries a wire correlation", () => {
-    it("passes the correlation trace id through", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("passes the correlation trace id through", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: {
             "event.name": "claude_code.api_request",
             "session.id": "sess-1",
@@ -246,7 +225,6 @@ describe("codingAgentLogFactsDispatch", () => {
           correlationTraceId: WIRE_TRACE,
           correlationSource: "wire",
         }),
-        context,
       );
 
       expect(dispatched[0]!.traceId).toBe(WIRE_TRACE);
@@ -254,15 +232,14 @@ describe("codingAgentLogFactsDispatch", () => {
   });
 
   describe("when the record spells the session only in its provider column", () => {
-    it("falls back to providerSessionId", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("falls back to providerSessionId", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: { "event.name": "claude_code.user_prompt" },
           providerSessionId: "sess-from-column",
         }),
-        context,
       );
 
       expect(dispatched[0]!.sessionId).toBe("sess-from-column");
@@ -272,14 +249,14 @@ describe("codingAgentLogFactsDispatch", () => {
 
   describe("when a codex record arrives without its session id", () => {
     /** @scenario "a codex record outside any session does not mint a session" */
-    it("declines the contribution instead of keying it on the trace", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("declines the contribution instead of keying it on the trace", () => {
+      const { lift, dispatched } = makeLift();
 
       // The live shape: codex's `log_only` scope reports an auth-refresh
       // api_request outside any conversation — no `conversation.id`, only
       // a trace. Keying it on the trace minted an all-zero session row.
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           scopeName: "codex_otel.log_only",
           attributes: {
             "event.name": "codex.api_request",
@@ -290,17 +267,16 @@ describe("codingAgentLogFactsDispatch", () => {
           correlationTraceId: WIRE_TRACE,
           correlationSource: "wire",
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);
     });
 
-    it("still contributes when the codex record carries its conversation id", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("still contributes when the codex record carries its conversation id", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           scopeName: "codex_exec",
           attributes: {
             "event.name": "codex.user_prompt",
@@ -308,7 +284,6 @@ describe("codingAgentLogFactsDispatch", () => {
             prompt_length: 153,
           },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -316,16 +291,15 @@ describe("codingAgentLogFactsDispatch", () => {
       expect(dispatched[0]!.sessionKeySource).toBe("provider");
     });
 
-    it("keeps the trace fallback for an agent that does not stamp every event", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("keeps the trace fallback for an agent that does not stamp every event", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: { "event.name": "claude_code.api_request", cost_usd: 1 },
           correlationTraceId: WIRE_TRACE,
           correlationSource: "wire",
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -335,15 +309,14 @@ describe("codingAgentLogFactsDispatch", () => {
   });
 
   describe("when an ordinary application log passes by", () => {
-    it("is ignored without dispatching", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("is ignored without dispatching", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: { "event.name": "http.request", "session.id": "s" },
           scopeName: "express",
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);
@@ -367,16 +340,15 @@ describe("codingAgentLogFactsDispatch", () => {
     });
 
     /** @scenario A session context contribution is labeled with its declared agent */
-    it("labels the contribution with the agent the event declares", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("labels the contribution with the agent the event declares", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: contextAttributes(),
           scopeName: HOOK_SCOPE,
           resourceAttributes: { "service.name": "langwatch-hook" },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -390,16 +362,15 @@ describe("codingAgentLogFactsDispatch", () => {
 
     it.each(["codex", "opencode"])(
       "labels a %s declaration the same way, with no vendor scope of its own",
-      async (agent) => {
-        const { subscriber, dispatched } = makeSubscriber();
+      (agent) => {
+        const { lift, dispatched } = makeLift();
 
-        await subscriber.handle(
-          canonicalLogEvent({
+        lift(
+          canonicalLogRecord({
             attributes: contextAttributes({ "coding_agent.name": agent }),
             scopeName: HOOK_SCOPE,
             resourceAttributes: { "service.name": "langwatch-hook" },
           }),
-          context,
         );
 
         expect(dispatched).toHaveLength(1);
@@ -409,34 +380,32 @@ describe("codingAgentLogFactsDispatch", () => {
     );
 
     /** @scenario A declared agent outside the registry contributes nothing */
-    it("drops a declaration naming an agent LangWatch does not know", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("drops a declaration naming an agent LangWatch does not know", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: contextAttributes({
             "coding_agent.name": "totally_new_agent",
           }),
           scopeName: HOOK_SCOPE,
           resourceAttributes: { "service.name": "langwatch-hook" },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);
     });
 
     /** @scenario A session context event with no declared agent contributes nothing */
-    it("drops an event that declares no agent at all", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("drops an event that declares no agent at all", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: contextAttributes({ "coding_agent.name": undefined }),
           scopeName: HOOK_SCOPE,
           resourceAttributes: { "service.name": "langwatch-hook" },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);
@@ -450,7 +419,7 @@ describe("codingAgentLogFactsDispatch", () => {
       });
 
     const responseBodyEvent = ({ querySource, body }: { querySource: string; body: string }) =>
-      canonicalLogEvent({
+      canonicalLogRecord({
         attributes: {
           "event.name": "api_response_body",
           "session.id": "sess-title",
@@ -460,44 +429,41 @@ describe("codingAgentLogFactsDispatch", () => {
       });
 
     /** @scenario The title lifts from a generate_session_title response body, capped */
-    it("stamps the generated title as a fact, capped in length", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps the generated title as a fact, capped in length", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
+      lift(
         responseBodyEvent({
           querySource: "generate_session_title",
           body: titleBody("Fix the flaky session fold test"),
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FACT_KEY]).toBe("Fix the flaky session fold test");
 
-      const { subscriber: capped, dispatched: cappedOut } = makeSubscriber();
-      await capped.handle(
+      const { lift: capped, dispatched: cappedOut } = makeLift();
+      capped(
         responseBodyEvent({
           querySource: "generate_session_title",
           body: titleBody("a".repeat(2_000)),
         }),
-        context,
       );
 
       expect(String(cappedOut[0]!.facts[SESSION_TITLE_FACT_KEY])).toHaveLength(512);
     });
 
     /** @scenario A conversational response body sets no title */
-    it("stamps nothing for a turn of the conversation itself", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps nothing for a turn of the conversation itself", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
+      lift(
         responseBodyEvent({
           querySource: "repl_main_thread",
           body: JSON.stringify({
             content: [{ type: "text", text: "Done, the test passes now." }],
           }),
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(1);
@@ -505,15 +471,14 @@ describe("codingAgentLogFactsDispatch", () => {
     });
 
     /** @scenario An unparseable title body sets no title */
-    it("stamps nothing and still contributes when the body does not parse", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps nothing and still contributes when the body does not parse", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
+      lift(
         responseBodyEvent({
           querySource: "generate_session_title",
           body: '{"content":[{"type":"text","text":"{\\"title\\": \\"Fix the fl',
         }),
-        context,
       );
 
       // The contribution proceeds: one odd body must not cost the record.
@@ -525,7 +490,7 @@ describe("codingAgentLogFactsDispatch", () => {
 
   describe("when a prompt event carries the user's words", () => {
     const promptEvent = (prompt: string) =>
-      canonicalLogEvent({
+      canonicalLogRecord({
         attributes: {
           "event.name": "user_prompt",
           "session.id": "sess-prompt",
@@ -535,13 +500,10 @@ describe("codingAgentLogFactsDispatch", () => {
       });
 
     /** @scenario A session with no generated title is named by the first thing the user asked */
-    it("stamps a name candidate derived from the prompt", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps a name candidate derived from the prompt", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        promptEvent("Fix the retry loop in the outbox worker\nIt spins."),
-        context,
-      );
+      lift(promptEvent("Fix the retry loop in the outbox worker\nIt spins."));
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBe(
@@ -550,20 +512,20 @@ describe("codingAgentLogFactsDispatch", () => {
     });
 
     /** @scenario A machine-injected first prompt does not name the session */
-    it("stamps nothing for a machine-injected turn", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps nothing for a machine-injected turn", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(promptEvent("<task-notification>\n<task-id>abc</task-id>"), context);
+      lift(promptEvent("<task-notification>\n<task-id>abc</task-id>"));
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
     });
 
     /** @scenario A machine-injected first prompt does not name the session */
-    it("stamps nothing for a withheld prompt", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("stamps nothing for a withheld prompt", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(promptEvent("[REDACTED]"), context);
+      lift(promptEvent("[REDACTED]"));
 
       expect(dispatched).toHaveLength(1);
       expect(dispatched[0]!.facts[SESSION_TITLE_FALLBACK_FACT_KEY]).toBeUndefined();
@@ -571,14 +533,13 @@ describe("codingAgentLogFactsDispatch", () => {
   });
 
   describe("when a coding-agent record has no session key and no correlation", () => {
-    it("skips it — there is nothing to aggregate under", async () => {
-      const { subscriber, dispatched } = makeSubscriber();
+    it("skips it — there is nothing to aggregate under", () => {
+      const { lift, dispatched } = makeLift();
 
-      await subscriber.handle(
-        canonicalLogEvent({
+      lift(
+        canonicalLogRecord({
           attributes: { "event.name": "claude_code.internal_error" },
         }),
-        context,
       );
 
       expect(dispatched).toHaveLength(0);

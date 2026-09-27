@@ -23,6 +23,7 @@
     "@clickhouse/client": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/kernel": "workspace:*",

@@ -26,6 +26,8 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"

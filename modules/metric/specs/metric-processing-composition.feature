@@ -46,6 +46,13 @@ Feature: Composing durable metric processing
     And nothing is reported at boot about a missing Coding Agent pipeline
 
   @unit
+  Scenario: Each received metric point is forwarded to coding-agent once per point
+    Given the coding-agent dispatch on the metric pipeline
+    When the same received metric point is delivered twice
+    Then each delivery forwards the point to coding-agent unchanged
+    And both deliveries share one deduplication identity, apart from any other point
+
+  @unit
   Scenario: The metric capability is installed by the process that boots it
     Given a process that provides the data-privacy capability
     When it installs the metric feature and boots for the worker role
