@@ -155,7 +155,6 @@ export type {
  * process that has both registers these through the endpoint's session-tool seam.
  */
 export {
-  GovernanceMcpPermissionProbe,
-  registerGovernanceMcpTools,
-  type GovernanceMcpContext,
-} from "./transport/api-mcp/governance-tools.api.ts";
+  GovernanceMcpToolsService,
+  type GovernanceMcpServer,
+} from "./services/governance-mcp-tools.service.ts";

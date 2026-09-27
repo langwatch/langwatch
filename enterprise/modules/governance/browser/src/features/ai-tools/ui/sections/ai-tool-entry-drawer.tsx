@@ -239,6 +239,135 @@ function saveToolLabel({ isPending, isEdit }: { isPending: boolean; isEdit: bool
   return isEdit ? "Save changes" : "Save tool";
 }
 
+type DrawerState = Props["state"];
+
+/** What the drawer shows when it opens: the entry's own values, or a blank tool org-wide. */
+function openingState({ state, organizationId }: { state: DrawerState; organizationId: string }): {
+  form: FormState;
+  scopes: ScopeChipPickerEntry[];
+  iconAsset: string | null;
+} {
+  if (state?.mode === "edit") {
+    return {
+      form: formFromEntry(state.entry),
+      scopes: scopesFromEntry(state.entry, organizationId),
+      iconAsset: state.entry.iconAsset ?? null,
+    };
+  }
+  const form = blankForm(state?.type ?? "coding_assistant");
+  return {
+    form,
+    scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+    iconAsset: deriveDefaultIconAsset(form),
+  };
+}
+
+/** A preset kind takes its preset icon; switching to custom clears a preset until an upload. */
+function iconAfterKindChange({
+  kind,
+  iconAsset,
+}: {
+  kind: AssistantKind;
+  iconAsset: string | null;
+}): string | null {
+  if (kind !== "custom") return `preset:${kind}`;
+  if (iconAsset === null || iconAsset.startsWith(PRESET_PREFIX)) return null;
+  return iconAsset;
+}
+
+function canSaveForm({ form, iconAsset }: { form: FormState; iconAsset: string | null }): boolean {
+  if (!form.displayName.trim()) return false;
+  if (form.type === "coding_assistant") {
+    return form.setupCommand.trim() !== "" && (form.assistantKind !== "custom" || !!iconAsset);
+  }
+  if (form.type === "model_provider") return form.providerKey.trim() !== "";
+  return form.descriptionMarkdown.trim() !== "" && form.linkUrl.trim() !== "";
+}
+
+function visibilityHint(departmentCount: number): string {
+  if (departmentCount === 0) return "Whole organization - every member sees this tool.";
+  return `${departmentCount} department${departmentCount === 1 ? "" : "s"} - only members of these departments see it.`;
+}
+
+function TypeSection({
+  isEdit,
+  type,
+  onSelect,
+}: {
+  isEdit: boolean;
+  type: AiToolTileType;
+  onSelect: (type: AiToolTileType) => void;
+}) {
+  return (
+    <FormSection label="Type">
+      {isEdit ? (
+        <Text fontSize="sm" color="fg.muted">
+          {TILE_TYPE_OPTIONS.find((o) => o.value === type)?.label} (locked on edit)
+        </Text>
+      ) : (
+        <HStack gap={3}>
+          {TILE_TYPE_OPTIONS.map((opt) => (
+            <RadioCard
+              key={opt.value}
+              label={opt.label}
+              checked={type === opt.value}
+              onSelect={() => onSelect(opt.value)}
+            />
+          ))}
+        </HStack>
+      )}
+    </FormSection>
+  );
+}
+
+/** The fields that belong to the tool's type. */
+function ToolTypeFields({
+  form,
+  setForm,
+  onAssistantKindChange,
+  iconAsset,
+  onIconAssetChange: setIconAsset,
+  modelProviderOptions,
+}: {
+  form: FormState;
+  setForm: (next: FormState) => void;
+  onAssistantKindChange: (kind: AssistantKind) => void;
+  iconAsset: string | null;
+  onIconAssetChange: (next: string | null) => void;
+  modelProviderOptions: Pick<
+    Parameters<typeof ModelProviderFields>[0],
+    | "providerOptions"
+    | "providerOptionsLoading"
+    | "routingPolicyOptions"
+    | "routingPolicyOptionsLoading"
+  >;
+}) {
+  return (
+    <>
+      {form.type === "coding_assistant" ? (
+        <CodingAssistantFields
+          form={form}
+          setForm={setForm}
+          onAssistantKindChange={onAssistantKindChange}
+          iconAsset={iconAsset}
+          onIconAssetChange={setIconAsset}
+        />
+      ) : null}
+      {form.type === "model_provider" ? (
+        <ModelProviderFields form={form} setForm={setForm} {...modelProviderOptions} />
+      ) : null}
+      {form.type === "external_tool" ? (
+        <ExternalToolFields
+          form={form}
+          setForm={setForm}
+          iconAsset={iconAsset}
+          onIconAssetChange={setIconAsset}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   const showErrorToast = useShowErrorToast();
   const toaster = useGovernanceToaster();
@@ -251,37 +380,23 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   );
   const departments = departmentsQuery.data ?? [];
 
-  const [form, setForm] = useState<FormState>(() =>
-    state?.mode === "edit"
-      ? formFromEntry(state.entry)
-      : blankForm(state?.type ?? "coding_assistant"),
-  );
+  const [form, setForm] = useState<FormState>(() => openingState({ state, organizationId }).form);
   // Visibility scopes: a single ORGANIZATION entry = org-wide, or one or
   // more DEPARTMENT entries. New tiles default to org-wide.
-  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>(() =>
-    state?.mode === "edit"
-      ? scopesFromEntry(state.entry, organizationId)
-      : [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+  const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>(
+    () => openingState({ state, organizationId }).scopes,
   );
   const [iconAsset, setIconAsset] = useState<string | null>(
-    state?.mode === "edit"
-      ? (state.entry.iconAsset ?? null)
-      : deriveDefaultIconAsset(blankForm(state?.type ?? "coding_assistant")),
+    () => openingState({ state, organizationId }).iconAsset,
   );
 
   // Reset state when drawer opens for a different entry/type
   useEffect(() => {
     if (!state) return;
-    const nextForm = state.mode === "edit" ? formFromEntry(state.entry) : blankForm(state.type);
-    setForm(nextForm);
-    setScopes(
-      state.mode === "edit"
-        ? scopesFromEntry(state.entry, organizationId)
-        : [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
-    );
-    setIconAsset(
-      state.mode === "edit" ? (state.entry.iconAsset ?? null) : deriveDefaultIconAsset(nextForm),
-    );
+    const opening = openingState({ state, organizationId });
+    setForm(opening.form);
+    setScopes(opening.scopes);
+    setIconAsset(opening.iconAsset);
   }, [state, organizationId]);
 
   const isEdit = state?.mode === "edit";
@@ -307,12 +422,7 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
       // toggle off when the admin picks it.
       ...(kind === "cursor" ? { allowOtelDirect: false } : {}),
     });
-    if (kind !== "custom") {
-      setIconAsset(`preset:${kind}`);
-    } else if (iconAsset?.startsWith(PRESET_PREFIX) || iconAsset === null) {
-      // Switching from preset → custom clears the preset until they upload
-      setIconAsset(null);
-    }
+    setIconAsset(iconAfterKindChange({ kind, iconAsset }));
   };
 
   const providerOptionsQuery = api.aiTools.providerOptions.useQuery(
@@ -351,47 +461,20 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const canSave = useMemo(() => {
-    if (!form.displayName.trim()) return false;
-    if (form.type === "coding_assistant") {
-      if (!form.setupCommand.trim()) return false;
-      if (form.assistantKind === "custom" && !iconAsset) return false;
-    }
-    if (form.type === "model_provider" && !form.providerKey.trim()) {
-      return false;
-    }
-    if (
-      form.type === "external_tool" &&
-      (!form.descriptionMarkdown.trim() || !form.linkUrl.trim())
-    ) {
-      return false;
-    }
-    return true;
-  }, [form, iconAsset]);
+  const canSave = useMemo(() => canSaveForm({ form, iconAsset }), [form, iconAsset]);
 
   const onSave = () => {
     if (!canSave || !state) return;
-    const config = configFromForm(form);
-    if (state.mode === "create") {
-      createMutation.mutate({
-        organizationId,
-        departmentIds,
-        type: form.type,
-        displayName: form.displayName.trim(),
-        iconAsset,
-        config,
-      });
-    } else {
-      updateMutation.mutate({
-        organizationId,
-        id: state.entry.id,
-        type: form.type,
-        displayName: form.displayName.trim(),
-        iconAsset,
-        departmentIds,
-        config,
-      });
-    }
+    const tool = {
+      organizationId,
+      departmentIds,
+      type: form.type,
+      displayName: form.displayName.trim(),
+      iconAsset,
+      config: configFromForm(form),
+    };
+    if (state.mode === "create") createMutation.mutate(tool);
+    else updateMutation.mutate({ ...tool, id: state.entry.id });
   };
 
   if (!state) return null;
@@ -416,37 +499,17 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
-            <FormSection label="Type">
-              {isEdit ? (
-                <Text fontSize="sm" color="fg.muted">
-                  {TILE_TYPE_OPTIONS.find((o) => o.value === form.type)?.label} (locked on edit)
-                </Text>
-              ) : (
-                <HStack gap={3}>
-                  {TILE_TYPE_OPTIONS.map((opt) => (
-                    <RadioCard
-                      key={opt.value}
-                      label={opt.label}
-                      checked={form.type === opt.value}
-                      onSelect={() => {
-                        const next = blankForm(opt.value);
-                        setForm(next);
-                        setIconAsset(deriveDefaultIconAsset(next));
-                      }}
-                    />
-                  ))}
-                </HStack>
-              )}
-            </FormSection>
+            <TypeSection
+              isEdit={isEdit}
+              type={form.type}
+              onSelect={(type) => {
+                const next = blankForm(type);
+                setForm(next);
+                setIconAsset(deriveDefaultIconAsset(next));
+              }}
+            />
 
-            <FormSection
-              label="Visible to"
-              hint={
-                departmentIds.length === 0
-                  ? "Whole organization - every member sees this tool."
-                  : `${departmentIds.length} department${departmentIds.length === 1 ? "" : "s"} - only members of these departments see it.`
-              }
-            >
+            <FormSection label="Visible to" hint={visibilityHint(departmentIds.length)}>
               <ScopeChipPicker
                 value={scopes}
                 onChange={setScopes}
@@ -478,33 +541,19 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
               />
             </FormSection>
 
-            {form.type === "coding_assistant" && (
-              <CodingAssistantFields
-                form={form}
-                setForm={setForm}
-                onAssistantKindChange={onAssistantKindChange}
-                iconAsset={iconAsset}
-                onIconAssetChange={setIconAsset}
-              />
-            )}
-            {form.type === "model_provider" && (
-              <ModelProviderFields
-                form={form}
-                setForm={setForm}
-                providerOptions={providerOptionsQuery.data}
-                providerOptionsLoading={providerOptionsQuery.isLoading}
-                routingPolicyOptions={routingPolicyOptionsQuery.data}
-                routingPolicyOptionsLoading={routingPolicyOptionsQuery.isLoading}
-              />
-            )}
-            {form.type === "external_tool" && (
-              <ExternalToolFields
-                form={form}
-                setForm={setForm}
-                iconAsset={iconAsset}
-                onIconAssetChange={setIconAsset}
-              />
-            )}
+            <ToolTypeFields
+              form={form}
+              setForm={setForm}
+              onAssistantKindChange={onAssistantKindChange}
+              iconAsset={iconAsset}
+              onIconAssetChange={setIconAsset}
+              modelProviderOptions={{
+                providerOptions: providerOptionsQuery.data,
+                providerOptionsLoading: providerOptionsQuery.isLoading,
+                routingPolicyOptions: routingPolicyOptionsQuery.data,
+                routingPolicyOptionsLoading: routingPolicyOptionsQuery.isLoading,
+              }}
+            />
 
             <HStack gap={2} marginTop={4}>
               <Spacer />

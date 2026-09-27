@@ -152,6 +152,8 @@ export type WorkerTestDoubles = {
   insertEvent: (input: GovernanceOcsfEventInput) => Promise<void>;
   usageEnabled: (organizationId: string) => Promise<boolean>;
   ensureProject: () => Promise<{ id: string }>;
+  discovery?: { recordFromPulledEvents(): Promise<{ discovered: number }> };
+  identityMatch?: { runFor(input: { organizationId: string }): Promise<void> };
 };
 
 export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWorkerService {
@@ -189,8 +191,8 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     usageEntitlement: new TestEntitlement(doubles.usageEnabled),
     usageRecords: PulledUsageRecordService.create(pricing),
     suppression: { loadForProvider: async () => NO_SUPPRESSION },
-    discovery: { recordFromPulledEvents: async () => ({ discovered: 0 }) },
-    identityMatch: { runFor: async () => undefined },
+    discovery: doubles.discovery ?? { recordFromPulledEvents: async () => ({ discovered: 0 }) },
+    identityMatch: doubles.identityMatch ?? { runFor: async () => undefined },
     unpricedWindows: {
       getUnpricedUsageWindow: async () => ({ since: null, through: null }),
       updateUnpricedUsageWindow: async () => undefined,

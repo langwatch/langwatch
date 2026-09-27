@@ -99,48 +99,49 @@ const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
 );
 
 /**
- * Plain-English summary of a threshold config — rendered live below
- * the JSON Textarea so admins see what their rule will actually
- * evaluate before they save (rchaves QA: "a preview would be great").
- *
- * Returns:
- *   - { kind: "ok", english } when the JSON parses + the rule type is
- *     known + every required field is present + has the right shape
- *   - { kind: "error", message } when JSON is invalid or required
- *     fields are missing/wrong type
- *   - { kind: "unsupported", english } when the rule type is in the
- *     UI suggestions but not yet wired to a detector — admin gets a
- *     clear "this won't fire" signal at compose time
+ * The plain-English preview under the threshold JSON: `ok` for a complete
+ * spend_spike config, `unsupported` for a preview rule type that will save but
+ * never fire, `error` for invalid JSON or missing fields.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
-function summariseThresholdConfig(
-  ruleType: string,
-  raw: string,
-): { kind: "ok" | "unsupported"; english: string } | { kind: "error"; message: string } {
-  // Order matters: non-spend_spike rule types are persisted as
-  // preview-mode (Sergey 5f416d410 — server accepts any
-  // thresholdConfig shape for non-detector-wired types). So check
-  // ruleType FIRST. Empty `{}` on rate_limit / after_hours /
-  // model_drift / error_rate is a valid save — surface it as
-  // "Won't fire" rather than the spend_spike-shape "Empty config"
-  // error.
-  if (ruleType !== "spend_spike") {
-    if (raw.trim() !== "" && raw.trim() !== "{}") {
-      try {
-        JSON.parse(raw);
-      } catch (err) {
-        return {
-          kind: "error",
-          message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
-        };
-      }
+type ThresholdSummary =
+  | { kind: "ok" | "unsupported"; english: string }
+  | { kind: "error"; message: string };
+
+function invalidJson(err: unknown): ThresholdSummary {
+  return {
+    kind: "error",
+    message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
+  };
+}
+
+function isEmptyConfig(raw: string): boolean {
+  return raw.trim() === "" || raw.trim() === "{}";
+}
+
+function fmtDuration(sec: number): string {
+  if (sec >= 86400) return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
+  if (sec >= 3600) return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
+  if (sec >= 60) return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
+  return `${sec} second${sec === 1 ? "" : "s"}`;
+}
+
+/** Preview rule types save any config shape; only unparseable JSON is refused. */
+function summarisePreviewConfig(ruleType: string, raw: string): ThresholdSummary {
+  if (!isEmptyConfig(raw)) {
+    try {
+      JSON.parse(raw);
+    } catch (err) {
+      return invalidJson(err);
     }
-    return {
-      kind: "unsupported",
-      english: `\`${ruleType}\` is in preview; the rule will save but no detector runs against it yet. \`spend_spike\` is the only type evaluated today; the others (\`rate_limit\`, \`after_hours\`, \`model_drift\`, \`error_rate\`) ship as detectors land.`,
-    };
   }
-  if (raw.trim() === "" || raw.trim() === "{}") {
+  return {
+    kind: "unsupported",
+    english: `\`${ruleType}\` is in preview; the rule will save but no detector runs against it yet. \`spend_spike\` is the only type evaluated today; the others (\`rate_limit\`, \`after_hours\`, \`model_drift\`, \`error_rate\`) ship as detectors land.`,
+  };
+}
+
+function summariseSpendSpikeConfig(raw: string): ThresholdSummary {
+  if (isEmptyConfig(raw)) {
     return {
       kind: "error",
       message:
@@ -151,14 +152,9 @@ function summariseThresholdConfig(
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    return {
-      kind: "error",
-      message: `Invalid JSON: ${err instanceof Error ? err.message : "parse failed"}`,
-    };
+    return invalidJson(err);
   }
-  const windowSec = parsed.windowSec;
-  const ratio = parsed.ratioVsBaseline;
-  const minBaseline = parsed.minBaselineUsd;
+  const { windowSec, ratioVsBaseline: ratio, minBaselineUsd: minBaseline } = parsed;
   const baselineOffset = parsed.baselineOffsetSec;
   if (
     typeof windowSec !== "number" ||
@@ -172,18 +168,20 @@ function summariseThresholdConfig(
         "spend_spike requires numeric `windowSec`, `ratioVsBaseline`, `minBaselineUsd`, and `baselineOffsetSec`.",
     };
   }
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relocated, not rewritten
-  const fmtDuration = (sec: number): string => {
-    if (sec >= 86400)
-      return `${Math.round((sec / 86400) * 10) / 10} day${sec === 86400 ? "" : "s"}`;
-    if (sec >= 3600) return `${Math.round((sec / 3600) * 10) / 10} hour${sec === 3600 ? "" : "s"}`;
-    if (sec >= 60) return `${Math.round((sec / 60) * 10) / 10} minute${sec === 60 ? "" : "s"}`;
-    return `${sec} second${sec === 1 ? "" : "s"}`;
-  };
   return {
     kind: "ok",
     english: `Fires when spend in the last ${fmtDuration(windowSec)} is at least ${ratio}× the spend in the equivalent ${fmtDuration(windowSec)} window from ${fmtDuration(baselineOffset)} ago, AND that baseline is at least $${minBaseline}. Otherwise the baseline is too noisy and the rule stays quiet.`,
   };
+}
+
+/**
+ * Rule type first: preview types (rate_limit, after_hours, …) save `{}` as a
+ * valid "won't fire" rule, not spend_spike's "Empty config" error.
+ */
+function summariseThresholdConfig(ruleType: string, raw: string): ThresholdSummary {
+  return ruleType === "spend_spike"
+    ? summariseSpendSpikeConfig(raw)
+    : summarisePreviewConfig(ruleType, raw);
 }
 
 interface ComposerState {

@@ -212,11 +212,7 @@ function createFixtureWorkspace(options: { betaAgeMs?: number } = {}) {
 
 type FixtureWorkspace = ReturnType<typeof createFixtureWorkspace>;
 
-/**
- * Serves the fixture workspace over real HTTP, with the pagination, the 403
- * and the broken page token the adapter has to survive.
- */
-async function startFixtureServer(params: {
+type FixtureServerParams = {
   workspace: FixtureWorkspace;
   onBeforeSpace?: (spaceId: string) => void;
   onMessages?: (conversationId: string) => Promise<void> | void;
@@ -227,24 +223,165 @@ async function startFixtureServer(params: {
     body?: unknown;
     hang?: boolean;
   };
-}): Promise<{
-  baseUrl: string;
+};
+
+type FixtureRecord = {
   conversationRequests: string[];
   requestCounts: Map<string, number>;
   oauthBasic: string[];
   bearersSeen: string[];
-  close: () => Promise<void>;
-}> {
-  const { workspace } = params;
-  const conversationRequests: string[] = [];
-  const requestCounts = new Map<string, number>();
-  const oauthBasic: string[] = [];
-  const bearersSeen: string[] = [];
-  const CONVERSATION_PAGE = 1;
-  const MESSAGE_PAGE = 1;
+};
+
+type FixtureExchange = {
+  params: FixtureServerParams;
+  record: FixtureRecord;
+  req: http.IncomingMessage;
+  res: http.ServerResponse;
+  url: URL;
+  send: (body: unknown) => void;
+};
+
+const CONVERSATION_PAGE = 1;
+const MESSAGE_PAGE = 1;
+
+function pageOf<Item>({ all, token, size }: { all: Item[]; token: string | null; size: number }) {
+  const offset = token ? Number(token) : 0;
+  const next = offset + size;
+  return {
+    slice: all.slice(offset, next),
+    nextPageToken: next < all.length ? String(next) : null,
+  };
+}
+
+function serveOauth({ params, record, req, res, send }: FixtureExchange): void {
+  const oauth = params.oauth;
+  if (!oauth) {
+    res.statusCode = 404;
+    send({ error: "no token endpoint" });
+    return;
+  }
+  const basic = /^Basic (.+)$/.exec(req.headers.authorization ?? "");
+  if (basic) record.oauthBasic.push(Buffer.from(basic[1]!, "base64").toString("utf8"));
+  if (oauth.hang) return;
+  if (oauth.status && oauth.status !== 200) {
+    res.statusCode = oauth.status;
+    send({ error: "invalid_client", error_description: "refused" });
+    return;
+  }
+  send(
+    oauth.body ?? {
+      access_token: oauth.accessToken ?? "minted-token",
+      token_type: "Bearer",
+      expires_in: 3600,
+    },
+  );
+}
+
+function serveConversations(exchange: FixtureExchange, spaceId: string): void {
+  const { params, record, res, url, send } = exchange;
+  const token = url.searchParams.get("page_token");
+  params.onBeforeSpace?.(spaceId);
+  record.conversationRequests.push(url.search);
+
+  if (spaceId === "space-forbidden") {
+    res.statusCode = 403;
+    send({ error_code: "PERMISSION_DENIED", message: "no access" });
+    return;
+  }
+  if (spaceId === "space-loop") {
+    send({ conversations: [], next_page_token: token ?? "stuck" });
+    return;
+  }
+  if (url.searchParams.get("include_all") !== "true") {
+    send({ conversations: [], next_page_token: null });
+    return;
+  }
+  const page = pageOf({
+    all: params.workspace.conversations[spaceId] ?? [],
+    token,
+    size: CONVERSATION_PAGE,
+  });
+  send({ conversations: page.slice, next_page_token: page.nextPageToken });
+}
+
+async function serveMessages(exchange: FixtureExchange, conversationId: string): Promise<void> {
+  const { params, url, send } = exchange;
+  await params.onMessages?.(conversationId);
+  const page = pageOf({
+    all: params.workspace.messages[conversationId] ?? [],
+    token: url.searchParams.get("page_token"),
+    size: MESSAGE_PAGE,
+  });
+  send({ messages: page.slice, next_page_token: page.nextPageToken });
+}
+
+function serveScimUser({ params, res, send }: FixtureExchange, userId: string): void {
+  const forced = params.onScim?.(userId);
+  if (forced !== undefined) {
+    res.statusCode = forced;
+    send({ error: `forced ${forced}` });
+    return;
+  }
+  const user = USERS[userId];
+  if (!user) {
+    res.statusCode = 404;
+    send({ error: "not found" });
+    return;
+  }
+  send(user);
+}
+
+async function serveFixtureRequest(exchange: FixtureExchange): Promise<void> {
+  const { record, req, res, url, send } = exchange;
+  if (url.pathname === "/oidc/v1/token") return serveOauth(exchange);
+
+  const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
+  if (bearer) record.bearersSeen.push(bearer[1]!);
+
+  if (url.pathname === "/api/2.0/genie/spaces") {
+    const ids = Object.keys(SPACE_TITLES);
+    send({
+      spaces: ids.map((space_id) => ({ space_id, title: SPACE_TITLES[space_id] ?? null })),
+      next_page_token: null,
+    });
+    return;
+  }
+  const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
+  if (conversations) return serveConversations(exchange, conversations[1]!);
+
+  const messages = /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
+    url.pathname,
+  );
+  if (messages) return serveMessages(exchange, messages[1]!);
+
+  const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(url.pathname);
+  if (scim) return serveScimUser(exchange, scim[1]!);
+
+  res.statusCode = 404;
+  send({ error: `unrouted ${url.pathname}` });
+}
+
+/**
+ * Serves the fixture workspace over real HTTP, with the pagination, the 403
+ * and the broken page token the adapter has to survive.
+ */
+async function startFixtureServer(
+  params: FixtureServerParams,
+): Promise<FixtureRecord & { baseUrl: string; close: () => Promise<void> }> {
+  const record: FixtureRecord = {
+    conversationRequests: [],
+    requestCounts: new Map<string, number>(),
+    oauthBasic: [],
+    bearersSeen: [],
+  };
 
   const server = http.createServer((req, res) => {
-    handle(req, res).catch(() => {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    record.requestCounts.set(url.pathname, (record.requestCounts.get(url.pathname) ?? 0) + 1);
+    res.setHeader("content-type", "application/json");
+    res.statusCode = 200;
+    const send = (body: unknown) => res.end(JSON.stringify(body));
+    serveFixtureRequest({ params, record, req, res, url, send }).catch(() => {
       if (!res.headersSent) {
         res.statusCode = 500;
         res.end("{}");
@@ -252,130 +389,10 @@ async function startFixtureServer(params: {
     });
   });
 
-  async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const token = url.searchParams.get("page_token");
-    requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
-    res.setHeader("content-type", "application/json");
-    res.statusCode = 200;
-    const send = (body: unknown) => res.end(JSON.stringify(body));
-
-    if (url.pathname === "/oidc/v1/token") {
-      const oauth = params.oauth;
-      if (!oauth) {
-        res.statusCode = 404;
-        send({ error: "no token endpoint" });
-        return;
-      }
-      const header = req.headers.authorization ?? "";
-      const basic = /^Basic (.+)$/.exec(header);
-      if (basic) {
-        oauthBasic.push(Buffer.from(basic[1]!, "base64").toString("utf8"));
-      }
-      if (oauth.hang) return;
-      if (oauth.status && oauth.status !== 200) {
-        res.statusCode = oauth.status;
-        send({ error: "invalid_client", error_description: "refused" });
-        return;
-      }
-      send(
-        oauth.body ?? {
-          access_token: oauth.accessToken ?? "minted-token",
-          token_type: "Bearer",
-          expires_in: 3600,
-        },
-      );
-      return;
-    }
-
-    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
-    if (bearer) bearersSeen.push(bearer[1]!);
-
-    if (url.pathname === "/api/2.0/genie/spaces") {
-      const ids = Object.keys(SPACE_TITLES);
-      send({
-        spaces: ids.map((space_id) => ({ space_id, title: SPACE_TITLES[space_id] ?? null })),
-        next_page_token: null,
-      });
-      return;
-    }
-
-    const conversations = /^\/api\/2\.0\/genie\/spaces\/([^/]+)\/conversations$/.exec(url.pathname);
-    if (conversations) {
-      const spaceId = conversations[1]!;
-      params.onBeforeSpace?.(spaceId);
-      conversationRequests.push(url.search);
-
-      if (spaceId === "space-forbidden") {
-        res.statusCode = 403;
-        send({ error_code: "PERMISSION_DENIED", message: "no access" });
-        return;
-      }
-      if (spaceId === "space-loop") {
-        send({ conversations: [], next_page_token: token ?? "stuck" });
-        return;
-      }
-      if (url.searchParams.get("include_all") !== "true") {
-        send({ conversations: [], next_page_token: null });
-        return;
-      }
-
-      const all = workspace.conversations[spaceId] ?? [];
-      const offset = token ? Number(token) : 0;
-      const slice = all.slice(offset, offset + CONVERSATION_PAGE);
-      const next = offset + CONVERSATION_PAGE;
-      send({
-        conversations: slice,
-        next_page_token: next < all.length ? String(next) : null,
-      });
-      return;
-    }
-
-    const messages = /^\/api\/2\.0\/genie\/spaces\/[^/]+\/conversations\/([^/]+)\/messages$/.exec(
-      url.pathname,
-    );
-    if (messages) {
-      await params.onMessages?.(messages[1]!);
-      const all = workspace.messages[messages[1]!] ?? [];
-      const offset = token ? Number(token) : 0;
-      const slice = all.slice(offset, offset + MESSAGE_PAGE);
-      const next = offset + MESSAGE_PAGE;
-      send({
-        messages: slice,
-        next_page_token: next < all.length ? String(next) : null,
-      });
-      return;
-    }
-
-    const scim = /^\/api\/2\.0\/preview\/scim\/v2\/Users\/([^/]+)$/.exec(url.pathname);
-    if (scim) {
-      const forced = params.onScim?.(scim[1]!);
-      if (forced !== undefined) {
-        res.statusCode = forced;
-        send({ error: `forced ${forced}` });
-        return;
-      }
-      const user = USERS[scim[1]!];
-      if (!user) {
-        res.statusCode = 404;
-        send({ error: "not found" });
-        return;
-      }
-      send(user);
-      return;
-    }
-
-    res.statusCode = 404;
-    send({ error: `unrouted ${url.pathname}` });
-  }
-
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   return {
+    ...record,
     baseUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
-    conversationRequests,
-    requestCounts,
-    oauthBasic,
-    bearersSeen,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

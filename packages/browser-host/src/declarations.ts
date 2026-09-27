@@ -20,6 +20,9 @@ export type UiAuthenticationOverviewCardProps = {
   canReadMembership: boolean;
 };
 
+/** What a landing hero hands project's lent inline command palette. */
+export type UiHeroAskFieldProps = { placeholder: string };
+
 /** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
 export type UiParameterLineFieldProps = {
   definitions: readonly ScenarioParameterDefinition[];
@@ -125,6 +128,23 @@ export type UiRenderInputOutputProps = {
   displayObjectSize?: boolean;
 };
 
+/** What a screen hands workflow's clamped text that expands into a dialog. */
+export type UiHoverableBigTextProps = {
+  children: ReactNode;
+  lineClamp?: number;
+  expandedVersion?: string;
+  expandable?: boolean;
+};
+
+/** What a screen hands workflow's marker for a trace field the reader may not see. */
+export type UiRedactedFieldProps = {
+  field: "input" | "output";
+  children: ReactNode;
+  loadingComponent?: ReactNode;
+  redacted?: boolean;
+  visibleTo?: string | null;
+};
+
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
   surface: "simulations" | "simulationRuns";
@@ -184,12 +204,15 @@ export type UiDeclaredCapabilities = {
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
   };
+  heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
+  hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
+  redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;

@@ -25,7 +25,10 @@ import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import type {
+  AiToolEntry,
+  AiToolStarterTileChoice,
+} from "@langwatch/enterprise-governance-contract";
 import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -56,6 +59,119 @@ const SECTION_ORDER: AiToolEntry["type"][] = [
   "model_provider",
   "external_tool",
 ];
+
+function starterPackImportedToast({ created, skipped }: { created: number; skipped: number }) {
+  return {
+    title:
+      created === 0
+        ? "Starter pack already published"
+        : `Imported ${created} ${created === 1 ? "tool" : "tools"}`,
+    description:
+      skipped > 0
+        ? `${skipped} ${skipped === 1 ? "tool was" : "tools were"} already published and skipped.`
+        : "Coding assistants and model providers are now visible to your team on /me.",
+  };
+}
+
+function groupEntriesByType(
+  entries: readonly AiToolEntry[],
+): Record<AiToolEntry["type"], AiToolEntry[]> {
+  const grouped: Record<AiToolEntry["type"], AiToolEntry[]> = {
+    coding_assistant: [],
+    model_provider: [],
+    external_tool: [],
+  };
+  for (const e of entries) grouped[e.type].push(e);
+  for (const t of SECTION_ORDER) grouped[t].sort((a, b) => a.order - b.order);
+  return grouped;
+}
+
+function StarterPackImportCard({
+  isCatalogEmpty,
+  starterTiles,
+  unchecked,
+  setUnchecked,
+  selectedSlugs,
+  isPending,
+  onImport,
+}: {
+  isCatalogEmpty: boolean;
+  starterTiles: readonly AiToolStarterTileChoice[];
+  unchecked: Record<string, boolean>;
+  setUnchecked: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  selectedSlugs: string[];
+  isPending: boolean;
+  onImport: () => void;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="orange.emphasized"
+      borderRadius="md"
+      backgroundColor="orange.subtle"
+      padding={4}
+    >
+      <HStack alignItems="start" gap={3}>
+        <Box color="orange.fg" paddingTop="2px">
+          <PackageOpen size={20} />
+        </Box>
+        <VStack align="start" gap={2} flex={1} minWidth={0}>
+          <Text fontSize="sm" fontWeight="semibold">
+            {isCatalogEmpty ? "Publish a starter pack to get going" : "Import starter pack"}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {isCatalogEmpty
+              ? "Pick the tools to publish at org scope so every member " +
+                "sees them on /me. You can rename, reorder, disable, or " +
+                "remove individual tools afterwards. Re-running is safe; " +
+                "only new slugs get added."
+              : "Adds starter tools the catalog never had. Tools already " +
+                "present, archived ones included, are skipped."}
+          </Text>
+          <VStack align="start" gap={2} paddingTop={1} width="full">
+            {SECTION_ORDER.map((type) => {
+              const tiles = starterTiles.filter((t) => t.type === type);
+              if (tiles.length === 0) return null;
+              return (
+                <VStack key={type} align="start" gap={1}>
+                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                    {SECTION_LABELS[type]}
+                  </Text>
+                  {tiles.map((tile) => (
+                    <Checkbox
+                      key={tile.slug}
+                      size="sm"
+                      checked={!unchecked[tile.slug]}
+                      onChange={(e) =>
+                        setUnchecked((prev) => ({
+                          ...prev,
+                          [tile.slug]: !e.target.checked,
+                        }))
+                      }
+                    >
+                      <Text fontSize="sm">{tile.displayName}</Text>
+                    </Checkbox>
+                  ))}
+                </VStack>
+              );
+            })}
+          </VStack>
+          <HStack paddingTop={1}>
+            <Button
+              size="sm"
+              colorPalette="orange"
+              loading={isPending}
+              disabled={selectedSlugs.length === 0}
+              onClick={onImport}
+            >
+              <PackageOpen size={14} /> Import selected ({selectedSlugs.length})
+            </Button>
+          </HStack>
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
 
 interface Props {
   organizationId: string;
@@ -96,17 +212,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
     onSuccess: ({ created, skipped }) => {
       void utils.aiTools.adminList.invalidate({ organizationId });
       void utils.aiTools.list.invalidate({ organizationId });
-      toaster.create({
-        title:
-          created === 0
-            ? "Starter pack already published"
-            : `Imported ${created} ${created === 1 ? "tool" : "tools"}`,
-        description:
-          skipped > 0
-            ? `${skipped} ${skipped === 1 ? "tool was" : "tools were"} already published and skipped.`
-            : "Coding assistants and model providers are now visible to your team on /me.",
-        type: "success",
-      });
+      toaster.create({ ...starterPackImportedToast({ created, skipped }), type: "success" });
     },
     onError: (err) =>
       showErrorToast({
@@ -142,15 +248,7 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
     );
   }
 
-  const grouped: Record<AiToolEntry["type"], AiToolEntry[]> = {
-    coding_assistant: [],
-    model_provider: [],
-    external_tool: [],
-  };
-  for (const e of entries) grouped[e.type].push(e);
-  for (const t of SECTION_ORDER) {
-    grouped[t].sort((a, b) => a.order - b.order);
-  }
+  const grouped = groupEntriesByType(entries);
 
   const handleSectionDragEnd = (type: AiToolEntry["type"]) => (event: DragEndEvent) => {
     const { active, over } = event;
@@ -167,11 +265,9 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
     }));
 
     const previous = entries;
-    const next: AiToolEntry[] = entries.map((e) => {
-      if (e.type !== type) return e;
-      const updated = reorderedSection.find((r) => r.id === e.id);
-      return updated ?? e;
-    });
+    const next = entries.map(
+      (e) => (e.type === type ? reorderedSection.find((r) => r.id === e.id) : undefined) ?? e,
+    );
 
     utils.aiTools.adminList.setData({ organizationId }, next);
 
@@ -200,82 +296,20 @@ export function ToolCatalogEditor({ organizationId, onAddTile, onEditTile }: Pro
         </HStack>
       )}
       {(isCatalogEmpty || showImport) && (
-        // Semantic orange, not the raw palette: fixed light-mode values kept a
-        // cream background whose text stayed non-flipping in dark mode (white
-        // on cream, 1.01:1). The semantic triple (_app.tsx) flips it to
-        // 10.49:1 heading / 7.39:1 body; light mode moves orange.50 →
-        // orange.100 (1.05:1), and the icon improves 3.26:1 → 8.16:1.
-        <Box
-          borderWidth="1px"
-          borderColor="orange.emphasized"
-          borderRadius="md"
-          backgroundColor="orange.subtle"
-          padding={4}
-        >
-          <HStack alignItems="start" gap={3}>
-            <Box color="orange.fg" paddingTop="2px">
-              <PackageOpen size={20} />
-            </Box>
-            <VStack align="start" gap={2} flex={1} minWidth={0}>
-              <Text fontSize="sm" fontWeight="semibold">
-                {isCatalogEmpty ? "Publish a starter pack to get going" : "Import starter pack"}
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                {isCatalogEmpty
-                  ? "Pick the tools to publish at org scope so every member " +
-                    "sees them on /me. You can rename, reorder, disable, or " +
-                    "remove individual tools afterwards. Re-running is safe; " +
-                    "only new slugs get added."
-                  : "Adds starter tools the catalog never had. Tools already " +
-                    "present, archived ones included, are skipped."}
-              </Text>
-              <VStack align="start" gap={2} paddingTop={1} width="full">
-                {SECTION_ORDER.map((type) => {
-                  const tiles = starterTiles.filter((t) => t.type === type);
-                  if (tiles.length === 0) return null;
-                  return (
-                    <VStack key={type} align="start" gap={1}>
-                      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                        {SECTION_LABELS[type]}
-                      </Text>
-                      {tiles.map((tile) => (
-                        <Checkbox
-                          key={tile.slug}
-                          size="sm"
-                          checked={!unchecked[tile.slug]}
-                          onChange={(e) =>
-                            setUnchecked((prev) => ({
-                              ...prev,
-                              [tile.slug]: !e.target.checked,
-                            }))
-                          }
-                        >
-                          <Text fontSize="sm">{tile.displayName}</Text>
-                        </Checkbox>
-                      ))}
-                    </VStack>
-                  );
-                })}
-              </VStack>
-              <HStack paddingTop={1}>
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  loading={importStarterPackMutation.isPending}
-                  disabled={selectedSlugs.length === 0}
-                  onClick={() =>
-                    importStarterPackMutation.mutate(
-                      { organizationId, slugs: selectedSlugs },
-                      { onSuccess: () => setShowImport(false) },
-                    )
-                  }
-                >
-                  <PackageOpen size={14} /> Import selected ({selectedSlugs.length})
-                </Button>
-              </HStack>
-            </VStack>
-          </HStack>
-        </Box>
+        <StarterPackImportCard
+          isCatalogEmpty={isCatalogEmpty}
+          starterTiles={starterTiles}
+          unchecked={unchecked}
+          setUnchecked={setUnchecked}
+          selectedSlugs={selectedSlugs}
+          isPending={importStarterPackMutation.isPending}
+          onImport={() =>
+            importStarterPackMutation.mutate(
+              { organizationId, slugs: selectedSlugs },
+              { onSuccess: () => setShowImport(false) },
+            )
+          }
+        />
       )}
       {SECTION_ORDER.map((type) => {
         const items = grouped[type];

@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -822,4 +823,13 @@ export interface AnomalySpendReader {
 export interface GovernanceIngestRateLimiter {
   /** `retryAfterSec` is the remaining window, as the receiver puts it on `Retry-After`. */
   check(input: { ip: string }): Promise<Readonly<{ allowed: boolean; retryAfterSec: number }>>;
+}
+
+/** Whether the caller holds a permission on an organization, from the process's own AuthZ graph. */
+export interface GovernanceMcpPermissionProbe {
+  holdsOrganizationPermission(input: {
+    userId: string;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
 }
