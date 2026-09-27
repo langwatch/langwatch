@@ -40,12 +40,14 @@ export const agentWeb = defineWebModule("agent")
     },
     agentCodeEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-code-editor-drawer.tsx")).AgentCodeEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentCodeEditorDrawer,
       }),
     },
     agentHttpEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-http-editor-drawer.tsx")).AgentHttpEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentHttpEditorDrawer,
       }),
     },
     agentVoiceEditor: {
@@ -80,8 +82,8 @@ export const agentWeb = defineWebModule("agent")
     },
     workflowSelector: {
       load: async () => ({
-        default: (await import("./ui/sections/workflow-selector-drawer.tsx"))
-          .WorkflowSelectorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedWorkflowSelectorDrawer,
       }),
     },
   })
