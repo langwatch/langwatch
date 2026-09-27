@@ -12,6 +12,7 @@ import {
   toComparisonConfig,
   disambiguateNames,
 } from "@langwatch/experiment-contract";
+import { targetHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import { VersionBadge } from "@langwatch/prompt-browser-kit";
 import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
@@ -42,7 +43,6 @@ import {
   useTargetNames,
 } from "../../../../behavior/experiments-v3/use-target-name.ts";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
-import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";

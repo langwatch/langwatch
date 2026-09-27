@@ -897,39 +897,22 @@ const extractOutputFromEvaluatorInputsForEvaluator = (
 const detectPredictedColumns = (
   dataset: ExperimentRunWithItems["dataset"],
 ): Record<string, Set<string>> => {
-  const columns: Record<string, Set<string>> = {};
+  const predictions = dataset.flatMap((d) => (d.predicted ? [d.predicted] : []));
+  const firstPredicted = predictions[0];
+  if (!firstPredicted) return {};
 
-  // Check if predicted values are flat or nested
-  const firstPredicted = dataset.find((d) => d.predicted)?.predicted;
-  if (!firstPredicted) return columns;
-
-  const isNested = Object.values(firstPredicted).every(isJsonRecord);
-
-  if (isNested) {
-    // Nested format: { node: { field: value } }
-    for (const entry of dataset) {
-      if (!entry.predicted) continue;
-      for (const [node, value] of Object.entries(entry.predicted)) {
-        const nodeOutput = jsonRecordOf(value);
-        if (!nodeOutput) continue;
-
-        if (!columns[node]) columns[node] = new Set();
-        for (const key of Object.keys(nodeOutput)) {
-          columns[node]!.add(key);
-        }
-      }
-    }
-  } else {
-    // Flat format: { field: value }
-    columns.end = new Set();
-    for (const entry of dataset) {
-      if (!entry.predicted) continue;
-      for (const key of Object.keys(entry.predicted)) {
-        columns.end!.add(key);
-      }
-    }
+  // Flat format `{ field: value }` sits under "end"; nested `{ node: { field } }` per node.
+  if (!Object.values(firstPredicted).every(isJsonRecord)) {
+    return { end: new Set(predictions.flatMap((predicted) => Object.keys(predicted))) };
   }
 
+  const columns: Record<string, Set<string>> = {};
+  for (const [node, value] of predictions.flatMap((predicted) => Object.entries(predicted))) {
+    const nodeOutput = jsonRecordOf(value);
+    if (!nodeOutput) continue;
+    columns[node] ??= new Set();
+    for (const key of Object.keys(nodeOutput)) columns[node].add(key);
+  }
   return columns;
 };
 

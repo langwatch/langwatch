@@ -245,6 +245,55 @@ const DATASET_INPUT_FIELDS = new Set([
 ]);
 
 /**
+ * One evaluator input's source: output-like fields read only the target (a lone
+ * output stands in for a name match), input-like only the dataset, anything else
+ * the dataset then the target. Empty beats grading the dataset against itself.
+ */
+const inferEvaluatorInputSource = ({
+  identifier,
+  dataset,
+  target,
+}: {
+  identifier: string;
+  dataset: DatasetReference;
+  target: TargetConfig;
+}): FieldMapping | undefined => {
+  const fieldLower = identifier.toLowerCase();
+  const fromTarget = (): FieldMapping | undefined => {
+    const field = findMatchingColumn(
+      identifier,
+      target.outputs.map((o) => ({
+        id: o.identifier,
+        name: o.identifier,
+        type: "string" as const,
+      })),
+    );
+    return field
+      ? { type: "source", source: "target", sourceId: target.id, sourceField: field }
+      : undefined;
+  };
+  const fromDataset = (): FieldMapping | undefined => {
+    const field = findMatchingColumn(identifier, dataset.columns);
+    return field
+      ? { type: "source", source: "dataset", sourceId: dataset.id, sourceField: field }
+      : undefined;
+  };
+
+  if (TARGET_OUTPUT_FIELDS.has(fieldLower)) {
+    const soleOutput = target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined;
+    return (
+      fromTarget() ??
+      (soleOutput
+        ? { type: "source", source: "target", sourceId: target.id, sourceField: soleOutput }
+        : undefined)
+    );
+  }
+  if (DATASET_INPUT_FIELDS.has(fieldLower)) return fromDataset();
+
+  return fromDataset() ?? fromTarget();
+};
+
+/**
  * Infers new mappings for the evaluator's input fields, preferring `target`'s outputs
  * or `dataset`'s columns depending on the field, and skipping already-mapped fields.
  */
@@ -260,85 +309,11 @@ export const inferEvaluatorMappings = ({
   existingMappings?: Record<string, FieldMapping>;
 }): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
-
   for (const input of evaluatorInputs) {
-    // Skip if already mapped
-    if (existingMappings[input.identifier]) {
-      continue;
-    }
-
-    const fieldLower = input.identifier.toLowerCase();
-    const isTargetOnly = TARGET_OUTPUT_FIELDS.has(fieldLower);
-    const isDatasetOnly = DATASET_INPUT_FIELDS.has(fieldLower);
-
-    const targetMatch = (): string | undefined =>
-      findMatchingColumn(
-        input.identifier,
-        target.outputs.map((o) => ({
-          id: o.identifier,
-          name: o.identifier,
-          type: "string" as const,
-        })),
-      );
-
-    const datasetMatch = (): string | undefined =>
-      findMatchingColumn(input.identifier, dataset.columns);
-
-    if (isTargetOnly) {
-      // Prefer a name/semantic match; otherwise, when the target exposes
-      // exactly one output it is the only sensible source for an output-like
-      // field, so auto-map to it (the single-output classifier case where the
-      // sole output is named e.g. "category", not "output").
-      const m =
-        targetMatch() ?? (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
-      if (m) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "target",
-          sourceId: target.id,
-          sourceField: m,
-        };
-      }
-      // No dataset fallback: empty beats a mapping that grades the dataset
-      // against itself.
-    } else if (isDatasetOnly) {
-      const m = datasetMatch();
-      if (m) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: dataset.id,
-          sourceField: m,
-        };
-      }
-      // No target fallback: empty beats a mapping that reads an expected
-      // answer back from the runner.
-    } else {
-      // Custom identifier (score, threshold, label, etc.): dataset first,
-      // then target. Preserves the original heuristic for everything
-      // outside the locked-side families above.
-      const fromDataset = datasetMatch();
-      if (fromDataset) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: dataset.id,
-          sourceField: fromDataset,
-        };
-        continue;
-      }
-      const fromTarget = targetMatch();
-      if (fromTarget) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "target",
-          sourceId: target.id,
-          sourceField: fromTarget,
-        };
-      }
-    }
+    if (existingMappings[input.identifier]) continue;
+    const mapping = inferEvaluatorInputSource({ identifier: input.identifier, dataset, target });
+    if (mapping) newMappings[input.identifier] = mapping;
   }
-
   return newMappings;
 };
 

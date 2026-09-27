@@ -4,7 +4,11 @@
 
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 
-import type { EvaluatorConfig, TargetConfig } from "../experiment-workbench.ts";
+import type {
+  ComparisonEvaluatorConfig,
+  EvaluatorConfig,
+  TargetConfig,
+} from "../experiment-workbench.ts";
 import { isGoldenFieldSatisfied } from "../experiment-workbench.ts";
 import { extractVariablesFromBodyTemplate } from "./body-template-variables.ts";
 import { toComparisonConfig } from "./normalize-comparison.ts";
@@ -168,6 +172,125 @@ export const getUsedFields = (
 // Target Validation
 // ============================================================================
 
+type DatasetMappings = TargetConfig["mappings"][string];
+
+const requiredGap = (fieldId: string): MissingMapping => ({
+  fieldId,
+  fieldName: fieldId,
+  isRequired: true,
+});
+
+/**
+ * Comparison column-target: validated against the comparison config (Variants /
+ * Golden), not the per-row input list, which is derived from the variants at save time.
+ */
+const comparisonTargetValidation = (
+  comparison: ComparisonEvaluatorConfig,
+): TargetValidationResult => {
+  const missingMappings: MissingMapping[] = [];
+  // Filter empty slots: a folded legacy pairwise config keeps both positions
+  // even when one is unset (see fromPairwise in normalize-comparison.ts).
+  if (comparison.variants.filter(Boolean).length < 2) {
+    missingMappings.push({ fieldId: "variants", fieldName: "Variants", isRequired: true });
+  }
+  // Golden is only required when golden-answer comparison is on (#5378).
+  if (!isGoldenFieldSatisfied(comparison)) {
+    missingMappings.push({ fieldId: "goldenField", fieldName: "Golden field", isRequired: true });
+  }
+  return { isValid: missingMappings.length === 0, missingMappings };
+};
+
+/**
+ * Evaluator targets: an input without `optional: true` is required, and at least
+ * one input must be mapped when there are any.
+ */
+const evaluatorTargetValidation = ({
+  target,
+  datasetMappings,
+}: {
+  target: TargetConfig;
+  datasetMappings: DatasetMappings;
+}): TargetValidationResult => {
+  const evaluatorInputs = target.inputs ?? [];
+  const unmapped = evaluatorInputs.filter(
+    (input) => datasetMappings[input.identifier] === undefined,
+  );
+  const missingMappings = unmapped
+    .filter((input) => !input.optional)
+    .map((input) => requiredGap(input.identifier));
+  const hasAnyMapping = unmapped.length < evaluatorInputs.length;
+
+  return {
+    isValid: missingMappings.length === 0 && (evaluatorInputs.length === 0 || hasAnyMapping),
+    missingMappings,
+  };
+};
+
+/**
+ * HTTP agents: every body-template variable is optional, but at least one must be
+ * mapped. The body template is the source of truth; persisted inputs are the fallback.
+ */
+const httpAgentValidation = ({
+  target,
+  inputs,
+  datasetMappings,
+}: {
+  target: TargetConfig;
+  inputs: readonly { identifier: string }[];
+  datasetMappings: DatasetMappings;
+}): TargetValidationResult => {
+  const templateVars = extractVariablesFromBodyTemplate(target.httpConfig?.bodyTemplate);
+  const httpFieldIds = new Set(
+    templateVars.length > 0 ? templateVars : inputs.map((input) => input.identifier),
+  );
+  // Check the value too: Object.entries includes keys holding undefined.
+  const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
+    ([fieldId, mapping]) => mapping !== undefined && httpFieldIds.has(fieldId),
+  );
+  const missingMappings = [...httpFieldIds]
+    .filter((fieldId) => datasetMappings[fieldId] === undefined)
+    .map((fieldId) => ({ fieldId, fieldName: fieldId, isRequired: false }));
+
+  return { isValid: httpFieldIds.size === 0 || hasAtLeastOneMapping, missingMappings };
+};
+
+/** Prompts and code/connected agents: every used, declared field must be mapped. */
+const usedFieldsValidation = ({
+  target,
+  inputs,
+  datasetMappings,
+  options,
+}: {
+  target: TargetConfig;
+  inputs: readonly { identifier: string }[];
+  datasetMappings: DatasetMappings;
+  options?: MappingValidationOptions;
+}): TargetValidationResult => {
+  const { usedFields, isProven } = resolveUsedFields(target, options);
+  const inputIds = new Set(inputs.map((i) => i.identifier));
+  // A connected agent's parameters carry the function's own defaults; only its turn must be mapped.
+  const isConnectedAgent =
+    target.type === "agent" && "agentType" in target && target.agentType === "connected";
+  const defaultedIds = new Set(
+    isConnectedAgent
+      ? inputs.filter((input) => "optional" in input && input.optional).map((i) => i.identifier)
+      : [],
+  );
+  // A prompt with no draft and no loaded template only proves its declared inputs,
+  // so its gaps are advisory: a scaffolded but unreferenced variable neither warns nor blocks.
+  const isRequired = !(target.type === "prompt" && !isProven);
+
+  const missingMappings = [...usedFields]
+    .filter((fieldId) => inputIds.has(fieldId) && !defaultedIds.has(fieldId))
+    .filter((fieldId) => datasetMappings[fieldId] === undefined)
+    .map((fieldId) => ({ fieldId, fieldName: fieldId, isRequired }));
+
+  return {
+    isValid: missingMappings.filter((m) => m.isRequired).length === 0,
+    missingMappings,
+  };
+};
+
 /**
  * Validates `target`'s mappings against `datasetId`, returning every mapping its
  * fields still need.
@@ -177,165 +300,18 @@ export const getTargetMissingMappings = (
   datasetId: string,
   options?: MappingValidationOptions,
 ): TargetValidationResult => {
-  const missingMappings: MissingMapping[] = [];
-  const { usedFields, isProven } = resolveUsedFields(target, options);
   const datasetMappings = target.mappings[datasetId] ?? {};
-
-  // Get the set of input identifiers (fields explicitly defined by user)
-  // Use localPromptConfig.inputs if available (has latest form state),
-  // otherwise fall back to target.inputs
+  // localPromptConfig.inputs carries the latest form state; target.inputs is the fallback.
   const inputs = target.localPromptConfig?.inputs ?? target.inputs ?? [];
-  const inputIds = new Set(inputs.map((i) => i.identifier));
 
-  // HTTP agents have special validation: all optional, but at least one required
-  const isHttpAgent =
-    target.type === "agent" && "agentType" in target && target.agentType === "http";
-
-  // A connected agent declares the turn it reads plus the parameters of its
-  // own function. Every parameter carries the function's default, so only the
-  // turn has to be mapped for the column to run.
-  const isConnectedAgent =
-    target.type === "agent" && "agentType" in target && target.agentType === "connected";
-  const optionalInputIds = new Set(
-    inputs
-      .filter((input) => "optional" in input && input.optional)
-      .map((input) => input.identifier),
-  );
-
-  // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
-  const isEvaluatorTarget = target.type === "evaluator";
-
-  // Comparison column-target: the high-level ComparisonConfigForm replaces the
-  // per-row mappings UI. Validate against the comparison config (Variants /
-  // Golden) instead of walking the input field list — those rows are derived
-  // from the variants at save time, so the user never has to fill them in.
-  const targetComparison = isEvaluatorTarget ? toComparisonConfig(target) : undefined;
-  if (targetComparison) {
-    // Filter empty slots, not just array length: a folded legacy pairwise
-    // config keeps both variantA/variantB positions even when one is unset
-    // (see fromPairwise in normalize-comparison.ts), so an under-filled
-    // config can have variants.length === 2 while one entry is "".
-    if (targetComparison.variants.filter(Boolean).length < 2) {
-      missingMappings.push({
-        fieldId: "variants",
-        fieldName: "Variants",
-        isRequired: true,
-      });
-    }
-    // Golden field is only required when the user hasn't opted out of
-    // golden-answer comparison (#5378) — see isGoldenFieldSatisfied.
-    if (!isGoldenFieldSatisfied(targetComparison)) {
-      missingMappings.push({
-        fieldId: "goldenField",
-        fieldName: "Golden field",
-        isRequired: true,
-      });
-    }
-    return {
-      isValid: missingMappings.length === 0,
-      missingMappings,
-    };
+  const targetComparison = target.type === "evaluator" ? toComparisonConfig(target) : undefined;
+  if (targetComparison) return comparisonTargetValidation(targetComparison);
+  if (target.type === "evaluator") return evaluatorTargetValidation({ target, datasetMappings });
+  if (target.type === "agent" && "agentType" in target && target.agentType === "http") {
+    return httpAgentValidation({ target, inputs, datasetMappings });
   }
 
-  if (isEvaluatorTarget) {
-    // For evaluator targets, use the optional property on each input field
-    // Fields without optional: true are considered required
-    // Note: evaluator targets use target.inputs directly (no localPromptConfig)
-    const evaluatorInputs = target.inputs ?? [];
-    let hasAnyMapping = false;
-    let missingRequiredCount = 0;
-
-    for (const input of evaluatorInputs) {
-      const hasMapping = datasetMappings[input.identifier] !== undefined;
-
-      if (hasMapping) {
-        hasAnyMapping = true;
-      } else if (!input.optional) {
-        // Required field (not marked as optional) is missing
-        missingRequiredCount++;
-        missingMappings.push({
-          fieldId: input.identifier,
-          fieldName: input.identifier,
-          isRequired: true,
-        });
-      }
-      // Optional fields don't block validation - don't add to missingMappings
-    }
-
-    // Valid if no required fields are missing AND at least one field has a mapping (or no fields)
-    const isValid = missingRequiredCount === 0 && (evaluatorInputs.length === 0 || hasAnyMapping);
-
-    return {
-      isValid,
-      missingMappings,
-    };
-  }
-
-  if (isHttpAgent) {
-    // Derive the effective variable set from the body template (source of truth).
-    // Only fall back to persisted inputs when no body template is available.
-    const templateVars = extractVariablesFromBodyTemplate(target.httpConfig?.bodyTemplate);
-    const httpFieldIds = new Set(
-      templateVars.length > 0 ? templateVars : inputs.map((input) => input.identifier),
-    );
-
-    // HTTP agents: all fields are optional, but at least one must be mapped.
-    // Check the value too — Object.keys includes keys with undefined values.
-    const hasAtLeastOneMapping = Object.entries(datasetMappings).some(
-      ([fieldId, mapping]) => mapping !== undefined && httpFieldIds.has(fieldId),
-    );
-
-    for (const fieldId of httpFieldIds) {
-      if (datasetMappings[fieldId] === undefined) {
-        // Add to missing but mark as NOT required (optional)
-        missingMappings.push({
-          fieldId,
-          fieldName: fieldId,
-          isRequired: false, // HTTP agent fields are optional
-        });
-      }
-    }
-
-    // Valid if at least one field has a mapping (or there are no fields)
-    const isValid = httpFieldIds.size === 0 || hasAtLeastOneMapping;
-
-    return {
-      isValid,
-      missingMappings,
-    };
-  }
-
-  // A prompt target with no draft and no loaded template gives us only its
-  // declared input list, and a prompt scaffold declares variables it never
-  // references (every prompt is born with an `input` the template may drop).
-  // Report those as advisory so an unreferenced variable neither warns nor
-  // blocks the run.
-  const isUnprovenPromptUsage = target.type === "prompt" && !isProven;
-
-  // Standard validation for prompts and code agents
-  for (const fieldId of usedFields) {
-    // Skip if not in inputs list - user hasn't defined this variable
-    if (!inputIds.has(fieldId)) continue;
-
-    // An unmapped parameter of a connected agent is not a gap: the function
-    // applies its own default for it.
-    if (isConnectedAgent && optionalInputIds.has(fieldId)) continue;
-
-    const hasMapping = datasetMappings[fieldId] !== undefined;
-
-    if (!hasMapping) {
-      missingMappings.push({
-        fieldId,
-        fieldName: fieldId,
-        isRequired: !isUnprovenPromptUsage,
-      });
-    }
-  }
-
-  return {
-    isValid: missingMappings.filter((m) => m.isRequired).length === 0,
-    missingMappings,
-  };
+  return usedFieldsValidation({ target, inputs, datasetMappings, options });
 };
 
 /** Whether `target` is still missing a mapping it needs against `datasetId`. */

@@ -53,6 +53,67 @@ const decodeCursor = (scrollId: string | null): CursorInfo | null => {
  */
 export type PaginationMode = "cursor" | "offset";
 
+type PaginationOverrides = { pageOffset?: number; pageSize?: number; scrollId?: string | null };
+
+/** A page's URL query: other params kept, defaults stripped, no `pageOffset` in cursor mode. */
+const paginationQueryOf = ({
+  query,
+  pageOffset,
+  pageSize,
+  isCursorMode,
+  overrides,
+}: {
+  query: Record<string, string | string[] | undefined>;
+  pageOffset: number;
+  pageSize: number;
+  isCursorMode: boolean;
+  overrides: PaginationOverrides;
+}): Record<string, string | string[] | undefined> => {
+  const { pageOffset: _po, pageSize: _ps, scrollId: _si, ...rest } = query;
+  const next: Record<string, string | string[] | undefined> = { ...rest };
+  const offset = overrides.pageOffset ?? pageOffset;
+  const size = overrides.pageSize ?? pageSize;
+
+  if (!isCursorMode && offset !== 0) next.pageOffset = offset.toString();
+  if (size !== DEFAULT_PAGE_SIZE) next.pageSize = size.toString();
+  if (overrides.scrollId) next.scrollId = overrides.scrollId;
+
+  return next;
+};
+
+/**
+ * One page back. Offset lists step by a page; cursor lists pop the cursor this
+ * scroll came from, and with nothing walked yet replay from the first page.
+ */
+const stepBack = ({
+  isCursorMode,
+  pageOffset,
+  pageSize,
+  stack,
+  setCursorPageNumber,
+  goTo,
+}: {
+  isCursorMode: boolean;
+  pageOffset: number;
+  pageSize: number;
+  stack: string[];
+  setCursorPageNumber: (update: (prev: number) => number) => void;
+  goTo: (overrides: PaginationOverrides) => void;
+}): void => {
+  if (!isCursorMode) {
+    if (pageOffset > 0) goTo({ pageOffset: Math.max(0, pageOffset - pageSize) });
+    return;
+  }
+  const previousScrollId = stack.pop();
+  if (previousScrollId !== undefined) {
+    setCursorPageNumber((prev) => Math.max(1, prev - 1));
+    goTo({ scrollId: previousScrollId });
+    return;
+  }
+  setCursorPageNumber(() => 1);
+  goTo({ scrollId: null });
+};
+
 /**
  * Custom hook for managing navigation footer state and logic.
  * @param mode - see {@link PaginationMode}. Defaults to `offset`, which is the
@@ -98,22 +159,20 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
   // In cursor mode `pageOffset` is stripped and never written back, so an old
   // link loses it rather than carrying a value the server will reject.
   const buildPaginationQuery = useCallback(
-    (overrides: { pageOffset?: number; pageSize?: number; scrollId?: string | null }) => {
-      const { pageOffset: _po, pageSize: _ps, scrollId: _si, ...rest } = router.query;
-
-      const query: Record<string, string | string[] | undefined> = { ...rest };
-
-      const offset = overrides.pageOffset ?? pageOffset;
-      const size = overrides.pageSize ?? pageSize;
-      const scroll = overrides.scrollId;
-
-      if (!isCursorMode && offset !== 0) query.pageOffset = offset.toString();
-      if (size !== DEFAULT_PAGE_SIZE) query.pageSize = size.toString();
-      if (scroll) query.scrollId = scroll;
-
-      return query;
-    },
+    (overrides: PaginationOverrides) =>
+      paginationQueryOf({ query: router.query, pageOffset, pageSize, isCursorMode, overrides }),
     [router.query, pageOffset, pageSize, isCursorMode],
+  );
+
+  const goTo = useCallback(
+    (overrides: PaginationOverrides) => {
+      void router.push(
+        { pathname: router.pathname, query: buildPaginationQuery(overrides) },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router, buildPaginationQuery],
   );
 
   /**
@@ -123,93 +182,35 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
   const nextPage = useCallback(
     (currentResponseScrollId?: string | null) => {
       if (currentResponseScrollId) {
-        // Push the current scrollId onto the stack before navigating forward
-        // so prevPage can pop it to go back.
-        if (urlScrollId) {
-          cursorStackRef.current.push(urlScrollId);
-        }
+        // Push the current scrollId so prevPage can pop back to it.
+        if (urlScrollId) cursorStackRef.current.push(urlScrollId);
         setCursorPageNumber((prev) => prev + 1);
-        void router.push(
-          {
-            pathname: router.pathname,
-            query: buildPaginationQuery({
-              scrollId: currentResponseScrollId,
-            }),
-          },
-          undefined,
-          { shallow: true },
-        );
+        goTo({ scrollId: currentResponseScrollId });
         return;
       }
 
-      // In cursor mode, no cursor in the response means there is no next page.
-      // The button is disabled in that state, so this is only reachable by a
-      // stale click — and advancing an offset here is exactly the bug: the
-      // trace API would return page one again, silently.
+      // In cursor mode no cursor in the response means no next page: only a stale
+      // click reaches here, and advancing an offset would silently return page one.
       if (isCursorMode) return;
 
-      void router.push(
-        {
-          pathname: router.pathname,
-          query: buildPaginationQuery({
-            pageOffset: pageOffset + pageSize,
-          }),
-        },
-        undefined,
-        { shallow: true },
-      );
+      goTo({ pageOffset: pageOffset + pageSize });
     },
-    [router, pageOffset, pageSize, isCursorMode, urlScrollId, buildPaginationQuery],
+    [pageOffset, pageSize, isCursorMode, urlScrollId, goTo],
   );
 
   /**
    * Navigate to the previous page
    */
   const prevPage = useCallback(() => {
-    if (isCursorMode) {
-      const stack = cursorStackRef.current;
-      if (stack.length > 0) {
-        // Pop the cursor this scroll came from and navigate back to it.
-        const previousScrollId = stack.pop()!;
-        setCursorPageNumber((prev) => Math.max(1, prev - 1));
-        void router.push(
-          {
-            pathname: router.pathname,
-            query: buildPaginationQuery({ scrollId: previousScrollId }),
-          },
-          undefined,
-          { shallow: true },
-        );
-        return;
-      }
-
-      // Nothing walked yet — drop the cursor and land on the first page. Keyset
-      // pagination has no way back other than replaying from the start.
-      setCursorPageNumber(1);
-      void router.push(
-        {
-          pathname: router.pathname,
-          query: buildPaginationQuery({ scrollId: null }),
-        },
-        undefined,
-        { shallow: true },
-      );
-      return;
-    }
-
-    if (pageOffset > 0) {
-      void router.push(
-        {
-          pathname: router.pathname,
-          query: buildPaginationQuery({
-            pageOffset: Math.max(0, pageOffset - pageSize),
-          }),
-        },
-        undefined,
-        { shallow: true },
-      );
-    }
-  }, [router, pageOffset, pageSize, isCursorMode, buildPaginationQuery]);
+    stepBack({
+      isCursorMode,
+      pageOffset,
+      pageSize,
+      stack: cursorStackRef.current,
+      setCursorPageNumber,
+      goTo,
+    });
+  }, [pageOffset, pageSize, isCursorMode, goTo]);
 
   /**
    * Change the page size and reset pagination

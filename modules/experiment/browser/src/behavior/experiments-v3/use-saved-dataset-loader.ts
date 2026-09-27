@@ -10,6 +10,36 @@ import type {
 } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
+/** A saved dataset's records as the workbench holds them: every value a string. */
+const savedRecordsFrom = ({
+  records,
+  columnNames,
+}: {
+  records: { id: string; entry: unknown }[];
+  columnNames: string[];
+}): SavedRecord[] =>
+  records.map((record) => ({
+    id: record.id,
+    ...Object.fromEntries(
+      columnNames.map((name) => {
+        const value = (record.entry as Record<string, unknown>)?.[name];
+        if (value === null || value === undefined) return [name, ""];
+        if (typeof value === "string") return [name, value];
+        // Stringify objects/arrays instead of [object Object]
+        return [name, JSON.stringify(value)];
+      }),
+    ),
+  }));
+
+/**
+ * ADR-032 I-READY: a still-preparing or failed dataset read throws
+ * PRECONDITION_FAILED; it has no rows yet, so it is not retried.
+ */
+const retryUnlessNotReady = (failureCount: number, error: unknown): boolean =>
+  (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
+    ? false
+    : failureCount < 3;
+
 /**
  * Hook to load records for a single saved dataset.
  * Each saved dataset tab should use this hook to declaratively fetch its data.
@@ -31,13 +61,7 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
     },
     {
       enabled: Boolean(project?.id) && needsLoading,
-      // ADR-032 I-READY: a still-preparing/failed dataset read throws
-      // PRECONDITION_FAILED. Don't retry it — the dataset simply has no rows to
-      // load yet (the effect below no-ops while `query.data` is undefined).
-      retry: (failureCount, error) =>
-        (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
-          ? false
-          : failureCount < 3,
+      retry: retryUnlessNotReady,
     },
   );
 
@@ -47,20 +71,10 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
 
     hasLoadedRef.current = true;
 
-    const savedRecords: SavedRecord[] = (query.data.datasetRecords ?? []).map(
-      (record: { id: string; entry: unknown }) => ({
-        id: record.id,
-        ...Object.fromEntries(
-          (dataset.columns as DatasetColumn[]).map((col) => {
-            const value = (record.entry as Record<string, unknown>)?.[col.name];
-            if (value === null || value === undefined) return [col.name, ""];
-            if (typeof value === "string") return [col.name, value];
-            // Properly stringify objects/arrays instead of [object Object]
-            return [col.name, JSON.stringify(value)];
-          }),
-        ),
-      }),
-    );
+    const savedRecords = savedRecordsFrom({
+      records: query.data.datasetRecords ?? [],
+      columnNames: dataset.columns.map((col) => col.name),
+    });
 
     setSavedDatasetRecords(dataset.id, savedRecords);
   }, [dataset, needsLoading, query.data, setSavedDatasetRecords]);
@@ -130,12 +144,7 @@ export const useDatasetSelectionLoader = ({
     },
     {
       enabled: !!projectId && !!pendingDatasetLoad,
-      // ADR-032 I-READY: don't retry a not-ready dataset read; it has no rows
-      // to add yet (PRECONDITION_FAILED).
-      retry: (failureCount, error) =>
-        (error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED"
-          ? false
-          : failureCount < 3,
+      retry: retryUnlessNotReady,
     },
   );
 
@@ -152,20 +161,10 @@ export const useDatasetSelectionLoader = ({
       }));
 
       // Transform records to SavedRecord format
-      const savedRecords: SavedRecord[] = (savedDatasetRecords.data?.datasetRecords ?? []).map(
-        (record: { id: string; entry: unknown }) => ({
-          id: record.id,
-          ...Object.fromEntries(
-            columnTypes.map((col) => {
-              const value = (record.entry as Record<string, unknown>)?.[col.name];
-              if (value === null || value === undefined) return [col.name, ""];
-              if (typeof value === "string") return [col.name, value];
-              // Properly stringify objects/arrays instead of [object Object]
-              return [col.name, JSON.stringify(value)];
-            }),
-          ),
-        }),
-      );
+      const savedRecords = savedRecordsFrom({
+        records: savedDatasetRecords.data?.datasetRecords ?? [],
+        columnNames: columnTypes.map((col) => col.name),
+      });
 
       const newDataset: DatasetReference = {
         id: `saved_${datasetId}`,

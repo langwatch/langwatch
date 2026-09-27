@@ -5,6 +5,7 @@
 import { Button, Spinner } from "@chakra-ui/react";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { validateWorkbench } from "@langwatch/experiment-contract/mapping-validation";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
@@ -20,7 +21,6 @@ import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../../model/experiments-v3/field-mapping-converters.ts";
-import { validateWorkbench } from "../../../model/experiments-v3/mapping-validation.ts";
 import { isComparisonEvaluator } from "../../../model/experiments-v3/types.ts";
 
 type RunEvaluationButtonProps = {

@@ -1,6 +1,6 @@
-import type { TargetConfig } from "@langwatch/experiment-contract";
 import { describe, expect, it } from "vitest";
 
+import type { TargetConfig } from "../../experiment-workbench.ts";
 import {
   getTargetMissingMappings,
   getUsedFields,

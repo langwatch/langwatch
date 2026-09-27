@@ -8,7 +8,10 @@ import {
   type BatchComparisonColumn,
   type BatchComparisonVerdict,
   type BatchEvaluationData,
+  type BatchEvaluatorResult,
   type BatchResultRow,
+  type BatchTargetColumn,
+  type BatchTargetOutput,
 } from "@langwatch/experiment-browser-kit";
 import numeral from "numeral";
 import Parse from "papaparse";
@@ -92,82 +95,49 @@ const formatComparisonCandidates = (
     .map((candidateId) => comparisonVariantName(column, candidateId))
     .join(", ");
 
+/** Every evaluator any row ran against `targetId`, in first-seen order. */
+const targetEvaluatorIds = (data: BatchEvaluationData, targetId: string): Set<string> =>
+  new Set(
+    data.rows.flatMap(
+      (row) => row.targets[targetId]?.evaluatorResults.map((result) => result.evaluatorId) ?? [],
+    ),
+  );
+
+const EVALUATOR_HEADER_SUFFIXES = ["score", "passed", "label", "details", "cost", "duration_ms"];
+
+/** One target's header block: metadata, outputs, cost, duration, error, trace, evaluators. */
+const targetHeaders = (data: BatchEvaluationData, target: BatchTargetColumn): string[] => {
+  // The name the reader sees, so two targets stored under one name keep their own block.
+  const targetName = target.displayName ?? target.name;
+  const outputFields = target.outputFields.length > 0 ? target.outputFields : ["output"];
+  const evaluatorHeaders = [...targetEvaluatorIds(data, target.id)].flatMap((evalId) => {
+    const evalName = data.evaluatorNames[evalId] ?? evalId;
+    return EVALUATOR_HEADER_SUFFIXES.map((suffix) => `${targetName}_${evalName}_${suffix}`);
+  });
+
+  return [
+    ...(target.model ? [`${targetName}_model`] : []),
+    ...(target.promptId ? [`${targetName}_prompt_id`, `${targetName}_prompt_version`] : []),
+    ...Object.keys(target.metadata ?? {}).map((key) => `${targetName}_${key}`),
+    ...outputFields.map((field) => `${targetName}_${field}`),
+    `${targetName}_cost`,
+    `${targetName}_duration_ms`,
+    `${targetName}_error`,
+    `${targetName}_trace_id`,
+    ...evaluatorHeaders,
+  ];
+};
+
 /**
  * Build CSV headers for the new layout
  */
 export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
-  const headers: string[] = [];
-
   // Row index first - useful for debugging and cross-referencing
-  headers.push("index");
-
-  // Dataset columns
-  for (const col of data.datasetColumns) {
-    headers.push(col.name);
-  }
-
-  // Target columns with their outputs, cost, duration, and evaluator results
-  for (const target of data.targetColumns) {
-    // The name the reader sees, so two targets stored under one name keep
-    // their own header block rather than repeating it.
-    const targetName = target.displayName ?? target.name;
-
-    // Target metadata columns (model, prompt info, custom metadata)
-    if (target.model) {
-      headers.push(`${targetName}_model`);
-    }
-    if (target.promptId) {
-      headers.push(`${targetName}_prompt_id`);
-      headers.push(`${targetName}_prompt_version`);
-    }
-    // Custom metadata keys
-    if (target.metadata) {
-      for (const key of Object.keys(target.metadata)) {
-        headers.push(`${targetName}_${key}`);
-      }
-    }
-
-    // Target output (may have multiple fields)
-    for (const field of target.outputFields) {
-      headers.push(`${targetName}_${field}`);
-    }
-    // If no output fields detected, add a generic output column
-    if (target.outputFields.length === 0) {
-      headers.push(`${targetName}_output`);
-    }
-
-    // Cost and duration for this target
-    headers.push(`${targetName}_cost`);
-    headers.push(`${targetName}_duration_ms`);
-
-    // Error column
-    headers.push(`${targetName}_error`);
-
-    // Trace ID
-    headers.push(`${targetName}_trace_id`);
-
-    // Evaluator results for this target
-    // Get unique evaluator IDs used by this target
-    const evaluatorIds = new Set<string>();
-    for (const row of data.rows) {
-      const targetOutput = row.targets[target.id];
-      if (targetOutput) {
-        for (const evalResult of targetOutput.evaluatorResults) {
-          evaluatorIds.add(evalResult.evaluatorId);
-        }
-      }
-    }
-
-    for (const evalId of evaluatorIds) {
-      const evalName = data.evaluatorNames[evalId] ?? evalId;
-      headers.push(`${targetName}_${evalName}_score`);
-      headers.push(`${targetName}_${evalName}_passed`);
-      headers.push(`${targetName}_${evalName}_label`);
-      headers.push(`${targetName}_${evalName}_details`);
-      headers.push(`${targetName}_${evalName}_cost`);
-      headers.push(`${targetName}_${evalName}_duration_ms`);
-    }
-  }
+  const headers: string[] = [
+    "index",
+    ...data.datasetColumns.map((col) => col.name),
+    ...data.targetColumns.flatMap((target) => targetHeaders(data, target)),
+  ];
 
   // Comparison verdicts, after every target block so the existing column order
   // is untouched for anything reading the export by position. A comparison
@@ -184,6 +154,59 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
   return headers.map((h) => h.toLowerCase().replace(/\s+/g, "_"));
 };
 
+/** One evaluator's six cells: score, passed, label, details, cost, duration. */
+const evaluatorValues = (evalResult: BatchEvaluatorResult | undefined): string[] => {
+  if (!evalResult) return ["", "", "", "", "", ""];
+  if (evalResult.status === "error") return ["Error", "", "", evalResult.details ?? "", "", ""];
+  if (evalResult.status === "skipped") return ["Skipped", "", "", evalResult.details ?? "", "", ""];
+
+  return [
+    formatNumber(evalResult.score),
+    formatBoolean(evalResult.passed),
+    evalResult.label ?? "",
+    evalResult.details ?? "",
+    formatNumber(evalResult.cost),
+    formatNumber(evalResult.duration),
+  ];
+};
+
+/** One target's cells for one row, in the order `targetHeaders` names them. */
+const targetValues = ({
+  data,
+  target,
+  targetOutput,
+}: {
+  data: BatchEvaluationData;
+  target: BatchTargetColumn;
+  targetOutput: BatchTargetOutput | undefined;
+}): string[] => {
+  const output = targetOutput?.output;
+  const parsedOutput = jsonRecordSchema.safeParse(output);
+  const outputValues =
+    target.outputFields.length > 0
+      ? target.outputFields.map((field) =>
+          stringify(parsedOutput.success ? parsedOutput.data[field] : void 0),
+        )
+      : [stringify(output)];
+  const evaluatorCells = [...targetEvaluatorIds(data, target.id)].flatMap((evalId) =>
+    evaluatorValues(targetOutput?.evaluatorResults.find((e) => e.evaluatorId === evalId)),
+  );
+
+  return [
+    ...(target.model ? [target.model] : []),
+    ...(target.promptId
+      ? [target.promptId, target.promptVersion != null ? String(target.promptVersion) : ""]
+      : []),
+    ...Object.keys(target.metadata ?? {}).map((key) => stringify(target.metadata?.[key])),
+    ...outputValues,
+    formatNumber(targetOutput?.cost),
+    formatNumber(targetOutput?.duration),
+    targetOutput?.error ?? "",
+    targetOutput?.traceId ?? "",
+    ...evaluatorCells,
+  ];
+};
+
 /**
  * Build CSV row data for a single row
  */
@@ -198,87 +221,8 @@ const buildCsvRow = (row: BatchResultRow, data: BatchEvaluationData): string[] =
     values.push(stringify(row.datasetEntry[col.name]));
   }
 
-  // Target columns
   for (const target of data.targetColumns) {
-    const targetOutput = row.targets[target.id];
-
-    // Target metadata values (must match header order)
-    if (target.model) {
-      values.push(target.model);
-    }
-    if (target.promptId) {
-      values.push(target.promptId);
-      values.push(target.promptVersion != null ? String(target.promptVersion) : "");
-    }
-    // Custom metadata values
-    if (target.metadata) {
-      for (const key of Object.keys(target.metadata)) {
-        values.push(stringify(target.metadata[key]));
-      }
-    }
-
-    const output = targetOutput?.output;
-    const parsedOutput = jsonRecordSchema.safeParse(output);
-
-    // Target output fields
-    if (target.outputFields.length > 0) {
-      for (const field of target.outputFields) {
-        const fieldValue = parsedOutput.success ? parsedOutput.data[field] : void 0;
-
-        values.push(stringify(fieldValue));
-      }
-    } else {
-      // Generic output
-      values.push(stringify(output));
-    }
-
-    // Cost and duration
-    values.push(formatNumber(targetOutput?.cost));
-    values.push(formatNumber(targetOutput?.duration));
-
-    // Error
-    values.push(targetOutput?.error ?? "");
-
-    // Trace ID
-    values.push(targetOutput?.traceId ?? "");
-
-    // Evaluator results
-    const evaluatorIds = new Set<string>();
-    for (const r of data.rows) {
-      const to = r.targets[target.id];
-      if (to) {
-        for (const er of to.evaluatorResults) {
-          evaluatorIds.add(er.evaluatorId);
-        }
-      }
-    }
-
-    for (const evalId of evaluatorIds) {
-      const evalResult = targetOutput?.evaluatorResults.find((e) => e.evaluatorId === evalId);
-
-      if (!evalResult) {
-        // Empty values for: score, passed, label, details, cost, duration
-        values.push("", "", "", "", "", "");
-        continue;
-      }
-
-      if (evalResult.status === "error") {
-        values.push("Error", "", "", evalResult.details ?? "", "", "");
-        continue;
-      }
-
-      if (evalResult.status === "skipped") {
-        values.push("Skipped", "", "", evalResult.details ?? "", "", "");
-        continue;
-      }
-
-      values.push(formatNumber(evalResult.score));
-      values.push(formatBoolean(evalResult.passed));
-      values.push(evalResult.label ?? "");
-      values.push(evalResult.details ?? "");
-      values.push(formatNumber(evalResult.cost));
-      values.push(formatNumber(evalResult.duration));
-    }
+    values.push(...targetValues({ data, target, targetOutput: row.targets[target.id] }));
   }
 
   // Comparison verdicts (must match header order)
