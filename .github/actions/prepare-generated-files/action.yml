@@ -5,8 +5,9 @@ description: >-
 
 # `start:prepare:files` is a chain of four generators — the langevals evaluator
 # types, the Prisma client, the langy skill catalogue and the setup-skill
-# bodies. `ensure:built` then builds the two workspace packages that resolve a
-# bundle rather than their own source: the TypeScript SDK and the MCP server.
+# bodies. `ensure:built` then builds the workspace packages that resolve a
+# bundle rather than their own source: the TypeScript SDK, the MCP server,
+# ksuid and mail.
 # It costs 30-35s and every test, build and check job in this workflow pays it.
 # Across the shards that was several runner-minutes per push spent regenerating
 # byte-identical output from byte-identical committed inputs.
@@ -42,6 +43,8 @@ runs:
           modules/langy/process/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
           mcp/typescript/dist
+          packages/ksuid/dist
+          packages/mail/dist
         key: >-
           ${{ runner.os }}-prepared-files-${{ hashFiles(
             'pnpm-lock.yaml',
@@ -57,6 +60,10 @@ runs:
             'sdks/typescript/tsup.config.ts',
             'mcp/typescript/src/**',
             'mcp/typescript/package.json',
+            'packages/ksuid/src/**',
+            'packages/ksuid/package.json',
+            'packages/mail/src/**',
+            'packages/mail/package.json',
             'infra/docker/Dockerfile.langyagent',
             'skills/**/SKILL.md'
           ) }}
