@@ -120,20 +120,20 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: UiAgentEditorDr
       {...code.options}
       isLoading={code.isLoading}
       {...(goBack ? { onGoBack: goBack } : {})}
-      renderCodeEditor={({ code: source, onExpand }) => (
+      renderCodeEditor={(editor) => (
         <VStack align="stretch" gap={2} data-testid="agent-code-preview">
-          <RenderCode code={source} language="python" />
-          <Button size="xs" variant="outline" alignSelf="start" onClick={onExpand}>
+          <RenderCode code={editor.code} language="python" />
+          <Button size="xs" variant="outline" alignSelf="start" onClick={() => editor.onExpand()}>
             Edit code
           </Button>
         </VStack>
       )}
-      renderCodeModal={({ code: source, onChange, open, onClose }) => (
+      renderCodeModal={(modal) => (
         <WorkflowCodeEditorModal
-          code={source}
-          setCode={onChange}
-          open={open}
-          onClose={onClose}
+          code={modal.code}
+          setCode={(source) => modal.onChange(source)}
+          open={modal.open}
+          onClose={() => modal.onClose()}
           secretNames={[]}
           renderModal={CodeEditorModalHost}
           {...(code.options.projectId ? { projectId: code.options.projectId } : {})}
