@@ -106,7 +106,9 @@ spec:
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           # The migration half of the app's own start script, and nothing else:
           # no listener, no queues, no projections. A serving process holding
-          # DDL locks is how deploys die (ARCHITECTURE.md §7).
+          # DDL locks is how deploys die (ARCHITECTURE.md §7). The image has no
+          # workspace root package.json, so it runs from the api like the app.
+          workingDir: /app/apps/api
           command: ["pnpm"]
           args: ["-s", "run", "start:prepare:db"]
           env:
