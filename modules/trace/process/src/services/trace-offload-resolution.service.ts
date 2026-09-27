@@ -1,4 +1,4 @@
-import type { Logger as PinoLogger } from "@langwatch/observability";
+import { createLogger, type Logger as PinoLogger } from "@langwatch/observability";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
@@ -9,9 +9,13 @@ import type { TraceIOExtractionService } from "#services/trace-io-extraction.ser
  * event_log and leans projections, so the fold holds preview IO; the read path resolves the
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
+import type { ResolveTraceSpansFn } from "../repositories/trace-legacy-read.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
+
+const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
 export type WarnLogger = Pick<PinoLogger, "warn" | "error">;
@@ -47,12 +51,24 @@ export class TraceOffloadResolutionService {
 
   private constructor() {}
 
+  /** The per-trace resolver a legacy read calls, bound to one blob store. */
+  resolverFor(deps: BlobResolutionDeps): ResolveTraceSpansFn {
+    return (projectId, normalizedSpans) =>
+      this.resolveOffloadedTraces({
+        projectId,
+        normalizedSpans,
+        blobStore: deps.blobStore,
+        ioExtractionService: deps.ioExtractionService,
+        logger: offloadResolutionLogger,
+      });
+  }
+
   /**
    * Resolves offloaded event refs for one trace's normalized spans, replacing spanAttributes with
    * the resolved map and re-running IO extraction when any span resolved. A missing event_log row
    * leaves that span's preview intact and is logged at warn, never propagated.
    */
-  static async resolveOffloadedTraces({
+  async resolveOffloadedTraces({
     projectId,
     normalizedSpans,
     blobStore,
@@ -82,7 +98,7 @@ export class TraceOffloadResolutionService {
     // keep the successes even when a span's resolver throws something unexpected.
     const spanSettlements = await Promise.allSettled(
       normalizedSpans.map((span) =>
-        TraceOffloadResolutionService.resolveSpan({
+        this.resolveSpan({
           span,
           projectId,
           blobStore,
@@ -140,7 +156,7 @@ export class TraceOffloadResolutionService {
    * whatever happens, so the namespace never reaches the UI, and a field that cannot be fetched
    * keeps the preview already sitting under its plain IO key.
    */
-  private static async resolveSpan({
+  private async resolveSpan({
     span,
     projectId,
     blobStore,
@@ -194,7 +210,7 @@ export class TraceOffloadResolutionService {
         continue;
       }
 
-      TraceOffloadResolutionService.warnFieldUnresolved({
+      this.warnFieldUnresolved({
         error: result.reason,
         projectId,
         span,
@@ -207,7 +223,7 @@ export class TraceOffloadResolutionService {
   }
 
   /** One field kept at its preview, said differently for a missing row than for a failed read. */
-  private static warnFieldUnresolved({
+  private warnFieldUnresolved({
     error,
     projectId,
     span,

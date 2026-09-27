@@ -248,37 +248,35 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when the saved setup has no dataset", () => {
-    it("answers 400 with main's flat body", async () => {
+    it("refuses 400 as an invalid evaluation input", async () => {
       const { request } = harness({ experiments: found(savedState([])) });
 
       const response = await request("/checkout-eval/run", runOf(""));
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "No dataset configured" });
+      expect(await response.json()).toMatchObject({ code: "experiment_evaluation_input_invalid" });
     });
   });
 
   describe("when the body is not JSON", () => {
-    it("answers 400 with main's flat body", async () => {
+    it("refuses 400 as an invalid evaluation input", async () => {
       const { request } = harness({ experiments: found(savedState()) });
 
       const response = await request("/checkout-eval/run", runOf("{not json"));
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "Invalid JSON body" });
+      expect(await response.json()).toMatchObject({ code: "experiment_evaluation_input_invalid" });
     });
   });
 
   describe("when the body fails the run inputs", () => {
-    it("answers 400 with the first issue as the flat error", async () => {
+    it("refuses 400 as an invalid evaluation input", async () => {
       const { request } = harness({ experiments: found(savedState()) });
 
       const response = await request("/checkout-eval/run", runOf('{"row_indices":"all"}'));
-      const body = (await response.json()) as Record<string, unknown>;
 
       expect(response.status).toBe(400);
-      expect(Object.keys(body)).toEqual(["error"]);
-      expect(typeof body.error).toBe("string");
+      expect(await response.json()).toMatchObject({ code: "experiment_evaluation_input_invalid" });
     });
   });
 
@@ -311,7 +309,7 @@ describe("POST /api/experiments/:slug/run", () => {
   });
 
   describe("when the caller asks for an event stream", () => {
-    it("streams data frames under main's event-stream headers", async () => {
+    it("streams data frames under the framework's event-stream headers", async () => {
       const { request, startRun } = harness({
         experiments: found(savedState()),
         ports: createApiFixture<ExperimentRunCollaborators>(),
@@ -323,7 +321,7 @@ describe("POST /api/experiments/:slug/run", () => {
       expect(response.status).toBe(200);
       expect(eventStreamHeaders(response)).toEqual({
         contentType: "text/event-stream",
-        cacheControl: "no-cache",
+        cacheControl: "no-cache, no-transform",
         connection: "keep-alive",
       });
       expect(await framesOf(response)).toMatchInlineSnapshot(`
@@ -546,7 +544,7 @@ describe("POST /api/experiments/execute", () => {
     scope: { type: "full" },
   };
 
-  it("streams data frames under main's event-stream headers", async () => {
+  it("streams data frames under the framework's event-stream headers", async () => {
     const { execute } = harness({
       ports: createApiFixture<ExperimentRunCollaborators>(),
       progress: {},
@@ -557,7 +555,7 @@ describe("POST /api/experiments/execute", () => {
     expect(response.status).toBe(200);
     expect(eventStreamHeaders(response)).toEqual({
       contentType: "text/event-stream",
-      cacheControl: "no-cache",
+      cacheControl: "no-cache, no-transform",
       connection: "keep-alive",
     });
     expect(await framesOf(response)).toMatchInlineSnapshot(`

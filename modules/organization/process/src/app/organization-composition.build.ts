@@ -285,6 +285,12 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return this.options.invites.extendInvite(input);
   }
 
+  async approvePaymentPending(
+    input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void> {
+    await this.options.invites.approvePaymentPendingInvites(input);
+  }
+
   list(input: Readonly<{ organizationId: string }>): ReturnType<InviteService["listInvites"]> {
     return this.options.invites.listInvites(input);
   }

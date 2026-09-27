@@ -9,7 +9,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceAnalyticsProjectionRepository } from "../../repositories/projection/trace-analytics-projection.repository.ts";
+import { TraceAnalyticsProjectionRepository } from "../../repositories/trace-analytics-projection.repository.ts";
 import { anchorStorageTime } from "../../rules/trace-storage-anchor.rules.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {

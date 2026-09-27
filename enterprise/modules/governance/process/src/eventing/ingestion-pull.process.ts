@@ -12,6 +12,7 @@ import type {
   ProcessIntent,
   ProcessManagerApplier,
 } from "@langwatch/eventing";
+import { z } from "zod";
 
 import type { IngestionPullScheduler } from "../app/governance.members.ts";
 import { isInCooldown, providerWaitFrom } from "../rules/ingestion-pull-cooldown.rules.ts";
@@ -46,23 +47,22 @@ type IngestionPullIntents = {
   >;
 };
 
-type ListingInFlight = { requestId: string; startedAt: number };
+const listingInFlightSchema = z.object({ requestId: z.string(), startedAt: z.number() });
 
 /** The listing slots and `cooldownUntil` are absent on state written before they existed. */
-export type IngestionPullProcessState = {
-  sourceId: string;
-  enabled: boolean;
-  cron: string | null;
-  cursor: string | null;
-  currentRun: {
-    runId: string;
-    scheduledFor: number;
-    startedAt: number;
-  } | null;
-  currentAgentsListing?: ListingInFlight | null;
-  currentPeopleListing?: ListingInFlight | null;
-  cooldownUntil?: number | null;
-};
+export const ingestionPullProcessStateSchema = z.object({
+  sourceId: z.string(),
+  enabled: z.boolean(),
+  cron: z.string().nullable(),
+  cursor: z.string().nullable(),
+  currentRun: z
+    .object({ runId: z.string(), scheduledFor: z.number(), startedAt: z.number() })
+    .nullable(),
+  currentAgentsListing: listingInFlightSchema.nullable().optional(),
+  currentPeopleListing: listingInFlightSchema.nullable().optional(),
+  cooldownUntil: z.number().nullable().optional(),
+});
+export type IngestionPullProcessState = z.infer<typeof ingestionPullProcessStateSchema>;
 
 type ListingSlot = "currentAgentsListing" | "currentPeopleListing";
 
@@ -106,7 +106,7 @@ export class IngestionPullProcess {
   processManager(): ProcessManagerApplier<IngestionPullEvent> {
     return (process) =>
       process
-        .state(INITIAL_STATE)
+        .state(ingestionPullProcessStateSchema, INITIAL_STATE)
         .intent(
           INGESTION_PULL_PROCESS_INTENT_TYPES.RUN,
           ingestionPullRunIntentSchema,

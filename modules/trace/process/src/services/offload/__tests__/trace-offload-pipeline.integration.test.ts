@@ -215,7 +215,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
   describe("when the lean span is resolved via TraceOffloadResolutionService.resolveOffloadedTraces backed by event_log", () => {
     let resolvedResult: Awaited<
-      ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>
+      ReturnType<TraceOffloadResolutionService["resolveOffloadedTraces"]>
     >;
     let getFromEventLogSpy: TraceBlobStoreService["getFromEventLog"];
     let logger: WarnLogger;
@@ -229,7 +229,7 @@ describe("given a span field value exceeds the offload threshold (IO_PREVIEW_BYT
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      resolvedResult = await TraceOffloadResolutionService.resolveOffloadedTraces({
+      resolvedResult = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -307,7 +307,7 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
 
       const normalizedSpan = makeNormalizedSpan(leanAttrs);
 
-      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -347,9 +347,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
 
   describe("when getFromEventLog throws BlobNotFoundError", () => {
     let blobStore: ReturnType<typeof makeEventLogBlobStore>["blobStore"];
-    let logger: Parameters<
-      typeof TraceOffloadResolutionService.resolveOffloadedTraces
-    >[0]["logger"];
+    let logger: Parameters<TraceOffloadResolutionService["resolveOffloadedTraces"]>[0]["logger"];
     let normalizedSpan: ReturnType<typeof makeNormalizedSpan>;
 
     beforeEach(() => {
@@ -360,7 +358,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
 
     it("does not throw to the caller", async () => {
       await expect(
-        TraceOffloadResolutionService.resolveOffloadedTraces({
+        TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: PROJECT_ID,
           normalizedSpans: [normalizedSpan],
           blobStore,
@@ -371,7 +369,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("returns the preview value (not the full value)", async () => {
-      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -386,7 +384,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("logs at warn level (not error or silent)", async () => {
-      await TraceOffloadResolutionService.resolveOffloadedTraces({
+      await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,
@@ -398,7 +396,7 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("anyResolved is false (the span was not resolved)", async () => {
-      const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+      const result = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
         blobStore,

@@ -16,7 +16,7 @@ import {
 import {
   ANOMALY_DETECTION_INITIAL_STATE,
   ANOMALY_DETECTION_INTERVAL_MS,
-  type AnomalyDetectionState,
+  anomalyDetectionStateSchema,
   anomalyDetectionSchema,
   anomalyDetectionWake,
 } from "./ops-anomaly-detection.process.ts";
@@ -35,7 +35,7 @@ export function buildAnomalyDetection({
     .withEvents([])
     .withProcessManager(ANOMALY_DETECTION_PROCESS_NAME, (pm) =>
       pm
-        .state<AnomalyDetectionState>(ANOMALY_DETECTION_INITIAL_STATE)
+        .state(anomalyDetectionStateSchema, ANOMALY_DETECTION_INITIAL_STATE)
         .schedule({ everyMs: ANOMALY_DETECTION_INTERVAL_MS })
         .onWake(anomalyDetectionWake)
         .intent(

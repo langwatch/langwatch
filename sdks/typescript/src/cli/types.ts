@@ -46,8 +46,8 @@ export type MaterializedPrompt = {
   prompt: string;
   temperature?: number;
   maxTokens?: number;
-  inputs?: any;
-  outputs?: any;
+  inputs?: unknown;
+  outputs?: unknown;
   parameters: RuntimeParameters;
   updatedAt: string;
 };

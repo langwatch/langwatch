@@ -61,10 +61,10 @@ describe("extraction budget", () => {
     /** @scenario Extraction cost inside the collector request is bounded */
     it("externalizes at most the cap and leaves the rest inline, counted", async () => {
       const { service, calls } = makeFakeService();
-      const budget = TraceValueMediaExtractionService.createExtractionBudget();
+      const budget = TraceValueMediaExtractionService.create().createExtractionBudget();
       const value = contentWith(MAX_MEDIA_PARTS_PER_SPAN + 4);
 
-      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.create().extractInlineMediaFromValue({
         value,
         service,
         budget,
@@ -93,7 +93,7 @@ describe("the marker gate", () => {
 
       expect(containsMediaMarkers(serialized)).toBe(false);
 
-      const result = await TraceValueMediaExtractionService.extractInlineMediaFromValue({
+      const result = await TraceValueMediaExtractionService.create().extractInlineMediaFromValue({
         value: plain,
         service,
         ...PARAMS,

@@ -16,7 +16,7 @@ import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-  type GithubBranchRecheckState,
+  githubBranchRecheckStateSchema,
   githubBranchRecheckSchema,
   githubBranchRecheckWake,
 } from "../eventing/github-branch-recheck.process.ts";
@@ -55,7 +55,7 @@ export class EventingGithubMaintenanceAdapter {
       .withEvents([])
       .withProcessManager(GITHUB_BRANCH_RECHECK_PROCESS_NAME, (pm) =>
         pm
-          .state<GithubBranchRecheckState>(GITHUB_BRANCH_RECHECK_INITIAL_STATE)
+          .state(githubBranchRecheckStateSchema, GITHUB_BRANCH_RECHECK_INITIAL_STATE)
           // Both intents are declared before `onWake` because the wake emits
           // both: the builder only lets one be declared after it.
           .intent("recheck", githubBranchRecheckSchema, runGithubBranchRecheck(deps))

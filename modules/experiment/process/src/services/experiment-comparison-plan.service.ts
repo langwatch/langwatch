@@ -4,9 +4,9 @@ import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   toComparisonConfig,
+  type CellEvaluatorConfig,
   type ComparisonEvaluatorConfig,
   type EvaluationsV3State,
-  type EvaluatorConfig,
   type ExecutionCell,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
@@ -200,7 +200,7 @@ export class ExperimentComparisonPlanService {
     variantIds: string[];
     legacyPairwise: boolean;
     built: { candidates: ExecutionCell["comparison"] };
-  }): EvaluatorConfig {
+  }): CellEvaluatorConfig {
     const resolvedInput = // falls back to the golden field (#5100/#5378)
       (cfg.inputField ? datasetEntry[cfg.inputField] : undefined) ??
       datasetEntry.input ??
@@ -253,7 +253,7 @@ export class ExperimentComparisonPlanService {
       comparison: cfg,
       inputs: target.inputs,
       mappings: perRowMappings,
-    } as unknown as EvaluatorConfig;
+    };
   }
 
   /** Column-style comparison targets: each is its own column, verdict stored under its own id. */

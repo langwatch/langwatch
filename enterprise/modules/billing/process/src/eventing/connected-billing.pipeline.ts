@@ -23,7 +23,7 @@ import {
 import {
   CONNECTED_BILLING_FIRST_DELAY_MS,
   CONNECTED_BILLING_INITIAL_STATE,
-  type ConnectedBillingTickState,
+  connectedBillingTickStateSchema,
   connectedBillingTickSchema,
   connectedBillingWake,
 } from "./connected-billing.process.ts";
@@ -45,7 +45,7 @@ export function buildConnectedBilling({
     .withEvents([])
     .withProcessManager(CONNECTED_BILLING_PROCESS_NAME, (pm) =>
       pm
-        .state<ConnectedBillingTickState>(CONNECTED_BILLING_INITIAL_STATE)
+        .state(connectedBillingTickStateSchema, CONNECTED_BILLING_INITIAL_STATE)
         .schedule({ everyMs: CONNECTED_BILLING_FIRST_DELAY_MS })
         .onWake(connectedBillingWake({ bootedAt }))
         .intent(

@@ -308,7 +308,12 @@ export const webhookRest: Readonly<{
             response_status: result.responseStatus,
             response_body: result.responseBody,
           }
-        : { delivered: false, response_status: result.responseStatus, error: result.error },
+        : {
+            delivered: false,
+            response_status: result.responseStatus,
+            ...(result.responseBody === undefined ? {} : { response_body: result.responseBody }),
+            error: result.error,
+          },
     };
   })
 

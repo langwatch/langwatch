@@ -3,7 +3,7 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
-} from "../projection/trace-summary-projection.repository.ts";
+} from "../trace-summary-projection.repository.ts";
 
 /**
  * The trace_summaries twin for a process with no ClickHouse. It keeps the last

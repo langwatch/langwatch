@@ -8,9 +8,9 @@ import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-
 import {
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   toComparisonConfig,
-  type EvaluatorConfig,
+  type CellEvaluatorConfig,
   type ExecutionCell,
-  type FieldMapping,
+  type EvaluatorFieldMapping,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
 
@@ -45,7 +45,7 @@ export class ExperimentEvaluatorInputService {
   }
 
   /** The fields an evaluator reads: its own declared inputs, or the catalog's otherwise. */
-  private declaredEvaluatorFields(evaluator: EvaluatorConfig): string[] {
+  private declaredEvaluatorFields(evaluator: CellEvaluatorConfig): string[] {
     const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
     if (declared.length > 0) {
       return declared;
@@ -114,7 +114,7 @@ export class ExperimentEvaluatorInputService {
     inputs,
   }: {
     cell: ExecutionCell;
-    evaluator: EvaluatorConfig;
+    evaluator: CellEvaluatorConfig;
     inputs: Record<string, unknown>;
   }): boolean {
     if (cell.comparison && toComparisonConfig(evaluator)) {
@@ -169,7 +169,7 @@ export class ExperimentEvaluatorInputService {
     datasetEntry,
   }: {
     inputs: Record<string, unknown>;
-    mappings: Record<string, FieldMapping>;
+    mappings: Record<string, EvaluatorFieldMapping>;
     datasetEntry: Record<string, unknown>;
   }): void {
     const inputMapping = mappings.input;
@@ -187,7 +187,7 @@ export class ExperimentEvaluatorInputService {
     inputs,
   }: {
     cell: ExecutionCell;
-    evaluator: EvaluatorConfig;
+    evaluator: CellEvaluatorConfig;
     datasetId: string;
     inputs: Record<string, unknown>;
   }): Record<string, unknown> {
@@ -260,7 +260,7 @@ export class ExperimentEvaluatorInputService {
   }: {
     cell: ExecutionCell;
     datasetId: string;
-    evaluator: EvaluatorConfig;
+    evaluator: CellEvaluatorConfig;
     targetOutput: Record<string, unknown>;
     inputs: Record<string, unknown>;
   }): Record<string, unknown> {

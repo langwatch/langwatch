@@ -1,4 +1,4 @@
-import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
+import type { LangWatchHandledErrorShape } from "@langwatch/langy-contract/cards/handled-error";
 /**
  * The code-keyed fallback table: exact-code hits, clean misses, and the rule
  * that advice the platform sent always beats advice the CLI shipped with.
@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 
 import { fallbackSuggestionsFor, withFallbackSuggestions } from "../errorSuggestions";
 
-const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
+const domain = (
+  overrides: Partial<LangWatchHandledErrorShape> = {},
+): LangWatchHandledErrorShape => ({
   code: "not_found",
   kind: "not_found",
   message: "Dataset not found: sales-q3",
@@ -133,7 +135,9 @@ describe("withFallbackSuggestions", () => {
 });
 
 describe("given the API refuses a management call because the plan is below Enterprise", () => {
-  const planRefusal = (overrides: Partial<CliHandledError> = {}): CliHandledError =>
+  const planRefusal = (
+    overrides: Partial<LangWatchHandledErrorShape> = {},
+  ): LangWatchHandledErrorShape =>
     domain({
       code: "enterprise_plan_required",
       kind: "enterprise_plan_required",

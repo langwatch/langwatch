@@ -7,29 +7,7 @@ import {
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import type { CustomGraph, ReportChart } from "@langwatch/automation-contract";
-
-/**
- * The stored graph JSON as a report reads it. The full `CustomGraphInput` is a BROWSER type
- * (colour sets, chart heights, tooltip options) owned by `@langwatch/analytics-browser`, and no
- * server module may value-import a browser package.
- */
-export interface ReportGraphInput {
-  graphType:
-    | "line"
-    | "bar"
-    | "horizontal_bar"
-    | "stacked_bar"
-    | "area"
-    | "stacked_area"
-    | "scatter"
-    | "pie"
-    | "donnut"
-    | "summary"
-    | "monitor_graph";
-  series?: (AnalyticsSeries & { name?: string })[];
-  groupBy?: string;
-  timeScale?: "full" | number;
-}
+import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 
 type Buckets = AnalyticsTimeseriesResult["currentPeriod"];
 
@@ -39,7 +17,7 @@ const MAX_SEGMENTS = 8;
 
 /** Slack renders four chart types; a graph can be any of eleven. Map onto the
  *  nearest one so a stacked bar still arrives as a bar rather than nothing. */
-export function chartTypeOf(graphType: ReportGraphInput["graphType"]): ReportChart["type"] {
+export function chartTypeOf(graphType: CustomGraphInput["graphType"]): ReportChart["type"] {
   switch (graphType) {
     case "pie":
     case "donnut":
@@ -58,7 +36,7 @@ export function chartTypeOf(graphType: ReportGraphInput["graphType"]): ReportCha
 }
 
 /** The series a report queries: the stored panel's own, capped and stripped of display names. */
-export function seriesInputsOf(graphData: ReportGraphInput): AnalyticsSeries[] {
+export function seriesInputsOf(graphData: CustomGraphInput): AnalyticsSeries[] {
   return (graphData.series ?? []).slice(0, MAX_SERIES).map((series) => ({
     metric: series.metric,
     aggregation: series.aggregation,
@@ -113,7 +91,7 @@ export function pieSegments({
   buckets: Buckets;
   bucketKeys: string[];
   seriesInputs: AnalyticsSeries[];
-  names: ReportGraphInput["series"];
+  names: CustomGraphInput["series"];
   groupBy?: string;
 }): { label: string; value: number }[] {
   if (groupBy) {
@@ -145,7 +123,7 @@ export function pieChartOf({
   buckets: Buckets;
   bucketKeys: string[];
   seriesInputs: AnalyticsSeries[];
-  graphData: ReportGraphInput;
+  graphData: CustomGraphInput;
 }): ReportChart {
   const segments = pieSegments({
     buckets,
@@ -178,7 +156,7 @@ export function trendChartOf({
   buckets: Buckets;
   bucketKeys: string[];
   seriesInputs: AnalyticsSeries[];
-  graphData: ReportGraphInput;
+  graphData: CustomGraphInput;
   /** One axis label per bucket; only the caller knows whether a bucket is an hour or a week. */
   categories: string[];
 }): ReportChart {

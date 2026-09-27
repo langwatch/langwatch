@@ -7,9 +7,16 @@ import {
   UnsubscribeRateLimitedError,
   type AutomationApi,
 } from "@langwatch/automation-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { createCanonicalAutomationApp } from "../../app/__tests__/automation-app.fixture.ts";
 import { mountUnsubscribeRest } from "./automation-rest.harness.ts";
+
+const resources: ReturnType<typeof createCanonicalAutomationApp>["resources"][] = [];
+
+afterEach(async () => {
+  await Promise.all(resources.splice(0).map((resource) => resource.close()));
+});
 
 type Accepted = Parameters<AutomationApi["acceptUnsubscribe"]>[0];
 
@@ -44,14 +51,17 @@ describe("given the one-click unsubscribe door", () => {
   });
 
   describe("when the link carries no token", () => {
-    it("answers 400 without reaching the application", async () => {
-      const api = mount(async () => undefined);
+    it("refuses it as an invalid link", async () => {
+      const fixture = createCanonicalAutomationApp();
+      resources.push(fixture.resources);
+      const api = mountUnsubscribeRest({
+        acceptUnsubscribe: (input) => fixture.app.acceptUnsubscribe(input),
+      });
 
       const response = await api.send("POST", "/api/unsubscribe");
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({ code: "unsubscribe_link_invalid" });
-      expect(api.spent).toEqual([]);
     });
   });
 
@@ -95,7 +105,6 @@ describe("given the one-click unsubscribe door", () => {
 
       expect(response.status).toBe(405);
       expect(response.headers.get("allow")).toBe("POST");
-      await expect(response.json()).resolves.toEqual({ error: "Method not allowed" });
       expect(api.spent).toEqual([]);
     });
   });

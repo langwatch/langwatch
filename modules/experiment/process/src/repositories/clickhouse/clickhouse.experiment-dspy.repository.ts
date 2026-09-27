@@ -9,6 +9,7 @@ import {
   type ExperimentDspyStepsLookup,
 } from "@langwatch/experiment-contract";
 import { Temporal, toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
@@ -26,7 +27,7 @@ const TABLE_NAME = "dspy_steps";
 const experimentDspyStepSummariesSchema = experimentDspyStepSummarySchema.array();
 
 export type ExperimentDspyClickHouseResult = {
-  json<T>(): Promise<T[]>;
+  json(): Promise<unknown[]>;
 };
 
 export type ExperimentDspyClickHouseClient = {
@@ -54,42 +55,44 @@ export type ExperimentDspyTelemetry = {
   warn(input: { projectId: string; error: unknown }, message: string): void;
 };
 
-type ExperimentDspyRow = {
-  TenantId: string;
-  ExperimentId: string;
-  RunId: string;
-  StepIndex: string;
-  WorkflowVersionId: string | null;
-  Score: number;
-  Label: string;
-  OptimizerName: string;
-  OptimizerParameters: string;
-  Predictors: string;
-  Examples: string;
-  LlmCalls: string;
-  LlmCallsTotal: number;
-  LlmCallsTotalTokens: string;
-  LlmCallsTotalCost: number;
-  CreatedAt: string;
-  InsertedAt: string;
-  UpdatedAt: string;
-};
+const dspyRowSchema = z.object({
+  TenantId: z.string(),
+  ExperimentId: z.string(),
+  RunId: z.string(),
+  StepIndex: z.string(),
+  WorkflowVersionId: z.string().nullable(),
+  Score: z.number(),
+  Label: z.string(),
+  OptimizerName: z.string(),
+  OptimizerParameters: z.string(),
+  Predictors: z.string(),
+  Examples: z.string(),
+  LlmCalls: z.string(),
+  LlmCallsTotal: z.number(),
+  LlmCallsTotalTokens: z.string(),
+  LlmCallsTotalCost: z.number(),
+  CreatedAt: z.string(),
+  InsertedAt: z.string(),
+  UpdatedAt: z.string(),
+});
+const dspyRowsSchema = z.array(dspyRowSchema);
 
-type ExperimentDspySummaryRow = Pick<
-  ExperimentDspyRow,
-  | "TenantId"
-  | "ExperimentId"
-  | "RunId"
-  | "StepIndex"
-  | "WorkflowVersionId"
-  | "Score"
-  | "Label"
-  | "OptimizerName"
-  | "LlmCallsTotal"
-  | "LlmCallsTotalTokens"
-  | "LlmCallsTotalCost"
-  | "CreatedAt"
->;
+const dspySummaryRowsSchema = z.array(
+  dspyRowSchema.pick({
+    TenantId: true,
+    ExperimentId: true,
+    RunId: true,
+    StepIndex: true,
+    WorkflowVersionId: true,
+    Score: true,
+    Label: true,
+    OptimizerName: true,
+    LlmCallsTotal: true,
+    LlmCallsTotalTokens: true,
+    LlmCallsTotalCost: true,
+    CreatedAt: true,
+  }),
+);
 
 function mergeByHash<T extends { hash: string }>(existing: T[], incoming: T[]): T[] {
   const seen = new Set(existing.map((item) => item.hash));
@@ -214,7 +217,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
         query_params: input,
         format: "JSONEachRow",
       });
-      const rows = await result.json<ExperimentDspySummaryRow>();
+      const rows = dspySummaryRowsSchema.parse(await result.json());
       return experimentDspyStepSummariesSchema.parse(
         rows.map((row) => ({
           tenantId: row.TenantId,
@@ -299,7 +302,7 @@ export class ClickHouseExperimentDspyRepository extends ExperimentDspyRepository
       query_params: input,
       format: "JSONEachRow",
     });
-    const row = (await result.json<ExperimentDspyRow>())[0];
+    const row = dspyRowsSchema.parse(await result.json())[0];
     if (!row) return null;
     return {
       tenantId: row.TenantId,

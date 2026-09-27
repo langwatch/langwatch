@@ -12,6 +12,7 @@ import {
   type UiNavigation,
 } from "@langwatch/browser-host/capabilities";
 import { uiLeaveTo } from "@langwatch/browser-host/navigation";
+import type { StripeEnvironment } from "@langwatch/enterprise-billing-contract";
 import { useMemo, type ReactNode } from "react";
 
 import {
@@ -28,6 +29,7 @@ class CapabilityBillingHost extends BillingHostApi {
   private readonly teamId: string | undefined;
   private readonly query: Readonly<Record<string, string | undefined>>;
   private readonly deploymentIsSaaS: boolean;
+  private readonly deploymentIsDevelopment: boolean;
   private readonly navigation: UiNavigation;
   private readonly feedback: UiFeedback;
 
@@ -36,6 +38,7 @@ class CapabilityBillingHost extends BillingHostApi {
     teamId,
     query,
     deploymentIsSaaS,
+    deploymentIsDevelopment,
     navigation,
     feedback,
   }: {
@@ -43,6 +46,7 @@ class CapabilityBillingHost extends BillingHostApi {
     teamId: string | undefined;
     query: Readonly<Record<string, string | undefined>>;
     deploymentIsSaaS: boolean;
+    deploymentIsDevelopment: boolean;
     navigation: UiNavigation;
     feedback: UiFeedback;
   }) {
@@ -51,6 +55,7 @@ class CapabilityBillingHost extends BillingHostApi {
     this.teamId = teamId;
     this.query = query;
     this.deploymentIsSaaS = deploymentIsSaaS;
+    this.deploymentIsDevelopment = deploymentIsDevelopment;
     this.navigation = navigation;
     this.feedback = feedback;
   }
@@ -69,6 +74,10 @@ class CapabilityBillingHost extends BillingHostApi {
 
   isSaaS(): boolean {
     return this.deploymentIsSaaS;
+  }
+
+  stripeEnvironment(): StripeEnvironment {
+    return this.deploymentIsDevelopment ? "test" : "live";
   }
 
   /** Deployment answers synchronously through capabilities, so it is already settled. */
@@ -132,10 +141,11 @@ export default function BillingHostMount({ children }: { children?: ReactNode })
         teamId,
         query,
         deploymentIsSaaS: deployment.isSaaS,
+        deploymentIsDevelopment: deployment.isDevelopment,
         navigation,
         feedback,
       }),
-    [org, teamId, query, deployment.isSaaS, navigation, feedback],
+    [org, teamId, query, deployment.isSaaS, deployment.isDevelopment, navigation, feedback],
   );
 
   return <BillingHostProvider value={host}>{children}</BillingHostProvider>;

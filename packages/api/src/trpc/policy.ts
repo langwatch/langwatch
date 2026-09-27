@@ -237,11 +237,10 @@ export interface TrpcDeclaredAuthzContext {
 }
 
 /**
- * `any` here is load-bearing: tRPC's `.use()` requires a middleware whose
- * return is assignable to its own `MiddlewareResult`, and a declared check
- * is written against the scope input rather than one procedure's generics.
+ * A declared check is written against the scope input rather than one procedure's generics, so
+ * what `next` answers stays opaque to it: the check only passes it on.
  */
-type DeclaredCheckNext = () => any;
+type DeclaredCheckNext = () => unknown;
 
 export type TrpcDeclaredCheckParams<TContext> = {
   ctx: TrpcMiddlewareContext<TContext>;
@@ -264,12 +263,12 @@ export type TrpcContextOnlyCheckParams<TContext> = {
  * way to produce the brand, so an undeclared function cannot stand in for one.
  */
 export type TrpcDeclaredCheck<TContext> = DeclaredAuthzMiddleware<
-  (params: TrpcDeclaredCheckParams<TContext>) => Promise<any>
+  (params: TrpcDeclaredCheckParams<TContext>) => Promise<unknown>
 >;
 
 /** The same, for a check that reads no validated input. */
 export type TrpcContextOnlyDeclaredCheck<TContext> = DeclaredAuthzMiddleware<
-  (params: TrpcContextOnlyCheckParams<TContext>) => Promise<any>
+  (params: TrpcContextOnlyCheckParams<TContext>) => Promise<unknown>
 >;
 
 const SENSITIVE_SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
@@ -657,12 +656,11 @@ function deniedError({
 type ScopeLineageParams<TContext> = {
   ctx: TrpcMiddlewareContext<TContext>;
   input: unknown;
-  next: () => any;
+  next: () => unknown;
 };
 
-/** Not `TRPCMiddlewareFunction` to avoid re-imposing mapped context; `any` result is
- * intentional */
-type ScopeLineageMiddleware<TContext> = (params: ScopeLineageParams<TContext>) => Promise<any>;
+/** Not `TRPCMiddlewareFunction`, to avoid re-imposing mapped context; the result stays opaque. */
+type ScopeLineageMiddleware<TContext> = (params: ScopeLineageParams<TContext>) => Promise<unknown>;
 
 function asScopeLineageInput(input: unknown): AuthzScopeLineageInput {
   return typeof input === "object" && input !== null ? input : {};
@@ -720,12 +718,12 @@ export function createScopeLineageGuard<TContext>(
 
 type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType ? TWith : Simplify<TType & TWith>;
 
-/** Parameter shape for hand-written checks; `any` on `next` and return is load-bearing */
+/** Parameter shape for hand-written checks; what `next` answers is passed on, never read. */
 export type TrpcCheckMiddleware<TCheckContext, TInput> = (params: {
   ctx: TCheckContext;
   input: TInput;
-  next: () => any;
-}) => Promise<any>;
+  next: () => unknown;
+}) => Promise<unknown>;
 
 /**
  * The process middlewares wrapped around every declared procedure. Opaque on
@@ -1059,7 +1057,7 @@ function procedureMiddlewareList(value: unknown): readonly unknown[] {
     throw new Error("tRPC procedure carries no `_def` to read its middlewares from");
   }
 
-  const definition = (value as { _def: unknown })._def;
+  const definition = value._def;
 
   if (typeof definition !== "object" || definition === null || !("middlewares" in definition)) {
     throw new Error("tRPC procedure `_def` carries no `middlewares` list");
@@ -1169,11 +1167,6 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
   return map[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }
 
-/**
- * Called once per root. Every middleware it returns belongs to that root,
- * so a process composes exactly one of these and hands the pieces to its
- * mounts.
- */
 /**
  * The TRPCError a known cause becomes: a HandledError keeps its code, a bare
  * ZodError is promoted as the REST door does, and a process-translated cause
@@ -1331,6 +1324,7 @@ function failuresToAudit<TActor extends { id?: string }>({
   return [{ error, actor: { ...actor, id: actor.id } }];
 }
 
+/** Called once per root; a process composes one and hands its middlewares to every mount. */
 export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
   TAuthenticatedContext extends object,

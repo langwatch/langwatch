@@ -72,7 +72,7 @@ function pipelineWithProcessManager() {
     .withEvents([recordedEventSchema])
     .withProcessManager(PROCESS_NAME, (process) =>
       process
-        .state({ handled: 0 })
+        .state(z.object({ handled: z.number() }), { handled: 0 })
         .keyBy(() => "process-key-1")
         .on("producer.recorded", (state) => ({ state: { handled: state.handled + 1 } })),
     )

@@ -113,7 +113,7 @@ export class SpanStorageService {
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
     const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
+    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,
@@ -154,7 +154,7 @@ export class SpanStorageService {
 
     // Resolve the single span via the normalized+resolve path.
     const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await TraceOffloadResolutionService.resolveOffloadedTraces({
+    const { resolvedSpans } = await TraceOffloadResolutionService.create().resolveOffloadedTraces({
       projectId: params.tenantId,
       normalizedSpans,
       blobStore: this.blobResolutionDeps.blobStore,

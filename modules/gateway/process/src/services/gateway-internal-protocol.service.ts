@@ -40,10 +40,10 @@ import type {
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
-  EMPTY_SPEND_USAGE,
   failSpendWireSchema,
 } from "../eventing/gateway-spend-commands.process.ts";
 import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
+import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
 import type { GatewayGuardrailEvaluationService } from "./gateway-guardrail-evaluation.service.ts";
 import type { GatewayJwtService } from "./gateway-jwt.service.ts";

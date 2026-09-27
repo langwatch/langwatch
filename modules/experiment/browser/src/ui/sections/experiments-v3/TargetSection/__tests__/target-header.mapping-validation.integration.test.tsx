@@ -35,8 +35,6 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
-import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import {
   evaluatorHasMissingMappings,
   extractFieldsFromContent,
@@ -45,7 +43,10 @@ import {
   getUsedFields,
   targetHasMissingMappings,
   validateWorkbench,
-} from "../../../../../model/experiments-v3/mapping-validation.ts";
+} from "@langwatch/experiment-contract/mapping-validation";
+
+import { useEvaluationsV3Store } from "../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { PromptTemplateFieldsContext } from "../../../../../behavior/experiments-v3/use-prompt-template-fields.ts";
 import type {
   DatasetReference,
   EvaluatorConfig,

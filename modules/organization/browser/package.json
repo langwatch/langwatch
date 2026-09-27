@@ -42,7 +42,6 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/enterprise-licensing-browser": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

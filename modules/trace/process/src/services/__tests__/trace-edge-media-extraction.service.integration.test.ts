@@ -100,7 +100,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -128,7 +128,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -165,7 +165,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -194,7 +194,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -228,7 +228,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ];
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -262,7 +262,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -289,7 +289,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -319,7 +319,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const firstSpan = baseSpan([
         { key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } },
       ]);
-      const firstResult = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const firstResult = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: baseCommand(firstSpan),
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -333,7 +333,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
         { key: "langwatch.input", value: { stringValue: JSON.stringify(messages) } },
       ]);
       secondSpan.spanId = "span-2";
-      const secondResult = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const secondResult = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: baseCommand(secondSpan),
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -364,7 +364,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       ]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service }),
         logger: silentLogger(),
@@ -400,7 +400,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const telemetry = { failOpen: vi.fn() };
       const logger = silentLogger();
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service: failingService, telemetry }),
         logger,
@@ -427,7 +427,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const span = baseSpan([{ key: "langwatch.input", value: { stringValue: original } }]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service, hasContentDropRules: async () => true }),
         logger: silentLogger(),
@@ -453,7 +453,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const span = baseSpan([{ key: "langwatch.input", value: { stringValue: original } }]);
       const command = baseCommand(span);
 
-      const result = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const result = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps: baseDeps({ service, featureFlags: flags(false) }),
         logger: silentLogger(),
@@ -482,7 +482,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
       const command = baseCommand(span);
       const deps = baseDeps({ service });
 
-      const firstPass = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const firstPass = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: command,
         deps,
         logger: silentLogger(),
@@ -491,7 +491,7 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
 
       // Simulates a group-queue retry re-running the hook over the
       // already-rewritten command (idempotent PUT, no marker left to find).
-      const secondPass = await TraceEdgeMediaExtractionService.maybeExtractSpanMedia({
+      const secondPass = await TraceEdgeMediaExtractionService.create().maybeExtractSpanMedia({
         data: firstPass,
         deps,
         logger: silentLogger(),

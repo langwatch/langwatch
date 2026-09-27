@@ -21,6 +21,18 @@ Feature: Langy drives the open page through typed UI actions
     Then the page claims the action and applies it through the workbench store
 
   @unit
+  Scenario: The CLI's UI-action door is served where main served it
+    Given the langy module is installed in the api process
+    When a worker's session key calls POST or GET /api/langy/ui/actions
+    Then the call reaches langy's own UI-action operations rather than an unmounted path
+
+  @unit
+  Scenario: A project the UI-action rollout has not reached answers a bare 404
+    Given the UI-action rollout is off for the key's project
+    When the worker lists or dispatches UI actions
+    Then the answer is the plain 404 an unmounted path gives
+
+  @unit
   Scenario: The action's result returns to the agent within the same CLI call
     Given the page executed a dispatched action
     When the page reports the action's result

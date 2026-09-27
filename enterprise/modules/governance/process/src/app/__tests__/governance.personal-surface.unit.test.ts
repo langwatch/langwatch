@@ -10,6 +10,8 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi, GatewayBudgetOverviewForUser } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   type OrganizationApi,
@@ -18,6 +20,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -85,8 +88,14 @@ async function buildApp(options: { workspace: PersonalWorkspace | null }) {
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
+      logs: createApiFixture<LogApi>(),
+      metrics: createApiFixture<MetricApi>(),
     },
-    members: { encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
+    members: {
+      encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
+      rateLimiter: memoryRateLimiter(),
+    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });

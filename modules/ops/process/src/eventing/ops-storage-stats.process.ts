@@ -8,9 +8,10 @@ export const storageStatsMeasurementSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface StorageStatsState {
-  lastMeasuredAt: number | null;
-}
+export const storageStatsStateSchema = z.object({
+  lastMeasuredAt: z.number().nullable(),
+});
+export type StorageStatsState = z.infer<typeof storageStatsStateSchema>;
 
 export const STORAGE_STATS_INITIAL_STATE: StorageStatsState = {
   lastMeasuredAt: null,

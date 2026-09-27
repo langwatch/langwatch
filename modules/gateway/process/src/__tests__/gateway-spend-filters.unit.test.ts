@@ -1,6 +1,7 @@
 import {
   MAX_FILTER_VALUES,
   SPEND_STATUS_FILTERS,
+  spendFilterQueryShape,
   spendFiltersSchema,
 } from "@langwatch/gateway-contract";
 /**
@@ -9,9 +10,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { ZodError, type z } from "zod";
 
-import { GatewaySpendFiltersAdapter, spendFilterQueryShape } from "../index.ts";
-
-const spendFilters = GatewaySpendFiltersAdapter.create();
+import * as spendFilters from "../rules/gateway-spend-filters.rules.ts";
 
 /** Which fields a parse rejected, so a refusal test can name the rule it
  *  meant rather than settling for "something threw". */

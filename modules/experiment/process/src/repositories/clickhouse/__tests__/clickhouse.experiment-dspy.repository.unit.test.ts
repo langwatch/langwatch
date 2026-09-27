@@ -33,7 +33,7 @@ class FixedRetention extends ExperimentDspyRetentionRepository {
 const telemetry = { warn: vi.fn() };
 
 const clickHouseResult = <T>(rows: T[]): ExperimentDspyClickHouseResult => ({
-  json: async <Requested>() => rows as unknown as Requested[],
+  json: async () => rows,
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

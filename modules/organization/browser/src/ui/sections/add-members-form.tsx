@@ -86,6 +86,62 @@ function LiteMemberNeedsTeamWarning() {
   );
 }
 
+function snapTeamRolesToSeat({
+  selectedTeams,
+  orgRole,
+  setValue,
+}: {
+  selectedTeams: (TeamAssignment | undefined)[];
+  orgRole: OrganizationUserRole;
+  setValue: UseFormSetValue<InternalForm>;
+}) {
+  selectedTeams.forEach((team, teamIndex) => {
+    if (!team) return;
+    if (orgRole === OrganizationUserRole.EXTERNAL) {
+      if (team.role !== TeamUserRole.VIEWER) {
+        setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+        setValue(`teams.${teamIndex}.customRoleId`, undefined);
+      }
+    } else if (orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+      setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+    }
+  });
+}
+
+function availableTeamOptions({
+  selectedTeams,
+  teamOptions,
+  currentTeamIndex,
+}: {
+  selectedTeams: (TeamAssignment | undefined)[] | undefined;
+  teamOptions: AddMembersFormProps["teamOptions"];
+  currentTeamIndex?: number;
+}) {
+  const selectedTeamIds = selectedTeams
+    ?.map((team, idx) => {
+      if (currentTeamIndex !== undefined && idx === currentTeamIndex) return null;
+      return team?.teamId;
+    })
+    .filter((id: string | null | undefined): id is string => !!id && id !== "");
+  return teamOptions.filter((opt) => !selectedTeamIds?.includes(opt.value));
+}
+
+function normalizeTeamForSeat({
+  team,
+  orgRole,
+}: {
+  team: TeamAssignment;
+  orgRole: OrganizationUserRole;
+}): TeamAssignment {
+  if (orgRole === OrganizationUserRole.EXTERNAL) {
+    return { teamId: team.teamId, role: TeamUserRole.VIEWER, customRoleId: undefined };
+  }
+  if (orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
+    return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
+  }
+  return team;
+}
+
 export function AddMembersForm({
   teamOptions,
   organizationId,
@@ -133,30 +189,13 @@ export function AddMembersForm({
 
   useEffect(() => {
     if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
-      selectedTeams.forEach((team: TeamAssignment | undefined, teamIndex: number) => {
-        if (!team) return;
-        if (orgRole === OrganizationUserRole.EXTERNAL) {
-          if (team.role !== TeamUserRole.VIEWER) {
-            setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-            setValue(`teams.${teamIndex}.customRoleId`, undefined);
-          }
-        } else if (orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
-          setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-        }
-      });
+      snapTeamRolesToSeat({ selectedTeams, orgRole, setValue });
     }
     prevOrgRoleRef.current = orgRole;
   }, [orgRole, selectedTeams, setValue]);
 
-  const getAvailableTeamOptions = (currentTeamIndex?: number) => {
-    const selectedTeamIds = selectedTeams
-      ?.map((team: TeamAssignment | undefined, idx: number) => {
-        if (currentTeamIndex !== undefined && idx === currentTeamIndex) return null;
-        return team?.teamId;
-      })
-      .filter((id: string | null | undefined): id is string => !!id && id !== "");
-    return teamOptions.filter((opt) => !selectedTeamIds?.includes(opt.value));
-  };
+  const getAvailableTeamOptions = (currentTeamIndex?: number) =>
+    availableTeamOptions({ selectedTeams, teamOptions, currentTeamIndex });
 
   const handleAddTeam = () => {
     const available = getAvailableTeamOptions();
@@ -175,19 +214,9 @@ export function AddMembersForm({
       .filter(Boolean);
 
     // Normalize team roles to match org role constraints
-    const normalizedTeams = data.teams.map((team) => {
-      if (data.orgRole === OrganizationUserRole.EXTERNAL) {
-        return {
-          teamId: team.teamId,
-          role: TeamUserRole.VIEWER,
-          customRoleId: undefined,
-        };
-      }
-      if (data.orgRole === OrganizationUserRole.MEMBER && team.role === TeamUserRole.VIEWER) {
-        return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
-      }
-      return team;
-    });
+    const normalizedTeams = data.teams.map((team) =>
+      normalizeTeamForSeat({ team, orgRole: data.orgRole }),
+    );
 
     const invites: InviteData[] = emails.map((email) => ({
       email,
@@ -287,7 +316,7 @@ export function AddMembersForm({
               borderRadius="xl"
               width="100%"
             >
-              <Table.Root variant={"ghost" as any} width="100%">
+              <Table.Root width="100%">
                 <Table.Header>
                   <Table.Row backgroundColor="transparent">
                     <Table.ColumnHeader paddingLeft={0} paddingTop={0}>

@@ -279,7 +279,7 @@ describe("traceRequest.utils", () => {
       });
 
       it("handles null-ish input", () => {
-        const result = OtlpTraceRequestService.normalizeOtlpAttributes(null as unknown as []);
+        const result = OtlpTraceRequestService.normalizeOtlpAttributes(null);
         expect(result).toEqual({});
       });
     });

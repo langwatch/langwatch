@@ -147,7 +147,23 @@ function buildApp(overrides: { scenarios?: Partial<ScenarioApi> } = {}) {
       agents: agentApi,
       prompts: promptApi,
       projects: projectApi,
-      evaluators: createApiFixture<EvaluatorApi>({}),
+      evaluators: createApiFixture<EvaluatorApi>({
+        findByIdWithFields: async ({ id, projectId }) => ({
+          id,
+          projectId,
+          name: id,
+          slug: id,
+          type: "evaluator",
+          config: null,
+          workflowId: null,
+          copiedFromEvaluatorId: null,
+          archivedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          fields: [],
+          outputFields: [],
+        }),
+      }),
     },
   });
   return { app, updateTestSuite };

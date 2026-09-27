@@ -8,12 +8,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
-import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
-const budgetDtos = GatewayBudgetDtoService.create();
 /**
  * The tenancy guard names a project on every query. This suite writes the
  * organizations and projects it then reads, so it composes the client without

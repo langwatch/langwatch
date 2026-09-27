@@ -12,7 +12,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
-import { GatewayEndUserCapsAdapter } from "../../app/gateway-end-user-caps.composition.ts";
+import { GatewayEndUserCapsAdapter } from "../../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,
@@ -23,9 +23,13 @@ import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/pri
 import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
 import {
+  type GatewaySpendApp,
+  GatewaySpendReconciliationService,
+} from "../../services/gateway-spend-reconciliation.service.ts";
+import {
+  type GatewaySpendDoorApi,
   gatewaySpendBillingPlanGate,
   gatewaySpendRest,
-  type GatewaySpendApp,
 } from "../gateway-spend.rest.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -89,8 +93,16 @@ function mountSpendFamily(spend: GatewaySpendApp) {
     },
   });
 
+  const answers = GatewaySpendReconciliationService.create({ collaborators: spend });
+  const door: GatewaySpendDoorApi = {
+    answerSpendSummaries: (input) => answers.answerSpendSummaries(input),
+    answerSpendEvents: (input) => answers.answerSpendEvents(input),
+    answerEndUserSpend: (input) => answers.answerEndUserSpend(input),
+    answerSpendReplay: (input) => answers.answerSpendReplay(input),
+  };
+
   return runtime.mount(gatewaySpendRest.router(), {
-    app: () => spend,
+    app: () => door,
     onError: (error, c) =>
       c.json(
         { error: { type: "internal_error", code: "internal_error", message: String(error) } },

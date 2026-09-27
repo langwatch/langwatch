@@ -1396,6 +1396,12 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#invitations.list(input);
   }
 
+  approvePaymentPendingInvites(
+    input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void> {
+    return this.#invitations.approvePaymentPending(input);
+  }
+
   acceptInvitation(
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,

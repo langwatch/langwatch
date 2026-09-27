@@ -17,6 +17,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { teamUserRoleSchema } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Select } from "@langwatch/design-system/select";
@@ -283,7 +284,7 @@ function AddToTeamDialog({
               create.mutate({
                 organizationId,
                 userId,
-                role: (customRoleId ? "CUSTOM" : role) as any,
+                role: teamUserRoleSchema.parse(customRoleId ? "CUSTOM" : role),
                 customRoleId,
                 scopeType: "TEAM",
                 scopeId: teamId,
@@ -427,7 +428,7 @@ function AddToProjectDialog({
               create.mutate({
                 organizationId,
                 userId,
-                role: (customRoleId ? "CUSTOM" : role) as any,
+                role: teamUserRoleSchema.parse(customRoleId ? "CUSTOM" : role),
                 customRoleId,
                 scopeType: "PROJECT",
                 scopeId: projectId,
@@ -891,7 +892,7 @@ function TeamCard({
                         updateBinding.mutate({
                           organizationId,
                           bindingId,
-                          role: role as any,
+                          role: teamUserRoleSchema.parse(role),
                           customRoleId,
                         })
                       }

@@ -1,10 +1,15 @@
 import {
+  IDENTIFIER_PROVIDERS,
   LIVE_IDENTIFIER_STATES,
+  looksLikeSsoConnectionId,
+  routingStateOf,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
+  ssoConnectionStateSchema,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import { identifierBelongsToMigrationConnection } from "../../rules/sso-migration.rules.ts";
 import type {
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -18,7 +23,10 @@ export type PrismaSsoConnectionReadDatabase = Pick<
 >;
 
 /** The identity heads a teardown's stranding check is answered from. */
-export type PrismaSsoConnectionStrandingDatabase = Pick<PrismaClient, "identifier">;
+export type PrismaSsoConnectionStrandingDatabase = Pick<
+  PrismaClient,
+  "identifier" | "ssoConnection" | "organizationUser"
+>;
 
 /**
  * The reads the connection guards run (D04, ADR-117 §5), over the
@@ -95,29 +103,117 @@ export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStra
 
   constructor(private readonly prisma: PrismaSsoConnectionStrandingDatabase) {}
 
+  /** Who signs in through this connection and holds no verified way in that survives it.
+   *  Without the connection's projection nothing is assumed safe. */
   async findStrandedUserIds({ connectionId }: { connectionId: string }): Promise<string[]> {
-    const held = await this.prisma.identifier.findMany({
+    const row = await this.prisma.ssoConnection.findUnique({ where: { id: connectionId } });
+    if (row === null) {
+      throw new SsoConnectionNotFoundError(
+        `connection ${connectionId}: cannot assess teardown without its projection`,
+      );
+    }
+    const connection = PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+    const legacyMembers =
+      connection.source === "legacy-grandfathered"
+        ? await this.prisma.organizationUser.findMany({
+            where: { organizationId: connection.organizationId },
+            select: { userId: true },
+          })
+        : [];
+    const candidates = await this.prisma.identifier.findMany({
       where: {
-        connectionId,
         state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { connectionId },
+          { connectionId: null, providerId: connectionId },
+          ...(legacyMembers.length > 0
+            ? [
+                {
+                  connectionId: null,
+                  userId: { in: legacyMembers.map(({ userId }) => userId) },
+                  providerId: { in: ["auth0", connection.idpMetadata.providerId] },
+                },
+              ]
+            : []),
+        ],
       },
-      select: { userId: true },
-      distinct: ["userId"],
+      select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
     });
-    const userIds = held.map((row) => row.userId);
+    const userIds = [
+      ...new Set(
+        candidates
+          .filter((identifier) =>
+            identifierBelongsToMigrationConnection({ identifier, connection }),
+          )
+          .map(({ userId }) => userId),
+      ),
+    ];
     if (userIds.length === 0) return [];
 
-    const elsewhere = await this.prisma.identifier.findMany({
+    const covered = await this.#usersWithAnotherWayIn({ connection, userIds });
+    return userIds.filter((userId) => !covered.has(userId));
+  }
+
+  /** A verified, non-address method that does not belong to this connection, through a
+   *  connection that is itself live - an address or a paused connection is not a way in. */
+  async #usersWithAnotherWayIn({
+    connection,
+    userIds,
+  }: {
+    connection: SsoConnectionState;
+    userIds: string[];
+  }): Promise<Set<string>> {
+    const alternatives = await this.prisma.identifier.findMany({
       where: {
         userId: { in: userIds },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-        NOT: { connectionId },
+        state: { in: ["VERIFIED", "PRIMARY"] },
+        provider: { in: IDENTIFIER_PROVIDERS.filter((provider) => provider !== "email") },
       },
-      select: { userId: true },
-      distinct: ["userId"],
+      select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
     });
-    const covered = new Set(elsewhere.map((row) => row.userId));
-    return userIds.filter((userId) => !covered.has(userId));
+    const independent = alternatives.filter(
+      (identifier) => !identifierBelongsToMigrationConnection({ identifier, connection }),
+    );
+    if (independent.length === 0) return new Set<string>();
+
+    const referencedIds = [
+      ...new Set(
+        independent.flatMap(({ connectionId, providerId }) =>
+          [connectionId, providerId].filter((id): id is string => id !== null),
+        ),
+      ),
+    ];
+    const referenced = await this.prisma.ssoConnection.findMany({
+      where: { id: { in: referencedIds } },
+      select: { id: true, state: true },
+    });
+    const routing = new Map(
+      referenced.map(({ id, state }) => [
+        id,
+        routingStateOf(ssoConnectionStateSchema.parse(state)),
+      ]),
+    );
+
+    return new Set(
+      independent
+        .filter(({ connectionId, providerId }) => {
+          if (connectionId !== null && routing.get(connectionId) !== "ACTIVE") return false;
+          if (
+            providerId !== null &&
+            looksLikeSsoConnectionId(providerId) &&
+            !routing.has(providerId)
+          ) {
+            return false;
+          }
+          return (
+            providerId !== connection.connectionId &&
+            (providerId === null ||
+              !routing.has(providerId) ||
+              routing.get(providerId) === "ACTIVE")
+          );
+        })
+        .map(({ userId }) => userId),
+    );
   }
 }
 

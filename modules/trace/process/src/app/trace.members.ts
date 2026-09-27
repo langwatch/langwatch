@@ -37,7 +37,7 @@ import type {
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 
-import type { EventingTracePipelineAdapter } from "../eventing/trace-processing-projections.pipeline.ts";
+export type { TraceProcessingPipelineDefinition } from "../eventing/trace-processing-projections.pipeline.ts";
 
 /** Queues an online-evaluator run for an ingested trace; Evaluation owns its delay and dedup. */
 export interface TraceEvaluationDispatch {
@@ -258,12 +258,6 @@ export interface TraceProcessingCommands {
   removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
   assignTopic(data: AssignTopicCommandData): Promise<unknown>;
 }
-
-/** The exact definition Trace's builder produces, commands and projections
- * included. Type-preserves the commands (recordSpan as itself, not as union). */
-export type TraceProcessingPipelineDefinition = ReturnType<
-  ReturnType<EventingTracePipelineAdapter["build"]>["build"]
->;
 
 /** One product-usage event, as the ingest path emits it. Keyed by userId,
  * not traced to observability. */

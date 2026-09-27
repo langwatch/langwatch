@@ -181,16 +181,13 @@ describe("given a connected agent column", () => {
     it("sends the mapped row and writes the answer in the cell", async () => {
       const dispatch = vi.fn<ConnectedDispatch>(async () => answered("Open a return request."));
 
-      // Every read of the clock is 1200ms later, so the duration the row
-      // reports is exact.
-      let clock = 0;
+      // The cell starts at 1000, the busy-retry budget check reads the same
+      // instant, and the answer lands at 2200: the row took exactly 1200ms.
+      const reads = [1_000, 1_000];
       const events = await run({
         cell: makeCell(),
         dispatch,
-        now: () => {
-          clock += 1200;
-          return clock;
-        },
+        now: () => reads.shift() ?? 2_200,
       });
 
       const call = dispatch.mock.calls[0]![0];

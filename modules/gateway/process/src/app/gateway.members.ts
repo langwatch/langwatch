@@ -1,18 +1,14 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import {
-  type GatewayConnectUpstream,
-  type SpendUsage,
-  type VirtualKeyWithScopes,
-  type ModelProvider,
-  PROVIDER_BUCKET_SEPARATOR,
-  bucketScopeIdFor,
-  computeBudgetPeriodFloorMs,
-  type GatewayBudgetDebitRow,
-  type GatewayBudgetResource,
-  type GatewayBudgetScopeType,
-  type GatewayBudgetWindow,
+import type {
+  GatewayConnectUpstream,
+  SpendUsage,
+  VirtualKeyWithScopes,
+  ModelProvider,
+  GatewayBudgetDebitRow,
+  GatewayBudgetScopeType,
+  GatewayBudgetWindow,
 } from "@langwatch/gateway-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
 
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 export type GatewayAuditAction =
@@ -142,47 +138,6 @@ export type PulledUsageTotals = {
   tokensInput: number;
   tokensOutput: number;
 };
-
-/**
- * Read targets for a plain list of budgets, no request context (a GROUP
- * budget sums every member bucket). `now` is shared with the rollup read so
- * an anchored budget's moving floor agrees across both halves of the read.
- */
-export function budgetSpendTargetsFor({
-  budgets,
-  now = nowInstant(),
-}: {
-  budgets: GatewayBudgetResource[];
-  now?: Instant;
-}): BudgetSpendTarget[] {
-  return budgets.map((b) =>
-    b.scopeType === "GROUP"
-      ? {
-          budgetId: b.id,
-          scope: b.scopeType,
-          // The member id sits between the group prefix and the provider
-          // suffix, so a provider-filtered group budget cannot be a plain
-          // prefix target: the prefix is the bare group, and the provider
-          // filter anchors the suffix instead.
-          scopeId: `${b.scopeId}:`,
-          window: b.window,
-          match: "prefix" as const,
-          bucketSuffix: b.providerKey ? `${PROVIDER_BUCKET_SEPARATOR}${b.providerKey}` : null,
-          // MANUAL windows, anchored cycles and mid-period resets all move
-          // the boundary; the list must total the CURRENT period, same as
-          // enforcement does.
-          periodFloorMs: computeBudgetPeriodFloorMs(b, now),
-        }
-      : {
-          budgetId: b.id,
-          scope: b.scopeType,
-          scopeId: bucketScopeIdFor(b, b.scopeId),
-          window: b.window,
-          match: "exact" as const,
-          periodFloorMs: computeBudgetPeriodFloorMs(b, now),
-        },
-  );
-}
 
 export interface GatewayBudgetSpend {
   insertDebit(rows: BudgetDebitRow[]): Promise<void>;

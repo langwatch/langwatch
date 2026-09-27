@@ -8,8 +8,8 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { PostgresVirtualKeyAdapter } from "../testing.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
+import { PostgresVirtualKeyAdapter } from "./testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";

@@ -167,6 +167,7 @@ const COUNT_SERIES = {
   metric: "metadata.trace_id",
   aggregation: "cardinality",
   name: "Traces",
+  colorSet: "colors",
 };
 const COUNT_KEY = buildSeriesName(COUNT_SERIES as never, 0);
 
@@ -180,6 +181,7 @@ function graphRow(overrides: Partial<CustomGraph> = {}): CustomGraph {
       graphId: "graph-1",
       graphType: "line",
       series: [COUNT_SERIES],
+      includePrevious: false,
       timeScale: 60,
     },
     ...overrides,
@@ -354,6 +356,36 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         "<strong>Spend per hour</strong> — 2",
         "<strong>Errors per hour</strong> — 2",
       ]);
+    });
+  });
+
+  describe("given a dashboard report with a panel whose stored graph does not parse", () => {
+    it("still sends the report with the panels that do", async () => {
+      const mail = new FakeMailGateway();
+      const trigger = makeTrigger({
+        source: { kind: "dashboard", dashboardId: "dashboard-1" },
+      });
+
+      await ReportDispatchService.create(
+        makeDeps({
+          trigger,
+          mail,
+          loadReportCharts: chartReader({
+            graphs: [
+              graphRow({ id: "graph-1", name: "Traces per hour" }),
+              graphRow({ id: "graph-broken", name: "Broken", graph: { graphType: "line" } }),
+            ],
+            timeseries: {
+              previousPeriod: [],
+              currentPeriod: [{ date: "2026-07-15T08:00:00Z", [COUNT_KEY]: 2 }],
+            },
+          }),
+        }),
+      ).dispatchScheduledReport(FIRE);
+
+      const html = mail.emails[0]?.html ?? "";
+      expect(html).toContain("<strong>Traces per hour</strong> — 2");
+      expect(html).not.toContain("Broken");
     });
   });
 

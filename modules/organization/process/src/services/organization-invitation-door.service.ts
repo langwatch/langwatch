@@ -139,6 +139,12 @@ export class OrganizationInvitationDoorService {
     return { invite: inviteOnWire(invite) };
   }
 
+  approvePaymentPending(
+    input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void> {
+    return this.deps.invitations.approvePaymentPending(input);
+  }
+
   async list(input: Readonly<{ organizationId: string }>): Promise<OrganizationListedInvite[]> {
     const invites = await this.deps.invitations.list(input);
     return invites.map((invite) => ({ ...invite, ...inviteOnWire(invite) }));

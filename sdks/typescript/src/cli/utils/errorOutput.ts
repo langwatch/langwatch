@@ -1,7 +1,7 @@
 import {
   handledErrorFromThrown,
   toCliErrorDocument,
-  type CliHandledError,
+  type LangWatchHandledErrorShape,
 } from "@langwatch/langy-contract/cards/handled-error";
 /**
  * Error output: prose for humans, JSON for machines.
@@ -40,12 +40,12 @@ export const disableOutputColor = (): void => {
  * Message scrubbed only (via redactSecrets); meta/kind/reasons are curated platform payload.
  * Asymmetry is deliberate: credentials leak via message prose, not via structured fields.
  */
-export const readCommandError = (error: unknown): CliHandledError => {
+export const readCommandError = (error: unknown): LangWatchHandledErrorShape => {
   const domain = handledErrorFromThrown(error);
   return { ...domain, message: redactSecrets(domain.message) };
 };
 
-const reasonDetailLines = (domain: CliHandledError): [string, string][] => {
+const reasonDetailLines = (domain: LangWatchHandledErrorShape): [string, string][] => {
   if (!domain.reasons?.length) {
     return [];
   }
@@ -65,7 +65,7 @@ const reasonDetailLines = (domain: CliHandledError): [string, string][] => {
 };
 
 /** `code` / `trace id` / meta keys, aligned into a dim block under `Details:`. */
-const detailLines = (domain: CliHandledError): string[] => {
+const detailLines = (domain: LangWatchHandledErrorShape): string[] => {
   const details: [string, string][] = [["code", domain.code]];
 
   if (domain.httpStatus > 0) {
@@ -103,7 +103,7 @@ const detailLines = (domain: CliHandledError): string[] => {
  * login here was minted with. Applied to both renderings, so a person and an
  * agent are told the same thing about why a 403 happened.
  */
-const withCliAdvice = (domain: CliHandledError): CliHandledError => {
+const withCliAdvice = (domain: LangWatchHandledErrorShape): LangWatchHandledErrorShape => {
   const enriched = withFallbackSuggestions(domain);
   const hint = loginPermissionsHint(enriched.code);
   if (!hint) return enriched;
@@ -114,7 +114,7 @@ const withCliAdvice = (domain: CliHandledError): CliHandledError => {
  * Human rendering: Error sentence, Details, Suggestions (platform or fallback), Docs.
  * Infrastructure failures print sentence only (no invented precision).
  */
-export const renderErrorForHumans = (domain: CliHandledError): string => {
+export const renderErrorForHumans = (domain: LangWatchHandledErrorShape): string => {
   if (!domain.isHandled) return domain.message;
 
   const enriched = withCliAdvice(domain);
@@ -134,7 +134,7 @@ export const renderErrorForHumans = (domain: CliHandledError): string => {
  * Machine rendering: JSON on stdout. Fallback suggestions filled even for unhandled errors
  * (isHandled: false signals code source); human gets sentence only (no invented precision).
  */
-export const renderErrorAsJson = (domain: CliHandledError): string =>
+export const renderErrorAsJson = (domain: LangWatchHandledErrorShape): string =>
   JSON.stringify(
     toCliErrorDocument(withCliAdvice(domain)),
     null,
@@ -149,7 +149,7 @@ export const renderErrorAsJson = (domain: CliHandledError): string =>
 export const commandValidationError = (
   message: string,
   meta: Record<string, unknown> = {},
-): CliHandledError & { isLangWatchHandledError: true } => ({
+): LangWatchHandledErrorShape & { isLangWatchHandledError: true } => ({
   isLangWatchHandledError: true,
   code: "validation_error",
   kind: "validation_error",
@@ -168,7 +168,7 @@ export const commandValidationError = (
 export const commandAuthError = (
   message: string,
   meta: Record<string, unknown> = {},
-): CliHandledError & { isLangWatchHandledError: true } => ({
+): LangWatchHandledErrorShape & { isLangWatchHandledError: true } => ({
   isLangWatchHandledError: true,
   code: "not_authenticated",
   kind: "not_authenticated",

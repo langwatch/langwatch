@@ -9,12 +9,12 @@ import {
 } from "@langwatch/trace-contract";
 
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
-} from "../projection/trace-summary-projection.repository.ts";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+} from "../trace-summary-projection.repository.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 

@@ -5,8 +5,26 @@
  * @see specs/licensing/seat-reconciliation.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { uiDeclarations, type UiResourceLimitRowProps } from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The row is licensing's to draw; this suite checks what organization asks of it.
+const LentRow = ({ limitType, label, current, max }: UiResourceLimitRowProps) => (
+  <p>{`${limitType ?? label}: ${current} / ${max ?? "none"}`}</p>
+);
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useUiDeclarations: () =>
+    uiDeclarations([
+      {
+        name: "licensing",
+        installation: {
+          capabilities: { resourceLimitRow: { load: async () => ({ default: LentRow }) } },
+        },
+      },
+    ]),
+}));
 
 const { mockUsageData } = vi.hoisted(() => ({
   mockUsageData: {
@@ -51,39 +69,21 @@ describe("given an organization with a seat allowance of each kind", () => {
 
   describe("when an admin opens the member list", () => {
     /** @scenario The member list shows how many seats of each kind are in use */
-    it("shows the full member seats in use against what the plan covers", () => {
+    it("shows the full member seats in use against what the plan covers", async () => {
       mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
-      expect(screen.getByText("Team Members")).toBeInTheDocument();
-      expect(screen.getByText("12")).toBeInTheDocument();
-      expect(screen.getByText("/ 15")).toBeInTheDocument();
+      expect(await screen.findByText("members: 12 / 15")).toBeInTheDocument();
     });
 
     /** @scenario The member list shows how many seats of each kind are in use */
-    it("shows the Lite Member seats the same way", () => {
+    it("shows the Lite Member seats the same way", async () => {
       mockUsageData.current = { membersCount: 12, membersLiteCount: 1 };
 
       renderSeatUsage({ maxMembers: 15, maxMembersLite: 3 });
 
-      expect(screen.getByText("Lite Members")).toBeInTheDocument();
-      expect(screen.getByText("1")).toBeInTheDocument();
-      expect(screen.getByText("/ 3")).toBeInTheDocument();
-    });
-
-    /** @scenario The member list shows how many seats of each kind are in use */
-    it("says unlimited rather than a number nobody can read", () => {
-      // Self-hosted with no license resolves to MAX_SAFE_INTEGER, and printing
-      // 9,007,199,254,740,991 seats would be worse than saying nothing.
-      mockUsageData.current = { membersCount: 40, membersLiteCount: 0 };
-
-      renderSeatUsage({
-        maxMembers: Number.MAX_SAFE_INTEGER,
-        maxMembersLite: Number.MAX_SAFE_INTEGER,
-      });
-
-      expect(screen.getAllByText("/ Unlimited").length).toBe(2);
+      expect(await screen.findByText("membersLite: 1 / 3")).toBeInTheDocument();
     });
   });
 

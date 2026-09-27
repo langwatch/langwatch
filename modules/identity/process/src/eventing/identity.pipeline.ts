@@ -17,7 +17,7 @@ import {
   BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE,
   BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS,
   BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
-  type BreakGlassExpiryWarnState,
+  breakGlassExpiryWarnStateSchema,
   breakGlassExpiryWarnSchema,
   breakGlassExpiryWarnWake,
 } from "./break-glass-expiry-warn.process.ts";
@@ -26,7 +26,7 @@ import {
   SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE,
   SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS,
   SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
-  type SsoDomainReproofSweepState,
+  ssoDomainReproofSweepStateSchema,
   ssoDomainReproofSweepSchema,
   ssoDomainReproofSweepWake,
 } from "./sso-domain-reproof-sweep.process.ts";
@@ -43,7 +43,7 @@ export const identityEventing = defineEventingModule({
       .withEvents([])
       .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
         pm
-          .state<BreakGlassExpiryWarnState>(BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)
+          .state(breakGlassExpiryWarnStateSchema, BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE)
           .schedule({ everyMs: BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS })
           .onWake(breakGlassExpiryWarnWake)
           .intent(
@@ -59,7 +59,7 @@ export const identityEventing = defineEventingModule({
       )
       .withProcessManager(SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME, (pm) =>
         pm
-          .state<SsoDomainReproofSweepState>(SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE)
+          .state(ssoDomainReproofSweepStateSchema, SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE)
           .schedule({ everyMs: SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS })
           .onWake(ssoDomainReproofSweepWake)
           .intent(

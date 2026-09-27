@@ -8,10 +8,11 @@ export const INGESTION_PULL_RECONCILE_CHECK_MS = 60 * 1000;
 
 export const ingestionPullReconcileSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface IngestionPullReconcileState {
+export const ingestionPullReconcileStateSchema = z.object({
   /** Epoch ms of the last reconciliation this process asked for. */
-  lastReconciledAt: number | null;
-}
+  lastReconciledAt: z.number().nullable(),
+});
+export type IngestionPullReconcileState = z.infer<typeof ingestionPullReconcileStateSchema>;
 
 export const INGESTION_PULL_RECONCILE_INITIAL_STATE: IngestionPullReconcileState = {
   lastReconciledAt: null,

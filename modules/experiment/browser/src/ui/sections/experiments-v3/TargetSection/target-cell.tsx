@@ -4,6 +4,7 @@ import { formatLatency } from "@langwatch/design-system/metric-value-formatters"
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEscapeKey } from "@langwatch/design-system/use-escape-key";
 import { describeCellFailure } from "@langwatch/experiment-browser-kit";
+import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -21,7 +22,6 @@ import { useCodeEvaluatorIds } from "../../../../behavior/experiments-v3/use-eva
 import { useOpenEvaluatorEditor } from "../../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetName } from "../../../../behavior/experiments-v3/use-target-name.ts";
 import { TraceIdPeek } from "../../../../behavior/lent-trace.tsx";
-import { evaluatorHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
 import type { EvaluatorConfig, TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { parseLLMError } from "../../../../model/format-llm-error.ts";

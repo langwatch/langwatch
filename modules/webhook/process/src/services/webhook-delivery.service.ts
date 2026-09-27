@@ -35,7 +35,7 @@ import {
   type SendBatchPayload,
   type SettleSpendCommandData,
   type WebhookDeliveryEndpointService,
-  type WebhookDeliveryState,
+  webhookDeliveryStateSchema,
   type WebhookDispatchResult,
 } from "../rules/webhook-delivery-contract.rules.ts";
 import {
@@ -90,7 +90,8 @@ export interface WebhookDeliveryProcessDeps {
     body: string;
     batchId: string;
     attempt: number;
-    signingSecrets: string[];
+    signingSecrets: readonly string[];
+    isTestFire?: boolean;
   }) => Promise<WebhookDispatchResult>;
   /** Resolves the org's active plan for the enterprise gate. */
   getPlan: (organizationId: string) => Promise<{ webhookEndpointsEnabled?: boolean }>;
@@ -152,7 +153,7 @@ export class WebhookDeliveryService {
   processManager(): ProcessManagerApplier<WebhookSpendDeliveryRequestedEvent> {
     return (process) =>
       process
-        .state<WebhookDeliveryState>(INITIAL_WEBHOOK_DELIVERY_STATE)
+        .state(webhookDeliveryStateSchema, INITIAL_WEBHOOK_DELIVERY_STATE)
         .intent("deliver", deliverSchema, this.runDeliver())
         .intent("flushEndpoint", flushEndpointSchema, this.runFlushEndpoint())
         .intent("sendBatch", sendBatchSchema, this.runWebhookSendBatch())
@@ -239,6 +240,7 @@ export class WebhookDeliveryService {
         batchId: request.batchId,
         attempt: request.attempt,
         signingSecrets: request.signingSecrets,
+        ...(request.isTestFire ? { isTestFire: true } : {}),
       });
     };
   }

@@ -14,6 +14,7 @@ import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate
 import { MemoryNurturingProfileRepository } from "./memory.nurturing-profile.repository.ts";
 import { MemoryOrganizationPricingRepository } from "./memory.organization-pricing.repository.ts";
 import { MemoryProjectActiveDayRepository } from "./memory.project-active-day.repository.ts";
+import { MemoryScenarioRunMilestoneClaimRepository } from "./memory.scenario-run-milestone-claim.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
 import { MemoryBillingTenantOrganizationRepository } from "./memory.tenant-organization.repository.ts";
 
@@ -39,6 +40,7 @@ export class MemoryBillingRepositories {
       organizationPricing: MemoryOrganizationPricingRepository.create(store),
       projectActiveDays: MemoryProjectActiveDayRepository.create(),
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
+      scenarioRunMilestoneClaims: MemoryScenarioRunMilestoneClaimRepository.create(),
       subscriptions,
       tenantOrganizations: MemoryBillingTenantOrganizationRepository.create(store),
       webhookOrganizations: MemoryBillingWebhookOrganizationRepository.create(store),

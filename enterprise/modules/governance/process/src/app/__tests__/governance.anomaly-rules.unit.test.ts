@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * The console's anomaly-rule ops over memory rows: main's Enterprise gate is a
- * per-organization refusal here, and a bad config reads as main's handled complaint.
- */
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -16,10 +11,18 @@ import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The console's anomaly-rule ops over memory rows: main's Enterprise gate is a
+ * per-organization refusal here, and a bad config reads as main's handled complaint.
+ */
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -70,10 +73,13 @@ async function buildApp(planType: string) {
       modelProviders: createApiFixture<ModelProviderApi>(),
       users: createApiFixture<UserApi>(),
       auditLog: createApiFixture<AuditLogApi>(),
+      logs: createApiFixture<LogApi>(),
+      metrics: createApiFixture<MetricApi>(),
     },
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
+      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

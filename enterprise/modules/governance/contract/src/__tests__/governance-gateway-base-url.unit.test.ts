@@ -10,6 +10,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayPublicUrl: "https://gw.example",
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
+          ingestRateLimitDisabled: false,
         },
         isSaas: false,
       }),
@@ -23,6 +24,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           gatewayPublicUrl: undefined,
           gatewayInternalUrl: undefined,
           gatewayLegacyUrl: "https://old.example",
+          ingestRateLimitDisabled: false,
         },
         isSaas: false,
       }),
@@ -34,6 +36,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
       gatewayPublicUrl: undefined,
       gatewayInternalUrl: undefined,
       gatewayLegacyUrl: undefined,
+      ingestRateLimitDisabled: false,
     };
 
     expect(governanceGatewayBaseUrl({ config: unset, isSaas: true })).toBe(

@@ -1,7 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
-import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import {
+  DEFAULT_PARTITION_WINDOW_MS,
+  queryWindowed,
+  RetentionFloorService,
+} from "@langwatch/clickhouse-client";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -59,35 +63,13 @@ import {
   applyTraceProtections,
   extractRedactionsForObject,
 } from "../../rules/trace-read-redaction.rules.ts";
-import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
-import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
+import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service.ts";
 import {
-  TraceOffloadResolutionService,
-  type ResolvedTraceSpans,
-} from "../../services/trace-offload-resolution.service.ts";
-import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
-import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
+  TraceLegacyReadRepository,
+  type ResolveTraceSpansBatchFn,
+  type ResolveTraceSpansFn,
+} from "../trace-legacy-read.repository.ts";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
-
-/**
- * Callback injected from TraceService that resolves offloaded blob refs for
- * a single trace's normalized spans (ADR-021 decision B: read-time recompute).
- * When present, called after fetching spans but before mapping to legacy Span.
- */
-export type ResolveTraceSpansFn = (
-  projectId: string,
-  normalizedSpans: NormalizedSpan[],
-) => Promise<ResolvedTraceSpans>;
-
-/**
- * Resolves offloaded blob refs for a whole result set in one bounded pass, so a bulk read
- * (getTracesWithSpans, enrichTracesWithSpans) streams event_log reads instead of fanning out
- * per trace. Falls back to {@link ResolveTraceSpansFn} when absent.
- */
-export type ResolveTraceSpansBatchFn = (
-  projectId: string,
-  spansPerTrace: NormalizedSpan[][],
-) => Promise<ResolvedTraceSpans[]>;
 
 /**
  * Cursor structure for keyset pagination.
@@ -291,37 +273,6 @@ export type TraceLegacyFilterConditions = (
   hasUnsupportedFilters: boolean;
 };
 
-/**
- * Restores offloaded spans from blob store using ADR-022 semantics.
- */
-class OffloadedSpanResolver {
-  constructor(private readonly deps: BlobResolutionDeps) {}
-
-  toResolverFn(): ResolveTraceSpansFn {
-    return (projectId, normalizedSpans) =>
-      TraceOffloadResolutionService.resolveOffloadedTraces({
-        projectId,
-        normalizedSpans,
-        blobStore: this.deps.blobStore,
-        ioExtractionService: this.deps.ioExtractionService,
-        logger: offloadResolutionLogger,
-      });
-  }
-
-  toBatchResolverFn(): ResolveTraceSpansBatchFn {
-    return (projectId, spansPerTrace) =>
-      TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
-        projectId,
-        spansPerTrace,
-        blobStore: this.deps.blobStore,
-        ioExtractionService: this.deps.ioExtractionService,
-        logger: offloadResolutionLogger,
-      });
-  }
-}
-
-const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
-
 /** What a composition root gives the legacy trace read over ClickHouse. */
 export interface ClickHouseTraceLegacyReadOptions {
   traceCanonicalisation: TraceCanonicalisationService;
@@ -329,14 +280,14 @@ export interface ClickHouseTraceLegacyReadOptions {
   resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
   /** The analytics filter translator; absent, a FILTERED list refuses. */
   filterConditions?: TraceLegacyFilterConditions | undefined;
-  blobResolutionDeps?: BlobResolutionDeps;
-  retentionResolver?: DataRetentionApi;
-  annotationService?: AnnotationApi;
-  /** The same peer as `annotationService`, under the name the class field uses. */
-  annotations?: AnnotationApi;
-  /** Supplied directly instead of `blobResolutionDeps`, which builds these. */
-  resolveTraceSpans?: ResolveTraceSpansFn;
-  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
+  resolveTraceSpans?: ResolveTraceSpansFn | undefined;
+  resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
+  /**
+   * Widens the span read's retention floor to the tenant's own policy. Absent, the floor stays
+   * at the platform default, which still bounds every read.
+   */
+  retentionFloor?: RetentionFloorService | undefined;
+  annotations?: AnnotationApi | undefined;
 }
 
 function mergeFilterWhere({
@@ -670,57 +621,24 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly annotations: AnnotationApi | undefined;
   private readonly traceCanonicalisation: TraceCanonicalisationService;
 
-  constructor({
-    resolveClickHouseClient,
-    filterConditions,
-    resolveTraceSpans,
-    resolveTraceSpansBatch,
-    retentionResolver,
-    annotations,
-    traceCanonicalisation,
-  }: {
-    resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
-    filterConditions?: TraceLegacyFilterConditions | undefined;
-    resolveTraceSpans?: ResolveTraceSpansFn;
-    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
-    /**
-     * Widens the span read's retention floor to this tenant's own policy.
-     * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
-     */
-    retentionResolver?: DataRetentionApi;
-    annotations?: AnnotationApi;
-    traceCanonicalisation: TraceCanonicalisationService;
-  }) {
+  private readonly retentionFloor: RetentionFloorService;
+
+  constructor(options: ClickHouseTraceLegacyReadOptions) {
     super();
-    this.resolveClickHouseClient = resolveClickHouseClient;
-    this.filterConditions = filterConditions;
-    this.annotations = annotations;
-    this.traceCanonicalisation = traceCanonicalisation;
-    this.resolveTraceSpans = resolveTraceSpans;
-    this.resolveTraceSpansBatch = resolveTraceSpansBatch;
-    this.retentionFloor = TraceRetentionFloorService.create(retentionResolver);
+    this.resolveClickHouseClient = options.resolveClickHouseClient;
+    this.filterConditions = options.filterConditions;
+    this.annotations = options.annotations;
+    this.traceCanonicalisation = options.traceCanonicalisation;
+    this.resolveTraceSpans = options.resolveTraceSpans;
+    this.resolveTraceSpansBatch = options.resolveTraceSpansBatch;
+    this.retentionFloor =
+      options.retentionFloor ??
+      new RetentionFloorService({ defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS });
   }
 
-  /** Builds the repository with offloaded-span resolvers from options. */
   static create(options: ClickHouseTraceLegacyReadOptions): TraceLegacyReadClickHouseRepository {
-    const offloadedSpanResolver =
-      options.blobResolutionDeps !== undefined
-        ? new OffloadedSpanResolver(options.blobResolutionDeps)
-        : undefined;
-
-    return new TraceLegacyReadClickHouseRepository({
-      resolveClickHouseClient: options.resolveClickHouseClient,
-      filterConditions: options.filterConditions,
-      resolveTraceSpans: options.resolveTraceSpans ?? offloadedSpanResolver?.toResolverFn(),
-      resolveTraceSpansBatch:
-        options.resolveTraceSpansBatch ?? offloadedSpanResolver?.toBatchResolverFn(),
-      retentionResolver: options.retentionResolver,
-      annotations: options.annotations ?? options.annotationService,
-      traceCanonicalisation: options.traceCanonicalisation,
-    });
+    return new TraceLegacyReadClickHouseRepository(options);
   }
-
-  private readonly retentionFloor: ReturnType<typeof TraceRetentionFloorService.create>;
 
   /**
    * Resolve the ClickHouse client for a given project.

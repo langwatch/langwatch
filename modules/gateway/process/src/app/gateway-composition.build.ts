@@ -11,15 +11,31 @@ import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/cl
 import { ClickHouseGatewayPrincipalSpendRepository } from "../repositories/clickhouse/clickhouse.gateway-principal-spend.repository.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
+import {
+  PrismaGatewayBudgetRepository,
+  type GatewayBudgetDatabase,
+} from "../repositories/prisma/prisma.gateway-budget.repository.ts";
+import {
+  PrismaGatewayCacheRuleRepository,
+  type GatewayCacheRuleDatabase,
+} from "../repositories/prisma/prisma.gateway-cache-rule.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
+import {
+  PrismaGatewayGuardrailRepository,
+  type GatewayGuardrailDatabase,
+} from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
 import { PrismaGatewayOrganizationDirectoryRepository } from "../repositories/prisma/prisma.gateway-organization-directory.repository.ts";
 import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { PrismaGatewayTransactionRepository } from "../repositories/prisma/prisma.gateway-transaction.repository.ts";
 import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
 import { PrismaVirtualKeyAuthorizationRepository } from "../repositories/prisma/prisma.virtual-key-authorization.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-budgets.service.ts";
+import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
+import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
+import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import {
   GatewayScopeResolutionService,
   type GatewayPlatformProviders,
@@ -27,6 +43,7 @@ import {
 import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { GatewayUsageService } from "../services/gateway-usage.service.ts";
 import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
+import { GatewayService } from "../services/gateway.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
 import type {
   MembershipSet,
@@ -42,9 +59,10 @@ import type {
   GatewayGovernanceSignals,
   GatewayPermissionScope,
   GatewayScopePermissions,
+  GatewayAudit,
+  GatewayBudgetSpend,
+  GatewayChangeEvents,
 } from "./gateway.members.ts";
-import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.ts";
-import { PrismaGatewayAdapter } from "./prisma.gateway.composition.ts";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -204,7 +222,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
   });
   const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const virtualKeys = VirtualKeyService.create({
-    transactions: PrismaGatewayTransactionAdapter.create({ database: prisma }),
+    transactions: PrismaGatewayTransactionRepository.create({ database: prisma }),
     keyBudgets: PrismaGatewayKeyBudgetRepository.create({ database: prisma }),
     scopeResolution,
     projects,
@@ -496,4 +514,78 @@ function membershipForProjectCredential(project: ProjectIdentity): MembershipSet
 function authzScopeOf(scope: GatewayPermissionScope) {
   if (scope.type === "org") return { organizationId: scope.id };
   return scope.type === "team" ? { teamId: scope.id } : { projectId: scope.id };
+}
+
+/**
+ * Everything Gateway persistence touches, as the three private repositories
+ * declare it — a composed slice, not the generated client, so this file
+ * (and every layer above it) names no generated declaration at all.
+ */
+export type GatewayPersistence = GatewayBudgetDatabase &
+  GatewayCacheRuleDatabase &
+  GatewayGuardrailDatabase;
+
+/** Composes Gateway's one process-owned service from private persistence adapters. */
+export class PrismaGatewayAdapter {
+  private constructor(private readonly service: GatewayService) {}
+
+  static create(options: {
+    database: GatewayPersistence;
+    projects: ProjectApi;
+    evaluators: EvaluatorApi;
+    monitors: MonitorApi;
+    changes: GatewayChangeEvents;
+    audit: GatewayAudit;
+    budgetSpend?: GatewayBudgetSpend;
+  }): PrismaGatewayAdapter {
+    const budgetRepository = PrismaGatewayBudgetRepository.create(
+      options.database,
+      options.budgetSpend,
+    );
+    const cacheRules = GatewayCacheRuleService.create(
+      PrismaGatewayCacheRuleRepository.create({
+        database: options.database,
+        changes: options.changes,
+        audit: options.audit,
+      }),
+    );
+    const guardrails = GatewayGuardrailService.create({
+      repository: PrismaGatewayGuardrailRepository.create(options.database),
+      evaluators: options.evaluators,
+      monitors: options.monitors,
+      projects: options.projects,
+      audit: options.audit,
+    });
+    return new PrismaGatewayAdapter(
+      GatewayService.create({
+        repository: budgetRepository,
+        projects: options.projects,
+        cacheRules,
+        guardrails,
+      }),
+    );
+  }
+
+  build(): GatewayService {
+    return this.service;
+  }
+}
+
+/**
+ * The composition seam for end-user caps: wires PrismaClient and the spend
+ * port here, keeping the Prisma repository private (`private-runtime-export`).
+ */
+
+export class GatewayEndUserCapsAdapter {
+  private constructor() {}
+
+  static create(options: {
+    database: GatewayBudgetDatabase;
+    spend: GatewayBudgetSpend;
+  }): GatewayEndUserCapsService {
+    return GatewayEndUserCapsService.create({
+      budgets: PrismaGatewayBudgetRepository.create(options.database, options.spend),
+      spend: options.spend,
+    });
+  }
 }

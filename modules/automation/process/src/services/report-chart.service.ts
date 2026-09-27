@@ -3,6 +3,8 @@ import type {
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import type { CustomGraph, ReportChart, ReportSource } from "@langwatch/automation-contract";
+import { customGraphInputSchema, type CustomGraphInput } from "@langwatch/dashboard-contract";
+import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 
 import {
@@ -12,8 +14,9 @@ import {
   pieChartOf,
   seriesInputsOf,
   trendChartOf,
-  type ReportGraphInput,
 } from "../rules/report-chart.rules.ts";
+
+const logger = createLogger("langwatch:automation:report-chart");
 
 /** Minutes per bucket at or above which a bucket is a whole day. */
 const DAY_SCALE_MINUTES = 1440;
@@ -28,7 +31,7 @@ function formatBucketLabel({
   timeScale,
 }: {
   date: string;
-  timeScale: ReportGraphInput["timeScale"];
+  timeScale: CustomGraphInput["timeScale"];
 }): string {
   const epochMs = toEpochMs(date);
   if (Number.isNaN(epochMs)) {
@@ -115,9 +118,10 @@ export class ReportChartService {
     // Panels are independent queries, so overlap them rather than paying eight
     // round-trips in series — but under a concurrency cap (ADR-044 §5) so a large
     // dashboard doesn't fire every panel's heavy ClickHouse query at once.
-    return mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
+    const charts = await mapWithConcurrency(graphs, REPORT_CHART_QUERY_CONCURRENCY, (graph) =>
       buildChart({ deps, graph, projectId, from, to }),
     );
+    return charts.flat();
   }
 }
 
@@ -161,13 +165,21 @@ async function buildChart({
   projectId: string;
   from: number;
   to: number;
-}): Promise<ReportChart> {
-  const graphData = graph.graph as unknown as ReportGraphInput;
+}): Promise<ReportChart[]> {
+  const parsed = customGraphInputSchema.safeParse(graph.graph);
+  if (!parsed.success) {
+    logger.warn(
+      { customGraphId: graph.id, projectId },
+      "stored graph does not parse as a chart; leaving it out of the report",
+    );
+    return [];
+  }
+  const graphData = parsed.data;
   const type = chartTypeOf(graphData.graphType);
   const seriesInputs = seriesInputsOf(graphData);
   const empty = emptyChartOf({ graph, type });
   if (seriesInputs.length === 0) {
-    return empty;
+    return [empty];
   }
 
   const timeseries = await deps.getTimeseries({
@@ -185,16 +197,16 @@ async function buildChart({
 
   const buckets = timeseries.currentPeriod;
   if (buckets.length === 0) {
-    return empty;
+    return [empty];
   }
 
   const bucketKeys = bucketKeysOf(seriesInputs);
   if (type === "pie") {
-    return pieChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData });
+    return [pieChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData })];
   }
 
   const timeScale = graphData.timeScale ?? 60;
   const categories = buckets.map((bucket) => formatBucketLabel({ date: bucket.date, timeScale }));
 
-  return trendChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData, categories });
+  return [trendChartOf({ empty, buckets, bucketKeys, seriesInputs, graphData, categories })];
 }

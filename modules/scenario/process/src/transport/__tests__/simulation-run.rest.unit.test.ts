@@ -287,4 +287,37 @@ describe("the simulation-runs REST declaration", () => {
       );
     });
   });
+
+  describe("when a listed run carries its set and per-role figures", () => {
+    /** @scenario "A simulation run answers with the scenario set and per-role figures it was recorded with" */
+    it("keeps scenarioSetId, roleCosts and roleLatencies on the run", async () => {
+      const family = await buildSimulationRunsFamily({
+        getRunDataForBatchRun: async () => ({
+          changed: true as const,
+          lastUpdatedAt: 2,
+          runs: [
+            {
+              ...run("run-a", "batch-a"),
+              scenarioSetId: "set-a",
+              roleCosts: { agent: [0.01] },
+              roleLatencies: { agent: [120] },
+            },
+          ],
+        }),
+      });
+
+      const response = await family.request("/api/simulation-runs?batchRunId=batch-a");
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        runs: [
+          {
+            scenarioRunId: "run-a",
+            scenarioSetId: "set-a",
+            roleCosts: { agent: [0.01] },
+            roleLatencies: { agent: [120] },
+          },
+        ],
+      });
+    });
+  });
 });

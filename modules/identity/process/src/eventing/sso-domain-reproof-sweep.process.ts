@@ -10,9 +10,10 @@ export const ssoDomainReproofSweepSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface SsoDomainReproofSweepState {
-  lastSweepAt: number | null;
-}
+export const ssoDomainReproofSweepStateSchema = z.object({
+  lastSweepAt: z.number().nullable(),
+});
+export type SsoDomainReproofSweepState = z.infer<typeof ssoDomainReproofSweepStateSchema>;
 
 export const SSO_DOMAIN_REPROOF_SWEEP_INITIAL_STATE: SsoDomainReproofSweepState = {
   lastSweepAt: null,

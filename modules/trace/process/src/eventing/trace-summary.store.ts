@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/eventing";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 
-import type { TraceSummaryProjectionRepository } from "../repositories/projection/trace-summary-projection.repository.ts";
+import type { TraceSummaryProjectionRepository } from "../repositories/trace-summary-projection.repository.ts";
 
 /**
  * Thin FoldProjectionStore adapter for trace summaries. Delegates directly to

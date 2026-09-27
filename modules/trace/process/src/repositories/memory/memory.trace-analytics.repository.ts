@@ -2,7 +2,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
-} from "../projection/trace-analytics-projection.repository.ts";
+} from "../trace-analytics-projection.repository.ts";
 
 /**
  * The trace_analytics twin for a process with no ClickHouse. It keeps the last

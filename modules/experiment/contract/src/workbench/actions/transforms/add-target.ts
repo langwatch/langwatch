@@ -1,12 +1,15 @@
+import { generate } from "@langwatch/ksuid";
 import type { Field } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
 
 import type { TargetConfig } from "../../../experiment-workbench.ts";
 import { inferAllEvaluatorMappings, inferAllTargetMappings } from "../../mapping-inference.ts";
 import { type AddTargetPayload, addTargetPayloadSchema } from "../schemas.ts";
 import { type Transform, TransformError, type WorkbenchState } from "./types.ts";
 
-export const newTargetId = (): string => `target-${nanoid(8)}`;
+/** The KSUID resource a new workbench target id is minted under; stored ids stay opaque. */
+const TARGET_KSUID_RESOURCE = "target";
+
+export const newTargetId = (): string => generate(TARGET_KSUID_RESOURCE).toString();
 
 /**
  * Append a target and wire it up.

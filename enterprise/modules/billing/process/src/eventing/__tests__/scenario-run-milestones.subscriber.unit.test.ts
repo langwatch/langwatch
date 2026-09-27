@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
 import { MemoryProjectActiveDayRepository } from "../../repositories/memory/memory.project-active-day.repository.ts";
+import { MemoryScenarioRunMilestoneClaimRepository } from "../../repositories/memory/memory.scenario-run-milestone-claim.repository.ts";
 import { ProjectActiveDayTrackerService } from "../../services/project-active-day-tracker.service.ts";
 import {
   createScenarioRunMilestonesSubscriber,
@@ -71,6 +72,7 @@ function createDeps(
       resolution && { ...resolution, onboardingVariant: "classic", organizationCreatedAt: null },
     posthog,
     activeDayTracker,
+    milestoneClaims: MemoryScenarioRunMilestoneClaimRepository.create(),
   };
 }
 

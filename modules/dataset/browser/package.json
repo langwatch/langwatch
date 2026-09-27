@@ -23,11 +23,6 @@
       "types": "./dist/dataset-picker-list.d.ts",
       "default": "./src/dataset-picker-list.ts"
     },
-    "./dataset-editor-table": {
-      "langwatch-declaration-source": "./src/dataset-editor-table.ts",
-      "types": "./dist/dataset-editor-table.d.ts",
-      "default": "./src/dataset-editor-table.ts"
-    },
     "./dataset-record-sync": {
       "langwatch-declaration-source": "./src/dataset-record-sync.ts",
       "types": "./dist/dataset-record-sync.d.ts",

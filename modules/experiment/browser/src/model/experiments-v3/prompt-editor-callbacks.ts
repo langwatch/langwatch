@@ -34,12 +34,12 @@ export type CreatePromptEditorCallbacksParams = {
       }[];
     },
   ) => void;
-  setTargetMapping: (
-    targetId: string,
-    datasetId: string,
-    inputIdentifier: string,
-    mapping: StoreFieldMapping,
-  ) => void;
+  setTargetMapping: (args: {
+    targetId: string;
+    datasetId: string;
+    inputField: string;
+    mapping: StoreFieldMapping;
+  }) => void;
   removeTargetMapping: (targetId: string, datasetId: string, inputIdentifier: string) => void;
   getActiveDatasetId: () => string;
   getDatasets: () => { id: string }[];
@@ -135,12 +135,12 @@ export const createPromptEditorCallbacks = ({
       currentDatasets.some((d) => d.id === sourceId);
 
     if (mapping) {
-      setTargetMapping(
+      setTargetMapping({
         targetId,
-        currentActiveDatasetId,
-        identifier,
-        convertFromUIMapping(mapping, checkIsDatasetSource),
-      );
+        datasetId: currentActiveDatasetId,
+        inputField: identifier,
+        mapping: convertFromUIMapping(mapping, checkIsDatasetSource),
+      });
     } else {
       removeTargetMapping(targetId, currentActiveDatasetId, identifier);
     }

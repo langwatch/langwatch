@@ -400,6 +400,11 @@ interface JsonWorkerWithLanguageOps {
   >;
 }
 
+/** Whether the running worker carries the completion or hover operation its types omit. */
+function exposesLanguageOps(worker: object): worker is JsonWorkerWithLanguageOps {
+  return "doComplete" in worker || "doHover" in worker;
+}
+
 interface JsonCompletionItem {
   label: string;
   kind?: number;
@@ -485,8 +490,8 @@ function registerJsonBridgeCompletion(monaco: Monaco): void {
       if (!shadowModel) return null;
 
       const workerGetter = await monaco.languages.json.getWorker();
-      const worker = (await workerGetter(shadowResource)) as unknown as JsonWorkerWithLanguageOps;
-      if (!worker.doComplete) return null;
+      const worker = await workerGetter(shadowResource);
+      if (!exposesLanguageOps(worker) || !worker.doComplete) return null;
 
       const result = await worker.doComplete(shadowResource.toString(), {
         line: position.lineNumber - 1,
@@ -522,8 +527,8 @@ function registerJsonBridgeHover(monaco: Monaco): void {
       const shadowResource = monaco.Uri.parse(shadowUri);
 
       const workerGetter = await monaco.languages.json.getWorker();
-      const worker = (await workerGetter(shadowResource)) as unknown as JsonWorkerWithLanguageOps;
-      if (!worker.doHover) return null;
+      const worker = await workerGetter(shadowResource);
+      if (!exposesLanguageOps(worker) || !worker.doHover) return null;
 
       const result = await worker.doHover(shadowResource.toString(), {
         line: position.lineNumber - 1,

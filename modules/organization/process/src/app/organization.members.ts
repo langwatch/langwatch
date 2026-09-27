@@ -298,6 +298,9 @@ export interface OrganizationInvitations {
   extend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): Promise<Readonly<{ invite: OrganizationInvite }>>;
+  approvePaymentPending(
+    input: Readonly<{ subscriptionId: string; organizationId: string }>,
+  ): Promise<void>;
   list(
     input: Readonly<{ organizationId: string }>,
   ): Promise<

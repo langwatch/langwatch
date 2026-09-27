@@ -213,25 +213,7 @@ function ProjectEditDrawer({
 
   useEffect(() => {
     if (!project) return;
-    setForm({
-      name: project.name,
-      slug: project.slug,
-      language: project.language ?? "",
-      framework: project.framework ?? "",
-      firstMessage: !!project.firstMessage,
-      integrated: !!project.integrated,
-      userLinkTemplate: project.userLinkTemplate ?? "",
-      traceSharingEnabled: !!project.traceSharingEnabled,
-      // S3 credentials are write-only: the server strips them from
-      // read payloads (see the Ops admin transport), so the form always
-      // starts empty. Typing a value replaces the stored secret;
-      // leaving it blank keeps the current one untouched.
-      s3Endpoint: "",
-      s3AccessKeyId: "",
-      s3SecretAccessKey: "",
-      s3Bucket: "",
-      archive: !!project.archivedAt,
-    });
+    setForm(formFromProject(project));
   }, [project]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -239,30 +221,7 @@ function ProjectEditDrawer({
 
   const handleSave = () => {
     if (!project || !form) return;
-    const data: Record<string, unknown> = {};
-
-    if (form.name !== project.name) data.name = form.name;
-    if (form.slug !== project.slug) data.slug = form.slug;
-    if (form.language !== (project.language ?? "")) data.language = form.language;
-    if (form.framework !== (project.framework ?? "")) data.framework = form.framework;
-    if (form.firstMessage !== !!project.firstMessage) data.firstMessage = form.firstMessage;
-    if (form.integrated !== !!project.integrated) data.integrated = form.integrated;
-    if (form.userLinkTemplate !== (project.userLinkTemplate ?? ""))
-      data.userLinkTemplate = nullIfEmpty(form.userLinkTemplate);
-    if (form.traceSharingEnabled !== !!project.traceSharingEnabled)
-      data.traceSharingEnabled = form.traceSharingEnabled;
-    // Write-only credentials — only forward fields the user typed into;
-    // an empty input means "leave the stored secret alone". Nothing we
-    // received from the server can be compared against because the
-    // server never sends these fields back.
-    if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
-    if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
-    if (form.s3SecretAccessKey.trim() !== "") data.s3SecretAccessKey = form.s3SecretAccessKey;
-    if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
-    const currentlyArchived = !!project.archivedAt;
-    if (form.archive !== currentlyArchived) {
-      data.archivedAt = form.archive ? toDate(nowInstant()).toISOString() : null;
-    }
+    const data = projectChanges({ project, form });
 
     if (Object.keys(data).length === 0) {
       onClose();
@@ -493,4 +452,62 @@ function ToggleRow({
       </HStack>
     </Field.Root>
   );
+}
+
+/** The edit form, filled from a stored project. */
+function formFromProject(project: AdminProject): FormState {
+  return {
+    name: project.name,
+    slug: project.slug,
+    language: project.language ?? "",
+    framework: project.framework ?? "",
+    firstMessage: !!project.firstMessage,
+    integrated: !!project.integrated,
+    userLinkTemplate: project.userLinkTemplate ?? "",
+    traceSharingEnabled: !!project.traceSharingEnabled,
+    // S3 credentials are write-only: the server strips them from
+    // read payloads (see the Ops admin transport), so the form always
+    // starts empty. Typing a value replaces the stored secret;
+    // leaving it blank keeps the current one untouched.
+    s3Endpoint: "",
+    s3AccessKeyId: "",
+    s3SecretAccessKey: "",
+    s3Bucket: "",
+    archive: !!project.archivedAt,
+  };
+}
+
+/** Only the fields the operator changed, as the admin write receives them. */
+function projectChanges({
+  project,
+  form,
+}: {
+  project: AdminProject;
+  form: FormState;
+}): Record<string, unknown> {
+  const data: Record<string, unknown> = {};
+
+  if (form.name !== project.name) data.name = form.name;
+  if (form.slug !== project.slug) data.slug = form.slug;
+  if (form.language !== (project.language ?? "")) data.language = form.language;
+  if (form.framework !== (project.framework ?? "")) data.framework = form.framework;
+  if (form.firstMessage !== !!project.firstMessage) data.firstMessage = form.firstMessage;
+  if (form.integrated !== !!project.integrated) data.integrated = form.integrated;
+  if (form.userLinkTemplate !== (project.userLinkTemplate ?? ""))
+    data.userLinkTemplate = nullIfEmpty(form.userLinkTemplate);
+  if (form.traceSharingEnabled !== !!project.traceSharingEnabled)
+    data.traceSharingEnabled = form.traceSharingEnabled;
+  // Write-only credentials — only forward fields the user typed into;
+  // an empty input means "leave the stored secret alone". Nothing we
+  // received from the server can be compared against because the
+  // server never sends these fields back.
+  if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
+  if (form.s3AccessKeyId.trim() !== "") data.s3AccessKeyId = form.s3AccessKeyId;
+  if (form.s3SecretAccessKey.trim() !== "") data.s3SecretAccessKey = form.s3SecretAccessKey;
+  if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
+  const currentlyArchived = !!project.archivedAt;
+  if (form.archive !== currentlyArchived) {
+    data.archivedAt = form.archive ? toDate(nowInstant()).toISOString() : null;
+  }
+  return data;
 }

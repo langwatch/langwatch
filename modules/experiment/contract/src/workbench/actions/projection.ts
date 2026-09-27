@@ -371,7 +371,12 @@ const projectResults = ({
   runId: results.runId,
   status: results.status,
   targets: state.targets.map((target) => {
-    const aggregate = computeTargetAggregates(target.id, results, state.evaluators, activeRowCount);
+    const aggregate = computeTargetAggregates({
+      targetId: target.id,
+      results,
+      evaluators: state.evaluators,
+      rowCount: activeRowCount,
+    });
     const errorTypes = sampleErrorTypes({
       results,
       targetId: target.id,

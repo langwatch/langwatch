@@ -30,6 +30,7 @@ import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
 import { createLangyLocalControlWebSocketProtocol } from "./transport/langy-local-control.ws.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsRest } from "./transport/langy-turns.rest.ts";
+import { langyUiActionsRest } from "./transport/langy-ui-actions.rest.ts";
 import { langyEgressTrpcTransport, langyTrpcTransport } from "./transport/langy.trpc.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
@@ -82,12 +83,12 @@ export function createLangySessionKeyReap(options: {
   });
 }
 
-// The UI-action REST family is unconverted: see .claude/handoffs/apidiff-parity-langy.md.
 export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
   .withTransports(
     langyTurnsRest,
+    langyUiActionsRest,
     langyInternalRest,
     langyLocalRest,
     langyLocalControlRest,

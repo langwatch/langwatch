@@ -10,10 +10,11 @@ import { buildIntentHandlers } from "../processRuntime.ts";
 describe("buildIntentHandlers", () => {
   describe("given a leased delivery", () => {
     it("tells the intent's executor when the lease lapses, so paid work can bound itself", async () => {
-      const run = vi.fn(async (_payload: { id: string }, _context: IntentContext) => {});
+      const run = vi.fn(async (_payload: unknown, _context: IntentContext) => {});
       const config: ProcessManagerDefinition["config"] = {
         name: "leased",
         state: {},
+        stateSchema: z.object({}),
         handlers: {},
         eventTypes: [],
         intents: { judge: { schema: z.object({ id: z.string() }), run } },

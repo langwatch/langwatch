@@ -33,7 +33,7 @@ vi.mock("../../../behavior/dataset-api.ts", () => ({
 
 // Render only the chrome (headerActions): the grid has its own suites, and
 // mounting it here would drag the whole editor into a test about the gate.
-vi.mock("../../../ui/sections/dataset-editor-table.tsx", () => ({
+vi.mock("../../../ui/sections/datasets/editor/dataset-editor-table.tsx", () => ({
   DatasetEditorTable: ({ headerActions }: { headerActions?: ReactNode }) => (
     <div data-testid="dataset-editor-table">{headerActions}</div>
   ),

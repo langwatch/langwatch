@@ -1362,7 +1362,9 @@ function handlerArguments<Api>({
     files: route.multipart
       ? (context.get(ROUTE_FILES) as Readonly<Record<string, File>>)
       : undefined,
-    response: route.response ? producerFor(route.response.kind) : undefined,
+    response: route.response
+      ? producerFor({ kind: route.response.kind, accept: context.req.header("Accept") ?? "" })
+      : undefined,
   };
 }
 

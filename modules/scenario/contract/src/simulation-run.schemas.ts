@@ -10,6 +10,7 @@ export const scenarioRunRestResponseSchema = z.object({
   scenarioId: z.string(),
   batchRunId: z.string(),
   scenarioRunId: z.string(),
+  scenarioSetId: z.string().optional(),
   name: z.string().nullable(),
   description: z.string().nullable(),
   status: z.string(),
@@ -56,6 +57,8 @@ export const scenarioRunRestResponseSchema = z.object({
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+  roleCosts: z.record(z.string(), z.array(z.number())).optional(),
+  roleLatencies: z.record(z.string(), z.array(z.number())).optional(),
   note: z
     .string()
     .nullable()

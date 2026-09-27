@@ -16,10 +16,11 @@ export const SPEND_SETTLEMENT_PROCESS_NAME = "spendSettlement" as const;
  */
 export const SETTLEMENT_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
 
-export interface SpendSettlementState {
+export const spendSettlementStateSchema = z.object({
   /** Epoch ms of the last sweep this process scheduled, for operators. */
-  lastSweepAt: number | null;
-}
+  lastSweepAt: z.number().nullable().default(null),
+});
+export type SpendSettlementState = z.infer<typeof spendSettlementStateSchema>;
 
 export const INITIAL_SPEND_SETTLEMENT_STATE: SpendSettlementState = {
   lastSweepAt: null,
@@ -56,7 +57,7 @@ export function spendSettlementPM(
 ): ProcessManagerApplier<GatewaySpendProcessingEvent> {
   return (pm) =>
     pm
-      .state<SpendSettlementState>(INITIAL_SPEND_SETTLEMENT_STATE)
+      .state(spendSettlementStateSchema, INITIAL_SPEND_SETTLEMENT_STATE)
       .schedule({ everyMs: SETTLEMENT_SWEEP_INTERVAL_MS })
       .onWake(spendSettlementWake)
       .intent("sweep", sweepSchema, runSpendSettlementSweep(deps))

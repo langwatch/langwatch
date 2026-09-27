@@ -11,9 +11,10 @@ const SWEEP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const usageWarningSweepSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface UsageWarningSweepState {
-  lastSweepAt: number | null;
-}
+export const usageWarningSweepStateSchema = z.object({
+  lastSweepAt: z.number().nullable(),
+});
+export type UsageWarningSweepState = z.infer<typeof usageWarningSweepStateSchema>;
 
 type UsageWarningSweepIntents = {
   sweep: IntentSpec<typeof usageWarningSweepSchema>;

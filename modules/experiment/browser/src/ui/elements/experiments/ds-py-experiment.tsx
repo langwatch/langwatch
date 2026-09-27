@@ -221,6 +221,63 @@ export function DSPyExperiment({
   );
 }
 
+/** The runs a view shows: the caller's, else the URL's, else the newest run alone. */
+const resolveSelectedRunIds = ({
+  selectedRuns,
+  queryRunIds,
+  firstRunId,
+}: {
+  selectedRuns: string[] | undefined;
+  queryRunIds: unknown;
+  firstRunId: string | undefined;
+}): string[] => {
+  const requested = selectedRuns ?? (typeof queryRunIds === "string" ? queryRunIds.split(",") : []);
+  if (requested.length > 0) return requested;
+  return firstRunId ? [firstRunId] : [];
+};
+
+/**
+ * What the optimizer view derives from the loaded runs: the step the chart
+ * points at, the optimizer and label names in view, and the runs list with a
+ * requested run that has not reported yet placed first.
+ */
+const dspyRunViewOf = ({
+  runs,
+  visibleRuns,
+  runsById,
+  selectedPoint,
+  requestedRunIds,
+}: {
+  runs: DSPyRunsSummary[] | undefined;
+  visibleRuns: DSPyRunsSummary[] | undefined;
+  runsById: Record<string, DSPyRunsSummary> | undefined;
+  selectedPoint: { runId: string; index: string } | null;
+  requestedRunIds: string[];
+}) => {
+  const stepToDisplay =
+    runs &&
+    (selectedPoint && runsById?.[selectedPoint.runId])?.steps.find(
+      (step) => step.index === selectedPoint.index,
+    );
+  const optimizerNames = Array.from(
+    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.optimizer.name)) ?? []),
+  );
+  const labelNames = Array.from(
+    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []),
+  );
+  const nonMatchingRunIds = Array.from(new Set(requestedRunIds)).filter(
+    (runId) => !runs?.some((run) => run.runId === runId),
+  );
+  const dspyRunsPlusIncoming =
+    nonMatchingRunIds.length > 0
+      ? ([{ runId: nonMatchingRunIds[0] }, ...(runs ?? [])] as ({
+          runId: string;
+        } & Partial<DSPyRunsSummary>)[])
+      : runs;
+
+  return { stepToDisplay, optimizerNames, labelNames, dspyRunsPlusIncoming };
+};
+
 export const useDSPyExperimentState = ({
   project,
   experiment,
@@ -250,15 +307,15 @@ export const useDSPyExperimentState = ({
 
   const [highlightedRun, setHighlightedRun] = useState<string | null>(null);
 
-  const selectedRuns_ = useMemo(() => {
-    let selectedRuns_ =
-      selectedRuns ??
-      (typeof router.query.runIds === "string" ? router.query.runIds.split(",") : null);
-    if (!selectedRuns_ || selectedRuns_.length === 0) {
-      selectedRuns_ = dspyRuns.data?.[0]?.runId ? [dspyRuns.data[0].runId] : [];
-    }
-    return selectedRuns_;
-  }, [dspyRuns.data, router.query.runIds, selectedRuns]);
+  const selectedRuns_ = useMemo(
+    () =>
+      resolveSelectedRunIds({
+        selectedRuns,
+        queryRunIds: router.query.runIds,
+        firstRunId: dspyRuns.data?.[0]?.runId,
+      }),
+    [dspyRuns.data, router.query.runIds, selectedRuns],
+  );
 
   const setSelectedRuns_ = useCallback(
     (runIds: string[]) => {
@@ -316,28 +373,13 @@ export const useDSPyExperimentState = ({
     );
   }, [dspyRuns.data]);
 
-  const stepToDisplay =
-    dspyRuns.data &&
-    (selectedPoint && runsById?.[selectedPoint.runId])?.steps.find(
-      (step) => step.index === selectedPoint.index,
-    );
-
-  const optimizerNames = Array.from(
-    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.optimizer.name)) ?? []),
-  );
-  const labelNames = Array.from(
-    new Set(visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []),
-  );
-
-  const nonMatchingRunIds = Array.from(new Set([...selectedRuns_, ...incomingRunIds])).filter(
-    (runId) => !dspyRuns.data?.some((run) => run.runId === runId),
-  );
-  const dspyRunsPlusIncoming =
-    nonMatchingRunIds.length > 0
-      ? ([{ runId: nonMatchingRunIds[0] }, ...(dspyRuns.data ?? [])] as ({
-          runId: string;
-        } & Partial<DSPyRunsSummary>)[])
-      : dspyRuns.data;
+  const { stepToDisplay, optimizerNames, labelNames, dspyRunsPlusIncoming } = dspyRunViewOf({
+    runs: dspyRuns.data,
+    visibleRuns,
+    runsById,
+    selectedPoint,
+    requestedRunIds: [...selectedRuns_, ...incomingRunIds],
+  });
 
   return {
     dspyRuns,
@@ -354,6 +396,33 @@ export const useDSPyExperimentState = ({
     runsById,
   };
 };
+
+/** The run list's placeholder while it loads, fails, or has no runs yet. */
+function DSPyRunsListStatus({ runsView }: { runsView: QueryView }) {
+  if (runsView === "loading") {
+    return Array.from({ length: 3 }).map((_, index) => (
+      <HStack key={index} paddingX={6} paddingY={2} width="100%">
+        <Skeleton width="100%" height="30px" />
+      </HStack>
+    ));
+  }
+  if (runsView === "error") {
+    return (
+      <Alert.Root>
+        <Alert.Indicator />
+        Error loading experiment runs
+      </Alert.Root>
+    );
+  }
+  if (runsView === "empty") {
+    return (
+      <Text paddingX={6} paddingY={4}>
+        Waiting for runs...
+      </Text>
+    );
+  }
+  return null;
+}
 
 export function DSPyExperimentRunList({
   dspyRuns,
@@ -409,26 +478,7 @@ export function DSPyExperimentRunList({
           DSPy Optimizer Runs
         </Heading>
       )}
-      {runsView === "loading" && (
-        <>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <HStack key={index} paddingX={6} paddingY={2} width="100%">
-              <Skeleton width="100%" height="30px" />
-            </HStack>
-          ))}
-        </>
-      )}
-      {runsView === "error" && (
-        <Alert.Root>
-          <Alert.Indicator />
-          Error loading experiment runs
-        </Alert.Root>
-      )}
-      {runsView === "empty" && (
-        <Text paddingX={6} paddingY={4}>
-          Waiting for runs...
-        </Text>
-      )}
+      <DSPyRunsListStatus runsView={runsView} />
       {runsView === "ready" &&
         dspyRunsPlusIncoming?.slice(0, 21).map((run) => {
           const runCost = run.steps

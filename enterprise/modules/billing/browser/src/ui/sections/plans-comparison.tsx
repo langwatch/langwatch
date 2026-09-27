@@ -25,8 +25,8 @@ import {
   formatPrice,
   FREE_PLAN_FEATURES,
   getGrowthPlanFeatures,
-  getGrowthSeatPriceCents,
 } from "../../model/billing-plans.ts";
+import type { BillingPricingService } from "../../model/billing-pricing.service.ts";
 import {
   type ComparisonPlanId,
   resolveCurrentComparisonPlan,
@@ -82,16 +82,26 @@ type PlansComparisonPageProps = {
     free?: boolean | null;
   };
   pricingModel?: string | null;
+  /** The growth seat's prices in the Stripe catalogue this deployment is priced against. */
+  growthSeatPriceCents: GrowthSeatPriceCents;
 };
 
-function getPlanPrice(
-  planId: ComparisonPlanId,
-  currency: Currency,
-  billingPeriod: BillingInterval,
-): string {
+type GrowthSeatPriceCents = ReturnType<BillingPricingService["getGrowthSeatPriceCents"]>;
+
+function getPlanPrice({
+  planId,
+  currency,
+  billingPeriod,
+  growthSeatPriceCents,
+}: {
+  planId: ComparisonPlanId;
+  currency: Currency;
+  billingPeriod: BillingInterval;
+  growthSeatPriceCents: GrowthSeatPriceCents;
+}): string {
   if (planId === "free") return `${currencySymbol[currency]}0 per user/month`;
   if (planId === "growth") {
-    const p = getGrowthSeatPriceCents();
+    const p = growthSeatPriceCents;
     const cents =
       billingPeriod === "annual" ? Math.round(p[currency].annual / 12) : p[currency].monthly;
     return `${formatPrice({ cents, currency })} per seat/month`;
@@ -155,12 +165,14 @@ function PlanCard({
   currentPlan,
   currency,
   billingPeriod,
+  growthSeatPriceCents,
 }: {
   plan: PlanColumn;
   isCurrent: boolean;
   currentPlan: ComparisonPlanId | null;
   currency: Currency;
   billingPeriod: BillingInterval;
+  growthSeatPriceCents: GrowthSeatPriceCents;
 }) {
   return (
     <Card.Root
@@ -190,7 +202,7 @@ function PlanCard({
               )}
             </HStack>
             <Text color="fg" fontSize="md" fontWeight="medium">
-              {getPlanPrice(plan.id, currency, billingPeriod)}
+              {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
             </Text>
             <Text color="fg.muted" fontSize="sm">
               {plan.subtitle}
@@ -221,7 +233,11 @@ function PlanCard({
   );
 }
 
-export function PlansComparisonPage({ activePlan, pricingModel }: PlansComparisonPageProps) {
+export function PlansComparisonPage({
+  activePlan,
+  pricingModel,
+  growthSeatPriceCents,
+}: PlansComparisonPageProps) {
   const currentPlan = resolveCurrentComparisonPlan(activePlan);
   const showTieredNotice = pricingModel === "TIERED" && !activePlan?.free;
 
@@ -367,6 +383,7 @@ export function PlansComparisonPage({ activePlan, pricingModel }: PlansCompariso
             currentPlan={currentPlan}
             currency={currency}
             billingPeriod={billingPeriod}
+            growthSeatPriceCents={growthSeatPriceCents}
           />
         ))}
       </SimpleGrid>

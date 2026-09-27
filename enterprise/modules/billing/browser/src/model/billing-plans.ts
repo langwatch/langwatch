@@ -13,26 +13,10 @@ import {
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import numeral from "numeral";
 
-import { BillingPricingService } from "./billing-pricing.service.ts";
-
 const formatNumber = (value: number): string => numeral(value).format("0,0");
 
 export { formatPrice, isAnnualTieredPlan, parseGrowthSeatPlanType, resolveGrowthSeatPlanType };
 export type { BillingInterval, CurrencyType as Currency };
-
-/**
- * Stripe catalogue this build is priced against. Structural type, not ambient:
- * this module compiles in every tsconfig, but an ambient declaration reaches only
- * the program that names its file.
- */
-const buildMode = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE;
-
-const pricingService = BillingPricingService.create(buildMode === "production" ? "live" : "test");
-
-export const getGrowthSeatPriceCents = () => pricingService.getGrowthSeatPriceCents();
-
-export const getAnnualDiscountPercent = (currency: CurrencyType) =>
-  pricingService.getAnnualDiscountPercent(currency);
 
 export const currencySymbol: Record<Currency, string> = {
   [Currency.EUR]: "\u20AC",

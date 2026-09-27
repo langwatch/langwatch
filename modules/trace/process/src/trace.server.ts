@@ -1,13 +1,13 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
+import {
+  composeTraceLegacyRead,
+  type TraceLegacyReadCompositionOptions,
+} from "./app/trace-read.composition.ts";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
-import {
-  TraceLegacyReadClickHouseRepository,
-  type ClickHouseTraceLegacyReadOptions,
-} from "./repositories/clickhouse/trace-legacy-read.repository.ts";
 import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
 import type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 import type { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
@@ -46,9 +46,9 @@ export function createTracePayloadReader(options: {
  * naming the repository class (private-runtime-export drive, §3d).
  */
 export function createTraceLegacyRead(
-  options: ClickHouseTraceLegacyReadOptions,
+  options: TraceLegacyReadCompositionOptions,
 ): TraceLegacyReadRepository {
-  return TraceLegacyReadClickHouseRepository.create(options);
+  return composeTraceLegacyRead(options);
 }
 
 /**

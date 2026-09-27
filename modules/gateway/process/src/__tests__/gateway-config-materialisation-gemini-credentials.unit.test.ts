@@ -10,15 +10,16 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { GatewayConfigAssemblyAdapter } from "../app/gateway-config-assembly.composition.ts";
 import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 
 const noPlatformProviders = createApiFixture<ModelProviderApi>({
   platformProviderChain: () => Promise.resolve([]),
 });
 
-const assembly = GatewayConfigAssemblyAdapter.create({
-  prisma: {} as never,
+const assembly = GatewayConfigAssemblyService.create({
+  repository: PrismaGatewayScopeResolutionRepository.create({ database: {} as never }),
   platformProviders: noPlatformProviders,
 });
 

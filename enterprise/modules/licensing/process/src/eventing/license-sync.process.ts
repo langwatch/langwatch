@@ -12,10 +12,11 @@ export const LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000;
 
 export const licenseSyncSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface LicenseSyncState {
+export const licenseSyncStateSchema = z.object({
   /** Epoch ms of the last sync this process asked for. */
-  lastSyncAt: number | null;
-}
+  lastSyncAt: z.number().nullable(),
+});
+export type LicenseSyncState = z.infer<typeof licenseSyncStateSchema>;
 
 export const LICENSE_SYNC_INITIAL_STATE: LicenseSyncState = { lastSyncAt: null };
 

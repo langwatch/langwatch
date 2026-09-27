@@ -58,10 +58,20 @@ func (tally moduleTally) addRest(rest *RestParity) {
 	}
 }
 
+func (tally moduleTally) addServed(served *ServedParity) {
+	if served == nil {
+		return
+	}
+	for _, gap := range served.Missing {
+		tally.row(gap.Module).Missing++
+	}
+}
+
 func moduleCounts(report ParityReport) []ModuleCounts {
 	tally := moduleTally{}
 	tally.addTrpc(report.Trpc)
 	tally.addRest(report.Rest)
+	tally.addServed(report.ServedOnly)
 	rows := make([]ModuleCounts, 0, len(tally))
 	for _, counts := range tally {
 		rows = append(rows, *counts)
@@ -84,6 +94,9 @@ func WriteParityTable(writer io.Writer, report ParityReport) error {
 	if report.Rest != nil {
 		fmt.Fprintf(&output, "; REST main %d / branch %d operations", report.Rest.MainCount, report.Rest.BranchCount)
 	}
+	if served := report.ServedOnly; served != nil {
+		fmt.Fprintf(&output, "; served routes main %d / branch %d", served.MainCount, served.BranchCount)
+	}
 	fmt.Fprintf(&output, "\n  %-28s %8s %9s %6s\n", "module", "missing", "breaking", "extra")
 	total := ModuleCounts{Module: "total"}
 	for _, row := range report.Modules {
@@ -94,6 +107,9 @@ func WriteParityTable(writer io.Writer, report ParityReport) error {
 	}
 	fmt.Fprintf(&output, "  %-28s %8d %9d %6d\n", total.Module, total.Missing, total.Breaking, total.Extra)
 	fmt.Fprintf(&output, "  rename candidates %d, namespace-move candidates %d, ruled owner moves %d, ruled retired %d\n", len(report.Trpc.Renamed), len(report.Trpc.Moved), len(report.Trpc.OwnerMoves), len(report.Trpc.Retired))
+	if served := report.ServedOnly; served != nil {
+		fmt.Fprintf(&output, "  served on main only %d, ruled retired %d, ignored %d (reasons in parity.json)\n", len(served.Missing), len(served.Retired), len(served.Ignored))
+	}
 	for _, note := range report.Notes {
 		fmt.Fprintf(&output, "  note: %s\n", note)
 	}
@@ -109,6 +125,9 @@ func renderPacket(report ParityReport, module string) string {
 	fmt.Fprintf(&output, "Main `%s` against the branch, generated %s by `apidiff run`. Main's tRPC sources are paths in the main checkout; branch sources are paths in this repository.\n\n", report.MainRef, report.GeneratedAt)
 	writePacketCounts(&output, report, module)
 	writeTrpcSections(&output, report.Trpc, module)
+	if report.ServedOnly != nil {
+		writeServedSections(&output, *report.ServedOnly, module)
+	}
 	if report.Rest != nil {
 		writeRestSections(&output, *report.Rest, module)
 	} else {
@@ -207,6 +226,34 @@ func writeSection(output *strings.Builder, title string, lines []string) {
 	fmt.Fprintf(output, "## %s\n\n%s\n", title, strings.Join(lines, ""))
 }
 
+// writeServedSections lists the routes main serves without documenting them
+// that the branch does not serve: invisible to REST parity, so listed here.
+func writeServedSections(output *strings.Builder, served ServedParity, module string) {
+	missing := filterServed(served.Missing, module)
+	if len(missing) > 0 {
+		fmt.Fprintf(output, "## Served on main, not on the branch (%d)\n\nMain serves these without documenting them, so REST parity cannot see them. Serve each from this module's REST transport at the same method and path; a ruling that retires one goes beside RetiredRestOperation.\n\n| route | main source |\n|---|---|\n", len(missing))
+		for _, gap := range missing {
+			fmt.Fprintf(output, "| `%s %s` | %s |\n", gap.Method, gap.Path, gap.Source)
+		}
+		output.WriteString("\n")
+	}
+	retired := []string{}
+	for _, gap := range filterServed(served.Retired, module) {
+		retired = append(retired, fmt.Sprintf("- `%s %s` %s\n", gap.Method, gap.Path, gap.Source))
+	}
+	writeSection(output, "Ruled retired served routes, not defects", retired)
+}
+
+func filterServed(gaps []ServedGap, module string) []ServedGap {
+	kept := []ServedGap{}
+	for _, gap := range gaps {
+		if gap.Module == module {
+			kept = append(kept, gap)
+		}
+	}
+	return kept
+}
+
 func writeRestSections(output *strings.Builder, rest RestParity, module string) {
 	writeSection(output, "Missing REST operations", restGapLines(rest.Missing, module))
 	writeSection(output, "Ruled retired REST operations, not defects", restGapLines(rest.Retired, module))
@@ -278,5 +325,6 @@ func WriteParityPlan(writer io.Writer, plan DryRunPlan) {
 	fmt.Fprintf(writer, "    pnpm install + start:prepare:files in both worktrees (no workspace build)\n")
 	fmt.Fprintf(writer, "    pnpm exec tsx %s (in %s/platform/app; a modular main runs like the branch), datastore URLs pointed at a closed port\n", inventoryScriptName, plan.MainDir)
 	fmt.Fprintf(writer, "    node --experimental-transform-types %s (in %s/branch/packages/api)\n", inventoryScriptName, plan.WorkRoot)
+	fmt.Fprintf(writer, "    served routes: %s in the same two places (main's built Hono router; the branch's installed server modules and API lanes)\n", routeScriptName)
 	fmt.Fprintf(writer, "    write %s/parity.json and %s/parity/<module>.md\n", plan.WorkRoot, plan.WorkRoot)
 }

@@ -9,6 +9,7 @@ import {
   type IntentSpec,
   type ProcessManagerConfig,
   type ProcessManagerDefinition,
+  type SchemaOf,
   type SignalHandler,
   type SignalSpec,
   type WakeHandler,
@@ -23,7 +24,10 @@ type OutboxOptions = NonNullable<
 >;
 
 export interface ProcessManagerInitialStage<E extends Event> {
-  state<State>(initial: State): ProcessManagerStateStage<E, State>;
+  state<Schema extends ZodTypeAny>(
+    schema: Schema,
+    initial: z.output<Schema>,
+  ): ProcessManagerStateStage<E, z.output<Schema>>;
 }
 
 export interface ProcessManagerStateStage<E extends Event, State> {
@@ -41,28 +45,20 @@ export interface ProcessManagerScheduledStage<
   E extends Event,
   State,
 > extends ProcessManagerStateStage<E, State> {
-  onWake<FutureIntents extends Record<string, IntentSpec<any>>>(
+  onWake<FutureIntents = Record<string, IntentSpec>>(
     handle: WakeHandler<State, FutureIntents>,
   ): ProcessManagerScheduledHandledStage<E, State, FutureIntents>;
 }
 
-export interface ProcessManagerScheduledHandledStage<
-  E extends Event,
-  State,
-  FutureIntents extends Record<string, IntentSpec<any>>,
-> {
+export interface ProcessManagerScheduledHandledStage<E extends Event, State, FutureIntents> {
   intent<Name extends keyof FutureIntents & string>(
     name: Name,
-    schema: FutureIntents[Name]["schema"],
-    run: FutureIntents[Name]["run"],
+    schema: SchemaOf<FutureIntents[Name]>,
+    run: IntentSpec<SchemaOf<FutureIntents[Name]>>["run"],
   ): ProcessManagerHandledStage<E, State, FutureIntents>;
 }
 
-export interface ProcessManagerIntentStage<
-  E extends Event,
-  State,
-  Intents extends Record<string, IntentSpec<any>>,
-> {
+export interface ProcessManagerIntentStage<E extends Event, State, Intents> {
   intent<Name extends string, Schema extends ZodTypeAny>(
     name: Name,
     schema: Schema,
@@ -87,11 +83,7 @@ export interface ProcessManagerIntentStage<
   ): ProcessManagerIntentStage<E, State, Intents>;
 }
 
-export interface ProcessManagerHandledStage<
-  E extends Event,
-  State,
-  Intents extends Record<string, IntentSpec<any>>,
-> {
+export interface ProcessManagerHandledStage<E extends Event, State, Intents> {
   on<Type extends EventTypeOf<E>>(
     eventType: Type,
     handle: EventHandler<State, EventData<E, Type>, Intents>,
@@ -111,15 +103,15 @@ export interface ProcessManagerHandledStage<
   ): ProcessManagerHandledStage<E, State, Intents>;
 }
 
-export type ProcessManagerBuildableStage =
-  | ProcessManagerHandledStage<any, any, any>
-  | ProcessManagerScheduledHandledStage<any, any, any>;
+export type ProcessManagerBuildableStage<E extends Event> =
+  | ProcessManagerHandledStage<E, unknown, Record<string, IntentSpec>>
+  | ProcessManagerScheduledHandledStage<E, unknown, Record<string, IntentSpec>>;
 
 type ErasedEventHandler = EventHandler<unknown, unknown, Record<string, IntentSpec>>;
 
 class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
-  private hasState = false;
+  private stateSchema: ZodTypeAny | undefined;
   private readonly intents: Record<string, IntentSpec> = {};
   private readonly handlers: Record<string, ErasedEventHandler> = {};
   private readonly signals: Record<string, SignalSpec> = {};
@@ -132,10 +124,13 @@ class ProcessManagerBuilder<E extends Event> {
 
   constructor(private readonly name: string) {}
 
-  state<State>(initial: State): ProcessManagerStateStage<E, State> {
+  state<Schema extends ZodTypeAny>(
+    schema: Schema,
+    initial: z.output<Schema>,
+  ): ProcessManagerStateStage<E, z.output<Schema>> {
     this.stateValue = initial;
-    this.hasState = true;
-    return this as unknown as ProcessManagerStateStage<E, State>;
+    this.stateSchema = schema;
+    return this as unknown as ProcessManagerStateStage<E, z.output<Schema>>;
   }
 
   intent(name: string, schema: ZodTypeAny, run: IntentSpec["run"]): this {
@@ -256,7 +251,7 @@ class ProcessManagerBuilder<E extends Event> {
   }
 
   build(): ProcessManagerDefinition {
-    if (!this.hasState) {
+    if (!this.stateSchema) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
         `Process manager "${this.name}" declares no state`,
@@ -266,6 +261,7 @@ class ProcessManagerBuilder<E extends Event> {
     return defineProcessManager({
       name: this.name,
       state: this.stateValue,
+      stateSchema: this.stateSchema,
       handlers: this.handlers,
       eventTypes: Object.keys(this.handlers),
       keyBy: this.keyResolver as ((event: Event) => string) | undefined,
@@ -284,7 +280,7 @@ class ProcessManagerBuilder<E extends Event> {
 
 export type ProcessManagerApplier<E extends Event> = (
   pm: ProcessManagerInitialStage<E>,
-) => ProcessManagerBuildableStage;
+) => ProcessManagerBuildableStage<E>;
 
 export function buildProcessManager<E extends Event>({
   name,

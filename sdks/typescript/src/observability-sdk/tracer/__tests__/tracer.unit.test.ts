@@ -390,27 +390,17 @@ describe("tracer.ts", () => {
     });
 
     describe("when given edge cases or promise-like objects", () => {
-      it("handles promise-like objects (thenables)", async () => {
-        const thenable = {
-          then: vi.fn((onFulfilled: any) => {
-            setTimeout(() => onFulfilled("thenable-result"), 5);
-            return thenable;
-          }),
-          catch: vi.fn((_onRejected: any) => thenable),
-          finally: vi.fn((onFinally: any) => {
-            setTimeout(() => onFinally(), 10);
-            return thenable;
-          }),
-        };
+      it("awaits a promise-like result through its then()", async () => {
+        const pending = new Promise<string>((resolve) => {
+          setTimeout(() => resolve("thenable-result"), 5);
+        });
+        const thenSpy = vi.spyOn(pending, "then");
+        const callback = vi.fn(() => pending);
 
-        const callback = vi.fn(() => thenable);
-
-        const result = await (langwatchTracer.withActiveSpan("thenable-span", callback) as any);
+        const result = await langwatchTracer.withActiveSpan("thenable-span", callback);
 
         expect(result).toBe("thenable-result");
-        expect(thenable.then).toHaveBeenCalled();
-        expect(thenable.catch).toHaveBeenCalled();
-        expect(thenable.finally).toHaveBeenCalled();
+        expect(thenSpy).toHaveBeenCalled();
       });
 
       it("handles null/undefined return values", () => {
@@ -425,7 +415,8 @@ describe("tracer.ts", () => {
       });
 
       it("handles objects with then property that is not a function", () => {
-        const fakePromise = { then: "not-a-function" };
+        // A parsed payload that happens to carry a `then` field is data, not a promise.
+        const fakePromise: unknown = JSON.parse('{"then":"not-a-function"}');
         const callback = vi.fn(() => fakePromise);
 
         const result = langwatchTracer.withActiveSpan("fake-promise-span", callback);

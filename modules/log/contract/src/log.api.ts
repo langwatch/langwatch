@@ -24,6 +24,14 @@ export type LogOtlpDoorResult = LogRequestCollectionResult | OtlpDoorRefusal;
 /** The exporter base a `/v1/logs` suffix was appended to; the receiver checks it. */
 export const otlpLogAliasParamsSchema = z.object({ otlpBase: z.string() });
 
+/** One OTLP log export to collect for a tenant, as main's `handleOtlpLogRequest` took it. */
+export type LogCollectionInput = {
+  tenantId: string;
+  organizationId: string;
+  logRequest: unknown;
+  piiRedactionLevel: LogPiiRedactionLevel;
+};
+
 /** The portable canonical log capability shared by process features. */
 export interface LogApi {
   prepareCanonicalLogRecords(input: {
@@ -41,6 +49,8 @@ export interface LogApi {
   }): Promise<CanonicalTraceLogRecord[]>;
   /** One exporter request at the logs door: key, allowance, parse, then collection. */
   receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult>;
+  /** Prepares and records one OTLP log export, for a receiver that authenticated it itself. */
+  collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult>;
   /** Sends prepared records onto the `log_processing` pipeline for durable storage. */
   recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>;
 }

@@ -11,6 +11,8 @@ import {
   type CanonicalLogRecord,
   type CanonicalTraceLogRecord,
   type LogApi as LogApiContract,
+  type LogCollectionInput,
+  type LogRequestCollectionResult,
   type LogPiiRedactionLevel,
   type LogOtlpDoorResult,
   type LogPreparation,
@@ -56,16 +58,19 @@ export class LogApp implements LogApiContract {
   readonly #service: LogService;
   readonly #pipeline: LogProcessingPipeline;
   readonly #receiver: OtlpLogReceiverService;
+  readonly #collection: LogRequestCollectionService;
   #commands: EventingCommands<LogProcessingPipeline> | undefined;
 
-  private constructor(
-    service: LogService,
-    pipeline: LogProcessingPipeline,
-    receiver: OtlpLogReceiverService,
-  ) {
-    this.#service = service;
-    this.#pipeline = pipeline;
-    this.#receiver = receiver;
+  private constructor(parts: {
+    service: LogService;
+    pipeline: LogProcessingPipeline;
+    receiver: OtlpLogReceiverService;
+    collection: LogRequestCollectionService;
+  }) {
+    this.#service = parts.service;
+    this.#pipeline = parts.pipeline;
+    this.#receiver = parts.receiver;
+    this.#collection = parts.collection;
   }
 
   static create({ dependencies, members, config }: LogSetup): LogApp {
@@ -88,18 +93,17 @@ export class LogApp implements LogApiContract {
         createCodingAgentLogFactsDispatchSubscriber({ codingAgents: dependencies.codingAgents }),
       ],
     }).build();
-    const app: LogApp = new LogApp(
+    const collection = LogRequestCollectionService.create({
+      traces: dependencies.traces,
+      logs: service,
+      recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
+    });
+    const app: LogApp = new LogApp({
       service,
       pipeline,
-      OtlpLogReceiverService.create({
-        traces: dependencies.traces,
-        collection: LogRequestCollectionService.create({
-          traces: dependencies.traces,
-          logs: service,
-          recordLogRecords: (records) => app.recordCanonicalLogRecords(records),
-        }),
-      }),
-    );
+      receiver: OtlpLogReceiverService.create({ traces: dependencies.traces, collection }),
+      collection,
+    });
     return app;
   }
 
@@ -115,6 +119,10 @@ export class LogApp implements LogApiContract {
 
   receiveOtlpLogs(request: OtlpDoorRequest): Promise<LogOtlpDoorResult> {
     return this.#receiver.receive(request);
+  }
+
+  collectOtlpLogs(input: LogCollectionInput): Promise<LogRequestCollectionResult> {
+    return this.#collection.handleOtlpLogRequest(input);
   }
 
   getLogsByTraceId(input: {

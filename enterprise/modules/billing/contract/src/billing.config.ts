@@ -18,9 +18,14 @@ export const billingConfig = Config.define((c) => ({
       .optional()
       .transform((value) => value?.trim() || void 0),
   ),
+  slackPlanLimitChannel: c.env("SLACK_PLAN_LIMIT_CHANNEL", z.string().optional()),
   slackSubscriptionsChannel: c.env("SLACK_CHANNEL_SUBSCRIPTIONS", z.string().optional()),
   slackSignupsChannel: c.env("SLACK_CHANNEL_SIGNUPS", z.string().optional()),
   slackSelfHostedChannel: c.env("SLACK_CHANNEL_SELF_HOSTED", z.string().optional()),
+  /** The HubSpot portal and forms a signup and a reached plan limit are submitted to. */
+  hubspotPortalId: c.env("HUBSPOT_PORTAL_ID", z.string().optional()),
+  hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
+  hubspotReachedLimitFormId: c.env("HUBSPOT_REACHED_LIMIT_FORM_ID", z.string().optional()),
   bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
 }));
 

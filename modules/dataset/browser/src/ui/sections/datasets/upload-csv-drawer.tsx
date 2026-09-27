@@ -20,6 +20,7 @@ import type {
   DatasetColumns,
   DatasetConfirmColumns,
   DatasetRecordEntry,
+  InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
@@ -52,7 +53,6 @@ import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
 } from "./add-or-edit-dataset-drawer.tsx";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 const logger = createLogger("UploadCSVDrawer");
 
@@ -384,6 +384,179 @@ export function InlineUploadCSVForm({
   );
 }
 
+/** A name from the file's own name, bumped when taken; "New Dataset" when it has none. */
+async function proposeDatasetName({
+  filename,
+  findNextName,
+}: {
+  filename: string;
+  findNextName: (proposedName: string) => Promise<string>;
+}): Promise<string> {
+  const fromFile = filename.split(".")[0] || "New Dataset";
+  try {
+    return await findNextName(fromFile);
+  } catch (error) {
+    logger.error({ error }, "Failed to get valid name");
+    return fromFile;
+  }
+}
+
+/**
+ * The rejected-PUT fallback: parse the file in the browser, guarded on `MAX_FILE_SIZE_BYTES`
+ * (over it, stop with a message; the CORS detail stays in the log).
+ */
+async function fallbackParseOf({
+  file,
+  proposeName,
+}: {
+  file: File;
+  proposeName: (filename: string) => Promise<string>;
+}): Promise<
+  | { kind: "too-large"; message: string }
+  | { kind: "parsed"; dataset: InMemoryDataset }
+  | { kind: "failed"; message: string }
+> {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return {
+      kind: "too-large",
+      message:
+        "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
+    };
+  }
+  try {
+    const rows = await parseFileToRows(file);
+    return { kind: "parsed", dataset: buildDatasetFromRows(rows, await proposeName(file.name)) };
+  } catch (error) {
+    logger.error({ error }, "Fallback parse of dataset file failed");
+    return {
+      kind: "failed",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Something went wrong reading your file. Please try again.",
+    };
+  }
+}
+
+/** A finalized upload: the host takes over in the drawer, or the reader is sent to the dataset. */
+function announceUploaded({
+  datasetId,
+  onDirectUploadComplete,
+  onClose,
+  openDataset,
+}: {
+  datasetId: string;
+  onDirectUploadComplete: ((datasetId: string) => void) | undefined;
+  onClose: (() => void) | undefined;
+  openDataset: (datasetId: string) => void;
+}): void {
+  if (onDirectUploadComplete) {
+    onDirectUploadComplete(datasetId);
+    return;
+  }
+  toaster.create({ title: "Preparing your dataset", type: "success" });
+  onClose?.();
+  openDataset(datasetId);
+}
+
+/**
+ * A failed direct upload: a cancel is silent; a refused storage PUT (almost always a missing
+ * bucket CORS rule) is logged for operators and falls back to the in-browser parse.
+ */
+async function recoverFromDirectUploadFailure({
+  error,
+  signal,
+  file,
+  projectId,
+  fallBack,
+  showFailure,
+}: {
+  error: unknown;
+  signal: AbortSignal;
+  file: File;
+  projectId: string;
+  fallBack: (file: File) => Promise<void>;
+  showFailure: (message: string) => void;
+}): Promise<void> {
+  const failure = directUploadFailureOf(error, signal);
+  if (failure === "aborted") return;
+  if (failure === "presigned-rejected") {
+    logger.error(
+      { error, fileSizeBytes: file.size, projectId },
+      "Direct-to-storage upload failed: presigned PUT rejected (likely a missing bucket CORS rule or storage connectivity). Falling back to in-browser parse.",
+    );
+    await fallBack(file);
+    return;
+  }
+  logger.error({ error }, "Direct dataset upload failed");
+  showFailure(describeError({ error, fallbackTitle: "Something went wrong uploading your file" }));
+}
+
+/** Why a direct upload stopped: the caller cancelled, the storage PUT was refused, or it failed. */
+function directUploadFailureOf(
+  error: unknown,
+  signal: AbortSignal,
+): "aborted" | "presigned-rejected" | "failed" {
+  if ((error instanceof Error && error.name === "AbortError") || signal.aborted) return "aborted";
+  if (error instanceof PresignedUploadFailedError) return "presigned-rejected";
+  return "failed";
+}
+
+/**
+ * Whether Upload is ready, and the file-level error shown inline on the file's row. The direct
+ * path streams the raw file and waits for the header parse; only the fallback parse-and-drawer
+ * flow is bound by the in-browser row limit.
+ */
+function uploadReadinessOf(input: {
+  enableDirectUpload: boolean;
+  hasRawFile: boolean;
+  isParsingHeader: boolean;
+  uploadedDataset: InMemoryDataset | undefined;
+  sizeError: string | null;
+}): { canUpload: boolean; fileError: string | undefined } {
+  if (input.enableDirectUpload) {
+    return {
+      canUpload: input.hasRawFile && !input.isParsingHeader,
+      fileError: input.sizeError ?? undefined,
+    };
+  }
+  const rowCount = input.uploadedDataset?.datasetRecords.length ?? 0;
+  if (rowCount > MAX_ROWS_LIMIT) {
+    return {
+      canUpload: false,
+      fileError: `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`,
+    };
+  }
+  return { canUpload: rowCount > 0, fileError: input.sizeError ?? undefined };
+}
+
+/**
+ * Reads a picked file's header and proposes a name for the confirm step. Best-effort: an
+ * unreadable header skips the confirm step. A parse for a since-replaced file is discarded.
+ */
+async function readHeaderForConfirm({
+  file,
+  proposeName,
+  isCurrent,
+  onParsed,
+  onSettled,
+}: {
+  file: File;
+  proposeName: (filename: string) => Promise<string>;
+  isCurrent: () => boolean;
+  onParsed: (parsed: { columns: DatasetConfirmColumns | null; name: string }) => void;
+  onSettled: () => void;
+}): Promise<void> {
+  try {
+    const [columns, name] = await Promise.all([parseHeaderColumns(file), proposeName(file.name)]);
+    if (isCurrent()) onParsed({ columns, name });
+  } catch (error) {
+    logger.error({ error }, "Failed to parse dataset header columns");
+  } finally {
+    if (isCurrent()) onSettled();
+  }
+}
+
 export function UploadCSVForm({
   setUploadedDataset,
   uploadedDataset,
@@ -461,27 +634,14 @@ export function UploadCSVForm({
     return () => abortControllerRef.current?.abort();
   }, []);
 
-  const getValidName = async (proposedName: string): Promise<string> => {
-    if (!projectId) return proposedName;
-    const validName = await trpcUtils.dataset.findNextName.fetch({
-      projectId: projectId,
-      proposedName: proposedName,
+  const proposeValidName = (filename: string): Promise<string> =>
+    proposeDatasetName({
+      filename,
+      findNextName: (proposedName) =>
+        projectId
+          ? trpcUtils.dataset.findNextName.fetch({ projectId, proposedName })
+          : Promise.resolve(proposedName),
     });
-    return validName;
-  };
-
-  const proposeValidName = async (filename: string): Promise<string> => {
-    let validName = "New Dataset";
-    try {
-      // Propose new name based on the file name.
-      validName = filename.split(".")[0] || validName;
-      // Try to get a valid name from the DB, in case it's already taken.
-      validName = await getValidName(validName);
-    } catch (error) {
-      logger.error({ error }, "Failed to get valid name");
-    }
-    return validName;
-  };
 
   const handleUploadAccepted = async (results: { data: string[][]; acceptedFile: File }) => {
     const { data, acceptedFile } = results;
@@ -536,43 +696,28 @@ export function UploadCSVForm({
         columnTypes: toConfirmColumns(confirmed?.columnTypes),
       });
 
-      if (onDirectUploadComplete) {
-        setIsUploading(false);
-        onDirectUploadComplete(datasetId);
-      } else {
-        toaster.create({
-          title: "Preparing your dataset",
-          type: "success",
-        });
-        setIsUploading(false);
-        onClose?.();
-        void router.push(`/${project.slug}/datasets/${datasetId}`);
-      }
-    } catch (error) {
-      if ((error instanceof Error && error.name === "AbortError") || controller.signal.aborted) {
-        return;
-      }
-      // Storage is configured but the cross-origin PUT was rejected (almost
-      // always a missing bucket CORS rule): log it for operators, then fall back.
-      if (error instanceof PresignedUploadFailedError) {
-        logger.error(
-          { error, fileSizeBytes: rawFile.size, projectId },
-          "Direct-to-storage upload failed: presigned PUT rejected (likely a missing bucket CORS rule or storage connectivity). Falling back to in-browser parse.",
-        );
-        await runFallbackParseAndDrawer(rawFile);
-        return;
-      }
-      logger.error({ error }, "Direct dataset upload failed");
-      // System error → top alert; clear any file-level error so the two never
-      // render the shared `upload-error` testid at once.
-      setSizeError(null);
-      setUploadError(
-        describeError({
-          error,
-          fallbackTitle: "Something went wrong uploading your file",
-        }),
-      );
       setIsUploading(false);
+      announceUploaded({
+        datasetId,
+        onDirectUploadComplete,
+        onClose,
+        openDataset: (id) => void router.push(`/${project.slug}/datasets/${id}`),
+      });
+    } catch (error) {
+      await recoverFromDirectUploadFailure({
+        error,
+        signal: controller.signal,
+        file: rawFile,
+        projectId,
+        fallBack: runFallbackParseAndDrawer,
+        showFailure: (message) => {
+          // System error → top alert; clear any file-level error so the two never
+          // render the shared `upload-error` testid at once.
+          setSizeError(null);
+          setUploadError(message);
+          setIsUploading(false);
+        },
+      });
     }
   };
 
@@ -588,31 +733,16 @@ export function UploadCSVForm({
    * limit, stop with a message instead of parsing; CORS detail stays in the log.
    */
   const runFallbackParseAndDrawer = async (file: File) => {
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      // File-level error → inline row; clear any system error for exclusivity.
-      setUploadError(null);
-      setSizeError(
-        "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
-      );
-      setIsUploading(false);
+    const outcome = await fallbackParseOf({ file, proposeName: proposeValidName });
+    setIsUploading(false);
+    if (outcome.kind === "parsed") {
+      setUploadedDataset(outcome.dataset);
+      uploadCSVData();
       return;
     }
-    try {
-      const rows = await parseFileToRows(file);
-      const validName = await proposeValidName(file.name);
-      setUploadedDataset(buildDatasetFromRows(rows, validName));
-      setIsUploading(false);
-      uploadCSVData();
-    } catch (error) {
-      logger.error({ error }, "Fallback parse of dataset file failed");
-      setSizeError(null);
-      setUploadError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong reading your file. Please try again.",
-      );
-      setIsUploading(false);
-    }
+    // A file-level error goes inline on the row, a system error in the top alert; never both.
+    setSizeError(outcome.kind === "too-large" ? outcome.message : null);
+    setUploadError(outcome.kind === "failed" ? outcome.message : null);
   };
 
   /**
@@ -634,23 +764,13 @@ export function UploadCSVForm({
     void handleUpload();
   };
 
-  // The direct path streams the raw file, so it is not bound by the in-browser
-  // row limit. The limit only constrains the fallback (parse-and-drawer) flow.
-  const overRowLimitForFallback =
-    !enableDirectUpload &&
-    !!uploadedDataset &&
-    uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT;
-
-  const canUpload = enableDirectUpload
-    ? // Wait for the header parse to settle so a fast click can't bypass confirm.
-      !!rawFile && !isParsingHeader
-    : !!uploadedDataset && uploadedDataset.datasetRecords.length > 0 && !overRowLimitForFallback;
-
-  // File-level validation, shown inline on the file's row: too-large (fallback)
-  // or over the in-browser row limit.
-  const fileError = overRowLimitForFallback
-    ? `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`
-    : (sizeError ?? undefined);
+  const { canUpload, fileError } = uploadReadinessOf({
+    enableDirectUpload,
+    hasRawFile: !!rawFile,
+    isParsingHeader,
+    uploadedDataset,
+    sizeError,
+  });
 
   return (
     <VStack width="full" align="start" gap={4}>
@@ -684,25 +804,16 @@ export function UploadCSVForm({
           // settles, only when a confirm host is wired.
           if (file && enableDirectUpload && requestColumnConfirm) {
             setIsParsingHeader(true);
-            void (async () => {
-              try {
-                const [columns, name] = await Promise.all([
-                  parseHeaderColumns(file),
-                  proposeValidName(file.name),
-                ]);
-                if (parseHeaderTokenRef.current !== token) return; // stale
+            void readHeaderForConfirm({
+              file,
+              proposeName: proposeValidName,
+              isCurrent: () => parseHeaderTokenRef.current === token,
+              onParsed: ({ columns, name }) => {
                 setParsedColumns(columns);
                 setProposedName(name);
-              } catch (error) {
-                // Best-effort: an unreadable header just skips the confirm step
-                // (parsedColumns stays null → upload proceeds, normalize derives).
-                logger.error({ error }, "Failed to parse dataset header columns");
-              } finally {
-                if (parseHeaderTokenRef.current === token) {
-                  setIsParsingHeader(false);
-                }
-              }
-            })();
+              },
+              onSettled: () => setIsParsingHeader(false),
+            });
           }
         }}
         onUploadRemoved={() => {

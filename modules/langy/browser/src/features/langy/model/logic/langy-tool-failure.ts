@@ -6,7 +6,7 @@ import { explainHandledError } from "@langwatch/error-presentation/presentation"
  */
 import {
   type CliErrorDocumentRead,
-  type CliHandledError,
+  type LangWatchHandledErrorShape,
   isTerminalFailure,
   parseCliJson,
   readCliErrorDocument,
@@ -167,9 +167,10 @@ const ACCESS_DENIAL_CODES = new Set([
  */
 const PLAN_LIMIT_CODES = new Set(["resource_limit_exceeded"]);
 
-const normalizedCode = (domain: CliHandledError): string => domain.code.trim().toLowerCase();
+const normalizedCode = (domain: LangWatchHandledErrorShape): string =>
+  domain.code.trim().toLowerCase();
 
-const isAccessDenial = (domain: CliHandledError): boolean =>
+const isAccessDenial = (domain: LangWatchHandledErrorShape): boolean =>
   ACCESS_DENIAL_CODES.has(normalizedCode(domain));
 
 const asCount = (value: unknown): number | undefined =>
@@ -184,7 +185,7 @@ function limitLabel(limitType: unknown): string | undefined {
 }
 
 /** The plan allowance behind a failure, or null when it was not one. */
-function readPlanLimit(domain: CliHandledError): LangyToolFailureLimit | null {
+function readPlanLimit(domain: LangWatchHandledErrorShape): LangyToolFailureLimit | null {
   const code = normalizedCode(domain);
   if (!PLAN_LIMIT_CODES.has(code)) return null;
   const label = limitLabel(domain.meta.limitType);
@@ -213,7 +214,7 @@ function limitSentence(limit: LangyToolFailureLimit): string {
 /**
  * What to SAY about a failure.
  */
-function describeFailure(domain: CliHandledError): {
+function describeFailure(domain: LangWatchHandledErrorShape): {
   message: string;
   detail?: string;
   limit?: LangyToolFailureLimit;
@@ -317,7 +318,7 @@ function buildNoDomainPresentation(
 /** Levels 1 and 2: a domain error document, structured into card copy. */
 function buildDomainPresentation(
   title: string,
-  domain: CliHandledError,
+  domain: LangWatchHandledErrorShape,
   raw: string | undefined,
 ): LangyToolErrorPresentation {
   // New-CLI documents carry the trace links top-level on the error; documents

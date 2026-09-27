@@ -74,25 +74,26 @@ export const instantEvalFinishIntentSchema = z.object({
 export type InstantEvalFinishIntent = z.infer<typeof instantEvalFinishIntentSchema>;
 
 /** What the process remembers between one input and the next. */
-export interface InstantEvalProcessState {
-  readonly phase: InstantEvalPhase;
+export const instantEvalProcessStateSchema = z.object({
+  phase: z.enum(INSTANT_EVAL_PHASES),
   /** The page judged most recently. Zero before the first one. */
-  readonly page: number;
+  page: z.number(),
   /** The trace id the last judged page ended on. */
-  readonly cursor: string | null;
+  cursor: z.string().nullable(),
   /** The span id the last judged page ended on, for a span-keyed statement. */
-  readonly cursorSpanId: string | null;
-  readonly pageSize: number;
-  readonly keyColumns: readonly string[];
+  cursorSpanId: z.string().nullable(),
+  pageSize: z.number(),
+  keyColumns: z.array(z.string()).readonly(),
   /** Rows the run may still judge. */
-  readonly remaining: number;
+  remaining: z.number(),
   /** What the run has spent so far, summed from its pages. */
-  readonly inputTokens: number;
-  readonly requests: number;
+  inputTokens: z.number(),
+  requests: z.number(),
   /** When the run last did something, which is what the stall wake measures. */
-  readonly lastActivityAtMs: number;
-  readonly cancelRequestedAtMs: number | null;
-}
+  lastActivityAtMs: z.number(),
+  cancelRequestedAtMs: z.number().nullable(),
+});
+export type InstantEvalProcessState = z.infer<typeof instantEvalProcessStateSchema>;
 
 export const INITIAL_INSTANT_EVAL_STATE: InstantEvalProcessState = {
   phase: "idle",

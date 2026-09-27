@@ -7,9 +7,13 @@ import {
   ScenarioTestSuiteNotFoundError,
   type EvaluatorAttachment,
   type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteUpdateInput,
   type ScenarioApi,
+  type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import {
+  assertFieldsNotInUse,
   createSuiteCommandSchema,
   mergeRunAttachments,
   readEvaluatorAttachments,
@@ -130,7 +134,7 @@ export class SuiteService {
         throw new SuiteTestSuiteMembershipManagedError();
       }
 
-      return this.updateTestSuite(parsed);
+      return this.updateTestSuiteByCommand(parsed);
     }
 
     const { fields, evaluators, ...columns } = parsed;
@@ -215,6 +219,54 @@ export class SuiteService {
       isPlanLevel: true,
       evaluatorsById: new Map(saved.map((evaluator) => [evaluator.id, evaluator])),
     });
+  }
+
+  /** A new test suite, once its evaluators name what the project holds. */
+  async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    await this.assertTestSuiteDeclarations({
+      projectId: input.projectId,
+      fields: input.fields ?? [],
+      evaluators: input.evaluators,
+    });
+    return this.options.scenarios.createTestSuite(input);
+  }
+
+  /** Edits a test suite, checking the fields and evaluators it will declare after the write. */
+  async updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    if (input.fields !== undefined || input.evaluators !== undefined) {
+      const existing = await this.options.scenarios.findTestSuite({
+        testSuiteId: input.testSuiteId,
+        projectId: input.projectId,
+      });
+      await this.assertTestSuiteDeclarations({
+        projectId: input.projectId,
+        fields: input.fields ?? existing?.fields ?? [],
+        evaluators: input.evaluators,
+        existingEvaluators: existing?.evaluators ?? [],
+      });
+    }
+    return this.options.scenarios.updateTestSuite(input);
+  }
+
+  private async assertTestSuiteDeclarations(input: {
+    projectId: string;
+    fields: SuiteFieldDefinition[];
+    evaluators: EvaluatorAttachment[] | undefined;
+    existingEvaluators?: EvaluatorAttachment[];
+  }): Promise<void> {
+    const attachments =
+      input.evaluators === undefined
+        ? (input.existingEvaluators ?? [])
+        : readEvaluatorAttachments({
+            attachments: input.evaluators,
+            fields: input.fields,
+            isPlanLevel: false,
+            evaluatorsById: await this.getAttachedEvaluators({
+              projectId: input.projectId,
+              attachments: input.evaluators,
+            }),
+          });
+    assertFieldsNotInUse({ fields: input.fields, attachments });
   }
 
   async duplicate(input: SuiteIdInput): Promise<Suite> {
@@ -306,9 +358,9 @@ export class SuiteService {
     };
   }
 
-  private async updateTestSuite(input: UpdateSuiteCommand): Promise<Suite> {
+  private async updateTestSuiteByCommand(input: UpdateSuiteCommand): Promise<Suite> {
     try {
-      const testSuite = await this.options.scenarios.updateTestSuite({
+      const testSuite = await this.updateTestSuite({
         testSuiteId: input.id,
         projectId: input.projectId,
         name: input.name,

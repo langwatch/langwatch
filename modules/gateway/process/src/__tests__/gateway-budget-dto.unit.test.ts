@@ -9,9 +9,9 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { GatewayBudgetDtoService, type GatewayBudgetWithSeats } from "../index.ts";
+import { type GatewayBudgetWithSeats } from "../index.ts";
+import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 
-const budgetDtos = GatewayBudgetDtoService.create();
 function budget(overrides: Partial<GatewayBudgetWithSeats> = {}): GatewayBudgetWithSeats {
   const now = Temporal.Instant.from("2026-08-01T00:00:00.000Z");
   return {

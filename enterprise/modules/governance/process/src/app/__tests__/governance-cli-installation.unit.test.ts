@@ -1,8 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- */
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -16,11 +12,18 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { createApp } from "@langwatch/kernel";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ */
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -73,6 +76,7 @@ async function boot(rest: RestHost) {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
       publicBaseUrl: "https://app.test",
+      rateLimiter: memoryRateLimiter(),
     })
     .provide({
       agent: createApiFixture<AgentApi>(),
@@ -92,6 +96,8 @@ async function boot(rest: RestHost) {
       "model-provider": createApiFixture<ModelProviderApi>(),
       user: createApiFixture<UserApi>(),
       "audit-log": createApiFixture<AuditLogApi>(),
+      log: createApiFixture<LogApi>(),
+      metric: createApiFixture<MetricApi>(),
     })
     .boot();
 }

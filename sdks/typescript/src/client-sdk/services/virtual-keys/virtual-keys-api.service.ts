@@ -214,6 +214,12 @@ export class VirtualKeysApiService {
     this.projectId = config?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
+  private mergedHeaders(extra: HeadersInit | undefined): Headers {
+    const merged = new Headers(this.headers());
+    new Headers(extra).forEach((value, key) => merged.set(key, value));
+    return merged;
+  }
+
   private headers(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.apiKey}`,
@@ -233,7 +239,7 @@ export class VirtualKeysApiService {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
-      headers: { ...this.headers(), ...init?.headers },
+      headers: this.mergedHeaders(init?.headers),
     });
     if (!response.ok) {
       let parsedBody: unknown;

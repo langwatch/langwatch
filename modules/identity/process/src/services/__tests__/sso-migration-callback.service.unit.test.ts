@@ -11,8 +11,8 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
+import { inMemoryIdentityUsers } from "../../__tests__/support/identity-memory-repositories.ts";
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
-import { inMemoryIdentityUsers } from "../../testing.ts";
 import { SsoMigrationCallbackService } from "../sso-migration-callback.service.ts";
 
 const ORGANIZATION_ID = "org_acme";

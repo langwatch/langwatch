@@ -63,7 +63,7 @@ describe("PromptService", () => {
             inputs: [{ identifier: "name", type: "str" as const }],
           });
 
-          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
           compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -111,7 +111,7 @@ describe("PromptService", () => {
             ],
           });
 
-          vi.spyOn(promptService, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
+          vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockResolvedValue(existingPrompt);
 
           compareConfigContent.mockReturnValue({
             isEqual: true,
@@ -152,13 +152,13 @@ describe("PromptService", () => {
       describe("when synced with template variables", () => {
         /** @scenario CLI hardcoded "input" default is kept only when it appears in the template */
         it("creates the prompt with auto-detected inputs merged", async () => {
-          vi.spyOn(promptService, "getPromptByIdOrHandle").mockRejectedValue(
+          vi.spyOn(promptService.reads, "getPromptByIdOrHandle").mockRejectedValue(
             new NotFoundError("Prompt config not found."),
           );
 
           const createdPrompt = buildExistingPrompt({ version: 1 });
           const createSpy = vi
-            .spyOn(promptService, "createPrompt")
+            .spyOn(promptService.writes, "createPrompt")
             .mockResolvedValue(createdPrompt);
 
           const result = await promptService.syncPrompt({

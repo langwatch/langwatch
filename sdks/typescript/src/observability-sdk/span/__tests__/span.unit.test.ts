@@ -1,5 +1,5 @@
 import { SpanStatusCode } from "@opentelemetry/api";
-import semconv from "@opentelemetry/semantic-conventions/incubating";
+import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
@@ -463,14 +463,16 @@ describe("span.ts", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
       langwatchSpan.end();
-      mockSpan.expectEnded();
+      expect(mockSpan.ended).toBe(true);
+      expect(mockSpan.endTime).toBeDefined();
 
       // Should not throw or change state
       langwatchSpan.end();
       langwatchSpan.end();
 
       expect(mockSpan.end).toHaveBeenCalledTimes(3);
-      mockSpan.expectEnded(); // Still ended, not corrupted
+      expect(mockSpan.ended).toBe(true);
+      expect(mockSpan.endTime).toBeDefined();
     });
   });
 

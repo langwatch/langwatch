@@ -25,15 +25,25 @@ export class LinkProposalService {
     proposals: IdentityHistoryRepository;
     accounts: Pick<AuthApi, "linkProviderAccount">;
   }): LinkProposalService {
-    return new LinkProposalService(deps.guards, deps.ledger, deps.proposals, deps.accounts);
+    return new LinkProposalService(deps);
   }
 
-  private constructor(
-    private readonly guards: LinkProposalGuardsService,
-    private readonly ledger: IdentityLedger,
-    private readonly proposals: IdentityHistoryRepository,
-    private readonly accounts: Pick<AuthApi, "linkProviderAccount">,
-  ) {}
+  private readonly guards: LinkProposalGuardsService;
+  private readonly ledger: IdentityLedger;
+  private readonly proposals: IdentityHistoryRepository;
+  private readonly accounts: Pick<AuthApi, "linkProviderAccount">;
+
+  private constructor(deps: {
+    guards: LinkProposalGuardsService;
+    ledger: IdentityLedger;
+    proposals: IdentityHistoryRepository;
+    accounts: Pick<AuthApi, "linkProviderAccount">;
+  }) {
+    this.guards = deps.guards;
+    this.ledger = deps.ledger;
+    this.proposals = deps.proposals;
+    this.accounts = deps.accounts;
+  }
 
   async confirmLink(input: ConfirmLinkCommandData): Promise<IdentityFact[]> {
     const data = confirmLinkCommandDataSchema.parse(input);

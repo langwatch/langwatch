@@ -33,6 +33,69 @@ export type UiParameterLineFieldProps = {
   testId: string;
 };
 
+/** A dataset column as a dataset surface names it: its name and its type's name. */
+export type UiDatasetColumn = { name: string; type: string };
+
+/** What a screen hands dataset's lent create-or-edit drawer. */
+export type UiAddOrEditDatasetDrawerProps = {
+  datasetToSave?: {
+    datasetId?: string;
+    name?: string;
+    columnTypes: UiDatasetColumn[];
+    datasetRecords?: ({ id?: string } & Record<string, unknown>)[];
+  };
+  open?: boolean;
+  onClose?: () => void;
+  onSuccess?: (dataset: {
+    datasetId: string;
+    name: string;
+    columnTypes: UiDatasetColumn[];
+  }) => void;
+  /** Apply the form without saving it: the caller holds the dataset in memory. */
+  localOnly?: boolean;
+  columnVisibility?: {
+    hiddenColumns: Set<string>;
+    onToggleVisibility: (columnName: string) => void;
+  };
+  isColumnsLocked?: boolean;
+};
+
+/** A dataset a borrower holds in memory, with plain columns, as dataset's lent editor reads it. */
+export type UiInMemoryDataset = {
+  datasetId?: string;
+  name?: string;
+  datasetRecords: ({ id: string } & Record<string, unknown>)[];
+  columnTypes: UiDatasetColumn[];
+};
+
+/** What a screen hands dataset's lent editor table: a saved dataset by id, or one in memory. */
+export type UiDatasetEditorTableProps = {
+  datasetId?: string;
+  inMemoryDataset?: UiInMemoryDataset;
+  onUpdateDataset?: (dataset: UiInMemoryDataset & { datasetId?: string }) => void;
+  title?: ReactNode;
+  headerActions?: ReactNode;
+  readEnabled?: boolean;
+  floatingSelectionBar?: boolean;
+  /** Called after column changes are saved, so the host can follow the new shape. */
+  onColumnsChanged?: (columnTypes: UiDatasetColumn[]) => void;
+  /** The dialog's portal target, so the floating cell editor stays inside its pointer scope. */
+  editorPortalRef?: { readonly current: HTMLDivElement | null };
+};
+
+/** What a screen hands dataset's lent record sync, which renders nothing and saves edits. */
+export type UiDatasetRecordSyncProps = {
+  projectId: string | undefined;
+  /** dbDatasetId -> recordId -> changed columns; `_delete: true` marks a deletion. */
+  pendingSavedChanges: Record<string, Record<string, Record<string, unknown>>>;
+  resolveFullRecord: (
+    dbDatasetId: string,
+    recordId: string,
+  ) => ({ id: string } & Record<string, unknown>) | undefined;
+  clearPendingChange: (dbDatasetId: string, recordId: string) => void;
+  onStatus: (state: "idle" | "saving" | "saved" | "error", error?: string) => void;
+};
+
 /** What a screen hands scenario's lent Talk-to-it panel. */
 export type UiTalkToItPanelProps = {
   projectId: string;
@@ -202,7 +265,7 @@ export type UiRedactedFieldProps = {
 
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
-  surface: "simulations" | "simulationRuns";
+  surface: "simulations" | "simulationRuns" | "connectedAgents";
   size?: "sm" | "md";
 };
 
@@ -249,17 +312,26 @@ export type UiSignInMethodLinking = {
   link(input: { provider: string }): Promise<UiLinkSignInMethodOutcome>;
 };
 
+/** A usage-against-limit row licensing lends: a limit type it names, or a caller's label. */
+export type UiResourceLimitRowProps = { current: number; max?: number } & (
+  | { label: string; limitType?: never }
+  | { limitType: "members" | "membersLite"; label?: never }
+);
+
 /**
  * Each capability a peer reads by name, and the shape a declaration must have
  * to fill it: the CORE side of the contract, as `UiSlotProps` is for slots.
  */
 export type UiDeclaredCapabilities = {
+  addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   annotationQueueConversation: UiDeclaredComponent<UiAnnotationQueueConversationProps>;
   /** A card on the Authentication overview; `section` places it, sign-in first. */
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
+  datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
@@ -271,6 +343,7 @@ export type UiDeclaredCapabilities = {
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
   redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
+  resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;

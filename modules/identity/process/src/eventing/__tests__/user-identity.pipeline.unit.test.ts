@@ -7,13 +7,16 @@ import {
 } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
 
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "../../__tests__/support/identity-memory-repositories.ts";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { MemoryIdentityHistoryRepository } from "../../repositories/memory/memory.identity-history.repository.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { CryptoIdentifierIdentityService } from "../../services/crypto-identifier-identity.service.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import { LinkProposalGuardsService } from "../../services/link-proposal-guards.service.ts";
-import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { AttachIdentifierCommand } from "../attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../detach-identifier.intent.ts";
 import { EraseUserCommand } from "../erase-user.intent.ts";

@@ -4,28 +4,39 @@
  * it stamps authoritatively, and what an exporter is told about a signal this
  * deployment folds nowhere. Spec: specs/ai-gateway/governance/
  */
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type {
+  GovernanceIngestionSource,
+  GovernanceRestApi,
+} from "@langwatch/enterprise-governance-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import { HandledError } from "@langwatch/handled-error";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
-import { TestGovernanceService } from "../../app/__tests__/support/test-governance-service.ts";
-import type { GovernanceIngestRateLimiter } from "../../app/governance.members.ts";
+import { MemoryOttlTransformChannel } from "../../channels/memory/memory.ottl-transform.channel.ts";
+import { CanonicalCostExtractorService } from "../../services/canonical-cost-extractor.service.ts";
 import { GovernanceIngestAccessService } from "../../services/governance-ingest-access.service.ts";
+import { GovernanceIngestPrincipalService } from "../../services/governance-ingest-principal.service.ts";
 import {
   GovernanceIngestReceiverService,
   type GovernanceIngestLogCollectionChannel,
   type GovernanceIngestMetricCollectionChannel,
-  type GovernanceIngestPrincipalDirectory,
   type GovernanceIngestTraceCollection,
 } from "../../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../../services/governance-ingest.service.ts";
+import type { IngestionSourceService } from "../../services/ingestion-source.service.ts";
 import { governanceIngestRest } from "../governance-ingest.rest.ts";
 
 const SECRET = "lw_is_abcdef123";
 const SOURCE_ID = "src_1";
 const ORGANIZATION_ID = "org_1";
 
-const SOURCE = {
+const SOURCE: GovernanceIngestionSource = {
   id: SOURCE_ID,
   organizationId: ORGANIZATION_ID,
   teamId: null,
@@ -33,174 +44,90 @@ const SOURCE = {
   name: "Workato",
   status: "active",
   description: null,
-  parserConfig: null,
+  parserConfig: {},
   lastEventAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   archivedAt: null,
+  ingestSecretHash: "hash-of-the-secret",
+  pollerCursor: null,
+  errorCount: 0,
+  pullSchedule: null,
+  createdById: null,
 };
 
-/** A dependency this door never reaches; calling one is the test's own bug. */
-const unreachable = <Method>(): Method =>
-  (() => Promise.reject(new Error("not reachable through the ingest door"))) as Method;
-
-const renderHandled: RestErrorHandler = (_error, c) => c.json({ error: "server_error" }, 500);
+const renderHandled: RestErrorHandler = (error) =>
+  HandledError.isHandled(error)
+    ? new Response(JSON.stringify({ code: error.code, message: error.message }), {
+        status: error.httpStatus,
+        headers: { "content-type": "application/json" },
+      })
+    : new Response(JSON.stringify({ code: "server_error" }), { status: 500 });
 
 type World = {
-  source?: Record<string, unknown> | null;
-  rateLimit?: GovernanceIngestRateLimiter;
+  source?: GovernanceIngestionSource | null;
+  rateLimiter?: RateLimiter;
+  rateLimitDisabled?: boolean;
   traceCollection?: GovernanceIngestTraceCollection;
   logCollection?: GovernanceIngestLogCollectionChannel;
   metricCollection?: GovernanceIngestMetricCollectionChannel;
 };
 
 function mountIngest(world: World = {}) {
-  const findIngestionSourceByIngestSecret = vi
-    .fn()
+  const findByIngestSecret = vi
+    .fn<IngestionSourceService["findByIngestSecret"]>()
     .mockResolvedValue(world.source === void 0 ? SOURCE : world.source);
-  const ingestionSourceRecordEventReceived = vi.fn().mockResolvedValue(void 0);
-  const governance = Object.assign(new TestGovernanceService(), {
-    findIngestionSourceByIngestSecret,
-    ingestionSourceRecordEventReceived,
+  const recordEventReceived = vi
+    .fn<IngestionSourceService["recordEventReceived"]>()
+    .mockResolvedValue(void 0);
+  const traceCollectionMock = vi.fn<GovernanceIngestTraceCollection>().mockResolvedValue({
+    rejectedSpans: 0,
   });
-  const traceCollectionMock = vi.fn().mockResolvedValue({ rejectedSpans: 0 });
-  const traceCollection: GovernanceIngestTraceCollection =
-    world.traceCollection ?? traceCollectionMock;
-  const directory: GovernanceIngestPrincipalDirectory = {
-    findMemberIdByEmail: unreachable<GovernanceIngestPrincipalDirectory["findMemberIdByEmail"]>(),
-  };
 
   const ingest = GovernanceIngestService.create({
     access: GovernanceIngestAccessService.create({
-      governance: () => governance,
-      ...(world.rateLimit ? { rateLimit: world.rateLimit } : {}),
+      sources: { findByIngestSecret },
+      rateLimiter: world.rateLimiter ?? memoryRateLimiter(),
+      rateLimitDisabled: world.rateLimitDisabled ?? false,
     }),
     receiver: GovernanceIngestReceiverService.create({
-      governance: () => governance,
-      projects: () => ({ ensureInternal: vi.fn().mockResolvedValue({ id: "gov_project" }) }),
-      traceCollection,
-      ...(world.logCollection ? { logCollection: world.logCollection } : {}),
-      ...(world.metricCollection ? { metricCollection: world.metricCollection } : {}),
-      directory: () => directory,
+      sources: { recordEventReceived },
+      costEvents: CanonicalCostExtractorService.create(),
+      ottl: MemoryOttlTransformChannel.create(),
+      projects: createApiFixture<ProjectApi>({
+        ensureInternal: async ({ organizationId, kind }) => ({
+          id: "gov_project",
+          name: `Governance ${organizationId}`,
+          slug: "gov-project",
+          teamId: "team_gov",
+          kind,
+          archivedAtMs: null,
+          traceSharingEnabled: false,
+        }),
+      }),
+      traceCollection: world.traceCollection ?? traceCollectionMock,
+      logCollection:
+        world.logCollection ??
+        vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue(void 0),
+      metricCollection:
+        world.metricCollection ??
+        vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
+          outcome: "collected",
+          acceptedDataPoints: 0,
+          rejectedDataPoints: 0,
+        }),
+      spend: createApiFixture<GatewayApi>(),
+      directory: GovernanceIngestPrincipalService.create({
+        organizations: createApiFixture<OrganizationApi>(),
+      }),
     }),
   });
-  const unsupportedRestOperation = (): Promise<never> =>
-    Promise.reject(new Error("not reachable through the ingest door"));
-  const app: GovernanceRestApi = {
+  const app = createApiFixture<GovernanceRestApi>({
     ingestOtlpTraces: (input) => ingest.receiveOtlpTraces(input),
     ingestWebhook: (input) => ingest.receiveWebhook(input),
     ingestOtlpLogs: (input) => ingest.receiveOtlpLogs(input),
     ingestOtlpMetrics: (input) => ingest.receiveOtlpMetrics(input),
-    registerMcpTools: () => {
-      throw new Error("not reachable through the ingest door");
-    },
-    cliBudgetStatus: unsupportedRestOperation,
-    cliBootstrapRead: unsupportedRestOperation,
-    cliBudgetOverview: unsupportedRestOperation,
-    cliPersonalProject: unsupportedRestOperation,
-    cliVirtualKey: unsupportedRestOperation,
-    cliProjectKey: unsupportedRestOperation,
-    cliIngestionSources: unsupportedRestOperation,
-    cliIngestionSourceEvents: unsupportedRestOperation,
-    cliIngestionSourceHealth: unsupportedRestOperation,
-    cliGovernanceStatus: unsupportedRestOperation,
-    cliIngestionTemplates: unsupportedRestOperation,
-    cliIngestionKey: unsupportedRestOperation,
-    cliIngestionKeys: unsupportedRestOperation,
-    cliIngestionKeyState: unsupportedRestOperation,
-    listIngestionTemplatesForMember: unsupportedRestOperation,
-    listIngestionTemplatesForAdmin: unsupportedRestOperation,
-    getIngestionTemplate: unsupportedRestOperation,
-    createIngestionTemplate: unsupportedRestOperation,
-    updateIngestionTemplateOttlRules: unsupportedRestOperation,
-    archiveIngestionTemplate: unsupportedRestOperation,
-    cloneIngestionTemplate: unsupportedRestOperation,
-    departmentResolveByNameOrCreate: unsupportedRestOperation,
-    departmentAssignUser: unsupportedRestOperation,
-    aiToolListForUser: unsupportedRestOperation,
-    aiToolProviderAvailability: unsupportedRestOperation,
-    aiToolClaudeCodeOtlpEndpoint: unsupportedRestOperation,
-    aiToolListForAdmin: unsupportedRestOperation,
-    aiToolGetById: unsupportedRestOperation,
-    aiToolCreate: unsupportedRestOperation,
-    aiToolUpdate: unsupportedRestOperation,
-    aiToolRemove: unsupportedRestOperation,
-    aiToolSeedStarterPack: unsupportedRestOperation,
-    aiToolListProviderOptionsForAdmin: unsupportedRestOperation,
-    aiToolListRoutingPolicyOptionsForAdmin: unsupportedRestOperation,
-    aiToolReorder: unsupportedRestOperation,
-    aiToolStarterPackCatalog: () => [],
-    templateListForUser: unsupportedRestOperation,
-    templateListForOrgAdmin: unsupportedRestOperation,
-    templateGetByIdForOrg: unsupportedRestOperation,
-    templateCreateOrg: unsupportedRestOperation,
-    templateUpdateOttlRules: unsupportedRestOperation,
-    templateArchiveOrg: unsupportedRestOperation,
-    templateCloneFromPlatform: unsupportedRestOperation,
-    findActorWorkspace: unsupportedRestOperation,
-    anomalyRuleList: unsupportedRestOperation,
-    anomalyRuleGetById: unsupportedRestOperation,
-    anomalyRuleCreate: unsupportedRestOperation,
-    anomalyRuleUpdate: unsupportedRestOperation,
-    anomalyRuleArchive: unsupportedRestOperation,
-    activitySummary: unsupportedRestOperation,
-    activitySpendByUser: unsupportedRestOperation,
-    activitySpendByTeam: unsupportedRestOperation,
-    activitySpendByDepartment: unsupportedRestOperation,
-    activitySpendOverTime: unsupportedRestOperation,
-    activityRecentAnomalies: unsupportedRestOperation,
-    activityIngestionSourcesHealth: unsupportedRestOperation,
-    activityEventsForSource: unsupportedRestOperation,
-    activitySourceHealthMetrics: unsupportedRestOperation,
-    sessionPolicyGet: unsupportedRestOperation,
-    sessionPolicySetMaxDuration: unsupportedRestOperation,
-    governanceAgentsSyncSources: unsupportedRestOperation,
-    governanceAgentsRequestListing: unsupportedRestOperation,
-    governanceAgentsList: unsupportedRestOperation,
-    governanceCostSummary: unsupportedRestOperation,
-    governanceCostDailyByProvider: unsupportedRestOperation,
-    governanceCostSpendByModel: unsupportedRestOperation,
-    governanceCostPeriodRecords: unsupportedRestOperation,
-    governanceCostSpenders: unsupportedRestOperation,
-    governancePeopleList: unsupportedRestOperation,
-    governancePeopleSuggestions: unsupportedRestOperation,
-    governancePeopleRunMatch: unsupportedRestOperation,
-    governancePeopleConfirmSuggestion: unsupportedRestOperation,
-    ingestionKeyList: unsupportedRestOperation,
-    ingestionKeyInstall: unsupportedRestOperation,
-    ingestionKeyRotate: unsupportedRestOperation,
-    ingestionKeyRevoke: unsupportedRestOperation,
-    governanceSetupState: unsupportedRestOperation,
-    ingestionSourceList: unsupportedRestOperation,
-    ingestionSourceGet: unsupportedRestOperation,
-    ingestionSourceCreate: unsupportedRestOperation,
-    ingestionSourceUpdate: unsupportedRestOperation,
-    ingestionSourceRotateSecret: unsupportedRestOperation,
-    ingestionSourceArchive: unsupportedRestOperation,
-    ingestionSourceValidateOttl: unsupportedRestOperation,
-    governanceResolveHome: unsupportedRestOperation,
-    ingestionSourceOttlStarter: () => {
-      throw new Error("not reachable through this door");
-    },
-    governanceRecordWorkspaceView: unsupportedRestOperation,
-    governanceOcsfExport: unsupportedRestOperation,
-    governanceQuarantineFillStats: unsupportedRestOperation,
-    cliSessionListForUser: unsupportedRestOperation,
-    cliSessionRevoke: unsupportedRestOperation,
-    cliSessionRevokeAll: unsupportedRestOperation,
-    personalWebSessionList: unsupportedRestOperation,
-    personalWebSessionEnd: unsupportedRestOperation,
-    personalWebSessionsEndForIdentifier: unsupportedRestOperation,
-    departmentList: unsupportedRestOperation,
-    departmentAssignments: unsupportedRestOperation,
-    departmentCreate: unsupportedRestOperation,
-    departmentRename: unsupportedRestOperation,
-    departmentArchive: unsupportedRestOperation,
-    departmentAssignTeam: unsupportedRestOperation,
-    departmentAssignProject: unsupportedRestOperation,
-    personalUsageDashboard: unsupportedRestOperation,
-    personalBudgetOverview: unsupportedRestOperation,
-    cliBootstrap: unsupportedRestOperation,
-  };
+  });
 
   const runtime = createRestRuntime({
     identity: {
@@ -217,8 +144,8 @@ function mountIngest(world: World = {}) {
 
   return {
     traceCollection: traceCollectionMock,
-    ingestionSourceRecordEventReceived,
-    findIngestionSourceByIngestSecret,
+    ingestionSourceRecordEventReceived: recordEventReceived,
+    findIngestionSourceByIngestSecret: findByIngestSecret,
     post: (path: string, body: string, headers: Record<string, string> = {}) =>
       hono.fetch(
         new Request(`http://api.test${path}`, {
@@ -238,6 +165,10 @@ const traceBody = JSON.stringify({
   resourceSpans: [{ scopeSpans: [{ spans: [{ name: "one", attributes: [] }] }] }],
 });
 
+const logBody = JSON.stringify({
+  resourceLogs: [{ scopeLogs: [{ logRecords: [{ body: { stringValue: "one" } }] }] }],
+});
+
 const metricBody = JSON.stringify({
   resourceMetrics: [
     { scopeMetrics: [{ metrics: [{ name: "m", sum: { dataPoints: [{ asInt: "1" }] } }] }] },
@@ -252,7 +183,9 @@ describe("the ingestion-source receivers", () => {
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
       expect(api.traceCollection).not.toHaveBeenCalled();
     });
   });
@@ -264,7 +197,9 @@ describe("the ingestion-source receivers", () => {
       const response = await api.post("/api/ingest/otel/src_other", traceBody);
 
       expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({ error: "unauthorized" });
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_source_unauthorized",
+      });
       expect(api.traceCollection).not.toHaveBeenCalled();
     });
   });
@@ -272,7 +207,7 @@ describe("the ingestion-source receivers", () => {
   describe("when the per-caller throttle refuses", () => {
     it("sheds at the edge with Retry-After, before the secret lookup", async () => {
       const api = mountIngest({
-        rateLimit: { check: vi.fn().mockResolvedValue({ allowed: false, retryAfterSec: 30 }) },
+        rateLimiter: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
       });
 
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
@@ -283,6 +218,19 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
+  describe("given the deployment switched the throttle off", () => {
+    it("lets a caller the limiter would refuse through to its source", async () => {
+      const api = mountIngest({
+        rateLimiter: { check: async () => ({ allowed: false, retryAfterSeconds: 30 }) },
+        rateLimitDisabled: true,
+      });
+
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
+
+      expect(response.status).toBe(202);
+    });
+  });
+
   describe("given a source type the OTLP path does not serve", () => {
     it("answers wrong_endpoint and hands nothing to the trace pipeline", async () => {
       const api = mountIngest({ source: { ...SOURCE, sourceType: "workato" } });
@@ -290,11 +238,7 @@ describe("the ingestion-source receivers", () => {
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}`, traceBody);
 
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({
-        error: "wrong_endpoint",
-        error_description:
-          "OTLP path is only valid for otel_generic, claude_cowork, and claude_code sources",
-      });
+      await expect(response.json()).resolves.toMatchObject({ code: "ingestion_wrong_endpoint" });
       expect(api.traceCollection).not.toHaveBeenCalled();
     });
   });
@@ -328,52 +272,60 @@ describe("the ingestion-source receivers", () => {
     });
   });
 
-  describe("given a deployment that folds no logs anywhere", () => {
-    it("answers a permanent 404 rather than a status an exporter would retry", async () => {
-      const api = mountIngest();
+  describe("when an OTLP log batch arrives for a source", () => {
+    it("hands its records to the log pipeline under the governance project", async () => {
+      const logCollection = vi.fn<GovernanceIngestLogCollectionChannel>().mockResolvedValue({
+        outcome: "collected",
+        acceptedLogRecords: 1,
+        rejectedLogRecords: 0,
+      });
+      const api = mountIngest({ logCollection });
 
-      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, "{}");
+      const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/logs`, logBody);
 
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "not_served" });
-      expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
-    });
-
-    it("refuses the webhook receiver the same way", async () => {
-      const api = mountIngest();
-
-      const response = await api.post(`/api/ingest/webhook/${SOURCE_ID}`, "{}");
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "not_served" });
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({ accepted: true, logRecords: 1 });
+      expect(logCollection).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "gov_project", organizationId: ORGANIZATION_ID }),
+      );
+      expect(api.ingestionSourceRecordEventReceived).toHaveBeenCalledWith(SOURCE_ID);
     });
   });
 
-  describe("given a deployment that folds no metrics anywhere", () => {
-    it("answers a permanent 404, not a retryable one", async () => {
-      const api = mountIngest();
+  describe("when an OTLP metric batch arrives for a source", () => {
+    it("hands its data points to the metric pipeline and reports what was accepted", async () => {
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
+        outcome: "collected",
+        acceptedDataPoints: 1,
+        rejectedDataPoints: 0,
+      });
+      const api = mountIngest({ metricCollection });
 
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody);
 
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toMatchObject({ error: "not_served" });
+      expect(response.status).toBe(202);
+      await expect(response.json()).resolves.toMatchObject({
+        accepted: true,
+        acceptedDataPoints: 1,
+      });
+      expect(metricCollection).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("when the metric pipeline is momentarily unavailable", () => {
     it("answers 503 and records no source event, so the retry cannot double-count", async () => {
-      const metricCollection = vi.fn().mockResolvedValue({
+      const metricCollection = vi.fn<GovernanceIngestMetricCollectionChannel>().mockResolvedValue({
         outcome: "unavailable",
         errorMessage: "queue down",
-        rejectedDataPoints: 0,
-        acceptedDataPoints: 0,
       });
       const api = mountIngest({ metricCollection });
 
       const response = await api.post(`/api/ingest/otel/${SOURCE_ID}/v1/metrics`, metricBody);
 
       expect(response.status).toBe(503);
-      await expect(response.json()).resolves.toEqual({ accepted: false, error: "queue down" });
+      await expect(response.json()).resolves.toMatchObject({
+        code: "ingestion_receiver_unavailable",
+      });
       expect(api.ingestionSourceRecordEventReceived).not.toHaveBeenCalled();
     });
   });

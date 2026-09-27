@@ -7,6 +7,8 @@ import { createRestRuntime } from "@langwatch/api/rest";
 import type * as observabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { CollectorIngestInput } from "../../rules/trace-collector-body.rules.ts";
+
 const logCalls: { level: string; fields: unknown; message: string }[] = [];
 
 vi.mock("@langwatch/observability", async (importOriginal) => {
@@ -31,6 +33,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
 });
 
 const { collectorRest } = await import("../collector.rest.ts");
+const { TraceCollectorDispatchService } =
+  await import("../../services/trace-collector-dispatch.service.ts");
 
 const project = { id: "project-123", teamId: "team-1", organizationId: "org-1" };
 
@@ -54,12 +58,15 @@ const collector = runtime.mount(collectorRest.router(), {
   app: () => ({
     collectorCredential: async () => ({ project, markUsed: () => undefined }),
     collectorUsageLimit: async () => undefined,
-    ingestSpan: async () => {
-      ingestedSpanCount++;
-      return { status: "collected" };
-    },
-    reportEvaluation: async () => undefined,
-    deriveEvaluatorId: (name: string) => name,
+    collectorIngest: (input: CollectorIngestInput) =>
+      TraceCollectorDispatchService.create({
+        ingestSpan: async () => {
+          ingestedSpanCount++;
+          return { status: "collected" };
+        },
+        reportEvaluation: async () => undefined,
+        deriveEvaluatorId: (name: string) => name,
+      }).ingest(input),
     collectorReportError: (error: Error, context: unknown) => {
       reportedErrors.push({ message: error.message, context });
     },

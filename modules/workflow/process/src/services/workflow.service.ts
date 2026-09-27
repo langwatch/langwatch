@@ -243,13 +243,13 @@ export class WorkflowService {
       projectId: input.projectId,
       includeVersion: false,
     });
+    if (!workflow.publishedId) {
+      throw new WorkflowNotPublishedError(input.workflowId);
+    }
+
     const version = await this.options.repository.findPublishedVersion(input);
     if (!version) {
-      if (!workflow.publishedId && !input.versionId) {
-        throw new WorkflowNotPublishedError(input.workflowId);
-      }
-
-      throw new WorkflowVersionNotFoundError(input.versionId ?? workflow.publishedId ?? "");
+      throw new WorkflowVersionNotFoundError(input.versionId ?? workflow.publishedId);
     }
 
     return version;

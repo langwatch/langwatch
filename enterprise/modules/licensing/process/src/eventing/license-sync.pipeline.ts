@@ -18,7 +18,7 @@ import { LICENSE_SYNC_PROCESS_NAME, runLicenseSync } from "./license-sync.intent
 import {
   LICENSE_SYNC_FIRST_DELAY_MS,
   LICENSE_SYNC_INITIAL_STATE,
-  type LicenseSyncState,
+  licenseSyncStateSchema,
   licenseSyncSchema,
   licenseSyncWake,
 } from "./license-sync.process.ts";
@@ -40,7 +40,7 @@ export function buildLicenseSync({
     .withEvents([])
     .withProcessManager(LICENSE_SYNC_PROCESS_NAME, (pm) =>
       pm
-        .state<LicenseSyncState>(LICENSE_SYNC_INITIAL_STATE)
+        .state(licenseSyncStateSchema, LICENSE_SYNC_INITIAL_STATE)
         .schedule({ everyMs: LICENSE_SYNC_FIRST_DELAY_MS })
         .onWake(licenseSyncWake({ bootedAt }))
         .intent(

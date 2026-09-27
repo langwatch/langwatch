@@ -1,6 +1,6 @@
 /**
  * Test builders for the AuthZ application, composed from the two contract
- * services (`app/postgres-authz.build.ts` composes from repositories): a
+ * services (`app/authz-composition.build.ts` composes from repositories): a
  * test states the slice it exercises, and the builder refuses the rest.
  */
 import type {

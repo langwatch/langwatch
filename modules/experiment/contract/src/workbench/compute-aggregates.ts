@@ -54,154 +54,143 @@ export type TargetAggregate = {
   costStats: MetricStats | null;
 };
 
+const isSettled = (result: unknown): boolean => {
+  if (result === undefined || result === null) return false;
+  const { status } = parseEvaluationResult(result);
+  return status !== "pending" && status !== "running";
+};
+
+type TargetRowProgress = {
+  completedRows: number;
+  errorRows: number;
+  costValues: number[];
+  latencyValues: number[];
+};
+
 /**
- * Computes aggregate statistics for a target from evaluation results.
+ * A row is complete once its output (or error) is in AND every evaluator has
+ * settled; its metadata carries the cost and latency the header averages.
  */
-export const computeTargetAggregates = (
-  targetId: string,
-  results: EvaluationResults,
-  evaluators: { id: string }[],
-  rowCount: number,
-): TargetAggregate => {
+const targetRowProgress = ({
+  targetId,
+  results,
+  evaluators,
+  rowCount,
+}: {
+  targetId: string;
+  results: EvaluationResults;
+  evaluators: { id: string }[];
+  rowCount: number;
+}): TargetRowProgress => {
   const targetOutputs = results.targetOutputs[targetId] ?? [];
   const targetMetadata = results.targetMetadata?.[targetId] ?? [];
   const targetErrors = results.errors[targetId] ?? [];
   const evaluatorResults = results.evaluatorResults[targetId] ?? {};
-
-  // Count completed rows and compute cost/latency averages
-  // A row is "complete" only when target output is done AND all evaluators have finished
-  let completedRows = 0;
-  let errorRows = 0;
-  const costValues: number[] = [];
-  const latencyValues: number[] = [];
+  const progress: TargetRowProgress = {
+    completedRows: 0,
+    errorRows: 0,
+    costValues: [],
+    latencyValues: [],
+  };
 
   for (let i = 0; i < rowCount; i++) {
     const hasOutput = targetOutputs[i] !== undefined && targetOutputs[i] !== null;
     const hasError = !!targetErrors[i];
+    const allSettled = evaluators.every((evaluator) =>
+      isSettled(evaluatorResults[evaluator.id]?.[i]),
+    );
+    if ((hasOutput || hasError) && allSettled) progress.completedRows++;
+    if (hasError) progress.errorRows++;
 
-    // Check if all evaluators have completed for this row
-    const allEvaluatorsComplete = evaluators.every((evaluator) => {
-      const evalResult = evaluatorResults[evaluator.id]?.[i];
-      if (evalResult === undefined || evalResult === null) {
-        return false;
-      }
-
-      const parsed = parseEvaluationResult(evalResult);
-
-      return parsed.status !== "pending" && parsed.status !== "running";
-    });
-
-    // Row is complete only when target is done AND all evaluators are done
-    if ((hasOutput || hasError) && allEvaluatorsComplete) {
-      completedRows++;
-    }
-    if (hasError) {
-      errorRows++;
-    }
-
-    // Collect cost and latency values from metadata
     const metadata = targetMetadata[i];
-    if (metadata) {
-      if (metadata.cost !== undefined && metadata.cost !== null) {
-        costValues.push(metadata.cost);
-      }
-      if (metadata.duration !== undefined && metadata.duration !== null) {
-        latencyValues.push(metadata.duration);
-      }
+    if (metadata?.cost !== undefined && metadata.cost !== null) {
+      progress.costValues.push(metadata.cost);
+    }
+    if (metadata?.duration !== undefined && metadata.duration !== null) {
+      progress.latencyValues.push(metadata.duration);
     }
   }
 
-  // Compute detailed stats
-  const latencyStats = computeMetricStats(latencyValues);
-  const costStats = computeMetricStats(costValues);
+  return progress;
+};
 
-  // Compute per-evaluator aggregates
-  const evaluatorAggregates: EvaluatorAggregate[] = evaluators.map((evaluator) => {
-    const evalResults = evaluatorResults[evaluator.id] ?? [];
+/**
+ * One evaluator's tally over the settled rows. The pass rate counts only
+ * explicit pass/fail verdicts; "processed" and "skipped" never count toward it.
+ */
+const evaluatorAggregateFor = ({
+  evaluatorId,
+  evalResults,
+  rowCount,
+}: {
+  evaluatorId: string;
+  evalResults: unknown[];
+  rowCount: number;
+}): EvaluatorAggregate => {
+  const parsed = evalResults
+    .slice(0, rowCount)
+    .filter(isSettled)
+    .map((result) => parseEvaluationResult(result));
+  const passed = parsed.filter((r) => r.status === "passed").length;
+  const failed = parsed.filter((r) => r.status === "failed").length;
+  const scores = parsed
+    .map((r) => r.score)
+    .filter((score): score is number => score !== undefined && score !== null);
 
-    let total = 0;
-    let passed = 0;
-    let failed = 0;
-    let errors = 0;
-    let scoreSum = 0;
-    let scoreCount = 0;
-    // Count results that have explicit pass/fail for pass rate calculation
-    let passFailCount = 0;
+  return {
+    evaluatorId,
+    total: parsed.length,
+    passed,
+    failed,
+    errors: parsed.filter((r) => r.status === "error").length,
+    passRate: passed + failed > 0 ? (passed / (passed + failed)) * 100 : null,
+    averageScore: scores.length > 0 ? scores.reduce((sum, v) => sum + v, 0) / scores.length : null,
+  };
+};
 
-    for (let i = 0; i < rowCount; i++) {
-      const result = evalResults[i];
-      if (result === undefined || result === null) continue;
-
-      const parsed = parseEvaluationResult(result);
-      if (parsed.status === "pending" || parsed.status === "running") continue;
-
-      total++;
-
-      if (parsed.status === "passed") {
-        passed++;
-        passFailCount++;
-      } else if (parsed.status === "failed") {
-        failed++;
-        passFailCount++;
-      } else if (parsed.status === "error") {
-        errors++;
-      }
-      // "processed" and "skipped" don't count towards pass rate
-
-      if (parsed.score !== undefined && parsed.score !== null) {
-        scoreSum += parsed.score;
-        scoreCount++;
-      }
-    }
-
-    return {
+/**
+ * Computes aggregate statistics for a target from evaluation results.
+ */
+export const computeTargetAggregates = ({
+  targetId,
+  results,
+  evaluators,
+  rowCount,
+}: {
+  targetId: string;
+  results: EvaluationResults;
+  evaluators: { id: string }[];
+  rowCount: number;
+}): TargetAggregate => {
+  const progress = targetRowProgress({ targetId, results, evaluators, rowCount });
+  const latencyStats = computeMetricStats(progress.latencyValues);
+  const costStats = computeMetricStats(progress.costValues);
+  const evaluatorResults = results.evaluatorResults[targetId] ?? {};
+  const evaluatorAggregates = evaluators.map((evaluator) =>
+    evaluatorAggregateFor({
       evaluatorId: evaluator.id,
-      total,
-      passed,
-      failed,
-      errors,
-      // Pass rate only counts results with explicit pass/fail, not score-only ("processed")
-      passRate: passFailCount > 0 ? (passed / passFailCount) * 100 : null,
-      averageScore: scoreCount > 0 ? scoreSum / scoreCount : null,
-    };
-  });
+      evalResults: evaluatorResults[evaluator.id] ?? [],
+      rowCount,
+    }),
+  );
 
-  // Compute overall pass rate (sum of passed / sum of passed+failed)
-  // Only count evaluators that have explicit pass/fail results, not score-only
+  // Overall pass rate: passed over passed+failed, across evaluators with explicit verdicts.
   const totalPassFail = evaluatorAggregates.reduce((sum, e) => sum + e.passed + e.failed, 0);
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
-
-  // Compute overall average score (across all evaluators with scores)
-  const _allScoreSums = evaluatorAggregates.reduce(
-    (acc, e) => {
-      if (e.averageScore !== null) {
-        return {
-          sum: acc.sum + e.averageScore * e.total,
-          count: acc.count + e.total,
-        };
-      }
-      return acc;
-    },
-    { sum: 0, count: 0 },
-  );
-  // Actually we want the average of the individual scores, not weighted by total
-  // Let's just average the non-null averageScores
-  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
-  const overallAverageScore =
-    scoresWithValues.length > 0
-      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
-        scoresWithValues.length
-      : null;
+  // Overall score: the plain mean of each evaluator's own average, not weighted by rows.
+  const averages = evaluatorAggregates
+    .map((e) => e.averageScore)
+    .filter((score): score is number => score !== null);
 
   return {
     targetId,
-    completedRows,
+    completedRows: progress.completedRows,
     totalRows: rowCount,
-    errorRows,
+    errorRows: progress.errorRows,
     evaluators: evaluatorAggregates,
-    overallPassRate,
-    overallAverageScore,
+    overallPassRate: totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null,
+    overallAverageScore:
+      averages.length > 0 ? averages.reduce((sum, v) => sum + v, 0) / averages.length : null,
     averageCost: costStats?.avg ?? null,
     totalCost: costStats?.total ?? null,
     averageLatency: latencyStats?.avg ?? null,
@@ -210,6 +199,12 @@ export const computeTargetAggregates = (
     costStats,
   };
 };
+
+/** The finite numbers among `values`. */
+const finiteNumbers = (values: unknown[]): number[] =>
+  values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+const sumOf = (values: number[]): number => values.reduce((sum, v) => sum + v, 0);
 
 /**
  * Compute aggregate stats for a comparison column so the workbench header
@@ -237,32 +232,14 @@ export const computeComparisonColumnTargetAggregate = (
     if (!rowMetadata.some(Boolean) && !verdict) continue;
     completedRows++;
 
-    let rowCost = 0;
-    let sawCost = false;
-    for (const m of rowMetadata) {
-      if (m && typeof m.cost === "number" && Number.isFinite(m.cost)) {
-        rowCost += m.cost;
-        sawCost = true;
-      }
-    }
-    if (verdict) {
-      const judgeCost = readCostAmount(verdict);
-      if (judgeCost > 0) {
-        rowCost += judgeCost;
-        sawCost = true;
-      }
-    }
-    if (sawCost) costValues.push(rowCost);
-
-    let rowLatency = 0;
-    let sawLatency = false;
-    for (const m of rowMetadata) {
-      if (m && typeof m.duration === "number" && Number.isFinite(m.duration)) {
-        rowLatency += m.duration;
-        sawLatency = true;
-      }
-    }
-    if (sawLatency) latencyValues.push(rowLatency);
+    const judgeCost = verdict ? readCostAmount(verdict) : 0;
+    const rowCosts = finiteNumbers([
+      ...rowMetadata.map((m) => m?.cost),
+      judgeCost > 0 ? judgeCost : undefined,
+    ]);
+    if (rowCosts.length > 0) costValues.push(sumOf(rowCosts));
+    const rowLatencies = finiteNumbers(rowMetadata.map((m) => m?.duration));
+    if (rowLatencies.length > 0) latencyValues.push(sumOf(rowLatencies));
   }
 
   const costStats = computeMetricStats(costValues);

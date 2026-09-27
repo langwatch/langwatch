@@ -10,9 +10,10 @@ export const breakGlassExpiryWarnSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface BreakGlassExpiryWarnState {
-  lastWarnAt: number | null;
-}
+export const breakGlassExpiryWarnStateSchema = z.object({
+  lastWarnAt: z.number().nullable(),
+});
+export type BreakGlassExpiryWarnState = z.infer<typeof breakGlassExpiryWarnStateSchema>;
 
 export const BREAK_GLASS_EXPIRY_WARN_INITIAL_STATE: BreakGlassExpiryWarnState = {
   lastWarnAt: null,

@@ -45,25 +45,15 @@ const getEvaluatorName = ({
   return evaluatorNames.get(evaluatorId) ?? evaluatorId;
 };
 
-export const TargetSummary = memo(function TargetSummary({
+/** The per-target breakdown the summary chip shows on hover. */
+function TargetSummaryTooltipContent({
   aggregates,
-  evaluators,
-  isRunning = false,
-}: TargetSummaryProps) {
-  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
-  const evaluatorNames = useEvaluatorNames(evaluators);
-
-  // Show summary if we have any completed rows, OR any errors, OR any metrics
-  const hasResults =
-    aggregates.completedRows > 0 || aggregates.errorRows > 0 || aggregates.totalCost !== null;
-
-  const coverage = passRateCoverage({
-    completedRows: aggregates.completedRows,
-    totalRows: aggregates.totalRows,
-  });
-
-  // Build tooltip content
-  const tooltipContent = (
+  evaluatorNames,
+}: {
+  aggregates: TargetAggregate;
+  evaluatorNames: Map<string, string>;
+}) {
+  return (
     <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Progress */}
@@ -207,6 +197,28 @@ export const TargetSummary = memo(function TargetSummary({
         </>
       )}
     </VStack>
+  );
+}
+
+export const TargetSummary = memo(function TargetSummary({
+  aggregates,
+  evaluators,
+  isRunning = false,
+}: TargetSummaryProps) {
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
+  const evaluatorNames = useEvaluatorNames(evaluators);
+
+  // Show summary if we have any completed rows, OR any errors, OR any metrics
+  const hasResults =
+    aggregates.completedRows > 0 || aggregates.errorRows > 0 || aggregates.totalCost !== null;
+
+  const coverage = passRateCoverage({
+    completedRows: aggregates.completedRows,
+    totalRows: aggregates.totalRows,
+  });
+
+  const tooltipContent = (
+    <TargetSummaryTooltipContent aggregates={aggregates} evaluatorNames={evaluatorNames} />
   );
 
   // Don't show anything if no results yet

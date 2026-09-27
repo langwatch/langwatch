@@ -21,8 +21,8 @@
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
     },
     "./realtime-session-reconciliation": {
       "types": "./dist/services/gateway-realtime-session-reconciliation.service.d.ts",
@@ -53,8 +53,8 @@
       "default": "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts"
     },
     "./composition/gateway-transactions": {
-      "types": "./dist/app/postgres.gateway-transaction.d.ts",
-      "default": "./src/app/postgres.gateway-transaction.ts"
+      "types": "./dist/repositories/prisma/prisma.gateway-transaction.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.gateway-transaction.repository.ts"
     },
     "./composition/gateway-virtual-key-direct-budgets": {
       "types": "./dist/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.d.ts",

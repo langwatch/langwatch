@@ -20,10 +20,11 @@ export const githubBranchRecheckSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface GithubBranchRecheckState {
-  lastRecheckAt: number | null;
-  lastPruneAt: number | null;
-}
+export const githubBranchRecheckStateSchema = z.object({
+  lastRecheckAt: z.number().nullable(),
+  lastPruneAt: z.number().nullable(),
+});
+export type GithubBranchRecheckState = z.infer<typeof githubBranchRecheckStateSchema>;
 
 export const GITHUB_BRANCH_RECHECK_INITIAL_STATE: GithubBranchRecheckState = {
   lastRecheckAt: null,

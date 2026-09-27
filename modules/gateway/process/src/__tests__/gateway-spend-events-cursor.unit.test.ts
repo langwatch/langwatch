@@ -1,7 +1,6 @@
-import { GatewaySpendCursorAdapter } from "@langwatch/gateway-process";
 import { describe, expect, it } from "vitest";
 
-const spendCursors = GatewaySpendCursorAdapter.create();
+import * as spendCursors from "../rules/gateway-spend-cursor.rules.ts";
 describe("Feature: Gateway spend reconciliation REST surface", () => {
   describe("given a page cursor", () => {
     describe("when it is encoded and read back", () => {

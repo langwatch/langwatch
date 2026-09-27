@@ -5,8 +5,10 @@ import { computeMetricStats, type MetricStats } from "@langwatch/experiment-cont
  */
 import type {
   BatchEvaluationData,
+  BatchEvaluatorResult,
   BatchResultRow,
   BatchTargetColumn,
+  BatchTargetOutput,
 } from "./batch-evaluation-results.types.ts";
 
 /**
@@ -61,6 +63,29 @@ export type BatchTargetAggregate = {
 };
 
 /**
+ * One evaluator's tally from its results against one target. The pass rate
+ * counts only explicit pass/fail (`passed` true or false), not score-only results.
+ */
+const batchEvaluatorAggregate = (results: BatchEvaluatorResult[]): BatchEvaluatorAggregate => {
+  const passed = results.filter((r) => r.status !== "error" && r.passed === true).length;
+  const failed = results.filter((r) => r.status !== "error" && r.passed === false).length;
+  const scores = results
+    .map((r) => r.score)
+    .filter((score): score is number => score !== null && score !== void 0);
+
+  return {
+    evaluatorId: results[0]?.evaluatorId ?? "",
+    evaluatorName: results[0]?.evaluatorName ?? "",
+    total: results.length,
+    passed,
+    failed,
+    errors: results.filter((r) => r.status === "error").length,
+    passRate: passed + failed > 0 ? (passed / (passed + failed)) * 100 : null,
+    averageScore: scores.length > 0 ? scores.reduce((sum, v) => sum + v, 0) / scores.length : null,
+  };
+};
+
+/**
  * Compute aggregate statistics for a single target from batch data.
  */
 export const computeBatchTargetAggregates = (
@@ -68,130 +93,43 @@ export const computeBatchTargetAggregates = (
   rows: BatchResultRow[],
 ): BatchTargetAggregate => {
   const targetId = targetColumn.id;
+  const outputs = rows
+    .map((row) => row.targets[targetId])
+    .filter((output): output is BatchTargetOutput => !!output);
+  // A row is "completed" once it has output, an error, or any evaluator result.
+  const completedRows = outputs.filter(
+    (o) => o.output !== null || !!o.error || o.evaluatorResults.length > 0,
+  ).length;
+  const latencyStats = computeMetricStats(
+    outputs.flatMap((o) => (o.duration !== null ? [o.duration] : [])),
+  );
+  const costStats = computeMetricStats(outputs.flatMap((o) => (o.cost !== null ? [o.cost] : [])));
 
-  let completedRows = 0;
-  let errorRows = 0;
-  const costValues: number[] = [];
-  const latencyValues: number[] = [];
-
-  // Collect evaluator results by evaluator ID
-  const evaluatorResultsMap = new Map<
-    string,
-    {
-      name: string;
-      total: number;
-      passed: number;
-      failed: number;
-      errors: number;
-      scoreSum: number;
-      scoreCount: number;
-      // Count of results with explicit pass/fail (true/false, not null)
-      passFailCount: number;
-    }
-  >();
-
-  for (const row of rows) {
-    const targetOutput = row.targets[targetId];
-    if (!targetOutput) continue;
-
-    // Count completed/error rows
-    // A row is "completed" if it has output, error, OR evaluator results
-    const hasOutput = targetOutput.output !== null;
-    const hasError = !!targetOutput.error;
-    const hasEvaluatorResults = targetOutput.evaluatorResults.length > 0;
-
-    if (hasOutput || hasError || hasEvaluatorResults) {
-      completedRows++;
-    }
-    if (hasError) {
-      errorRows++;
-    }
-
-    // Collect cost and latency
-    if (targetOutput.cost !== null) {
-      costValues.push(targetOutput.cost);
-    }
-    if (targetOutput.duration !== null) {
-      latencyValues.push(targetOutput.duration);
-    }
-
-    // Process evaluator results
-    for (const evalResult of targetOutput.evaluatorResults) {
-      let agg = evaluatorResultsMap.get(evalResult.evaluatorId);
-      if (!agg) {
-        agg = {
-          name: evalResult.evaluatorName,
-          total: 0,
-          passed: 0,
-          failed: 0,
-          errors: 0,
-          scoreSum: 0,
-          scoreCount: 0,
-          passFailCount: 0,
-        };
-        evaluatorResultsMap.set(evalResult.evaluatorId, agg);
-      }
-
-      agg.total++;
-
-      if (evalResult.status === "error") {
-        agg.errors++;
-      } else if (evalResult.passed === true) {
-        agg.passed++;
-        agg.passFailCount++;
-      } else if (evalResult.passed === false) {
-        agg.failed++;
-        agg.passFailCount++;
-      }
-      // Note: passed === null means no pass/fail determination - don't count towards passFailCount
-
-      if (evalResult.score !== null && evalResult.score !== void 0) {
-        agg.scoreSum += evalResult.score;
-        agg.scoreCount++;
-      }
-    }
+  const resultsByEvaluator = new Map<string, BatchEvaluatorResult[]>();
+  for (const result of outputs.flatMap((o) => o.evaluatorResults)) {
+    resultsByEvaluator.set(result.evaluatorId, [
+      ...(resultsByEvaluator.get(result.evaluatorId) ?? []),
+      result,
+    ]);
   }
+  const evaluatorAggregates = [...resultsByEvaluator.values()].map(batchEvaluatorAggregate);
 
-  // Compute detailed stats
-  const latencyStats = computeMetricStats(latencyValues);
-  const costStats = computeMetricStats(costValues);
-
-  // Build evaluator aggregates
-  const evaluatorAggregates: BatchEvaluatorAggregate[] = Array.from(
-    evaluatorResultsMap.entries(),
-  ).map(([evalId, agg]) => ({
-    evaluatorId: evalId,
-    evaluatorName: agg.name,
-    total: agg.total,
-    passed: agg.passed,
-    failed: agg.failed,
-    errors: agg.errors,
-    // Pass rate only counts results with explicit pass/fail (true/false), not score-only results
-    passRate: agg.passFailCount > 0 ? (agg.passed / agg.passFailCount) * 100 : null,
-    averageScore: agg.scoreCount > 0 ? agg.scoreSum / agg.scoreCount : null,
-  }));
-
-  // Compute overall pass rate (only from evaluators with explicit pass/fail results)
+  // Overall pass rate only from evaluators with explicit pass/fail results.
   const totalPassFail = evaluatorAggregates.reduce((sum, e) => sum + e.passed + e.failed, 0);
   const totalPassed = evaluatorAggregates.reduce((sum, e) => sum + e.passed, 0);
-  const overallPassRate = totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null;
-
-  // Compute overall average score
-  const scoresWithValues = evaluatorAggregates.filter((e) => e.averageScore !== null);
-  const overallAverageScore =
-    scoresWithValues.length > 0
-      ? scoresWithValues.reduce((sum, e) => sum + (e.averageScore ?? 0), 0) /
-        scoresWithValues.length
-      : null;
+  const averages = evaluatorAggregates.flatMap((e) =>
+    e.averageScore !== null ? [e.averageScore] : [],
+  );
 
   return {
     targetId,
     completedRows,
     totalRows: rows.length,
-    errorRows,
+    errorRows: outputs.filter((o) => !!o.error).length,
     evaluators: evaluatorAggregates,
-    overallPassRate,
-    overallAverageScore,
+    overallPassRate: totalPassFail > 0 ? (totalPassed / totalPassFail) * 100 : null,
+    overallAverageScore:
+      averages.length > 0 ? averages.reduce((sum, v) => sum + v, 0) / averages.length : null,
     averageCost: costStats?.avg ?? null,
     totalCost: costStats?.total ?? null,
     averageLatency: latencyStats?.avg ?? null,

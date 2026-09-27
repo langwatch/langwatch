@@ -40,6 +40,14 @@ export type MetricOtlpDoorResult = MetricRequestCollectionResult | OtlpDoorRefus
 /** The exporter base a `/v1/metrics` suffix was appended to; the receiver checks it. */
 export const otlpMetricAliasParamsSchema = z.object({ otlpBase: z.string() });
 
+/** One OTLP metric export to collect for a tenant, as main's `handleOtlpMetricRequest` took it. */
+export type MetricCollectionInput = {
+  tenantId: string;
+  organizationId: string;
+  metricRequest: unknown;
+  piiRedactionLevel: MetricPiiRedactionLevel;
+};
+
 export interface MetricApi {
   prepareMetricDataPoints(input: {
     tenantId: string;
@@ -50,6 +58,8 @@ export interface MetricApi {
   }): Promise<MetricDataPointPreparation>;
   /** One exporter request at the metrics door: key, allowance, parse, then collection. */
   receiveOtlpMetrics(request: OtlpDoorRequest): Promise<MetricOtlpDoorResult>;
+  /** Prepares and records one OTLP metric export, for a receiver that authenticated it itself. */
+  collectOtlpMetrics(input: MetricCollectionInput): Promise<MetricRequestCollectionResult>;
   /** Sends prepared points onto the `metric_processing` pipeline for durable storage. */
   recordCanonicalMetricDataPoints(points: readonly CanonicalMetricDataPoint[]): Promise<void>;
 }

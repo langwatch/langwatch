@@ -13,21 +13,26 @@ import type {
 } from "@langwatch/eventing";
 import { Temporal, toDate } from "@langwatch/time";
 import { Cron } from "croner";
+import { z } from "zod";
 
 import type { reportDispatchIntentSchema } from "./report-schedule.intent.ts";
 
 export const REPORT_SCHEDULE_PROCESS_NAME = "reportSchedule" as const;
 
-export type ReportScheduleState = {
-  triggerId: string;
-  cron: string | null;
-  timezone: string | null;
-  active: boolean;
-  lastSlot: number | null;
-  lastRunRequestId: string | null;
+export const reportScheduleStateSchema = z.object({
+  triggerId: z.string(),
+  cron: z.string().nullable(),
+  timezone: z.string().nullable(),
+  active: z.boolean(),
+  lastSlot: z.number().nullable(),
+  lastRunRequestId: z.string().nullable(),
   /** A run whose dispatch is neither sent nor finally failed; absent on pre-guard instances. */
-  pendingRun?: { requestId: string; slot: number; since: number } | null;
-};
+  pendingRun: z
+    .object({ requestId: z.string(), slot: z.number(), since: z.number() })
+    .nullable()
+    .optional(),
+});
+export type ReportScheduleState = z.infer<typeof reportScheduleStateSchema>;
 
 export const INITIAL_REPORT_SCHEDULE_STATE: ReportScheduleState = {
   triggerId: "",

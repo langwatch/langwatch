@@ -42,6 +42,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../dashboard/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {

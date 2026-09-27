@@ -53,10 +53,10 @@ describe("ResizeRail", () => {
   /** @scenario Hit area covers full drawer height */
   describe("given the rail is mounted", () => {
     describe("when looked up via the data-edge-grip selector", () => {
-      it("renders into the DOM as a separator with col-resize cursor", () => {
+      it("renders into the DOM as a pointer-only grip hidden from assistive tech", () => {
         render(<ResizeRail />, { wrapper });
         const el = getRail();
-        expect(el.getAttribute("role")).toBe("separator");
+        expect(el.getAttribute("aria-hidden")).toBe("true");
         // The pill is rendered as a child element, also via data attr.
         expect(el.querySelector("[data-edge-pill]")).not.toBeNull();
       });

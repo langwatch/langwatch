@@ -125,7 +125,10 @@ export class TraceSpoolService {
 
     const { uri, objectStore } = await this.mintSpoolUri({ ...identity, purpose: "access" });
 
-    return TraceStreamBufferService.streamToBuffer(await objectStore.get(uri), MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.create().streamToBuffer(
+      await objectStore.get(uri),
+      MAX_SPOOL_BYTES,
+    );
   }
 
   /**
@@ -225,7 +228,7 @@ export class TraceSpoolService {
   private async getLegacySpool(spoolRef: string, projectId: string): Promise<Buffer> {
     const body = await this.legacyObjects().read({ projectId, key: spoolRef });
 
-    return TraceStreamBufferService.streamToBuffer(body, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.create().streamToBuffer(body, MAX_SPOOL_BYTES);
   }
 
   private legacyObjects(): TraceSpoolLegacyObject {

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { adminClient, impersonateUser } from "../../../index.ts";
 
@@ -8,22 +8,20 @@ import { adminClient, impersonateUser } from "../../../index.ts";
  * ra-data-simple-prisma), so drift here breaks every Backoffice resource view.
  */
 describe("adminClient", () => {
-  const originalFetch = globalThis.fetch;
-  let fetchMock: Mock;
+  let fetchMock: MockInstance<typeof fetch>;
 
   beforeEach(() => {
-    fetchMock = vi.fn(
+    fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
       async () =>
         new Response(JSON.stringify({ data: [], total: 0 }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }),
     );
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    fetchMock.mockRestore();
   });
 
   describe("when calling getList", () => {
@@ -37,9 +35,9 @@ describe("adminClient", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [url, init] = fetchMock.mock.calls[0]!;
       expect(url).toBe("/api/admin/user");
-      expect(init.method).toBe("POST");
-      expect(init.credentials).toBe("include");
-      expect(JSON.parse(init.body as string)).toEqual({
+      expect(init?.method).toBe("POST");
+      expect(init?.credentials).toBe("include");
+      expect(JSON.parse(init?.body as string)).toEqual({
         resource: "user",
         method: "getList",
         params: {
@@ -52,7 +50,7 @@ describe("adminClient", () => {
 
     it("defaults pagination, sort, and filter when params are partial", async () => {
       await adminClient.getList("organization", {});
-      const body = JSON.parse(fetchMock.mock.calls[0]![1].body as string);
+      const body = JSON.parse(fetchMock.mock.calls[0]![1]?.body as string);
       expect(body.params.pagination).toEqual({ page: 1, perPage: 25 });
       expect(body.params.sort).toEqual({ field: "id", order: "ASC" });
       expect(body.params.filter).toEqual({});
@@ -65,7 +63,7 @@ describe("adminClient", () => {
         name: "Jane",
         deactivatedAt: null,
       });
-      expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({
+      expect(JSON.parse(fetchMock.mock.calls[0]![1]?.body as string)).toEqual({
         resource: "user",
         method: "update",
         params: { id: "user_123", data: { name: "Jane", deactivatedAt: null } },
@@ -79,7 +77,7 @@ describe("adminClient", () => {
         organizationId: "org_1",
         plan: "GROWTH",
       });
-      expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string)).toEqual({
+      expect(JSON.parse(fetchMock.mock.calls[0]![1]?.body as string)).toEqual({
         resource: "subscription",
         method: "create",
         params: {
@@ -136,16 +134,18 @@ describe("adminClient", () => {
 });
 
 describe("impersonateUser", () => {
-  const originalFetch = globalThis.fetch;
-  let fetchMock: Mock;
+  let fetchMock: MockInstance<typeof fetch>;
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () => new Response(JSON.stringify({ message: "ok" }), { status: 200 }));
-    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ message: "ok" }), { status: 200 }),
+      );
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
+    fetchMock.mockRestore();
   });
 
   it("posts userIdToImpersonate and reason to the dedicated impersonate endpoint", async () => {
@@ -155,13 +155,13 @@ describe("impersonateUser", () => {
     });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("/api/admin/impersonate");
-    expect(init.method).toBe("POST");
+    expect(init?.method).toBe("POST");
     // Cookie-mode auth: the admin session is carried via a same-site
     // cookie, so we must explicitly send credentials. Pinning this here
     // catches a silent regression where a refactor drops the flag and
     // BetterAuth starts rejecting the impersonation as unauthenticated.
-    expect(init.credentials).toBe("include");
-    expect(JSON.parse(init.body as string)).toEqual({
+    expect(init?.credentials).toBe("include");
+    expect(JSON.parse(init?.body as string)).toEqual({
       userIdToImpersonate: "user_xyz",
       reason: "Investigating a stuck trace reported by support",
     });

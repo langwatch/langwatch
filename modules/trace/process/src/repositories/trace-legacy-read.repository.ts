@@ -1,4 +1,5 @@
 import type {
+  NormalizedSpan,
   Protections,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
@@ -10,6 +11,28 @@ import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
 } from "@langwatch/trace-contract";
+
+import type { ResolvedTraceSpans } from "../services/trace-offload-resolution.service.ts";
+
+/**
+ * Resolves offloaded blob refs for a single trace's normalized spans (ADR-021 decision B:
+ * read-time recompute). When present, called after fetching spans but before mapping them to
+ * legacy Span.
+ */
+export type ResolveTraceSpansFn = (
+  projectId: string,
+  normalizedSpans: NormalizedSpan[],
+) => Promise<ResolvedTraceSpans>;
+
+/**
+ * Resolves offloaded blob refs for a whole result set in one bounded pass, so a bulk read
+ * (getTracesWithSpans, enrichTracesWithSpans) streams event_log reads instead of fanning out
+ * per trace. Falls back to {@link ResolveTraceSpansFn} when absent.
+ */
+export type ResolveTraceSpansBatchFn = (
+  projectId: string,
+  spansPerTrace: NormalizedSpan[][],
+) => Promise<ResolvedTraceSpans[]>;
 
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence

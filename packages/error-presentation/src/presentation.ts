@@ -3168,6 +3168,23 @@ const presentations = {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
   },
+  ingestion_source_unauthorized: {
+    title: "That ingestion source secret wasn't recognized",
+    describe: () =>
+      "Check that the exporter sends the secret shown for this source, and that it posts to this source's own address.",
+  },
+  ingestion_rate_limited: {
+    title: "Too many requests from this sender",
+    describe: () => "Slow down, then send again once the Retry-After wait has passed.",
+  },
+  ingestion_wrong_endpoint: {
+    title: "This source can't send to that address",
+    describe: () => "Send this source's data to the address shown in its setup instructions.",
+  },
+  ingestion_receiver_unavailable: {
+    title: "We couldn't accept that data just now",
+    describe: () => "Nothing was recorded. Send the same request again in a moment.",
+  },
   agent_listing_unavailable: {
     // fault: platform, and the copy is written to match. Nothing reached a
     // provider here — the ask could not be recorded at all — so there is no
@@ -3390,6 +3407,23 @@ const presentations = {
     // can't do, and there is a way to get where they were going.
     title: "That column's type can't be changed",
     describe: () => "Add a new column with the type you need, then move the values across.",
+  },
+  dataset_conflict: {
+    title: "That conflicts with another dataset",
+    describe: () => "Pick a different name, or reload to see the dataset as it is now.",
+  },
+  dataset_not_retryable: {
+    title: "There's nothing to retry",
+    describe: () => "This dataset has no failed import to run again.",
+  },
+  dataset_too_large_to_edit_columns: {
+    // A limit, not a breakage: the change would rewrite more rows than one edit can hold.
+    title: "This dataset is too large to change column types",
+    describe: () => "Make the dataset smaller, or add a new column with the type you need.",
+  },
+  stored_object_files_rate_limited: {
+    title: "Too many files opened at once",
+    describe: () => "Wait a moment, then open the file again.",
   },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is

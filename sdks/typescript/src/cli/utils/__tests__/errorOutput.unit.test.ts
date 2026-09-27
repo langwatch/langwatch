@@ -1,11 +1,11 @@
 import {
-  type CliHandledError,
+  type LangWatchHandledErrorShape,
   readCliErrorDocument,
 } from "@langwatch/langy-contract/cards/handled-error";
 import chalk from "chalk";
 
 /** The CLI error document stdout carried; these cases all expect one. */
-function cliErrorDocument(output: unknown): CliHandledError {
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
   const read = readCliErrorDocument(output);
   if (read.kind !== "error") throw new Error("stdout held no CLI error document");
   return read.error;

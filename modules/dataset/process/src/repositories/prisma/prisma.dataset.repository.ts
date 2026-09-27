@@ -103,7 +103,7 @@ export class PrismaDatasetRepository
 
   async update(input: DatasetUpdateInput): Promise<Dataset> {
     const row = await this.database.dataset.update({
-      where: { id: input.id },
+      where: { id: input.id, projectId: input.projectId },
       data: {
         name: input.name,
         slug: input.slug,

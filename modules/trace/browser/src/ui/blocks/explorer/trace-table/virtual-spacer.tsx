@@ -16,7 +16,7 @@ export const VirtualSpacer: React.FC<VirtualSpacerProps> = ({ height, colSpan })
   return (
     <Tbody aria-hidden="true">
       <tr>
-        <td colSpan={colSpan} style={{ height: `${height}px`, padding: 0 }} />
+        <td aria-hidden="true" colSpan={colSpan} style={{ height: `${height}px`, padding: 0 }} />
       </tr>
     </Tbody>
   );

@@ -33,6 +33,7 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:"
   },

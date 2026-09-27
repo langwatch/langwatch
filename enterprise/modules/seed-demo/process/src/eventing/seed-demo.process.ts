@@ -12,9 +12,10 @@ const RUN_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const seedDemoRunSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface SeedDemoRunState {
-  lastRunAt: number | null;
-}
+export const seedDemoRunStateSchema = z.object({
+  lastRunAt: z.number().nullable(),
+});
+export type SeedDemoRunState = z.infer<typeof seedDemoRunStateSchema>;
 
 type SeedDemoIntents = {
   run: IntentSpec<typeof seedDemoRunSchema>;

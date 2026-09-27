@@ -4,7 +4,7 @@ import {
   type ESBatchEvaluationTarget,
   type EvaluationsV3State,
   type EvaluationV3Event,
-  type EvaluatorConfig,
+  type CellEvaluatorConfig,
   ExperimentRunLoopUnavailableError,
   ExperimentRunNotFoundError,
   type ExecutionCell,
@@ -320,7 +320,7 @@ export class ExperimentRunOrchestratorService {
     inputs,
   }: {
     cell: ExecutionCell;
-    evaluator: EvaluatorConfig;
+    evaluator: CellEvaluatorConfig;
     inputs: Record<string, unknown>;
   }): boolean => evaluatorInputSvc.hasNoResolvedInputs({ cell, evaluator, inputs });
 

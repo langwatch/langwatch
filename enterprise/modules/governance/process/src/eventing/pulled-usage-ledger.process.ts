@@ -7,10 +7,11 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
 import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
 import {
-  type FiledCell,
+  filedCellSchema,
   filedCellFor,
   isReissuedElsewhere,
 } from "../rules/pulled-usage-reissue.rules.ts";
@@ -42,9 +43,10 @@ export const PULLED_USAGE_LEDGER_PROCESS_NAME = "pulledUsageLedger" as const;
  * the log; losing it fails towards a missed withdrawal, never a wrong one (main
  * `pulledUsageLedger.process.ts`).
  */
-export interface PulledUsageLedgerState {
-  filedCell: FiledCell | null;
-}
+export const pulledUsageLedgerStateSchema = z.object({
+  filedCell: filedCellSchema.nullable().optional(),
+});
+export type PulledUsageLedgerState = z.infer<typeof pulledUsageLedgerStateSchema>;
 
 const INITIAL_PULLED_USAGE_LEDGER_STATE: PulledUsageLedgerState = { filedCell: null };
 
@@ -80,7 +82,7 @@ export class PulledUsageLedgerProcess {
   processManager(): ProcessManagerApplier<PulledUsageEvent> {
     return (process) =>
       process
-        .state<PulledUsageLedgerState>(INITIAL_PULLED_USAGE_LEDGER_STATE)
+        .state(pulledUsageLedgerStateSchema, INITIAL_PULLED_USAGE_LEDGER_STATE)
         .intent("writePulledUsage", writePulledUsageSchema, (payload) =>
           this.write.execute(payload),
         )

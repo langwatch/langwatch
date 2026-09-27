@@ -5,10 +5,14 @@
  * Uses real store; mocks tRPC transport and drawer registry.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  uiDeclarations,
+  type UiDatasetEditorTableProps,
+} from "@langwatch/browser-host/declarations";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
   mockOpenDrawer: vi.fn(),
@@ -23,6 +27,51 @@ const { mockOpenDrawer, mockDatasets } = vi.hoisted(() => ({
       _count: { datasetRecords: number };
     }[],
   },
+}));
+
+/** Dataset lends its editor; this stand-in reports an edited first cell the way the editor does. */
+const datasetLends = uiDeclarations([
+  {
+    name: "dataset",
+    installation: {
+      capabilities: {
+        datasetEditorTable: {
+          load: async () => ({
+            default: ({
+              title,
+              headerActions,
+              inMemoryDataset,
+              onUpdateDataset,
+            }: UiDatasetEditorTableProps) => (
+              <div data-testid="dataset-editor-table">
+                {title}
+                {headerActions}
+                <button
+                  type="button"
+                  aria-label="Edit the first cell"
+                  data-testid="lent-editor-edit-first-cell"
+                  onClick={() => {
+                    if (!inMemoryDataset) return;
+                    onUpdateDataset?.({
+                      ...inMemoryDataset,
+                      datasetRecords: inMemoryDataset.datasetRecords.map((record, index) =>
+                        index === 0 ? { ...record, input: "bonjour" } : record,
+                      ),
+                    });
+                  }}
+                />
+              </div>
+            ),
+          }),
+        },
+      },
+    },
+  },
+]);
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useUiDeclarations: () => datasetLends,
 }));
 
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
@@ -271,11 +320,8 @@ describe("Workflow dataset dialog", () => {
         { wrapper: Wrapper },
       );
 
-      // Edit a cell
-      await user.dblClick(await screen.findByTestId("cell-0-input_0"));
-      const textarea = await screen.findByRole("textbox");
-      await user.clear(textarea);
-      await user.type(textarea, "bonjour{Enter}");
+      // Dataset's lent editor reports an edited cell
+      await user.click(await screen.findByTestId("lent-editor-edit-first-cell"));
 
       // The change landed in the workflow DSL, not in any database
       await waitFor(() => {

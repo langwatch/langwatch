@@ -3,14 +3,14 @@
  * doors a BROWSER opens, behind the session door. The project a run names
  * resolves `evaluations:manage` from the project in the body before either operation.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   abortExperimentRunRequestSchema,
   abortExperimentRunResponseSchema,
   executionRequestSchema,
 } from "@langwatch/experiment-contract";
 
-import { ExperimentV3RestApi, rawAnswerOf } from "./experiment-v3.rest.ts";
+import { ExperimentV3RestApi, runEventsOf } from "./experiment-v3.rest.ts";
 
 export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   .withNamespace("experiments")
@@ -24,10 +24,10 @@ export const experimentWorkbenchRunRest = defineRestRouter(ExperimentV3RestApi)
   .post("/execute", "executeExperiment")
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
-  .withRawResponse({ produces: "text/event-stream" })
+  .withResponse("sse", {})
   .withDocs({ hide: true })
-  .handle(async ({ app, input, actor }): Promise<RestRawResult> =>
-    rawAnswerOf(await app.executeWorkbenchRun(input, actor)),
+  .handle(async ({ app, input, actor, response }) =>
+    response.events(runEventsOf((await app.executeWorkbenchRun(input, actor)).events)),
   )
 
   // ── POST /abort ────────────────────────────────────────────────────────

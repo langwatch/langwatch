@@ -3,6 +3,7 @@ import { Liquid } from "liquidjs";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 
 import { PromptCompilationError, PromptValidationError } from "./errors";
+import { promptDataOf } from "./prompt-data";
 import { promptDataSchema } from "./schema";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import {
@@ -98,7 +99,7 @@ export class Prompt {
 
       // Create new prompt data with compiled content
       const compiledData: PromptData = {
-        ...this,
+        ...promptDataOf(this),
         prompt: compiledPrompt,
         messages: compiledMessages,
       };

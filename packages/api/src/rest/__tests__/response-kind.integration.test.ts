@@ -126,6 +126,13 @@ const objects = defineRestRouter(ObjectApi)
   .withResponse("sse", {})
   .handle(({ response }) => response.events(neverEnds()))
 
+  .get("/runs/latest", "readLatestRun")
+  .withAccess(publicRoute({ reason: "the family's own door is tested elsewhere" }))
+  .withResponse("negotiated", {})
+  .handle(({ response }) =>
+    response.wantsEvents ? response.events(twoEvents()) : response.json({ runId: "run_1" }),
+  )
+
   .post("/scim/Users", "createScimUser")
   .withRawBody("text")
   .withAccess(publicRoute({ reason: "SCIM presents its own bearer token" }))
@@ -222,7 +229,7 @@ describe("given a route that declares the bytes kind", () => {
       }
     }
 
-    const producer = producerFor("bytes");
+    const producer = producerFor({ kind: "bytes", accept: "" });
 
     if (!("stream" in producer)) {
       throw new Error("Expected byte producer");
@@ -303,6 +310,34 @@ describe("given a route that declares the event-stream kind", () => {
       await response.body?.cancel();
 
       expect(ended).toContain("endless");
+    });
+  });
+});
+
+describe("given a route that declares the negotiated kind", () => {
+  describe("when the caller accepts an event stream", () => {
+    /** @scenario "A negotiated route answers JSON or an event stream by what the caller accepts" */
+    it("frames the handler's events under the event-stream media type", async () => {
+      const response = await objectsApp().request("/api/v1/objects/runs/latest", {
+        headers: { Accept: "text/event-stream" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("text/event-stream");
+      await expect(response.text()).resolves.toBe(FRAMED);
+    });
+  });
+
+  describe("when the caller accepts only JSON", () => {
+    /** @scenario "A negotiated route answers JSON or an event stream by what the caller accepts" */
+    it("answers the JSON body the handler produced", async () => {
+      const response = await objectsApp().request("/api/v1/objects/runs/latest", {
+        headers: { Accept: "application/json" },
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toBe("application/json");
+      await expect(response.json()).resolves.toEqual({ runId: "run_1" });
     });
   });
 });

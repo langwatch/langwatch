@@ -12,7 +12,7 @@ import {
 import {
   LANGY_SESSION_KEY_REAP_INTERVAL_MS,
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
-  type LangySessionKeyReapState,
+  langySessionKeyReapStateSchema,
   langySessionKeyReapSchema,
   langySessionKeyReapWake,
 } from "../eventing/langy-session-key-reap.process.ts";
@@ -45,7 +45,7 @@ export class LangyMaintenanceService {
       .withEvents([])
       .withProcessManager(LANGY_SESSION_KEY_REAP_PROCESS_NAME, (pm) =>
         pm
-          .state<LangySessionKeyReapState>({ lastReapAt: null })
+          .state(langySessionKeyReapStateSchema, { lastReapAt: null })
           .schedule({ everyMs: LANGY_SESSION_KEY_REAP_INTERVAL_MS })
           .onWake(langySessionKeyReapWake)
           .intent("reap", langySessionKeyReapSchema, runLangySessionKeyReap(sessionKeyReap))

@@ -13,10 +13,9 @@ import {
 } from "@langwatch/gateway-contract";
 import { toDate } from "@langwatch/time";
 
-import { GatewayProviderLabelService } from "../services/gateway-provider-label.service.ts";
+import * as providerLabelAdapter from "../rules/gateway-provider-label.rules.ts";
 
 /** One stateless label resolver for every budget row this door renders. */
-const providerLabelAdapter = GatewayProviderLabelService.create();
 
 function toDto(b: GatewayBudgetWithSeats): {
   id: GatewayBudgetWithSeats["id"];

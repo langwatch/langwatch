@@ -21,9 +21,8 @@ export const SCENARIO_EVALUATIONS_PROCESS_NAME = "scenario_evaluations" as const
 type ScenarioEvaluationsIntents = { grade: IntentSpec<typeof gradeRunIntentSchema> };
 
 /** Persisted per run; ids and flags only. */
-interface ScenarioEvaluationsProcessState {
-  gradingQueued: boolean;
-}
+const scenarioEvaluationsProcessStateSchema = z.object({ gradingQueued: z.boolean() });
+type ScenarioEvaluationsProcessState = z.infer<typeof scenarioEvaluationsProcessStateSchema>;
 
 export const INITIAL_SCENARIO_EVALUATIONS_STATE: ScenarioEvaluationsProcessState = {
   gradingQueued: false,
@@ -101,7 +100,7 @@ export function scenarioEvaluationsPM(
 ): ProcessManagerApplier<SimulationProcessingEvent> {
   return (pm) =>
     pm
-      .state(INITIAL_SCENARIO_EVALUATIONS_STATE)
+      .state(scenarioEvaluationsProcessStateSchema, INITIAL_SCENARIO_EVALUATIONS_STATE)
       .intent("grade", gradeRunIntentSchema, createGradeRunHandler(deps))
       .on(SIMULATION_RUN_EVENT_TYPES.FINISHED, handleRunFinishedForGrading)
       .toPayload(finishedRunViewOf)

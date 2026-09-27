@@ -5,6 +5,7 @@ export {
   LogApi,
   otlpLogAliasParamsSchema,
   type LogOtlpDoorResult,
+  type LogCollectionInput,
   type LogRequestCollectionResult,
 } from "./log.api.ts";
 export * from "./log-record.ts";

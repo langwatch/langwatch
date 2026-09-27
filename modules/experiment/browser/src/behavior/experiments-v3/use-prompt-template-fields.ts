@@ -1,6 +1,5 @@
+import type { PromptTemplateFieldsLookup } from "@langwatch/experiment-contract/mapping-validation";
 import { createContext, useContext } from "react";
-
-import type { PromptTemplateFieldsLookup } from "../../model/experiments-v3/mapping-validation.ts";
 
 /**
  * Publishes, for every prompt target that carries no local draft, the variables its

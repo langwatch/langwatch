@@ -72,6 +72,12 @@
       "path": "../../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/metric/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {

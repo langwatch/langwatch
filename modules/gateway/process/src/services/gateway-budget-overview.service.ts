@@ -11,9 +11,10 @@ import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization
 import { nowInstant, Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
+import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rules.ts";
 import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,

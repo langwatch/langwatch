@@ -84,7 +84,14 @@ const TestComponent = () => {
 /** The change an agent's `workbench.duplicateTarget` leaves in the store. */
 const applyAgentEdit = () => {
   act(() => {
-    useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "the agent's edit");
+    useEvaluationsV3Store
+      .getState()
+      .setCellValue({
+        datasetId: "test-data",
+        row: 0,
+        columnId: "input",
+        value: "the agent's edit",
+      });
   });
 };
 
@@ -185,7 +192,14 @@ describe("an agent edit reaching the server", () => {
       // flight, which is exactly the overlap that used to send two writes on
       // the same expectedVersion.
       await act(async () => {
-        useEvaluationsV3Store.getState().setCellValue("test-data", 1, "input", "a second edit");
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({
+            datasetId: "test-data",
+            row: 1,
+            columnId: "input",
+            value: "a second edit",
+          });
         second = autosave?.saveNow();
         await Promise.resolve();
       });

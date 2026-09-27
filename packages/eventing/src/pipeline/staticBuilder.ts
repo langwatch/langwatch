@@ -423,9 +423,9 @@ export class PipelineBuilder<
 
   /** Mount a process manager (ADR-049/052) on this pipeline. */
   withProcessManager(name: string, applier: ProcessManagerApplier<EventType>): this;
-  withProcessManager(definition: ProcessManagerDefinition<any, any, any>): this;
+  withProcessManager(definition: ProcessManagerDefinition): this;
   withProcessManager(
-    definitionOrName: ProcessManagerDefinition<any, any, any> | string,
+    definitionOrName: ProcessManagerDefinition | string,
     applier?: ProcessManagerApplier<EventType>,
   ): this {
     const definition =

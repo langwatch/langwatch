@@ -11,7 +11,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,

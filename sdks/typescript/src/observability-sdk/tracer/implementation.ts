@@ -2,13 +2,14 @@ import {
   type Span,
   type SpanOptions,
   type Context,
+  type Exception,
   SpanStatusCode,
   type TracerProvider,
   trace,
 } from "@opentelemetry/api";
 
 import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
-import { createLangWatchSpan } from "../span";
+import { createLangWatchSpan, type LangWatchSpan } from "../span";
 import { type LangWatchTracer } from "./types";
 
 /**
@@ -65,18 +66,52 @@ export function getLangWatchTracerFromProvider(
   return new Proxy(tracer, handler) as LangWatchTracer;
 }
 
+type SpanCallback = (span: LangWatchSpan, ...args: unknown[]) => unknown;
+
+type SpanArgs =
+  | [name: string, fn: SpanCallback]
+  | [name: string, options: SpanOptions | undefined, fn: SpanCallback]
+  | [name: string, options: SpanOptions | undefined, context: Context, fn: SpanCallback];
+
+function hasContextArg(
+  args: readonly unknown[],
+): args is [string, SpanOptions | undefined, Context, SpanCallback] {
+  return typeof args[3] === "function";
+}
+
+function hasOptionsArg(
+  args: readonly unknown[],
+): args is [string, SpanOptions | undefined, SpanCallback] {
+  return typeof args[2] === "function";
+}
+
+function hasCallbackArg(args: readonly unknown[]): args is [string, SpanCallback] {
+  return typeof args[1] === "function";
+}
+
 /**
  * Normalizes the variable-arg overloads of a span method: (name, fn),
  * (name, options, fn), or (name, options, context, fn). Throws if no
  * callback is found.
  */
-function normalizeSpanArgs(args: any[]) {
-  const [name, arg2, arg3, arg4] = args;
-
-  if (typeof arg4 === "function") return { name, options: arg2, context: arg3, fn: arg4 };
-
-  if (typeof arg3 === "function") return { name, options: arg2, fn: arg3 };
-  if (typeof arg2 === "function") return { name, fn: arg2 };
+function normalizeSpanArgs(args: SpanArgs): {
+  name: string;
+  options?: SpanOptions;
+  context?: Context;
+  fn: SpanCallback;
+} {
+  if (hasContextArg(args)) {
+    const [name, options, context, fn] = args;
+    return { name, options, context, fn };
+  }
+  if (hasOptionsArg(args)) {
+    const [name, options, fn] = args;
+    return { name, options, fn };
+  }
+  if (hasCallbackArg(args)) {
+    const [name, fn] = args;
+    return { name, fn };
+  }
 
   throw new Error("Expected a span callback as the last argument");
 }
@@ -100,11 +135,11 @@ function withDefaultOrigin(options?: SpanOptions): SpanOptions {
 
 /** `startActiveSpan` with the callback handed a LangWatch span. */
 function startActiveSpanOf(target: LangWatchTracer) {
-  return (...args: any[]) => {
+  return (...args: SpanArgs) => {
     const spanArgs = normalizeSpanArgs(args);
     const options = withDefaultOrigin(spanArgs.options);
 
-    const wrappedFn = (span: Span, ...cbArgs: any[]) =>
+    const wrappedFn = (span: Span, ...cbArgs: unknown[]) =>
       spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
     if (spanArgs.context !== void 0)
@@ -116,7 +151,7 @@ function startActiveSpanOf(target: LangWatchTracer) {
 
 /** `withActiveSpan` through the target's own `startActiveSpan`, to avoid double-wrapping. */
 function withActiveSpanOf(target: LangWatchTracer) {
-  return (...args: any[]) => {
+  return (...args: SpanArgs) => {
     const spanArgs = normalizeSpanArgs(args);
     const optionsWithOrigin = withDefaultOrigin(spanArgs.options);
 
@@ -131,27 +166,23 @@ function withActiveSpanOf(target: LangWatchTracer) {
 }
 
 /** Runs `fn` in a LangWatch span, setting its status and ending it, sync or async. */
-function runInLangWatchSpan(span: Span, fn: ReturnType<typeof normalizeSpanArgs>["fn"]) {
+function runInLangWatchSpan(span: Span, fn: SpanCallback) {
   const wrappedSpan = createLangWatchSpan(span);
 
   try {
     const result = fn(wrappedSpan);
 
     // If result is a promise, handle it async
-    if (result && typeof result.then === "function") {
+    if (isThenable(result)) {
       return result
-        .then((result: any) => {
+        .then((result) => {
           wrappedSpan.setStatus({
             code: SpanStatusCode.OK,
           });
           return result;
         })
-        .catch((err: any) => {
-          wrappedSpan.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err?.message ?? String(err),
-          });
-          wrappedSpan.recordException?.(err);
+        .catch((err: unknown) => {
+          markSpanFailed(wrappedSpan, err);
           throw err;
         })
         .finally(() => {
@@ -165,13 +196,38 @@ function runInLangWatchSpan(span: Span, fn: ReturnType<typeof normalizeSpanArgs>
     });
     wrappedSpan.end();
     return result;
-  } catch (err: any) {
-    wrappedSpan.setStatus({
-      code: SpanStatusCode.ERROR,
-      message: err?.message ?? String(err),
-    });
-    wrappedSpan.recordException?.(err);
+  } catch (err) {
+    markSpanFailed(wrappedSpan, err);
     wrappedSpan.end();
     throw err;
   }
+}
+
+function isThenable(value: unknown): value is Promise<unknown> {
+  return (
+    (typeof value === "object" || typeof value === "function") &&
+    value !== null &&
+    "then" in value &&
+    typeof value.then === "function"
+  );
+}
+
+function isRecordableException(value: unknown): value is Exception {
+  return (
+    typeof value === "string" ||
+    ((typeof value === "object" || typeof value === "function") && value !== null)
+  );
+}
+
+function errorMessageOf(err: unknown): string {
+  const message =
+    (typeof err === "object" || typeof err === "function") && err !== null && "message" in err
+      ? err.message
+      : undefined;
+  return typeof message === "string" ? message : String(err);
+}
+
+function markSpanFailed(span: LangWatchSpan, err: unknown): void {
+  span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessageOf(err) });
+  if (isRecordableException(err)) span.recordException?.(err);
 }

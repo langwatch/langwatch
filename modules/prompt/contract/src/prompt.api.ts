@@ -98,7 +98,7 @@ export interface PromptApi {
     projectId: string;
     organizationId?: string;
   }): Promise<PromptDeleteResult>;
-  syncPrompt(input: Record<string, unknown>): Promise<PromptSyncResult>;
+  syncPrompt(input: PromptRestSyncInput): Promise<PromptSyncResult>;
   assignTag(
     input: {
       configId: string;

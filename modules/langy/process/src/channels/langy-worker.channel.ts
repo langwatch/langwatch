@@ -1,3 +1,6 @@
+/** How long one dispatch to the worker manager may take before it counts as unavailable. */
+export const LANGY_AGENT_DISPATCH_TIMEOUT_MS = 60_000;
+
 export type LangyDispatchOutcome =
   | "accepted"
   | "busy"

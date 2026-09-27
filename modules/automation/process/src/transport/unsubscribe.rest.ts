@@ -9,11 +9,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import {
-  AutomationApi,
-  unsubscribeRestAcknowledgedSchema,
-  UnsubscribeLinkInvalidError,
-} from "@langwatch/automation-contract";
+import { AutomationApi, unsubscribeRestAcknowledgedSchema } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -61,11 +57,8 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
   })
   .withMiddleware(unsubscribeCallerAddress)
   .handle(async ({ app, input }, callerAddress) => {
-    if (!input.token)
-      throw new UnsubscribeLinkInvalidError("This unsubscribe link has no token.", 400);
-
     await app.acceptUnsubscribe({
-      token: input.token,
+      token: input.token ?? "",
       scope: "trigger",
       callerAddress,
       via: "one-click",
@@ -76,18 +69,4 @@ export const unsubscribeRest = defineRestRouter(AutomationApi)
     return { ok: true };
   })
 
-  /**
-   * RFC 8058 one-click is POST-only. Declared AFTER the POST route so a
-   * POST resolves there; every other method falls through here for a 405
-   * with `Allow`, not a bare 404.
-   */
-  .get("/api/unsubscribe", "unsubscribeMethodGuard")
-  .withAccess(publicRoute({ reason: ONE_CLICK_IS_TOKEN_AUTHORIZED }))
-  .withRawResponse({ produces: "application/json" })
-  .anyMethod()
-  .handle(() => ({
-    status: 405,
-    headers: { Allow: "POST", "Content-Type": "application/json" },
-    body: JSON.stringify({ error: "Method not allowed" }),
-  }))
   .build();

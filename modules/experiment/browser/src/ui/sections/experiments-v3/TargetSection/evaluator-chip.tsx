@@ -48,6 +48,38 @@ type EvaluatorChipProps = {
   onRunOnAllRows?: () => void;
 };
 
+/** The chip's compact result: a spinner, an error mark, the score, or the label. */
+function EvaluatorInlineResult({
+  status,
+  statusColor,
+  score,
+  label,
+}: {
+  status: keyof typeof EVALUATION_STATUS_COLORS;
+  statusColor: string;
+  score: number | undefined;
+  label: string | undefined;
+}) {
+  if (status === "pending") return null;
+  if (status === "running") return <Spinner size="xs" color="fg.muted" />;
+  if (status === "error") return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
+  if (score !== undefined) {
+    return (
+      <Text fontSize="10px" fontWeight="semibold">
+        {score.toFixed(2)}
+      </Text>
+    );
+  }
+  if (label) {
+    return (
+      <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
+        {label}
+      </Text>
+    );
+  }
+  return null;
+}
+
 export function EvaluatorChip({
   evaluator,
   result,
@@ -76,37 +108,6 @@ export function EvaluatorChip({
   const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];
-
-  // Format inline result display
-  const getInlineResult = () => {
-    if (status === "pending") return null;
-
-    // Show spinner when running
-    if (status === "running") {
-      return <Spinner size="xs" color="fg.muted" />;
-    }
-
-    // Show error icon for error status
-    if (status === "error") {
-      return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
-    }
-
-    if (score !== undefined) {
-      return (
-        <Text fontSize="10px" fontWeight="semibold">
-          {score.toFixed(2)}
-        </Text>
-      );
-    }
-    if (label) {
-      return (
-        <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
-          {label}
-        </Text>
-      );
-    }
-    return null;
-  };
 
   return (
     <Menu.Root open={isMenuOpen} onOpenChange={(e) => setIsMenuOpen(e.open)}>
@@ -158,7 +159,14 @@ export function EvaluatorChip({
               </Tooltip>
             )}
             {/* Inline result (score, label, or error icon) */}
-            {status !== "running" && getInlineResult()}
+            {status !== "running" && (
+              <EvaluatorInlineResult
+                status={status}
+                statusColor={statusColor}
+                score={score}
+                label={label}
+              />
+            )}
             {/* Missing mapping alert icon - on the right side like prompts */}
             {hasMissingMappings && (
               <Tooltip

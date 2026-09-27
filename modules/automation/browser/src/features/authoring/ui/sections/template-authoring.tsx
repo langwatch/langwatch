@@ -177,7 +177,7 @@ export function LiquidEditor({
 }) {
   const isLiquid = language === LIQUID_LANGUAGE_ID || language === LIQUID_JSON_LANGUAGE_ID;
   const theme = useMonacoTheme();
-  const monacoRef = useRef<Monaco | null>(null);
+  const monacoRef = useRef<Monaco>(null);
   const modelRef = useRef<MonacoTextModel | null>(null);
   const changeSubscription = useRef<{ dispose: () => void } | null>(null);
   const schemaSubscription = useRef<{ dispose: () => void } | null>(null);

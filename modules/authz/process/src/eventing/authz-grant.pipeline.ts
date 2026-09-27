@@ -1,7 +1,14 @@
-import { defineAggregate, definePipeline } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type EventingSetup,
+} from "@langwatch/eventing";
 
+import type { AuthzApp } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
+import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -59,6 +66,8 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
   );
 };
 
+export type AuthzGrantPipeline = ReturnType<typeof buildAuthzGrantPipeline>;
+
 /**
  * Explicit composition boundary for the AuthZ Eventing topology. Importing
  * this module creates no pipeline and registers nothing with a runtime.
@@ -70,11 +79,17 @@ export class EventingAuthzAdapter {
     return new EventingAuthzAdapter(options);
   }
 
-  static build(options: EventingAuthzAdapterOptions): ReturnType<typeof buildAuthzGrantPipeline> {
+  static build(options: EventingAuthzAdapterOptions): AuthzGrantPipeline {
     return EventingAuthzAdapter.create(options).build();
   }
 
-  build(): ReturnType<typeof buildAuthzGrantPipeline> {
+  build(): AuthzGrantPipeline {
     return buildAuthzGrantPipeline(this.options);
   }
 }
+
+export const authzEventing = defineEventingModule({
+  pipeline: AUTHZ_GRANT_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<AuthzRepositories, AuthzApp>) => app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

@@ -11,10 +11,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
-import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 import {
   GATEWAY_INTERNAL_TEST_SECRET,
   mountGatewayInternalRest,

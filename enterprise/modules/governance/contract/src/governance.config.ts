@@ -36,11 +36,19 @@ export const governanceSecrets = {
   ottlSigningSecret: gatewayInternalSecret,
 } as const;
 
-/** Where issued personal keys send traffic, and where OTTL calls reach the gateway. */
-export const governanceConfig = Config.define(() => ({
+/** Where issued personal keys send traffic, where OTTL calls reach the gateway, and the ingest throttle. */
+export const governanceConfig = Config.define((c) => ({
   gatewayPublicUrl,
   gatewayInternalUrl,
   gatewayLegacyUrl,
+  /** Main's `LW_INGEST_RATE_LIMIT_DISABLED=1`: tests and dev switch the push receivers' throttle off. */
+  ingestRateLimitDisabled: c.env(
+    "LW_INGEST_RATE_LIMIT_DISABLED",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "1"),
+  ),
 }));
 export type GovernanceConfig = ConfigOf<typeof governanceConfig>;
 

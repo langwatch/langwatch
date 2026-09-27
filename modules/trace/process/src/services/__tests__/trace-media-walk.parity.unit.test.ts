@@ -52,12 +52,13 @@ const RENDER_COLLECTOR_EXAMPLES = EXTRACTABLE_PART_EXAMPLES.filter(
 describe("media walk parity", () => {
   describe.each(EXTRACTABLE_PART_EXAMPLES)("given the extractable shape: $name", ({ part }) => {
     it("is classified extractable, matching the store-side rewriter", async () => {
-      expect(TraceValueMediaExtractionService.isExtractableMediaPart(part)).toBe(true);
-      const { part: rewritten, ref } = await TraceContentExtractionService.processContentPart({
-        part,
-        service: makeFakeService(),
-        ...PARAMS,
-      });
+      expect(TraceValueMediaExtractionService.create().isExtractableMediaPart(part)).toBe(true);
+      const { part: rewritten, ref } =
+        await TraceContentExtractionService.create().processContentPart({
+          part,
+          service: makeFakeService(),
+          ...PARAMS,
+        });
       expect(ref).not.toBeNull();
       expect(rewritten).not.toBe(part);
     });
@@ -80,7 +81,7 @@ describe("media walk parity", () => {
     });
 
     it("is surfaced by the render-side collector after extraction", async () => {
-      const { part: rewritten } = await TraceContentExtractionService.processContentPart({
+      const { part: rewritten } = await TraceContentExtractionService.create().processContentPart({
         part,
         service: makeFakeService(),
         ...PARAMS,
@@ -94,12 +95,13 @@ describe("media walk parity", () => {
     "given the non-extractable shape: $name",
     ({ part }) => {
       it("is not classified extractable and passes the rewriter untouched", async () => {
-        expect(TraceValueMediaExtractionService.isExtractableMediaPart(part)).toBe(false);
-        const { part: rewritten, ref } = await TraceContentExtractionService.processContentPart({
-          part,
-          service: makeFakeService(),
-          ...PARAMS,
-        });
+        expect(TraceValueMediaExtractionService.create().isExtractableMediaPart(part)).toBe(false);
+        const { part: rewritten, ref } =
+          await TraceContentExtractionService.create().processContentPart({
+            part,
+            service: makeFakeService(),
+            ...PARAMS,
+          });
         expect(ref).toBeNull();
         expect(rewritten).toBe(part);
       });

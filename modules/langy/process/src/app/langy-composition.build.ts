@@ -22,7 +22,7 @@ import type {
 } from "../services/langy-postgres.service.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
-import { LangyGithubPermit, type LangyModel } from "./langy.members.ts";
+import { LangyGithubPermit, type LangyModel, type LangyUiActionSurface } from "./langy.members.ts";
 
 /** The turn's three permit calls, on the feature package's own quota service. */
 class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
@@ -67,6 +67,8 @@ export function buildLangyInfrastructure(input: {
   models: LangyModel;
   sessionKeys: LangySessionKeyService;
   virtualKeys: LangyVirtualKeyService;
+  /** Whether a turn may advertise the page channel; absent holds it closed. */
+  uiActionSurface?: LangyUiActionSurface;
 }): LangyBuiltInfrastructure {
   const { redis, repositories, worker, models, sessionKeys, virtualKeys } = input;
 
@@ -86,9 +88,12 @@ export function buildLangyInfrastructure(input: {
     // The one turn port that answers for real here: rendering the composer's
     // context chips is pure, and the contract package owns it.
     context: { render: renderLangyTurnContext },
-    // Fails toward the closed channel: nothing here resolves a project's
-    // rollout flag, so advertising the surface would be a lie.
-    uiActionSurface: { resolve: () => Promise.resolve(false) },
+    // Without a surface, or without the Redis the channel runs on, the channel
+    // stays closed: advertising one a dispatch cannot reach would be a lie.
+    uiActionSurface:
+      redis && input.uiActionSurface
+        ? input.uiActionSurface
+        : { resolve: () => Promise.resolve(false) },
     metrics: { count: () => undefined },
     accessStore: repositories.turnAccess,
     handoffStore: repositories.turnHandoff,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { NotFoundError } from "@langwatch/api/rest";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   BillingApi,
   billingBrowserConfig,
@@ -10,6 +12,8 @@ import {
   type BillingServerConfig,
   type BillingStaff,
   type ConnectedAddCommitRequest,
+  type CurrencyRequest,
+  type DetectedCurrency,
   type ConnectedBillingAccountView,
   type ConnectedBillingOverview,
   ConnectedBillingUnavailableError,
@@ -36,7 +40,10 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import Stripe from "stripe";
 
+import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
+import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
@@ -48,6 +55,8 @@ import type { BillingRepositories } from "../repositories/billing.repositories.t
 import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service.rules.ts";
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
+import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
+import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
@@ -59,6 +68,7 @@ import {
 import { ConnectedMonthlyStatementService } from "../services/connected-monthly-statement.service.ts";
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
+import { CurrencyService } from "../services/currency.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
 import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
@@ -67,11 +77,15 @@ import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
 } from "../services/scenario-created-signal.service.ts";
+import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
+import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
   type UsageReportingService,
 } from "../services/usage-reporting.service.ts";
+import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhook.rest.ts";
+import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 
 /** Both are the process's own facts: where it runs, and which price mode it bills in. */
 type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
@@ -106,13 +120,23 @@ export type ConnectedBillingPeers = Readonly<{
   gateway: ConnectedCustomerPeers["gateway"];
 }>;
 
+/** Stripe API version this callback's client speaks, as the rest of billing pins it. */
+const STRIPE_API_VERSION = "2024-04-10";
+
+type StripeWebhookComposition = Readonly<{
+  signing: StripeWebhookSignatureService;
+  host: BillingWebhookHost;
+  /** Opens the invitations a seat checkout paid for; organization owns them. */
+  invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
+}>;
+
 type ConnectedBilling = Readonly<{
   billing: ConnectedBillingService;
   seats: ConnectedSeatChangeService;
   tick: ConnectedBillingTickService;
 }>;
 
-export class BillingApp implements BillingApi {
+export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingCurrencyApi {
   static readonly contract = BillingApi;
   static readonly dependencies = {
     /** The commit and the contract budget live on the license, not here. */
@@ -131,13 +155,23 @@ export class BillingApp implements BillingApi {
     traces: TraceApi,
     /** The named projects a usage-limit warning lists. */
     projects: ProjectApi,
+    /** The retention window a plan change resets, as main's webhook did. */
+    dataRetention: DataRetentionApi,
   };
   static readonly config = billingConfig;
   static readonly publicConfig = billingBrowserConfig.project;
-  static readonly secrets = { stripeSecretKey: billingSecrets.stripeSecretKey } as const;
+  static readonly secrets = {
+    stripeSecretKey: billingSecrets.stripeSecretKey,
+    stripeWebhookSecret: billingSecrets.stripeWebhookSecret,
+    licensePrivateKey: billingSecrets.licensePrivateKey,
+  } as const;
   static readonly reads = ["isSaas", "nodeEnvironment", "mail", "publicBaseUrl"] as const;
 
-  static create(setup: BillingSetup): Promise<BillingApp> {
+  static async create(setup: BillingSetup): Promise<BillingApp> {
+    const signing = await setup.secrets.into(BillingApp.secrets.stripeWebhookSecret, (secret) =>
+      StripeWebhookSignatureService.create(secret),
+    );
+    const notices = BillingApp.#composeNotices(setup);
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingApp.assemble({
         members: setup.members,
@@ -145,22 +179,48 @@ export class BillingApp implements BillingApi {
         config: setup.config,
         peers: setup.dependencies,
         stripeSecretKey,
-        usageWarnings: BillingApp.#composeUsageWarnings(setup),
+        usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
+        webhook: {
+          signing,
+          host: billingWebhookHostChannels.slack.create({
+            notices,
+            retention: setup.dependencies.dataRetention,
+          }),
+          invites: setup.dependencies.organizations,
+        },
       }),
     );
   }
 
+  /** Main's Slack, HubSpot and usage-limit mail notices, over the configured channels. */
+  static #composeNotices(setup: BillingSetup): BillingUsageNoticeService {
+    const { config } = setup;
+    return BillingUsageNoticeService.create({
+      config: {
+        baseHost: setup.members.publicBaseUrl,
+        slackPlanLimitChannel: config.slackPlanLimitChannel,
+        slackSignupsChannel: config.slackSignupsChannel,
+        slackSelfHostedChannel: config.slackSelfHostedChannel,
+        slackSubscriptionsChannel: config.slackSubscriptionsChannel,
+        hubspotPortalId: config.hubspotPortalId,
+        hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
+        hubspotFormId: config.hubspotFormId,
+      },
+      usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
+    });
+  }
+
   /** Main's usage-limit warning, sent over the process's mail member. */
-  static #composeUsageWarnings(setup: BillingSetup): MeteredUsageWarningService {
+  static #composeUsageWarnings(
+    setup: BillingSetup,
+    notices: BillingUsageNoticeService,
+  ): MeteredUsageWarningService {
     const { notifications, traces, organizations, projects } = setup.dependencies;
     const billableEvents = BillableEventsQueryService.create(setup.repositories.billableEvents);
     return MeteredUsageWarningService.create({
       records: notifications,
       organizations: UsageLimitOrganizationService.create({ organizations, projects }),
-      emails: BillingUsageNoticeService.create({
-        config: {},
-        usageLimitEmail: usageLimitEmailChannels.ses.create(setup.members.mail),
-      }),
+      emails: notices,
       baseHost: setup.members.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
       counters: {
         traces: { getCountByProjects: (input) => traces.countTracesByProjects(input) },
@@ -180,6 +240,7 @@ export class BillingApp implements BillingApi {
     stripeSecretKey,
     statementMail,
     usageWarnings,
+    webhook,
   }: {
     members: BillingMembers;
     repositories: Pick<
@@ -191,13 +252,17 @@ export class BillingApp implements BillingApi {
       | "organizationCache"
       | "subscriptions"
       | "organizationPricing"
+      | "webhookSubscriptions"
+      | "webhookOrganizations"
     >;
-    config: Pick<BillingServerConfig, "bankDetails">;
+    config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
     stripeSecretKey: string | undefined;
     /** No process composes the statement mail yet; absent, statements wait. */
     statementMail?: ConnectedStatementMailChannel;
     usageWarnings: MeteredUsageWarningService;
+    /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
+    webhook?: StripeWebhookComposition;
   }): BillingApp {
     const { isSaas, nodeEnvironment } = members;
     const repository = repositories.connectedBilling;
@@ -240,7 +305,13 @@ export class BillingApp implements BillingApi {
           : void 0,
       }),
     };
-    if (!stripeSecretKey) return new BillingApp({ ...gate, connected: void 0 });
+    if (!stripeSecretKey) {
+      return new BillingApp({
+        ...gate,
+        connected: void 0,
+        stripeWebhook: BillingApp.#undispatchedWebhook(),
+      });
+    }
 
     const invoicing = connectedInvoicingChannels.http.create({
       secretKey: stripeSecretKey,
@@ -267,6 +338,17 @@ export class BillingApp implements BillingApi {
 
     return new BillingApp({
       ...gate,
+      stripeWebhook: webhook
+        ? BillingApp.#composeStripeWebhook({
+            webhook,
+            isSaas,
+            stripeSecretKey,
+            nodeEnvironment,
+            repositories,
+            licensePaymentLinkId: config.licensePaymentLinkId,
+            connectedBilling: billing,
+          })
+        : BillingApp.#undispatchedWebhook(),
       connected: {
         billing,
         seats,
@@ -287,6 +369,71 @@ export class BillingApp implements BillingApi {
     });
   }
 
+  /** A deployment that composed no Stripe callback: every delivery answers 404. */
+  static #undispatchedWebhook(): StripeWebhookReceiptService {
+    return StripeWebhookReceiptService.create({
+      dispatchesEvents: () => false,
+      hasSigningSecret: () => false,
+      constructEvent: () => {
+        throw new Error("No Stripe callback is composed");
+      },
+      handleEvent: () => Promise.reject(new Error("No Stripe callback is composed")),
+    });
+  }
+
+  /** Main's `EEWebhookService` behind the callback, over billing's own rows. */
+  static #composeStripeWebhook({
+    webhook,
+    isSaas,
+    stripeSecretKey,
+    nodeEnvironment,
+    repositories,
+    licensePaymentLinkId,
+    connectedBilling,
+  }: {
+    webhook: StripeWebhookComposition;
+    isSaas: boolean;
+    stripeSecretKey: string;
+    nodeEnvironment: string | undefined;
+    repositories: Pick<BillingRepositories, "webhookSubscriptions" | "webhookOrganizations">;
+    licensePaymentLinkId: string | undefined;
+    connectedBilling: ConnectedBillingService;
+  }): StripeWebhookReceiptService {
+    const prices = BillingPriceCatalogue.create(
+      getStripeEnvironmentFromNodeEnv(nodeEnvironment),
+    ).prices;
+    const events = EEWebhookService.create({
+      subscriptionRepository: repositories.webhookSubscriptions,
+      organizationRepository: repositories.webhookOrganizations,
+      stripe: new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }),
+      itemCalculator: SubscriptionItemCalculatorService.create(prices),
+      licensePaymentLinkId,
+      inviteApprover: webhook.invites,
+      host: webhook.host,
+      connectedBilling,
+    });
+    return StripeWebhookReceiptService.create({
+      dispatchesEvents: () => isSaas,
+      hasSigningSecret: () => webhook.signing.isConfigured(),
+      constructEvent: (input) => webhook.signing.constructEvent(input),
+      handleEvent: (event) => events.handleEvent(event),
+    });
+  }
+
+  /** Main mounted currency detection on LangWatch Cloud only; elsewhere the procedure is absent. */
+  detectCurrency(request: CurrencyRequest): DetectedCurrency {
+    if (!this.#isSaas) throw new NotFoundError("Currency detection is not served here");
+    return CurrencyService.create().detect(request);
+  }
+
+  receiveStripeWebhook(input: {
+    rawBody: Uint8Array;
+    signature: string | undefined;
+  }): Promise<{ received: true }> {
+    return this.#stripeWebhook.receiveStripeWebhook(input);
+  }
+
+  readonly #stripeWebhook: StripeWebhookReceiptService;
   readonly #connected: ConnectedBilling | undefined;
   readonly #operators: Pick<OpsApi, "isAdmin">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
@@ -300,6 +447,7 @@ export class BillingApp implements BillingApi {
   readonly #usageWarnings: MeteredUsageWarningService;
 
   private constructor({
+    stripeWebhook,
     connected,
     operators,
     auditLog,
@@ -312,6 +460,7 @@ export class BillingApp implements BillingApi {
     reporting,
     usageWarnings,
   }: {
+    stripeWebhook: StripeWebhookReceiptService;
     connected: ConnectedBilling | undefined;
     operators: Pick<OpsApi, "isAdmin">;
     auditLog: Pick<AuditLogApi, "record">;
@@ -324,6 +473,7 @@ export class BillingApp implements BillingApi {
     reporting: BillingReportingPipeline;
     usageWarnings: MeteredUsageWarningService;
   }) {
+    this.#stripeWebhook = stripeWebhook;
     this.#connected = connected;
     this.#operators = operators;
     this.#auditLog = auditLog;

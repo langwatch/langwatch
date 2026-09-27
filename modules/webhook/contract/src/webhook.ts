@@ -143,9 +143,9 @@ export type WebhookDeliveryLog = {
 
 /**
  * A test fire's outcome, over the same last hop a real delivery dispatches
- * through. `responseBody`/`error` are truncated summaries: the full detail
- * lands in the delivery log, never in this answer.
+ * through. `responseBody`/`error` are truncated summaries; `responseBody` is
+ * absent only when the fire never reached a receiver.
  */
 export type WebhookTestFireResult =
   | { delivered: true; responseStatus: number | null; responseBody: string }
-  | { delivered: false; responseStatus: number | null; error: string };
+  | { delivered: false; responseStatus: number | null; responseBody?: string; error: string };

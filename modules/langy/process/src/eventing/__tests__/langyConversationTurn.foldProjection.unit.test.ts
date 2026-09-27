@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { LangyConversationTurnFoldProjection } from "../langy-conversation-turn.projection.ts";
+import { processingEvent } from "./support/langy-processing-events.ts";
 
 const noopStore: StateProjectionStore<LangyConversationTurnData> = {
   store: async () => {},
@@ -31,7 +32,7 @@ function event(
   data: Record<string, unknown>,
   occurredAt: number,
 ): LangyConversationProcessingEvent {
-  return {
+  return processingEvent({
     id: `event-${occurredAt}`,
     aggregateId: CONVERSATION,
     aggregateType: "langy_conversation",
@@ -41,7 +42,7 @@ function event(
     type: LANGY_CONVERSATION_EVENT_TYPES[typeKey],
     version,
     data: { conversationId: CONVERSATION, turnId: TURN, ...data },
-  } as unknown as LangyConversationProcessingEvent;
+  });
 }
 
 const started = (occurredAt: number) =>

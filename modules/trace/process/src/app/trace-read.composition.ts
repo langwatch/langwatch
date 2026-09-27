@@ -21,8 +21,11 @@ import {
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { EventingTraceTopicAssignment } from "../eventing/trace-topic-assignment.commands.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
-import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import type * as traceLegacyReadRepositoryModule from "../repositories/clickhouse/trace-legacy-read.repository.ts";
+import {
+  TraceLegacyReadClickHouseRepository,
+  type ClickHouseTraceLegacyReadOptions,
+  type TraceLegacyFilterConditions,
+} from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
@@ -43,11 +46,17 @@ import {
   type CodingAgentIngestFilter,
 } from "../services/trace-ingestion.service.ts";
 import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
-import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
+import {
+  TraceLegacyReadService,
+  type BlobResolutionDeps,
+} from "../services/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/trace-list-read.service.ts";
 import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
 import { TraceModelCostService } from "../services/trace-model-cost.service.ts";
+import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
+import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TraceQueryClassificationService } from "../services/trace-query-classification.service.ts";
+import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
 import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
@@ -108,7 +117,7 @@ export type TraceReaderCompositionOptions = {
    */
   ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
-  filterConditions?: traceLegacyReadRepositoryModule.TraceLegacyFilterConditions | undefined;
+  filterConditions?: TraceLegacyFilterConditions | undefined;
   evaluations: TraceAppDependencies["evaluations"];
   /** The Instant Eval peer the Explorer's judged searches run through. */
   instantEvals?: TraceAppDependencies["instantEvals"];
@@ -131,6 +140,39 @@ export type TraceReaderCompositionOptions = {
   publicBaseUrl?: string;
 };
 
+/** What a composition root gives the legacy trace read: the store, and the policies over it. */
+export type TraceLegacyReadCompositionOptions = Omit<
+  ClickHouseTraceLegacyReadOptions,
+  "retentionFloor"
+> & {
+  /** Restores offloaded spans from the blob store (ADR-022) where no resolver is supplied. */
+  blobResolutionDeps?: BlobResolutionDeps | undefined;
+  /** The tenant's retention policy; absent, the span read floors at the platform default. */
+  retentionResolver?: DataRetentionApi | undefined;
+};
+
+/** The legacy trace read over ClickHouse, with its offload resolution and retention floor. */
+export function composeTraceLegacyRead(
+  options: TraceLegacyReadCompositionOptions,
+): TraceLegacyReadClickHouseRepository {
+  const { blobResolutionDeps, retentionResolver, ...read } = options;
+
+  return TraceLegacyReadClickHouseRepository.create({
+    ...read,
+    retentionFloor: TraceRetentionFloorService.create(retentionResolver),
+    resolveTraceSpans:
+      read.resolveTraceSpans ??
+      (blobResolutionDeps
+        ? TraceOffloadResolutionService.create().resolverFor(blobResolutionDeps)
+        : undefined),
+    resolveTraceSpansBatch:
+      read.resolveTraceSpansBatch ??
+      (blobResolutionDeps
+        ? TraceOffloadResolutionBatchService.create().resolverFor(blobResolutionDeps)
+        : undefined),
+  });
+}
+
 /** Constructs one Trace read graph from process storage and complete feature peers. */
 export function composeTraceAppDependencies(
   options: TraceReaderCompositionOptions,
@@ -146,12 +188,12 @@ export function composeTraceAppDependencies(
   });
   const read = TraceLegacyReadService.create({
     traceCanonicalisation: options.canonicalisation,
-    traceRead: TraceLegacyReadClickHouseRepository.create({
+    traceRead: composeTraceLegacyRead({
       traceCanonicalisation: options.canonicalisation,
       ...(resolve ? { resolveClickHouseClient: resolve } : {}),
       ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
       retentionResolver: options.dataRetention,
-      annotationService: options.annotations,
+      annotations: options.annotations,
       blobResolutionDeps,
     }),
     editOverlay,

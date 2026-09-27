@@ -111,7 +111,7 @@ export class TraceSummaryService {
         occurredAtMs: summary.occurredAt,
       });
       const { recomputedInput, recomputedOutput, anyResolved } =
-        await TraceOffloadResolutionService.resolveOffloadedTraces({
+        await TraceOffloadResolutionService.create().resolveOffloadedTraces({
           projectId: tenantId,
           normalizedSpans,
           blobStore: deps.blobStore,

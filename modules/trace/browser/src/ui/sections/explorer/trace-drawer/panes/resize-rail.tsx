@@ -152,7 +152,6 @@ export function ResizeRail() {
       onPointerCancel={handlePointerUp}
       onDoubleClick={handleDoubleClick}
       aria-hidden="true"
-      role="separator"
       _hover={{ "& > [data-edge-pill]": { opacity: 1 } }}
     >
       <Box

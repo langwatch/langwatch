@@ -403,3 +403,12 @@ func lateListServer(t *testing.T, mintedID string, withheldReads int) *httptest.
 		},
 	})
 }
+
+func TestAnErrorEchoingTheIDIsNotVisible(t *testing.T) {
+	if visibleIn(SideResult{Status: 404, Body: `{"code":"not_found","meta":{"id":"w-a"}}`}, "w-a") {
+		t.Fatal("a 404 naming the id counted as the entity being listed")
+	}
+	if !visibleIn(SideResult{Status: 200, Body: `[{"id":"w-a"}]`}, "w-a") {
+		t.Fatal("a listed entity was not visible")
+	}
+}

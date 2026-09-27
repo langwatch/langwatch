@@ -6,13 +6,13 @@ import {
   toComparisonConfig,
   disambiguateNames,
 } from "@langwatch/experiment-contract";
+import { getEvaluatorMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import { CircleAlert, Swords } from "lucide-react";
 import { useMemo } from "react";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
-import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
 import { ComparisonScoreboard } from "../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 
 // Matches the pulse used for the equivalent per-target alert

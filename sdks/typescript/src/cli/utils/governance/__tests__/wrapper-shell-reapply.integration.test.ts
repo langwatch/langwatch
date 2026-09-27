@@ -26,7 +26,8 @@ const SHELLS = ["bash", "zsh"].filter(has);
 const TOOLS = ["copilot", "gemini", "opencode"] as const;
 const combos = SHELLS.flatMap((shell) => TOOLS.map((tool) => ({ shell, tool })));
 
-describe("buildShellReapply real-shell execution", () => {
+// Without bash or zsh on PATH the suite reports skipped, never a green pass.
+describe.skipIf(combos.length === 0)("buildShellReapply real-shell execution", () => {
   let tmp: string;
   let binDir: string;
   let origHome: string | undefined;
@@ -71,14 +72,6 @@ describe("buildShellReapply real-shell execution", () => {
       // interactive shells without a tty warn to stderr ("cannot set
       // terminal process group") — ignore it, we assert on stdout.
       stdio: ["ignore", "pipe", "ignore"],
-    });
-  }
-
-  if (combos.length === 0) {
-    // Reported as skipped, not passed — a green "pass" here would claim
-    // real-shell coverage that never ran.
-    it.skip("no POSIX shell on PATH — real-shell coverage unavailable", () => {
-      throw new Error("unreachable: this suite requires bash or zsh on PATH");
     });
   }
 

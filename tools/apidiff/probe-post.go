@@ -163,8 +163,8 @@ func (engine *probeEngine) settleForVisibility(operation Operation, record mutat
 	for {
 		outcome.attempts++
 		outcome.transcript = engine.runCase(operation, probeCase{name: settleCollectionCase}, target)
-		outcome.visibleA = containsID(outcome.transcript.A.Body, record.idA)
-		outcome.visibleB = containsID(outcome.transcript.B.Body, record.idB)
+		outcome.visibleA = visibleIn(outcome.transcript.A, record.idA)
+		outcome.visibleB = visibleIn(outcome.transcript.B, record.idB)
 		outcome.waited = time.Since(started)
 		if outcome.visibleA && outcome.visibleB {
 			return outcome
@@ -514,6 +514,12 @@ func emptyListObject(object map[string]any) bool {
 		}
 	}
 	return arrays > 0
+}
+
+// visibleIn counts an entity as listed only on a successful answer: a 404
+// that repeats the requested id in its meta is not the entity.
+func visibleIn(side SideResult, id string) bool {
+	return side.Status >= 200 && side.Status < 300 && containsID(side.Body, id)
 }
 
 // containsID reports whether the ID appears anywhere in a decoded JSON body.

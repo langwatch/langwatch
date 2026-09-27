@@ -33,7 +33,7 @@ export const addTargetPayloadSchema = z
       .string()
       .min(1)
       .optional()
-      .describe("Id for the new column. Generated as target-<nanoid> when omitted."),
+      .describe("Id for the new column. Generated as a target KSUID when omitted."),
     inputs: z.array(fieldSchema).default([]).describe("Fields the column reads from the dataset."),
     outputs: z.array(fieldSchema).default([]).describe("Fields the column produces for each row."),
     mappings: z
@@ -243,7 +243,7 @@ export const addEvaluatorPayloadSchema = z
       .string()
       .min(1)
       .optional()
-      .describe("Id for the new evaluator. Generated as evaluator_<nanoid> when omitted."),
+      .describe("Id for the new evaluator. Generated as an evaluator KSUID when omitted."),
     name: z
       .string()
       .trim()

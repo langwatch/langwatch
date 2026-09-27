@@ -11,6 +11,33 @@ import { proxiedDatasetImageUrl } from "../../model/dataset-image-url.ts";
 /** Kept clear of the viewport edge so the expanded picture is never flush. */
 const VIEWPORT_MARGIN = 32;
 
+/** How far to shift a copy centred on `origin` so it stays `VIEWPORT_MARGIN` inside the window. */
+function clampIntoViewport({
+  origin,
+  rect,
+}: {
+  origin: { centerX: number; centerY: number };
+  rect: { width: number; height: number };
+}): { top: number; left: number } {
+  const left = origin.centerX - rect.width / 2;
+  const top = origin.centerY - rect.height / 2;
+  const right = left + rect.width;
+  const bottom = top + rect.height;
+
+  let offsetLeft = 0;
+  let offsetTop = 0;
+  if (right > window.innerWidth - VIEWPORT_MARGIN) {
+    offsetLeft = window.innerWidth - VIEWPORT_MARGIN - right;
+  }
+  if (left + offsetLeft < VIEWPORT_MARGIN) offsetLeft = VIEWPORT_MARGIN - left;
+  if (bottom > window.innerHeight - VIEWPORT_MARGIN) {
+    offsetTop = window.innerHeight - VIEWPORT_MARGIN - bottom;
+  }
+  if (top + offsetTop < VIEWPORT_MARGIN) offsetTop = VIEWPORT_MARGIN - top;
+
+  return { top: offsetTop, left: offsetLeft };
+}
+
 export function DatasetCellImage({
   src,
   alt,
@@ -39,24 +66,7 @@ export function DatasetCellImage({
     // After layout: the image has to have sized before its overflow is known.
     requestAnimationFrame(() => {
       if (!expandedRef.current) return;
-      const rect = expandedRef.current.getBoundingClientRect();
-      const left = origin.centerX - rect.width / 2;
-      const top = origin.centerY - rect.height / 2;
-      const right = left + rect.width;
-      const bottom = top + rect.height;
-
-      let offsetLeft = 0;
-      let offsetTop = 0;
-      if (right > window.innerWidth - VIEWPORT_MARGIN) {
-        offsetLeft = window.innerWidth - VIEWPORT_MARGIN - right;
-      }
-      if (left + offsetLeft < VIEWPORT_MARGIN) offsetLeft = VIEWPORT_MARGIN - left;
-      if (bottom > window.innerHeight - VIEWPORT_MARGIN) {
-        offsetTop = window.innerHeight - VIEWPORT_MARGIN - bottom;
-      }
-      if (top + offsetTop < VIEWPORT_MARGIN) offsetTop = VIEWPORT_MARGIN - top;
-
-      setClamp({ top: offsetTop, left: offsetLeft });
+      setClamp(clampIntoViewport({ origin, rect: expandedRef.current.getBoundingClientRect() }));
       setIsPositioned(true);
     });
   }, [isExpanded, origin]);

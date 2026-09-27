@@ -2,10 +2,13 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
 import { Temporal } from "@langwatch/time";
+import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 
+import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import type { MeteredUsageWarningService } from "../../services/metered-usage-warning.service.ts";
+import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
 
 const ACME = "org-acme";
@@ -56,10 +59,12 @@ function billingApp({
   isSaas,
   stripeSecretKey,
   commitUsdCents = 100_00,
+  webhookSecret,
 }: {
   isSaas: boolean;
   stripeSecretKey: string | undefined;
   commitUsdCents?: number;
+  webhookSecret?: string;
 }) {
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
@@ -67,9 +72,13 @@ function billingApp({
     usageWarnings: createApiFixture<MeteredUsageWarningService>({}),
     members: { isSaas, nodeEnvironment: "test" },
     repositories,
-    config: { bankDetails: undefined },
+    config: { bankDetails: undefined, licensePaymentLinkId: undefined },
     peers: registry.peers,
     stripeSecretKey,
+    webhook: {
+      signing: StripeWebhookSignatureService.create(webhookSecret),
+      host: MemoryBillingWebhookHostChannel.create(),
+    },
   });
   return { app, asked: registry.asked, audited: registry.audited, repositories };
 }
@@ -238,5 +247,80 @@ describe("the subscription plan billing answers entitlement", () => {
     await expect(
       app.getActiveSubscriptionPlan({ organizationId: ACME, user: CUSTOMER_ADMIN }),
     ).resolves.toMatchObject({ type: "LAUNCH", overrideAddingLimitations: false });
+  });
+});
+
+describe("the Stripe callback BillingApp answers", () => {
+  const payload = JSON.stringify({
+    id: "evt_1",
+    object: "event",
+    type: "account.application.deauthorized",
+    data: { object: { id: "ca_1", object: "application" } },
+  });
+  const rawBody = new TextEncoder().encode(payload);
+
+  describe("given a hosted deployment with Stripe and its signing secret", () => {
+    /** @scenario "A signed delivery is acknowledged" */
+    it("acknowledges a delivery signed with that secret", async () => {
+      const { app } = billingApp({
+        isSaas: true,
+        stripeSecretKey: "sk_test_fixture",
+        webhookSecret: "whsec_fixture",
+      });
+      const signature = Stripe.webhooks.generateTestHeaderString({
+        payload,
+        secret: "whsec_fixture",
+      });
+
+      await expect(app.receiveStripeWebhook({ rawBody, signature })).resolves.toEqual({
+        received: true,
+      });
+    });
+
+    it("refuses a delivery signed with another secret", async () => {
+      const { app } = billingApp({
+        isSaas: true,
+        stripeSecretKey: "sk_test_fixture",
+        webhookSecret: "whsec_fixture",
+      });
+      const signature = Stripe.webhooks.generateTestHeaderString({
+        payload,
+        secret: "whsec_other",
+      });
+
+      await expect(app.receiveStripeWebhook({ rawBody, signature })).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+  });
+
+  describe("given a deployment with no Stripe key", () => {
+    it("answers 404, as main did off SaaS", async () => {
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+
+      await expect(
+        app.receiveStripeWebhook({ rawBody, signature: "t=1,v1=abc" }),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+  });
+});
+
+describe("the currency BillingApp detects", () => {
+  describe("given LangWatch Cloud", () => {
+    it("answers from the request, falling back when nothing names a country", () => {
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: undefined });
+
+      expect(app.detectCurrency({ headers: {} })).toMatchObject({ country: null });
+    });
+  });
+
+  describe("given a self-hosted deployment", () => {
+    it("serves no detection, as main mounted none", () => {
+      const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });
+
+      expect(() => app.detectCurrency({ headers: {} })).toThrow(
+        expect.objectContaining({ status: 404 }),
+      );
+    });
   });
 });

@@ -384,7 +384,7 @@ export class SuiteApp implements SuiteApi {
 
   /** A new, empty test-suite test suite. */
   createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.createTestSuite(input);
+    return this.#dependencies.suites.createTestSuite(input);
   }
 
   /**
@@ -415,7 +415,7 @@ export class SuiteApp implements SuiteApi {
 
     refuseExecutionSettings(input);
 
-    const updated = await this.#dependencies.scenarios.updateTestSuite({
+    const updated = await this.#dependencies.suites.updateTestSuite({
       testSuiteId: input.id,
       projectId: input.projectId,
       ...(input.name === undefined ? {} : { name: input.name }),
@@ -471,7 +471,7 @@ export class SuiteApp implements SuiteApi {
    * on a rename.
    */
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.updateTestSuite(input);
+    return this.#dependencies.suites.updateTestSuite(input);
   }
 
   // -- runs ------------------------------------------------------------------

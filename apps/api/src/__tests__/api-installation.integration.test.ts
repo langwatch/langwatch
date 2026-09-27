@@ -239,6 +239,128 @@ describe("the api process installation", () => {
       await runtime.stop();
     }
   });
+});
+
+describe("the api process installation", () => {
+  it("answers the hosted MCP approval step from the installed hosted-mcp module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const closed = {
+        authenticate: () => {
+          throw new Error("the approval step resolves its caller optionally.");
+        },
+      };
+      const signedIn = (request: Request) =>
+        request.headers.get("x-test-user")
+          ? { actor: { type: "user" as const, id: "user-1" }, scope: null }
+          : null;
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: { ...closed, identifyOptional: ({ request }) => signedIn(request) },
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const isApproval = (transport: { protocol: string; namespace?: string }) =>
+        transport.protocol === "rest" && transport.namespace === "mcp-authorize";
+      const owner = serverModules.find((module) => (module.transports ?? []).some(isApproval));
+      const approval = owner?.transports?.find(isApproval);
+      if (!owner || !approval) throw new Error("no installed module declares mcp-authorize");
+      expect(owner.name).toBe("hosted-mcp");
+      host.mount(approval.router(), () => runtime.service(owner.apiContract));
+      const post = (headers: Record<string, string>) =>
+        host.app.fetch(
+          new Request("http://api.test/api/mcp/authorize", {
+            method: "POST",
+            headers: { "content-type": "application/json", ...headers },
+            body: JSON.stringify({
+              projectId: "project-1",
+              redirect_uri: "http://127.0.0.1:9999/cb",
+              client_id: "never-registered",
+            }),
+          }),
+        );
+
+      const signedOut = await post({});
+      const unregistered = await post({ "x-test-user": "yes" });
+
+      expect({ status: signedOut.status, body: await signedOut.json() }).toEqual({
+        status: 401,
+        body: { error: "Not authenticated" },
+      });
+      expect({ status: unregistered.status, body: await unregistered.json() }).toEqual({
+        status: 400,
+        body: { error: "Unknown or unregistered client_id" },
+      });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("answers every push ingestion receiver from the installed governance module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const closed = {
+        authenticate: () => {
+          throw new Error("the ingestion receivers resolve their own source secret.");
+        },
+      };
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: closed,
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const isIngest = (transport: { protocol: string; namespace?: string }) =>
+        transport.protocol === "rest" && transport.namespace === "ingest";
+      const owner = serverModules.find((module) => (module.transports ?? []).some(isIngest));
+      const ingest = owner?.transports?.find(isIngest);
+      if (!owner || !ingest) throw new Error("no installed module declares the ingest family");
+      expect(owner.name).toBe("governance");
+      host.mount(ingest.router(), () => runtime.service(owner.apiContract));
+      const paths = [
+        "/api/ingest/otel/src_never",
+        "/api/ingest/webhook/src_never",
+        "/api/ingest/otel/src_never/v1/logs",
+        "/api/ingest/otel/src_never/v1/metrics",
+      ];
+
+      const answers = await Promise.all(
+        paths.map(async (path) => {
+          const response = await host.app.fetch(
+            new Request(`http://api.test${path}`, {
+              method: "POST",
+              headers: {
+                authorization: "Bearer lw_is_nobodysSecret",
+                "content-type": "application/json",
+              },
+              body: "{}",
+            }),
+          );
+          return [path, response.status] as const;
+        }),
+      );
+
+      expect(Object.fromEntries(answers)).toEqual(
+        Object.fromEntries(paths.map((path) => [path, 401])),
+      );
+    } finally {
+      await runtime.stop();
+    }
+  });
 
   /** @scenario "The api process serves every OTLP signal at its own module's door" */
   it("answers every OTLP signal from its owner's door, canonically and under an alias", async () => {

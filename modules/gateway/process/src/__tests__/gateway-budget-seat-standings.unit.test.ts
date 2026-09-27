@@ -10,8 +10,8 @@ import { type GatewayBudget, Prisma, type PrismaClient } from "@langwatch/prisma
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import { type BucketSpend, type GatewayBudgetSpend } from "../app/gateway.members.ts";
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 
 function stubTemplate(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {

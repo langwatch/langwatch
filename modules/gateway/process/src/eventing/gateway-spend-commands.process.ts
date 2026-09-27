@@ -1,6 +1,8 @@
-import { spendUsageSchema, type SpendUsage } from "@langwatch/gateway-contract";
+import { spendUsageSchema } from "@langwatch/gateway-contract";
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
+
+import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 
 export const GATEWAY_SPEND_PIPELINE_NAME = "gateway_spend_processing" as const;
 export const GATEWAY_SPEND_AGGREGATE_TYPE = "gateway_request" as const;
@@ -30,13 +32,6 @@ export const GATEWAY_SPEND_PROCESSING_EVENT_TYPES = [
 ] as const;
 
 export const GATEWAY_SPEND_EVENT_VERSION_LATEST = "2026-07-29" as const;
-
-/**
- * Schema-snapshot version of the gatewaySpend fold, stamped on the projected
- * row. The read-back only trusts the current stamp, so an older-shape row
- * refolds from the event log instead of decoding wrong column defaults.
- */
-export const GATEWAY_SPEND_PROJECTION_VERSION_LATEST = "2026-07-29";
 
 /**
  * Command payloads for the gateway_spend_processing pipeline. *WireSchema
@@ -78,23 +73,6 @@ const occurredAtMs = z
     Temporal.PlainDateTime.from({ year: 2100, month: 1, day: 1 }).toZonedDateTime("UTC")
       .epochMilliseconds,
   );
-
-/** Every quantity at zero: what a request that measured nothing carries. */
-export const EMPTY_SPEND_USAGE: SpendUsage = {
-  input_tokens: 0,
-  output_tokens: 0,
-  cache_read_input_tokens: 0,
-  cache_creation_input_tokens: 0,
-  cache_creation_1h_tokens: 0,
-  reasoning_tokens: 0,
-  input_audio_tokens: 0,
-  output_audio_tokens: 0,
-  input_chars: 0,
-  audio_ms: 0,
-  input_image_tokens: 0,
-  output_image_tokens: 0,
-  image_count: 0,
-};
 
 /**
  * Who a request is billed against. Carried on both admission and outcome so

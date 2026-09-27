@@ -235,7 +235,6 @@ export {
   REPORT_CHART_QUERY_CONCURRENCY,
   type ReportChartDeps,
 } from "./services/report-chart.service.ts";
-export type { ReportGraphInput } from "./rules/report-chart.rules.ts";
 export { toReportTraceRow } from "./rules/report-trace-row.rules.ts";
 /**
  * The two Postgres reads a scheduled report fires through, published so a background process

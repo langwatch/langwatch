@@ -86,26 +86,13 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     { enabled: false },
   );
 
-  const { refetch: refetchDiscover } = discoverQuery;
-  const lastDiscoverKey = useRef("");
-  useEffect(() => {
-    if (!canDiscover) return;
-    const key = JSON.stringify({
-      tenantIds: allTenants ? [] : tenantIds,
-      since,
-    });
-    if (key === lastDiscoverKey.current) return;
-    lastDiscoverKey.current = key;
-
-    void refetchDiscover().then((result) => {
-      if (result.data) {
-        const relevant = new Set(
-          result.data.projections.filter((p) => p.aggregateCount > 0).map((p) => p.projectionName),
-        );
-        setSelectedProjections(relevant);
-      }
-    });
-  }, [canDiscover, allTenants, tenantIds, since, refetchDiscover]);
+  useDiscoverOnScopeChange({
+    canDiscover,
+    tenantIds: allTenants ? [] : tenantIds,
+    since,
+    refetch: discoverQuery.refetch,
+    onDiscovered: setSelectedProjections,
+  });
 
   const projectionMetaByName = useMemo(
     () => new Map((projectionsQuery.data?.projections ?? []).map((p) => [p.projectionName, p])),
@@ -124,7 +111,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
       void statusQuery.refetch();
       toaster.create({
         title: "Projection replay started",
-        description: `Replaying ${selectedProjections.size} projection${selectedProjections.size !== 1 ? "s" : ""}...`,
+        description: `Replaying ${projectionCount(selectedProjections.size)}...`,
         type: "success",
       });
       onReplayStarted();
@@ -132,12 +119,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't start the replay" }),
   });
 
-  const [dryRunResult, setDryRunResult] = useState<{
-    status: string;
-    message: string;
-    projectionNames: string[];
-    sampleSize: number;
-  } | null>(null);
+  const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
 
   const dryRunMutation = api.ops.dryRunReplay.useMutation({
     onSuccess: (data) => {
@@ -153,15 +135,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
 
   function toggleProjection(name: string) {
     if (!projectionsWithData.has(name)) return;
-    setSelectedProjections((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else {
-        next.add(name);
-      }
-      return next;
-    });
+    setSelectedProjections((prev) => toggledIn(prev, name));
   }
 
   function selectAllRelevant() {
@@ -255,33 +229,7 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
             </Text>
             <Input type="date" size="sm" value={since} onChange={(e) => setSince(e.target.value)} />
           </Box>
-          <HStack gap={1}>
-            {[
-              { label: "This month", months: 0 },
-              { label: "2 months", months: 2 },
-              { label: "3 months", months: 3 },
-              { label: "6 months", months: 6 },
-            ].map(({ label, months }) => {
-              const d = toDate(nowInstant());
-              if (months === 0) {
-                d.setDate(1);
-              } else {
-                d.setMonth(d.getMonth() - months);
-              }
-              const value = d.toISOString().slice(0, 10);
-              return (
-                <Button
-                  key={label}
-                  size="sm"
-                  height="36px"
-                  variant={since === value ? "solid" : "outline"}
-                  onClick={() => setSince(value)}
-                >
-                  {label}
-                </Button>
-              );
-            })}
-          </HStack>
+          <SincePresets since={since} onSince={setSince} />
         </HStack>
 
         {canDiscover && discoverQuery.isFetching && (
@@ -317,62 +265,17 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {discoverQuery.data!.projections.map((proj) => {
-                    const hasData = proj.aggregateCount > 0;
-                    const meta = projectionMetaByName.get(proj.projectionName);
-                    const isSelected = selectedProjections.has(proj.projectionName);
-                    return (
-                      <Table.Row
-                        key={proj.projectionName}
-                        cursor={hasData ? "pointer" : "default"}
-                        opacity={hasData ? 1 : 0.4}
-                        onClick={() => toggleProjection(proj.projectionName)}
-                        _hover={hasData ? { bg: "bg.subtle" } : undefined}
-                        bg={isSelected ? "bg.subtle" : undefined}
-                      >
-                        <Table.Cell>
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={!hasData}
-                            onCheckedChange={() => toggleProjection(proj.projectionName)}
-                          />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <HStack gap={2}>
-                            <Text textStyle="sm">{proj.projectionName}</Text>
-                            {meta && (
-                              <Badge
-                                size="sm"
-                                variant="subtle"
-                                colorPalette={KIND_PALETTE[meta.kind]}
-                              >
-                                {meta.kind}
-                              </Badge>
-                            )}
-                            {!hasData && (
-                              <Badge size="sm" variant="subtle" colorPalette="gray">
-                                no data
-                              </Badge>
-                            )}
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color="fg.muted">
-                            {meta?.pipelineName ?? "—"}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell textAlign="end">
-                          <Text fontWeight="medium">{proj.aggregateCount}</Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text textStyle="xs" color="fg.muted">
-                            {proj.tenantBreakdown.length} tenant
-                            {proj.tenantBreakdown.length !== 1 ? "s" : ""}
-                          </Text>
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  })}
+                  {discoverQuery.data!.projections.map((proj) => (
+                    <ProjectionRow
+                      key={proj.projectionName}
+                      projectionName={proj.projectionName}
+                      aggregateCount={proj.aggregateCount}
+                      tenantCount={proj.tenantBreakdown.length}
+                      meta={projectionMetaByName.get(proj.projectionName)}
+                      isSelected={selectedProjections.has(proj.projectionName)}
+                      onToggle={toggleProjection}
+                    />
+                  ))}
                 </Table.Body>
               </Table.Root>
             </Table.ScrollArea>
@@ -396,75 +299,19 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
               </HStack>
 
               {hasAccess && (
-                <VStack align="stretch" gap={3}>
-                  <Box>
-                    <Text textStyle="xs" color="fg.muted" marginBottom={1}>
-                      Description (for audit log)
-                    </Text>
-                    <Textarea
-                      size="sm"
-                      placeholder="Describe the reason for this replay..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={2}
-                    />
-                  </Box>
-                  <Box>
-                    <Checkbox
-                      checked={fullRebuild}
-                      onCheckedChange={(e) => setFullRebuild(!!e.checked)}
-                    >
-                      <Text textStyle="sm">Rebuild from scratch</Text>
-                    </Checkbox>
-                    <Text textStyle="xs" color="fg.muted" marginTop={1} marginLeft={6}>
-                      Clears replay markers first. Use it when the target table was truncated or
-                      swapped empty; otherwise the run resumes and skips finished aggregates.
-                    </Text>
-                  </Box>
-                  <HStack gap={2}>
-                    <Button
-                      size="sm"
-                      colorPalette="orange"
-                      disabled={isReplayRunning || totalAggregates === 0}
-                      loading={startReplayMutation.isPending}
-                      onClick={handleStartReplay}
-                    >
-                      {fullRebuild ? "Start Full Rebuild" : "Start Full Replay"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isReplayRunning || totalAggregates === 0}
-                      loading={dryRunMutation.isPending}
-                      onClick={handleDryRun}
-                    >
-                      Dry Run (5 aggregates)
-                    </Button>
-                    {isReplayRunning && (
-                      <Text textStyle="xs" color="orange.500">
-                        A replay is already running
-                      </Text>
-                    )}
-                  </HStack>
-                  <Text textStyle="xs" color="fg.muted">
-                    Full replay pauses projections, drains active jobs, replays events from
-                    ClickHouse, then unpauses. Dry run processes 5 sample aggregates in memory
-                    without writing.
-                  </Text>
-
-                  {dryRunResult && (
-                    <Box borderLeft="2px solid" borderColor="blue.400" paddingLeft={3} paddingY={1}>
-                      <Text textStyle="xs" fontWeight="medium" color="blue.500" marginBottom={1}>
-                        Dry Run Result
-                      </Text>
-                      <Text textStyle="sm">{dryRunResult.message}</Text>
-                      <Text textStyle="xs" color="fg.muted" marginTop={1}>
-                        Projections: {dryRunResult.projectionNames.join(", ")} | Sample size:{" "}
-                        {dryRunResult.sampleSize}
-                      </Text>
-                    </Box>
-                  )}
-                </VStack>
+                <ReplayLaunchPanel
+                  description={description}
+                  onDescription={setDescription}
+                  fullRebuild={fullRebuild}
+                  onFullRebuild={setFullRebuild}
+                  disabled={isReplayRunning || totalAggregates === 0}
+                  isReplayRunning={isReplayRunning}
+                  starting={startReplayMutation.isPending}
+                  dryRunning={dryRunMutation.isPending}
+                  onStart={handleStartReplay}
+                  onDryRun={handleDryRun}
+                  dryRunResult={dryRunResult}
+                />
               )}
             </Box>
           )}
@@ -472,4 +319,260 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
       )}
     </VStack>
   );
+}
+
+const SINCE_PRESETS = [
+  { label: "This month", months: 0 },
+  { label: "2 months", months: 2 },
+  { label: "3 months", months: 3 },
+  { label: "6 months", months: 6 },
+];
+
+/** The first of this month, or the same day some months back, as a date input value. */
+function sinceValueOf(months: number): string {
+  const d = toDate(nowInstant());
+  if (months === 0) {
+    d.setDate(1);
+  } else {
+    d.setMonth(d.getMonth() - months);
+  }
+  return d.toISOString().slice(0, 10);
+}
+
+function SincePresets({ since, onSince }: { since: string; onSince: (since: string) => void }) {
+  return (
+    <HStack gap={1}>
+      {SINCE_PRESETS.map(({ label, months }) => {
+        const value = sinceValueOf(months);
+        return (
+          <Button
+            key={label}
+            size="sm"
+            height="36px"
+            variant={since === value ? "solid" : "outline"}
+            onClick={() => onSince(value)}
+          >
+            {label}
+          </Button>
+        );
+      })}
+    </HStack>
+  );
+}
+
+type ProjectionMeta = { kind: keyof typeof KIND_PALETTE; pipelineName: string };
+
+/** One discovered projection; only a projection with data can be selected. */
+function ProjectionRow({
+  projectionName,
+  aggregateCount,
+  tenantCount,
+  meta,
+  isSelected,
+  onToggle,
+}: {
+  projectionName: string;
+  aggregateCount: number;
+  tenantCount: number;
+  meta: ProjectionMeta | undefined;
+  isSelected: boolean;
+  onToggle: (projectionName: string) => void;
+}) {
+  const hasData = aggregateCount > 0;
+
+  return (
+    <Table.Row
+      cursor={hasData ? "pointer" : "default"}
+      opacity={hasData ? 1 : 0.4}
+      onClick={() => onToggle(projectionName)}
+      _hover={hasData ? { bg: "bg.subtle" } : undefined}
+      bg={isSelected ? "bg.subtle" : undefined}
+    >
+      <Table.Cell>
+        <Checkbox
+          checked={isSelected}
+          disabled={!hasData}
+          onCheckedChange={() => onToggle(projectionName)}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        <HStack gap={2}>
+          <Text textStyle="sm">{projectionName}</Text>
+          {meta && (
+            <Badge size="sm" variant="subtle" colorPalette={KIND_PALETTE[meta.kind]}>
+              {meta.kind}
+            </Badge>
+          )}
+          {!hasData && (
+            <Badge size="sm" variant="subtle" colorPalette="gray">
+              no data
+            </Badge>
+          )}
+        </HStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Text textStyle="xs" color="fg.muted">
+          {meta?.pipelineName ?? "—"}
+        </Text>
+      </Table.Cell>
+      <Table.Cell textAlign="end">
+        <Text fontWeight="medium">{aggregateCount}</Text>
+      </Table.Cell>
+      <Table.Cell>
+        <Text textStyle="xs" color="fg.muted">
+          {tenantCount} tenant
+          {tenantCount !== 1 ? "s" : ""}
+        </Text>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+type DryRunResult = {
+  status: string;
+  message: string;
+  projectionNames: string[];
+  sampleSize: number;
+};
+
+/** The audit description, rebuild choice and the two ways to launch a replay. */
+function ReplayLaunchPanel({
+  description,
+  onDescription,
+  fullRebuild,
+  onFullRebuild,
+  disabled,
+  isReplayRunning,
+  starting,
+  dryRunning,
+  onStart,
+  onDryRun,
+  dryRunResult,
+}: {
+  description: string;
+  onDescription: (description: string) => void;
+  fullRebuild: boolean;
+  onFullRebuild: (fullRebuild: boolean) => void;
+  disabled: boolean;
+  isReplayRunning: boolean;
+  starting: boolean;
+  dryRunning: boolean;
+  onStart: () => void;
+  onDryRun: () => void;
+  dryRunResult: DryRunResult | null;
+}) {
+  return (
+    <VStack align="stretch" gap={3}>
+      <Box>
+        <Text textStyle="xs" color="fg.muted" marginBottom={1}>
+          Description (for audit log)
+        </Text>
+        <Textarea
+          size="sm"
+          placeholder="Describe the reason for this replay..."
+          value={description}
+          onChange={(e) => onDescription(e.target.value)}
+          rows={2}
+        />
+      </Box>
+      <Box>
+        <Checkbox checked={fullRebuild} onCheckedChange={(e) => onFullRebuild(!!e.checked)}>
+          <Text textStyle="sm">Rebuild from scratch</Text>
+        </Checkbox>
+        <Text textStyle="xs" color="fg.muted" marginTop={1} marginLeft={6}>
+          Clears replay markers first. Use it when the target table was truncated or swapped empty;
+          otherwise the run resumes and skips finished aggregates.
+        </Text>
+      </Box>
+      <HStack gap={2}>
+        <Button
+          size="sm"
+          colorPalette="orange"
+          disabled={disabled}
+          loading={starting}
+          onClick={onStart}
+        >
+          {fullRebuild ? "Start Full Rebuild" : "Start Full Replay"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          loading={dryRunning}
+          onClick={onDryRun}
+        >
+          Dry Run (5 aggregates)
+        </Button>
+        {isReplayRunning && (
+          <Text textStyle="xs" color="orange.500">
+            A replay is already running
+          </Text>
+        )}
+      </HStack>
+      <Text textStyle="xs" color="fg.muted">
+        Full replay pauses projections, drains active jobs, replays events from ClickHouse, then
+        unpauses. Dry run processes 5 sample aggregates in memory without writing.
+      </Text>
+
+      {dryRunResult && (
+        <Box borderLeft="2px solid" borderColor="blue.400" paddingLeft={3} paddingY={1}>
+          <Text textStyle="xs" fontWeight="medium" color="blue.500" marginBottom={1}>
+            Dry Run Result
+          </Text>
+          <Text textStyle="sm">{dryRunResult.message}</Text>
+          <Text textStyle="xs" color="fg.muted" marginTop={1}>
+            Projections: {dryRunResult.projectionNames.join(", ")} | Sample size:{" "}
+            {dryRunResult.sampleSize}
+          </Text>
+        </Box>
+      )}
+    </VStack>
+  );
+}
+
+function toggledIn(selected: Set<string>, name: string): Set<string> {
+  const next = new Set(selected);
+  if (next.has(name)) next.delete(name);
+  else next.add(name);
+  return next;
+}
+
+function projectionCount(count: number): string {
+  return `${count} projection${count !== 1 ? "s" : ""}`;
+}
+
+type DiscoverResult = {
+  data?: { projections: { projectionName: string; aggregateCount: number }[] };
+};
+
+/** Rediscovers once per tenant scope and date, preselecting every projection that has data. */
+function useDiscoverOnScopeChange({
+  canDiscover,
+  tenantIds,
+  since,
+  refetch,
+  onDiscovered,
+}: {
+  canDiscover: boolean;
+  tenantIds: string[];
+  since: string;
+  refetch: () => Promise<DiscoverResult>;
+  onDiscovered: (projectionNames: Set<string>) => void;
+}) {
+  const lastDiscoverKey = useRef("");
+  const key = JSON.stringify({ tenantIds, since });
+
+  useEffect(() => {
+    if (!canDiscover || key === lastDiscoverKey.current) return;
+    lastDiscoverKey.current = key;
+
+    void refetch().then((result) => {
+      if (!result.data) return;
+      onDiscovered(
+        new Set(
+          result.data.projections.filter((p) => p.aggregateCount > 0).map((p) => p.projectionName),
+        ),
+      );
+    });
+  }, [canDiscover, key, refetch, onDiscovered]);
 }

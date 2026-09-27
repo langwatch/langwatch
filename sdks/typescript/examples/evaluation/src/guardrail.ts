@@ -95,7 +95,7 @@ const processMessage = async (userInput: string): Promise<string> => {
       return generatedResponse;
     }
   } catch (error) {
-    console.error(`❌ Guardrail error: ${error}`);
+    console.error("❌ Guardrail error:", error);
     // On guardrail error, you might want to block or allow based on your policy
     console.log("⚠️  Allowing response due to guardrail error (fail-open policy)");
     return generatedResponse;

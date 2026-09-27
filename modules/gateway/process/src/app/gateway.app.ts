@@ -35,6 +35,14 @@ import {
   type GatewayRealtimeUsageOutcome,
   type GatewayRealtimeUsageReport,
   type GatewaySignedJwt,
+  type GatewayEndUserSpendQuery,
+  type GatewayEndUserSpendResponse,
+  type GatewaySpendEventsPage,
+  type GatewaySpendEventsQuery,
+  type GatewaySpendReplayBody,
+  type GatewaySpendReplayResponse,
+  type GatewaySpendSummariesPage,
+  type GatewaySpendSummariesQuery,
   type GatewaySpendByRequestTypeQuery,
   type GatewaySpendEventPage,
   type GatewayCaller,
@@ -138,10 +146,12 @@ import {
 import type { z } from "zod";
 
 import { elevenLabsConversationChannels } from "../channels/elevenlabs-conversation-channels.registry.ts";
-import { GatewaySpendProducerAdapter } from "../eventing/gateway-spend-producer.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
-import { EventingGatewaySpendAdapter } from "../eventing/gateway-spend.adapter.ts";
 import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
+import {
+  EventingGatewaySpendAdapter,
+  GatewaySpendProducerAdapter,
+} from "../eventing/gateway-spend.pipeline.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import type { GatewayPrincipalSpendRepository } from "../repositories/gateway-principal-spend.repository.ts";
 import type { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
@@ -151,7 +161,10 @@ import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import {
+  type GatewayAgentCacheEntryStore,
+  RedisGatewayAgentCacheEntryRepository,
+} from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
@@ -190,6 +203,11 @@ import {
 import { GatewayRealtimeSessionSweepService } from "../services/gateway-realtime-session-sweep.service.ts";
 import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import {
+  GatewaySpendReconciliationService,
+  type GatewaySpendScope,
+  type GatewaySpendScopeQuery,
+} from "../services/gateway-spend-reconciliation.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
 import type {
   VirtualKeyCamelDto,
@@ -207,9 +225,11 @@ import type {
   GatewayInternalResolveKeyRequest,
   GatewayInternalSessionRequest,
 } from "../transport/gateway-internal.rest.ts";
-import type { GatewaySpendScope, GatewaySpendScopeQuery } from "../transport/gateway-spend.rest.ts";
-import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
-import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
+import type { GatewaySpendDoorApi } from "../transport/gateway-spend.rest.ts";
+import {
+  buildGatewayControlPlane,
+  GatewayEndUserCapsAdapter,
+} from "./gateway-composition.build.ts";
 import {
   type GatewayBudgetSpend,
   type GatewayChangeEvents,
@@ -675,7 +695,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption"> &
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
       publicBaseUrl?: string | undefined;
@@ -693,7 +713,7 @@ export type GatewayInternalProtocolCollaborators = Readonly<{
   spend?: GatewayInternalSpendPipeline | undefined;
 }>;
 
-export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
+export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
     /**
@@ -752,6 +772,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     "prisma",
     "clickhouse",
     "encryption",
+    "redis",
     "gatewayInternalProtocol",
     "publicBaseUrl",
   ] as const;
@@ -846,7 +867,13 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     });
 
     return new GatewayApp({
-      members: controlPlane,
+      members: {
+        ...controlPlane,
+        agentCache: {
+          store: RedisGatewayAgentCacheEntryRepository.create(setup.members.redis),
+          encryption: setup.members.encryption,
+        },
+      },
       voice: {
         webhook: GatewayElevenLabsWebhookService.create({
           credentials: voiceCredentials,
@@ -908,6 +935,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
   #budgetLedger: GatewayBudgetLedgerService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
   #internalAnswers: GatewayInternalDoorService;
+  #spendAnswers: GatewaySpendReconciliationService;
   #internalDoor: RestIdentity;
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
@@ -947,6 +975,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     this.#spendPipeline = spendPipeline;
     this.#internalProtocol = internalProtocol;
     this.#internalAnswers = GatewayInternalDoorService.create({ protocol: internalProtocol });
+    this.#spendAnswers = GatewaySpendReconciliationService.create({ collaborators: this });
     this.#internalDoor = internalDoor;
     this.#budgetOverviewDeps = budgetOverviewDeps;
     // The union's second arm exists for the REST-only composition (agent cache
@@ -1083,6 +1112,34 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     input: GatewayRealtimeUsageReport,
   ): Promise<GatewayRealtimeUsageOutcome> {
     return this.#internalProtocol.reportRealtimeSessionUsage(input);
+  }
+
+  answerSpendSummaries(input: {
+    organizationId: string;
+    query: GatewaySpendSummariesQuery;
+  }): Promise<GatewaySpendSummariesPage> {
+    return this.#spendAnswers.answerSpendSummaries(input);
+  }
+
+  answerSpendEvents(input: {
+    organizationId: string;
+    query: GatewaySpendEventsQuery;
+  }): Promise<GatewaySpendEventsPage> {
+    return this.#spendAnswers.answerSpendEvents(input);
+  }
+
+  answerEndUserSpend(input: {
+    organizationId: string;
+    query: GatewayEndUserSpendQuery;
+  }): Promise<GatewayEndUserSpendResponse> {
+    return this.#spendAnswers.answerEndUserSpend(input);
+  }
+
+  answerSpendReplay(input: {
+    organizationId: string;
+    body: GatewaySpendReplayBody;
+  }): Promise<GatewaySpendReplayResponse> {
+    return this.#spendAnswers.answerSpendReplay(input);
   }
 
   answerInternalResolveKey(

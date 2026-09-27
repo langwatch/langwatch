@@ -281,7 +281,7 @@ export class PromptApp implements PromptApi {
     return this.#dependencies.prompts.updatePrompt(input);
   }
 
-  syncPrompt(input: Parameters<PromptService["syncPrompt"]>[0]): Promise<PromptSyncResult> {
+  syncPrompt(input: PromptRestSyncInput): Promise<PromptSyncResult> {
     return this.#dependencies.prompts.syncPrompt(input);
   }
 

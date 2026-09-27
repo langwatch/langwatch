@@ -13,10 +13,6 @@
       "langwatch-declaration-source": "./src/licensing.web.ts",
       "types": "./dist/licensing.web.d.ts",
       "default": "./src/licensing.web.ts"
-    },
-    "./surfaces/resource-limits": {
-      "types": "./dist/ui/sections/resource-limits/index.d.ts",
-      "default": "./src/ui/sections/resource-limits/index.ts"
     }
   },
   "scripts": {

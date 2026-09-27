@@ -1,7 +1,7 @@
 import type { Logger } from "@langwatch/observability";
 
 import { observeEsProcessWakeLag } from "../../metrics.ts";
-import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import { ProcessStateUnreadableError, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { HandleResult } from "../processManagerService.ts";
 import type { DueWake, ProcessStore } from "../stores/processStore.types.ts";
 
@@ -147,6 +147,7 @@ export class ProcessWakeWorker {
           processKey: wake.ref.processKey,
           errorType,
           errorMessage,
+          ...(error instanceof ProcessStateUnreadableError ? { issuePaths: error.issuePaths } : {}),
         },
         "Wake handling failed; the next poll will retry",
       );

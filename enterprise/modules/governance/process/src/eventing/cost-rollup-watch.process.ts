@@ -6,6 +6,7 @@ import {
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { computeNextRunAt, Temporal } from "@langwatch/time";
+import { z } from "zod";
 
 import type { CostRollupDayComparer } from "../app/governance.members.ts";
 import {
@@ -30,22 +31,23 @@ const COST_ROLLUP_WATCH_TIMEZONE = "UTC";
 /** The widest moment an instant can state, so a wilder number is refused. */
 const EPOCH_MS_LIMIT = 8.64e15;
 
-export interface CostRollupWatchState {
+export const costRollupWatchStateSchema = z.object({
   /** UTC `YYYY-MM-DD`, in the order they were first marked. Set semantics. */
-  pendingDays: string[];
+  pendingDays: z.array(z.string()),
   /**
    * Duplicates the instance's own `nextWakeAt` on purpose: a handler that
    * cannot read the armed moment out of its own state would re-arm on every
    * charge, and it makes "days marked with nothing armed" a state a test can find.
    */
-  armedAt: number | null;
+  armedAt: z.number().nullable(),
   /**
    * Days ever newly marked, never reset — not even by a check. Part of what
    * identifies a comparison request: a redelivered wake carries the same
    * count and stays a repeat; a new mark moves it and asks a new question.
    */
-  marks: number;
-}
+  marks: z.number(),
+});
+export type CostRollupWatchState = z.infer<typeof costRollupWatchStateSchema>;
 
 const INITIAL_COST_ROLLUP_WATCH_STATE: CostRollupWatchState = {
   pendingDays: [],
@@ -142,7 +144,7 @@ export class CostRollupWatchProcess {
 
     return (process) =>
       process
-        .state<CostRollupWatchState>(INITIAL_COST_ROLLUP_WATCH_STATE)
+        .state(costRollupWatchStateSchema, INITIAL_COST_ROLLUP_WATCH_STATE)
         .intent("compareDay", compareCostRollupDaySchema, (payload, context) =>
           this.intent.execute(payload, { attempt: context.attempt }),
         )

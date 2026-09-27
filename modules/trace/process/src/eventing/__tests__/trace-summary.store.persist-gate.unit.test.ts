@@ -4,7 +4,7 @@ import { createTenantId, type ProjectionStoreContext } from "@langwatch/eventing
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceSummaryProjectionRepository } from "../../repositories/projection/trace-summary-projection.repository.ts";
+import type { TraceSummaryProjectionRepository } from "../../repositories/trace-summary-projection.repository.ts";
 import { TraceSummaryStore } from "../trace-summary.store.ts";
 
 const context: ProjectionStoreContext = {

@@ -62,7 +62,7 @@ export class TraceScenarioEventMediaService {
     ownerId: string;
     purpose: "scenario_event";
   }): Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }> {
-    return TraceContentExtractionService.extractInlineMediaFromEvent({
+    return TraceContentExtractionService.create().extractInlineMediaFromEvent({
       event: input.event,
       projectId: input.projectId,
       ownerKind: "scenario_run",

@@ -31,3 +31,18 @@ export function toSafeFailureDiagnostic(error: unknown): {
 
   return { errorType, errorMessage: GENERIC_FAILURE_MESSAGE };
 }
+
+/** A stored process state its schema no longer reads; carries issue paths, never values. */
+export class ProcessStateUnreadableError extends Error {
+  override readonly name = "ProcessStateUnreadableError";
+  readonly processName: string;
+  readonly processKey: string;
+  readonly issuePaths: readonly string[];
+
+  constructor(params: { processName: string; processKey: string; issuePaths: readonly string[] }) {
+    super(`Stored state of process "${params.processName}" does not match its state schema`);
+    this.processName = params.processName;
+    this.processKey = params.processKey;
+    this.issuePaths = params.issuePaths;
+  }
+}

@@ -1,5 +1,11 @@
 import type { ProtocolConnection } from "@langwatch/api";
-import type { RequestActor, SessionKeyHolder, SessionKeyPresented } from "@langwatch/api/rest";
+import type {
+  RequestActor,
+  RestResolvedProjectCredential,
+  SessionKeyHolder,
+  SessionKeyPresented,
+} from "@langwatch/api/rest";
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import type { z } from "zod";
 
@@ -122,6 +128,29 @@ export type LangyLocalWaitInput = LangyKeyCaller &
 export type LangyControlOwnerInput = Readonly<{ actor: RequestActor | null }>;
 export type LangyControlRequestInput = LangyControlOwnerInput & Readonly<{ requestId: string }>;
 export type LangyControlRequestCancelled = z.infer<typeof langyControlCancelResultSchema>;
+/** One UI action the page channel serves, as `langwatch ui actions` lists it. */
+export type LangyUiActionListing = Readonly<{
+  kind: string;
+  permission: AuthzPermission;
+  backend: string | undefined;
+  /** The action's payload as a draft-07 JSON Schema, inlined. */
+  payloadSchema: unknown;
+}>;
+
+/** The catalogue, or the dark rollout that answers nothing. */
+export type LangyUiActionsListed =
+  | Readonly<{ dark: true }>
+  | Readonly<{ dark: false; actions: LangyUiActionListing[] }>;
+
+/** One dispatch as the CLI posts it: the key's caller, its resolved credential, and the body. */
+export type LangyUiActionDispatchInput = LangyKeyCaller &
+  Readonly<{ credential: RestResolvedProjectCredential; raw: string }>;
+
+/** The action's own outcome, or the dark rollout that answers nothing. */
+export type LangyUiActionDispatched =
+  | Readonly<{ dark: true }>
+  | Readonly<{ dark: false; outcome: unknown }>;
+
 /** A public surface's caller: the key's owner and project, and which surface's rollout gates it. */
 export type LangyControlRegisterInput = LangyKeyCaller &
   Readonly<{ authorization: string; frame: RegisterFrame }>;
@@ -314,6 +343,13 @@ export interface LangyApi {
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */
   getRestCaller(input: LangyRestCallerInput): Promise<LangyRestCaller>;
+  /** Every UI action kind this process serves, behind the UI-action rollout. */
+  listUiActions(input: LangyKeyCaller): Promise<LangyUiActionsListed>;
+  /**
+   * Dispatches one UI action to the page the conversation's turn is attached to (or its saved
+   * document when the page is away), enforcing the action's own permission as the key's ceiling.
+   */
+  dispatchUiAction(input: LangyUiActionDispatchInput): Promise<LangyUiActionDispatched>;
   /** The person an owner's turns are filed under; a missing one throws. */
   getRestActor(input: { userId: string }): Promise<LangyCredentialSession>;
   /** The owner of a local worker's key, proved against Langy access. */

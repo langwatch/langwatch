@@ -43,6 +43,14 @@ export const datasetRecordEntrySchema = z
   .and(z.object({ id: z.string().min(1) }));
 export type DatasetRecordEntry = z.infer<typeof datasetRecordEntrySchema>;
 
+/** A dataset held in the browser before (or instead of) being saved: its rows and its columns. */
+export type InMemoryDataset = {
+  datasetId?: string;
+  name?: string;
+  datasetRecords: DatasetRecordEntry[];
+  columnTypes: DatasetColumns;
+};
+
 export const datasetRecordInputSchema = z
   .record(z.string(), z.unknown())
   .and(z.object({ id: z.string().min(1).optional() }));

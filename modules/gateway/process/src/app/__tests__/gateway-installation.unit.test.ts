@@ -7,6 +7,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { gatewayRealtimeSessionEventing } from "../../eventing/gateway-realtime-session.pipeline.ts";
@@ -16,8 +17,8 @@ import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
 } from "../../rules/gateway-internal-identity.rules.ts";
+import type { GatewaySpendApp } from "../../services/gateway-spend-reconciliation.service.ts";
 import { gatewayInternalRest } from "../../transport/gateway-internal.rest.ts";
-import type { GatewaySpendApp } from "../../transport/gateway-spend.rest.ts";
 import { GatewayApp } from "../gateway.app.ts";
 
 /**
@@ -87,6 +88,7 @@ async function installGateway() {
         clickhouse: analyticalWithoutStore(),
         gatewayInternalProtocol: {},
         encryption: createApiFixture<Encryption>(),
+        redis: redisDouble(),
       },
       role: "api",
       secrets,

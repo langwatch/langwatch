@@ -11,8 +11,9 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewayVirtualKeyRepository } from "../../repositories/prisma/prisma.virtual-key.repository.ts";
-import { GatewayConfigAssemblyAdapter } from "../gateway-config-assembly.composition.ts";
+import { GatewayConfigAssemblyService } from "../../services/gateway-config-assembly.service.ts";
 
 const noPlatformProviders = createApiFixture<ModelProviderApi>({
   platformProviderChain: () => Promise.resolve([]),
@@ -39,8 +40,8 @@ async function loadVk(): Promise<VirtualKeyWithScopes> {
 }
 
 async function etag() {
-  return GatewayConfigAssemblyAdapter.create({
-    prisma,
+  return GatewayConfigAssemblyService.create({
+    repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
     platformProviders: noPlatformProviders,
   }).versionToken(await loadVk());
 }

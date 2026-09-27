@@ -276,6 +276,15 @@ const useExperimentUpdateSignal = ({
   );
 };
 
+/** Whether a visible tab may probe now, at most once per interval; claims the slot when it may. */
+const claimProbe = (lastProbeAtRef: { current: number }): boolean => {
+  if (document.visibilityState !== "visible") return false;
+  const now = nowInstant().epochMilliseconds;
+  if (now - lastProbeAtRef.current < VISIBILITY_PROBE_MIN_INTERVAL_MS) return false;
+  lastProbeAtRef.current = now;
+  return true;
+};
+
 /** A returning tab probes the version once, cheaply, and runs the same rule. */
 const useVisibilityVersionProbe = ({
   enabled,
@@ -294,12 +303,7 @@ const useVisibilityVersionProbe = ({
   useEffect(() => {
     if (!enabled || !projectId || !experimentSlug) return;
     const probe = () => {
-      if (document.visibilityState !== "visible") return;
-      const now = nowInstant().epochMilliseconds;
-      if (now - lastProbeAtRef.current < VISIBILITY_PROBE_MIN_INTERVAL_MS) {
-        return;
-      }
-      lastProbeAtRef.current = now;
+      if (!claimProbe(lastProbeAtRef)) return;
       void trpcUtils.experiments.getWorkbenchVersion
         .fetch({ projectId, experimentSlug })
         .then(({ version, actorLabel, runId }) =>

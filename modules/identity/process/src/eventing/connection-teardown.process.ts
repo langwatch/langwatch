@@ -17,10 +17,11 @@ export const completeTeardownIntentSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface ConnectionTeardownState {
+export const connectionTeardownStateSchema = z.object({
   /** The deadline, while one is armed. Null means nothing is pending. */
-  tearDownAfterMs: number | null;
-}
+  tearDownAfterMs: z.number().nullable(),
+});
+export type ConnectionTeardownState = z.infer<typeof connectionTeardownStateSchema>;
 
 export const CONNECTION_TEARDOWN_INITIAL_STATE: ConnectionTeardownState = {
   tearDownAfterMs: null,

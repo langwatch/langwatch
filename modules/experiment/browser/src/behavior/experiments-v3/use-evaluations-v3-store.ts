@@ -300,13 +300,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // Inline dataset cell/column actions (scoped to a dataset)
   // -------------------------------------------------------------------------
 
-  setCellValue: (datasetId, row, columnId, value) => {
+  setCellValue: ({ datasetId, row, columnId, value }) => {
     const dataset = get().datasets.find((d) => d.id === datasetId);
     if (!dataset) return;
 
     // For saved datasets, use updateSavedRecordValue
     if (dataset.type === "saved") {
-      get().updateSavedRecordValue(datasetId, row, columnId, value);
+      get().updateSavedRecordValue({ datasetId, rowIndex: row, columnId, value });
       return;
     }
 
@@ -464,7 +464,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     return "";
   },
 
-  updateSavedRecordValue: (datasetId, rowIndex, columnId, value) => {
+  updateSavedRecordValue: ({ datasetId, rowIndex, columnId, value }) => {
     set((state) => {
       const dataset = state.datasets.find((d) => d.id === datasetId);
       if (dataset?.type !== "saved" || !dataset.datasetId) {
@@ -751,7 +751,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  setTargetMapping: (targetId, datasetId, inputField, mapping) => {
+  setTargetMapping: ({ targetId, datasetId, inputField, mapping }) => {
     set(
       (state) =>
         runTransformOrKeep({
@@ -824,7 +824,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
-  setEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField, mapping) => {
+  setEvaluatorMapping: ({ evaluatorId, datasetId, targetId, inputField, mapping }) => {
     set(
       (state) =>
         runTransformOrKeep({
@@ -835,7 +835,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     );
   },
 
-  removeEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField) => {
+  removeEvaluatorMapping: ({ evaluatorId, datasetId, targetId, inputField }) => {
     set((state) => ({
       evaluators: state.evaluators.map((e) => {
         if (e.id !== evaluatorId) return e;

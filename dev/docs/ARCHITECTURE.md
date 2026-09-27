@@ -173,6 +173,8 @@ document, is the authority on filenames):
 - `eventing/` — one folder: the pipeline and everything it names (§9).
 - `transport/` — declarations only (§8).
 - `rules/` — pure functions and constants; no clock, no I/O.
+- Ids: a new record's id is a KSUID with its resource prefix; ids minted before (nanoid, uuid) keep
+  their format and stay accepted, since clients hold them as opaque strings (Alex, 2026-09-27).
 - No `utils/`, `ports/`, `adapters/`, `composition/`, `lib/`, `helpers/`,
   `domain/`.
 

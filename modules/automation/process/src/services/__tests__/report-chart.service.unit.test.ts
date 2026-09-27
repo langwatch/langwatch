@@ -2,7 +2,13 @@ import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
 import type { ReportSource } from "@langwatch/automation-contract";
 import type { CustomGraph } from "@langwatch/prisma-client/generated";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: loggerWarn, error: vi.fn() }),
+}));
 
 import {
   ReportChartService,
@@ -14,6 +20,7 @@ const COUNT_SERIES = {
   metric: "metadata.trace_id",
   aggregation: "cardinality",
   name: "Traces",
+  colorSet: "colors",
 };
 /** The bucket key the timeseries result really uses — NOT the display name. */
 const COUNT_KEY = buildSeriesName(COUNT_SERIES as never, 0);
@@ -221,6 +228,34 @@ describe("ReportChartService.loadReportCharts", () => {
         projectId: "proj-1",
         dashboardId: "dash-1",
       });
+    });
+  });
+
+  describe("given a dashboard with a panel whose stored graph does not parse", () => {
+    beforeEach(() => loggerWarn.mockClear());
+
+    it("leaves that panel out, names it in a warning, and renders the rest", async () => {
+      const deps = makeDeps({
+        graphs: [
+          makeGraph({ id: "graph-1", name: "Panel one" }),
+          makeGraph({ id: "graph-broken", name: "Broken", graph: { graphType: "line" } }),
+        ],
+        timeseries: {
+          previousPeriod: [],
+          currentPeriod: [{ date: "2026-07-11T09:00:00Z", [COUNT_KEY]: 4 }],
+        },
+      });
+
+      const charts = await run({
+        deps,
+        source: { kind: "dashboard", dashboardId: "dash-1" },
+      });
+
+      expect(charts.map((c) => c.title)).toEqual(["Panel one"]);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        expect.objectContaining({ customGraphId: "graph-broken" }),
+        expect.any(String),
+      );
     });
   });
 

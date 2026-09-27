@@ -2,7 +2,7 @@ import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/
 import { defineServerModule } from "@langwatch/kernel";
 
 import { AuthzApp } from "./app/authz.app.ts";
-import { authzEventing } from "./eventing/authz.eventing.ts";
+import { authzEventing } from "./eventing/authz-grant.pipeline.ts";
 import { authzRepositories } from "./repositories/authz-repositories.registry.ts";
 import { authzRoleBindingRest, roleBindingRestFacts } from "./transport/authz-role-binding.rest.ts";
 import { authzTrpcTransport } from "./transport/authz.trpc.ts";

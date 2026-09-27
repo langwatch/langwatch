@@ -7,7 +7,7 @@ import { useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
-import { DatasetEditorTable } from "./dataset-editor-table.tsx";
+import { DatasetEditorTable } from "./datasets/editor/dataset-editor-table.tsx";
 
 /**
  * The grant that offers the workbench hand-off. Read from the host, not
@@ -112,6 +112,7 @@ export default function DatasetEditorScreen() {
         <DatasetEditorTable
           datasetId={datasetId}
           readEnabled={isReady}
+          floatingSelectionBar
           headerActions={
             host.hasPermission(EXPERIMENT_PERMISSION) ? (
               <Button

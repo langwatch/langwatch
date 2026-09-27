@@ -440,6 +440,10 @@ class ApiSurface {
           : null,
       ),
       bindTrpcFact(gatewaySessionFact, (ctx: TrpcRequestContext) => ctx.session ?? null),
+      bindTrpcFact(
+        currencyRequestHeadersFact,
+        (ctx: TrpcRequestContext) => ctx.req?.headers ?? null,
+      ),
       bindTrpcFact(shareViewerFact, (ctx: TrpcRequestContext) => {
         const userAgent = ctx.req?.headers["user-agent"];
         return {
@@ -563,6 +567,7 @@ const userAvatarCaller = defineRestMiddleware(
 const callerEmailFact = defineTrpcFact("callerEmail", z.string().nullable());
 const organizationSessionPersonFact = defineTrpcFact("organizationSessionPerson", z.unknown());
 const opsOperatorFact = defineTrpcFact("opsOperator", z.unknown());
+const currencyRequestHeadersFact = defineTrpcFact("currencyRequestHeaders", z.unknown());
 const gatewaySessionFact = defineTrpcFact("gatewaySession", z.unknown());
 const shareViewerFact = defineTrpcFact(
   "shareViewer",

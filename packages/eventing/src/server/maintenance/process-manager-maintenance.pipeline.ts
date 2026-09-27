@@ -9,7 +9,7 @@ import {
   PROCESS_RETENTION_SWEEP_INTERVAL_MS,
   PROCESS_RETENTION_SWEEP_LEASE_MS,
   PROCESS_RETENTION_SWEEP_PROCESS_NAME,
-  type ProcessRetentionSweepState,
+  processRetentionSweepStateSchema,
   processRetentionSweepSchema,
   processRetentionSweepWake,
 } from "./process-retention-sweep.process.ts";
@@ -38,7 +38,7 @@ export function createProcessManagerMaintenancePipeline(
     .withEvents([])
     .withProcessManager(PROCESS_RETENTION_SWEEP_PROCESS_NAME, (pm) =>
       pm
-        .state<ProcessRetentionSweepState>(PROCESS_RETENTION_SWEEP_INITIAL_STATE)
+        .state(processRetentionSweepStateSchema, PROCESS_RETENTION_SWEEP_INITIAL_STATE)
         .schedule({ everyMs: PROCESS_RETENTION_SWEEP_INTERVAL_MS })
         .onWake(processRetentionSweepWake)
         .intent("sweep", processRetentionSweepSchema, runProcessRetentionSweep(deps.retentionSweep))

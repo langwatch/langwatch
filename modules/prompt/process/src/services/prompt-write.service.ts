@@ -242,7 +242,7 @@ export class PromptWriteService {
       projectId,
     });
 
-    const updatedConfig = await this.repository.updateConfig(idOrHandle, projectId, data);
+    const updatedConfig = await this.repository.updateConfig({ idOrHandle, projectId, data });
 
     // Get the latest version to return complete prompt
     const latestVersionRaw = await this.repository.versions.findLatestVersion(

@@ -323,6 +323,29 @@ describe("WorkflowService", () => {
     ).rejects.toMatchObject({ code: "workflow_not_found" });
   });
 
+  /** @scenario "Running a named version of an unpublished workflow is refused as not published" */
+  it("refuses a named version of a workflow that was never published", async () => {
+    const repository = new FakeWorkflowRepository();
+    await repository.createVersion({
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: null,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "first",
+      dsl: { name: "Triage", version: "1", nodes: [], edges: [] },
+    });
+
+    await expect(
+      service(repository).getPublishedVersion({
+        workflowId: "workflow_1",
+        projectId: "project_1",
+        versionId: "version_1",
+      }),
+    ).rejects.toBeInstanceOf(WorkflowNotPublishedError);
+  });
+
   it("throws a concrete error when a workflow is not published", async () => {
     await expect(
       service().getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" }),

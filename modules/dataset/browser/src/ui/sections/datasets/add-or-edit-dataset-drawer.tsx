@@ -20,6 +20,7 @@ import {
   type DatasetColumns,
   type DatasetRecordForm,
   datasetRecordFormSchema,
+  type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
@@ -27,12 +28,11 @@ import { readHandledError } from "@langwatch/error-presentation/read-handled-err
 import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-browser-kit";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
-import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-hook-form";
 
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -122,6 +122,82 @@ export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
  * This is a component that allows you to create a new dataset
  * or edit an existing one's columns.
  */
+/** Why the column list cannot be saved: an empty name, or two columns sharing one. */
+function columnTypesError(columns: FormValues["columnTypes"]): string | undefined {
+  const seen = new Set<string>();
+  let duplicate: string | undefined;
+  for (const col of columns) {
+    if (col.name.trim() === "") return "Column name cannot be empty";
+    if (seen.has(col.name))
+      duplicate = `Cannot have multiple columns with the same name: \`${col.name}\``;
+    seen.add(col.name);
+  }
+  return duplicate;
+}
+
+/** The schema's verdict, plus a required name and a column list that can be saved. */
+const validateDatasetForm: Resolver<FormValues> = async (data, context, options) => {
+  const result = await zodResolver(datasetRecordFormSchema)(data, context, options);
+  const errors = result.errors as FieldErrors<DatasetRecordForm>;
+
+  if (!data.name || data.name.trim() === "") {
+    errors.name = { type: "required", message: "Name is required" };
+  }
+  const columnsMessage = columnTypesError(data.columnTypes);
+  if (columnsMessage) errors.columnTypes = { type: "required", message: columnsMessage };
+
+  return result;
+};
+
+/** The upsert as the form submits it, with remapped records when a dataset is edited. */
+function upsertInputOf({
+  projectId,
+  datasetToSave,
+  data,
+}: {
+  projectId: string;
+  datasetToSave: AddDatasetDrawerProps["datasetToSave"];
+  data: DatasetRecordForm;
+}) {
+  const base = {
+    projectId,
+    datasetId: datasetToSave?.datasetId,
+    name: data.name,
+    columnTypes: data.columnTypes,
+  };
+  if (!datasetToSave?.datasetRecords) return base;
+
+  const remapped = tryToMapPreviousColumnsToNewColumns(
+    datasetToSave.datasetRecords,
+    datasetToSave.columnTypes,
+    data.columnTypes,
+  );
+  return {
+    ...base,
+    datasetRecords: convertDatasetRecordsToColumnTypes(remapped, data.columnTypes),
+  };
+}
+
+/** Resets the form to the edited dataset (after layout) or a blank one; answers the cancel. */
+function resetDrawerForm({
+  reset,
+  datasetToSave,
+  initialColumns,
+}: {
+  reset: (values: FormValues) => void;
+  datasetToSave: AddDatasetDrawerProps["datasetToSave"];
+  initialColumns: FormValues["columnTypes"];
+}): () => void {
+  if (!datasetToSave) {
+    reset({ name: "", columnTypes: initialColumns });
+    return () => undefined;
+  }
+  const timeout = setTimeout(() => {
+    reset({ name: datasetToSave.name ?? "", columnTypes: datasetToSave.columnTypes });
+  }, 0);
+  return () => clearTimeout(timeout);
+}
+
 export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -144,35 +220,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       name: props.datasetToSave?.name ?? "",
       columnTypes: props.datasetToSave?.columnTypes ?? initialColumns,
     },
-    resolver: async (data, context, options) => {
-      const result = await zodResolver(datasetRecordFormSchema)(data, context, options);
-
-      if (!data.name || data.name.trim() === "") {
-        (result.errors as FieldErrors<DatasetRecordForm>).name = {
-          type: "required",
-          message: "Name is required",
-        };
-      }
-
-      const columnNamesSet = new Set();
-      for (const col of data.columnTypes) {
-        if (col.name.trim() === "") {
-          (result.errors as FieldErrors<DatasetRecordForm>).columnTypes = {
-            type: "required",
-            message: `Column name cannot be empty`,
-          };
-          break;
-        }
-        if (columnNamesSet.has(col.name)) {
-          (result.errors as FieldErrors<DatasetRecordForm>).columnTypes = {
-            type: "required",
-            message: `Cannot have multiple columns with the same name: \`${col.name}\``,
-          };
-        }
-        columnNamesSet.add(col.name);
-      }
-      return result;
-    },
+    resolver: validateDatasetForm,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -191,24 +239,13 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   );
 
   useEffect(() => {
-    let resetTimeout: ReturnType<typeof setTimeout> | undefined;
-    if (props.datasetToSave) {
-      resetTimeout = setTimeout(() => {
-        reset({
-          name: props.datasetToSave!.name ?? "",
-          columnTypes: props.datasetToSave!.columnTypes,
-        });
-      }, 0);
-    } else {
-      reset({
-        name: "",
-        columnTypes: initialColumns,
-      });
-    }
+    const cancelReset = resetDrawerForm({
+      reset,
+      datasetToSave: props.datasetToSave,
+      initialColumns,
+    });
     resetSlugInfo();
-    return () => {
-      if (resetTimeout) clearTimeout(resetTimeout);
-    };
+    return cancelReset;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
@@ -216,24 +253,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
   const performUpsert = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
-      {
-        projectId: project?.id ?? "",
-        datasetId: props.datasetToSave?.datasetId,
-        name: data.name,
-        columnTypes: data.columnTypes,
-        ...(props.datasetToSave?.datasetRecords
-          ? {
-              datasetRecords: convertDatasetRecordsToColumnTypes(
-                tryToMapPreviousColumnsToNewColumns(
-                  props.datasetToSave.datasetRecords,
-                  props.datasetToSave.columnTypes,
-                  data.columnTypes,
-                ),
-                data.columnTypes,
-              ),
-            }
-          : {}),
-      },
+      upsertInputOf({ projectId: project?.id ?? "", datasetToSave: props.datasetToSave, data }),
       {
         onSuccess: (data: WireOf<DatasetApiUpsertOutput>) => {
           props.onSuccess?.({
@@ -243,9 +263,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           });
           toaster.create({
             title: datasetSavedTitle(props.datasetToSave),
-            description: props.datasetToSave?.datasetId
-              ? `Successfully updated ${data.name} dataset`
-              : `Successfully created ${data.name} dataset`,
+            description: `Successfully ${props.datasetToSave?.datasetId ? "updated" : "created"} ${data.name} dataset`,
             type: "success",
           });
           reset();
@@ -268,9 +286,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           }
           showErrorToast({
             error,
-            fallbackTitle: props.datasetToSave?.datasetId
-              ? "Couldn't update the dataset"
-              : "Couldn't create the dataset",
+            fallbackTitle: `Couldn't ${props.datasetToSave?.datasetId ? "update" : "create"} the dataset`,
           });
         },
       },

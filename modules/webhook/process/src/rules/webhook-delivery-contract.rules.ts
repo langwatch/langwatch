@@ -164,34 +164,26 @@ export const MAINTENANCE_TENANT = "__webhook_maintenance__";
 
 /** Attribution captured at admission; outcome events carry only the
  *  outcome. Field names mirror the admit command's wire shape. */
-export interface SpendAttribution {
-  organization_id: string;
-  virtual_key_id: string;
-  principal_user_id: string;
-  end_user_id: string;
-  model: string;
-  model_provider_id: string;
-  trace_id: string;
-  request_type: string;
-  labels: string[];
-  metadata: string;
-  admitted_at: number;
-}
+export const spendAttributionSchema = z.object({
+  organization_id: z.string(),
+  virtual_key_id: z.string(),
+  principal_user_id: z.string(),
+  end_user_id: z.string(),
+  model: z.string(),
+  model_provider_id: z.string(),
+  trace_id: z.string(),
+  request_type: z.string(),
+  labels: z.array(z.string()),
+  metadata: z.string(),
+  admitted_at: z.number(),
+});
+export type SpendAttribution = z.infer<typeof spendAttributionSchema>;
 
 /** What the process instance contributes to every deliver payload: the
  *  project it runs in and the attribution admission stored. */
 export interface DeliverInstance {
   projectId: string;
   attribution: SpendAttribution | null;
-}
-
-export interface WebhookDeliveryState {
-  attribution: SpendAttribution | null;
-  /** An outcome this instance saw before its admission. Outcomes can
-   *  outrun their admit append (the fold's status lattice is built for the
-   *  same ordering), and the envelope needs attribution, so the outcome
-   *  waits here until `admitted` arrives and emits it. */
-  pendingOutcome: DeliverPayload | null;
 }
 
 export const INITIAL_WEBHOOK_DELIVERY_STATE: WebhookDeliveryState = {
@@ -268,6 +260,16 @@ export const deliverSchema = z.object({
   error: z.object({ type: z.string(), http_status: z.number().int() }).nullable(),
   settle_reason: z.string().nullable(),
 });
+
+export const webhookDeliveryStateSchema = z.object({
+  attribution: spendAttributionSchema.nullable(),
+  /** An outcome this instance saw before its admission. Outcomes can
+   *  outrun their admit append (the fold's status lattice is built for the
+   *  same ordering), and the envelope needs attribution, so the outcome
+   *  waits here until `admitted` arrives and emits it. */
+  pendingOutcome: deliverSchema.nullable(),
+});
+export type WebhookDeliveryState = z.infer<typeof webhookDeliveryStateSchema>;
 export type DeliverPayload = z.infer<typeof deliverSchema>;
 
 export const sendBatchSchema = z.object({

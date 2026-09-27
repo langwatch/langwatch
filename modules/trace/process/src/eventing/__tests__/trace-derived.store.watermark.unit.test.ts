@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
-} from "../../repositories/projection/trace-analytics-projection.repository.ts";
+} from "../../repositories/trace-analytics-projection.repository.ts";
 import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
 import {
   TraceAnalyticsFoldProjection,

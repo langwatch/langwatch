@@ -10,20 +10,20 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import { PostgresVirtualKeyAdapter } from "../../__tests__/testing.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../../app/gateway-composition.build.ts";
 import type { GatewayModelProviderCredentials } from "../../app/gateway.members.ts";
-import { PrismaGatewayAdapter } from "../../app/prisma.gateway.composition.ts";
 import { PrismaGatewayInternalStoreRepository } from "../../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { GatewayConfigMaterialiserService } from "../../services/gateway-config-materialisation.service.ts";
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
-import { PostgresVirtualKeyAdapter } from "../../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { GatewayConfigAssemblyAdapter } from "../../app/gateway-config-assembly.composition.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { GatewayConfigAssemblyService } from "../../services/gateway-config-assembly.service.ts";
 import { GatewayScopeResolutionService } from "../../services/gateway-scope-resolution.service.ts";
 import {
   mountGatewayInternalRest,
@@ -110,8 +110,8 @@ function buildApp(): void {
     chRepo: null,
     budgetDecisions: gateway,
     credentials,
-    assembly: GatewayConfigAssemblyAdapter.create({
-      prisma,
+    assembly: GatewayConfigAssemblyService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
     }),
   });

@@ -1,12 +1,8 @@
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 
-import {
-  type BillingInterval,
-  type Currency,
-  formatPrice,
-  getGrowthSeatPriceCents,
-} from "../model/billing-plans.ts";
+import { type BillingInterval, type Currency, formatPrice } from "../model/billing-plans.ts";
 import { countFullMembers } from "../model/subscription-types.ts";
+import { useBillingPricingService } from "./use-billing-pricing-service.ts";
 
 interface HasMemberType {
   memberType: MemberType;
@@ -23,7 +19,7 @@ export function useBillingPricing({
   users: HasMemberType[];
   plannedUsers: HasMemberType[];
 }) {
-  const priceCents = getGrowthSeatPriceCents();
+  const priceCents = useBillingPricingService().getGrowthSeatPriceCents();
   const seatCents =
     billingPeriod === "annual" ? priceCents[currency].annual : priceCents[currency].monthly;
   const periodSuffix = billingPeriod === "annual" ? "/yr" : "/mo";

@@ -96,7 +96,7 @@ function makeLedger(overrides: Partial<LedgerStub> = {}): LedgerStub {
 
 const actor = { userId: "admin-1" };
 
-const WRITE_ACTOR = { type: "user", id: "admin-1" };
+const WRITE_ACTOR = { type: "user", id: "admin-1" } as const;
 
 function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
   const epoch = new StubAuthzEpoch();
@@ -700,11 +700,35 @@ describe("AuthzGrantsService.offboard", () => {
   });
 });
 
-const COMPATIBILITY_CALLS: readonly {
-  method: CompatibilityMethod;
-  input: unknown;
-  output: unknown;
-}[] = [
+type CompatibilityInputs = {
+  [M in CompatibilityMethod]: Parameters<AuthzGrantsService[M]>[0];
+};
+type CompatibilityCall = {
+  [M in CompatibilityMethod]: { method: M; input: CompatibilityInputs[M]; output: unknown };
+}[CompatibilityMethod];
+type CompatibilityInvokers = {
+  [M in CompatibilityMethod]: (input: CompatibilityInputs[M]) => Promise<unknown>;
+};
+
+function invokeCompatibility<M extends CompatibilityMethod>(
+  service: AuthzGrantsService,
+  call: { method: M; input: CompatibilityInputs[M] },
+): Promise<unknown> {
+  const invokers: CompatibilityInvokers = {
+    attachBindings: (input) => service.attachBindings(input),
+    attachResourceGrant: (input) => service.attachResourceGrant(input),
+    revokeResourceGrants: (input) => service.revokeResourceGrants(input),
+    changeBindingRole: (input) => service.changeBindingRole(input),
+    revokeBindings: (input) => service.revokeBindings(input),
+    revokeBindingsWhere: (input) => service.revokeBindingsWhere(input),
+    offboardMember: (input) => service.offboardMember(input),
+    defineRole: (input) => service.defineRole(input),
+    deleteRole: (input) => service.deleteRole(input),
+  };
+  return invokers[call.method](call.input);
+}
+
+const COMPATIBILITY_CALLS: readonly CompatibilityCall[] = [
   {
     method: "attachBindings",
     input: {
@@ -713,7 +737,8 @@ const COMPATIBILITY_CALLS: readonly {
         {
           bindingId: "rb-ledger",
           principal: { userId: "alice" },
-          roleKey: "member",
+          role: "MEMBER",
+          customRoleId: null,
           scopeType: "TEAM",
           scopeId: TEAM,
         },
@@ -831,37 +856,29 @@ const COMPATIBILITY_CALLS: readonly {
 ];
 
 describe("AuthzGrantsService compatibility operations", () => {
-  it.each(COMPATIBILITY_CALLS)(
-    "$method delegates its exact input and result",
-    async ({ method, input, output }) => {
-      const ledger = makeLedger({
-        [method]: vi.fn().mockResolvedValue(output),
-      });
-      const { service } = makeService(makeRepository(), ledger);
-      const invoke = service[method] as unknown as (args: unknown) => Promise<unknown>;
+  it.each(COMPATIBILITY_CALLS)("$method delegates its exact input and result", async (call) => {
+    const { method, input, output } = call;
+    const ledger = makeLedger({
+      [method]: vi.fn().mockResolvedValue(output),
+    });
+    const { service } = makeService(makeRepository(), ledger);
+    await expect(invokeCompatibility(service, call)).resolves.toBe(output);
+    expect(ledger[method]).toHaveBeenCalledOnce();
+    expect(ledger[method]).toHaveBeenCalledWith(input);
+  });
 
-      await expect(invoke.call(service, input)).resolves.toBe(output);
-      expect(ledger[method]).toHaveBeenCalledOnce();
-      expect(ledger[method]).toHaveBeenCalledWith(input);
-    },
-  );
-
-  it.each(COMPATIBILITY_CALLS)(
-    "$method preserves the adapter's exact error",
-    async ({ method, input }) => {
-      const error = Object.assign(new Error(`${method} failed`), {
-        code: `test_${method}`,
-      });
-      const ledger = makeLedger({
-        [method]: vi.fn().mockRejectedValue(error),
-      });
-      const { service } = makeService(makeRepository(), ledger);
-      const invoke = service[method] as unknown as (args: unknown) => Promise<unknown>;
-
-      const raised = await invoke.call(service, input).catch((value) => value);
-      expect(raised).toBe(error);
-    },
-  );
+  it.each(COMPATIBILITY_CALLS)("$method preserves the adapter's exact error", async (call) => {
+    const { method } = call;
+    const error = Object.assign(new Error(`${method} failed`), {
+      code: `test_${method}`,
+    });
+    const ledger = makeLedger({
+      [method]: vi.fn().mockRejectedValue(error),
+    });
+    const { service } = makeService(makeRepository(), ledger);
+    const raised = await invokeCompatibility(service, call).catch((value) => value);
+    expect(raised).toBe(error);
+  });
 
   it("keeps the high-level attach path on its existing validated repository flow", async () => {
     const repository = makeRepository();

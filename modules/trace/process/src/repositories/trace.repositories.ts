@@ -1,11 +1,10 @@
 import type { TraceListRepository } from "@langwatch/trace-contract";
 
 import type { LogRecordStorageRepository } from "./log-record-storage.repository.ts";
-import type { TraceAnalyticsProjectionRepository } from "./projection/trace-analytics-projection.repository.ts";
-import type { TraceAnalyticsRollupRepository } from "./projection/trace-analytics-rollup.repository.ts";
-import type { TraceSummaryProjectionRepository } from "./projection/trace-summary-projection.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { SpanStorageRepository } from "./span-storage.repository.ts";
+import type { TraceAnalyticsProjectionRepository } from "./trace-analytics-projection.repository.ts";
+import type { TraceAnalyticsRollupRepository } from "./trace-analytics-rollup.repository.ts";
 import type { TraceAttributeSpendRepository } from "./trace-attribute-spend.repository.ts";
 import type { TraceClusteringSampleRepository } from "./trace-clustering-sample.repository.ts";
 import type { TraceDerivationSpanReaderRepository } from "./trace-derivation-span-reader.repository.ts";
@@ -13,6 +12,7 @@ import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository
 import type { TraceExistenceRepository } from "./trace-existence.repository.ts";
 import type { TraceModelSpendRepository } from "./trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "./trace-payload-reader.repository.ts";
+import type { TraceSummaryProjectionRepository } from "./trace-summary-projection.repository.ts";
 import type { TraceSummaryRepository } from "./trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "./trace-usage-count.repository.ts";
 

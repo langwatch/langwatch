@@ -10,10 +10,11 @@ export const CONNECTED_BILLING_FIRST_DELAY_MS = 5 * 60 * 1000;
 
 export const connectedBillingTickSchema = z.object({ scheduledFor: z.number().int() });
 
-export interface ConnectedBillingTickState {
+export const connectedBillingTickStateSchema = z.object({
   /** Epoch ms of the last tick this process asked for. */
-  lastTickAt: number | null;
-}
+  lastTickAt: z.number().nullable(),
+});
+export type ConnectedBillingTickState = z.infer<typeof connectedBillingTickStateSchema>;
 
 export const CONNECTED_BILLING_INITIAL_STATE: ConnectedBillingTickState = { lastTickAt: null };
 

@@ -10,6 +10,7 @@
 import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
+import { isDeepStrictEqual } from "util";
 
 import { config } from "dotenv";
 import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
@@ -220,16 +221,16 @@ describe("CLI E2E", () => {
         expectCliResultSuccess(sync1);
         const localPrompt = localPromptFileManagement.readPromptFile(promptHandle);
 
-        // Verify remote prompt
+        // Precondition: the first sync pushed the local prompt as-is (template has no temperature)
         const remotePrompt = await langwatch.prompts.get(promptHandle);
-        if (!remotePrompt) {
-          throw new Error("Remote prompt not found");
+        const pushedAsIs =
+          remotePrompt.handle === promptHandle &&
+          remotePrompt.model === localPrompt.model &&
+          remotePrompt.temperature === undefined &&
+          isDeepStrictEqual(remotePrompt.messages, localPrompt.messages);
+        if (!pushedAsIs) {
+          throw new Error(`First sync did not push ${promptHandle} as written locally`);
         }
-        expect(remotePrompt.handle).toBe(promptHandle);
-        expect(remotePrompt.model).toBe(localPrompt.model);
-        // Template omits temperature (gpt-5+ incompatible), so no temperature is synced
-        expect(remotePrompt.temperature).toBeUndefined();
-        expect(remotePrompt.messages).toEqual(localPrompt.messages);
 
         // 5. Modify remote prompt
         await langwatch.prompts.update(promptHandle, {
@@ -355,8 +356,7 @@ describe("CLI E2E", () => {
         `);
       });
 
-      // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
-      it.skip("leaves the prompt out of the prompts directory", () => {
+      it("leaves the prompt out of the prompts directory", () => {
         expect(fs.existsSync(localPromptFileManagement.getPromptFilePath(promptHandle))).toBe(
           false,
         );

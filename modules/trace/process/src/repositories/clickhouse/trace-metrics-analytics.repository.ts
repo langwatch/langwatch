@@ -2,14 +2,12 @@ import { queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
-  type TraceAnalyticsRow,
-} from "../../eventing/trace-derived.projection.ts";
+import type { TraceAnalyticsRow } from "../../eventing/trace-derived.projection.ts";
+import { TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT } from "../../rules/trace-analytics-projection-version.rules.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
-} from "../projection/trace-analytics-projection.repository.ts";
+} from "../trace-analytics-projection.repository.ts";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 
 const asString = (value: unknown): string =>

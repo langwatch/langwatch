@@ -7,11 +7,13 @@
 import { Spinner } from "@chakra-ui/react";
 
 import { billingApi } from "../../behavior/billing-api.ts";
+import { useBillingPricingService } from "../../behavior/use-billing-pricing-service.ts";
 import { useBillingHost } from "../../model/billing-host.ts";
 import { PlansComparisonPage } from "./plans-comparison.tsx";
 
 export default function PlansScreen() {
   const organization = useBillingHost().organization();
+  const pricing = useBillingPricingService();
   const activePlan = billingApi.plan.getActivePlan.useQuery(
     {
       organizationId: organization?.id ?? "",
@@ -31,6 +33,7 @@ export default function PlansScreen() {
     <PlansComparisonPage
       activePlan={activePlan.data}
       pricingModel={organization?.pricingModel ?? void 0}
+      growthSeatPriceCents={pricing.getGrowthSeatPriceCents()}
     />
   );
 }

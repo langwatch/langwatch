@@ -1,4 +1,4 @@
-import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Check, ChevronDown, HelpCircle } from "lucide-react";
 import type { ReactNode } from "react";
@@ -79,27 +79,27 @@ export function FacetSection({
       borderColor={complete ? "colorPalette.solid" : "border"}
       bg="bg"
     >
-      <Box
-        role="button"
-        tabIndex={0}
-        aria-expanded={open}
-        width="full"
-        textAlign="left"
+      <HStack
+        gap={2}
+        align="center"
         padding={3}
-        cursor="pointer"
         borderRadius="md"
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
         _hover={{
           borderColor: complete ? "colorPalette.emphasized" : "orange.400",
         }}
       >
-        <HStack gap={2} align="center">
+        <chakra.button
+          type="button"
+          aria-expanded={open}
+          display="flex"
+          alignItems="center"
+          gap={2}
+          flex="1"
+          minWidth="0"
+          textAlign="left"
+          cursor="pointer"
+          onClick={onToggle}
+        >
           <VStack align="start" gap={0} flex="1" minWidth="0">
             {titleRow}
             {!open && summary ? (
@@ -108,11 +108,6 @@ export function FacetSection({
               </Text>
             ) : null}
           </VStack>
-          {open && headerRight ? (
-            // The header is the toggle; a control living in it must not also
-            // collapse the panel.
-            <Box onClick={(e) => e.stopPropagation()}>{headerRight}</Box>
-          ) : null}
           <Box
             color="fg.muted"
             flexShrink={0}
@@ -122,8 +117,10 @@ export function FacetSection({
           >
             <ChevronDown size={16} />
           </Box>
-        </HStack>
-      </Box>
+        </chakra.button>
+        {/* Beside the toggle, not inside it: a control here must not collapse the panel. */}
+        {open && headerRight ? <Box>{headerRight}</Box> : null}
+      </HStack>
       {open ? (
         <Box paddingX={3} paddingBottom={3}>
           {children}

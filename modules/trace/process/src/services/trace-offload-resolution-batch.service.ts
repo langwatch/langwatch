@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import type { NormalizedAttributes, NormalizedSpan } from "@langwatch/trace-contract";
 
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
@@ -7,10 +8,14 @@ import type { TraceIOExtractionService } from "#services/trace-io-extraction.ser
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
+import type { ResolveTraceSpansBatchFn } from "../repositories/trace-legacy-read.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
 import type { ResolvedTraceSpans, WarnLogger } from "./trace-offload-resolution.service.ts";
+
+const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
 /**
  * Maximum concurrent `event_log` reads in flight across an entire result set. It bounds the bulk
@@ -126,12 +131,24 @@ export class TraceOffloadResolutionBatchService {
 
   private constructor() {}
 
+  /** The whole-result-set resolver a legacy read calls, bound to one blob store. */
+  resolverFor(deps: BlobResolutionDeps): ResolveTraceSpansBatchFn {
+    return (projectId, spansPerTrace) =>
+      this.resolveOffloadedTracesBatch({
+        projectId,
+        spansPerTrace,
+        blobStore: deps.blobStore,
+        ioExtractionService: deps.ioExtractionService,
+        logger: offloadResolutionLogger,
+      });
+  }
+
   /**
    * Resolves refs for a whole result set in one bounded pass; see the module doc. Takes the tenant,
    * per-trace span arrays in result order, the blob store, IO recomputation and a warning logger,
    * plus the aggregate type and read concurrency. Returns one entry per trace, in input order.
    */
-  static async resolveOffloadedTracesBatch({
+  async resolveOffloadedTracesBatch({
     projectId,
     spansPerTrace,
     blobStore,

@@ -33,9 +33,6 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../licensing/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../licensing/contract/tsconfig.build.json"
     },
     {

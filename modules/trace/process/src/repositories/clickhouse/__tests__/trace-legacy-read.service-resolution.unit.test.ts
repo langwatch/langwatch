@@ -13,6 +13,7 @@ import { blobStoreResolving } from "../../../services/__tests__/support/trace-bl
 import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
+import type { ResolveTraceSpansFn } from "../../trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
 
 // ---------------------------------------------------------------------------
@@ -156,7 +157,7 @@ function setupGetTracesWithSpansMocks(traceId: string, spanId: string) {
 describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-022)", () => {
   let TraceLegacyReadClickHouseRepository: typeof traceLegacyReadRepositoryModule.TraceLegacyReadClickHouseRepository;
   let blobStore: TraceBlobStoreService;
-  let resolveTraceSpansFn: traceLegacyReadRepositoryModule.ResolveTraceSpansFn;
+  let resolveTraceSpansFn: ResolveTraceSpansFn;
   let traceCanonicalisation: TraceCanonicalisationService;
 
   beforeEach(async () => {
@@ -171,7 +172,7 @@ describe("TraceLegacyReadClickHouseRepository — eventref resolution seam (ADR-
     const logger = createLogger("test");
 
     resolveTraceSpansFn = (projectId, normalizedSpans) =>
-      TraceOffloadResolutionService.resolveOffloadedTraces({
+      TraceOffloadResolutionService.create().resolveOffloadedTraces({
         projectId,
         normalizedSpans,
         blobStore,

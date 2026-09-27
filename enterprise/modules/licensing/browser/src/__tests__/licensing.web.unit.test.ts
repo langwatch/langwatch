@@ -34,12 +34,11 @@ describe("given a browser that installs licensing", () => {
     });
   });
 
-  describe("when a surface the declaration publishes is asked for", () => {
-    it("resolves the resource-limits surface", async () => {
-      const publication = licensingWeb.installation.publications["surfaces/resource-limits"];
-      const loaded = await publication?.load();
+  describe("when billing or organization reads the resourceLimitRow capability", () => {
+    it("resolves the lent usage row", async () => {
+      const loaded = await licensingWeb.installation.capabilities.resourceLimitRow.load();
 
-      expect(loaded).toBeDefined();
+      expect(loaded).toHaveProperty("default");
     });
   });
 });

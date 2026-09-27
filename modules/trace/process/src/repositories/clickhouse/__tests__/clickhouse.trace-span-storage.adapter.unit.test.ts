@@ -1,6 +1,9 @@
+import { createTenantId } from "@langwatch/eventing";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
+import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
 import { TraceSpanStorageRepository } from "../../span-storage-write.repository.ts";
 import type {
   TraceClickHouseWriteClient,
@@ -84,9 +87,13 @@ describe("TraceSpanStorageClickHouseRepository", () => {
 
     /** @scenario "A span without a retention of its own is stamped with the deployment's" */
     it("stamps the retention the process configured it with", async () => {
-      const { port, inserts } = adapter(35);
+      const { port, inserts } = adapter();
+      const store = SpanStorageStore.create({ storage: port, defaultRetentionDays: () => 35 });
 
-      await port.insertSpan({ ...span("a"), retentionDays: undefined as unknown as number });
+      await store.append(createTestSpan({ spanId: "a" }), {
+        aggregateId: "trace-1",
+        tenantId: createTenantId("project-1"),
+      });
 
       const row = (inserts[0]!.values as Record<string, unknown>[])[0]!;
       expect(row._retention_days).toBe(35);

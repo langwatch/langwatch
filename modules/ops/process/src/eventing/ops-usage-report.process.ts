@@ -9,10 +9,11 @@ export const USAGE_REPORT_WAKE_INTERVAL_MS = 60 * 60 * 1000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export interface UsageReportScheduleState {
+export const usageReportScheduleStateSchema = z.object({
   /** Epoch ms of the last report this process asked for, or of its first wake. */
-  lastReportAt: number | null;
-}
+  lastReportAt: z.number().nullable(),
+});
+export type UsageReportScheduleState = z.infer<typeof usageReportScheduleStateSchema>;
 
 const sendSchema = z.object({ scheduledFor: z.number().int() });
 
@@ -42,7 +43,7 @@ export const usageReportWake: WakeHandler<UsageReportScheduleState, UsageReportI
 export function usageReportPM(deps: UsageReportRunDeps): ProcessManagerApplier<Event> {
   return (pm) =>
     pm
-      .state<UsageReportScheduleState>({ lastReportAt: null })
+      .state(usageReportScheduleStateSchema, { lastReportAt: null })
       .schedule({ everyMs: USAGE_REPORT_WAKE_INTERVAL_MS })
       .onWake(usageReportWake)
       .intent("send", sendSchema, runUsageReport(deps))

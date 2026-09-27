@@ -63,15 +63,16 @@ export type JoinRequestNotification = z.infer<typeof joinRequestNotificationInte
  * means the day-7 wake re-arms to the day-14 deadline; `remindedAt` makes the
  * reminder exactly-once. Who asked and on which domain ride along for notices.
  */
-export interface JoinRequestLifecycleState {
-  remindAtMs: number | null;
-  expiresAtMs: number | null;
-  remindedAt: number | null;
-  joinRequestId: string | null;
-  organizationId: string | null;
-  requesterUserId: string | null;
-  domain: string | null;
-}
+export const joinRequestLifecycleStateSchema = z.object({
+  remindAtMs: z.number().nullable(),
+  expiresAtMs: z.number().nullable(),
+  remindedAt: z.number().nullable(),
+  joinRequestId: z.string().nullable().default(null),
+  organizationId: z.string().nullable().default(null),
+  requesterUserId: z.string().nullable().default(null),
+  domain: z.string().nullable().default(null),
+});
+export type JoinRequestLifecycleState = z.infer<typeof joinRequestLifecycleStateSchema>;
 
 export const JOIN_REQUEST_LIFECYCLE_INITIAL_STATE: JoinRequestLifecycleState = {
   remindAtMs: null,

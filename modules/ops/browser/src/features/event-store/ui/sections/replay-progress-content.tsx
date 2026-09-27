@@ -143,14 +143,6 @@ function LiveRunView({
   hasAccess: boolean;
   cancelMutation: { isPending: boolean; mutate: () => void };
 }) {
-  const throughputRate = useMemo(() => {
-    if (!status.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
-    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
-    if (elapsed < 1) return null;
-    return Math.round(status.eventsProcessed / elapsed);
-  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
-
   const activeProjectionNames = useMemo(
     () => parseActiveProjections(status.currentProjection),
     [status.currentProjection],
@@ -165,32 +157,7 @@ function LiveRunView({
         completedState={!isRunning ? (status.state as "completed" | "failed" | "cancelled") : null}
       />
 
-      {/* Stat bar */}
-      <SimpleGrid columns={4} gap={1}>
-        <Stat.Root>
-          <Stat.Label>Aggregates</Stat.Label>
-          <Stat.ValueText textStyle="lg">
-            {status.aggregatesProcessed}
-            {status.aggregatesTotal > 0 && ` / ${status.aggregatesTotal}`}
-          </Stat.ValueText>
-        </Stat.Root>
-        <Stat.Root>
-          <Stat.Label>Events</Stat.Label>
-          <Stat.ValueText textStyle="lg">{status.eventsProcessed.toLocaleString()}</Stat.ValueText>
-        </Stat.Root>
-        <Stat.Root>
-          <Stat.Label>Rate</Stat.Label>
-          <Stat.ValueText textStyle="lg">
-            {throughputRate !== null ? `${throughputRate.toLocaleString()}/s` : "\u2014"}
-          </Stat.ValueText>
-        </Stat.Root>
-        <Stat.Root>
-          <Stat.Label>Elapsed</Stat.Label>
-          <Stat.ValueText textStyle="lg">
-            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "\u2014"}
-          </Stat.ValueText>
-        </Stat.Root>
-      </SimpleGrid>
+      <ReplayStatBar status={status} />
 
       {/* Progress bar */}
       {isRunning && status.aggregatesTotal > 0 && (
@@ -384,5 +351,44 @@ function HistoricalRunView({
         </Card.Body>
       </Card.Root>
     </VStack>
+  );
+}
+
+/** Aggregates, events, throughput and elapsed time of one replay run. */
+function ReplayStatBar({ status }: { status: ReplayStatus }) {
+  const throughputRate = useMemo(() => {
+    if (!status.startedAt || !status.eventsProcessed) return null;
+    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
+    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
+    if (elapsed < 1) return null;
+    return Math.round(status.eventsProcessed / elapsed);
+  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
+
+  return (
+    <SimpleGrid columns={4} gap={1}>
+      <Stat.Root>
+        <Stat.Label>Aggregates</Stat.Label>
+        <Stat.ValueText textStyle="lg">
+          {status.aggregatesProcessed}
+          {status.aggregatesTotal > 0 && ` / ${status.aggregatesTotal}`}
+        </Stat.ValueText>
+      </Stat.Root>
+      <Stat.Root>
+        <Stat.Label>Events</Stat.Label>
+        <Stat.ValueText textStyle="lg">{status.eventsProcessed.toLocaleString()}</Stat.ValueText>
+      </Stat.Root>
+      <Stat.Root>
+        <Stat.Label>Rate</Stat.Label>
+        <Stat.ValueText textStyle="lg">
+          {throughputRate !== null ? `${throughputRate.toLocaleString()}/s` : "\u2014"}
+        </Stat.ValueText>
+      </Stat.Root>
+      <Stat.Root>
+        <Stat.Label>Elapsed</Stat.Label>
+        <Stat.ValueText textStyle="lg">
+          {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "\u2014"}
+        </Stat.ValueText>
+      </Stat.Root>
+    </SimpleGrid>
   );
 }

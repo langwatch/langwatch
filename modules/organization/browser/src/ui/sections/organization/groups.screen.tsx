@@ -10,6 +10,7 @@ import {
   Box,
   Button,
   Card,
+  chakra,
   Heading,
   HStack,
   Separator,
@@ -127,17 +128,13 @@ export default function GroupsScreen() {
                       key={g.id}
                       cursor="pointer"
                       onClick={() => setSelectedGroup(g)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedGroup(g);
-                        }
-                      }}
-                      tabIndex={0}
-                      role="button"
                       _hover={{ bg: "bg.muted" }}
                     >
-                      <Table.Cell fontWeight="medium">{g.name}</Table.Cell>
+                      <Table.Cell fontWeight="medium">
+                        <chakra.button type="button" cursor="pointer" textAlign="start">
+                          {g.name}
+                        </chakra.button>
+                      </Table.Cell>
                       <Table.Cell>
                         <SourceBadge scimSource={g.scimSource} />
                       </Table.Cell>
@@ -215,22 +212,16 @@ export default function GroupsScreen() {
                     <Table.Row
                       cursor="pointer"
                       onClick={() => setCreating(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setCreating(true);
-                        }
-                      }}
-                      tabIndex={0}
-                      role="button"
                       _hover={{ bg: "bg.muted" }}
                       color="fg.muted"
                     >
                       <Table.Cell colSpan={5}>
-                        <HStack gap={2}>
-                          <Plus size={14} />
-                          <Text fontSize="sm">Add manual group</Text>
-                        </HStack>
+                        <chakra.button type="button" cursor="pointer">
+                          <HStack gap={2}>
+                            <Plus size={14} />
+                            <Text fontSize="sm">Add manual group</Text>
+                          </HStack>
+                        </chakra.button>
                       </Table.Cell>
                     </Table.Row>
                   )}

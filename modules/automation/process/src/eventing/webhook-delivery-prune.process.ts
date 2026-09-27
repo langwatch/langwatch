@@ -1,4 +1,5 @@
 import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { z } from "zod";
 
 import { webhookDeliveryPruneIntentSchema } from "./webhook-delivery-prune.intent.ts";
 
@@ -8,9 +9,10 @@ export const WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 export const pruneSchema = webhookDeliveryPruneIntentSchema;
 
-export interface WebhookDeliveryPruneState {
-  lastPruneAt: number | null;
-}
+export const webhookDeliveryPruneStateSchema = z.object({
+  lastPruneAt: z.number().nullable(),
+});
+export type WebhookDeliveryPruneState = z.infer<typeof webhookDeliveryPruneStateSchema>;
 
 type PruneIntents = {
   prune: IntentSpec<typeof pruneSchema>;

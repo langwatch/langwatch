@@ -10,7 +10,6 @@
     "./src/licensing.web.ts",
     "./src/ui/sections/global-upgrade-modal/index.ts",
     "./src/ui/sections/license-error-interceptor/index.ts",
-    "./src/ui/sections/resource-limits/index.ts",
     "./src/ui/sections/seat-types/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

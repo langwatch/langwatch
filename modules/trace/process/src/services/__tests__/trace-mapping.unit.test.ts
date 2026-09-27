@@ -299,11 +299,11 @@ describe("mapTraceToDatasetEntry span expansion", () => {
   describe("when the all-spans expansion is enabled", () => {
     /** @scenario Expanding spans produces one dataset row per span */
     it("produces one dataset row per span", () => {
-      const rows = mapTraceToDatasetEntry(
-        threeSpanTrace as any,
-        spansMapping,
-        new Set(["spans.all.span_id"]) as any,
-      );
+      const rows = mapTraceToDatasetEntry({
+        trace: threeSpanTrace as any,
+        mapping: spansMapping,
+        expansions: new Set(["spans.all.span_id"]) as any,
+      });
 
       expect(rows).toHaveLength(3);
     });
@@ -312,7 +312,11 @@ describe("mapTraceToDatasetEntry span expansion", () => {
   describe("when no expansion is enabled", () => {
     /** @scenario Without the span expansion the trace stays a single row */
     it("produces a single row whose spans field holds all spans", () => {
-      const rows = mapTraceToDatasetEntry(threeSpanTrace as any, spansMapping, new Set() as any);
+      const rows = mapTraceToDatasetEntry({
+        trace: threeSpanTrace as any,
+        mapping: spansMapping,
+        expansions: new Set() as any,
+      });
 
       expect(rows).toHaveLength(1);
       // The spans column is serialized as JSON; it should contain all 3 spans.
@@ -367,12 +371,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
   describe("when no expansion is enabled", () => {
     /** @scenario "Every annotation on the trace gets its own readable line" */
     it("holds one text with a line per annotation", () => {
-      const rows = mapTraceToDatasetEntry(
-        reviewedTrace as any,
-        annotationsMapping,
-        new Set() as any,
-        projectScores,
-      );
+      const rows = mapTraceToDatasetEntry({
+        trace: reviewedTrace as any,
+        mapping: annotationsMapping,
+        expansions: new Set() as any,
+        annotationScoreOptions: projectScores,
+      });
 
       expect(rows).toHaveLength(1);
       expect(rows[0]!.annotations).toBe(
@@ -384,12 +388,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
 
     /** @scenario "Every annotation on the trace gets its own readable line" */
     it("hands the reader the review rather than a list to parse", () => {
-      const rows = mapTraceToDatasetEntry(
-        reviewedTrace as any,
-        annotationsMapping,
-        new Set() as any,
-        projectScores,
-      );
+      const rows = mapTraceToDatasetEntry({
+        trace: reviewedTrace as any,
+        mapping: annotationsMapping,
+        expansions: new Set() as any,
+        annotationScoreOptions: projectScores,
+      });
 
       expect(rows[0]!.annotations).not.toContain('["');
     });
@@ -397,12 +401,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
 
   describe("when the one-row-per-annotation expansion is enabled", () => {
     it("gives each annotation its own row holding its own line", () => {
-      const rows = mapTraceToDatasetEntry(
-        reviewedTrace as any,
-        annotationsMapping,
-        new Set(["annotations.id"]) as any,
-        projectScores,
-      );
+      const rows = mapTraceToDatasetEntry({
+        trace: reviewedTrace as any,
+        mapping: annotationsMapping,
+        expansions: new Set(["annotations.id"]) as any,
+        annotationScoreOptions: projectScores,
+      });
 
       expect(rows.map((row) => row.annotations)).toEqual([
         "Ada (on web_search span (0af31b2c) · Output): too terse [thumbs down] [goodness: mild]",
@@ -412,12 +416,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
 
     /** @scenario "Every annotation on the trace gets its own readable line" */
     it("draws no rule when the row carries one review", () => {
-      const rows = mapTraceToDatasetEntry(
-        reviewedTrace as any,
-        annotationsMapping,
-        new Set(["annotations.id"]) as any,
-        projectScores,
-      );
+      const rows = mapTraceToDatasetEntry({
+        trace: reviewedTrace as any,
+        mapping: annotationsMapping,
+        expansions: new Set(["annotations.id"]) as any,
+        annotationScoreOptions: projectScores,
+      });
 
       expect(rows[0]!.annotations).not.toContain("---");
     });
@@ -429,12 +433,12 @@ describe("mapTraceToDatasetEntry annotations ai_readable column", () => {
     };
     const rowsFor = (annotation: Record<string, unknown>) =>
       JSON.parse(
-        mapTraceToDatasetEntry(
-          { ...reviewedTrace, annotations: [annotation] } as any,
-          wholeAnnotationMapping,
-          new Set() as any,
-          projectScores,
-        )[0]!.annotations as string,
+        mapTraceToDatasetEntry({
+          trace: { ...reviewedTrace, annotations: [annotation] } as any,
+          mapping: wholeAnnotationMapping,
+          expansions: new Set() as any,
+          annotationScoreOptions: projectScores,
+        })[0]!.annotations as string,
       ) as Record<string, unknown>[];
 
     const commentOnly = {
@@ -554,8 +558,11 @@ describe("mapTraceToDatasetEntry annotations expected_output column", () => {
   });
 
   const expectedColumnOf = (annotation: Record<string, unknown>) =>
-    mapTraceToDatasetEntry(tracedWith(annotation) as any, suggestionMapping, new Set() as any)[0]
-      ?.expected;
+    mapTraceToDatasetEntry({
+      trace: tracedWith(annotation) as any,
+      mapping: suggestionMapping,
+      expansions: new Set() as any,
+    })[0]?.expected;
 
   describe("when the suggestion is about the trace's output", () => {
     it("carries the suggestion", () => {
@@ -1064,10 +1071,12 @@ describe("mapTraceToDatasetEntry()", () => {
         },
       };
 
-      const result = mapTraceToDatasetEntry(trace1 as any, mapping, new Set(), undefined, [
-        trace1,
-        trace2,
-      ] as any[]);
+      const result = mapTraceToDatasetEntry({
+        trace: trace1 as any,
+        mapping,
+        expansions: new Set(),
+        allTraces: [trace1, trace2] as any[],
+      });
 
       expect(result).toHaveLength(1);
       // The threads mapping returns an array of objects, which gets JSON.stringified

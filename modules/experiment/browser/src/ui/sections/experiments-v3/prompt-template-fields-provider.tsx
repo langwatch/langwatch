@@ -1,13 +1,13 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { api } from "@langwatch/browser-trpc/workflow-api";
+import {
+  getFieldsUsedByPromptTemplate,
+  type PromptTemplateMessage,
+} from "@langwatch/experiment-contract/mapping-validation";
 import { type ReactNode, useCallback, useMemo } from "react";
 
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { PromptTemplateFieldsContext } from "../../../behavior/experiments-v3/use-prompt-template-fields.ts";
-import {
-  getFieldsUsedByPromptTemplate,
-  type PromptTemplateMessage,
-} from "../../../model/experiments-v3/mapping-validation.ts";
 import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 
 /** What one resolved prompt query answers with, of the parts read here. */
