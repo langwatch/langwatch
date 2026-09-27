@@ -5,6 +5,8 @@ import {
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
 
+import { useFeatureFlagOverrides } from "./feature-flag-overrides.ts";
+
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the
 // browser keeps its resolved value for five minutes.
@@ -52,7 +54,8 @@ export function useFeatureFlag(
   flag: FrontendFeatureFlag,
   options: UseFeatureFlagOptions,
 ): UseFeatureFlagResult {
-  const queryEnabled = options.enabled ?? true;
+  const override = useFeatureFlagOverrides()[flag];
+  const queryEnabled = (options.enabled ?? true) && override === undefined;
 
   const { data, isLoading } = api.featureFlag.isEnabled.useQuery(
     {
@@ -73,6 +76,7 @@ export function useFeatureFlag(
     },
   );
 
+  if (override !== undefined) return { enabled: override, isLoading: false };
   return {
     enabled: data?.enabled ?? false,
     isLoading: queryEnabled ? isLoading : false,

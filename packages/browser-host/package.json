@@ -34,6 +34,10 @@
       "types": "./dist/capabilities.d.ts",
       "default": "./src/capabilities.ts"
     },
+    "./feature-flag-overrides": {
+      "types": "./dist/feature-flag-overrides.d.ts",
+      "default": "./src/feature-flag-overrides.ts"
+    },
     "./query-client": {
       "types": "./dist/query-client.d.ts",
       "default": "./src/query-client.ts"
