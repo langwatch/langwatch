@@ -281,6 +281,7 @@ jobs:
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."
           --filter "@langwatch/ui..."
+          --filter "@langwatch/tasks..."
           --filter "langwatch..."
 
       - name: Build mcp-server
