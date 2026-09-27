@@ -3774,9 +3774,6 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
-      '@langwatch/workflow-browser-kit':
-        specifier: workspace:*
-        version: link:../../workflow/browser-kit
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
