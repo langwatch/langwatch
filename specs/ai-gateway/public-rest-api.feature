@@ -138,6 +138,28 @@ Feature: Public REST API — /api/gateway/v1/*
     And the write is attributed to the synthetic actor `svc_<projectId>`
 
   @integration @rest @rbac
+  Scenario: A legacy project key cannot aim a budget at another organization
+    Given a legacy project key for a project in organization A
+    When it creates a budget whose scope, anchor or model provider names a resource of organization B
+    Then it is refused with the code `gateway_scope_org_mismatch`, or `virtual_key_not_found` for a key
+    And no budget is created
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot change another organization's budget or cache rule
+    Given a legacy project key for a project in organization A
+    When it updates, archives or resets a budget or cache rule of organization B by id
+    Then the response status is 404
+    And nothing is written
+
+  @integration @rest @rbac
+  Scenario: A legacy project key's writes land in its own project's organization
+    # As on main: inside its own organization the key may budget any team or
+    # project, and change any budget or cache rule.
+    Given a legacy project key for a project in organization A
+    When it creates a budget or a cache rule, whatever organization the body names
+    Then the row is filed under organization A
+
+  @integration @rest @rbac
   Scenario: A key that can create but not manage mints a key for its own project
     # MEMBER holds virtualKeys:create but not virtualKeys:manage. Issuing a
     # project's own keys is the day job of anyone driving the gateway from

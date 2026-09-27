@@ -234,6 +234,7 @@ export class GatewayService {
 
   async create(input: CreateBudgetInput): Promise<GatewayBudgetResource> {
     const parsed = createGatewayBudgetInputSchema.parse(input);
+    assertOrganizationScopeIsOwn(parsed);
     await this.assertProjectScopesBelongToOrganization(parsed);
     await this.assertScopeIsReachable(parsed);
 
@@ -427,6 +428,13 @@ export class GatewayService {
     if (project?.team.organizationId !== organizationId) {
       throw new GatewayScopeOrgMismatchError("project");
     }
+  }
+}
+
+/** A budget is filed under the caller's organization, so an org scope must name that one. */
+function assertOrganizationScopeIsOwn(input: CreateBudgetInput): void {
+  if (input.scope.kind === "ORGANIZATION" && input.scope.organizationId !== input.organizationId) {
+    throw new GatewayScopeOrgMismatchError("organization");
   }
 }
 
