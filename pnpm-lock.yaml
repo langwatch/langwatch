@@ -1554,6 +1554,9 @@ importers:
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../modules/feature-flag/contract
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../modules/langy/contract
       '@langwatch/onboarding-browser-kit':
         specifier: workspace:*
         version: link:../../modules/onboarding/browser-kit

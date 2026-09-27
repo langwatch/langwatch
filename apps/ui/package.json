@@ -113,6 +113,7 @@
     "@ai-sdk/openai-compatible": "catalog:",
     "@elevenlabs/client": "catalog:",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@langwatch/onboarding-browser-kit": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/scenario": "catalog:",
