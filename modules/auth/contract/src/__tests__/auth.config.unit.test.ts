@@ -1,7 +1,7 @@
 import { ConfigParseError, parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
 
-import { assertAuthServerConfig, authServerConfig } from "../auth.config.ts";
+import { assertAuthServerConfig, authBrowserConfig, authServerConfig } from "../auth.config.ts";
 
 const read = (environment: Record<string, string | undefined>) =>
   parseProcessConfig({ owners: [{ name: "auth", config: authServerConfig }], environment }).auth;
@@ -20,6 +20,16 @@ describe("auth server configuration", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot rather than leaving the surface quietly off", () => {
       expect(() => read({ PASSKEYS_ENABLED: "true" })).toThrow(ConfigParseError);
+    });
+  });
+
+  describe("given the browser config the served page carries", () => {
+    /** @scenario "The served page names the identifier-first screens as the sign-in front door" */
+    it("names the identifier-first screens as the front door with no switch set", () => {
+      expect(authBrowserConfig.project(read({})).identityFrontDoor).toBe(true);
+      expect(authBrowserConfig.project(read({ PASSKEYS_ENABLED: "on" })).identityFrontDoor).toBe(
+        true,
+      );
     });
   });
 

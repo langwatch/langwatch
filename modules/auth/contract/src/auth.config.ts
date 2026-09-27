@@ -75,7 +75,7 @@ export const authWebConfigSchema = z.strictObject({
 
 export type AuthWebConfig = z.infer<typeof authWebConfigSchema>;
 
-/** The sign-in router is off in every process, so the identifier-first screens never front. */
+/** The identifier-first screens are the only sign-in front door (ADR-117, bake end). */
 export const authBrowserConfig = defineBrowserConfig({
   schema: authWebConfigSchema,
   project: (config: AuthServerConfig) => {
@@ -83,7 +83,7 @@ export const authBrowserConfig = defineBrowserConfig({
       config.signInProviders.authProvider ?? config.signInProviders.legacyProvider;
     return {
       passkeys: config.passkeysEnabled,
-      identityFrontDoor: false,
+      identityFrontDoor: true,
       ...(authProvider ? { authProvider } : {}),
     };
   },
