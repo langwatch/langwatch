@@ -50,6 +50,7 @@ export {
 } from "./model/drawer-registry.ts";
 export {
   type DrawerCallbacksIn,
+  type DrawersDifferingFromMap,
   type DrawerPropsMapOf,
   type UiDrawerMap,
   type UiDrawerPropsOf,

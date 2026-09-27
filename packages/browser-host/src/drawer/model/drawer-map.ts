@@ -46,3 +46,15 @@ export type DrawerPropsMapOf<Drawers> = {
       ? Props
       : never;
 };
+
+/**
+ * Drawers whose registered props differ from their entry in `Map`: an owner's registration
+ * checked against what the other modules open it with. `never` when every entry agrees.
+ */
+export type DrawersDifferingFromMap<Drawers, Map = UiDrawerMap> = {
+  [Name in keyof Drawers & keyof Map]: [DrawerPropsMapOf<Drawers>[Name]] extends [Map[Name]]
+    ? [Map[Name]] extends [DrawerPropsMapOf<Drawers>[Name]]
+      ? never
+      : Name
+    : Name;
+}[keyof Drawers & keyof Map];
