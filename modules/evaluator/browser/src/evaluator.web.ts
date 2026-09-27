@@ -61,4 +61,19 @@ export const evaluatorWeb = defineWebModule("evaluator")
         default: (await import("./ui/elements/evaluations/guardrails-drawer.tsx")).GuardrailsDrawer,
       }),
     },
+  })
+  /** The studio's evaluator editor and inline settings form (§3.4 rule 7). */
+  .withCapabilities({
+    studioEvaluatorEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
+          .LentStudioEvaluatorEditor,
+      }),
+    },
+    evaluatorSettingsForm: {
+      load: async () => ({
+        default: (await import("./ui/sections/evaluators/lent-studio-evaluator.tsx"))
+          .LentEvaluatorSettingsForm,
+      }),
+    },
   });

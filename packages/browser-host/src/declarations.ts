@@ -8,6 +8,7 @@ import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
+import type { AvailableSource, FieldMapping } from "@langwatch/workflow-contract";
 import type { ComponentType, ReactNode } from "react";
 
 /** A component a module declares, loaded the first time something draws it. */
@@ -264,6 +265,36 @@ export type UiRedactedFieldProps = {
   visibleTo?: string | null;
 };
 
+/** An evaluator's name and settings as the studio holds them. */
+export type UiEvaluatorEditorValues = { name: string; settings: Record<string, unknown> };
+
+/** What the studio hands evaluator's editor for one saved evaluator node. */
+export type UiStudioEvaluatorEditorProps = {
+  evaluatorType: string | undefined;
+  description: string | undefined;
+  isWorkflowEvaluator: boolean;
+  workflow:
+    | { id: string; name: string; icon?: string | null; updatedAt: string; projectSlug: string }
+    | undefined;
+  fields: { requiredFields?: string[]; optionalFields?: string[] } | undefined;
+  initialValues: UiEvaluatorEditorValues;
+  onChange: (values: UiEvaluatorEditorValues) => void;
+  mappings: {
+    availableSources: AvailableSource[];
+    initialMappings: Record<string, FieldMapping>;
+    onMappingChange: (identifier: string, mapping: FieldMapping | undefined) => void;
+  };
+};
+
+/** What the studio hands evaluator's settings form for an inline evaluator node. */
+export type UiEvaluatorSettingsFormProps = {
+  evaluatorType: string;
+  initialSettings: Record<string, unknown>;
+  /** Fill in the evaluator's default settings on first render. */
+  applyDefaults: boolean;
+  onChange: (settings: Record<string, unknown>) => void;
+};
+
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type UiSetupWithAgentButtonProps = {
   surface: "simulations" | "simulationRuns" | "connectedAgents";
@@ -372,6 +403,7 @@ export type UiDeclaredCapabilities = {
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
+  evaluatorSettingsForm: UiDeclaredComponent<UiEvaluatorSettingsFormProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
@@ -382,6 +414,7 @@ export type UiDeclaredCapabilities = {
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
+  studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
   talkToItPanel: UiDeclaredComponent<UiTalkToItPanelProps>;
   traceEditButton: UiDeclaredComponent<UiTraceEditButtonProps>;
   traceIdPeek: UiDeclaredComponent<UiTraceIdPeekProps>;
