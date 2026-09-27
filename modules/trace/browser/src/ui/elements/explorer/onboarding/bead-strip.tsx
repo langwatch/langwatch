@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VisuallyHidden, VStack } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type React from "react";
 
@@ -37,16 +37,10 @@ export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement
 
   return (
     <VStack gap={1.5} aria-label="Tour progress">
-      <Box
-        role="progressbar"
-        aria-label="Tour progress"
-        aria-valuemin={1}
-        aria-valuemax={total}
-        aria-valuenow={currentIdx + 1}
-        position="relative"
-        width="180px"
-        paddingY={2}
-      >
+      <Box position="relative" width="180px" paddingY={2}>
+        <VisuallyHidden>
+          <progress aria-label="Tour progress" value={currentIdx + 1} max={total} />
+        </VisuallyHidden>
         {/* Connector line — full width, soft. The bar reads as a
             continuous path the user is travelling along, not six
             disconnected dots. */}

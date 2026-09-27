@@ -87,26 +87,29 @@ export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hid
           </Box>
         </BuiltInTooltip>
       )}
-      {isDraft && <DraftDot lensId={lens.id} lensName={lens.name} />}
       {errorCount > 0 && <ErrorBadge count={errorCount} />}
     </Tabs.Trigger>
   );
 
   return (
-    <MenuRoot>
-      <MenuContextTrigger asChild>{trigger}</MenuContextTrigger>
-      <MenuContent minWidth="160px">
-        {lens.isBuiltIn ? (
-          <BuiltInLensMenuItems lensId={lens.id} canDelete={canDelete} />
-        ) : (
-          <UserLensMenuItems
-            lensId={lens.id}
-            isDraft={isDraft}
-            onRename={() => setIsRenaming(true)}
-          />
-        )}
-      </MenuContent>
-    </MenuRoot>
+    <>
+      <MenuRoot>
+        <MenuContextTrigger asChild>{trigger}</MenuContextTrigger>
+        <MenuContent minWidth="160px">
+          {lens.isBuiltIn ? (
+            <BuiltInLensMenuItems lensId={lens.id} canDelete={canDelete} />
+          ) : (
+            <UserLensMenuItems
+              lensId={lens.id}
+              isDraft={isDraft}
+              onRename={() => setIsRenaming(true)}
+            />
+          )}
+        </MenuContent>
+      </MenuRoot>
+      {/* A sibling of the tab, not inside it: the tab is a <button>, and the dot is one too. */}
+      {isDraft && !hidden && <DraftDot lensId={lens.id} lensName={lens.name} />}
+    </>
   );
 };
 
@@ -151,15 +154,7 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lens
           >
             <PopoverTrigger asChild>
               <Box
-                // A span, not a button: this dot lives inside the lens
-                // Tabs.Trigger, which is itself a <button>, and a <button>
-                // nested in a <button> is invalid HTML (hydration error).
-                // role/tabIndex/onKeyDown restore the button keyboard
-                // semantics on the span.
-                as="span"
-                role="button"
-                tabIndex={0}
-                // Bumped 6px → 8px + ring.
+                as="button"
                 width="8px"
                 height="8px"
                 borderRadius="full"
@@ -177,13 +172,6 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({ lensId, lens
                 onClick={(e) => {
                   e.stopPropagation();
                   setPopoverOpen((v) => !v);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setPopoverOpen((v) => !v);
-                  }
                 }}
               />
             </PopoverTrigger>

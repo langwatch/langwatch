@@ -7,7 +7,7 @@ import { Crosshair, Lightbulb, MessageCircle, Pencil, ThumbsDown, ThumbsUp } fro
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { z } from "zod";
 
-import type { AnnotationUser } from "../../model/annotation-row.ts";
+type AnnotationUser = NonNullable<AnnotationWithUser["user"]>;
 
 interface ScoreEntry {
   name: string;

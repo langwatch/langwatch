@@ -70,9 +70,8 @@ export const annotationWeb = defineWebModule("annotation")
       load: () => import("./ui/sections/annotation-scores-screen.tsx"),
     },
   })
-  /** What another module may mount. Today the trace explorer mounts all four. */
+  /** What another module may mount. Today the trace explorer mounts all three. */
   .publishSurfaces({
-    "annotation-card": { load: () => import("./annotation-card.ts") },
     "annotation-chips": { load: () => import("./annotation-chips.ts") },
     "annotation-form": { load: () => import("./annotation-form.ts") },
     "annotation-scores": { load: () => import("./annotation-scores.ts") },

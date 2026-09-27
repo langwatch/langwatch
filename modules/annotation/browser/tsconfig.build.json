@@ -6,7 +6,6 @@
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
   "files": [
-    "./src/annotation-card.ts",
     "./src/annotation-chips.ts",
     "./src/annotation-form.ts",
     "./src/annotation.web.ts"
