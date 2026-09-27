@@ -11711,9 +11711,6 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../workflow/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5

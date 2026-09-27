@@ -34,9 +34,6 @@
     },
     {
       "path": "../../../packages/plans/tsconfig.build.json"
-    },
-    {
-      "path": "../../workflow/contract/tsconfig.build.json"
     }
   ]
 }
