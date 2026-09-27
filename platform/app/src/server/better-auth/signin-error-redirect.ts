@@ -105,23 +105,16 @@ export async function redirectFailedSignInCallback({
 }
 
 /**
- * The `code` and `message` of better-auth's JSON error body, for the log only.
- * Nothing else in the body is read, so a stack, a header echo or a token in
- * some other field never reaches the log line.
+ * The stable `code` of better-auth's JSON error body, for the log only. The
+ * message is left out because it can carry an address or a token; the thrower
+ * logs its own error with the same trace id.
  */
-async function errorCauseOf(
-  response: Response,
-): Promise<{ code?: string; message?: string } | null> {
+async function errorCauseOf(response: Response): Promise<string | null> {
   try {
     const body: unknown = JSON.parse(await response.text());
     if (typeof body !== "object" || body === null) return null;
-    const { code, message } = body as Record<string, unknown>;
-    return {
-      ...(typeof code === "string" ? { code: code.slice(0, 100) } : {}),
-      ...(typeof message === "string"
-        ? { message: message.slice(0, 300) }
-        : {}),
-    };
+    const { code } = body as Record<string, unknown>;
+    return typeof code === "string" ? code.slice(0, 100) : null;
   } catch {
     return null;
   }

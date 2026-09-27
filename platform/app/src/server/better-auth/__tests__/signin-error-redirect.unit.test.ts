@@ -279,14 +279,13 @@ describe("given a sign-in callback that fails on the server", () => {
           path,
           traceId: "trace_1",
           status: 500,
-          cause: {
-            code: "INTERNAL_SERVER_ERROR",
-            message: "rekey transaction failed",
-          },
+          cause: "INTERNAL_SERVER_ERROR",
         }),
         expect.any(String),
       );
-      expect(JSON.stringify(errorLog.mock.calls)).not.toContain("secret-path");
+      const logged = JSON.stringify(errorLog.mock.calls);
+      expect(logged).not.toContain("secret-path");
+      expect(logged).not.toContain("rekey transaction failed");
     });
   });
 });
