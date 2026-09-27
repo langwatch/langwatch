@@ -802,6 +802,31 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
 
+    /** @scenario "A redirect into /dev/null is not a path outside the folder" */
+    it("lets a redirect into /dev/null through and keeps every other escape refused", () => {
+      for (const command of [
+        "git status --porcelain 2>/dev/null",
+        "git branch --show-current 2> /dev/null && git remote -v",
+        "npm ls langwatch >/dev/null",
+        "node -e \"require('langwatch')\" &>/dev/null",
+        "cat agent.mjs >> /dev/null",
+        "node agent.mjs </dev/null",
+      ]) {
+        expect(bash(command).kind, command).not.toBe("refuse");
+      }
+      for (const command of [
+        "cat agent.mjs > /etc/hosts",
+        "git status 2>/tmp/langy.log",
+        "node agent.mjs < /etc/passwd",
+        "cat agent.mjs > /dev/null/../../etc/hosts",
+        "cat /dev/null",
+      ]) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("refuse");
+        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
+      }
+    });
+
     it("allows a home path that lands inside the folder", () => {
       const decision = decide({
         call: { tool: "local_read", params: { path: "~/acme/src/app.py" } },

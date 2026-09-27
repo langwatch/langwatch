@@ -1633,6 +1633,9 @@ function decideBash({
   };
 }
 
+/** The device a redirect discards output into, or reads nothing from. */
+const DISCARD_DEVICE = "/dev/null";
+
 /**
  * Every token of this part that names a file or a directory: the arguments
  * that are written the way a path is written, and the argument of `cd`, of a
@@ -1654,7 +1657,9 @@ export function pathTokensOf(part: CommandPart): string[] {
     const token = part.tokens[index]!;
     const next = part.tokens[index + 1];
     if (part.redirectTarget[index] === true) {
-      named.add(token);
+      // `2>/dev/null` discards output rather than reaching a file outside the
+      // folder; any other redirect target is judged as the path it names.
+      if (token !== DISCARD_DEVICE) named.add(token);
       continue;
     }
     if ((token === "cd" || DIRECTORY_FLAGS.has(token)) && next !== undefined) {

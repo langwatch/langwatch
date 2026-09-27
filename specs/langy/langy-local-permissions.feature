@@ -385,6 +385,13 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And the target of a redirect is still checked
 
     @unit
+    Scenario: A redirect into /dev/null is not a path outside the folder
+      When Langy runs a command that sends output to /dev/null or reads input from it, as in "git status 2>/dev/null", ">/dev/null", "&>/dev/null" or "</dev/null"
+      Then the command is not refused for leaving the folder
+      And a redirect to any other path outside the folder is still refused
+      And /dev/null given to a command as an argument, not as a redirect, is still checked as a path
+
+    @unit
     Scenario: A refusal names the argument it judged a path
       When a command is refused for naming a path outside the folder
       Then the refusal names the argument it read as a path
