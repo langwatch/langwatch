@@ -11,9 +11,11 @@ import {
   detectColdScan,
   RetryPolicy,
   routingDriver,
+  setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
   type StatementMetrics,
+  type WindowedReadMetrics,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
@@ -68,6 +70,16 @@ function clickHouseStatementMetrics(): StatementMetrics {
   };
 }
 
+/** Windowed reads by table and the path each took, under main's metric name. */
+function clickHouseWindowedReadMetrics(): WindowedReadMetrics {
+  const total = counter({
+    name: "clickhouse_windowed_read_total",
+    description: "Total number of ClickHouse windowed reads by table and outcome",
+  });
+
+  return { record: ({ table, outcome }) => total.inc({ table, outcome }) };
+}
+
 /**
  * The routed client, and the close that shuts every endpoint it opened. The
  * tenant guard is outermost, so a statement that cannot name its tenant is
@@ -99,6 +111,7 @@ export function buildClickHouse(options: {
       : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
   }).connect(configuration);
 
+  setWindowedReadMetrics(clickHouseWindowedReadMetrics());
   const reporter = new StatementReporter({
     metrics: clickHouseStatementMetrics(),
     noticeLogger: createLogger("langwatch:clickhouse:resilient"),

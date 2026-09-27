@@ -28,3 +28,9 @@ Feature: Every ClickHouse statement reports how it ended
     Given the routed ClickHouse client reports its statements
     When a batch is inserted
     Then it is counted as an INSERT success against the table it wrote to
+
+  @unit
+  Scenario: The process member counts statements under main's metric names
+    Given a process that built its ClickHouse member
+    When a read reaches the server
+    Then clickhouse_query_duration_seconds and clickhouse_query_total record it by query type
