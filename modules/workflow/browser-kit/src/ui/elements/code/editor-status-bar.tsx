@@ -1,7 +1,10 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import type { Monaco } from "@monaco-editor/react";
+import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { useEffect, useState } from "react";
+
+/** The monaco namespace; `@monaco-editor/react`'s own `Monaco` type reads as `any` here. */
+type Monaco = typeof MonacoApi;
 
 /**
  * Status bar mirroring VS Code's bottom strip with cursor position and save actions.

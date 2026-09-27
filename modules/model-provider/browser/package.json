@@ -18,11 +18,6 @@
       "types": "./dist/edit-model-provider-form.d.ts",
       "default": "./src/edit-model-provider-form.ts"
     },
-    "./surfaces/model-selector": {
-      "langwatch-declaration-source": "./src/ui/elements/model-selector.tsx",
-      "types": "./dist/ui/elements/model-selector.d.ts",
-      "default": "./src/ui/elements/model-selector.tsx"
-    },
     "./model-limits": {
       "langwatch-declaration-source": "./src/model-limits.ts",
       "types": "./dist/model-limits.d.ts",

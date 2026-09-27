@@ -1,10 +1,10 @@
 import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { allModelOptions } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { useEffect, useMemo } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { resolveComposerModel } from "../../../../model/langy-composer-model.ts";
+import { useLangyModelOptions } from "./use-langy-model-options.ts";
 
 /**
  * The same feature key Langy's chat route resolves against. Seeds the composer's picker with
@@ -44,7 +44,9 @@ export function useLangyComposerModel({ projectId }: { projectId: string | undef
 
   // Narrowed to the providers connected at this project, team, or organization
   // (ADR-021), the same ladder the turn's virtual key walks.
-  const { selectOptions } = useModelSelectionOptions(modelOptions, modelOverride, "chat", {
+  const { selectOptions } = useLangyModelOptions({
+    options: modelOptions,
+    model: modelOverride,
     featureKey: LANGY_GATE_FEATURE_KEY,
   });
   const reachableModels = useMemo(
