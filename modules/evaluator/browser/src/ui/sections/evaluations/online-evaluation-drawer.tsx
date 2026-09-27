@@ -28,7 +28,16 @@ import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contr
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { z } from "zod";
@@ -236,62 +245,26 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // Track if the form has been modified (dirty state)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Clear module-level state on unmount unless in an active flow — checked via
-  // isInActiveEvaluationFlow() rather than the last stack entry, since
-  // StrictMode's simulated cleanup can see "onlineEvaluation" mid-mount.
-  useLayoutEffect(() => {
-    return () => {
-      if (!isInActiveEvaluationFlow()) {
-        onlineEvaluationDrawerState = null;
-      }
-    };
-  }, []);
+  useClearStateOnLeave();
 
   // Skip the first watch trigger (initial render)
   const isInitialRenderRef = useRef(true);
 
-  // Track form changes using react-hook-form's watch
   useEffect(() => {
-    const subscription = form.watch(() => {
-      // Skip the first trigger which happens on mount
-      if (isInitialRenderRef.current) {
-        isInitialRenderRef.current = false;
-        return;
-      }
-      setHasUnsavedChanges(true);
-    });
+    const subscription = form.watch(() =>
+      markDirtyAfterMount(isInitialRenderRef, setHasUnsavedChanges),
+    );
     return () => subscription.unsubscribe();
   }, [form]);
 
-  // Load existing monitor if editing
-  const monitorQuery = api.monitors.getById.useQuery(
-    { id: monitorId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!monitorId && !!project?.id && isOpen },
-  );
-
-  // Load evaluator if monitor has evaluatorId
-  const evaluatorQuery = api.evaluators.getById.useQuery(
-    {
-      id: monitorQuery.data?.evaluatorId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!monitorQuery.data?.evaluatorId && !!project?.id && isOpen,
-    },
-  );
-
-  // Load pending evaluator (newly created from the flow)
   const pendingEvaluatorId = onlineEvaluationDrawerState?.pendingEvaluatorId;
   const localTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const pendingEvaluatorQuery = api.evaluators.getById.useQuery(
-    {
-      id: pendingEvaluatorId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!pendingEvaluatorId && !!project?.id && isOpen,
-    },
-  );
+  const { monitorQuery, evaluatorQuery, pendingEvaluatorQuery } = useDrawerQueries({
+    monitorId,
+    projectId: project?.id,
+    pendingEvaluatorId,
+    isOpen,
+  });
 
   // Create mutation
   const finishSave = (savedMonitorId: string | undefined) => {
@@ -410,114 +383,24 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   // IMPORTANT: This persists to module-level state FIRST because OnlineEvaluationDrawer
   // may not be mounted when EvaluatorEditorDrawer is open (CurrentDrawer renders one at a time)
   // We cannot rely on setMappings callback to persist because it may not run when unmounted.
-  const handleMappingChange = useCallback(
-    (identifier: string, mapping: UIFieldMapping | undefined) => {
-      // First, persist to module-level state (this always runs, even if component is unmounted)
-      if (onlineEvaluationDrawerState) {
-        persistDrawerStatePatch({
-          mappings: withMappingChange(onlineEvaluationDrawerState.mappings, identifier, mapping),
-        });
-      }
-      // Then update React state (only matters if component is mounted)
-      setMappings((prev) => withMappingChange(prev, identifier, mapping));
-      // Mark as dirty since user changed mappings
-      setHasUnsavedChanges(true);
-    },
-    [],
-  );
-
-  // Open evaluator editor with mappings config
-  const openEvaluatorEditorForMappings = useCallback(() => {
-    if (!selectedEvaluator) return;
-    openEvaluatorEditor({
+  const { openEvaluatorEditorForMappings, handleEditSelectedEvaluator, handleSelectEvaluator } =
+    useEvaluatorFlow({
+      draft: { level, name, sample, preconditions, threadIdleTimeout },
+      selectedEvaluator,
+      mappings,
+      form,
       openDrawer,
-      evaluatorId: selectedEvaluator.id,
-      level,
-      initialMappings: mappings,
-      onMappingChange: handleMappingChange,
+      setSelectedEvaluator,
+      setMappings,
+      setHasUnsavedChanges,
     });
-  }, [selectedEvaluator, level, mappings, handleMappingChange, openDrawer]);
-
-  // Picking an evaluator (existing or from the list) names the check, infers its mappings,
-  // persists before navigating, and opens the editor in place of the list.
-  const adoptEvaluatorAndOpenEditor = useCallback(
-    (evaluator: WireEvaluatorWithFields) => {
-      const newName = name || evaluator.name;
-      setSelectedEvaluator(evaluator);
-      setHasUnsavedChanges(true);
-      if (!name) form.setValue("name", newName);
-      const autoMappings = autoInferMappings(getEvaluatorFieldIds(evaluator), level);
-      setMappings(autoMappings);
-      onlineEvaluationDrawerState = {
-        level,
-        name: newName,
-        selectedEvaluator: evaluator,
-        sample,
-        mappings: autoMappings,
-        preconditions,
-        threadIdleTimeout,
-      };
-      openEvaluatorEditor({
-        openDrawer,
-        evaluatorId: evaluator.id,
-        level,
-        initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
-        selecting: true,
-      });
-    },
-    [name, level, sample, preconditions, threadIdleTimeout, form, openDrawer, handleMappingChange],
-  );
-
-  // Open evaluator editor when clicking on already-selected evaluator
-  // This opens the editor directly with mappings config
-  const handleEditSelectedEvaluator = useCallback(() => {
-    if (!selectedEvaluator) return;
-    // Changing evaluator from the list stays reachable via the editor's "back" button.
-    setFlowCallbacks("evaluatorList", { onSelect: adoptEvaluatorAndOpenEditor });
-    // Editing the already-selected evaluator keeps the default "Save Changes" text.
-    openEvaluatorEditor({
-      openDrawer,
-      evaluatorId: selectedEvaluator.id,
-      level,
-      initialMappings: mappings,
-      onMappingChange: handleMappingChange,
-    });
-  }, [
-    selectedEvaluator,
-    level,
-    mappings,
-    handleMappingChange,
-    openDrawer,
-    adoptEvaluatorAndOpenEditor,
-  ]);
-
-  const handleSelectEvaluator = useCallback(() => {
-    setFlowCallbacks("evaluatorList", {
-      onSelect: adoptEvaluatorAndOpenEditor,
-      onCreateNew: () => {
-        registerNewEvaluatorFlow({ level, name, sample, preconditions, threadIdleTimeout });
-        openDrawer("evaluatorCategorySelector");
-      },
-    });
-    openDrawer("evaluatorList", {});
-  }, [
-    name,
-    level,
-    sample,
-    preconditions,
-    threadIdleTimeout,
-    openDrawer,
-    adoptEvaluatorAndOpenEditor,
-  ]);
 
   const handleLevelChange = useCallback(
     (details: { value: string | null }) => {
       if (!details.value) return;
       const newLevel = details.value as EvaluationLevel;
       form.setValue("level", newLevel);
-      // Trace and thread levels map from different sources, so mappings are replaced, not merged.
-      const newMappings = selectedEvaluator ? autoInferMappings(allFields, newLevel) : {};
+      const newMappings = mappingsForLevel({ selectedEvaluator, allFields, level: newLevel });
       setMappings(newMappings);
       persistDrawerStatePatch({ level: newLevel, mappings: newMappings });
     },
@@ -525,63 +408,21 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   );
 
   // Track whether preconditions are expanded (user clicked "Add precondition")
-  const [preconditionsExpanded, setPreconditionsExpanded] = useState(false);
-
-  // Precondition handlers
-  const addPrecondition = useCallback(() => {
-    const current = form.getValues("preconditions");
-    form.setValue("preconditions", [
-      ...current,
-      { field: "metadata.labels", rule: "contains", value: "" },
-    ]);
-    setPreconditionsExpanded(true);
-  }, [form]);
-
-  const removePrecondition = useCallback(
-    (index: number) => {
-      const current = form.getValues("preconditions");
-      const updated = current.filter((_, i) => i !== index);
-      form.setValue("preconditions", updated);
-      // Collapse back to summary if only default precondition remains
-      if (isDefaultOnlyPrecondition(updated)) {
-        setPreconditionsExpanded(false);
-      }
-    },
-    [form],
-  );
-
-  const updatePrecondition = useCallback(
-    (index: number, key: keyof CheckPrecondition, value: string) => {
-      const current = form.getValues("preconditions");
-      const updated = current.map((p, i) =>
-        i === index ? withPreconditionEdit(p, key, value) : p,
-      );
-      form.setValue("preconditions", updated);
-    },
-    [form],
-  );
+  const { preconditionsExpanded, addPrecondition, removePrecondition, updatePrecondition } =
+    usePreconditions(form);
 
   // Compute field groups for the dropdown
   const fieldGroups = useMemo(() => getFieldOptionsByCategory(), []);
 
   const handleSave = useCallback(() => {
-    if (!selectedEvaluator || !project?.id || !name.trim() || hasPendingMappings) return;
-
-    const payload = monitorPayload({
-      selectedEvaluator,
-      projectId: project.id,
-      name,
-      preconditions,
-      mappings,
-      sample,
-      level,
-      threadIdleTimeout,
+    saveMonitor({
+      monitorId,
+      projectId: project?.id,
+      blocked: hasPendingMappings,
+      draft: { selectedEvaluator, name, preconditions, mappings, sample, level, threadIdleTimeout },
+      create: createMutation.mutate,
+      update: updateMutation.mutate,
     });
-    if (monitorId) {
-      updateMutation.mutate({ id: monitorId, ...payload });
-    } else {
-      createMutation.mutate(payload);
-    }
   }, [
     selectedEvaluator,
     project?.id,
@@ -691,70 +532,64 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
 
             {/* Name - only show after evaluator is selected */}
             {level && selectedEvaluator && (
-              <HorizontalFormControl
-                label="Name"
-                helper="A descriptive name for this online evaluation"
-              >
-                <Input {...form.register("name")} placeholder="Enter evaluation name" />
-              </HorizontalFormControl>
-            )}
-
-            {/* Preconditions - only show after evaluator is selected */}
-            {level && selectedEvaluator && (
-              <HorizontalFormControl
-                label={
-                  <HStack>
-                    Preconditions (Optional)
-                    <Tooltip content="Conditions that must be met for this evaluation to run">
-                      <HelpCircle size={14} />
-                    </Tooltip>
-                  </HStack>
-                }
-                helper="Only run this evaluation when certain conditions are met"
-              >
-                <PreconditionsEditor
-                  preconditions={preconditions}
-                  expanded={preconditionsExpanded}
-                  runOnText={runOnText}
-                  fieldGroups={fieldGroups}
-                  onAdd={addPrecondition}
-                  onUpdate={updatePrecondition}
-                  onRemove={removePrecondition}
-                />
-              </HorizontalFormControl>
-            )}
-
-            {/* Sampling Rate - only show after evaluator is selected */}
-            {level && selectedEvaluator && (
-              <HorizontalFormControl
-                label={
-                  <HStack>
-                    Sampling (Optional)
-                    <Tooltip content="You can use this to save costs on expensive evaluations if you have too many messages incoming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                      <HelpCircle size={14} />
-                    </Tooltip>
-                  </HStack>
-                }
-                helper=""
-              >
-                <VStack align="start">
-                  <HStack>
-                    <Input
-                      width="110px"
-                      type="number"
-                      min="0.01"
-                      max="1"
-                      step="0.1"
-                      value={sample}
-                      onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
-                    />
-                  </HStack>
-                  <Text color="gray.500" fontStyle="italic">
-                    This evaluation will run on {runOnText}
-                    {preconditions.length > 0 && " matching the preconditions"}
-                  </Text>
-                </VStack>
-              </HorizontalFormControl>
+              <>
+                <HorizontalFormControl
+                  label="Name"
+                  helper="A descriptive name for this online evaluation"
+                >
+                  <Input {...form.register("name")} placeholder="Enter evaluation name" />
+                </HorizontalFormControl>
+                <HorizontalFormControl
+                  label={
+                    <HStack>
+                      Preconditions (Optional)
+                      <Tooltip content="Conditions that must be met for this evaluation to run">
+                        <HelpCircle size={14} />
+                      </Tooltip>
+                    </HStack>
+                  }
+                  helper="Only run this evaluation when certain conditions are met"
+                >
+                  <PreconditionsEditor
+                    preconditions={preconditions}
+                    expanded={preconditionsExpanded}
+                    runOnText={runOnText}
+                    fieldGroups={fieldGroups}
+                    onAdd={addPrecondition}
+                    onUpdate={updatePrecondition}
+                    onRemove={removePrecondition}
+                  />
+                </HorizontalFormControl>
+                <HorizontalFormControl
+                  label={
+                    <HStack>
+                      Sampling (Optional)
+                      <Tooltip content="You can use this to save costs on expensive evaluations if you have too many messages incoming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                        <HelpCircle size={14} />
+                      </Tooltip>
+                    </HStack>
+                  }
+                  helper=""
+                >
+                  <VStack align="start">
+                    <HStack>
+                      <Input
+                        width="110px"
+                        type="number"
+                        min="0.01"
+                        max="1"
+                        step="0.1"
+                        value={sample}
+                        onChange={(e) => form.setValue("sample", parseFloat(e.target.value) || 1)}
+                      />
+                    </HStack>
+                    <Text color="gray.500" fontStyle="italic">
+                      This evaluation will run on {runOnText}
+                      {preconditions.length > 0 && " matching the preconditions"}
+                    </Text>
+                  </VStack>
+                </HorizontalFormControl>
+              </>
             )}
 
             {/* Thread Idle Timeout - only show for thread level */}
@@ -1414,4 +1249,288 @@ function canSaveMonitor({
 
 function runOnTextFor(sample: number): string {
   return sample >= 1 ? "every trace" : `${+(sample * 100).toFixed(2)}% of traces`;
+}
+
+/**
+ * Choosing, creating and editing the evaluator: each path persists the draft to module state
+ * before navigating, since this drawer may be unmounted while the evaluator drawers are open.
+ */
+function useEvaluatorFlow({
+  draft,
+  selectedEvaluator,
+  mappings,
+  form,
+  openDrawer,
+  setSelectedEvaluator,
+  setMappings,
+  setHasUnsavedChanges,
+}: {
+  draft: {
+    level: EvaluationLevel;
+    name: string;
+    sample: number;
+    preconditions: CheckPrecondition[];
+    threadIdleTimeout: number | null;
+  };
+  selectedEvaluator: WireEvaluatorWithFields | null;
+  mappings: Record<string, UIFieldMapping>;
+  form: UseFormReturn<DrawerFormValues>;
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  setSelectedEvaluator: (evaluator: WireEvaluatorWithFields | null) => void;
+  setMappings: Dispatch<SetStateAction<Record<string, UIFieldMapping>>>;
+  setHasUnsavedChanges: (dirty: boolean) => void;
+}) {
+  const { level, name, sample, preconditions, threadIdleTimeout } = draft;
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: UIFieldMapping | undefined) => {
+      // First, persist to module-level state (this always runs, even if component is unmounted)
+      if (onlineEvaluationDrawerState) {
+        persistDrawerStatePatch({
+          mappings: withMappingChange(onlineEvaluationDrawerState.mappings, identifier, mapping),
+        });
+      }
+      // Then update React state (only matters if component is mounted)
+      setMappings((prev) => withMappingChange(prev, identifier, mapping));
+      // Mark as dirty since user changed mappings
+      setHasUnsavedChanges(true);
+    },
+    [setMappings, setHasUnsavedChanges],
+  );
+
+  // Open evaluator editor with mappings config
+  const openEvaluatorEditorForMappings = useCallback(() => {
+    if (!selectedEvaluator) return;
+    openEvaluatorEditor({
+      openDrawer,
+      evaluatorId: selectedEvaluator.id,
+      level,
+      initialMappings: mappings,
+      onMappingChange: handleMappingChange,
+    });
+  }, [selectedEvaluator, level, mappings, handleMappingChange, openDrawer]);
+
+  // Picking an evaluator (existing or from the list) names the check, infers its mappings,
+  // persists before navigating, and opens the editor in place of the list.
+  const adoptEvaluatorAndOpenEditor = useCallback(
+    (evaluator: WireEvaluatorWithFields) => {
+      const newName = name || evaluator.name;
+      setSelectedEvaluator(evaluator);
+      setHasUnsavedChanges(true);
+      if (!name) form.setValue("name", newName);
+      const autoMappings = autoInferMappings(getEvaluatorFieldIds(evaluator), level);
+      setMappings(autoMappings);
+      onlineEvaluationDrawerState = {
+        level,
+        name: newName,
+        selectedEvaluator: evaluator,
+        sample,
+        mappings: autoMappings,
+        preconditions,
+        threadIdleTimeout,
+      };
+      openEvaluatorEditor({
+        openDrawer,
+        evaluatorId: evaluator.id,
+        level,
+        initialMappings: autoMappings,
+        onMappingChange: handleMappingChange,
+        selecting: true,
+      });
+    },
+    [
+      name,
+      level,
+      sample,
+      preconditions,
+      threadIdleTimeout,
+      form,
+      openDrawer,
+      handleMappingChange,
+      setSelectedEvaluator,
+      setMappings,
+      setHasUnsavedChanges,
+    ],
+  );
+
+  // Open evaluator editor when clicking on already-selected evaluator
+  // This opens the editor directly with mappings config
+  const handleEditSelectedEvaluator = useCallback(() => {
+    if (!selectedEvaluator) return;
+    // Changing evaluator from the list stays reachable via the editor's "back" button.
+    setFlowCallbacks("evaluatorList", { onSelect: adoptEvaluatorAndOpenEditor });
+    // Editing the already-selected evaluator keeps the default "Save Changes" text.
+    openEvaluatorEditor({
+      openDrawer,
+      evaluatorId: selectedEvaluator.id,
+      level,
+      initialMappings: mappings,
+      onMappingChange: handleMappingChange,
+    });
+  }, [
+    selectedEvaluator,
+    level,
+    mappings,
+    handleMappingChange,
+    openDrawer,
+    adoptEvaluatorAndOpenEditor,
+  ]);
+
+  const handleSelectEvaluator = useCallback(() => {
+    setFlowCallbacks("evaluatorList", {
+      onSelect: adoptEvaluatorAndOpenEditor,
+      onCreateNew: () => {
+        registerNewEvaluatorFlow({ level, name, sample, preconditions, threadIdleTimeout });
+        openDrawer("evaluatorCategorySelector");
+      },
+    });
+    openDrawer("evaluatorList", {});
+  }, [
+    name,
+    level,
+    sample,
+    preconditions,
+    threadIdleTimeout,
+    openDrawer,
+    adoptEvaluatorAndOpenEditor,
+  ]);
+
+  return {
+    openEvaluatorEditorForMappings,
+    handleEditSelectedEvaluator,
+    handleSelectEvaluator,
+  };
+}
+
+/** The precondition list: edits go to the form; the list opens once one is added. */
+function usePreconditions(form: UseFormReturn<DrawerFormValues>) {
+  const [preconditionsExpanded, setPreconditionsExpanded] = useState(false);
+
+  // Precondition handlers
+  const addPrecondition = useCallback(() => {
+    const current = form.getValues("preconditions");
+    form.setValue("preconditions", [
+      ...current,
+      { field: "metadata.labels", rule: "contains", value: "" },
+    ]);
+    setPreconditionsExpanded(true);
+  }, [form]);
+
+  const removePrecondition = useCallback(
+    (index: number) => {
+      const current = form.getValues("preconditions");
+      const updated = current.filter((_, i) => i !== index);
+      form.setValue("preconditions", updated);
+      // Collapse back to summary if only default precondition remains
+      if (isDefaultOnlyPrecondition(updated)) {
+        setPreconditionsExpanded(false);
+      }
+    },
+    [form],
+  );
+
+  const updatePrecondition = useCallback(
+    (index: number, key: keyof CheckPrecondition, value: string) => {
+      const current = form.getValues("preconditions");
+      const updated = current.map((p, i) =>
+        i === index ? withPreconditionEdit(p, key, value) : p,
+      );
+      form.setValue("preconditions", updated);
+    },
+    [form],
+  );
+
+  return { preconditionsExpanded, addPrecondition, removePrecondition, updatePrecondition };
+}
+
+/** Clears module-level state on unmount unless in an active flow; StrictMode's simulated
+ * cleanup can see "onlineEvaluation" mid-mount, so the check is the flow, not the stack top. */
+function useClearStateOnLeave() {
+  useLayoutEffect(() => {
+    return () => {
+      if (!isInActiveEvaluationFlow()) onlineEvaluationDrawerState = null;
+    };
+  }, []);
+}
+
+/** Any form edit after the first (mount) trigger marks the drawer dirty. */
+function markDirtyAfterMount(
+  isInitialRenderRef: { current: boolean },
+  setHasUnsavedChanges: (dirty: boolean) => void,
+) {
+  if (isInitialRenderRef.current) {
+    isInitialRenderRef.current = false;
+    return;
+  }
+  setHasUnsavedChanges(true);
+}
+
+/** The monitor being edited, its linked evaluator, and an evaluator just created in the flow. */
+function useDrawerQueries({
+  monitorId,
+  projectId,
+  pendingEvaluatorId,
+  isOpen,
+}: {
+  monitorId: string | undefined;
+  projectId: string | undefined;
+  pendingEvaluatorId: string | undefined;
+  isOpen: boolean;
+}) {
+  const canLoad = !!projectId && isOpen;
+  const monitorQuery = api.monitors.getById.useQuery(
+    { id: monitorId ?? "", projectId: projectId ?? "" },
+    { enabled: !!monitorId && canLoad },
+  );
+  const linkedEvaluatorId = monitorQuery.data?.evaluatorId;
+  const evaluatorQuery = api.evaluators.getById.useQuery(
+    { id: linkedEvaluatorId ?? "", projectId: projectId ?? "" },
+    { enabled: !!linkedEvaluatorId && canLoad },
+  );
+  const pendingEvaluatorQuery = api.evaluators.getById.useQuery(
+    { id: pendingEvaluatorId ?? "", projectId: projectId ?? "" },
+    { enabled: !!pendingEvaluatorId && canLoad },
+  );
+  return { monitorQuery, evaluatorQuery, pendingEvaluatorQuery };
+}
+
+/** Trace and thread levels map from different sources, so mappings are replaced, not merged. */
+function mappingsForLevel({
+  selectedEvaluator,
+  allFields,
+  level,
+}: {
+  selectedEvaluator: WireEvaluatorWithFields | null;
+  allFields: string[];
+  level: EvaluationLevel;
+}): Record<string, UIFieldMapping> {
+  return selectedEvaluator ? autoInferMappings(allFields, level) : {};
+}
+
+type MonitorPayload = ReturnType<typeof monitorPayload>;
+
+function saveMonitor({
+  monitorId,
+  projectId,
+  blocked,
+  draft,
+  create,
+  update,
+}: {
+  monitorId: string | undefined;
+  projectId: string | undefined;
+  blocked: boolean;
+  draft: Omit<Parameters<typeof monitorPayload>[0], "projectId" | "selectedEvaluator"> & {
+    selectedEvaluator: WireEvaluatorWithFields | null;
+  };
+  create: (payload: MonitorPayload) => void;
+  update: (payload: MonitorPayload & { id: string }) => void;
+}) {
+  const { selectedEvaluator } = draft;
+  if (!selectedEvaluator || !projectId || !draft.name.trim() || blocked) return;
+  const payload = monitorPayload({ ...draft, selectedEvaluator, projectId });
+  if (monitorId) {
+    update({ id: monitorId, ...payload });
+  } else {
+    create(payload);
+  }
 }
