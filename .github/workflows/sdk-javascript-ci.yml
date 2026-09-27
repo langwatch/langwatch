@@ -295,6 +295,12 @@ jobs:
         working-directory: .
         run: pnpm start:prepare:files && pnpm ensure:built
 
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api and worker refuse to boot without a 32-byte hex encryption key,
+        # and the seed hashes the project key under it, so it comes before the seed.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Setup database
         working-directory: .
         run: pnpm prisma:migrate
@@ -322,11 +328,6 @@ jobs:
       - name: Build LangWatch browser bundle
         working-directory: .
         run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
-
-      - name: Generate a throwaway CREDENTIALS_SECRET
-        # The api and worker refuse to boot without a 32-byte hex encryption key.
-        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
-        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Start LangWatch server and worker
         working-directory: .
