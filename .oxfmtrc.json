@@ -28,6 +28,7 @@
     "charts/**/templates/**",
     "docs/docs.json",
     "**/*.mdx",
+    "services/langyagent/internal/assets/AGENTS.md",
     "specs/langy/langy-keys-plan.md",
     "specs/langy/langy-pr4-plan.md",
     "**/vendor/**",
