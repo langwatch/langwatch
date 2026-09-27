@@ -240,12 +240,15 @@ function isMalformedBody(error: unknown): error is HTTPException {
   return error instanceof HTTPException && error.status === 400;
 }
 
-/** The implementation, written against the loose runtime contract. */
-function build(
-  target: keyof ValidationTargets,
-  schema: ZodSchema,
+/**
+ * A drop-in for `hono-openapi`'s `validator` that refuses a failed schema with the handled 422
+ * and an unparseable body with `malformed_request`, keeping `c.req.valid(target)` typed.
+ */
+export function validator<Target extends keyof ValidationTargets, Schema extends ZodSchema>(
+  target: Target,
+  schema: Schema,
   hook?: (result: unknown, c: unknown) => unknown,
-): MiddlewareHandler {
+) {
   const validate = openApiValidator(target, schema, (async (
     result: ValidationResult,
     c: unknown,
@@ -271,13 +274,13 @@ function build(
 }
 
 /** A body that does not parse is the handled 400 `malformed_request`, never Hono's bare 400. */
-export function refusingMalformedBody({
+export function refusingMalformedBody<Validate extends MiddlewareHandler>({
   target,
   validate,
 }: {
   target: keyof ValidationTargets;
-  validate: MiddlewareHandler;
-}): MiddlewareHandler {
+  validate: Validate;
+}): Validate {
   const guarded: MiddlewareHandler = async (c, next) => {
     // A failure raised before the route ran is the validator's; anything after
     // `next()` belongs to the handler and passes through untouched.
@@ -321,13 +324,6 @@ function issuesOf(error: ValidationResult["error"]): ZodIssue[] {
 
   return Array.isArray(error) ? [...error] : ((error as { issues?: ZodIssue[] }).issues ?? []);
 }
-
-/**
- * A drop-in for `hono-openapi`'s `validator`, declared AS its own type so
- * `c.req.valid("json")` stays typed. The cast is the price of borrowing a
- * type the package doesn't export.
- */
-export const validator = build as unknown as typeof openApiValidator;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The two capabilities a route declares and a process supplies the store for.
@@ -1054,7 +1050,7 @@ export function createSSEResponse<TEvents extends Record<string, ApiSchema>>({
         finish({ error });
       }
     },
-  ) as unknown as Response;
+  );
 }
 
 /** Returns the current SSE handler lifecycle for request instrumentation. */

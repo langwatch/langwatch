@@ -122,9 +122,9 @@ describe("given two routers built under one namespace", () => {
     it("builds both routers' procedures on the one runtime it was handed", () => {
       const runtime = collectingRuntime();
 
-      const mounted = composed.router(runtime, () => application) as unknown as {
-        record: Record<string, unknown>;
-      };
+      const mounted = z
+        .object({ record: z.record(z.string(), z.unknown()) })
+        .parse(composed.router(runtime, () => application));
 
       expect(Object.keys(runtime.built).toSorted()).toEqual(["review.archive", "review.getById"]);
       expect(Object.keys(mounted.record).toSorted()).toEqual(["archive", "getById"]);
