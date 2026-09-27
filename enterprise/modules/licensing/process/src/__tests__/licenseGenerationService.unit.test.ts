@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { NodeLicenseCryptographyService } from "../index.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
+import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";
 
 const baseParams = {
   organizationName: "Acme Corp",

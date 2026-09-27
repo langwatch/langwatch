@@ -10,7 +10,6 @@ import {
   PrismaApiKeyRepository,
   type PrismaApiKeyDatabase,
 } from "./repositories/prisma/prisma.api-key.repository.ts";
-import { hashApiKeySecret as hashSecret } from "./rules/api-key-token.rules.ts";
 import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
 import { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
 import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
@@ -21,11 +20,6 @@ import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
  * composition root never names one directly (private-runtime-export drive,
  * dev/docs/plans/private-runtime-export-drive.md §3d).
  */
-
-/** The secret hasher for callers outside the module, such as the seed. */
-export function hashApiKeySecret(secret: string, pepper: string): string {
-  return hashSecret({ secret, pepper });
-}
 
 /** The sandbox-key sweep over the process's own Prisma-backed repository. */
 export function createAgentSandboxKeyReapService(options: {

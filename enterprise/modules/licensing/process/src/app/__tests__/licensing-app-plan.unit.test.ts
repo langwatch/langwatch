@@ -8,7 +8,7 @@ import {
   ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_LICENSING_CONFIG,
-} from "../../testing.ts";
+} from "../../__tests__/testing.ts";
 import { LicensingApp, type LicensingInfrastructure } from "../licensing.app.ts";
 import type { LicenseStorage } from "../licensing.members.ts";
 

@@ -5,11 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": [
-    "./src/annotation-chips.ts",
-    "./src/annotation-form.ts",
-    "./src/annotation.web.ts"
-  ],
+  "files": ["./src/annotation-chips.ts", "./src/annotation.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

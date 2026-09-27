@@ -7,7 +7,7 @@ import { TraceSpanStorageRepository } from "../span-storage-write.repository.ts"
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import { TraceStoredSpanReaderRepository } from "../trace-stored-span-reader.repository.ts";
 import {
-  type FullSpanRow,
+  fullSpanRowsSchema,
   mapChRowToNormalized,
   serializeAttributes,
 } from "./stored-span-row.mapper.ts";
@@ -265,7 +265,7 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
         ? ""
         : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query<FullSpanRow>({
+    const result = await client.query({
       query: `
         SELECT ${DERIVATION_SPAN_SELECT}
         FROM ${TABLE_NAME}
@@ -294,7 +294,7 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageReposi
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<FullSpanRow>();
+    const rows = fullSpanRowsSchema.parse(await result.json());
     if (rows.length === 0) return null;
     return mapChRowToNormalized(rows[0]!);
   }

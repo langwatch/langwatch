@@ -208,3 +208,14 @@ func TestARuledBreakingRestOperationIsNotCounted(t *testing.T) {
 		t.Errorf("packet:\n%s", packet)
 	}
 }
+
+func TestRuledOutServedRoutesAreRetired(t *testing.T) {
+	for _, path := range []string{"/api/rpc.discover", "/api/copilotkit", "/api/cron/seed_demo", "/api/cron/trace_analytics", "/api/dataset/generate"} {
+		if !RetiredRestOperation(path) {
+			t.Errorf("%s is not ruled retired", path)
+		}
+	}
+	if RetiredRestOperation("/api/demo/hotel_bot") {
+		t.Error("hotel_bot is being ported, not retired")
+	}
+}

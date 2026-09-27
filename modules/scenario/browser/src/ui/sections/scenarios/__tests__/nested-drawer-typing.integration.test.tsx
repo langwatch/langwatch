@@ -9,9 +9,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock heavy sub-components
-vi.mock("@langwatch/prompt-browser/surfaces/prompt-editor-drawer", () => ({
-  PromptEditorDrawer: () => null,
-}));
 vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: () => <div data-testid="save-and-run-menu" />,
 }));

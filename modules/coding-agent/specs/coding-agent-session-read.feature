@@ -22,6 +22,14 @@ Feature: Coding-agent session read service
       When Coding Agent resolves its session
       Then it returns no session
 
+  Rule: Billing follows the governance bundled-plan policy
+
+    @unit
+    Scenario: a bundled source reads as not billed and a per-token source as billed
+      Given governance bills codex and bundles every other source
+      When coding-agent asks whether each source's cost is billable
+      Then claude_code reads as not billed and codex reads as billed
+
   Rule: Session reads remain bounded
 
     @unit

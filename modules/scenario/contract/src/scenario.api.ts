@@ -198,7 +198,8 @@ export interface QueueSimulationRunInput {
   scenarioRunId: string;
   batchRunId: string;
   setId: string;
-  name: string;
+  /** Absent when the batch read no name for the scenario; the run is still queued, as on main. */
+  name: string | undefined;
   /** The same union the queued command declares, so a door cannot widen it. */
   target: NonNullable<SimulationQueueRun["target"]>;
   parameters: RunParameterValues;
@@ -213,6 +214,13 @@ export interface QueueSimulationRunInput {
    * existed reads back.
    */
   resolvedModels?: ResolvedRunModels | null;
+  /** A suite run's column: the target's identity including its own overrides. */
+  targetKey?: string | undefined;
+  /** A suite run's target-level overrides; the suite sends them only when the target has any. */
+  targetParameters?: RunParameterValues | undefined;
+  /** The models the suite's plan was configured with; each is recorded only when set. */
+  simulatorModel?: string | null | undefined;
+  judgeModel?: string | null | undefined;
 }
 
 /**

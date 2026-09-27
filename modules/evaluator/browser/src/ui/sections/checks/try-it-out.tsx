@@ -30,8 +30,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
 import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
-  type Evaluators,
-  evaluatorsSchema,
+  evaluatorSettingsSchemaFor,
   type SingleEvaluationResult,
   getEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
@@ -100,7 +99,7 @@ export function TryItOut({
   const settings = watch("settings");
   const mappings = watch("mappings");
 
-  const evaluatorDefinition = evaluatorType && getEvaluatorDefinitions(evaluatorType);
+  const evaluatorDefinition = evaluatorType ? getEvaluatorDefinitions(evaluatorType) : undefined;
 
   const [query, setQuery] = useDebounceValue("", 300);
   const {
@@ -113,7 +112,7 @@ export function TryItOut({
   const { openDrawer } = useDrawer();
   const [randomSeed, setRandomSeed] = useState<number>(Math.random() * 1000);
   const [fetchingParams, setFetchingParams] = useState<
-    { preconditions: CheckPreconditions; evaluatorType: keyof Evaluators } | undefined
+    { preconditions: CheckPreconditions; evaluatorType: string } | undefined
   >(undefined);
 
   const tracesPassingPreconditionsOnLoad = api.traces.getSampleTraces.useQuery(
@@ -208,8 +207,10 @@ export function TryItOut({
     };
 
     let settings_;
+    const settingsLookup = evaluatorSettingsSchemaFor(evaluatorType);
     try {
-      settings_ = evaluatorsSchema.shape[evaluatorType].shape.settings.parse(settings);
+      if (!settingsLookup.found) throw new Error(`no settings schema for ${evaluatorType}`);
+      settings_ = settingsLookup.schema.parse(settings);
     } catch (e) {
       if (Object.keys(evaluatorDefinition?.settings ?? {}).length === 0) {
         settings_ = {};

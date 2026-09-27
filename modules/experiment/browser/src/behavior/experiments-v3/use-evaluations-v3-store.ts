@@ -15,29 +15,35 @@ import {
   setTargetPrompt as setTargetPromptTransform,
   type Transform,
   type WorkbenchState,
-  deriveComparisonTargetMappings,
-  inferAllEvaluatorMappings,
-  propagateMappingsToNewDataset,
-  normalizeEvaluators,
-  normalizeTargets,
 } from "@langwatch/experiment-contract";
-import { nowInstant } from "@langwatch/time";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
-import { create, type StateCreator } from "zustand";
+import { create, type StateCreator, type StoreApi } from "zustand";
 
 import {
-  createInitialResults,
   createInitialState,
-  type DatasetColumn,
+  type EvaluationsV3Actions,
   type EvaluationsV3State,
   type EvaluationsV3Store,
   type EvaluatorConfig,
-  type FieldMapping,
-  isComparisonEvaluator,
   type TargetConfig,
 } from "../../model/experiments-v3/types.ts";
+import {
+  datasetCellValue,
+  datasetRowCount,
+  withInlineColumnEdit,
+  withoutInlineColumn,
+  withoutPendingChange,
+  withoutSelectedRows,
+  withSavedRecordEdit,
+} from "../../model/experiments-v3/workbench-dataset-edits.ts";
+import { loadedWorkbenchState } from "../../model/experiments-v3/workbench-loaded-state.ts";
+import {
+  withNewDatasetMappings,
+  withTargetComparison,
+  withTargetUpdate,
+} from "../../model/experiments-v3/workbench-target-edits.ts";
 
 // ============================================================================
 // Helper Functions
@@ -146,13 +152,21 @@ const editOrKeep = <Slice>(edit: () => Slice, keep: Slice): Slice => {
 // Store Implementation
 // ============================================================================
 
-const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
-  ...createInitialState(),
+type StoreSet = StoreApi<EvaluationsV3Store>["setState"];
+type StoreGet = StoreApi<EvaluationsV3Store>["getState"];
 
-  // -------------------------------------------------------------------------
-  // Metadata actions
-  // -------------------------------------------------------------------------
+/** Metadata actions. */
+type MetadataActions = Pick<
+  EvaluationsV3Actions,
+  | "setName"
+  | "setExperimentId"
+  | "setExperimentSlug"
+  | "setWorkbenchVersion"
+  | "setStaleWorkbench"
+  | "rememberRunStartedHere"
+>;
 
+const metadataSlice = (set: StoreSet): MetadataActions => ({
   setName: (name) => {
     set({ name });
   },
@@ -179,68 +193,19 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       return known.includes(runId) ? {} : { runsStartedHere: [...known, runId] };
     });
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Dataset management actions
-  // -------------------------------------------------------------------------
+/** Dataset management actions. */
+type DatasetManagementActions = Pick<EvaluationsV3Actions, "addDataset" | "removeDataset">;
 
+const datasetManagementSlice = (set: StoreSet, get: StoreGet): DatasetManagementActions => ({
   addDataset: (dataset) => {
-    // First add the dataset
-    set((state) => ({
-      datasets: [...state.datasets, dataset],
-    }));
-
-    // Then auto-map fields for all targets for this new dataset
-    // Uses cross-dataset propagation: if field X is mapped to "input" on existing dataset,
-    // and new dataset has "input", map field X to "input" on new dataset
+    set((state) => ({ datasets: [...state.datasets, dataset] }));
+    // Auto-map every target and evaluator onto the new dataset, carrying each
+    // existing mapping across by column name.
     const state = get();
-    const targetsWithNewMappings = state.targets.map((target) => {
-      const newDatasetMappings = propagateMappingsToNewDataset(
-        target.inputs,
-        target.mappings,
-        dataset,
-      );
-      if (Object.keys(newDatasetMappings).length > 0) {
-        return {
-          ...target,
-          mappings: {
-            ...target.mappings,
-            [dataset.id]: {
-              ...target.mappings[dataset.id],
-              ...newDatasetMappings,
-            },
-          },
-        };
-      }
-      return target;
-    });
-
-    // Also auto-map evaluator fields for the new dataset
-    const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
-      const newMappings = inferAllEvaluatorMappings(evaluator, [dataset], targetsWithNewMappings);
-      const datasetMappings = newMappings[dataset.id];
-      if (datasetMappings && Object.keys(datasetMappings).length > 0) {
-        return {
-          ...evaluator,
-          mappings: {
-            ...evaluator.mappings,
-            [dataset.id]: datasetMappings,
-          },
-        };
-      }
-      return evaluator;
-    });
-
-    // Update targets and evaluators with new mappings if any changed
-    const targetsChanged = targetsWithNewMappings.some((r, i) => r !== state.targets[i]);
-    const evaluatorsChanged = evaluatorsWithNewMappings.some((e, i) => e !== state.evaluators[i]);
-
-    if (targetsChanged || evaluatorsChanged) {
-      set({
-        targets: targetsWithNewMappings,
-        evaluators: evaluatorsWithNewMappings,
-      });
-    }
+    const mapped = withNewDatasetMappings({ state, dataset });
+    if (mapped.targets !== state.targets || mapped.evaluators !== state.evaluators) set(mapped);
   },
 
   removeDataset: (datasetId) => {
@@ -266,7 +231,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       };
     });
   },
+});
 
+/** Active dataset and dataset edit actions. */
+type DatasetSelectionActions = Pick<
+  EvaluationsV3Actions,
+  "setActiveDataset" | "updateDataset" | "exportInlineToSaved"
+>;
+
+const datasetSelectionSlice = (set: StoreSet): DatasetSelectionActions => ({
   setActiveDataset: (datasetId) => {
     set((state) => {
       // Verify dataset exists
@@ -295,11 +268,21 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       ),
     }));
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Inline dataset cell/column actions (scoped to a dataset)
-  // -------------------------------------------------------------------------
+/** Inline dataset cell/column actions (scoped to a dataset). */
+type DatasetCellsActions = Pick<
+  EvaluationsV3Actions,
+  | "setCellValue"
+  | "addColumn"
+  | "removeColumn"
+  | "renameColumn"
+  | "updateColumnType"
+  | "getRowCount"
+  | "getCellValue"
+>;
 
+const datasetCellsSlice = (set: StoreSet, get: StoreGet): DatasetCellsActions => ({
   setCellValue: ({ datasetId, row, columnId, value }) => {
     const dataset = get().datasets.find((d) => d.id === datasetId);
     if (!dataset) return;
@@ -335,229 +318,46 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   removeColumn: (datasetId, columnId) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (dataset?.type !== "inline" || !dataset.inline) {
-        return state;
-      }
-
-      const columns = dataset.inline.columns.filter((c) => c.id !== columnId);
-      const records = { ...dataset.inline.records };
-      delete records[columnId];
-
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? {
-                ...d,
-                columns: d.columns.filter((c) => c.id !== columnId),
-                inline: {
-                  ...d.inline!,
-                  columns,
-                  records,
-                },
-              }
-            : d,
-        ),
-      };
-    });
+    set((state) => withoutInlineColumn({ state, datasetId, columnId }));
   },
 
   renameColumn: (datasetId, columnId, newName) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (dataset?.type !== "inline" || !dataset.inline) {
-        return state;
-      }
-
-      const updateColumns = (cols: DatasetColumn[]) =>
-        cols.map((c) => (c.id === columnId ? { ...c, name: newName } : c));
-
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? {
-                ...d,
-                columns: updateColumns(d.columns),
-                inline: {
-                  ...d.inline!,
-                  columns: updateColumns(d.inline!.columns),
-                },
-              }
-            : d,
-        ),
-      };
-    });
+    set((state) =>
+      withInlineColumnEdit({ state, datasetId, columnId, edit: (c) => ({ ...c, name: newName }) }),
+    );
   },
 
   updateColumnType: (datasetId, columnId, type) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (dataset?.type !== "inline" || !dataset.inline) {
-        return state;
-      }
-
-      const updateColumns = (cols: DatasetColumn[]) =>
-        cols.map((c) => (c.id === columnId ? { ...c, type } : c));
-
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? {
-                ...d,
-                columns: updateColumns(d.columns),
-                inline: {
-                  ...d.inline!,
-                  columns: updateColumns(d.inline!.columns),
-                },
-              }
-            : d,
-        ),
-      };
-    });
+    set((state) =>
+      withInlineColumnEdit({ state, datasetId, columnId, edit: (c) => ({ ...c, type }) }),
+    );
   },
 
-  getRowCount: (datasetId) => {
-    const state = get();
-    const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (!dataset) return 0;
+  getRowCount: (datasetId) => datasetRowCount(get().datasets.find((d) => d.id === datasetId)),
 
-    // Handle inline datasets
-    if (dataset.type === "inline" && dataset.inline) {
-      const columnValues = Object.values(dataset.inline.records);
-      if (columnValues.length === 0) return 0;
-      return Math.max(...columnValues.map((v) => v.length));
-    }
+  getCellValue: (datasetId, row, columnId) =>
+    datasetCellValue({ dataset: get().datasets.find((d) => d.id === datasetId), row, columnId }),
+});
 
-    // Handle saved datasets with cached records
-    if (dataset.type === "saved" && dataset.savedRecords) {
-      return dataset.savedRecords.length;
-    }
+/** Saved dataset record actions. */
+type SavedRecordActions = Pick<
+  EvaluationsV3Actions,
+  "updateSavedRecordValue" | "clearPendingChange" | "getSavedRecordInfo"
+>;
 
-    return 0;
-  },
-
-  getCellValue: (datasetId, row, columnId) => {
-    const state = get();
-    const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (!dataset) return "";
-
-    // Handle inline datasets
-    if (dataset.type === "inline" && dataset.inline) {
-      return dataset.inline.records[columnId]?.[row] ?? "";
-    }
-
-    // Handle saved datasets with cached records
-    if (dataset.type === "saved" && dataset.savedRecords) {
-      const record = dataset.savedRecords[row];
-      if (!record) return "";
-      // Use column name to get value (savedRecords use column names, not IDs)
-      const column = dataset.columns.find((c) => c.id === columnId);
-      if (!column) return "";
-      const value = record[column.name];
-      if (typeof value === "string") return value;
-      if (value === null || value === undefined) return "";
-      // Properly stringify objects/arrays instead of [object Object]
-      return JSON.stringify(value);
-    }
-
-    return "";
-  },
-
-  updateSavedRecordValue: ({ datasetId, rowIndex, columnId, value }) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (dataset?.type !== "saved" || !dataset.datasetId) {
-        return state;
-      }
-
-      // Get column name from column id
-      const column = dataset.columns.find((c) => c.id === columnId);
-      if (!column) return state;
-
-      const existingRecords = dataset.savedRecords ?? [];
-      const record = existingRecords[rowIndex];
-
-      // If record doesn't exist, create a new one
-      if (!record) {
-        // Generate a temporary ID for the new record (will be replaced when synced to DB)
-        const newRecordId = `new_${nowInstant().epochMilliseconds}_${rowIndex}`;
-        const newRecord = {
-          id: newRecordId,
-          // Initialize all columns with empty values
-          ...Object.fromEntries(dataset.columns.map((c) => [c.name, ""])),
-          [column.name]: value,
-        };
-
-        const updatedRecords = [...existingRecords];
-        // Ensure array is long enough
-        while (updatedRecords.length < rowIndex) {
-          updatedRecords.push({
-            id: `new_${nowInstant().epochMilliseconds}_${updatedRecords.length}`,
-            ...Object.fromEntries(dataset.columns.map((c) => [c.name, ""])),
-          });
-        }
-        updatedRecords[rowIndex] = newRecord;
-
-        // Track as pending new record for DB sync
-        const pendingSavedChanges = { ...state.pendingSavedChanges };
-        const datasetChanges = pendingSavedChanges[dataset.datasetId] ?? {};
-        pendingSavedChanges[dataset.datasetId] = {
-          ...datasetChanges,
-          [newRecordId]: newRecord,
-        };
-
-        return {
-          datasets: state.datasets.map((d) =>
-            d.id === datasetId ? { ...d, savedRecords: updatedRecords } : d,
-          ),
-          pendingSavedChanges,
-        };
-      }
-
-      // Update existing record
-      const updatedRecords = [...existingRecords];
-      updatedRecords[rowIndex] = {
-        ...record,
-        [column.name]: value,
-      };
-
-      // Track pending changes for DB sync
-      const pendingSavedChanges = { ...state.pendingSavedChanges };
-      const datasetChanges = pendingSavedChanges[dataset.datasetId] ?? {};
-      const recordChanges = datasetChanges[record.id] ?? {};
-
-      pendingSavedChanges[dataset.datasetId] = {
-        ...datasetChanges,
-        [record.id]: {
-          ...recordChanges,
-          [column.name]: value,
-        },
-      };
-
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId ? { ...d, savedRecords: updatedRecords } : d,
-        ),
-        pendingSavedChanges,
-      };
-    });
+const savedRecordsSlice = (set: StoreSet, get: StoreGet): SavedRecordActions => ({
+  updateSavedRecordValue: (edit) => {
+    set((state) => withSavedRecordEdit({ state, ...edit }));
   },
 
   clearPendingChange: (dbDatasetId, recordId) => {
-    set((state) => {
-      const pendingSavedChanges = { ...state.pendingSavedChanges };
-      const datasetChanges = { ...pendingSavedChanges[dbDatasetId] };
-      delete datasetChanges[recordId];
-
-      if (Object.keys(datasetChanges).length === 0) {
-        delete pendingSavedChanges[dbDatasetId];
-      } else {
-        pendingSavedChanges[dbDatasetId] = datasetChanges;
-      }
-
-      return { pendingSavedChanges };
-    });
+    set((state) => ({
+      pendingSavedChanges: withoutPendingChange({
+        pending: state.pendingSavedChanges,
+        dbDatasetId,
+        recordId,
+      }),
+    }));
   },
 
   getSavedRecordInfo: (datasetId, rowIndex) => {
@@ -575,11 +375,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       recordId: record.id,
     };
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Target actions
-  // -------------------------------------------------------------------------
+/** Target actions. */
+type TargetsActions = Pick<
+  EvaluationsV3Actions,
+  "addTarget" | "applyWorkbenchAction" | "duplicateTarget" | "updateTarget" | "removeTarget"
+>;
 
+const targetsSlice = (set: StoreSet): TargetsActions => ({
   addTarget: (target) => {
     // Calls the transform's core rather than the transform itself: the store's
     // callers hand over an already-typed TargetConfig, so re-parsing it against
@@ -647,39 +451,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   updateTarget: (targetId, updates) => {
-    set((state) => {
-      const existingTarget = state.targets.find((r) => r.id === targetId);
-      if (!existingTarget) return state;
-
-      let finalUpdates = { ...updates };
-
-      // Clean up mappings when inputs are removed (but NO auto-mapping)
-      const newInputs = updates.inputs;
-      if (newInputs) {
-        const existingInputs = existingTarget.inputs ?? [];
-        const newInputIds = new Set(newInputs.map((i) => i.identifier));
-        const existingInputIds = new Set(existingInputs.map((i) => i.identifier));
-
-        // Find removed inputs (need to clean up mappings)
-        const removedInputIds = [...existingInputIds].filter((id) => !newInputIds.has(id));
-
-        if (removedInputIds.length > 0) {
-          const mergedMappings = { ...existingTarget.mappings };
-          for (const datasetId of Object.keys(mergedMappings)) {
-            const datasetMappings = { ...mergedMappings[datasetId] };
-            for (const inputId of removedInputIds) {
-              delete datasetMappings[inputId];
-            }
-            mergedMappings[datasetId] = datasetMappings;
-          }
-          finalUpdates = { ...finalUpdates, mappings: mergedMappings };
-        }
-      }
-
-      return {
-        targets: state.targets.map((r) => (r.id === targetId ? { ...r, ...finalUpdates } : r)),
-      };
-    });
+    set((state) => withTargetUpdate({ state, targetId, updates }));
   },
 
   removeTarget: (targetId) => {
@@ -692,7 +464,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         }).slice,
     );
   },
+});
 
+/** Target prompt, comparison and mapping actions. */
+type TargetConfigActions = Pick<
+  EvaluationsV3Actions,
+  "setTargetPrompt" | "updateTargetComparison" | "setTargetMapping" | "removeTargetMapping"
+>;
+
+const targetConfigSlice = (set: StoreSet): TargetConfigActions => ({
   setTargetPrompt: (payload) => {
     set(
       (state) =>
@@ -705,50 +485,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   updateTargetComparison: (targetId, comparison) => {
-    set((state) => {
-      const existingTarget = state.targets.find((r) => r.id === targetId);
-      // Silently skip non-comparison targets so we never perturb the prompt / agent /
-      // plain-evaluator code paths.
-      if (existingTarget?.type !== "evaluator" || !isComparisonEvaluator(existingTarget)) {
-        return state;
-      }
-
-      // Derive the per-row field mappings the orchestrator expects from the high-level
-      // picks — this is what lets ComparisonConfigForm be a clean variants + golden UI
-      // while keeping the orchestrator unchanged.
-      const DERIVED_KEYS = [
-        "candidate_a_id",
-        "candidate_a_output",
-        "candidate_b_id",
-        "candidate_b_output",
-        "golden",
-        "input",
-      ];
-      const newDatasetMappings: Record<string, Record<string, FieldMapping>> = {};
-      for (const dataset of state.datasets) {
-        const derived = deriveComparisonTargetMappings(comparison, dataset);
-        const existing = { ...existingTarget.mappings[dataset.id] };
-        for (const key of DERIVED_KEYS) delete existing[key];
-        newDatasetMappings[dataset.id] = {
-          ...existing,
-          ...derived,
-        };
-      }
-
-      return {
-        targets: state.targets.map((t) =>
-          t.id === targetId
-            ? // Drop the legacy shape as we write the canonical one.
-              {
-                ...t,
-                pairwise: undefined,
-                comparison,
-                mappings: newDatasetMappings,
-              }
-            : t,
-        ),
-      };
-    });
+    set((state) => withTargetComparison({ state, targetId, comparison }));
   },
 
   setTargetMapping: ({ targetId, datasetId, inputField, mapping }) => {
@@ -778,11 +515,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       }),
     }));
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Global evaluator actions
-  // -------------------------------------------------------------------------
+/** Global evaluator actions. */
+type EvaluatorsActions = Pick<
+  EvaluationsV3Actions,
+  "addEvaluator" | "updateEvaluator" | "removeEvaluator"
+>;
 
+const evaluatorsSlice = (set: StoreSet): EvaluatorsActions => ({
   addEvaluator: (evaluator) => {
     // The transform's core, for the same reason as addTarget: the caller's
     // EvaluatorConfig is already typed, and the auto-mapping is shared.
@@ -819,11 +560,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
     }));
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator)
-  // -------------------------------------------------------------------------
+/** Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator). */
+type EvaluatorMappingsActions = Pick<
+  EvaluationsV3Actions,
+  "setEvaluatorMapping" | "removeEvaluatorMapping"
+>;
 
+const evaluatorMappingsSlice = (set: StoreSet): EvaluatorMappingsActions => ({
   setEvaluatorMapping: ({ evaluatorId, datasetId, targetId, inputField, mapping }) => {
     set(
       (state) =>
@@ -853,11 +598,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       }),
     }));
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Results actions
-  // -------------------------------------------------------------------------
+/** Results actions. */
+type ResultsActions = Pick<EvaluationsV3Actions, "setResults" | "clearResults">;
 
+const resultsSlice = (set: StoreSet): ResultsActions => ({
   setResults: (results) => {
     set((state) => ({
       results: {
@@ -880,11 +626,23 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       },
     });
   },
+});
 
-  // -------------------------------------------------------------------------
-  // UI actions
-  // -------------------------------------------------------------------------
+/** UI actions. */
+type UiActions = Pick<
+  EvaluationsV3Actions,
+  | "openOverlay"
+  | "closeOverlay"
+  | "setSelectedCell"
+  | "setEditingCell"
+  | "setHighlightedVariantTargetId"
+  | "toggleRowSelection"
+  | "selectAllRows"
+  | "clearRowSelection"
+  | "deleteSelectedRows"
+>;
 
+const uiSlice = (set: StoreSet, get: StoreGet): UiActions => ({
   openOverlay: (type, targetId, evaluatorId) => {
     set({
       ui: {
@@ -971,116 +729,27 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   deleteSelectedRows: (datasetId) => {
-    const state = get();
-    const selectedRows = state.ui.selectedRows;
+    const selectedRows = get().ui.selectedRows;
     if (selectedRows.size === 0) return;
-
-    const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (!dataset) return;
-
-    // Sort indices in descending order to delete from end first
-    // This prevents index shifting issues
-    const _sortedIndices = Array.from(selectedRows).toSorted((a, b) => b - a);
-
-    if (dataset.type === "inline" && dataset.inline) {
-      // For inline datasets, remove values from each column's array
-      set((currentState) => {
-        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
-        if (currentDataset?.type !== "inline" || !currentDataset.inline) {
-          return currentState;
-        }
-
-        const newRecords: Record<string, string[]> = {};
-
-        // For each column, filter out the selected row indices
-        for (const [columnId, values] of Object.entries(currentDataset.inline.records)) {
-          const newValues = values.filter((_, index) => !selectedRows.has(index));
-          newRecords[columnId] = newValues;
-        }
-
-        // Ensure we have at least one empty row (the "last empty white line")
-        const rowCount = Object.values(newRecords)[0]?.length ?? 0;
-        if (rowCount === 0) {
-          for (const columnId of Object.keys(newRecords)) {
-            newRecords[columnId] = [""];
-          }
-        }
-
-        return {
-          datasets: currentState.datasets.map((d) =>
-            d.id === datasetId
-              ? {
-                  ...d,
-                  inline: {
-                    ...d.inline!,
-                    records: newRecords,
-                  },
-                }
-              : d,
-          ),
-          ui: {
-            ...currentState.ui,
-            selectedRows: new Set(),
-            // Clear editing/selection state to avoid referencing deleted rows
-            selectedCell: undefined,
-            editingCell: undefined,
-          },
-        };
-      });
-    } else if (dataset.type === "saved" && dataset.savedRecords) {
-      // For saved datasets, filter out the records and track which to delete from DB
-      set((currentState) => {
-        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
-        if (currentDataset?.type !== "saved" || !currentDataset.savedRecords) {
-          return currentState;
-        }
-
-        // Filter out selected records
-        const newRecords = currentDataset.savedRecords.filter(
-          (_, index) => !selectedRows.has(index),
-        );
-
-        // Track record IDs to delete (for existing records, not new ones)
-        const recordsToDelete = currentDataset.savedRecords
-          .filter((_, index) => selectedRows.has(index))
-          .map((record) => record.id)
-          .filter((id) => !id.startsWith("new_")); // Only delete persisted records
-
-        // Store pending deletions in pendingSavedChanges
-        const dbDatasetId = currentDataset.datasetId;
-        const pendingChanges = { ...currentState.pendingSavedChanges };
-
-        if (dbDatasetId && recordsToDelete.length > 0) {
-          // Mark records for deletion: datasetId -> recordId -> { _delete: true }
-          if (!pendingChanges[dbDatasetId]) {
-            pendingChanges[dbDatasetId] = {};
-          }
-          for (const recordId of recordsToDelete) {
-            pendingChanges[dbDatasetId]![recordId] = { _delete: true };
-          }
-        }
-
-        return {
-          datasets: currentState.datasets.map((d) =>
-            d.id === datasetId
-              ? {
-                  ...d,
-                  savedRecords: newRecords,
-                }
-              : d,
-          ),
-          pendingSavedChanges: pendingChanges,
-          ui: {
-            ...currentState.ui,
-            selectedRows: new Set(),
-            selectedCell: undefined,
-            editingCell: undefined,
-          },
-        };
-      });
-    }
+    set((state) => withoutSelectedRows({ state, datasetId, rows: selectedRows }));
   },
+});
 
+/** Column, row and panel layout actions. */
+type UiLayoutActions = Pick<
+  EvaluationsV3Actions,
+  | "setExpandedEvaluator"
+  | "setColumnWidth"
+  | "setColumnWidths"
+  | "setRowHeightMode"
+  | "setConcurrency"
+  | "toggleCellExpanded"
+  | "toggleColumnVisibility"
+  | "setHiddenColumns"
+  | "setAutosaveStatus"
+>;
+
+const uiLayoutSlice = (set: StoreSet): UiLayoutActions => ({
   setExpandedEvaluator: (expanded) => {
     set((state) => ({
       ui: {
@@ -1190,11 +859,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       },
     }));
   },
+});
 
-  // -------------------------------------------------------------------------
-  // Reset
-  // -------------------------------------------------------------------------
+/** Reset. */
+type ResetActions = Pick<EvaluationsV3Actions, "reset" | "loadState" | "setSavedDatasetRecords">;
 
+const resetSlice = (set: StoreSet): ResetActions => ({
   reset: () => {
     // IMPORTANT: Explicitly clear experimentId and experimentSlug
     // createInitialState() doesn't include these optional fields,
@@ -1210,71 +880,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   loadState: (workbenchState: unknown) => {
     if (!workbenchState || typeof workbenchState !== "object") return;
-
-    const state = workbenchState as Record<string, unknown>;
-
-    // Load persisted results if available
-    const persistedResults = state.results as Record<string, unknown> | undefined;
-    const loadedResults = persistedResults
-      ? {
-          ...createInitialResults(),
-          runId: persistedResults.runId as string | undefined,
-          versionId: persistedResults.versionId as string | undefined,
-          targetOutputs: (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
-          targetMetadata:
-            (persistedResults.targetMetadata as Record<
-              string,
-              { cost?: number; duration?: number; traceId?: string }[]
-            >) ?? {},
-          evaluatorResults:
-            (persistedResults.evaluatorResults as Record<string, Record<string, unknown[]>>) ?? {},
-          errors: (persistedResults.errors as Record<string, string[]>) ?? {},
-        }
-      : undefined;
-
-    set((current) => {
-      // Load hidden columns from persisted state (convert array to Set)
-      const hiddenColumns = Array.isArray(state.hiddenColumns)
-        ? new Set(state.hiddenColumns as string[])
-        : current.ui.hiddenColumns;
-
-      // Load concurrency from persisted state
-      const concurrency =
-        typeof state.concurrency === "number" ? state.concurrency : current.ui.concurrency;
-
-      return {
-        ...current,
-        experimentId: (state.experimentId as string) ?? current.experimentId,
-        experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
-        name: (state.name as string) ?? current.name,
-        datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
-        activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
-        // Experiments saved before pairwise and N-way were merged carry a
-        // two-slot `pairwise` config. This is the load boundary where it is
-        // folded into the canonical `comparison` shape — everything
-        // downstream, including what gets saved back, sees only `comparison`.
-        evaluators: normalizeEvaluators(
-          (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-        ),
-        // Support loading old state format (agents) and new format (targets)
-        targets: normalizeTargets(
-          (state.targets as typeof current.targets) ??
-            (state.agents as typeof current.targets) ??
-            current.targets,
-        ),
-        // Load persisted results if available
-        results: loadedResults ?? current.results,
-        // Load UI settings
-        ui: {
-          ...current.ui,
-          hiddenColumns,
-          concurrency,
-        },
-      };
-    });
-
-    // Clear undo/redo history after loading state
-    // This prevents undoing back to the pre-load state
+    set((current) => loadedWorkbenchState({ current, persisted: workbenchState }));
+    // Clear undo/redo history so an undo cannot return to the pre-load state.
     useEvaluationsV3Store.temporal.getState().clear();
   },
 
@@ -1285,6 +892,23 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       ),
     }));
   },
+});
+
+const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
+  ...createInitialState(),
+  ...metadataSlice(set),
+  ...datasetManagementSlice(set, get),
+  ...datasetSelectionSlice(set),
+  ...datasetCellsSlice(set, get),
+  ...savedRecordsSlice(set, get),
+  ...targetsSlice(set),
+  ...targetConfigSlice(set),
+  ...evaluatorsSlice(set),
+  ...evaluatorMappingsSlice(set),
+  ...resultsSlice(set),
+  ...uiSlice(set, get),
+  ...uiLayoutSlice(set),
+  ...resetSlice(set),
 });
 
 // ============================================================================

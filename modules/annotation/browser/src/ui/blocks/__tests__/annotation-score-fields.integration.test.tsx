@@ -5,17 +5,17 @@
  * together; leaving any other way costs nothing. See specs/traces-v2/annotations.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { ScoreOptions } from "@langwatch/annotation-contract";
+import {
+  type ScoreOptions,
+  type AnnotationFormState,
+  type AnnotationScoreList,
+} from "@langwatch/annotation-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
 import "@testing-library/jest-dom/vitest";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  AnnotationFormState,
-  AnnotationScoreList,
-} from "../../../model/annotation-form-types.ts";
 import { ScoreFields } from "../annotation-score-fields.tsx";
 
 function score(over: Partial<AnnotationScoreList[number]>): AnnotationScoreList[number] {

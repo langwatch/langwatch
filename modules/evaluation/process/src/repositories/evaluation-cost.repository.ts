@@ -1,3 +1,5 @@
+import type { EvaluationCostRecord } from "@langwatch/evaluation-contract";
+
 /**
  * The cost ledger one evaluation run writes into: one row per run, keyed by the
  * run's own idempotency key so a redelivery reuses the row it already wrote.
@@ -32,5 +34,7 @@ export class EvaluationCostAlreadyRecordedError extends Error {
 export interface EvaluationCostRepository {
   /** Writes one row, refusing with {@link EvaluationCostAlreadyRecordedError}. */
   create(input: EvaluationCostRow): Promise<void>;
+  /** Writes one ledger entry exactly as the caller shaped it (the public evaluate doors). */
+  createEntry(input: EvaluationCostRecord): Promise<void>;
   findById(input: { id: string; projectId: string }): Promise<EvaluationCostReference | undefined>;
 }

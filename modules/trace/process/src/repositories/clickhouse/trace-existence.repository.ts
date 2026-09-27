@@ -3,9 +3,14 @@
  */
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceUsageCount } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
+import { chString } from "./clickhouse.trace-row.mapper.ts";
+
+const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
   static create(options: {
@@ -30,7 +35,7 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
     if (traceIds.length === 0) return [];
     const client = await this.resolveClient(projectId);
     try {
-      const result = await client.query<{ TraceId: string }>({
+      const result = await client.query({
         query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
@@ -40,7 +45,7 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
         query_params: { tenantId: projectId, traceIds: [...traceIds] },
         format: "JSONEachRow",
       });
-      const rows = await result.json<{ TraceId: string }>();
+      const rows = traceIdRowsSchema.parse(await result.json());
       return rows.map((row) => row.TraceId);
     } catch (error) {
       this.logger.warn(
@@ -68,13 +73,13 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
       [...new Set(projectIds)].map(async (projectId) => {
         const client = await this.resolveClient(projectId);
         const count = async (query: string) => {
-          const result = await client.query<{ Total: string }>({
+          const result = await client.query({
             query,
             query_params:
               since === undefined ? { tenantId: projectId } : { tenantId: projectId, since },
             format: "JSONEachRow",
           });
-          const [row] = await result.json<{ Total: string }>();
+          const [row] = totalRowsSchema.parse(await result.json());
           return Number.parseInt(row?.Total ?? "0", 10);
         };
         const [traces, spans] = await Promise.all([

@@ -1,9 +1,9 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
   RetentionFloorService,
+  type RetentionDaysProvider,
 } from "@langwatch/clickhouse-client";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -39,6 +39,7 @@ import type {
 } from "@langwatch/trace-contract";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
+import { z } from "zod";
 
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import {
@@ -64,12 +65,77 @@ import {
   extractRedactionsForObject,
 } from "../../rules/trace-read-redaction.rules.ts";
 import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service.ts";
+import type { TraceClickHouseClient } from "../trace-clickhouse-client.repository.ts";
 import {
   TraceLegacyReadRepository,
   type ResolveTraceSpansBatchFn,
   type ResolveTraceSpansFn,
 } from "../trace-legacy-read.repository.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
+
+const attributeMapSchema = z.record(z.string(), z.unknown());
+const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const totalRowsSchema = z.array(z.looseObject({ total: chString }));
+const topicCountRowsSchema = z.array(
+  z.looseObject({ TopicId: chString.nullable(), SubTopicId: chString.nullable(), count: chString }),
+);
+const customerRowsSchema = z.array(z.looseObject({ customer_id: chString }));
+const labelsRowsSchema = z.array(z.looseObject({ labels_json: chString }));
+const spanNameRowsSchema = z.array(z.looseObject({ SpanName: chString }));
+const metadataKeyRowsSchema = z.array(z.looseObject({ key: chString }));
+const evaluatorNameRowsSchema = z.array(z.looseObject({ id: chString, name: chString.nullable() }));
+const occurredAtRangeRowsSchema = z.array(
+  z.looseObject({ fromMs: chNumber.nullable(), toMs: chNumber.nullable() }),
+);
+const promptStudioSpanRowsSchema = z.array(
+  z.looseObject({
+    SpanId: chString,
+    TraceId: chString,
+    ParentSpanId: chString.nullable(),
+    SpanName: chString,
+    SpanAttributes: attributeMapSchema,
+    StartTime: chNumber,
+    EndTime: chNumber,
+    DurationMs: chNumber,
+    StatusCode: chNumber.nullable(),
+    StatusMessage: chString.nullable(),
+  }),
+);
+const eventSpanRowsSchema: z.ZodType<EventSpanRow[]> = z.array(
+  z.looseObject({
+    TraceId: chString,
+    SpanId: chString,
+    StartTimeMs: chNumber,
+    EndTimeMs: chNumber,
+    EventAttrs: chStringMap,
+  }),
+);
+const evaluationRunRowsSchema: z.ZodType<ClickHouseEvaluationRunRow[]> = z.array(
+  z.looseObject({
+    ProjectionId: chString,
+    TenantId: chString,
+    EvaluationId: chString,
+    Version: chString,
+    EvaluatorId: chString,
+    EvaluatorType: chString,
+    EvaluatorName: chString.nullable(),
+    TraceId: chString.nullable(),
+    IsGuardrail: chNumber,
+    Status: chString,
+    Score: chNumber.nullable(),
+    Passed: chNumber.nullable(),
+    Label: chString.nullable(),
+    Details: chString.nullable(),
+    Error: chString.nullable(),
+    Inputs: chString.nullable(),
+    ScheduledAt: chString.nullable(),
+    StartedAt: chString.nullable(),
+    CompletedAt: chString.nullable(),
+    LastProcessedEventId: chString,
+    UpdatedAt: chString,
+  }),
+);
 
 /**
  * Cursor structure for keyset pagination.
@@ -273,20 +339,22 @@ export type TraceLegacyFilterConditions = (
   hasUnsupportedFilters: boolean;
 };
 
+const retentionFloorLogger = createLogger("langwatch:clickhouse:retention-floor");
+
 /** What a composition root gives the legacy trace read over ClickHouse. */
 export interface ClickHouseTraceLegacyReadOptions {
   traceCanonicalisation: TraceCanonicalisationService;
   /** The process's tenant-keyed connection; absent, every read refuses. */
-  resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
+  resolveClickHouseClient?: ((tenantId: string) => Promise<TraceClickHouseClient>) | undefined;
   /** The analytics filter translator; absent, a FILTERED list refuses. */
   filterConditions?: TraceLegacyFilterConditions | undefined;
   resolveTraceSpans?: ResolveTraceSpansFn | undefined;
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /**
-   * Widens the span read's retention floor to the tenant's own policy. Absent, the floor stays
+   * The tenant's retention policy, which widens the span read's floor. Absent, the floor stays
    * at the platform default, which still bounds every read.
    */
-  retentionFloor?: RetentionFloorService | undefined;
+  retentionDays?: RetentionDaysProvider | undefined;
   annotations?: AnnotationApi | undefined;
 }
 
@@ -524,32 +592,36 @@ function buildLatestVersionOnly(scrollStart: number | undefined): string {
 }
 
 /** Stored-span rows as the joined read selects them. */
-type JoinedSpanRow = {
-  SpanId: string;
-  TraceId: string;
-  TenantId: string;
-  ParentSpanId: string | null;
-  ParentTraceId: string | null;
-  ParentIsRemote: boolean | null;
-  Sampled: boolean;
-  StartTime: number;
-  EndTime: number;
-  DurationMs: number;
-  SpanName: string;
-  SpanKind: number;
-  ResourceAttributes: Record<string, unknown>;
-  SpanAttributes: Record<string, unknown>;
-  StatusCode: number | null;
-  StatusMessage: string | null;
-  ScopeName: string | null;
-  ScopeVersion: string | null;
-  Events_Timestamp: number[];
-  Events_Name: string[];
-  Events_Attributes: Record<string, unknown>[];
-  Links_TraceId: string[];
-  Links_SpanId: string[];
-  Links_Attributes: Record<string, unknown>[];
-};
+const joinedSpanRowSchema = z.looseObject({
+  SpanId: chString,
+  TraceId: chString,
+  TenantId: chString,
+  ParentSpanId: chString.nullable(),
+  ParentTraceId: chString.nullable(),
+  ParentIsRemote: chBoolean.nullable(),
+  Sampled: chBoolean,
+  StartTime: chNumber,
+  EndTime: chNumber,
+  DurationMs: chNumber,
+  SpanName: chString,
+  SpanKind: chNumber,
+  ResourceAttributes: attributeMapSchema,
+  SpanAttributes: attributeMapSchema,
+  StatusCode: chNumber.nullable(),
+  StatusMessage: chString.nullable(),
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+  Events_Timestamp: z.array(chNumber),
+  Events_Name: z.array(chString),
+  Events_Attributes: z.array(attributeMapSchema),
+  Links_TraceId: z.array(chString),
+  Links_SpanId: z.array(chString),
+  Links_Attributes: z.array(attributeMapSchema),
+});
+
+type JoinedSpanRow = z.infer<typeof joinedSpanRowSchema>;
+
+const joinedSpanRowsSchema = z.array(joinedSpanRowSchema);
 
 /**
  * Bounds the stored_spans scan to the weeks the matched traces occurred in, falling back to the
@@ -615,7 +687,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
 
   private readonly resolveClickHouseClient:
-    | ((tenantId: string) => Promise<ClickHouseClient>)
+    | ((tenantId: string) => Promise<TraceClickHouseClient>)
     | undefined;
   private readonly filterConditions: TraceLegacyFilterConditions | undefined;
   private readonly annotations: AnnotationApi | undefined;
@@ -631,9 +703,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     this.traceCanonicalisation = options.traceCanonicalisation;
     this.resolveTraceSpans = options.resolveTraceSpans;
     this.resolveTraceSpansBatch = options.resolveTraceSpansBatch;
-    this.retentionFloor =
-      options.retentionFloor ??
-      new RetentionFloorService({ defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS });
+    this.retentionFloor = new RetentionFloorService({
+      defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+      provider: options.retentionDays,
+      logger: retentionFloorLogger,
+    });
   }
 
   static create(options: ClickHouseTraceLegacyReadOptions): TraceLegacyReadClickHouseRepository {
@@ -660,7 +734,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return translate(filters, window);
   }
 
-  private async resolveClient(projectId: string): Promise<ClickHouseClient> {
+  private async resolveClient(projectId: string): Promise<TraceClickHouseClient> {
     const resolve = this.resolveClickHouseClient;
     if (!resolve) {
       throw new ClickHouseClientUnavailableError(projectId);
@@ -797,7 +871,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as { TraceId: string }[];
+          const rows = traceIdRowsSchema.parse(await result.json());
           return rows.map((r) => r.TraceId);
         } catch (error) {
           this.logger.warn(
@@ -854,7 +928,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as { TraceId: string }[];
+          const rows = traceIdRowsSchema.parse(await result.json());
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -949,7 +1023,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as { TraceId: string }[];
+          const rows = traceIdRowsSchema.parse(await result.json());
           const traceIds = rows.map((r) => r.TraceId);
 
           if (traceIds.length === 0) {
@@ -1178,12 +1252,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }: {
     projection: GetAllTracesForProjectOptions["projection"];
     groups: TracesForProjectResult["groups"];
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     protections: Protections;
   }): Promise<void> {
     if (!projection?.needsEvents && !projection?.needsAnnotations) return;
-    const pageTraces = groups.flat() as unknown as ProjectableTrace[];
+    const pageTraces: ProjectableTrace[] = groups.flat();
     if (projection.needsEvents) {
       await this.enrichTracesWithEventsForProjection({
         clickHouseClient,
@@ -1205,7 +1279,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     traceIds,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     traceIds: string[];
   }): Promise<TracesForProjectResult["traceChecks"]> {
@@ -1359,7 +1433,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // does not carry, scoped to this page's traces (never table-wide).
           // Evaluations already flow through traceChecks; events and annotations
           // are fetched here on demand. The compiled projector reads
-          // trace.events / trace.annotations off these same objects.
+          // trace.events / trace.projectedAnnotations off these same objects.
           await this.attachProjectionCollections({
             projection,
             groups,
@@ -1436,7 +1510,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = await result.json<TopicCountRow>();
+          const rows = topicCountRowsSchema.parse(await result.json());
 
           return aggregateTopicCounts(rows);
         } catch (error) {
@@ -1494,9 +1568,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const customerRows = (await customerResult.json()) as {
-            customer_id: string;
-          }[];
+          const customerRows = customerRowsSchema.parse(await customerResult.json());
 
           // Query for unique labels
           // Labels are stored as JSON array in langwatch.labels attribute
@@ -1516,9 +1588,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const labelsRows = (await labelsResult.json()) as {
-            labels_json: string;
-          }[];
+          const labelsRows = labelsRowsSchema.parse(await labelsResult.json());
 
           // Parse labels from JSON arrays
           const labelsSet = new Set<string>();
@@ -1592,18 +1662,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const allRows = (await queryResult.json()) as {
-            SpanId: string;
-            TraceId: string;
-            ParentSpanId: string | null;
-            SpanName: string;
-            SpanAttributes: Record<string, unknown>;
-            StartTime: number;
-            EndTime: number;
-            DurationMs: number;
-            StatusCode: number | null;
-            StatusMessage: string | null;
-          }[];
+          const allRows = promptStudioSpanRowsSchema.parse(await queryResult.json());
 
           const requestedRow = allRows.find((r) => r.SpanId === spanId);
           if (!requestedRow) {
@@ -1792,9 +1851,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const spanRows = (await spanResult.json()) as {
-            SpanName: string;
-          }[];
+          const spanRows = spanNameRowsSchema.parse(await spanResult.json());
 
           const spanNames = spanRows.map((row) => ({
             key: row.SpanName,
@@ -1820,9 +1877,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const metaRows = (await metaResult.json()) as {
-            key: string;
-          }[];
+          const metaRows = metadataKeyRowsSchema.parse(await metaResult.json());
 
           const metadataKeys = metaRows.map((row) => ({
             key: row.key,
@@ -1854,10 +1909,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const evalRows = (await evalResult.json()) as {
-            id: string;
-            name: string | null;
-          }[];
+          const evalRows = evaluatorNameRowsSchema.parse(await evalResult.json());
 
           const evaluationNames = evalRows.map((row) => ({
             key: row.id,
@@ -2024,8 +2076,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         ]);
 
         const [countRows, idRows] = await Promise.all([
-          countResult.json() as Promise<{ total: string }[]>,
-          idsResult.json() as Promise<{ TraceId: string }[]>,
+          countResult.json().then((rows) => totalRowsSchema.parse(rows)),
+          idsResult.json().then((rows) => traceIdRowsSchema.parse(rows)),
         ]);
 
         const totalHits = parseInt(countRows[0]?.total ?? "0", 10);
@@ -2087,7 +2139,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     dateColumn = "OccurredAt",
     scrollStart,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     startDate: number;
     endDate: number;
@@ -2191,7 +2243,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
         format: "JSONEachRow",
       });
-      return result.json() as Promise<TraceSummaryRow[]>;
+      return traceSummaryRowsSchema.parse(await result.json());
     };
 
     try {
@@ -2256,7 +2308,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     traces,
     protections,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     traces: ProjectableTrace[];
     protections: Protections;
@@ -2324,7 +2376,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as EventSpanRow[];
+    const rows = eventSpanRowsSchema.parse(await result.json());
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
       const event = mapEventAttrsToEvent({ row, projectId });
@@ -2410,7 +2462,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       byTrace.set(row.traceId, list);
     }
     for (const trace of traces) {
-      trace.annotations = byTrace.get(trace.trace_id) ?? [];
+      trace.projectedAnnotations = byTrace.get(trace.trace_id) ?? [];
     }
   }
 
@@ -2423,7 +2475,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     traceIds,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     traceIds: string[];
   }): Promise<ClickHouseEvaluationRunRow[]> {
@@ -2448,7 +2500,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         },
         format: "JSONEachRow",
       });
-      return result.json() as Promise<ClickHouseEvaluationRunRow[]>;
+      return evaluationRunRowsSchema.parse(await result.json());
     };
 
     try {
@@ -2794,7 +2846,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     traceIds,
   }: {
-    client: ClickHouseClient;
+    client: TraceClickHouseClient;
     projectId: string;
     traceIds: string[];
   }): Promise<OccurredAtRange | undefined> {
@@ -2814,10 +2866,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       query_params: { tenantId: projectId, traceIds },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as {
-      fromMs: number | null;
-      toMs: number | null;
-    }[];
+    const rows = occurredAtRangeRowsSchema.parse(await result.json());
     const row = rows[0];
     if (!row || !(Number(row.fromMs) > 0) || !(Number(row.toMs) > 0)) {
       return undefined;
@@ -2864,7 +2913,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     traceIds,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     traceIds: string[];
   }): Promise<OccurredAtRange | undefined> {
@@ -2900,7 +2949,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     effectiveOccurredAt,
     traceIds,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     traceIds: string[];
@@ -2970,7 +3019,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     batchTraceIds,
     maxSpanRows,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     batchTraceIds: string[];
@@ -3044,7 +3093,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     effectiveOccurredAt,
     batchTraceIds,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     effectiveOccurredAt: OccurredAtRange | undefined;
     batchTraceIds: string[];
@@ -3131,7 +3180,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           },
           format: "JSONEachRow",
         });
-        return (await summaryResult.json()) as TraceSummaryRow[];
+        return traceSummaryRowsSchema.parse(await summaryResult.json());
       },
     });
     return { summaryRows, hasSummaryWindow };
@@ -3144,7 +3193,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     spanRange,
     maxSpanRows,
   }: {
-    clickHouseClient: ClickHouseClient;
+    clickHouseClient: TraceClickHouseClient;
     projectId: string;
     batchTraceIds: string[];
     spanRange: { from: number; to: number } | undefined;
@@ -3242,7 +3291,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           clickhouse_settings: spanReadSettings,
           format: "JSONEachRow",
         });
-        return (await spansResult.json()) as JoinedSpanRow[];
+        return joinedSpanRowsSchema.parse(await spansResult.json());
       },
     });
   }
@@ -3447,45 +3496,49 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 /**
  * Type for trace summary rows from the summary-only query.
  */
-interface TraceSummaryRow {
-  ts_TraceId: string;
-  ts_SpanCount: number;
-  ts_TotalDurationMs: number;
-  ts_ComputedIOSchemaVersion: string;
-  ts_ComputedInput?: string | null;
-  ts_ComputedOutput?: string | null;
-  ts_TimeToFirstTokenMs: number | null;
-  ts_TimeToLastTokenMs: number | null;
-  ts_TokensPerSecond: number | null;
-  ts_ContainsErrorStatus: boolean;
-  ts_ContainsOKStatus: boolean;
-  ts_ErrorMessage: string | null;
-  ts_Models: string[];
-  ts_TotalCost: number | null;
-  ts_NonBilledCost: number | null;
-  ts_TokensEstimated: boolean;
-  ts_TotalPromptTokenCount: number | null;
-  ts_TotalCompletionTokenCount: number | null;
-  ts_OutputFromRootSpan?: boolean;
-  ts_OutputSpanEndTimeMs?: number;
-  ts_TopicId: string | null;
-  ts_SubTopicId: string | null;
-  ts_HasAnnotation: boolean | null;
-  ts_AnnotationIds: string[];
-  ts_Attributes: Record<string, string>;
-  ts_TraceName?: string | null;
+const traceSummaryRowSchema = z.looseObject({
+  ts_TraceId: chString,
+  ts_SpanCount: chNumber,
+  ts_TotalDurationMs: chNumber,
+  ts_ComputedIOSchemaVersion: chString,
+  ts_ComputedInput: chString.nullish(),
+  ts_ComputedOutput: chString.nullish(),
+  ts_TimeToFirstTokenMs: chNumber.nullable(),
+  ts_TimeToLastTokenMs: chNumber.nullable(),
+  ts_TokensPerSecond: chNumber.nullable(),
+  ts_ContainsErrorStatus: chBoolean,
+  ts_ContainsOKStatus: chBoolean,
+  ts_ErrorMessage: chString.nullable(),
+  ts_Models: z.array(chString),
+  ts_TotalCost: chNumber.nullable(),
+  ts_NonBilledCost: chNumber.nullable(),
+  ts_TokensEstimated: chBoolean,
+  ts_TotalPromptTokenCount: chNumber.nullable(),
+  ts_TotalCompletionTokenCount: chNumber.nullable(),
+  ts_OutputFromRootSpan: chBoolean.optional(),
+  ts_OutputSpanEndTimeMs: chNumber.optional(),
+  ts_TopicId: chString.nullable(),
+  ts_SubTopicId: chString.nullable(),
+  ts_HasAnnotation: chBoolean.nullable(),
+  ts_AnnotationIds: z.array(chString),
+  ts_Attributes: chStringMap,
+  ts_TraceName: chString.nullish(),
   /**
    * The row's projection stamp. Read only to tell a pre-anchor row's `OccurredAt`
-   * (which was `min(span start)`) from a post-anchor one's (which is the frozen
-   * storage anchor). See {@link traceSummaryTimesFromRow}.
+   * (which was `min(span start)`) from a post-anchor one's (the frozen storage
+   * anchor). See {@link traceSummaryTimesFromRow}.
    */
-  ts_Version?: string;
+  ts_Version: chString.optional(),
   /** The span timing baseline column added by migration 00072; absent on older rows. */
-  ts_EarliestSpanStartMs?: number | string;
-  ts_OccurredAt: number;
-  ts_CreatedAt: number;
-  ts_UpdatedAt: number;
-}
+  ts_EarliestSpanStartMs: chNumber.optional(),
+  ts_OccurredAt: chNumber,
+  ts_CreatedAt: chNumber,
+  ts_UpdatedAt: chNumber,
+});
+
+type TraceSummaryRow = z.infer<typeof traceSummaryRowSchema>;
+
+const traceSummaryRowsSchema = z.array(traceSummaryRowSchema);
 
 /**
  * Splits a summary row's two times back apart: `OccurredAt` is the frozen storage anchor (the

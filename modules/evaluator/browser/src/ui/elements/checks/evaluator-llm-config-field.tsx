@@ -1,7 +1,6 @@
 import { Box, HStack, Skeleton } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { allModelOptions, NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { toInternalKey } from "@langwatch/prompt-browser-kit";
 import { LLMConfigPopover } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
@@ -10,6 +9,7 @@ import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
+import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 
 /**
  * LLM config parameter keys that the popover can read/write.
@@ -79,7 +79,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // playground and workflow LLM-node pickers. While the providers
   // query is in flight, render a skeleton so the empty state doesn't
   // flash before the data resolves.
-  const { isEmpty, isLoading } = useModelSelectionOptions(allModelOptions, llmConfig.model, "chat");
+  const { isEmpty, isLoading } = useModelSelection({
+    options: allModelOptions,
+    model: llmConfig.model,
+    mode: "chat",
+  });
   if (isLoading) {
     return <Skeleton width="full" height="40px" borderRadius="md" />;
   }

@@ -2,6 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
   CustomEvaluator,
   EvaluationRunOutcome,
@@ -10,6 +11,7 @@ import type {
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -199,6 +201,8 @@ export function createEvaluationTestApp(
       monitors: MonitorApi;
       automations: AutomationApi;
       analytics: AnalyticsApi;
+      datasets: DatasetApi;
+      experiments: ExperimentApi;
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
@@ -220,6 +224,8 @@ export function createEvaluationTestApp(
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
       automations: input.dependencies?.automations ?? createApiFixture<AutomationApi>(),
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
+      datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
+      experiments: input.dependencies?.experiments ?? createApiFixture<ExperimentApi>(),
     },
     clustering:
       input.clustering ??

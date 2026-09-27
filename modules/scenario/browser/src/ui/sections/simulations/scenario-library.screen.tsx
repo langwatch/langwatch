@@ -6,6 +6,7 @@ import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import type { Scenario } from "@langwatch/scenario-contract";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
@@ -17,7 +18,6 @@ import { useOrganizationTeamProject } from "../../../behavior/use-organization-t
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioLabelFilter as useLabelFilter } from "../../../behavior/use-scenario-label-filter.ts";
 import { useScenarioSelection } from "../../../behavior/use-scenario-selection.ts";
-import type { Scenario } from "../../../model/prisma-types.ts";
 import { ScenarioArchiveDialog } from "../../../ui/elements/scenario-archive-dialog.tsx";
 import {
   ScenarioBatchActionBar as BatchActionBar,

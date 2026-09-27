@@ -40,10 +40,11 @@ type WithDateWrites<T, K extends keyof T> = {
   [P in keyof T]: P extends K ? DateWrite<T[P]> : T[P];
 };
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
+import { z } from "zod";
 
 import {
   ensureStringRecord,
-  type FullSpanRow,
+  fullSpanRowsSchema,
   mapChRowToNormalized,
   serializeAttributes,
 } from "./stored-span-row.mapper.ts";
@@ -63,6 +64,7 @@ import {
   MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
 } from "../span-storage.repository.ts";
+import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -230,20 +232,26 @@ const MODEL_ATTR_SELECT = `coalesce(
  */
 const SAMPLE_CANDIDATE_TRACE_POOL = 500;
 
-interface ModelSpanSampleQueryRow {
-  TraceId: string;
-  SpanId: string;
-  SpanName: string;
-  Model: string;
-  InputTokensRaw: string;
-  PromptTokensRaw: string;
-  OutputTokensRaw: string;
-  CompletionTokensRaw: string;
-  CacheReadTokensRaw: string;
-  CacheCreationTokensRaw: string;
-  CacheCreation1hTokensRaw: string;
-  StartTimeMs: number | string;
-}
+const numeric = z.union([z.number(), z.string()]);
+
+const modelSpanSampleQueryRowSchema = z.looseObject({
+  TraceId: chString,
+  SpanId: chString,
+  SpanName: chString,
+  Model: chString,
+  InputTokensRaw: chString,
+  PromptTokensRaw: chString,
+  OutputTokensRaw: chString,
+  CompletionTokensRaw: chString,
+  CacheReadTokensRaw: chString,
+  CacheCreationTokensRaw: chString,
+  CacheCreation1hTokensRaw: chString,
+  StartTimeMs: numeric,
+});
+
+const modelSpanSampleQueryRowsSchema = z.array(modelSpanSampleQueryRowSchema);
+
+type ModelSpanSampleQueryRow = z.infer<typeof modelSpanSampleQueryRowSchema>;
 
 /** Map-subscript token values arrive as strings ('' when absent). */
 function parseTokenCount(...raws: string[]): number | null {
@@ -382,48 +390,52 @@ const SIGNAL_BUCKET_PREDICATES: Record<LangwatchSignalBucket, string> = {
   genai: "arrayExists(k -> startsWith(k, 'gen_ai.'), keys)",
 };
 
-export interface SpanSummaryQueryRow {
-  SpanId: string;
-  ParentSpanId: string | null;
-  SpanName: string;
-  DurationMs: number;
-  StatusCode: number | null;
-  SpanType: string;
+const spanSummaryQueryRowSchema = z.looseObject({
+  SpanId: chString,
+  ParentSpanId: chString.nullable(),
+  SpanName: chString,
+  DurationMs: chNumber,
+  StatusCode: chNumber.nullable(),
+  SpanType: chString,
   // Semconv `gen_ai.tool.name` first, claude's bare `tool_name` second —
   // whichever the emitter used, the waterfall can label the tool row.
-  ToolName: string;
+  ToolName: chString,
   // Claude joins: request_id ties llm_request spans to their api_* logs,
   // query_source scopes positional prompt pairing, tool_use_id ties tool
   // spans to tool_decision/tool_result logs. Server-side only.
-  RequestId: string;
-  QuerySource: string;
-  ToolUseId: string;
-  Model: string;
-  ResponseModel: string;
+  RequestId: chString,
+  QuerySource: chString,
+  ToolUseId: chString,
+  Model: chString,
+  ResponseModel: chString,
   // `SpanAttributes[...]` materialises as the raw map value; ClickHouse
   // Map values are typed `String`, so each numeric attribute arrives as
   // a stringified number (or "" when absent). Parsed in the mapper.
-  Cost: string;
-  InputTokens: string;
-  OutputTokens: string;
-  CacheReadTokens: string;
-  CacheCreationTokens: string;
-  CacheCreation1hTokens: string;
-  InputChars: string;
-  AudioSeconds: string;
-  InputAudioTokens: string;
-  OutputAudioTokens: string;
-  InputImageTokens: string;
-  OutputImageTokens: string;
-  CustomInputRate: string;
-  CustomOutputRate: string;
-  CustomCacheReadRate: string;
-  CustomCacheCreationRate: string;
-  CustomCacheCreation1hRate: string;
-  LwSpanCost: string;
-  StartTimeMs: number;
-  UpdatedAtMs: number;
-}
+  Cost: chString,
+  InputTokens: chString,
+  OutputTokens: chString,
+  CacheReadTokens: chString,
+  CacheCreationTokens: chString,
+  CacheCreation1hTokens: chString,
+  InputChars: chString,
+  AudioSeconds: chString,
+  InputAudioTokens: chString,
+  OutputAudioTokens: chString,
+  InputImageTokens: chString,
+  OutputImageTokens: chString,
+  CustomInputRate: chString,
+  CustomOutputRate: chString,
+  CustomCacheReadRate: chString,
+  CustomCacheCreationRate: chString,
+  CustomCacheCreation1hRate: chString,
+  LwSpanCost: chString,
+  StartTimeMs: chNumber,
+  UpdatedAtMs: chNumber,
+});
+
+const spanSummaryQueryRowsSchema = z.array(spanSummaryQueryRowSchema);
+
+export type SpanSummaryQueryRow = z.infer<typeof spanSummaryQueryRowSchema>;
 
 /** "" → null, malformed → null, otherwise the parsed number. */
 function parseAttrNumber(raw: string): number | null {
@@ -488,30 +500,71 @@ function computeSummaryRowCost({
   });
 }
 
-interface EventRow {
-  event_id: string;
-  trace_id: string;
-  project_id: string;
-  started_at: string | number;
-  event_type: string;
-  attributes: Record<string, string>;
-}
+const eventRowSchema = z.looseObject({
+  event_id: chString,
+  trace_id: chString,
+  project_id: chString,
+  started_at: numeric,
+  event_type: chString,
+  attributes: chStringMap,
+});
 
-interface TraceEventRow {
-  spanId: string;
-  timestamp: string | number;
-  name: string;
-  attributes: Record<string, string>;
-}
+const eventRowsSchema = z.array(eventRowSchema);
 
-interface TraceEventRollupRow {
-  traceId: string;
-  name: string;
-  nameCount: string | number;
-  firstTimestamp: string | number;
-  totalCount: string | number;
-  distinctCount: string | number;
-}
+type EventRow = z.infer<typeof eventRowSchema>;
+
+const traceEventRowSchema = z.looseObject({
+  spanId: chString,
+  timestamp: numeric,
+  name: chString,
+  attributes: chStringMap,
+});
+
+const traceEventRowsSchema = z.array(traceEventRowSchema);
+
+const traceEventRollupRowSchema = z.looseObject({
+  traceId: chString,
+  name: chString,
+  nameCount: numeric,
+  firstTimestamp: numeric,
+  totalCount: numeric,
+  distinctCount: numeric,
+});
+
+const traceEventRollupRowsSchema = z.array(traceEventRollupRowSchema);
+
+type TraceEventRollupRow = z.infer<typeof traceEventRollupRowSchema>;
+
+const resourceInfoRowSchema = z.looseObject({
+  SpanId: chString,
+  ParentSpanId: chString.nullable(),
+  StartTimeMs: chNumber,
+  ResourceAttributes: chStringMap,
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+});
+
+const resourceInfoRowsSchema = z.array(resourceInfoRowSchema);
+
+const occurredAtRowSchema = z.looseObject({ occurredAtMs: numeric.nullable() });
+
+const occurredAtRowsSchema = z.array(occurredAtRowSchema);
+
+const signalsRowSchema = z.looseObject({ SpanId: chString, Signals: z.array(chString) });
+
+const signalsRowsSchema = z.array(signalsRowSchema);
+
+const totalRowSchema = z.looseObject({ Total: numeric });
+
+const totalRowsSchema = z.array(totalRowSchema);
+
+const modelUsageRowSchema = z.looseObject({
+  Model: chString,
+  SpanCount: numeric,
+  LastSeenMs: numeric,
+});
+
+const modelUsageRowsSchema = z.array(modelUsageRowSchema);
 
 /** JSONEachRow renders 64-bit integers as strings; narrow both back to number. */
 function asNumber(value: string | number): number {
@@ -727,7 +780,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as FullSpanRow[];
+          const rows = fullSpanRowsSchema.parse(await result.json());
           return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
         },
       );
@@ -793,7 +846,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as FullSpanRow[];
+          const rows = fullSpanRowsSchema.parse(await result.json());
           return rows.map(mapChRowToNormalized);
         },
       );
@@ -933,7 +986,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as FullSpanRow[];
+    const rows = fullSpanRowsSchema.parse(await result.json());
     if (rows.length === 0) return null;
     return mapChRowToNormalized(rows[0]!);
   }
@@ -981,14 +1034,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as {
-          SpanId: string;
-          ParentSpanId: string | null;
-          StartTimeMs: number;
-          ResourceAttributes: Record<string, string>;
-          ScopeName: string | null;
-          ScopeVersion: string | null;
-        }[];
+        const rows = resourceInfoRowsSchema.parse(await result.json());
 
         return rows.map((row) => ({
           spanId: row.SpanId,
@@ -1041,9 +1087,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       query_params: sinceMs !== undefined ? { tenantId, traceId, sinceMs } : { tenantId, traceId },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as {
-      occurredAtMs: string | number | null;
-    }[];
+    const rows = occurredAtRowsSchema.parse(await result.json());
     const raw = rows[0]?.occurredAtMs;
     if (raw === null || raw === undefined) return undefined;
     // `min` over no matching rows yields the epoch default (0); treat that — and
@@ -1140,7 +1184,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as TraceEventRow[];
+          const rows = traceEventRowsSchema.parse(await result.json());
           return rows.map((r) => ({
             spanId: r.spanId,
             timestamp: typeof r.timestamp === "string" ? parseInt(r.timestamp, 10) : r.timestamp,
@@ -1191,7 +1235,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         format: "JSONEachRow",
       });
 
-      return toTraceEventRollups((await result.json()) as TraceEventRollupRow[]);
+      return toTraceEventRollups(traceEventRollupRowsSchema.parse(await result.json()));
     } catch (error) {
       logger.warn(
         {
@@ -1256,7 +1300,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as EventRow[];
+          const rows = eventRowsSchema.parse(await result.json());
           return rows.map(mapEventRow);
         },
       );
@@ -1333,7 +1377,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as EventRow[];
+          const rows = eventRowsSchema.parse(await result.json());
           return rows.map(mapEventRow);
         },
       );
@@ -1385,7 +1429,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
 
-        const rows = await result.json<SpanSummaryQueryRow>();
+        const rows = spanSummaryQueryRowsSchema.parse(await result.json());
         return rows.map((row) => SpanStorageClickHouseRepository.mapSpanSummaryRow(row));
       },
     );
@@ -1447,10 +1491,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as {
-          SpanId: string;
-          Signals: string[];
-        }[];
+        const rows = signalsRowsSchema.parse(await result.json());
 
         const validBuckets = new Set<string>(LANGWATCH_SIGNAL_BUCKETS);
         return rows
@@ -1520,10 +1561,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           }),
         ]);
 
-        const pageRows = (await pageResult.json()) as FullSpanRow[];
-        const countRows = (await countResult.json()) as {
-          Total: number | string;
-        }[];
+        const pageRows = fullSpanRowsSchema.parse(await pageResult.json());
+        const countRows = totalRowsSchema.parse(await countResult.json());
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
@@ -1567,7 +1606,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       format: "JSONEachRow",
     });
 
-    const rows = (await result.json()) as FullSpanRow[];
+    const rows = fullSpanRowsSchema.parse(await result.json());
     return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
@@ -1608,11 +1647,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      Model: string;
-      SpanCount: number | string;
-      LastSeenMs: number | string;
-    }>();
+    const rows = modelUsageRowsSchema.parse(await result.json());
     return rows.map((row) => ({
       model: row.Model,
       spanCount: Number(row.SpanCount),
@@ -1689,7 +1724,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<ModelSpanSampleQueryRow>();
+    const rows = modelSpanSampleQueryRowsSchema.parse(await result.json());
     return rows.map(mapModelSpanSampleRow);
   }
 

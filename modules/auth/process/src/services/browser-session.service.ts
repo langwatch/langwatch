@@ -5,6 +5,7 @@ import {
   SessionIsCurrentError,
   verifiedBrowserSessionSchema,
   type BrowserSession,
+  type BrowserSessionResolution,
   type BrowserSessionInventoryEntry,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
@@ -64,20 +65,15 @@ export class BrowserSessionService {
     return this.deps.sessions.countSignedInUsersAmong(input);
   }
 
-  async tryResolveBrowserSession(input: {
-    verified: VerifiedBrowserSession | null;
-  }): Promise<BrowserSession | null> {
-    const verified = input.verified ? verifiedBrowserSessionSchema.parse(input.verified) : null;
-    if (!verified) {
-      return null;
-    }
+  async resolveBrowserSession(input: {
+    verified: VerifiedBrowserSession;
+  }): Promise<BrowserSessionResolution> {
+    const verified = verifiedBrowserSessionSchema.parse(input.verified);
 
     const stored = await this.deps.sessions.findById({ id: verified.session.id });
-    if (!stored) {
-      return null;
-    }
+    if (!stored) return { kind: "anonymous" };
 
-    if (await this.pastItsWindow({ stored })) return null;
+    if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
     const user = await this.deps.users.findById({ id: verified.user.id });
     const identityEmail = await this.deps.identityEmails?.resolveEmail({
@@ -99,7 +95,7 @@ export class BrowserSessionService {
       sessionId: verified.session.id,
     });
 
-    return this.asImpersonated({ stored, session });
+    return { kind: "signed_in", session: await this.asImpersonated({ stored, session }) };
   }
 
   /**

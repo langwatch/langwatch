@@ -9,11 +9,8 @@ import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
-import {
-  TraceExportBoundsService,
-  type TraceExportSlotSet,
-  type TraceExportSlotStore,
-} from "../trace-export-bounds.service.ts";
+import type { TraceExportSlotRepository } from "../../repositories/trace-export-slot.repository.ts";
+import { TraceExportBoundsService } from "../trace-export-bounds.service.ts";
 
 const FREE_TIER_ORG = "org-free";
 const ENTERPRISE_TIER_ORG = "org-enterprise";
@@ -48,7 +45,7 @@ function windowLimiter() {
 function slotStore() {
   const held = new Map<string, string>();
   const claimCalls: [string, string, number][] = [];
-  const store: TraceExportSlotStore = {
+  const store: TraceExportSlotRepository = {
     claim: (key, value, expirySeconds) => {
       claimCalls.push([key, value, expirySeconds]);
       if (held.has(key)) return Promise.resolve(false);
@@ -84,7 +81,7 @@ function harness(tier: "free" | "enterprise" = "free") {
         Promise.resolve(tier === "free" ? FREE_TIER_ORG : ENTERPRISE_TIER_ORG),
     } as Pick<ProjectApi, "getOrganizationId">,
     rateLimiter: limiter,
-    redis: store,
+    slots: store,
   });
 
   return { service, used, claimCalls };
@@ -181,59 +178,6 @@ describe("TraceExportBoundsService", () => {
       await first.release();
       await service.acquireExportSlot({ projectId: "project-1", exportId: "export-3" });
       expect(claimCalls[3]?.[0]).toBe("trace-export:slot:project-1:0");
-    });
-  });
-});
-
-describe("TraceExportBoundsService.createOverRedis", () => {
-  describe("given a free key", () => {
-    it("claims it as SET key value EX seconds NX with the crash-safety TTL", async () => {
-      const setCalls: Parameters<TraceExportSlotSet>[] = [];
-      const set: TraceExportSlotSet = (...args) => {
-        setCalls.push(args);
-
-        return Promise.resolve("OK");
-      };
-      const service = TraceExportBoundsService.createOverRedis({
-        entitlement: {
-          requestBound: () => Promise.resolve(2),
-        } as Pick<EntitlementApi, "requestBound">,
-        projects: {
-          getOrganizationId: () => Promise.resolve(FREE_TIER_ORG),
-        } as Pick<ProjectApi, "getOrganizationId">,
-        rateLimiter: windowLimiter().limiter,
-        redis: { set, del: async () => 1 },
-      });
-
-      await service.acquireExportSlot({ projectId: "project-1", exportId: "export-1" });
-
-      expect(setCalls[0]).toEqual(["trace-export:slot:project-1:0", "export-1", "EX", 600, "NX"]);
-    });
-  });
-
-  describe("given a held key", () => {
-    it("moves to the next slot index on the NX refusal", async () => {
-      const setCalls: Parameters<TraceExportSlotSet>[] = [];
-      const set: TraceExportSlotSet = (...args) => {
-        setCalls.push(args);
-
-        return Promise.resolve(setCalls.length === 1 ? null : "OK");
-      };
-      const service = TraceExportBoundsService.createOverRedis({
-        entitlement: {
-          requestBound: () => Promise.resolve(2),
-        } as Pick<EntitlementApi, "requestBound">,
-        projects: {
-          getOrganizationId: () => Promise.resolve(FREE_TIER_ORG),
-        } as Pick<ProjectApi, "getOrganizationId">,
-        rateLimiter: windowLimiter().limiter,
-        redis: { set, del: async () => 1 },
-      });
-
-      await expect(
-        service.acquireExportSlot({ projectId: "project-1", exportId: "export-1" }),
-      ).resolves.toMatchObject({ release: expect.any(Function) });
-      expect(setCalls).toHaveLength(2);
     });
   });
 });

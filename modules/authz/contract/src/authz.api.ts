@@ -2,6 +2,7 @@ import { moduleApi } from "@langwatch/kernel/module-api";
 import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
+import type { RoleBindingRest } from "./authz-rest.schemas.ts";
 import type * as authzScopeLineageModule from "./authz-scope-lineage.ts";
 import type {
   AuthzAdmissionScope,
@@ -179,6 +180,8 @@ export interface AuthzApi {
   deleteRole(args: Commands.AuthzDeleteRoleInput): Promise<Commands.AuthzDeleteRoleOutput>;
   createBinding(args: Binding.AuthzCreateBindingInput): Promise<Binding.AuthzCreateBindingOutput>;
   updateBinding(args: Binding.AuthzUpdateBindingInput): Promise<Binding.AuthzCreateBindingOutput>;
+  /** `PATCH /role-bindings/:id`: the update, read back as the list reports it. */
+  updateRoleBinding(args: Binding.AuthzUpdateBindingInput): Promise<RoleBindingRest>;
   deleteBinding(
     args: Binding.AuthzDeleteBindingInput,
   ): Promise<Binding.AuthzBindingMutationSuccess>;

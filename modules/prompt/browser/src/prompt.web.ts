@@ -25,4 +25,10 @@ export const promptWeb = defineWebModule("prompt")
         default: (await import("./ui/sections/prompt-list-drawer.tsx")).PromptListDrawer,
       }),
     },
+    promptEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/prompts/prompt-editor-drawer.tsx"))
+          .PromptEditorDrawer,
+      }),
+    },
   });

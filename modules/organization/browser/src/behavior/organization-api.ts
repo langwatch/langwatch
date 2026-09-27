@@ -773,6 +773,22 @@ export type OrganizationApiMap = {
       mutation: { input: { organizationId: string; joinRequestId: string }; output: unknown };
     };
   };
+  /** Billing's seat expansion, borrowed until a capability offers it; mounted on SaaS. */
+  subscription: {
+    addTeamMemberOrEvents: {
+      mutation: {
+        input: {
+          organizationId: string;
+          plan: string;
+          upgradeMembers: boolean;
+          upgradeTraces: boolean;
+          totalMembers: number;
+          totalTraces: number;
+        };
+        output: unknown;
+      };
+    };
+  };
 };
 
 /**

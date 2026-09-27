@@ -2,11 +2,23 @@ import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhous
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
+import { z } from "zod";
 
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
-import { type FullSpanRow, mapChRowToNormalized } from "./stored-span-row.mapper.ts";
+import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+import { fullSpanRowsSchema, mapChRowToNormalized } from "./stored-span-row.mapper.ts";
 
 const logger = createLogger("langwatch:trace:derivation-span-repository");
+
+/** One flattened `Events.*` tuple, as ClickHouse hands it back. */
+const traceEventRowSchema = z.looseObject({
+  spanId: chString,
+  timestamp: chNumber,
+  name: chString,
+  attributes: chStringMap.nullish(),
+});
+
+const traceEventRowsSchema = z.array(traceEventRowSchema);
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -138,7 +150,7 @@ export class TraceDerivationSpanClickHouseRepository {
         ? ""
         : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query<TraceEventRow>({
+    const result = await client.query({
       query: `
         SELECT
           SpanId AS spanId,
@@ -174,9 +186,9 @@ export class TraceDerivationSpanClickHouseRepository {
       format: "JSONEachRow",
     });
 
-    return (await result.json<TraceEventRow>()).map((row) => ({
+    return traceEventRowsSchema.parse(await result.json()).map((row) => ({
       spanId: row.spanId,
-      timestamp: typeof row.timestamp === "string" ? parseInt(row.timestamp, 10) : row.timestamp,
+      timestamp: row.timestamp,
       name: row.name,
       attributes: row.attributes ?? {},
     }));
@@ -191,7 +203,7 @@ export class TraceDerivationSpanClickHouseRepository {
         ? ""
         : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const client = await this.options.resolveClient(input.tenantId);
-    const result = await client.query<FullSpanRow>({
+    const result = await client.query({
       query: `
         SELECT ${DERIVATION_TRACE_SPAN_SELECT}
         FROM (
@@ -235,16 +247,8 @@ export class TraceDerivationSpanClickHouseRepository {
       format: "JSONEachRow",
     });
 
-    return (await result.json<FullSpanRow>()).map((row) => mapChRowToNormalized(row));
+    return fullSpanRowsSchema.parse(await result.json()).map((row) => mapChRowToNormalized(row));
   }
 }
-
-/** One flattened `Events.*` tuple, as ClickHouse hands it back. */
-type TraceEventRow = {
-  spanId: string;
-  timestamp: number | string;
-  name: string;
-  attributes?: Record<string, string> | null;
-};
 
 export { DERIVATION_EVENT_LIMIT, DERIVATION_SPAN_LIMIT };

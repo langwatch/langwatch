@@ -141,6 +141,12 @@ Feature: Enterprise governance package boundary
     Then the cached resolution is reused and an explicit billable tile overrides it
 
   @unit
+  Scenario: Governance answers whether a coding-assistant source is billed
+    Given an organization whose codex tile opts out of the bundled plan
+    When another module asks whether a source is billed
+    Then codex is billed, and every other source, or any source of another organization, is not
+
+  @unit
   Scenario: Every governance REST family answers from the installed module
     Given the governance module is installed in a process
     When a request arrives on the project-scoped family, the CLI governance plane or a push-mode ingestion receiver

@@ -176,6 +176,7 @@ import type { z } from "zod";
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
+import { RedisTraceExportSlotRepository } from "../repositories/redis/redis.trace-export-slot.repository.ts";
 import { RedisTraceSpanDedupRepository } from "../repositories/redis/redis.trace-span-dedup.repository.ts";
 import type { TraceAttributeSpendRepository } from "../repositories/trace-attribute-spend.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
@@ -246,10 +247,9 @@ import type {
   CollectorCredential,
   CollectorProject,
 } from "../transport/collector.rest.ts";
-import { buildTraceCollaborators } from "./trace-composition.build.ts";
-import { traceDependencies } from "./trace-composition.types.ts";
-import { composeTraceAppDependencies } from "./trace-read.composition.ts";
+import { buildTraceCollaborators, composeTraceAppDependencies } from "./trace-composition.build.ts";
 import {
+  traceDependencies,
   type TraceProcessingPipelineDefinition,
   type TraceSpanIngest,
   type TraceLegacyRead,
@@ -583,7 +583,8 @@ export interface TraceAppDependencies {
     sessionGroups: TracesSessionGroupsReader;
     spans: TracesSpanReader;
     summary: TraceSummaryReader;
-    tree: TraceTreeService;
+    /** Absent where no ClickHouse was composed; each tree read then refuses by name. */
+    tree?: TraceTreeService | undefined;
     logRecords: TraceLogRecordReader;
     canonicalisation: TraceCanonicalisationService;
     /** Reviewer corrections applied over a captured trace at read time. */
@@ -728,11 +729,11 @@ export class TraceApp implements TraceApi, CollectorApp {
         ...input.dependencies,
         repositories: input.repositories,
         requestBounds: input.dependencies.plans,
-        exportBounds: TraceExportBoundsService.createOverRedis({
+        exportBounds: TraceExportBoundsService.create({
           entitlement: input.dependencies.plans,
           projects: input.dependencies.projects,
           rateLimiter: input.members.rateLimiter,
-          redis: input.members.redis,
+          slots: RedisTraceExportSlotRepository.create({ connection: input.members.redis }),
         }),
         presence: input.dependencies.presence,
         shareReadLimiter: input.members.rateLimiter,
@@ -943,7 +944,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number> {
-    return this.#dependencies.traces.tree.resolveIngestWaitTimeout(input);
+    return this.#getTree().resolveIngestWaitTimeout(input);
   }
 
   formatSpansDigest(input: { spans: Span[] }): Promise<string> {
@@ -1039,13 +1040,13 @@ export class TraceApp implements TraceApi, CollectorApp {
   getEvaluationSpans(
     input: traceContractModule.EvaluationTraceReadInput,
   ): Promise<EvaluationTraceSpan[]> {
-    return this.#dependencies.traces.tree.getEvaluationSpans(input);
+    return this.#getTree().getEvaluationSpans(input);
   }
 
   getEvaluationEvents(
     input: traceContractModule.EvaluationTraceReadInput,
   ): Promise<EvaluationTraceEvent[]> {
-    return this.#dependencies.traces.tree.getEvaluationEvents(input);
+    return this.#getTree().getEvaluationEvents(input);
   }
 
   async listTraces(input: TraceListTracesInput): Promise<TracesForProjectResult> {
@@ -2206,48 +2207,57 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   // -------------------------------------------------------------------------
+  #getTree(): TraceTreeService {
+    const tree = this.#dependencies.traces.tree;
+    if (!tree) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace tree read");
+    }
+
+    return tree;
+  }
+
   // The span tree
   // -------------------------------------------------------------------------
 
   /** One page of the span tree, in `(startTimeMs, spanId)` order. */
   readSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage> {
-    return this.#dependencies.traces.tree.getSpanTreePage(input);
+    return this.#getTree().getSpanTreePage(input);
   }
 
   /** The tree nodes of a live trace whose row version is newer than a mark. */
   readSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
-    return this.#dependencies.traces.tree.getSpanTreeDelta(input);
+    return this.#getTree().getSpanTreeDelta(input);
   }
 
   /** The canonical trace record, closed under payload-parity review. */
   getById(input: TraceByIdInput): Promise<TraceRecord> {
-    return this.#dependencies.traces.tree.getById(input);
+    return this.#getTree().getById(input);
   }
 
   getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
-    return this.#dependencies.traces.tree.getFullRecord(input);
+    return this.#getTree().getFullRecord(input);
   }
 
   getFullThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
-    return this.#dependencies.traces.tree.getFullThread(input);
+    return this.#getTree().getFullThread(input);
   }
 
   deriveEvents(input: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
-    return this.#dependencies.traces.tree.deriveEvents(input);
+    return this.#getTree().deriveEvents(input);
   }
 
   /** The query-language field catalogue an AI composer's prompt is grounded on. */
   buildQueryFieldCatalogue(input: TraceQueryFieldCatalogueInput): Promise<string> {
-    return this.#dependencies.traces.tree.buildQueryFieldCatalogue(input);
+    return this.#getTree().buildQueryFieldCatalogue(input);
   }
 
   classifyQuery(input: TraceQueryClassificationInput): TraceQueryClassification {
-    return this.#dependencies.traces.tree.classifyQuery(input);
+    return this.#getTree().classifyQuery(input);
   }
 
   /** A polling read: absent summaries and disabled projections both read as null. */
   findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
-    return this.#dependencies.traces.tree.findSummary(input);
+    return this.#getTree().findSummary(input);
   }
 
   readModelUsageStats(input: {

@@ -1,11 +1,11 @@
-/** Minimal ClickHouse client primitive accepted by the composition adapter. */
+/** Minimal ClickHouse client primitive; rows arrive unknown and each caller parses its own. */
 export interface TraceClickHouseClient {
-  query<Row>(input: {
+  query(input: {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: Record<string, string>;
-  }): Promise<{ json<T = Row>(): Promise<T[]> }>;
+  }): Promise<{ json(): Promise<unknown[]> }>;
 }
 
 export interface TraceClickHouseWriteClient extends TraceClickHouseClient {

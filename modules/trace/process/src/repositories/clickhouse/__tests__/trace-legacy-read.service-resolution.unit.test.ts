@@ -15,6 +15,7 @@ import { TraceIOExtractionService } from "../../../services/trace-io-extraction.
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import type { ResolveTraceSpansFn } from "../../trace-legacy-read.repository.ts";
 import type * as traceLegacyReadRepositoryModule from "../trace-legacy-read.repository.ts";
+import { traceSummaryRow } from "./support/trace-summary-row.support.ts";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — mock only the CH SQL boundary
@@ -65,7 +66,7 @@ const fullOutput = "The full 50 KB output value that was offloaded to event_log"
 
 /** Minimal trace-summary row as returned by ClickHouse. */
 function makeSummaryRow(traceId: string) {
-  return {
+  return traceSummaryRow({
     ts_TraceId: traceId,
     ts_SpanCount: 1,
     ts_TotalDurationMs: 100,
@@ -92,7 +93,7 @@ function makeSummaryRow(traceId: string) {
     ts_OccurredAt: Date.now(),
     ts_CreatedAt: Date.now(),
     ts_UpdatedAt: Date.now(),
-  };
+  });
 }
 
 /** Minimal span row with an eventref attribute for langwatch.output. */

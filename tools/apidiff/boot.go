@@ -38,7 +38,7 @@ const (
 	// throwawayCredentialsSecret matches the cipher's 32-bytes-of-hex rule.
 	// Both instances share it; each hashes and verifies its own seeded keys
 	// under the same value, also injected as API_KEY_PEPPER below — the
-	// branch's storage-seed and modules/api-key/contract's config.ts read
+	// branch's storage-seed task and modules/api-key/contract's config.ts read
 	// the pepper under that name, not this one.
 	throwawayCredentialsSecret = "0000000000000000000000000000000000000000000000000000000000000000"
 	throwawayNextAuthSecret    = "apidiff-throwaway-nextauth-secret"

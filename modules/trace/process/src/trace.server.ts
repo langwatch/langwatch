@@ -4,7 +4,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import {
   composeTraceLegacyRead,
   type TraceLegacyReadCompositionOptions,
-} from "./app/trace-read.composition.ts";
+} from "./app/trace-composition.build.ts";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
@@ -26,7 +26,7 @@ import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 
 /** The process-owned collaborators needed to construct the Trace application once. */
-export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
+export type { TraceInfrastructure } from "./app/trace.members.ts";
 
 /**
  * The durable ADR-022 claim-check reader alone, over a composition root's own tenant-keyed
@@ -54,7 +54,7 @@ export function createTraceLegacyRead(
 /**
  * Canonical Trace server feature installer and application factory. The
  * registry selects the Postgres-backed `editOverlay`; TraceApp does not
- * yet take it from `setup.repositories` — see app/trace-read.composition.ts.
+ * yet take it from `setup.repositories` — see app/trace-composition.build.ts.
  */
 export const traceServer = defineServerModule("trace")
   .withRepositories(traceRepositories)

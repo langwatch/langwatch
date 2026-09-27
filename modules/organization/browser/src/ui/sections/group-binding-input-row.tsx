@@ -1,8 +1,17 @@
-import { Badge, Box, Button, createListCollection, HStack, Input, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  createListCollection,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+} from "@chakra-ui/react";
 import { teamUserRoleSchema } from "@langwatch/authz-contract";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Select } from "@langwatch/design-system/select";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 
 import { api } from "../../behavior/organization-api.ts";
@@ -576,5 +585,89 @@ export function AddBindingForm({
         })
       }
     />
+  );
+}
+
+export type BindingRowShape = {
+  role: string;
+  customRoleName?: string | null;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+  scopeName?: string | null;
+};
+
+export function toggled({ set, id }: { set: ReadonlySet<string>; id: string }): Set<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+export function DirectBindingRow({
+  binding,
+  markedForRemoval,
+  removable,
+  onToggle,
+}: {
+  binding: BindingRowShape;
+  markedForRemoval: boolean;
+  removable: boolean;
+  onToggle: () => void;
+}) {
+  const strike = markedForRemoval ? "line-through" : undefined;
+  return (
+    <HStack
+      px={3}
+      py={2}
+      bg="bg.muted"
+      borderRadius="md"
+      fontSize="sm"
+      opacity={markedForRemoval ? 0.4 : 1}
+      transition="opacity 0.15s"
+    >
+      <Badge colorPalette={roleBadgeColor(binding.role)} size="sm" textDecoration={strike}>
+        {binding.customRoleName ?? binding.role}
+      </Badge>
+      <Text color="fg.muted">on</Text>
+      <Badge colorPalette="purple" size="sm" textDecoration={strike}>
+        {scopeTypeLabel(binding.scopeType)} {binding.scopeName ?? binding.scopeId}
+      </Badge>
+      <Spacer />
+      {removable && (
+        <Button
+          size="xs"
+          variant="ghost"
+          color={markedForRemoval ? "blue.500" : "fg.muted"}
+          aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
+          onClick={onToggle}
+        >
+          <X size={14} />
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+export function StagedBindingRow({
+  binding,
+  onUndo,
+}: {
+  binding: PendingBinding;
+  onUndo: () => void;
+}) {
+  return (
+    <HStack px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm" opacity={0.7}>
+      <Badge colorPalette={roleBadgeColor(binding.role)} size="sm">
+        {binding.customRoleName ?? binding.role}
+      </Badge>
+      <Text color="fg.muted">on</Text>
+      <Badge colorPalette="purple" size="sm">
+        {scopeTypeLabel(binding.scopeType)} {binding.scopeName ?? binding.scopeId}
+      </Badge>
+      <Spacer />
+      <Button size="xs" variant="ghost" color="fg.muted" aria-label="Undo add" onClick={onUndo}>
+        <X size={14} />
+      </Button>
+    </HStack>
   );
 }

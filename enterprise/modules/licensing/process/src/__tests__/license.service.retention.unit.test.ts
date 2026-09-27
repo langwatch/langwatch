@@ -7,7 +7,7 @@ import {
   type StoredLicense,
 } from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
-import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "../testing.ts";
+import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "./testing.ts";
 
 const ORGANIZATION_ID = "org_123";
 const RETENTION_CATEGORIES = ["traces", "scenarios", "experiments"] as const;

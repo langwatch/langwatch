@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import type { Actor } from "@langwatch/actor";
 import {
   SurfaceBlankSecretError,
@@ -9,6 +11,7 @@ import {
 import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import {
   answerApiFailure,
+  apiRootPaths,
   composeApiApplication,
   HttpMux,
   BrowserBundle,
@@ -100,7 +103,12 @@ class ApiSurface {
       ? SessionReader.create({
           verify: composeSessionVerification({
             sessions: BetterAuthBrowserSessionTransportAdapter.create({
-              api: { getSession: (input) => auth.tryVerifyBrowserSession(input) },
+              api: {
+                getSession: async (input) => {
+                  const verification = await auth.verifyBrowserSession(input);
+                  return verification.kind === "verified" ? verification.verified : null;
+                },
+              },
             }),
             auth,
           }),
@@ -232,6 +240,8 @@ class ApiSurface {
       .use(ClientAddress.fromTrustedProxies({ addresses: composition.trustedProxies }))
       .use(SecurityHeaders.strict({ production: composition.production }))
       .route("/api", api, { onFailure: answerApiFailure });
+    for (const path of apiRootPaths(api))
+      mux.route(path, api, { onFailure: answerApiFailure, exact: true });
     for (const document of selected.documents)
       mux.route(document.path, FramedDocument.create(document));
     return mux.route("/", page).handler;
@@ -455,6 +465,17 @@ class ApiSurface {
   }
 }
 
+/** Constant-time, so how long a refusal takes says nothing about how much of it matched. */
+function sameSecret({ presented, configured }: { presented: string; configured: string }): boolean {
+  const presentedBytes = Buffer.from(presented);
+  const configuredBytes = Buffer.from(configured);
+
+  return (
+    presentedBytes.length === configuredBytes.length &&
+    timingSafeEqual(presentedBytes, configuredBytes)
+  );
+}
+
 export function bearerDoor(options: { name: string; token: string | undefined }): RestIdentity {
   const { name, token } = options;
   const admit = (request: Request): RestCaller => {
@@ -463,7 +484,7 @@ export function bearerDoor(options: { name: string; token: string | undefined })
     if (configured === "") throw new SurfaceBlankSecretError(name);
     const header = request.headers.get("authorization") ?? "";
     const presented = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : header;
-    if (presented !== configured) throw new SurfaceUnverifiedError(name);
+    if (!sameSecret({ presented, configured })) throw new SurfaceUnverifiedError(name);
     return { actor: null, scope: null, internal: { type: "internalSecret", secretName: name } };
   };
 

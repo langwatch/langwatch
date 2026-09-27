@@ -1,3 +1,5 @@
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   type CodingAgentSessionLookupInput,
   type TranscriptLogRecord,
@@ -35,14 +37,17 @@ import {
   type CodingAgentReceivedSpan,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
 
 import {
   type CodingAgentProcessingPipeline,
@@ -60,18 +65,20 @@ import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts"
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
+import { GovernanceCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
+import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
+import { CodingAgentScopePermissionsService } from "../services/coding-agent-scope-permissions.service.ts";
+import { CodingAgentViewerVisibilityService } from "../services/coding-agent-viewer-visibility.service.ts";
 import {
   type CodingAgentSessionService,
   CodingAgentFeatureService,
 } from "../services/coding-agent.service.ts";
 import { ModelCatalogCostEstimatorService } from "../services/model-catalog-cost-estimator.service.ts";
 import type {
-  CodingAgentBillingPolicy,
-  CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,
-  CodingAgentScopePermissions,
+  CodingAgentViewerVisibilityReader,
 } from "./coding-agent.members.ts";
 
 /**
@@ -116,52 +123,19 @@ export interface CodingAgentScopeMembers {
   }): Promise<CodingAgentCallerScope>;
 }
 
-/** What one viewer may see of one project: the generated titles travel under content visibility. */
-export type CodingAgentViewerVisibility = Readonly<{
-  canReadCapturedContent: boolean;
-  canSeeCosts: boolean;
-}>;
-
-/** Resolves one viewer's protections over one project; throws when the
- * policy cannot be resolved.
- */
-export interface CodingAgentViewerVisibilityReader {
-  readVisibility(input: {
-    userId: string;
-    projectId: string;
-  }): Promise<CodingAgentViewerVisibility>;
-}
-
-/** Where a read that names people is written down; the application builds the entry. */
-export interface CodingAgentAuditSink {
-  auditLog(entry: {
-    userId: string;
-    organizationId: string;
-    action: string;
-    targetKind: string;
-    targetId: string;
-    args: Record<string, unknown>;
-  }): Promise<void>;
-}
-
-/** What the process composes this feature's application from. */
-export type CodingAgentInfrastructure = Readonly<{
-  billing: CodingAgentBillingPolicy;
-  scopeDirectory: CodingAgentCallerScopeDirectory;
-  scopePermissions: CodingAgentScopePermissions;
-  /** What one viewer may read of one project's captured content and spend. */
-  visibility: CodingAgentViewerVisibilityReader;
-  /** Where a read that names people is written down. */
-  audit: CodingAgentAuditSink;
-  /** Test-only service seam; production composition leaves this absent. */
-  service?: CodingAgentSessionService;
-}>;
+/** What the process composes this feature's application from: nothing, every need is a peer. */
+export type CodingAgentInfrastructure = Readonly<Record<never, never>>;
 
 type CodingAgentDependencies = {
   projects: typeof ProjectApi;
   github: typeof GithubApi;
   traces: typeof TraceApi;
   retention: typeof DataRetentionApi;
+  authz: typeof AuthzApi;
+  organizations: typeof OrganizationApi;
+  users: typeof UserApi;
+  auditLog: typeof AuditLogApi;
+  governance: typeof GovernanceRestApi;
 };
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
@@ -179,24 +153,35 @@ export class CodingAgentApp implements CodingAgentApi {
     traces: TraceApi,
     /** Owns the platform default retention a session's rows are stamped with, read lazily. */
     retention: DataRetentionApi,
+    /** Decides both project cuts of a cross-project read in one batched ask. */
+    authz: AuthzApi,
+    /** Names each personal workspace by its owner. */
+    organizations: OrganizationApi,
+    users: UserApi,
+    /** Where a read that names people is written down. */
+    auditLog: AuditLogApi,
+    /** Decides which coding-assistant sources a bundled plan covers. */
+    governance: GovernanceRestApi,
   };
 
-  static create({ members, dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
-    const service =
-      members.service ??
-      CodingAgentFeatureService.create({
-        sessions: repositories.sessions,
-        traceSessions: repositories.traceSessions,
-        metricSeries: repositories.metricSeries,
-        sessionEvents: repositories.sessionEvents,
-        github: dependencies.github,
-        projects: dependencies.projects,
-        billing: members.billing,
-        clock: SystemCodingAgentClockService.create(),
-      });
+  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
+    const service = CodingAgentFeatureService.create({
+      sessions: repositories.sessions,
+      traceSessions: repositories.traceSessions,
+      metricSeries: repositories.metricSeries,
+      sessionEvents: repositories.sessionEvents,
+      github: dependencies.github,
+      projects: dependencies.projects,
+      billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
+      clock: SystemCodingAgentClockService.create(),
+    });
     const scopeService = CodingAgentCallerScopeService.create({
-      directory: members.scopeDirectory,
-      permissions: members.scopePermissions,
+      directory: CodingAgentScopeDirectoryService.create({
+        projects: dependencies.projects,
+        organizations: dependencies.organizations,
+        users: dependencies.users,
+      }),
+      permissions: CodingAgentScopePermissionsService.create({ authz: dependencies.authz }),
     });
     const scope: CodingAgentScopeMembers = {
       findOrganizationForProject: async (projectId: string) => {
@@ -226,7 +211,8 @@ export class CodingAgentApp implements CodingAgentApi {
       github: dependencies.github,
       traces: dependencies.traces,
       scope,
-      members,
+      visibility: CodingAgentViewerVisibilityService.create({ traces: dependencies.traces }),
+      auditLog: dependencies.auditLog,
       processing,
       commands,
     });
@@ -249,7 +235,7 @@ export class CodingAgentApp implements CodingAgentApi {
   readonly #traces: TraceApi;
   readonly #scope: CodingAgentScopeMembers;
   readonly #visibility: CodingAgentViewerVisibilityReader;
-  readonly #audit: CodingAgentAuditSink;
+  readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #processing: CodingAgentProcessingPipeline;
   readonly #commands: CodingAgentCommandDispatcherService;
 
@@ -258,7 +244,8 @@ export class CodingAgentApp implements CodingAgentApi {
     github,
     traces,
     scope,
-    members,
+    visibility,
+    auditLog,
     processing,
     commands,
   }: {
@@ -266,7 +253,8 @@ export class CodingAgentApp implements CodingAgentApi {
     github: GithubApi;
     traces: TraceApi;
     scope: CodingAgentScopeMembers;
-    members: CodingAgentInfrastructure;
+    visibility: CodingAgentViewerVisibilityReader;
+    auditLog: Pick<AuditLogApi, "record">;
     processing: CodingAgentProcessingPipeline;
     commands: CodingAgentCommandDispatcherService;
   }) {
@@ -274,8 +262,8 @@ export class CodingAgentApp implements CodingAgentApi {
     this.#github = github;
     this.#traces = traces;
     this.#scope = scope;
-    this.#visibility = members.visibility;
-    this.#audit = members.audit;
+    this.#visibility = visibility;
+    this.#auditLog = auditLog;
     this.#processing = processing;
     this.#commands = commands;
   }
@@ -424,7 +412,7 @@ export class CodingAgentApp implements CodingAgentApi {
    * the answer leaves, so a read is never served unrecorded.
    */
   async recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void> {
-    await this.#audit.auditLog({
+    await this.#auditLog.record({
       userId: read.readerUserId,
       organizationId: read.organizationId,
       action: "codingAgents.pullRequestUsage",

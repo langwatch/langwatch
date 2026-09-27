@@ -1,23 +1,64 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
-import { describe, expect, it, vi } from "vitest";
+import type {
+  QueueSimulationRunInput,
+  ResolvedScenarioRunParametersForScenario,
+  ScenarioApi,
+} from "@langwatch/scenario-contract";
+import type { StartSuiteRunCommandData } from "@langwatch/suite-contract";
+import { describe, expect, it } from "vitest";
 
-import type { SuiteRunCommands } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
-class Commands implements SuiteRunCommands {
-  readonly startSuiteRun = vi.fn().mockResolvedValue(undefined);
-  readonly queueSimulationRun = vi.fn().mockResolvedValue(undefined);
+type Resolve = ScenarioApi["resolveRunParametersForScenarios"];
+
+const resolveGold: Resolve = async () => [
+  {
+    scenarioId: "scenario_1",
+    parameters: { tier: "gold" },
+    secretParameters: {},
+    scenarioVersion: 3,
+  },
+];
+
+/** Every scenario resolves with no values. */
+function resolveNone(ids: string[]): Resolve {
+  return async () =>
+    ids.map((scenarioId): ResolvedScenarioRunParametersForScenario => ({
+      scenarioId,
+      parameters: {},
+      secretParameters: {},
+      scenarioVersion: 1,
+    }));
 }
 
-function scenarios(
-  resolve = vi
-    .fn()
-    .mockResolvedValue([
-      { scenarioId: "scenario_1", parameters: { tier: "gold" }, secretParameters: {} },
-    ]),
-): ScenarioApi {
-  return createApiFixture<ScenarioApi>({ resolveRunParametersForScenarios: resolve });
+/** The suite's start command and the scenario owner, both recording what they were handed. */
+function harness(
+  options: {
+    resolve?: Resolve;
+    /** Refuses the queueing of these scenario run positions (0-based, in dispatch order). */
+    refuseAt?: number[];
+  } = {},
+) {
+  const started: StartSuiteRunCommandData[] = [];
+  const queued: QueueSimulationRunInput[] = [];
+  let dispatched = 0;
+  const service = SuiteExecutionService.create({
+    commands: {
+      startSuiteRun: async (data) => {
+        started.push(data);
+      },
+    },
+    scenarios: createApiFixture<ScenarioApi>({
+      resolveRunParametersForScenarios: options.resolve ?? resolveGold,
+      queueSimulationRun: async (input) => {
+        const position = dispatched++;
+        if (options.refuseAt?.includes(position)) throw new Error("queue unavailable");
+        queued.push(input);
+      },
+    }),
+  });
+
+  return { service, started, queued };
 }
 
 type ExecuteInput = Parameters<SuiteExecutionService["execute"]>[0];
@@ -39,7 +80,7 @@ function input(overrides: Partial<ExecuteInput> = {}): ExecuteInput {
         parameters: {},
       },
     ],
-    activeTargets: [{ type: "http" as const, referenceId: "agent_1" }],
+    activeTargets: [{ type: "http", referenceId: "agent_1" }],
     repeatCount: 1,
     skippedArchived: { scenarios: [], targets: [] },
     idempotencyKey: "request_1",
@@ -48,78 +89,67 @@ function input(overrides: Partial<ExecuteInput> = {}): ExecuteInput {
 }
 
 describe("SuiteExecutionService", () => {
-  it("resolves parameters then emits the stable Suite and Simulation command payloads", async () => {
-    const commands = new Commands();
-    const service = SuiteExecutionService.create({
-      commands,
-      scenarios: scenarios(),
-    });
+  it("starts the suite run, then hands each run to the scenario owner with its resolved values", async () => {
+    const { service, started, queued } = harness();
+
     await service.execute(input());
-    expect(commands.startSuiteRun).toHaveBeenCalledWith(
+
+    expect(started).toEqual([
       expect.objectContaining({
         scenarioSetId: "__internal__suite_1__suite",
         total: 1,
         idempotencyKey: "request_1",
       }),
-    );
-    expect(commands.queueSimulationRun).toHaveBeenCalledWith(
+    ]);
+    expect(queued).toEqual([
       expect.objectContaining({
+        projectId: "project_1",
         scenarioId: "scenario_1",
-        scenarioSetId: "__internal__suite_1__suite",
-        metadata: expect.objectContaining({ parameters: { tier: "gold" } }),
+        setId: "__internal__suite_1__suite",
+        name: "Refund flow",
+        scenarioVersion: 3,
+        target: { type: "http", referenceId: "agent_1" },
+        parameters: { tier: "gold" },
       }),
-    );
+    ]);
   });
 
-  it("does not emit durable commands when Scenario parameter resolution refuses the run", async () => {
-    const commands = new Commands();
-    const service = SuiteExecutionService.create({
-      commands,
-      scenarios: scenarios(vi.fn().mockRejectedValue({ code: "scenario_parameter_unknown" })),
+  it("queues nothing when Scenario parameter resolution refuses the run", async () => {
+    const { service, started, queued } = harness({
+      resolve: () =>
+        Promise.reject(Object.assign(new Error("refused"), { code: "scenario_parameter_unknown" })),
     });
+
     await expect(service.execute(input())).rejects.toMatchObject({
       code: "scenario_parameter_unknown",
     });
-    expect(commands.startSuiteRun).not.toHaveBeenCalled();
-    expect(commands.queueSimulationRun).not.toHaveBeenCalled();
+    expect(started).toHaveLength(0);
+    expect(queued).toHaveLength(0);
   });
 
-  it("keeps encrypted parameters outside metadata while still scheduling the run", async () => {
-    const commands = new Commands();
-    const service = SuiteExecutionService.create({
-      commands,
-      scenarios: scenarios(
-        vi.fn().mockResolvedValue([
-          {
-            scenarioId: "scenario_1",
-            parameters: { tier: "gold" },
-            secretParameters: { api_token: "encrypted" },
-          },
-        ]),
-      ),
-    });
-    await service.execute(input());
-    expect(commands.queueSimulationRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        secretParameters: { api_token: "encrypted" },
-        metadata: expect.objectContaining({
+  it("hands the encrypted values to the scenario owner apart from the plain ones", async () => {
+    const { service, queued } = harness({
+      resolve: async () => [
+        {
+          scenarioId: "scenario_1",
           parameters: { tier: "gold" },
-          secretParameterNames: ["api_token"],
-        }),
-      }),
-    );
+          secretParameters: { api_token: "encrypted" },
+          scenarioVersion: 3,
+        },
+      ],
+    });
+
+    await service.execute(input());
+
+    expect(queued[0]).toMatchObject({
+      parameters: { tier: "gold" },
+      secretParameters: { api_token: "encrypted" },
+    });
   });
 
   it("preserves client identities and fans out the filtered work", async () => {
-    const commands = new Commands();
-    const service = SuiteExecutionService.create({
-      commands,
-      scenarios: scenarios(
-        vi.fn().mockResolvedValue([
-          { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
-          { scenarioId: "scenario_2", parameters: {}, secretParameters: {} },
-        ]),
-      ),
+    const { service, started, queued } = harness({
+      resolve: resolveNone(["scenario_1", "scenario_2"]),
     });
 
     await service.execute(
@@ -135,128 +165,95 @@ describe("SuiteExecutionService", () => {
       }),
     );
 
-    expect(commands.startSuiteRun).toHaveBeenCalledWith(
-      expect.objectContaining({
-        batchRunId: "client_batch_1",
-        idempotencyKey: "client-idempotency-key",
-        scenarioIds: ["scenario_1", "scenario_2"],
-        targetIds: ["agent_1", "prompt_1"],
-      }),
-    );
-    expect(commands.queueSimulationRun).toHaveBeenCalledTimes(12);
+    expect(started[0]).toMatchObject({
+      batchRunId: "client_batch_1",
+      idempotencyKey: "client-idempotency-key",
+      scenarioIds: ["scenario_1", "scenario_2"],
+      targetIds: ["agent_1", "prompt_1"],
+    });
+    expect(queued).toHaveLength(12);
   });
 
-  it("returns scheduled work when one durable queue dispatch fails", async () => {
-    const commands = new Commands();
-    commands.queueSimulationRun.mockRejectedValueOnce(new Error("queue unavailable"));
-    const service = SuiteExecutionService.create({
-      commands,
-      scenarios: scenarios(),
-    });
+  describe("given the queue refuses one run of the batch", () => {
+    /** @scenario "A run the queue refused is left out of the batch it answers" */
+    it("answers the runs that were queued and leaves the refused one out", async () => {
+      const { service, queued } = harness({
+        resolve: resolveNone(["scenario_1", "scenario_2"]),
+        refuseAt: [0],
+      });
 
-    await expect(service.execute(input())).resolves.toMatchObject({
-      batchRunId: expect.any(String),
-      jobCount: 1,
+      const result = await service.execute(
+        input({
+          activeScenarioIds: ["scenario_1", "scenario_2"],
+          scenarioNames: new Map([
+            ["scenario_1", "Refund flow"],
+            ["scenario_2", "Login flow"],
+          ]),
+        }),
+      );
+
+      expect(result.jobCount).toBe(1);
+      expect(result.items.map((item) => item.scenarioId)).toEqual(["scenario_2"]);
+      expect(queued.map((run) => run.scenarioId)).toEqual(["scenario_2"]);
     });
-    expect(commands.queueSimulationRun).toHaveBeenCalledTimes(1);
   });
 
   describe("given a run plan configured with both simulation models", () => {
     /** @scenario "A run records the simulation models its plan was configured with" */
-    it("records the simulator and judge models it was configured with", async () => {
-      const commands = new Commands();
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(),
-      });
+    it("hands both models to every queued run", async () => {
+      const { service, queued } = harness();
 
       await service.execute(
         input({ simulatorModel: "openai/gpt-5-mini", judgeModel: "openai/gpt-5" }),
       );
 
-      expect(commands.queueSimulationRun).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({
-            langwatch: expect.objectContaining({
-              simulatorModel: "openai/gpt-5-mini",
-              judgeModel: "openai/gpt-5",
-            }),
-          }),
-        }),
-      );
+      expect(queued[0]).toMatchObject({
+        simulatorModel: "openai/gpt-5-mini",
+        judgeModel: "openai/gpt-5",
+      });
     });
   });
 
   describe("given a run plan that names neither model", () => {
     /** @scenario "A run plan that names no model records no model" */
-    it("records neither model", async () => {
-      const commands = new Commands();
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(),
-      });
+    it("hands no model", async () => {
+      const { service, queued } = harness();
 
       await service.execute(input());
 
-      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
-        metadata: { langwatch: Record<string, unknown> };
-      };
-      expect(call.metadata.langwatch).not.toHaveProperty("simulatorModel");
-      expect(call.metadata.langwatch).not.toHaveProperty("judgeModel");
+      expect(queued[0]?.simulatorModel ?? null).toBeNull();
+      expect(queued[0]?.judgeModel ?? null).toBeNull();
     });
   });
 
   describe("given a run plan that names only the judge model", () => {
     /** @scenario "A plan that names only one of the two models records only that one" */
-    it("records only the judge model", async () => {
-      const commands = new Commands();
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(),
-      });
+    it("hands only the judge model", async () => {
+      const { service, queued } = harness();
 
       await service.execute(input({ judgeModel: "openai/gpt-5" }));
 
-      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
-        metadata: { langwatch: Record<string, unknown> };
-      };
-      expect(call.metadata.langwatch.judgeModel).toBe("openai/gpt-5");
-      expect(call.metadata.langwatch).not.toHaveProperty("simulatorModel");
+      expect(queued[0]?.judgeModel).toBe("openai/gpt-5");
+      expect(queued[0]?.simulatorModel ?? null).toBeNull();
     });
   });
 
   describe("given a run started by no person", () => {
     /** @scenario "A run started by no person records no actor" */
-    it("records no actor", async () => {
-      const commands = new Commands();
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(),
-      });
+    it("hands no actor", async () => {
+      const { service, queued } = harness();
 
       await service.execute(input());
 
-      const call = commands.queueSimulationRun.mock.calls[0]?.[0] as {
-        metadata: { langwatch: Record<string, unknown> };
-      };
-      expect(call.metadata.langwatch).not.toHaveProperty("actorId");
-      expect(call.metadata.langwatch).not.toHaveProperty("actorLabel");
+      expect(queued[0]?.actor).toBeUndefined();
     });
   });
 
   describe("given a run plan with three scenarios and two targets", () => {
     /** @scenario "Every run of a batch carries the note stamped at queue time" */
-    it("stamps the same note on every one of the six queued runs", async () => {
-      const commands = new Commands();
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(
-          vi.fn().mockResolvedValue([
-            { scenarioId: "scenario_1", parameters: {}, secretParameters: {} },
-            { scenarioId: "scenario_2", parameters: {}, secretParameters: {} },
-            { scenarioId: "scenario_3", parameters: {}, secretParameters: {} },
-          ]),
-        ),
+    it("hands the same note to every one of the six queued runs", async () => {
+      const { service, queued } = harness({
+        resolve: resolveNone(["scenario_1", "scenario_2", "scenario_3"]),
       });
 
       await service.execute(
@@ -270,29 +267,27 @@ describe("SuiteExecutionService", () => {
         }),
       );
 
-      expect(commands.queueSimulationRun).toHaveBeenCalledTimes(6);
-      for (const call of commands.queueSimulationRun.mock.calls) {
-        expect((call[0] as { metadata: { note?: string } }).metadata.note).toBe(
-          "switched judge to the stricter criterion",
-        );
-      }
+      expect(queued).toHaveLength(6);
+      expect(queued.map((run) => run.note)).toEqual(
+        Array.from({ length: 6 }, () => "switched judge to the stricter criterion"),
+      );
     });
   });
 
   describe("given a target that carries overrides of its own", () => {
     /** @scenario "Each target receives its own parameters merged over the run parameters" */
     it("merges them over the run's values, the target winning", async () => {
-      const commands = new Commands();
       // Echoes back the merged `values` it was resolved with, so the
       // assertions below can tell which target a call resolved for.
-      const resolve = vi
-        .fn()
-        .mockImplementation(async ({ values }: { values: Record<string, unknown> }) => [
-          { scenarioId: "scenario_1", parameters: values, secretParameters: {} },
-        ]);
-      const service = SuiteExecutionService.create({
-        commands,
-        scenarios: scenarios(resolve),
+      const { service, queued } = harness({
+        resolve: async ({ values }) => [
+          {
+            scenarioId: "scenario_1",
+            parameters: values ?? {},
+            secretParameters: {},
+            scenarioVersion: 3,
+          },
+        ],
       });
 
       await service.execute(
@@ -305,13 +300,10 @@ describe("SuiteExecutionService", () => {
         }),
       );
 
-      expect(commands.queueSimulationRun).toHaveBeenCalledTimes(2);
-      const [unmerged, merged] = commands.queueSimulationRun.mock.calls.map(
-        (call) =>
-          (call[0] as { metadata: { parameters?: Record<string, unknown> } }).metadata.parameters,
-      );
-      expect(unmerged).toEqual({ region: "us-east" });
-      expect(merged).toEqual({ region: "us-east", account_tier: "silver" });
+      expect(queued.map((run) => run.parameters)).toEqual([
+        { region: "us-east" },
+        { region: "us-east", account_tier: "silver" },
+      ]);
     });
   });
 });

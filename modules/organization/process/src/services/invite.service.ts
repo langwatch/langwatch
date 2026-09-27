@@ -266,6 +266,18 @@ export class InviteService {
     return this.lifecycle.createPaymentPendingInvite(params);
   }
 
+  createPaymentPendingInvites(
+    params: Parameters<InviteLifecycleService["createPaymentPendingInvites"]>[0],
+  ): Promise<void> {
+    return this.lifecycle.createPaymentPendingInvites(params);
+  }
+
+  cancelPaymentPendingInvites(
+    params: Parameters<InviteLifecycleService["cancelPaymentPendingInvites"]>[0],
+  ): Promise<void> {
+    return this.lifecycle.cancelPaymentPendingInvites(params);
+  }
+
   async approvePaymentPendingInvites(
     params: Parameters<InviteLifecycleService["approvePaymentPendingInvites"]>[0],
   ): ReturnType<InviteLifecycleService["approvePaymentPendingInvites"]> {

@@ -14,6 +14,7 @@ import type { NurturingProfileRepository } from "./nurturing-profile.repository.
 import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
 import type { ProjectActiveDayRepository } from "./project-active-day.repository.ts";
 import type { ScenarioRunMilestoneClaimRepository } from "./scenario-run-milestone-claim.repository.ts";
+import type { SeatEventSubscriptionRepository } from "./seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRepository } from "./subscription.repository.ts";
 import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
 
@@ -32,6 +33,7 @@ export interface BillingRepositories {
   readonly projectActiveDays: ProjectActiveDayRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
   readonly scenarioRunMilestoneClaims: ScenarioRunMilestoneClaimRepository;
+  readonly seatEventSubscriptions: SeatEventSubscriptionRepository;
   readonly subscriptions: BillingSubscriptionRepository;
   readonly tenantOrganizations: TenantOrganizationRepository;
   readonly webhookOrganizations: BillingWebhookOrganizationRepository;

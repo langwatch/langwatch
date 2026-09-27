@@ -69,10 +69,9 @@ export class JoinRequestLedgerStore implements JoinRequestLedger {
     this.stagedSender =
       deps.stagedSender ??
       ((command) =>
-        deps.eventing.tryPipelineCommand({
-          pipeline: JOIN_REQUEST_PIPELINE_NAME,
-          command,
-        }));
+        deps.eventing
+          .resolvePipelineCommand({ pipeline: JOIN_REQUEST_PIPELINE_NAME, command })
+          .then((resolved) => (resolved.kind === "registered" ? resolved.sender : null)));
     this.convergence = deps.convergence ?? {
       timeoutMs: JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
       pollMs: JOIN_REQUEST_CONVERGENCE_POLL_MS,

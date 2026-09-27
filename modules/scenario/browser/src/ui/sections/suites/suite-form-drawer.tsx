@@ -29,6 +29,7 @@ import {
   useSuiteForm,
 } from "@langwatch/suite-browser-kit";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
@@ -37,7 +38,6 @@ import { api } from "../../../behavior/scenario-api.ts";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { PromptTargetMappingSection } from "../../elements/suites/prompt-target-mapping-section.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
 import { SimulationModelSelect } from "../scenarios/simulation-model-select.tsx";
@@ -73,12 +73,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
-  /** Tracks whether the current save is a "save and run" flow.
-   *  When true, the mutation-level onSuccess skips its normal
-   *  close/toast behavior — the per-call onSuccess handles it. */
-  const saveAndRunRef = useRef(false);
   const params = useDrawerParams();
-  const utils = api.useUtils();
 
   const isOpen = drawerOpen("suiteEditor");
   const suiteId = params.suiteId;
@@ -138,144 +133,16 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const { form } = suiteForm;
   const errors = form.formState.errors;
 
-  /**
-   * Puts a taken-name rejection under the field the server is complaining about — the
-   * same input the user is looking at — and reports whether it did, so the caller can
-   * skip the toast.
-   */
-  const applyNameTakenToForm = (error: unknown): boolean => {
-    if (readHandledError(error)?.code !== "suite_name_taken") return false;
-    form.setError(
-      "name",
-      { type: "server", message: describeError({ error }) },
-      { shouldFocus: true },
-    );
-    return true;
-  };
-
-  // -- Mutations --
-
-  const createMutation = api.suites.create.useMutation({
-    onSuccess: (data) => {
-      void utils.suites.getAll.invalidate();
-      // When saveAndRunRef is set, the per-call onSuccess handles
-      // navigation, drawer close, and running — skip the default path.
-      if (saveAndRunRef.current) {
-        saveAndRunRef.current = false;
-        return;
-      }
-      onSaved?.(data);
-      closeDrawer();
-      toaster.create({
-        title: "Run plan created",
-        type: "success",
-      });
-    },
-    onError: (err) => {
-      saveAndRunRef.current = false;
-      if (applyNameTakenToForm(err)) return;
-      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true })) return;
-      showErrorToast({ error: err, fallbackTitle: "Couldn't create run plan" });
-    },
+  const { handleSave, handleRunNow, isSaving } = useSuiteSave({
+    projectId: project?.id,
+    suite: isEditMode ? (suite ?? null) : null,
+    form,
+    onSaved,
+    onRunRequested,
+    closeDrawer,
+    openDrawer,
+    idempotencyKey,
   });
-
-  const updateMutation = api.suites.update.useMutation({
-    onSuccess: (data) => {
-      void utils.suites.getAll.invalidate();
-      void utils.suites.getById.invalidate({
-        projectId: project?.id ?? "",
-        id: data.id,
-      });
-      // When saveAndRunRef is set, the per-call onSuccess handles
-      // navigation, drawer close, and running — skip the default path.
-      if (saveAndRunRef.current) {
-        saveAndRunRef.current = false;
-        return;
-      }
-      onSaved?.(data);
-      closeDrawer();
-      toaster.create({
-        title: "Run plan updated",
-        type: "success",
-      });
-    },
-    onError: (err) => {
-      saveAndRunRef.current = false;
-      if (applyNameTakenToForm(err)) return;
-      if (applyHandledErrorToForm({ error: err, form, hasFormErrorSlot: true })) return;
-      showErrorToast({ error: err, fallbackTitle: "Couldn't update run plan" });
-    },
-  });
-
-  const { runMutation } = useSuiteRunMutation({
-    onEditSuite: (suiteId) => {
-      openDrawer("suiteEditor", { urlParams: { suiteId } });
-    },
-  });
-
-  const submitForm = useCallback(
-    (data: SuiteFormData) => {
-      if (!project) return;
-      const payload = buildMutationPayload(data, project.id);
-
-      if (isEditMode && suite) {
-        updateMutation.mutate({ ...payload, id: suite.id });
-      } else {
-        createMutation.mutate(payload);
-      }
-    },
-    [project, isEditMode, suite, createMutation, updateMutation],
-  );
-
-  const submitAndRun = useCallback(
-    (data: SuiteFormData) => {
-      if (!project) return;
-      const payload = buildMutationPayload(data, project.id);
-
-      const onSuccess = (saved: SimulationSuite) => {
-        saveAndRunRef.current = false;
-        closeDrawer();
-        if (onRunRequested) {
-          onRunRequested(saved);
-        } else {
-          runMutation.mutate({
-            projectId: payload.projectId,
-            id: saved.id,
-            idempotencyKey,
-          });
-        }
-      };
-
-      if (isEditMode && suite) {
-        saveAndRunRef.current = true;
-        updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
-      } else {
-        saveAndRunRef.current = true;
-        createMutation.mutate(payload, { onSuccess });
-      }
-    },
-    [
-      project,
-      isEditMode,
-      suite,
-      createMutation,
-      updateMutation,
-      closeDrawer,
-      onRunRequested,
-      runMutation,
-      idempotencyKey,
-    ],
-  );
-
-  const handleSave = useCallback(() => {
-    void form.handleSubmit(submitForm)();
-  }, [form, submitForm]);
-
-  const handleRunNow = useCallback(() => {
-    void form.handleSubmit(submitAndRun)();
-  }, [form, submitAndRun]);
-
-  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <>
@@ -518,4 +385,176 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
       })}
     </>
   );
+}
+
+type SuiteForm = ReturnType<typeof useSuiteForm>["form"];
+
+/** Create or update the run plan, and optionally run it once it is saved. */
+function useSuiteSave({
+  projectId,
+  suite,
+  form,
+  onSaved,
+  onRunRequested,
+  closeDrawer,
+  openDrawer,
+  idempotencyKey,
+}: {
+  projectId: string | undefined;
+  /** The plan being edited; null when creating one. */
+  suite: SimulationSuite | null;
+  form: SuiteForm;
+  onSaved: ((suite: SimulationSuite) => void) | undefined;
+  onRunRequested: ((suite: SimulationSuite) => void) | undefined;
+  closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
+  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
+  idempotencyKey: string;
+}) {
+  const utils = api.useUtils();
+  /** True during a "save and run": the per-call onSuccess then owns closing and running. */
+  const saveAndRunRef = useRef(false);
+  const refuse = (err: unknown, fallbackTitle: string) => {
+    saveAndRunRef.current = false;
+    rejectSave({ error: err, form, fallbackTitle });
+  };
+
+  // -- Mutations --
+
+  const createMutation = api.suites.create.useMutation({
+    onSuccess: (data) => {
+      void utils.suites.getAll.invalidate();
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
+      onSaved?.(data);
+      closeDrawer();
+      toaster.create({
+        title: "Run plan created",
+        type: "success",
+      });
+    },
+    onError: (err) => refuse(err, "Couldn't create run plan"),
+  });
+
+  const updateMutation = api.suites.update.useMutation({
+    onSuccess: (data) => {
+      void utils.suites.getAll.invalidate();
+      void utils.suites.getById.invalidate({
+        projectId: projectId ?? "",
+        id: data.id,
+      });
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
+      onSaved?.(data);
+      closeDrawer();
+      toaster.create({
+        title: "Run plan updated",
+        type: "success",
+      });
+    },
+    onError: (err) => refuse(err, "Couldn't update run plan"),
+  });
+
+  const { runMutation } = useSuiteRunMutation({
+    onEditSuite: (suiteId) => {
+      openDrawer("suiteEditor", { urlParams: { suiteId } });
+    },
+  });
+
+  const submitForm = useCallback(
+    (data: SuiteFormData) => {
+      if (!projectId) return;
+      const payload = buildMutationPayload(data, projectId);
+
+      if (suite) {
+        updateMutation.mutate({ ...payload, id: suite.id });
+      } else {
+        createMutation.mutate(payload);
+      }
+    },
+    [projectId, suite, createMutation, updateMutation],
+  );
+
+  const submitAndRun = useCallback(
+    (data: SuiteFormData) => {
+      if (!projectId) return;
+      const payload = buildMutationPayload(data, projectId);
+
+      const onSuccess = (saved: SimulationSuite) => {
+        saveAndRunRef.current = false;
+        closeDrawer();
+        if (onRunRequested) {
+          onRunRequested(saved);
+        } else {
+          runMutation.mutate({
+            projectId: payload.projectId,
+            id: saved.id,
+            idempotencyKey,
+          });
+        }
+      };
+
+      if (suite) {
+        saveAndRunRef.current = true;
+        updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
+      } else {
+        saveAndRunRef.current = true;
+        createMutation.mutate(payload, { onSuccess });
+      }
+    },
+    [
+      projectId,
+      suite,
+      createMutation,
+      updateMutation,
+      closeDrawer,
+      onRunRequested,
+      runMutation,
+      idempotencyKey,
+    ],
+  );
+
+  const handleSave = useCallback(() => {
+    void form.handleSubmit(submitForm)();
+  }, [form, submitForm]);
+
+  const handleRunNow = useCallback(() => {
+    void form.handleSubmit(submitAndRun)();
+  }, [form, submitAndRun]);
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
+  return { handleSave, handleRunNow, isSaving };
+}
+
+/**
+ * Puts a taken-name rejection under the name field, else any handled field errors under their
+ * fields, else a toast.
+ */
+function rejectSave({
+  error,
+  form,
+  fallbackTitle,
+}: {
+  error: unknown;
+  form: SuiteForm;
+  fallbackTitle: string;
+}): void {
+  if (readHandledError(error)?.code === "suite_name_taken") {
+    form.setError(
+      "name",
+      { type: "server", message: describeError({ error }) },
+      { shouldFocus: true },
+    );
+    return;
+  }
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle });
 }

@@ -1,6 +1,7 @@
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
 
 import {
   type LogRecordStorageRepository,
@@ -8,6 +9,20 @@ import {
   TRACE_LOG_READ_CAP,
 } from "../log-record-storage.repository.ts";
 import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
+import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+
+const logRecordRowSchema = z.looseObject({
+  TraceId: chString,
+  SpanId: chString,
+  TimeUnixMs: chNumber,
+  Body: chString.nullable(),
+  Attributes: chStringMap,
+  ResourceAttributes: chStringMap,
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+});
+
+const logRecordRowsSchema = z.array(logRecordRowSchema);
 
 const TABLE_NAME = "stored_log_records" as const;
 
@@ -105,16 +120,7 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
           format: "JSONEachRow",
         });
 
-        const rows = (await result.json()) as {
-          TraceId: string;
-          SpanId: string;
-          TimeUnixMs: number;
-          Body: string | null;
-          Attributes: Record<string, string>;
-          ResourceAttributes: Record<string, string>;
-          ScopeName: string | null;
-          ScopeVersion: string | null;
-        }[];
+        const rows = logRecordRowsSchema.parse(await result.json());
 
         if (rows.length > limit) {
           rows.length = limit;

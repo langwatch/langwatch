@@ -61,7 +61,7 @@ export {
 // Application-facing Langy orchestration primitives. These are deliberately
 // exported from the package root so the application never couples itself to
 // the feature's private repository/service layout.
-export type { LangyToolFrame } from "./services/langy-cli-envelope.service.ts";
+export type { LangyToolFrame } from "./rules/langy-cli-envelope.rules.ts";
 export type { LangyConversationProcessingEvent } from "./eventing/langy-conversation-state.projection.ts";
 export {
   computeFrameMac,

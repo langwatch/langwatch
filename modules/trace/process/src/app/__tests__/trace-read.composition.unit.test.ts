@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 
-import { TraceReadFullIo } from "../trace-read.composition.ts";
+import { TraceReadFullIo } from "../trace-composition.build.ts";
 
 function capturedSpan(spanAttributes: NormalizedSpan["spanAttributes"]): NormalizedSpan {
   return {

@@ -8,22 +8,21 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
+/** An evaluator as this table holds one: off a query, so its instants are strings. */
+import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
   type DatasetTableColumnType as ColumnType,
   datasetTableCss,
   useTableKeyboardNavigation,
   VirtualizedTableBody,
 } from "@langwatch/dataset-browser-kit";
-import { AddOrEditDatasetDrawer } from "@langwatch/dataset-browser/dataset-drawer";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { isRowEmpty, isCellInExecution, toComparisonConfig } from "@langwatch/experiment-contract";
+import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
-import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import {
   type ColumnDef,
-  type ColumnSizingState,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
@@ -32,20 +31,11 @@ import {
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-/** An evaluator as this table holds one: off a query, so its instants are strings. */
-type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
-  newTargetId,
-  connectedTargetFields,
-  isRowEmpty,
-  isCellInExecution,
-  toComparisonConfig,
-} from "@langwatch/experiment-contract";
-import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
-import { nowInstant } from "@langwatch/time";
-
-import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
+  AddOrEditDatasetDrawer,
+  DatasetRecordSync,
+} from "../../../behavior/experiments-v3/lent-dataset-capabilities.tsx";
+import { useDatasetSyncProps } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
 import { useSyncPromptEditorMappings } from "../../../behavior/experiments-v3/use-evaluation-mappings.ts";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";
@@ -56,27 +46,31 @@ import {
 } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
 import { useDatasetSelectionLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useSyncWorkflowTargetFields } from "../../../behavior/experiments-v3/use-sync-workflow-target-fields.ts";
+import { useWorkbenchColumnSizing } from "../../../behavior/experiments-v3/use-workbench-column-sizing.ts";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
 import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
 import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
-import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters.ts";
-import {
-  buildInputsFromBodyTemplate,
-  convertHttpComponentConfig,
-} from "../../../model/experiments-v3/http-agent-utils.ts";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
 import {
-  type PromptOutputField,
-  toTargetOutputFields,
-} from "../../../model/experiments-v3/target-output-fields.ts";
+  type EvaluatorWithFields,
+  evaluatorTargetConfig,
+  comparisonContextOf,
+  type PickedPrompt,
+  reloadedComparisonContext,
+  promptTargetConfig,
+  type SavedPrompt,
+  savedAgentTargetConfig,
+  savedPromptTargetConfig,
+  workbenchEvaluatorConfig,
+} from "../../../model/experiments-v3/target-configs.ts";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
+  EvaluationsV3State,
   DatasetReference,
   EvaluationResults,
   EvaluatorConfig,
-  FieldMapping,
   TableMeta,
   TableRowData,
   TargetConfig,
@@ -86,6 +80,13 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../../model/experiments-v3/types.ts";
+import {
+  CHECKBOX_WIDTH_PX,
+  COMPARISON_COL_DEFAULT_PCT,
+  COMPARISON_COL_MIN_PCT,
+  DATASET_COL_DEFAULT_PCT,
+  TARGET_COL_DEFAULT_PCT,
+} from "../../../model/experiments-v3/workbench-column-widths.ts";
 import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
 import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
 import { ComparisonCell } from "./comparison-cell.tsx";
@@ -102,27 +103,23 @@ import {
 // Max rows for expanded mode (disable virtualization above this)
 const MAX_ROWS_FOR_FIT_MODE = 100;
 
-// Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
-const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
-const DATASET_COL_DEFAULT_PCT = 16;
-const TARGET_COL_DEFAULT_PCT = 20;
-/**
- * A comparison column carries strictly more header content than a prompt/agent column —
- * its name, the "<winner> wins" verdict, latency, cost AND the run button all share one
- * row, where a prompt column has only name + summary + run.
- */
-const COMPARISON_COL_DEFAULT_PCT = 24;
-const COMPARISON_COL_MIN_PCT = 14;
+/** The picker a switched target reopens, by the kind of target it replaces. */
+const SWITCH_DRAWERS = {
+  prompt: "promptList",
+  agent: "agentList",
+  evaluator: "evaluatorList",
+} as const satisfies Record<Exclude<TargetConfig["type"], "workflow">, string>;
 
-/**
- * Type for the config stored in DB Evaluator.config field.
- * The DB stores evaluatorType and settings - inputs are derived from
- * the evaluator definition at runtime, not stored in DB.
- */
-type EvaluatorDbConfig = {
-  evaluatorType?: EvaluatorTypes;
-  settings?: Record<string, unknown>;
-};
+/** Collects a not-yet-created prompt's mapping edits into `pending.current`, keyed by input. */
+const recordPendingMapping =
+  (pending: { current: Record<string, UIFieldMapping> }) =>
+  (identifier: string, mapping: UIFieldMapping | undefined): void => {
+    if (mapping) {
+      pending.current[identifier] = mapping;
+    } else {
+      delete pending.current[identifier];
+    }
+  };
 
 // A comparison evaluator is ready to render its own result column once at least two
 // variants are picked and the golden-field requirement is satisfied (see
@@ -134,6 +131,40 @@ export const isComparisonConfigured = (e: EvaluatorConfig) => {
     comparison.variants.filter(Boolean).length >= 2 &&
     isGoldenFieldSatisfied(comparison)
   );
+};
+
+/**
+ * One target's cell in one row: its output, evaluator chips, error (the engine's
+ * raw string plus the code its copy is read from), trace and duration. It shows a
+ * skeleton while executing until its output or error arrives.
+ */
+const targetCellOf = ({
+  target,
+  evaluators,
+  results,
+  rowIndex,
+}: {
+  target: TargetConfig;
+  evaluators: EvaluatorConfig[];
+  results: EvaluationsV3State["results"];
+  rowIndex: number;
+}) => {
+  const metadata = results.targetMetadata?.[target.id]?.[rowIndex];
+  const output = results.targetOutputs[target.id]?.[rowIndex];
+  const error = results.errors[target.id]?.[rowIndex];
+  return {
+    output: output ?? null,
+    evaluators: buildTargetEvaluatorsForRow({ target, evaluators, results, rowIndex }),
+    error: error ?? null,
+    domainError: metadata?.domainError,
+    isLoading:
+      results.executingCells !== undefined &&
+      isCellInExecution(results.executingCells, rowIndex, target.id) &&
+      output === undefined &&
+      error === undefined,
+    traceId: metadata?.traceId ?? null,
+    duration: metadata?.duration ?? null,
+  };
 };
 
 /**
@@ -202,7 +233,7 @@ export function EvaluationsV3Table({
   const trpcUtils = api.useUtils();
 
   // Sync saved dataset changes to DB
-  useDatasetSync();
+  const datasetSyncProps = useDatasetSyncProps();
 
   // Re-read what each workflow agent target reads and produces from its
   // workflow, which owns those fields and can change without the workbench.
@@ -402,75 +433,7 @@ export function EvaluationsV3Table({
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
     (savedAgent: AgentWithFields) => {
-      const config = savedAgent.config as Record<string, unknown>;
-
-      // A connected agent runs in the customer's own process, so the column
-      // reads the turn to send and the parameters the function declares
-      // rather than the fields of a node.
-      if (savedAgent.type === "connected") {
-        const { inputs, outputs } = connectedTargetFields(savedAgent.config);
-        addOrReplaceTarget({
-          id: newTargetId(),
-          type: "agent",
-          agentType: "connected",
-          dbAgentId: savedAgent.id,
-          inputs,
-          outputs,
-          mappings: {},
-        });
-        closeDrawer();
-        return;
-      }
-
-      // Check if this is an HTTP agent by looking at savedAgent.type or config structure
-      const isHttpAgent =
-        savedAgent.type === "http" ||
-        (config.url !== undefined && config.bodyTemplate !== undefined);
-
-      // Convert the saved agent to TargetConfig format (agent type)
-      // For HTTP agents, extract inputs from bodyTemplate and store httpConfig
-      // For code/workflow agents, use config.inputs directly
-      let targetInputs: Field[];
-      let httpConfig: TargetConfig["httpConfig"];
-
-      if (isHttpAgent) {
-        // HTTP agent: extract inputs from body template
-        const httpComponentConfig = config as HttpComponentConfig;
-        targetInputs = buildInputsFromBodyTemplate(httpComponentConfig.bodyTemplate);
-        httpConfig = convertHttpComponentConfig(httpComponentConfig);
-
-        // Fall back to default input if bodyTemplate has no variables
-        if (targetInputs.length === 0) {
-          targetInputs = [{ identifier: "input", type: "str" }];
-        }
-      } else {
-        // Code/workflow agent: use config.inputs directly
-        targetInputs = (config.inputs as TargetConfig["inputs"]) ?? [
-          { identifier: "input", type: "str" },
-        ];
-      }
-
-      // A workflow agent keeps no inputs or outputs on its own config, its Studio graph
-      // does, and the API derives them from that graph.
-      const { inputFields, outputFields, fieldsResolved } = savedAgent;
-      const derivationIsFinal = savedAgent.type === "workflow" && fieldsResolved;
-
-      const targetConfig: TargetConfig = {
-        id: newTargetId(),
-        type: "agent", // This is a target of type "agent" (code/workflow/http)
-        agentType: isHttpAgent ? "http" : (savedAgent.type as TargetConfig["agentType"]),
-        dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: derivationIsFinal || inputFields.length > 0 ? inputFields : targetInputs,
-        outputs:
-          derivationIsFinal || outputFields.length > 0
-            ? outputFields
-            : ((config.outputs as TargetConfig["outputs"]) ?? [
-                { identifier: "output", type: "str" },
-              ]),
-        mappings: {},
-        httpConfig, // Only set for HTTP agents
-      };
-      addOrReplaceTarget(targetConfig);
+      addOrReplaceTarget(savedAgentTargetConfig(savedAgent));
       closeDrawer();
     },
     [addOrReplaceTarget, closeDrawer],
@@ -480,64 +443,15 @@ export function EvaluationsV3Table({
   // Uses pre-computed fields from the API (includes type and optional flag)
   const handleSelectEvaluatorAsTarget = useCallback(
     (evaluator: EvaluatorWithFields) => {
-      // Convert EvaluatorField[] to Field[] for TargetConfig
-      const inputs: Field[] = evaluator.fields.map((field) => ({
-        identifier: field.identifier,
-        type: field.type as Field["type"],
-        ...(field.optional && { optional: true }),
-      }));
-
-      // Use pre-computed output fields from the API
-      // For workflow evaluators, these come from the End node inputs
-      // For built-in evaluators, these are the standard passed/score/label/details
-      const outputs: Field[] = evaluator.outputFields.map((field) => ({
-        identifier: field.identifier,
-        type: field.type as Field["type"],
-      }));
-
-      // Comparison column-target: seed an empty config so the column owns its variants/goldenField
-      // selections — this is the discriminator the Run flow and validation use to render the clean
-      // ComparisonConfigForm instead of the generic per-row mappings UI.
-      const config = (evaluator.config ?? null) as {
-        evaluatorType?: string;
-        settings?: { has_golden_answer?: boolean };
-      } | null;
-      const isComparisonJudge =
-        config?.evaluatorType === COMPARISON_EVALUATOR_TYPE ||
-        config?.evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
-
-      // An existing comparison evaluator's saved `has_golden_answer` setting is the
-      // source of truth for whether it needs a golden answer at all.
-      const savedHasGoldenAnswer = config?.settings?.has_golden_answer;
-      const comparison = pendingComparisonRef.current ?? {
-        variants: [],
-        hasGoldenAnswer: savedHasGoldenAnswer ?? false,
-        goldenField: "",
-        includeMetrics: [],
-        randomizeOrder: true,
-      };
-
-      const targetConfig: TargetConfig = {
-        id: newTargetId(),
-        type: "evaluator",
-        targetEvaluatorId: evaluator.id,
-        inputs,
-        outputs,
-        mappings: {},
-        ...(isComparisonJudge && { comparison }),
-      };
+      const { targetConfig, needsConfiguration } = evaluatorTargetConfig({
+        evaluator,
+        pendingComparison: pendingComparisonRef.current,
+      });
       pendingComparisonRef.current = null;
       addOrReplaceTarget(targetConfig);
-
-      // A comparison needs two variants before it can judge anything. Picking
-      // one straight off the evaluator list leaves it unconfigured, so open the
-      // ComparisonConfigForm rather than dropping the user back on a column
-      // that cannot run. The Comparison card collects the variants up front, so
-      // that flow arrives here already configured and the drawer just closes.
-      const needsConfiguration = comparison.variants.length < 2;
-      if (isComparisonJudge && needsConfiguration) {
-        // openTargetEditor reads fresh store state, so the target we just added
-        // is visible when the drawer opens.
+      // An unconfigured comparison opens its form (openTargetEditor reads fresh
+      // store state, so the new column is there); anything else just closes.
+      if (needsConfiguration) {
         void openTargetEditor(targetConfig);
       } else {
         closeDrawer();
@@ -549,30 +463,9 @@ export function EvaluationsV3Table({
   // Handler for when a prompt is selected from the drawer
   // Adds the target and immediately opens the prompt editor for configuration
   const handleSelectPrompt = useCallback(
-    (prompt: {
-      id: string;
-      name: string;
-      version?: number;
-      versionId?: string;
-      inputs?: { identifier: string; type: string }[];
-      outputs?: PromptOutputField[];
-    }) => {
-      // Convert prompt to TargetConfig format (prompt type)
-      // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const targetId = newTargetId();
-      const targetConfig: TargetConfig = {
-        id: targetId,
-        type: "prompt",
-        promptId: prompt.id,
-        promptVersionId: prompt.versionId,
-        promptVersionNumber: prompt.version,
-        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
-          identifier: i.identifier,
-          type: i.type as Field["type"],
-        })),
-        outputs: toTargetOutputFields(prompt.outputs ?? [{ identifier: "output", type: "str" }]),
-        mappings: {},
-      };
+    (prompt: PickedPrompt) => {
+      const targetConfig = promptTargetConfig(prompt);
+      const targetId = targetConfig.id;
       // addOrReplaceTarget will auto-map based on the real inputs (and handle switch mode)
       addOrReplaceTarget(targetConfig);
 
@@ -617,31 +510,10 @@ export function EvaluationsV3Table({
    */
   const addEvaluatorToWorkbench = useCallback(
     (evaluator: EvaluatorWithFields): string | null => {
-      // Extract evaluator config from the Prisma evaluator
-      const config = evaluator.config as EvaluatorDbConfig | null;
-
-      // Check if this evaluator is already added globally
+      // Already on the workbench: reuse it rather than silently doing nothing.
       const existingEvaluator = evaluators.find((e) => e.dbEvaluatorId === evaluator.id);
-
-      // If already exists, reuse it instead of silently no-op'ing.
-      if (existingEvaluator) {
-        return existingEvaluator.id;
-      }
-
-      // Create a new EvaluatorConfig from the evaluator
-      // Note: settings are NOT stored in workbench state - always fetched fresh from DB
-      const evaluatorConfig: EvaluatorConfig = {
-        id: `evaluator_${nowInstant().epochMilliseconds}`,
-        evaluatorType: (config?.evaluatorType ??
-          "custom/unknown") as EvaluatorConfig["evaluatorType"],
-        inputs: evaluator.fields.map((field) => ({
-          identifier: field.identifier,
-          type: field.type as Field["type"],
-          ...(field.optional && { optional: true }),
-        })),
-        mappings: {},
-        dbEvaluatorId: evaluator.id,
-      };
+      if (existingEvaluator) return existingEvaluator.id;
+      const evaluatorConfig = workbenchEvaluatorConfig(evaluator);
 
       // Add the evaluator globally (applies to all targets automatically).
       // The store runs auto-inference on add, so any auto-mappable fields are
@@ -807,13 +679,7 @@ export function EvaluationsV3Table({
           // Pass available sources via complexProps
           availableSources,
           inputMappings: {},
-          onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-            if (mapping) {
-              pendingMappingsRef.current[identifier] = mapping;
-            } else {
-              delete pendingMappingsRef.current[identifier];
-            }
-          },
+          onInputMappingsChange: recordPendingMapping(pendingMappingsRef),
         },
         // Reset stack to prevent back button when creating new prompts
         { resetStack: true },
@@ -827,55 +693,17 @@ export function EvaluationsV3Table({
       onCreateNew: openNewPromptEditor,
     });
     setFlowCallbacks("promptEditor", {
-      // For new prompts: track mappings in pendingMappingsRef, then apply when saved
-      onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
-        if (mapping) {
-          pendingMappingsRef.current[identifier] = mapping;
-        } else {
-          delete pendingMappingsRef.current[identifier];
-        }
-      },
-      onSave: (savedPrompt: {
-        id: string;
-        versionId: string;
-        version: number;
-        inputs?: { identifier: string; type: string }[];
-        outputs?: { identifier: string; type: string }[];
-      }) => {
-        // Apply pending mappings when creating the target
-        const storeMappings: Record<string, FieldMapping> = {};
-        for (const [key, uiMapping] of Object.entries(pendingMappingsRef.current)) {
-          storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
-        }
-
-        // Get current state for active dataset
-        const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
-
-        // Create target with pending mappings
-        const targetId = newTargetId();
-        const targetConfig: TargetConfig = {
-          id: targetId,
-          type: "prompt",
-          promptId: savedPrompt.id,
-          promptVersionId: savedPrompt.versionId,
-          promptVersionNumber: savedPrompt.version,
-          inputs: (savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]).map(
-            (i: { identifier: string; type: string }) => ({
-              identifier: i.identifier,
-              type: i.type as Field["type"],
-            }),
-          ),
-          outputs: toTargetOutputFields(
-            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }],
-          ),
-          mappings:
-            Object.keys(storeMappings).length > 0
-              ? { [currentActiveDatasetId]: storeMappings }
-              : {},
-        };
-        addOrReplaceTarget(targetConfig);
-
-        // Clear pending mappings
+      // New prompts collect their mappings here, applied when the prompt is saved.
+      onInputMappingsChange: recordPendingMapping(pendingMappingsRef),
+      onSave: (savedPrompt: SavedPrompt) => {
+        addOrReplaceTarget(
+          savedPromptTargetConfig({
+            savedPrompt,
+            pendingMappings: pendingMappingsRef.current,
+            isDatasetSource,
+            activeDatasetId: useEvaluationsV3Store.getState().activeDatasetId,
+          }),
+        );
         pendingMappingsRef.current = {};
       },
     });
@@ -898,15 +726,7 @@ export function EvaluationsV3Table({
     // this makes the creation form show the variant picker and Golden field
     // immediately, matching the edit-mode experience (#5195).
     pendingComparisonRef.current = null;
-    const state = useEvaluationsV3Store.getState();
-    const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
-    const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
-    const datasetColumns = activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
-    const comparisonContext = {
-      targets: variantOptions,
-      datasetColumns,
-      datasetName: activeDs?.name,
-    };
+    const comparisonContext = comparisonContextOf(useEvaluationsV3Store.getState());
 
     // Set up flow callback for when a NEW evaluator is created during the target flow
     // This handles: add comparison > evaluator > create new > category > fill form > create
@@ -952,29 +772,10 @@ export function EvaluationsV3Table({
     )?.onComparisonChange;
     if (alreadyWired) return;
 
-    const state = useEvaluationsV3Store.getState();
-    const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
-    const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
-    const datasetColumns = activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
-    // Edit reload carries the DB evaluator id → re-derive its saved comparison
-    // config (matching the column-header edit flow). A fresh "New Comparison"
-    // (no evaluatorId) leaves initialComparison undefined — a blank form, since
-    // its unsaved in-progress draft was never persisted.
-    const evaluatorId = drawerParams.evaluatorId;
-    const evaluatorMatch = evaluatorId
-      ? state.evaluators.find((e) => e.dbEvaluatorId === evaluatorId)
-      : undefined;
-    const targetMatch = evaluatorId
-      ? state.targets.find((t) => t.targetEvaluatorId === evaluatorId)
-      : undefined;
-    const comparisonSource = evaluatorMatch ?? targetMatch;
-    const initialComparison = comparisonSource ? toComparisonConfig(comparisonSource) : undefined;
-    const comparisonContext = {
-      ...(initialComparison ? { initialComparison } : {}),
-      targets: variantOptions,
-      datasetColumns,
-      datasetName: activeDs?.name,
-    };
+    const { targetMatch, comparisonContext } = reloadedComparisonContext({
+      state: useEvaluationsV3Store.getState(),
+      evaluatorId: drawerParams.evaluatorId,
+    });
 
     // targetMatch means this reload resumed editing an EXISTING comparison column, not
     // the New Comparison add flow.
@@ -1024,14 +825,8 @@ export function EvaluationsV3Table({
         onSelect: handleSelectEvaluatorAsTarget,
       });
 
-      // Open the specific drawer based on target type
-      if (target.type === "prompt") {
-        openDrawer("promptList");
-      } else if (target.type === "agent") {
-        openDrawer("agentList");
-      } else if (target.type === "evaluator") {
-        openDrawer("evaluatorList");
-      }
+      // A workflow target has no picker to reopen.
+      if (target.type !== "workflow") openDrawer(SWITCH_DRAWERS[target.type]);
     },
     [openDrawer, handleSelectPrompt, handleSelectSavedAgent, handleSelectEvaluatorAsTarget],
   );
@@ -1225,31 +1020,7 @@ export function EvaluationsV3Table({
         targets: Object.fromEntries(
           targets.map((target) => [
             target.id,
-            {
-              output: results.targetOutputs[target.id]?.[index] ?? null,
-              // All evaluators apply to all targets
-              evaluators: buildTargetEvaluatorsForRow({
-                target,
-                evaluators,
-                results,
-                rowIndex: index,
-              }),
-              // Error for this target/row: the engine's raw string, plus the
-              // code the cell reads its customer-facing copy from.
-              error: results.errors[target.id]?.[index] ?? null,
-              domainError: results.targetMetadata?.[target.id]?.[index]?.domainError,
-              // Loading if this specific cell is in the executing set AND has no output/error yet
-              // Once target output or error arrives, show it instead of skeleton
-              isLoading:
-                results.executingCells !== undefined &&
-                isCellInExecution(results.executingCells, index, target.id) &&
-                results.targetOutputs[target.id]?.[index] === undefined &&
-                results.errors[target.id]?.[index] === undefined,
-              // Trace ID for viewing the execution trace
-              traceId: results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
-              // Duration/latency for this cell execution
-              duration: results.targetMetadata?.[target.id]?.[index]?.duration ?? null,
-            },
+            targetCellOf({ target, evaluators, results, rowIndex: index }),
           ]),
         ),
       };
@@ -1328,14 +1099,11 @@ export function EvaluationsV3Table({
   // Helper to check if a specific target has cells being executed
   const isTargetExecuting = useCallback(
     (targetId: string): boolean => {
-      if (!results.executingCells) return false;
-      // Check if any cell for this target is in the executing set
-      for (let i = 0; i < rowCount; i++) {
-        if (isCellInExecution(results.executingCells, i, targetId)) {
-          return true;
-        }
-      }
-      return false;
+      const executing = results.executingCells;
+      if (!executing) return false;
+      return Array.from({ length: rowCount }, (_, i) => i).some((i) =>
+        isCellInExecution(executing, i, targetId),
+      );
     },
     [results.executingCells, rowCount],
   );
@@ -1564,165 +1332,27 @@ export function EvaluationsV3Table({
 
   // Column sizing state - stores percentage values (e.g., 16 means 16%)
   // Initialize from store, which also stores percentages
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => ui.columnWidths);
-
-  // Track the table container width for converting pixel deltas to percentages
-  const [containerWidth, setContainerWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1200,
+  const datasetColumnIds = useMemo(() => datasetColumns.map((c) => c.id), [datasetColumns]);
+  const comparisonEvaluatorIds = useMemo(
+    () => stableComparisonEvaluators.map((e) => e.id),
+    [stableComparisonEvaluators],
   );
-
-  // Update container width on resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (tableRef.current?.parentElement) {
-        setContainerWidth(tableRef.current.parentElement.clientWidth);
-      } else {
-        setContainerWidth(window.innerWidth);
-      }
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Sync column sizing changes to store (debounced to avoid excessive updates)
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Track which column is being resized
-  const resizingColumnRef = useRef<string | null>(null);
-  const resizeStartXRef = useRef<number>(0);
-  const resizeStartWidthRef = useRef<number>(0);
-
-  // Single source of truth for a column's default/minimum width, by id and type — every
-  // sizing path reads through this instead of re-deriving "is this a comparison column" on
-  // its own, which is how the comparison sizing previously only applied to rendering.
-  const getDefaultPctForColumn = useCallback(
-    (columnId: string, columnType: string): number => {
-      if (columnType === "dataset") return DATASET_COL_DEFAULT_PCT;
-      if (columnType === "comparison") return COMPARISON_COL_DEFAULT_PCT;
-      if (columnType === "target") {
-        const targetId = columnId.replace(/^target\./, "");
-        return comparisonTargetIds.has(targetId)
-          ? COMPARISON_COL_DEFAULT_PCT
-          : TARGET_COL_DEFAULT_PCT;
-      }
-      return TARGET_COL_DEFAULT_PCT;
-    },
-    [comparisonTargetIds],
-  );
-
-  const getMinPctForColumn = useCallback(
-    (columnId: string, columnType: string): number => {
-      if (columnType === "dataset") return 8;
-      if (columnType === "comparison") return COMPARISON_COL_MIN_PCT;
-      if (columnType === "target") {
-        const targetId = columnId.replace(/^target\./, "");
-        return comparisonTargetIds.has(targetId) ? COMPARISON_COL_MIN_PCT : 10;
-      }
-      return 10;
-    },
-    [comparisonTargetIds],
-  );
-
-  // Custom resize handler - converts pixel movements to percentage changes
-  // This gives us fine-grained control over resize sensitivity
-  const createResizeHandler = useCallback(
-    (columnId: string, columnType: string) => {
-      return (event: React.MouseEvent | React.TouchEvent) => {
-        event.preventDefault();
-
-        const startX = "touches" in event ? event.touches[0]!.clientX : event.clientX;
-
-        // Get current width percentage
-        const currentPct = columnSizing[columnId] ?? getDefaultPctForColumn(columnId, columnType);
-
-        resizingColumnRef.current = columnId;
-        resizeStartXRef.current = startX;
-        resizeStartWidthRef.current = currentPct;
-
-        const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-          const currentX =
-            "touches" in moveEvent ? moveEvent.touches[0]!.clientX : moveEvent.clientX;
-
-          const deltaX = currentX - resizeStartXRef.current;
-
-          // Convert pixel delta to percentage delta based on container width
-          // This ensures consistent resize feel regardless of screen size
-          const deltaPct = (deltaX / containerWidth) * 100;
-
-          // Calculate new width percentage, clamped to this column's own
-          // minimum rather than a flat 5% every column shared regardless of
-          // its declared minSize.
-          const newPct = Math.max(
-            getMinPctForColumn(columnId, columnType),
-            resizeStartWidthRef.current + deltaPct,
-          );
-
-          // Update column sizing state
-          setColumnSizing((prev) => ({
-            ...prev,
-            [columnId]: newPct,
-          }));
-        };
-
-        const handleEnd = () => {
-          resizingColumnRef.current = null;
-
-          // Sync to store after resize ends - use setState callback to get current value
-          if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current);
-          }
-          syncTimeoutRef.current = setTimeout(() => {
-            setColumnSizing((current) => {
-              setColumnWidths(current);
-              return current;
-            });
-          }, 100);
-
-          document.removeEventListener("mousemove", handleMove);
-          document.removeEventListener("mouseup", handleEnd);
-          document.removeEventListener("touchmove", handleMove);
-          document.removeEventListener("touchend", handleEnd);
-        };
-
-        document.addEventListener("mousemove", handleMove);
-        document.addEventListener("mouseup", handleEnd);
-        document.addEventListener("touchmove", handleMove);
-        document.addEventListener("touchend", handleEnd);
-      };
-    },
-    [columnSizing, containerWidth, setColumnWidths, getDefaultPctForColumn, getMinPctForColumn],
-  );
-
-  // Check if a column is currently being resized
-  const isColumnResizing = useCallback(
-    (columnId: string) => resizingColumnRef.current === columnId,
-    [],
-  );
-
-  // Double-click handler to reset column to default width
-  const handleResizeDoubleClick = useCallback(
-    (columnId: string, columnType: string) => {
-      const defaultPct = getDefaultPctForColumn(columnId, columnType);
-
-      setColumnSizing((prev) => ({
-        ...prev,
-        [columnId]: defaultPct,
-      }));
-
-      // Sync to store
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-      syncTimeoutRef.current = setTimeout(() => {
-        setColumnSizing((current) => {
-          setColumnWidths(current);
-          return current;
-        });
-      }, 100);
-    },
-    [setColumnWidths, getDefaultPctForColumn],
-  );
+  const {
+    columnSizing,
+    createResizeHandler,
+    isColumnResizing,
+    handleResizeDoubleClick,
+    totalColumnPercentage,
+    getColumnWidth,
+  } = useWorkbenchColumnSizing({
+    initialWidths: ui.columnWidths,
+    setColumnWidths,
+    tableRef,
+    comparisonTargetIds,
+    datasetColumnIds,
+    targetIds,
+    comparisonEvaluatorIds,
+  });
 
   const table = useReactTable({
     data: rowData,
@@ -1761,64 +1391,6 @@ export function EvaluationsV3Table({
     return () => observer.disconnect();
   }, []);
   const MENU_PLUS_PADDING = 56 + 16;
-
-  // Calculate total percentage for all resizable columns
-  // This allows the table to grow beyond 100% when needed
-  const totalColumnPercentage = useMemo(() => {
-    let total = 0;
-
-    // Sum dataset column percentages. Column IDs here must match the
-    // header IDs resize actually writes to (`dataset.${column.id}` /
-    // `target.${targetId}`, see the columnHelper.accessor calls above) —
-    // a mismatched ID means a resized column's stored width is never
-    // found, so its contribution silently falls back to the default.
-    for (const col of datasetColumns) {
-      const colId = `dataset.${col.id}`;
-      total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
-    }
-
-    // Sum target column percentages
-    for (const target of targets) {
-      const colId = `target.${target.id}`;
-      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "target");
-    }
-
-    // Sum dedicated comparison result column percentages — omitting these left
-    // the table's overall width computed as if they didn't exist, so each
-    // comparison column had to squeeze into whatever sliver of "auto" space
-    // was left over, rendering near-zero-width with its text wrapping one
-    // character per line.
-    for (const compEval of stableComparisonEvaluators) {
-      const colId = `comparison.${compEval.id}`;
-      total += columnSizing[colId] ?? getDefaultPctForColumn(colId, "comparison");
-    }
-
-    return total;
-  }, [datasetColumns, targets, stableComparisonEvaluators, columnSizing, getDefaultPctForColumn]);
-
-  // Get column width as CSS string
-  // Converts stored percentage values to CSS percentage strings
-  const getColumnWidth = useCallback(
-    (columnId: string, columnType: string, isFixedWidth?: boolean): string => {
-      // Checkbox is always fixed pixels
-      if (columnId === "select" || isFixedWidth) {
-        return `${CHECKBOX_WIDTH_PX}px`;
-      }
-
-      // Get stored percentage or use default
-      const storedPct = columnSizing[columnId];
-      if (storedPct) {
-        return `${storedPct}%`;
-      }
-
-      // Use default percentages based on column type.
-      if (columnType === "dataset" || columnType === "target" || columnType === "comparison") {
-        return `${getDefaultPctForColumn(columnId, columnType)}%`;
-      }
-      return "auto";
-    },
-    [columnSizing, getDefaultPctForColumn],
-  );
 
   return (
     <Box
@@ -2038,6 +1610,8 @@ export function EvaluationsV3Table({
         isRunning={isExecutionRunning}
         isAborting={isAborting}
       />
+
+      <DatasetRecordSync {...datasetSyncProps} />
 
       {/* Save as dataset drawer */}
       <AddOrEditDatasetDrawer

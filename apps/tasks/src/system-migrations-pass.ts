@@ -78,8 +78,10 @@ export async function systemMigrationsPass(input: TaskInput): Promise<void> {
       }
     }
     const identity: IdentityEventing = {
-      tryPipelineCommand: async ({ pipeline, command }) =>
-        pipeline === IDENTITY_PIPELINE_NAME ? (commands.get(command) ?? null) : null,
+      resolvePipelineCommand: async ({ pipeline, command }) => {
+        const sender = pipeline === IDENTITY_PIPELINE_NAME ? commands.get(command) : undefined;
+        return sender ? { kind: "registered", sender } : { kind: "unregistered" };
+      },
     };
     const userMigrations = IdentityUserMigrations.create({
       database,

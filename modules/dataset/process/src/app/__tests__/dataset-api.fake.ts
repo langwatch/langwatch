@@ -13,6 +13,8 @@ export function completeDatasetApi(overrides: Partial<DatasetApi> = {}): Dataset
     listDatasets: unused,
     getBySlugOrId: unused,
     findBySlugOrId: unused,
+    findBySlug: unused,
+    createBatchEvaluation: unused,
     getByIds: unused,
     renameDataset: unused,
     updateMapping: unused,

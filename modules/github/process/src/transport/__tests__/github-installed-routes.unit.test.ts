@@ -40,21 +40,24 @@ async function installedGithub(
       project: createApiFixture<ProjectApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => canManage }),
       auth: createApiFixture<AuthApi>({
-        tryVerifyBrowserSession: async ({ headers }) =>
+        verifyBrowserSession: async ({ headers }) =>
           headers.get("cookie") === SESSION_COOKIE
             ? {
-                session: { id: "session-1", expiresAt: new Date(Date.now() + 60_000) },
-                user: { id: signedInAs },
+                kind: "verified",
+                verified: {
+                  session: { id: "session-1", expiresAt: new Date(Date.now() + 60_000) },
+                  user: { id: signedInAs },
+                },
               }
-            : null,
-        tryResolveBrowserSession: async ({ verified }) =>
-          verified
-            ? {
-                user: { id: verified.user.id },
-                expires: verified.session.expiresAt.toISOString(),
-                sessionId: verified.session.id,
-              }
-            : null,
+            : { kind: "anonymous" },
+        resolveBrowserSession: async ({ verified }) => ({
+          kind: "signed_in",
+          session: {
+            user: { id: verified.user.id },
+            expires: verified.session.expiresAt.toISOString(),
+            sessionId: verified.session.id,
+          },
+        }),
       }),
       "audit-log": createApiFixture<AuditLogApi>({}),
       "coding-agent": createApiFixture<CodingAgentApi>({}),

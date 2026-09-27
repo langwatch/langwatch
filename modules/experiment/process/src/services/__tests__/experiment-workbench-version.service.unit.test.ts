@@ -27,6 +27,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
           return { experimentId: "experiment_1", slug: "my-experiment", version: 4 };
         },
       }),
+      workbenchTargetNames: async () => ({}),
     });
 
     const answer = await service.restoreBySlug({
@@ -47,6 +48,7 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
       experiments: createApiFixture<ExperimentService>({
         getWorkbenchState: async () => workbench,
       }),
+      workbenchTargetNames: async () => ({}),
     });
 
     await expect(
@@ -57,5 +59,88 @@ describe("ExperimentWorkbenchVersionService.restoreBySlug", () => {
         actor,
       }),
     ).rejects.toMatchObject({ code: "experiment_version_not_found" });
+  });
+});
+
+const savedState: NonNullable<WorkbenchStateView["state"]> = {
+  name: "My experiment",
+  activeDatasetId: "dataset_1",
+  datasets: [
+    {
+      id: "dataset_1",
+      name: "Inline",
+      type: "inline",
+      columns: [{ id: "input", name: "input", type: "string" }],
+      inline: {
+        columns: [{ id: "input", name: "input", type: "string" }],
+        records: { input: ["hi"] },
+      },
+    },
+  ],
+  evaluators: [],
+  targets: [],
+  results: {
+    runId: "run_1",
+    targetOutputs: {},
+    targetMetadata: {},
+    evaluatorResults: {},
+    errors: {},
+  },
+};
+
+describe("ExperimentWorkbenchVersionService.projectSavedBySlug", () => {
+  it("projects the saved board with its results and the column names the platform resolved", async () => {
+    const named: unknown[] = [];
+    const service = ExperimentWorkbenchVersionService.create({
+      experiments: createApiFixture<ExperimentService>({
+        getWorkbenchState: async () => ({ ...workbench, state: savedState }),
+      }),
+      workbenchTargetNames: async (input) => {
+        named.push(input);
+        return {};
+      },
+    });
+
+    const read = await service.projectSavedBySlug({
+      projectId: "project_1",
+      slug: "my-experiment",
+    });
+
+    expect(read).toMatchObject({ source: "saved", version: 3, name: "My experiment" });
+    expect(read).toHaveProperty("results");
+    expect(named).toStrictEqual([{ projectId: "project_1", targets: [] }]);
+  });
+
+  it("leaves the results out when the agent asks for the board alone", async () => {
+    const service = ExperimentWorkbenchVersionService.create({
+      experiments: createApiFixture<ExperimentService>({
+        getWorkbenchState: async () => ({ ...workbench, state: savedState }),
+      }),
+      workbenchTargetNames: async () => ({}),
+    });
+
+    const read = await service.projectSavedBySlug({
+      projectId: "project_1",
+      slug: "my-experiment",
+      includeResults: false,
+    });
+
+    expect(read).not.toHaveProperty("results");
+  });
+
+  it("answers an experiment with nothing saved yet as an empty board", async () => {
+    const service = ExperimentWorkbenchVersionService.create({
+      experiments: createApiFixture<ExperimentService>({
+        getWorkbenchState: async () => workbench,
+      }),
+      workbenchTargetNames: async () => ({}),
+    });
+
+    const read = await service.projectSavedBySlug({
+      projectId: "project_1",
+      slug: "my-experiment",
+    });
+
+    expect(read).toStrictEqual({ source: "saved", version: 3, state: null });
   });
 });

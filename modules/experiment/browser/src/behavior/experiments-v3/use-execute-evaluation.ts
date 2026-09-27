@@ -2,6 +2,7 @@ import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
+  type CellId,
   type EvaluationV3Event,
   type ExecutionScope,
   UNNAMED_FAILURE,
@@ -10,14 +11,20 @@ import {
 } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import { fetchSSE } from "@langwatch/workflow-browser/fetch-sse";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import {
+  producedRowsOf,
+  resultsAfterRun,
+  resultsBeforePartialRun,
+} from "../../model/experiments-v3/execution/execution-cells.ts";
 import {
   applyEvaluatorResult,
   applyTargetError,
   applyTargetOutput,
 } from "../../model/experiments-v3/execution/results-fold.ts";
+import type { EvaluationsV3Store } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 // ============================================================================
@@ -62,6 +69,341 @@ export type UseExecuteEvaluationReturn = {
 const asHandledEnvelope = (event: { domainError?: SerializedHandledError; traceId?: string }) => ({
   data: { error: event.domainError, traceId: event.traceId },
 });
+
+/** Write one target's output into the store. */
+const writeTargetOutput = ({
+  rowIndex,
+  targetId,
+  output,
+  metadata,
+}: {
+  rowIndex: number;
+  targetId: string;
+  output: unknown;
+  metadata?: { cost?: number; duration?: number; traceId?: string };
+}): void => {
+  useEvaluationsV3Store.setState((state) => ({
+    results: applyTargetOutput({
+      results: state.results,
+      rowIndex,
+      targetId,
+      output,
+      metadata,
+      evaluatorIds: state.evaluators.map((evaluator) => evaluator.id),
+    }),
+  }));
+};
+
+/** Write one target's failure into the store. */
+const writeTargetError = ({
+  rowIndex,
+  targetId,
+  errorMsg,
+  domainError,
+}: {
+  rowIndex: number;
+  targetId: string;
+  errorMsg: string;
+  domainError?: SerializedHandledError;
+}): void => {
+  useEvaluationsV3Store.setState((state) => ({
+    results: applyTargetError({
+      results: state.results,
+      rowIndex,
+      targetId,
+      error: errorMsg,
+      domainError,
+    }),
+  }));
+};
+
+/** Write one evaluator's result into the store. */
+const writeEvaluatorResult = ({
+  rowIndex,
+  targetId,
+  evaluatorId,
+  result,
+}: {
+  rowIndex: number;
+  targetId: string;
+  evaluatorId: string;
+  result: unknown;
+}): void => {
+  useEvaluationsV3Store.setState((state) => ({
+    results: applyEvaluatorResult({
+      results: state.results,
+      rowIndex,
+      targetId,
+      evaluatorId,
+      result,
+    }),
+  }));
+};
+
+/** The hook state an execution's events and failures write to. */
+type ExecutionSink = {
+  setRunId: (runId: string | null) => void;
+  setProgress: (progress: { completed: number; total: number }) => void;
+  addCost: (cost: number) => void;
+  setError: (error: string | null) => void;
+  setStatus: (status: ExecutionStatus) => void;
+  setIsAborting: (isAborting: boolean) => void;
+  setResults: EvaluationsV3Store["setResults"];
+};
+
+type EventOf<Type extends EvaluationV3Event["type"]> = Extract<EvaluationV3Event, { type: Type }>;
+
+/**
+ * A target's result: the code and the engine's raw string side by side when it
+ * failed (the cell shows the registry's copy, never the raw string as headline).
+ */
+const onTargetResult = (event: EventOf<"target_result">, sink: ExecutionSink): void => {
+  if (event.domainError ?? event.error) {
+    writeTargetError({
+      rowIndex: event.rowIndex,
+      targetId: event.targetId,
+      errorMsg: event.error ?? UNNAMED_FAILURE,
+      domainError: event.domainError,
+    });
+  } else {
+    writeTargetOutput({
+      rowIndex: event.rowIndex,
+      targetId: event.targetId,
+      output: event.output,
+      metadata: { cost: event.cost, duration: event.duration, traceId: event.traceId },
+    });
+  }
+  if (event.cost) sink.addCost(event.cost);
+};
+
+/**
+ * An error frame: a handled code or the unnamed-failure marker. A row's error
+ * lands in its evaluator or target cell; anything else fails the run, toasted
+ * through `showErrorToast` so the trace id is the copyable error id.
+ */
+const onErrorEvent = (event: EventOf<"error">, sink: ExecutionSink): void => {
+  const envelope = asHandledEnvelope(event);
+  const detail = describeError({
+    error: envelope,
+    fallbackTitle:
+      event.rowIndex === undefined
+        ? "The evaluation couldn't be completed"
+        : "This row couldn't be run",
+  });
+
+  if (event.rowIndex === undefined || !event.targetId) {
+    sink.setError(detail);
+    sink.setResults({ status: "error" });
+    showErrorToast({ error: envelope, fallbackTitle: "Couldn't finish the evaluation" });
+    return;
+  }
+  if (event.evaluatorId) {
+    writeEvaluatorResult({
+      rowIndex: event.rowIndex,
+      targetId: event.targetId,
+      evaluatorId: event.evaluatorId,
+      result: {
+        status: "error",
+        error_type: "EvaluatorError",
+        details: detail,
+        traceback: [],
+        ...(event.domainError ? { domainError: event.domainError } : {}),
+      },
+    });
+    return;
+  }
+  // Target error: the code, not the sentence it renders as.
+  writeTargetError({
+    rowIndex: event.rowIndex,
+    targetId: event.targetId,
+    errorMsg: event.message,
+    domainError: event.domainError,
+  });
+};
+
+/**
+ * Fold one SSE event into the hook and the store. `stopped` and `done` never
+ * clear executingCells/runningEvaluators: `resultsAfterRun` removes only this
+ * execution's, so concurrent executions keep theirs.
+ */
+const applyExecutionEvent = (event: EvaluationV3Event, sink: ExecutionSink): void => {
+  switch (event.type) {
+    case "execution_started":
+      sink.setRunId(event.runId);
+      // This page owns the run now, so its own write-back bump is not a stranger's.
+      useEvaluationsV3Store.getState().rememberRunStartedHere(event.runId);
+      sink.setProgress({ completed: 0, total: event.total });
+      sink.setResults({ runId: event.runId, status: "running", progress: 0, total: event.total });
+      return;
+    case "target_result":
+      onTargetResult(event, sink);
+      return;
+    case "evaluator_result":
+      writeEvaluatorResult({
+        rowIndex: event.rowIndex,
+        targetId: event.targetId,
+        evaluatorId: event.evaluatorId,
+        result: event.result,
+      });
+      return;
+    case "progress":
+      sink.setProgress({ completed: event.completed, total: event.total });
+      sink.setResults({ progress: event.completed, total: event.total });
+      return;
+    case "error":
+      onErrorEvent(event, sink);
+      return;
+    case "stopped":
+      sink.setStatus("stopped");
+      sink.setIsAborting(false);
+      sink.setResults({ status: "stopped" });
+      return;
+    case "done":
+      sink.setStatus("completed");
+      sink.setIsAborting(false);
+      sink.setResults({ status: "success" });
+      return;
+    default:
+      return;
+  }
+};
+
+/** A run that could not start or stream: its error in registry copy, never the wire message. */
+const failExecution = ({ err, sink }: { err: unknown; sink: ExecutionSink }): void => {
+  sink.setStatus("error");
+  sink.setError(describeError({ error: err, fallbackTitle: "Couldn't run the evaluation" }));
+  sink.setIsAborting(false);
+};
+
+const toastCannotExecute = (): void => {
+  toaster.create({
+    title: "Cannot execute",
+    description: "No project or dataset selected",
+    type: "error",
+  });
+};
+
+/**
+ * The results a run starts from: a full run clears everything; a partial run
+ * keeps the rest and clears only its own cells (see `resultsBeforePartialRun`).
+ */
+const startRunResults = ({
+  scope,
+  executionCells,
+  executingCells,
+  setResults,
+}: {
+  scope: ExecutionScope;
+  executionCells: CellId[];
+  executingCells: Set<string>;
+  setResults: EvaluationsV3Store["setResults"];
+}): void => {
+  if (scope.type === "full") {
+    // A full run (not a cell or evaluator rerun) enables the History button.
+    useEvaluationsV3Store.setState((state) => ({ ui: { ...state.ui, hasRunThisSession: true } }));
+    setResults({
+      status: "running",
+      executingCells,
+      progress: 0,
+      total: executionCells.length,
+      targetOutputs: {},
+      targetMetadata: {},
+      evaluatorResults: {},
+      errors: {},
+    });
+    return;
+  }
+  useEvaluationsV3Store.setState((state) => ({
+    results: resultsBeforePartialRun({
+      results: state.results,
+      evaluatorIds: state.evaluators.map((e) => e.id),
+      scope,
+      executionCells,
+      executingCells,
+    }),
+  }));
+};
+
+/**
+ * Ask the server to stop a run. `isAborting` stays true until the `stopped`
+ * event arrives; a 404 means the run already finished, which is no failure.
+ */
+const requestAbort = async ({
+  projectId,
+  runId,
+  setIsAborting,
+}: {
+  projectId: string;
+  runId: string;
+  setIsAborting: (isAborting: boolean) => void;
+}): Promise<void> => {
+  setIsAborting(true);
+  try {
+    const response = await fetch("/api/experiments/abort", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ projectId, runId }),
+    });
+    if (response.status === 404) {
+      setIsAborting(false);
+      toaster.create({
+        title: "Already finished",
+        description: "The run completed on its own before the stop request reached the server.",
+        type: "info",
+      });
+      return;
+    }
+    if (!response.ok) throw new Error("Failed to abort execution");
+  } catch (err) {
+    setIsAborting(false);
+    showErrorToast({ error: err, fallbackTitle: "Couldn't stop the run" });
+  }
+};
+
+/**
+ * Stream one execution's events into the hook and store, then release only
+ * this execution's cells, so concurrent executions keep theirs.
+ */
+const streamExecution = async ({
+  request,
+  executingCells,
+  sink,
+  onRunStarted,
+}: {
+  request: NonNullable<ReturnType<typeof buildExecutionRequest>>["request"];
+  executingCells: Set<string>;
+  sink: ExecutionSink;
+  onRunStarted?: (runId: string) => void;
+}): Promise<void> => {
+  const release = () => {
+    useEvaluationsV3Store.setState((state) => ({
+      results: resultsAfterRun({ results: state.results, executingCells }),
+    }));
+  };
+  try {
+    await fetchSSE<EvaluationV3Event>({
+      endpoint: "/api/experiments/execute",
+      payload: request,
+      onEvent: (event) => {
+        // Before the fold, so a caller waiting on the id hears it as soon as it exists.
+        if (event.type === "execution_started") onRunStarted?.(event.runId);
+        applyExecutionEvent(event, sink);
+      },
+      shouldStopProcessing: (event) => event.type === "done" || event.type === "stopped",
+      timeout: 30_000, // 30s to connect
+      chunkTimeout: 300_000, // 5min between events
+      onError: (err) => {
+        failExecution({ err, sink });
+        release();
+        showErrorToast({ error: err, fallbackTitle: "Couldn't run the evaluation" });
+      },
+    });
+    release();
+  } catch (err) {
+    failExecution({ err, sink });
+    release();
+  }
+};
 
 // ============================================================================
 // Hook
@@ -110,230 +452,18 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   // Find active dataset
   const activeDataset = datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
-  /**
-   * Write one target's output into the store.
-   */
-  const updateTargetOutput = useCallback(
-    ({
-      rowIndex,
-      targetId,
-      output,
-      metadata,
-    }: {
-      rowIndex: number;
-      targetId: string;
-      output: unknown;
-      metadata?: { cost?: number; duration?: number; traceId?: string };
-    }) => {
-      useEvaluationsV3Store.setState((state) => ({
-        results: applyTargetOutput({
-          results: state.results,
-          rowIndex,
-          targetId,
-          output,
-          metadata,
-          evaluatorIds: state.evaluators.map((evaluator) => evaluator.id),
-        }),
-      }));
-    },
-    [],
-  );
-
-  /** Write one target's failure into the store. */
-  const updateTargetError = useCallback(
-    ({
-      rowIndex,
-      targetId,
-      errorMsg,
-      domainError,
-    }: {
-      rowIndex: number;
-      targetId: string;
-      errorMsg: string;
-      domainError?: SerializedHandledError;
-    }) => {
-      useEvaluationsV3Store.setState((state) => ({
-        results: applyTargetError({
-          results: state.results,
-          rowIndex,
-          targetId,
-          error: errorMsg,
-          domainError,
-        }),
-      }));
-    },
-    [],
-  );
-
-  /** Write one evaluator's result into the store. */
-  const updateEvaluatorResult = useCallback(
-    ({
-      rowIndex,
-      targetId,
-      evaluatorId,
-      result,
-    }: {
-      rowIndex: number;
-      targetId: string;
-      evaluatorId: string;
-      result: unknown;
-    }) => {
-      useEvaluationsV3Store.setState((state) => ({
-        results: applyEvaluatorResult({
-          results: state.results,
-          rowIndex,
-          targetId,
-          evaluatorId,
-          result,
-        }),
-      }));
-    },
-    [],
-  );
-
-  /**
-   * Handle incoming SSE events
-   */
-  const handleEvent = useCallback(
-    (event: EvaluationV3Event) => {
-      switch (event.type) {
-        case "execution_started":
-          setRunId(event.runId);
-          // This page owns the run from here on. A run that writes its cells
-          // back advances the saved version, and the page adopts that bump
-          // rather than reading its own run's write as a stranger's.
-          useEvaluationsV3Store.getState().rememberRunStartedHere(event.runId);
-          setProgress({ completed: 0, total: event.total });
-          setResults({
-            runId: event.runId,
-            status: "running",
-            progress: 0,
-            total: event.total,
-          });
-          break;
-
-        case "cell_started":
-          // Cell started - no state update needed yet
-          break;
-
-        case "target_result":
-          if (event.domainError ?? event.error) {
-            // The code and the engine's raw string, side by side. The cell
-            // shows the registry's copy for the code and keeps the raw string
-            // for whoever asks — never as the headline.
-            updateTargetError({
-              rowIndex: event.rowIndex,
-              targetId: event.targetId,
-              errorMsg: event.error ?? UNNAMED_FAILURE,
-              domainError: event.domainError,
-            });
-          } else {
-            updateTargetOutput({
-              rowIndex: event.rowIndex,
-              targetId: event.targetId,
-              output: event.output,
-              metadata: {
-                cost: event.cost,
-                duration: event.duration,
-                traceId: event.traceId,
-              },
-            });
-          }
-          if (event.cost) {
-            setTotalCost((prev) => prev + event.cost!);
-          }
-          break;
-
-        case "evaluator_result":
-          updateEvaluatorResult({
-            rowIndex: event.rowIndex,
-            targetId: event.targetId,
-            evaluatorId: event.evaluatorId,
-            result: event.result,
-          });
-          break;
-
-        case "progress":
-          setProgress({ completed: event.completed, total: event.total });
-          setResults({
-            progress: event.completed,
-            total: event.total,
-          });
-          break;
-
-        case "error": {
-          // Error frames carry either a handled error code or the unnamed-failure marker.
-          const envelope = asHandledEnvelope(event);
-          const detail = describeError({
-            error: envelope,
-            fallbackTitle:
-              event.rowIndex === undefined
-                ? "The evaluation couldn't be completed"
-                : "This row couldn't be run",
-          });
-
-          if (event.rowIndex !== undefined && event.targetId) {
-            if (event.evaluatorId) {
-              // Evaluator error
-              updateEvaluatorResult({
-                rowIndex: event.rowIndex,
-                targetId: event.targetId,
-                evaluatorId: event.evaluatorId,
-                result: {
-                  status: "error",
-                  error_type: "EvaluatorError",
-                  details: detail,
-                  traceback: [],
-                  ...(event.domainError ? { domainError: event.domainError } : {}),
-                },
-              });
-            } else {
-              // Target error — the code, not the sentence it renders as.
-              updateTargetError({
-                rowIndex: event.rowIndex,
-                targetId: event.targetId,
-                errorMsg: event.message,
-                domainError: event.domainError,
-              });
-            }
-          } else {
-            // Fatal error
-            setError(detail);
-            setResults({ status: "error" });
-            // Through `showErrorToast` so the trace id becomes the copyable
-            // error id in the toast. An unhandled failure tells the customer
-            // nothing else, and "Something went wrong" with no id to quote
-            // leaves support nothing to search on.
-            showErrorToast({
-              error: envelope,
-              fallbackTitle: "Couldn't finish the evaluation",
-            });
-          }
-          break;
-        }
-
-        case "stopped":
-          setStatus("stopped");
-          setIsAborting(false); // Clear aborting state when stop is confirmed
-          // Update store status immediately for UI feedback
-          // NOTE: Don't clear executingCells/runningEvaluators here!
-          // cleanupThisExecution() handles removing only THIS execution's state
-          // to preserve concurrent executions.
-          setResults({ status: "stopped" });
-          break;
-
-        case "done":
-          setStatus("completed");
-          setIsAborting(false); // Clear aborting state on completion too
-          // Update store status immediately for UI feedback
-          // NOTE: Don't clear executingCells/runningEvaluators here!
-          // cleanupThisExecution() handles removing only THIS execution's state
-          // to preserve concurrent executions.
-          setResults({ status: "success" });
-          break;
-      }
-    },
-    [setResults, updateTargetOutput, updateTargetError, updateEvaluatorResult],
+  // Stable across renders, so `execute` keeps its identity like the setters it wraps.
+  const sink = useMemo<ExecutionSink>(
+    () => ({
+      setRunId,
+      setProgress,
+      addCost: (cost) => setTotalCost((prev) => prev + cost),
+      setError,
+      setStatus,
+      setIsAborting,
+      setResults,
+    }),
+    [setResults],
   );
 
   /**
@@ -345,11 +475,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       options?: { onRunStarted?: (runId: string) => void },
     ) => {
       if (!project?.id || !activeDataset) {
-        toaster.create({
-          title: "Cannot execute",
-          description: "No project or dataset selected",
-          type: "error",
-        });
+        toastCannotExecute();
         return;
       }
 
@@ -357,14 +483,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       setStatus("running");
       setError(null);
       setTotalCost(0);
-
-      // Mark that we've run an evaluation this session (enables History button)
-      // Only for full executions, not for cell/evaluator reruns
-      if (scope.type === "full") {
-        useEvaluationsV3Store.setState((state) => ({
-          ui: { ...state.ui, hasRunThisSession: true },
-        }));
-      }
 
       // The request and the cells it covers, comparison dependencies included.
       // Built from state alone (`execution/build-execution-request.ts`) so a run
@@ -386,11 +504,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         concurrency,
       });
       if (!built) {
-        toaster.create({
-          title: "Cannot execute",
-          description: "No project or dataset selected",
-          type: "error",
-        });
+        toastCannotExecute();
         return;
       }
       const { request, executionCells } = built;
@@ -399,221 +513,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // Set progress based on actual cells to execute
       setProgress({ completed: 0, total: executionCells.length });
 
-      // For full execution, clear all results
-      // For partial execution, preserve existing results AND merge executingCells
-      const isFullExecution = scope.type === "full";
+      startRunResults({ scope, executionCells, executingCells: executingCellsSet, setResults });
 
-      if (isFullExecution) {
-        // Clear all results and set to running
-        setResults({
-          status: "running",
-          executingCells: executingCellsSet,
-          progress: 0,
-          total: executionCells.length,
-          targetOutputs: {},
-          targetMetadata: {},
-          evaluatorResults: {},
-          errors: {},
-        });
-      } else {
-        // Partial execution: clear data for cells being executed.
-        // For evaluator-only scopes, preserve target data and only clear the
-        // specific evaluator's results. For other scopes, clear everything.
-        const isEvaluatorOnlyScope =
-          scope.type === "evaluator-all-rows" || scope.type === "evaluator";
-
-        useEvaluationsV3Store.setState((state) => {
-          const existingCells = state.results.executingCells;
-          const mergedCells = existingCells
-            ? new Set([...existingCells, ...executingCellsSet])
-            : executingCellsSet;
-
-          // Helper to clear a specific cell from an array-based record
-          const clearCellFromArrayRecord = <T>(
-            record: Record<string, (T | undefined | null)[]>,
-            targetId: string,
-            rowIndex: number,
-          ): Record<string, (T | undefined | null)[]> => {
-            const arr = record[targetId];
-            if (!arr || arr[rowIndex] === undefined) return record;
-            const newArr = [...arr];
-            newArr[rowIndex] = undefined;
-            return { ...record, [targetId]: newArr };
-          };
-
-          let newTargetOutputs = { ...state.results.targetOutputs };
-          let newTargetMetadata = { ...state.results.targetMetadata };
-          let newErrors = { ...state.results.errors };
-          const newEvaluatorResults = { ...state.results.evaluatorResults };
-
-          // For evaluator-only scopes, determine which single evaluator to clear
-          const specificEvaluatorId =
-            isEvaluatorOnlyScope && "evaluatorId" in scope ? scope.evaluatorId : undefined;
-
-          const evaluatorIds = specificEvaluatorId
-            ? [specificEvaluatorId]
-            : state.evaluators.map((e) => e.id);
-
-          for (const cell of executionCells) {
-            // Only clear target data for non-evaluator scopes
-            // (evaluator scopes reuse existing target outputs)
-            if (!isEvaluatorOnlyScope) {
-              // Clear target output
-              newTargetOutputs = clearCellFromArrayRecord(
-                newTargetOutputs,
-                cell.targetId,
-                cell.rowIndex,
-              );
-
-              // Clear target metadata
-              newTargetMetadata = clearCellFromArrayRecord(
-                newTargetMetadata,
-                cell.targetId,
-                cell.rowIndex,
-              );
-
-              // Clear errors (also array-based with holes)
-              newErrors = clearCellFromArrayRecord(newErrors, cell.targetId, cell.rowIndex);
-            }
-
-            // Clear evaluator results (only specific evaluator for evaluator scopes)
-            // For evaluator-only scopes, set to "running" for UI feedback;
-            // for other scopes, clear to undefined
-            if (!newEvaluatorResults[cell.targetId]) {
-              newEvaluatorResults[cell.targetId] = {};
-            }
-            const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
-            for (const evaluatorId of evaluatorIds) {
-              const evalResults = newTargetResults[evaluatorId];
-              if (isEvaluatorOnlyScope) {
-                // Always set to "running" for evaluator scopes, even if no
-                // prior results exist (freshly added evaluator)
-                const newEvalResults = evalResults ? [...evalResults] : [];
-                newEvalResults[cell.rowIndex] = { status: "running" };
-                newTargetResults[evaluatorId] = newEvalResults;
-              } else if (evalResults && evalResults[cell.rowIndex] !== undefined) {
-                const newEvalResults = [...evalResults];
-                newEvalResults[cell.rowIndex] = undefined;
-                newTargetResults[evaluatorId] = newEvalResults;
-              }
-            }
-            newEvaluatorResults[cell.targetId] = newTargetResults;
-          }
-
-          return {
-            results: {
-              ...state.results,
-              status: "running",
-              executingCells: mergedCells,
-              targetOutputs: newTargetOutputs,
-              targetMetadata: newTargetMetadata,
-              errors: newErrors,
-              evaluatorResults: newEvaluatorResults,
-            },
-          };
-        });
-      }
-
-      // Helper to remove this execution's cells and evaluators from state when done
-      // This only removes state for THIS execution, preserving concurrent executions
-      const cleanupThisExecution = () => {
-        useEvaluationsV3Store.setState((state) => {
-          // Remove only the cells from THIS execution
-          let remainingCells: Set<string> | undefined = state.results.executingCells
-            ? new Set(
-                [...state.results.executingCells].filter(
-                  (cellKey) => !executingCellsSet.has(cellKey),
-                ),
-              )
-            : undefined;
-          if (remainingCells?.size === 0) remainingCells = undefined;
-
-          // Remove runningEvaluators for THIS execution's cells
-          // Key format: "rowIndex:targetId:evaluatorId"
-          let remainingEvaluators: Set<string> | undefined = state.results.runningEvaluators
-            ? new Set(
-                [...state.results.runningEvaluators].filter((evalKey) => {
-                  // Extract rowIndex:targetId from the evaluator key
-                  const parts = evalKey.split(":");
-                  if (parts.length >= 2) {
-                    const cellKey = `${parts[0]}:${parts[1]}`;
-                    return !executingCellsSet.has(cellKey);
-                  }
-                  return true;
-                }),
-              )
-            : undefined;
-          if (remainingEvaluators?.size === 0) remainingEvaluators = undefined;
-
-          // Determine if there's remaining work from other concurrent executions
-          const hasRemainingWork =
-            (remainingCells?.size ?? 0) > 0 || (remainingEvaluators?.size ?? 0) > 0;
-
-          // Determine the final status:
-          // - If there's remaining work, keep current status
-          // - If status was explicitly set to "stopped", keep it
-          // - Otherwise, set to "success"
-          const shouldKeepCurrentStatus = hasRemainingWork || state.results.status === "stopped";
-
-          return {
-            results: {
-              ...state.results,
-              executingCells: remainingCells,
-              runningEvaluators: remainingEvaluators,
-              status: shouldKeepCurrentStatus ? state.results.status : "success",
-            },
-          };
-        });
-      };
-
-      try {
-        await fetchSSE<EvaluationV3Event>({
-          endpoint: "/api/experiments/execute",
-          payload: request,
-          onEvent: (event) => {
-            // Before the fold, so a caller waiting on the id is answered as
-            // soon as the run has one rather than after the whole stream.
-            if (event.type === "execution_started") {
-              options?.onRunStarted?.(event.runId);
-            }
-            handleEvent(event);
-          },
-          shouldStopProcessing: (event) => event.type === "done" || event.type === "stopped",
-          timeout: 30_000, // 30s to connect
-          chunkTimeout: 300_000, // 5min between events
-          onError: (err) => {
-            setStatus("error");
-            // `error` is exported hook state that ends up on screen, so it gets
-            // the same treatment as the toast: registry copy, never the wire
-            // message (which is the code slug for a handled failure).
-            setError(
-              describeError({
-                error: err,
-                fallbackTitle: "Couldn't run the evaluation",
-              }),
-            );
-            setIsAborting(false); // Clear aborting state on error
-            cleanupThisExecution();
-            showErrorToast({
-              error: err,
-              fallbackTitle: "Couldn't run the evaluation",
-            });
-          },
-        });
-
-        // Clean up this execution's cells when SSE completes
-        cleanupThisExecution();
-      } catch (err) {
-        setStatus("error");
-        setError(
-          describeError({
-            error: err,
-            fallbackTitle: "Couldn't run the evaluation",
-          }),
-        );
-        setIsAborting(false); // Clear aborting state on error
-        cleanupThisExecution();
-      }
+      await streamExecution({
+        request,
+        executingCells: executingCellsSet,
+        sink,
+        onRunStarted: options?.onRunStarted,
+      });
     },
     [
       project?.id,
@@ -626,7 +533,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       targets,
       evaluators,
       concurrency,
-      handleEvent,
+      sink,
       setResults,
     ],
   );
@@ -636,42 +543,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
    * Sets isAborting=true which remains true until the `stopped` SSE event is received.
    */
   const abort = useCallback(async () => {
-    if (!project?.id || !runId) {
-      return;
-    }
-
-    // Set aborting state - this stays true until we receive the `stopped` event
-    setIsAborting(true);
-
-    try {
-      const response = await fetch("/api/experiments/abort", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: project.id, runId }),
-      });
-
-      if (response.status === 404) {
-        // Server says the run isn't running anymore — it finished (or
-        // was already aborted) between the user's click and this request
-        // landing. Not a failure: just inform the user and reset state.
-        setIsAborting(false);
-        toaster.create({
-          title: "Already finished",
-          description: "The run completed on its own before the stop request reached the server.",
-          type: "info",
-        });
-        return;
-      }
-      if (!response.ok) {
-        throw new Error("Failed to abort execution");
-        // Note: we don't setIsAborting(false) here - we wait for the `stopped` event
-      }
-    } catch (err) {
-      // On error, reset aborting state since abort failed
-      setIsAborting(false);
-      showErrorToast({ error: err, fallbackTitle: "Couldn't stop the run" });
-    }
-    // Note: No finally block - isAborting stays true until `stopped` event
+    if (!project?.id || !runId) return;
+    await requestAbort({ projectId: project.id, runId, setIsAborting });
   }, [project?.id, runId]);
 
   /**
@@ -700,12 +573,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
-      updateEvaluatorResult({
-        rowIndex,
-        targetId,
-        evaluatorId,
-        result: { status: "running" },
-      });
+      writeEvaluatorResult({ rowIndex, targetId, evaluatorId, result: { status: "running" } });
 
       // Build the evaluator scope with pre-computed target output
       const scope: ExecutionScope = {
@@ -721,7 +589,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
       await execute(scope);
     },
-    [execute, updateEvaluatorResult],
+    [execute],
   );
 
   /**
@@ -732,19 +600,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const runEvaluatorOnAllRows = useCallback(
     async (targetId: string, evaluatorId: string) => {
       const state = useEvaluationsV3Store.getState();
-      const targetOutputs = state.results.targetOutputs[targetId] ?? [];
-      const targetMetadata = state.results.targetMetadata[targetId] ?? [];
-
-      // Build maps of only rows that have target outputs
-      const precomputedTargetOutputs: Record<number, unknown> = {};
-      const traceIds: Record<number, string | undefined> = {};
-
-      for (let i = 0; i < targetOutputs.length; i++) {
-        if (targetOutputs[i] !== undefined && targetOutputs[i] !== null) {
-          precomputedTargetOutputs[i] = targetOutputs[i];
-          traceIds[i] = targetMetadata[i]?.traceId;
-        }
-      }
+      const { precomputedTargetOutputs, traceIds } = producedRowsOf({
+        targetOutputs: state.results.targetOutputs[targetId] ?? [],
+        targetMetadata: state.results.targetMetadata[targetId] ?? [],
+      });
 
       // Nothing to run if no rows have outputs
       if (Object.keys(precomputedTargetOutputs).length === 0) return;

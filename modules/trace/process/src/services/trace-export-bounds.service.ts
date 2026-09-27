@@ -3,28 +3,14 @@ import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TraceExportRateLimitedError } from "@langwatch/trace-contract";
 
+import type { TraceExportSlotRepository } from "../repositories/trace-export-slot.repository.ts";
+
 /**
  * A held slot outlives its export for ten minutes at most: the TTL is the
  * crash safety that frees a slot whose process died mid-stream, the
  * stream's own `finally` is only the prompt release.
  */
 const SLOT_TTL_SECONDS = 600;
-
-/** The two commands one export slot is claimed and freed with. */
-export interface TraceExportSlotStore {
-  /** Claims the key for `expirySeconds` when it is free; false when already held. */
-  claim(key: string, value: string, expirySeconds: number): Promise<boolean>;
-  del(key: string): Promise<number>;
-}
-
-/** The ioredis `SET key value EX seconds NX` call one slot claim is built from. */
-export type TraceExportSlotSet = (
-  key: string,
-  value: string,
-  expiryToken: "EX",
-  expirySeconds: number,
-  claimToken: "NX",
-) => Promise<"OK" | null>;
 
 /** One held in-flight slot. `release` is idempotent because DEL is. */
 export interface TraceExportSlot {
@@ -49,28 +35,9 @@ export class TraceExportBoundsService implements TraceExportBounds {
     entitlement: Pick<EntitlementApi, "requestBound">;
     projects: Pick<ProjectApi, "getOrganizationId">;
     rateLimiter: RateLimiter;
-    redis: TraceExportSlotStore;
+    slots: TraceExportSlotRepository;
   }): TraceExportBoundsService {
     return new TraceExportBoundsService(deps);
-  }
-
-  /** The composition's own path: the slot store over the process's Redis connection. */
-  static createOverRedis(deps: {
-    entitlement: Pick<EntitlementApi, "requestBound">;
-    projects: Pick<ProjectApi, "getOrganizationId">;
-    rateLimiter: RateLimiter;
-    redis: { set: TraceExportSlotSet; del(key: string): Promise<number> };
-  }): TraceExportBoundsService {
-    const redis = deps.redis;
-
-    return TraceExportBoundsService.create({
-      ...deps,
-      redis: {
-        claim: async (key, value, expirySeconds) =>
-          (await redis.set(key, value, "EX", expirySeconds, "NX")) === "OK",
-        del: (key) => redis.del(key),
-      },
-    });
   }
 
   private constructor(
@@ -78,7 +45,7 @@ export class TraceExportBoundsService implements TraceExportBounds {
       entitlement: Pick<EntitlementApi, "requestBound">;
       projects: Pick<ProjectApi, "getOrganizationId">;
       rateLimiter: RateLimiter;
-      redis: TraceExportSlotStore;
+      slots: TraceExportSlotRepository;
     }>,
   ) {}
 
@@ -113,11 +80,11 @@ export class TraceExportBoundsService implements TraceExportBounds {
     });
     for (let index = 0; index < slots; index += 1) {
       const key = `trace-export:slot:${input.projectId}:${index}`;
-      const claimed = await this.deps.redis.claim(key, input.exportId, SLOT_TTL_SECONDS);
+      const claimed = await this.deps.slots.claim(key, input.exportId, SLOT_TTL_SECONDS);
       if (claimed) {
         return {
           release: async () => {
-            await this.deps.redis.del(key);
+            await this.deps.slots.del(key);
           },
         };
       }

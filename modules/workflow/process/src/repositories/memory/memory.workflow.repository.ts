@@ -123,6 +123,20 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     );
   }
 
+  findEvaluators(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
+    return Promise.resolve(
+      this.store
+        .workflowsOf(input.projectId)
+        .filter((workflow) => workflow.isEvaluator)
+        .map((workflow) => ({
+          ...workflow,
+          versions: this.store.versionsOf({ workflowId: workflow.id, projectId: input.projectId }),
+        })),
+    );
+  }
+
   findVersions(input: {
     workflowId: string;
     projectId: string;

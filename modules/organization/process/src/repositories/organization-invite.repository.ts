@@ -139,6 +139,11 @@ export abstract class OrganizationInviteRepository {
     subscriptionId: string;
     organizationId: string;
   }): Promise<InviteWithOrganization[]>;
+  /** Deletes the PAYMENT_PENDING invites held for these subscriptions. */
+  abstract deletePaymentPendingInvites(input: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<number>;
   abstract approvePaymentPendingInvite(input: {
     inviteId: string;
     organizationId: string;

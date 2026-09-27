@@ -50,6 +50,9 @@
   ],
   "references": [
     {
+      "path": "../../modules/annotation/contract/tsconfig.build.json"
+    },
+    {
       "path": "../api/tsconfig.build.json"
     },
     {
@@ -77,6 +80,9 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
       "path": "../react-rum/tsconfig.build.json"
     },
     {
@@ -87,6 +93,9 @@
     },
     {
       "path": "../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }

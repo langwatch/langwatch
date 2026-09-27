@@ -2,20 +2,22 @@ import type {
   CompleteSuiteRunItemCommandData,
   RecordSuiteRunItemStartedCommandData,
   RegradeSuiteRunItemCommandData,
+  StartSuiteRunCommandData,
 } from "@langwatch/suite-contract";
 
 type CommandSender<Payload> = { send(payload: Payload): Promise<unknown> };
 
-/** Suite's three run-item commands, bound once the pipeline registered them. */
+/** Suite's run and run-item commands, bound once the pipeline registered them. */
 export type SuiteRunItemCommandSenders = {
+  startSuiteRun: CommandSender<StartSuiteRunCommandData>;
   recordSuiteRunItemStarted: CommandSender<RecordSuiteRunItemStartedCommandData>;
   completeSuiteRunItem: CommandSender<CompleteSuiteRunItemCommandData>;
   regradeSuiteRunItem: CommandSender<RegradeSuiteRunItemCommandData>;
 };
 
 /**
- * Records a scenario run's start and completion against its suite run, through
- * `suite_run_processing`'s own commands (main's `suiteRuns.*` senders).
+ * Starts a suite run and records a scenario run's start and completion against
+ * it, through `suite_run_processing`'s own commands (main's `suiteRuns.*` senders).
  */
 export class SuiteRunItemCommandsService {
   static create(): SuiteRunItemCommandsService {
@@ -28,6 +30,10 @@ export class SuiteRunItemCommandsService {
 
   connect(senders: SuiteRunItemCommandSenders): void {
     this.#senders = senders;
+  }
+
+  async startSuiteRun(data: StartSuiteRunCommandData): Promise<void> {
+    await this.#connected().startSuiteRun.send(data);
   }
 
   async recordSuiteRunItemStarted(data: RecordSuiteRunItemStartedCommandData): Promise<void> {

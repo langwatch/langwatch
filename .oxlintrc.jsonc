@@ -113,6 +113,21 @@
       "rules": { "typescript/no-explicit-any": "error" },
     },
     {
+      // Published SDK surface keeps its public `any`s (Alex, 2026-09-27); internal SDK code stays strict.
+      "files": [
+        "sdks/typescript/src/client-sdk/services/prompts/errors/prompt-compilation.error.ts",
+        "sdks/typescript/src/client-sdk/services/traces/types.ts",
+        "sdks/typescript/src/observability-sdk/features/data-capture/types.ts",
+        "sdks/typescript/src/observability-sdk/span/types.ts",
+      ],
+      "rules": { "typescript/no-explicit-any": "off" },
+    },
+    {
+      // Prisma's extended client has no nameable type; the one cast stays (Alex, 2026-09-27).
+      "files": ["packages/prisma-client/src/connection.ts"],
+      "rules": { "langwatch/stand-in-cast": "off" },
+    },
+    {
       // Process source logs through `createLogger`, and a REST handler throws a
       // HandledError rather than building its own error response.
       "files": [
@@ -156,13 +171,9 @@
       "rules": { "node/no-process-env": "off" },
     },
     {
-      // Substrate that boots below the config layer: the logger, the migration
-      // runner and the seed tool run before any composed config exists.
-      "files": [
-        "packages/observability/**",
-        "packages/clickhouse-migrations/src/**",
-        "packages/storage-seed/**",
-      ],
+      // Substrate that boots below the config layer: the logger and the
+      // migration runner run before any composed config exists.
+      "files": ["packages/observability/**", "packages/clickhouse-migrations/src/**"],
       "rules": { "node/no-process-env": "off" },
     },
     {

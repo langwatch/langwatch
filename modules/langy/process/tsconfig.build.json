@@ -12,7 +12,7 @@
     "./src/index.ts",
     "./src/rules/langy-capability-progress.rules.ts",
     "./src/rules/langy-turn-settlement.rules.ts",
-    "./src/services/langy-cli-envelope.service.ts",
+    "./src/rules/langy-cli-envelope.rules.ts",
     "./src/services/langy-final-parts.service.ts",
     "./src/services/langy-message.service.ts",
     "./src/services/langy-rest-caller.service.ts",

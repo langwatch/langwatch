@@ -35,13 +35,13 @@ function mount(app: Partial<LicensingApi>) {
       label: "Connect host",
     }),
   });
-  // `connect.langwatch.ai/v1/*` is `/api/v1/connect/*` on the app.
+  // `connect.langwatch.ai/v1/*` is `/api/connect/v1/*` on the app, as on main.
   const channel = HttpConnectLicenseChannel.create({
     endpoint: "https://connect.test",
     fetch: async (url, init) =>
       hono.fetch(
         new Request(
-          url.replace("https://connect.test/v1/", "http://api.test/api/v1/connect/"),
+          url.replace("https://connect.test/v1/", "http://api.test/api/connect/v1/"),
           init,
         ),
       ),
@@ -75,7 +75,7 @@ describe("the connect host", () => {
       });
 
       const response = await hono.fetch(
-        new Request("http://api.test/api/v1/connect/license/sync", {
+        new Request("http://api.test/api/connect/v1/license/sync", {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
           body: JSON.stringify({ version: "1.2.3", seats }),
@@ -106,7 +106,7 @@ describe("the connect host", () => {
       const { hono } = mount({ recordLicenseSync });
 
       const response = await hono.fetch(
-        new Request("http://api.test/api/v1/connect/license/sync", {
+        new Request("http://api.test/api/connect/v1/license/sync", {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
           body: JSON.stringify({ version: "1.2.3", seats, organizationName: "ACME" }),

@@ -16,6 +16,7 @@ import {
   type ScenarioFieldValues,
   type ScenarioParameterDefinition,
   type SuiteFieldDefinition,
+  type Scenario,
 } from "@langwatch/scenario-contract";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,7 +26,6 @@ import {
   formatParameterLine,
   toParameterDefinitions,
 } from "../../../../model/agent-testing/run/parameter-line.ts";
-import type { Scenario } from "../../../../model/prisma-types.ts";
 import { type CaseCustomizeBlocks, useCaseCustomizeBlocks } from "./use-case-customize-blocks.ts";
 
 /** What a person types into the editor. */

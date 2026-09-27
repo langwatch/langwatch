@@ -9,7 +9,7 @@ import {
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
 
-import { LangyCliEnvelopeService } from "./langy-cli-envelope.service.ts";
+import { normalizeToolFrame } from "../rules/langy-cli-envelope.rules.ts";
 import type { LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 export type LangyBlockCounter = (reason: string) => void;
@@ -28,7 +28,6 @@ export type { LangyFinalToolCall } from "@langwatch/langy-contract";
  */
 export class LangyFinalPartsService {
   private constructor(
-    private readonly cliEnvelope: LangyCliEnvelopeService,
     /**
      * The composition root's block-metrics collector, applied to any `build()` call that names
      * no `countBlock` of its own. Defaults to a no-op, same as `build`'s own default.
@@ -37,7 +36,7 @@ export class LangyFinalPartsService {
   ) {}
 
   static create(defaultCountBlock?: LangyBlockCounter): LangyFinalPartsService {
-    return new LangyFinalPartsService(LangyCliEnvelopeService.create(), defaultCountBlock);
+    return new LangyFinalPartsService(defaultCountBlock);
   }
 
   build({
@@ -65,7 +64,7 @@ export class LangyFinalPartsService {
   }
 
   private toolPart(rawCall: LangyFinalToolCall): LangyMessagePart {
-    const call = this.cliEnvelope.normalizeToolFrame({
+    const call = normalizeToolFrame({
       frame: { ...rawCall, phase: "end" },
     });
 

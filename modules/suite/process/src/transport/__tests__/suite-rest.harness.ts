@@ -14,6 +14,7 @@ import {
   type RestMountOptions,
 } from "@langwatch/api/rest";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -255,10 +256,15 @@ export class SuiteWorld {
 
     return plan;
   }
+
+  /** The plan's own evaluators, stored in the column the domain row leaves out. */
+  attachPlanEvaluators(planId: string, attachments: EvaluatorAttachment[]): void {
+    this.database.planEvaluators.set(planId, attachments);
+  }
 }
 
 /** The scenario half of the world, as the peer capability the suite reads. */
-function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
+export function memoryScenarioApi(world: SuiteWorld, commands: CollapsingRunCommands): ScenarioApi {
   const active = (id: string) => {
     const row = world.scenarios.get(id);
 
@@ -376,10 +382,11 @@ function memoryScenarioApi(world: SuiteWorld): ScenarioApi {
         parameters: {},
         secretParameters: {},
       })),
+    queueSimulationRun: (input) => commands.queueSimulationRun(input),
   });
 }
 
-function memoryAgentApi(world: SuiteWorld): AgentApi {
+export function memoryAgentApi(world: SuiteWorld): AgentApi {
   return createApiFixture<AgentApi>({
     getReferenceStates: async (input) =>
       input.ids.flatMap((id) => {
@@ -422,12 +429,18 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 export type RestFamilyCaller = { userId?: string | null | undefined };
 
 /** The three families, one application, one world. */
-export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefined } = {}) {
+export function mountSuiteFamilies(
+  options: {
+    caller?: RestFamilyCaller | undefined;
+    /** The project reads the Agent Testing interface (`release_ui_agent_testing_v2_enabled`). */
+    agentTesting?: boolean;
+  } = {},
+) {
   const caller = options.caller ?? {};
   const database = MemorySuiteDatabase.create();
   const world = new SuiteWorld(database);
   const commands = new CollapsingRunCommands();
-  const scenarios = memoryScenarioApi(world);
+  const scenarios = memoryScenarioApi(world, commands);
 
   const app = SuiteApp.createForTesting({
     repositories: { suites: MemorySuiteRepository.create({ database }) },
@@ -440,8 +453,12 @@ export function mountSuiteFamilies(options: { caller?: RestFamilyCaller | undefi
       }),
       projects: createApiFixture<ProjectApi>({
         findOrganizationId: async () => TEST_PROJECT.organizationId,
+        getOrganizationId: async () => TEST_PROJECT.organizationId,
       }),
       evaluators: createApiFixture<EvaluatorApi>({}),
+      featureFlags: createApiFixture<FeatureFlagApi>({
+        isEnabled: async () => options.agentTesting ?? false,
+      }),
     },
     infrastructure: {
       execution: SuiteExecutionService.create({ commands, scenarios }),

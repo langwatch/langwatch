@@ -15,10 +15,10 @@ import {
 } from "@langwatch/api/rest";
 import { deriveRunActor } from "@langwatch/scenario-contract";
 import {
-  parseSuiteScope,
   SuiteApi,
   SuiteNotFoundError,
-  type Suite,
+  runPlanWireSchema,
+  type RunPlanWire,
   type SuiteRunResult,
   runPlanIdParamsSchema,
   runPlanListQuerySchema,
@@ -30,7 +30,6 @@ import {
   rerunInputSchema,
   runPlanRunInputSchema,
   runPlanRunResultSchema,
-  runPlanWireSchema,
   suiteSurfaceFact,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
@@ -40,63 +39,12 @@ const notFound = documentedResponses({ 404: badRequestSchema });
 /** What a route knows about the project and the person behind the credential. */
 type ProjectFacts = z.output<typeof projectRestFacts.schema>;
 
-/** Where this plan opens in the platform, for the project's own interface. */
-function planUrl(params: { app: SuiteApi; projectSlug: string; suite: Suite }): string {
-  return params.app.platformUrl({
-    projectSlug: params.projectSlug,
-    path: `/simulations/run-plans/${params.suite.slug}`,
-  });
-}
-
-function planWire(params: {
-  app: SuiteApi;
-  projectSlug: string;
-  suite: Suite;
-}): z.infer<typeof runPlanWireSchema> {
-  const { suite } = params;
-
-  return {
-    id: suite.id,
-    name: suite.name,
-    slug: suite.slug,
-    // A row stored before scopes carries null and runs its stored
-    // `scenarioIds`; the wire always answers the concrete scope that means.
-    scope: parseSuiteScope(suite.scope),
-    scenarioIds: suite.scenarioIds,
-    targets: suite.targets,
-    repeatCount: suite.repeatCount,
-    simulatorModel: suite.simulatorModel,
-    judgeModel: suite.judgeModel,
-    labels: suite.labels,
-    archivedAt: suite.archivedAt?.toISOString() ?? null,
-    createdAt: suite.createdAt.toISOString(),
-    updatedAt: suite.updatedAt.toISOString(),
-    platformUrl: planUrl(params),
-  };
-}
-
-/**
- * The row this id names, refusing a test suite id the same way a missing one
- * is refused: the two families address disjoint sets of rows, so an id from
- * one is simply not a member of the other.
- */
-async function readPlan(params: { app: SuiteApi; id: string; projectId: string }): Promise<Suite> {
-  const found = await params.app.getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
-  if (found.kind !== "suite" || found.suite.kind !== "run_plan") {
-    throw new SuiteNotFoundError("Run plan not found");
-  }
-
-  return found.suite;
-}
-
 /** What every run of this family answers with. */
 function runWire(params: {
   result: SuiteRunResult & { suiteId?: string; planName?: string; created?: boolean };
-  suite: Suite;
-  app: SuiteApi;
-  projectSlug: string;
+  plan: RunPlanWire;
 }): z.infer<typeof runPlanRunResultSchema> {
-  const { result, suite } = params;
+  const { result, plan } = params;
 
   return {
     scheduled: true,
@@ -105,10 +53,10 @@ function runWire(params: {
     jobCount: result.jobCount,
     skippedArchived: result.skippedArchived,
     items: toRunItemsWire(result.items),
-    runPlanId: result.suiteId ?? suite.id,
-    planName: result.planName ?? suite.name,
+    runPlanId: result.suiteId ?? plan.id,
+    planName: result.planName ?? plan.name,
     created: result.created ?? false,
-    platformUrl: planUrl({ app: params.app, projectSlug: params.projectSlug, suite }),
+    platformUrl: plan.platformUrl,
   };
 }
 
@@ -134,14 +82,13 @@ async function runConfiguration(params: {
     ...(input.note !== undefined && { note: input.note }),
     ...(actor !== undefined && { actor }),
   });
-  const suite = await readPlan({ app, id: result.suiteId, projectId });
-
-  return runWire({
-    result,
-    suite,
-    app: params.app,
+  const plan = await app.getRunPlan({
+    id: result.suiteId,
+    projectId,
     projectSlug: params.project.projectSlug,
   });
+
+  return runWire({ result, plan });
 }
 
 /** Runs a stored plan again, with the configuration it already holds. */
@@ -153,7 +100,11 @@ async function rerunStoredPlan(params: {
   surface: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
-  const suite = await readPlan({ app, id: input.id, projectId });
+  const plan = await app.getRunPlan({
+    id: input.id,
+    projectId,
+    projectSlug: params.project.projectSlug,
+  });
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
@@ -161,7 +112,7 @@ async function rerunStoredPlan(params: {
   // Any refusal (a missing target, an archived scenario, ...) is a
   // `HandledError` the process's own boundary already serializes.
   const result = await app.run({
-    id: suite.id,
+    id: plan.id,
     projectId,
     idempotencyKey: input.idempotencyKey ?? `api-${randomUUID()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),
@@ -169,12 +120,7 @@ async function rerunStoredPlan(params: {
     ...(actor !== undefined && { actor }),
   });
 
-  return runWire({
-    result,
-    suite,
-    app: params.app,
-    projectSlug: params.project.projectSlug,
-  });
+  return runWire({ result, plan });
 }
 
 /** Archives the plan this id names, refusing a test suite id as a miss. */
@@ -183,10 +129,13 @@ async function archivePlan(params: {
   id: string;
   projectId: string;
 }): Promise<z.infer<typeof runPlanArchiveResultSchema>> {
-  const suite = await readPlan(params);
-  await params.app.archive({ id: suite.id, projectId: params.projectId });
+  const found = await params.app.getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
+  if (found.kind !== "suite" || found.suite.kind !== "run_plan") {
+    throw new SuiteNotFoundError("Run plan not found");
+  }
+  await params.app.archive({ id: found.suite.id, projectId: params.projectId });
 
-  return { id: suite.id, archived: true };
+  return { id: found.suite.id, archived: true };
 }
 
 /** The `/api/v1/run-plans` collection and item endpoints. */
@@ -210,10 +159,12 @@ export function createRunPlansRest(): Readonly<{
         "List the project's run plans. Archived plans are left out unless includeArchived is set. Test suites are not run plans and are listed by the test suites family.",
     })
     .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) =>
-      (await app.list({ projectId: scope.id, includeArchived: input.includeArchived })).map(
-        (suite) => planWire({ app, projectSlug: project.projectSlug, suite }),
-      ),
+    .handle(({ app, input, scope }, project) =>
+      app.listRunPlans({
+        projectId: scope.id,
+        projectSlug: project.projectSlug,
+        includeArchived: input.includeArchived,
+      }),
     )
 
     .post("/run", "runRunPlan")
@@ -241,12 +192,8 @@ export function createRunPlansRest(): Readonly<{
       responses: notFound,
     })
     .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) =>
-      planWire({
-        app,
-        projectSlug: project.projectSlug,
-        suite: await readPlan({ app, id: input.id, projectId: scope.id }),
-      }),
+    .handle(({ app, input, scope }, project) =>
+      app.getRunPlan({ id: input.id, projectId: scope.id, projectSlug: project.projectSlug }),
     )
 
     .post("/:id/run", "rerunRunPlan")

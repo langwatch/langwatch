@@ -538,6 +538,12 @@ export class WorkflowApp implements WorkflowApi {
     return this.#members.workflows.list(input);
   }
 
+  findEvaluatorWorkflows(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
+    return this.#members.workflows.findEvaluatorWorkflows(input);
+  }
+
   /** One workflow, optionally with its current version. */
   getById(input: {
     id: string;

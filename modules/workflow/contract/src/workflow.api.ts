@@ -171,6 +171,10 @@ export interface WorkflowApi {
 
   executeComponent(input: ExecuteWorkflowComponentInput): Promise<ExecutionState>;
   list(input: { projectId: string }): Promise<Workflow[]>;
+  /** Every evaluator workflow, archived or not, each carrying only its published version. */
+  findEvaluatorWorkflows(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]>;
   getById(input: {
     id: string;
     projectId: string;

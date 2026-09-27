@@ -1,6 +1,9 @@
 import {
   ExperimentVersionNotFoundError,
+  readSavedWorkbench,
+  type SavedWorkbenchRead,
   type SaveWorkbenchStateBySlugRequest,
+  type TargetConfig,
   type WorkbenchActor,
   type WorkbenchSavedVersion,
   type WorkbenchSaveResult,
@@ -16,16 +19,48 @@ import type { ExperimentService } from "./experiment.service.ts";
 
 const logger = createLogger("langwatch:experiments-v3");
 
+type WorkbenchTargetNames = (input: {
+  projectId: string;
+  targets: TargetConfig[];
+}) => Promise<Record<string, string>>;
+
 /** A workbench's saved versions, addressed the way the `/api/experiments` doors name them. */
 export class ExperimentWorkbenchVersionService {
-  static create(options: { experiments: ExperimentService }): ExperimentWorkbenchVersionService {
+  static create(options: {
+    experiments: ExperimentService;
+    workbenchTargetNames: WorkbenchTargetNames;
+  }): ExperimentWorkbenchVersionService {
     return new ExperimentWorkbenchVersionService(options);
   }
 
   readonly #experiments: ExperimentService;
+  readonly #workbenchTargetNames: WorkbenchTargetNames;
 
-  private constructor(options: { experiments: ExperimentService }) {
+  private constructor(options: {
+    experiments: ExperimentService;
+    workbenchTargetNames: WorkbenchTargetNames;
+  }) {
     this.#experiments = options.experiments;
+    this.#workbenchTargetNames = options.workbenchTargetNames;
+  }
+
+  /** The saved board as an agent reads it, columns named as a run's own errors name them. */
+  async projectSavedBySlug(input: {
+    projectId: string;
+    slug: string;
+    includeResults?: boolean;
+  }): Promise<SavedWorkbenchRead> {
+    const { projectId, slug, includeResults } = input;
+    const view = await this.#experiments.getWorkbenchState({ projectId, slug });
+    if (!view.state) return readSavedWorkbench({ view });
+    // A saved target may predate its declared fields; the resolver reads only its references.
+    const targets = view.state.targets.map((target) => ({
+      ...target,
+      inputs: target.inputs ?? [],
+      outputs: target.outputs ?? [],
+    }));
+    const targetNames = await this.#workbenchTargetNames({ projectId, targets });
+    return readSavedWorkbench({ view, includeResults, targetNames });
   }
 
   async readStateBySlug(input: WorkbenchStateBySlugRequest): Promise<WorkbenchStateAnswer> {

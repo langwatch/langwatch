@@ -63,8 +63,8 @@ export function composeSessionVerification(options: {
     const verified = await sessions.tryResolveVerifiedSession(request);
     if (!verified) return null;
 
-    const session = await auth.tryResolveBrowserSession({ verified });
-    if (!session) {
+    const resolution = await auth.resolveBrowserSession({ verified });
+    if (resolution.kind === "anonymous") {
       // Better Auth verified the cookie and the Auth service still found no
       // live session: the row is gone, revoked, or was never this process's
       // to see. Distinct from an anonymous caller for the same reason the
@@ -76,6 +76,7 @@ export function composeSessionVerification(options: {
 
       return { authSessionId: verified.session.id };
     }
+    const { session } = resolution;
 
     return {
       authSessionId: verified.session.id,

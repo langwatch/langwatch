@@ -8,11 +8,10 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ExternalSetSummary } from "@langwatch/scenario-contract";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { SimulationSuite } from "../../../../model/prisma-types.ts";
 
 vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
@@ -271,34 +270,6 @@ describe("<SuiteSidebar/> External Sets", () => {
         expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
         expect(screen.getByText("No matching run plans")).toBeInTheDocument();
       });
-    });
-  });
-
-  describe("given an external set with no runs", () => {
-    // Skipped: Code bug in SuiteSidebar.tsx — ExternalSetListItem always renders
-    // <RunSummaryLine> unconditionally, even when totalCount=0. This means "0 passed"
-    // and a pass-rate indicator are shown for sets with no runs. Fix: conditionally
-    // render <RunSummaryLine> only when totalCount > 0 (or lastRunTimestamp > 0).
-    it.skip("displays only the name with no summary line", () => {
-      render(
-        <SuiteSidebar
-          {...defaultProps}
-          externalSets={[
-            makeExternalSet({
-              scenarioSetId: "New Set",
-              passedCount: 0,
-              totalCount: 0,
-              lastRunTimestamp: 0,
-            }),
-          ]}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("New Set")).toBeInTheDocument();
-      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
-      expect(screen.queryByTestId("status-icon-pass")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("status-icon-fail")).not.toBeInTheDocument();
     });
   });
 

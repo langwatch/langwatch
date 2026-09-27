@@ -15,6 +15,7 @@ import {
   type WorkflowId,
   type WorkflowExecutionInput,
 } from "../../app/workflow.app.ts";
+import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import {
   WorkflowRepository,
   type PersistWorkflowInput,
@@ -57,6 +58,9 @@ class FakeWorkflowRepository extends WorkflowRepository {
     throw new Error("not used by this test");
   }
   async deleteUncommitted(): Promise<never> {
+    throw new Error("not used by this test");
+  }
+  async findEvaluators(): Promise<never> {
     throw new Error("not used by this test");
   }
   private readonly workflows = new Map<string, Workflow>();
@@ -524,6 +528,63 @@ describe("WorkflowService", () => {
       workflowId: "workflow_1",
       version: { id: "version_1" },
       inputs: { ticket: "42" },
+    });
+  });
+
+  describe("when the project's evaluator workflows are listed", () => {
+    async function evaluatorProject() {
+      const repository = MemoryWorkflowRepositories.create().workflows;
+      const draft = { projectId: "project_1", icon: null, description: null };
+      await repository.createWorkflow({ ...draft, id: "judge", name: "Judge", isEvaluator: true });
+      await repository.createWorkflow({ ...draft, id: "draft", name: "Draft", isEvaluator: true });
+      await repository.createWorkflow({ ...draft, id: "triage", name: "Triage" });
+      for (const id of ["judge_v1", "judge_v2"]) {
+        await repository.createVersion({
+          id,
+          workflowId: "judge",
+          projectId: "project_1",
+          parentId: null,
+          version: id,
+          autoSaved: false,
+          commitMessage: id,
+          dsl: { name: "Judge", version: id, nodes: [], edges: [] },
+        });
+      }
+      await repository.publish({ id: "judge", projectId: "project_1", versionId: "judge_v1" });
+
+      return ServerWorkflowService.create({
+        repository,
+        datasets: new TestDatasetService().api,
+        studioEvents: new FakeStudioEventPreparer(),
+        dslMigration: new FakeWorkflowDslMigration(),
+        execution: new FakeWorkflowExecution(),
+        ids: new FakeWorkflowId(),
+      });
+    }
+
+    /** @scenario "Evaluator workflows are listed with only their published version" */
+    it("answers each evaluator workflow with only the version it published", async () => {
+      const workflowService = await evaluatorProject();
+
+      const found = await workflowService.findEvaluatorWorkflows({ projectId: "project_1" });
+
+      expect(
+        found
+          .map(({ id, versions }) => ({ id, versions: versions.map((version) => version.id) }))
+          .toSorted((left, right) => left.id.localeCompare(right.id)),
+      ).toEqual([
+        { id: "draft", versions: [] },
+        { id: "judge", versions: ["judge_v1"] },
+      ]);
+    });
+
+    /** @scenario "Evaluator workflows are listed with only their published version" */
+    it("answers none for another project", async () => {
+      const workflowService = await evaluatorProject();
+
+      await expect(
+        workflowService.findEvaluatorWorkflows({ projectId: "project_2" }),
+      ).resolves.toEqual([]);
     });
   });
 });

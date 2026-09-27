@@ -2,7 +2,7 @@
 // every request and one route per prefix, the API's whole surface behind
 // `/api`, and the browser application behind `/`.
 
-export { answerApiFailure, composeApiApplication } from "./api-application.ts";
+export { answerApiFailure, apiRootPaths, composeApiApplication } from "./api-application.ts";
 export {
   HttpMux,
   type HttpExchange,

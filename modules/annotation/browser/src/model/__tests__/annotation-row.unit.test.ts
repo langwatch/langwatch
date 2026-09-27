@@ -1,4 +1,5 @@
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { readAnnotationScoreOptions } from "@langwatch/annotation-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -13,7 +14,6 @@ import {
   suggestionExportLine,
   toOccurredAtMsHint,
 } from "../annotation-row.ts";
-import { readAnnotationScoreOptions } from "../annotation-score-options.ts";
 
 const score = (scoreOptions: unknown) => ({ scoreOptions });
 

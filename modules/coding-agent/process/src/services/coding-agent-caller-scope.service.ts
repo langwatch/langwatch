@@ -1,33 +1,13 @@
 // Organization's projects split by caller's traces:view and cost:view
 // permissions; projects enumerated from org, never from request; both cuts
 // through batched probe to prevent REST/page drift.
+import type { CodingAgentContributorProject } from "@langwatch/coding-agent-contract";
+
 import type {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopeCaller,
   CodingAgentScopePermissions,
 } from "../app/coding-agent.members.ts";
-
-/** How one permitted project is named to a reader. */
-export interface CallerProjectDisplay {
-  /** The project's own name. */
-  name: string;
-  /** The project's slug, which addresses its pages. */
-  slug: string;
-  /** Whether the project is one person's workspace rather than a shared one. */
-  isPersonal: boolean;
-  /**
-   * Who work in this project is attributed to: a personal workspace is named
-   * by its one person; a shared project is named by itself, since the work
-   * belongs to the project, not to anyone the platform can identify.
-   */
-  contributorLabel: string;
-  /**
-   * Whether `contributorLabel` names a project a reader can open, rather than
-   * a person. Personal workspaces never link: the label is somebody's name,
-   * and the workspace behind it is theirs alone.
-   */
-  isLinkable: boolean;
-}
 
 export interface CallerProjectScope {
   /** Projects the caller may read. Work outside it never appears. */
@@ -35,7 +15,7 @@ export interface CallerProjectScope {
   /** The subset of those the caller may also price. */
   costProjectIds: string[];
   /** How each permitted project is named to a reader, keyed by project id. */
-  projects: Record<string, CallerProjectDisplay>;
+  projects: Record<string, CodingAgentContributorProject>;
 }
 
 export interface CodingAgentCallerScopeDependencies {
@@ -80,6 +60,7 @@ export class CodingAgentCallerScopeService {
     const permitted = projects.filter((project) => viewable.has(project.id));
     const permittedProjectIds = permitted.map((project) => project.id);
     const ownerNames = await directory.listPersonalTeamOwnerNames({
+      organizationId: input.organizationId,
       teamIds: permitted.filter((project) => project.isPersonal).map((project) => project.teamId),
     });
 
@@ -90,14 +71,12 @@ export class CodingAgentCallerScopeService {
         permitted.map((project) => [
           project.id,
           {
-            name: project.name,
             slug: project.slug,
-            isPersonal: project.isPersonal,
             contributorLabel: project.isPersonal
               ? (ownerNames.get(project.teamId) ?? project.name)
               : project.name,
             isLinkable: !project.isPersonal,
-          } satisfies CallerProjectDisplay,
+          } satisfies CodingAgentContributorProject,
         ]),
       ),
     };

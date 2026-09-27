@@ -117,10 +117,11 @@ export interface ProjectedAnnotation {
 
 /**
  * A trace as seen by the projector: the core `Trace` plus the Postgres-sourced
- * annotations the ENGINE attaches when `needsAnnotations` is set.
+ * annotations the ENGINE attaches when `needsAnnotations` is set. They sit beside
+ * the list read's `annotations` summary, and project under `annotations`.
  */
 export type ProjectableTrace = Trace & {
-  annotations?: ProjectedAnnotation[];
+  projectedAnnotations?: ProjectedAnnotation[];
 };
 
 /** One projected output row (one per trace), shaped to mirror the selection. */

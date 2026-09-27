@@ -1,4 +1,8 @@
-import type { BatchEvaluationRecord, BatchEvaluationSummary } from "@langwatch/dataset-contract";
+import type {
+  BatchEvaluationEntry,
+  BatchEvaluationRecord,
+  BatchEvaluationSummary,
+} from "@langwatch/dataset-contract";
 
 /**
  * The batch-evaluation rows an experiment's runs are summarised by. They sit
@@ -12,4 +16,5 @@ export interface BatchEvaluationRepository {
     projectId: string;
     experimentId: string;
   }): Promise<BatchEvaluationRecord[]>;
+  create(input: BatchEvaluationEntry): Promise<void>;
 }

@@ -69,6 +69,33 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  describe("when a public evaluate door writes its own ledger entry", () => {
+    /** @scenario "A public evaluate call writes its cost to the ledger" */
+    it("reads the entry back by its id, inside its project only", async () => {
+      const repository = backend.repository();
+      const id = `cost_${randomUUID()}`;
+
+      await repository.createEntry({
+        id,
+        projectId: backend.projectId(),
+        costType: "GUARDRAIL",
+        costName: "Toxicity",
+        referenceType: "CHECK",
+        referenceId: "monitor-1",
+        amount: 0.01,
+        currency: "USD",
+        extraInfo: { trace_id: "trace-1" },
+      });
+
+      await expect(repository.findById({ id, projectId: backend.projectId() })).resolves.toEqual({
+        id,
+      });
+      await expect(
+        repository.findById({ id, projectId: backend.otherProjectId() }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("when the same run is recorded twice", () => {
     it("refuses the second write rather than billing the project again", async () => {
       const repository = backend.repository();

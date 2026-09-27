@@ -41,6 +41,20 @@ Feature: Shared Dataset service
     Then the Dataset service uses injected storage and queue capabilities
     And it does not import an object-store client or global Prisma
 
+  @unit
+  Scenario: A dataset evaluation finds its dataset by slug alone
+    Given a project holding a dataset with the slug "golden-set"
+    When a dataset evaluation names "golden-set"
+    Then that dataset comes back, archived or not
+    And the dataset's id is not read as its slug
+    And another project's lookup answers no dataset
+
+  @unit
+  Scenario: A dataset evaluation records each scored entry as a batch-evaluation row
+    Given a dataset evaluation that scored one entry inside an experiment
+    When the row is recorded
+    Then the experiment's batch-evaluation records hold it beside the dataset it ran over
+
   @integration
   Scenario: The memory and Postgres dataset repositories answer alike
     Given the same datasets and entries written to each backend

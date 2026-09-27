@@ -15,6 +15,7 @@ import type {
   CreateSuiteCommand,
   RecordSuiteRunItemStartedCommandData,
   RegradeSuiteRunItemCommandData,
+  RunPlanWire,
   Suite,
   SuiteArchivedNamesInput,
   SuiteIdInput,
@@ -31,6 +32,14 @@ import type {
 export interface SuiteApi {
   listByIds(input: { projectId: string; ids: readonly string[] }): Promise<Suite[]>;
   list(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
+  /** The project's run plans with their own evaluators and a link into the interface it reads. */
+  listRunPlans(input: {
+    projectId: string;
+    projectSlug: string;
+    includeArchived?: boolean;
+  }): Promise<RunPlanWire[]>;
+  /** One run plan as `listRunPlans` answers it; a missing id or a test suite id is not found. */
+  getRunPlan(input: { projectId: string; projectSlug: string; id: string }): Promise<RunPlanWire>;
   listTestSuites(input: {
     projectId: string;
     includeArchived?: boolean;

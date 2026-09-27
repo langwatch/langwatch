@@ -170,6 +170,21 @@ function makeRelay(
   };
 }
 
+type Relay = ReturnType<typeof makeRelay>["relay"];
+
+/** Feeds frames to the relay in order, as the pushed connection does. */
+async function handleAll({
+  relay,
+  frames,
+}: {
+  relay: Relay;
+  frames: Parameters<Relay["handle"]>[0][];
+}) {
+  for (const f of frames) {
+    await relay.handle(f);
+  }
+}
+
 /** A real signed envelope for a payload object. */
 const frame = (payload: unknown, identity = IDENTITY, runToken = RUN_TOKEN) =>
   signFrame(runToken, identity, JSON.stringify(payload));
@@ -249,7 +264,9 @@ describe("LangyTurnRelayAdapter", () => {
       });
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given a plan snapshot frame", () => {
     it("mirrors it to the live buffer AND records the durable plan_updated", async () => {
       const { relay, buffer, conversations } = makeRelay();
@@ -296,7 +313,9 @@ describe("LangyTurnRelayAdapter", () => {
       expect(buffer.appendPlan).not.toHaveBeenCalled();
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given a LangWatch capability tool call", () => {
     it("emits a present-continuous sub-status on start and clears it on end", async () => {
       const { relay, buffer } = makeRelay();
@@ -352,7 +371,9 @@ describe("LangyTurnRelayAdapter", () => {
       expect(buffer.appendStatus).not.toHaveBeenCalled();
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given named tool-call frames (live card + durable milestone)", () => {
     it("records a tool start as both a card and a durable event", async () => {
       const { relay, buffer, conversations } = makeRelay();
@@ -465,25 +486,26 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given a navigate instruction (the agent asking to open a resource it surfaced)", () => {
     /** @scenario "The navigation address is platform-computed, never agent-authored" */
     it("resolves the address from the platform link it remembered — never an address the agent authors", async () => {
       const { relay, buffer, conversations } = makeRelay();
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
       buffer.appendTool.mockClear();
       conversations.recordToolCallStarted.mockClear();
       conversations.recordToolCallCompleted.mockClear();
 
       // The navigate call's own output ("attacker-supplied" address) must be
       // ignored — only the id it named, and the CACHED platform link, matter.
-      for (const f of navigateFrames("run_1", {
-        output: JSON.stringify({ href: "https://evil.example.com/steal" }),
-      })) {
-        await relay.handle(f);
-      }
+      await handleAll({
+        relay: relay,
+        frames: navigateFrames("run_1", {
+          output: JSON.stringify({ href: "https://evil.example.com/steal" }),
+        }),
+      });
 
       expect(buffer.appendNavigate).toHaveBeenCalledWith({
         conversationId: "conv-1",
@@ -505,9 +527,10 @@ describe("LangyTurnRelayAdapter", () => {
       // (sharing only the store) must still resolve the earlier lookup.
       const resourceLinks = fakeResourceLinks();
       const first = makeRelay({ resourceLinks });
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await first.relay.handle(f);
-      }
+      await handleAll({
+        relay: first.relay,
+        frames: surfaceResourceFrames({ resourceId: "run_1" }),
+      });
 
       const second = makeRelay({ resourceLinks });
       const nextTurn = { ...IDENTITY, turnId: "turn-2" };
@@ -545,18 +568,20 @@ describe("LangyTurnRelayAdapter", () => {
       const { relay, buffer } = makeRelay();
       const drawerUrl =
         "https://app.langwatch.ai/acme/simulations?drawer.open=scenarioRunDetail&drawer.scenarioRunId=run_9";
-      for (const f of surfaceResourceFrames({
-        resourceId: "batch_1",
-        platformUrl: drawerUrl,
-      })) {
-        await relay.handle(f);
-      }
+      await handleAll({
+        relay: relay,
+        frames: surfaceResourceFrames({
+          resourceId: "batch_1",
+          platformUrl: drawerUrl,
+        }),
+      });
 
       for (const target of ["batch_1", "run_9"]) {
         buffer.appendNavigate.mockClear();
-        for (const f of navigateFrames(target, { id: `call-nav-${target}` })) {
-          await relay.handle(f);
-        }
+        await handleAll({
+          relay: relay,
+          frames: navigateFrames(target, { id: `call-nav-${target}` }),
+        });
         expect(buffer.appendNavigate).toHaveBeenCalledWith({
           conversationId: "conv-1",
           turnId: "turn-1",
@@ -603,9 +628,10 @@ describe("LangyTurnRelayAdapter", () => {
 
       for (const target of ["run_7", "batch_3"]) {
         buffer.appendNavigate.mockClear();
-        for (const f of navigateFrames(target, { id: `call-nav-${target}` })) {
-          await relay.handle(f);
-        }
+        await handleAll({
+          relay: relay,
+          frames: navigateFrames(target, { id: `call-nav-${target}` }),
+        });
         expect(buffer.appendNavigate).toHaveBeenCalledWith({
           conversationId: "conv-1",
           turnId: "turn-1",
@@ -619,9 +645,7 @@ describe("LangyTurnRelayAdapter", () => {
       // Only the sole plain invocation was intercepted, so the chained form rendered as an ordinary
       // tool card and nothing navigated.
       const { relay, buffer, conversations } = makeRelay();
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
       buffer.appendTool.mockClear();
 
       const command =
@@ -696,9 +720,7 @@ describe("LangyTurnRelayAdapter", () => {
       );
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
 
-      for (const f of navigateFrames("run_cold")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_cold") });
 
       expect(resolveResourceUrl).toHaveBeenCalledWith({
         projectId: "proj-1",
@@ -714,13 +736,9 @@ describe("LangyTurnRelayAdapter", () => {
     it("prefers the remembered link and never consults the fallback on a cache hit", async () => {
       const resolveResourceUrl = vi.fn(async () => null);
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
 
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(resolveResourceUrl).not.toHaveBeenCalled();
       expect(buffer.appendNavigate).toHaveBeenCalledWith({
@@ -735,9 +753,7 @@ describe("LangyTurnRelayAdapter", () => {
       const resolveResourceUrl = vi.fn(async () => null);
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
 
-      for (const f of navigateFrames("run_gone")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_gone") });
 
       expect(resolveResourceUrl).toHaveBeenCalled();
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
@@ -745,9 +761,7 @@ describe("LangyTurnRelayAdapter", () => {
 
     it("never navigates for a navigate command that only appears inside quoted text", async () => {
       const { relay, buffer } = makeRelay();
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
 
       for (const phase of [
         { phase: "start" as const },
@@ -770,16 +784,12 @@ describe("LangyTurnRelayAdapter", () => {
     /** @scenario "Reopening a past conversation does not replay its navigation" */
     it("stays live-only — never becomes a durable event, so a reopened conversation cannot replay it", async () => {
       const { relay, buffer, conversations } = makeRelay();
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
       // The surfacing tool call above IS durably recorded (as any tool call
       // is) — only the navigate frames below must leave no durable trace.
       conversations.recordToolCallStarted.mockClear();
       conversations.recordToolCallCompleted.mockClear();
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).toHaveBeenCalledTimes(1);
       // Every durable command the relay knows how to call — none of them ran
@@ -815,9 +825,7 @@ describe("LangyTurnRelayAdapter", () => {
           output: "Error: 403 — you do not have access to this resource",
         }),
       );
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
     });
@@ -837,9 +845,7 @@ describe("LangyTurnRelayAdapter", () => {
       })) {
         await relay.handle(f);
       }
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
     });
@@ -873,9 +879,7 @@ describe("LangyTurnRelayAdapter", () => {
         }),
       );
 
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
     });
@@ -883,16 +887,15 @@ describe("LangyTurnRelayAdapter", () => {
     /** @scenario "A navigation target outside the app never moves the browser" */
     it("drops navigation when the remembered link resolves outside this instance", async () => {
       const { relay, buffer } = makeRelay();
-      for (const f of surfaceResourceFrames({
-        resourceId: "run_1",
-        platformUrl:
-          "https://not-this-instance.example.com/acme/simulations/set_1/batch_1?openRun=run_1",
-      })) {
-        await relay.handle(f);
-      }
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({
+        relay: relay,
+        frames: surfaceResourceFrames({
+          resourceId: "run_1",
+          platformUrl:
+            "https://not-this-instance.example.com/acme/simulations/set_1/batch_1?openRun=run_1",
+        }),
+      });
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
     });
@@ -902,15 +905,14 @@ describe("LangyTurnRelayAdapter", () => {
       // resolved) must never land the user on the wrong page — it is not
       // cached as navigable at all.
       const { relay, buffer } = makeRelay();
-      for (const f of surfaceResourceFrames({
-        resourceId: "run_1",
-        platformUrl: "https://app.langwatch.ai/acme/simulations",
-      })) {
-        await relay.handle(f);
-      }
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({
+        relay: relay,
+        frames: surfaceResourceFrames({
+          resourceId: "run_1",
+          platformUrl: "https://app.langwatch.ai/acme/simulations",
+        }),
+      });
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
 
       expect(buffer.appendNavigate).not.toHaveBeenCalled();
     });
@@ -918,13 +920,9 @@ describe("LangyTurnRelayAdapter", () => {
     /** @scenario "A navigate instruction arriving mid-stream does not interrupt the answer" */
     it("does not interrupt the rest of the turn — tokens keep streaming and the final still lands", async () => {
       const { relay, buffer, conversations } = makeRelay();
-      for (const f of surfaceResourceFrames({ resourceId: "run_1" })) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: surfaceResourceFrames({ resourceId: "run_1" }) });
       await relay.handle(frame({ type: "delta", text: "Here's the run: " }));
-      for (const f of navigateFrames("run_1")) {
-        await relay.handle(f);
-      }
+      await handleAll({ relay: relay, frames: navigateFrames("run_1") });
       await relay.handle(frame({ type: "delta", text: "it passed." }));
       const out = await relay.handle(frame({ type: "final", text: "Here's the run: it passed." }));
 
@@ -941,7 +939,9 @@ describe("LangyTurnRelayAdapter", () => {
       );
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given terminal frames", () => {
     it("marks the stream end and ingests the durable completed result", async () => {
       const { relay, buffer, conversations } = makeRelay();
@@ -1030,7 +1030,9 @@ describe("LangyTurnRelayAdapter", () => {
       expect(conversations.ingestAgentTurnResult).not.toHaveBeenCalled();
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given an attacker or a corrupt frame", () => {
     it("rejects a tampered signature and applies nothing", async () => {
       const { relay, buffer } = makeRelay();
@@ -1079,7 +1081,9 @@ describe("LangyTurnRelayAdapter", () => {
       expect(out).toEqual({ status: "rejected", reason: "invalid-payload" });
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given a multi-frame turn", () => {
     it("loads the runToken once and reuses it across frames", async () => {
       const { relay, conversations } = makeRelay();
@@ -1089,7 +1093,9 @@ describe("LangyTurnRelayAdapter", () => {
       expect(conversations.findRunToken).toHaveBeenCalledTimes(1);
     });
   });
+});
 
+describe("LangyTurnRelayAdapter", () => {
   describe("given the run-token handoff races the projection", () => {
     describe("when a frame arrives before the projection has landed", () => {
       it("authenticates it against the handoff token", async () => {

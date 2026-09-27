@@ -27,6 +27,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -37,6 +40,9 @@
     },
     {
       "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
@@ -63,6 +69,9 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
@@ -70,6 +79,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     }
   ]
 }

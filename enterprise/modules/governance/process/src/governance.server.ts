@@ -4,7 +4,6 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import { defineServerModule } from "@langwatch/kernel";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
@@ -17,10 +16,6 @@ import { defineServerModule } from "@langwatch/kernel";
  */
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import {
-  GovernanceInstallationComposition,
-  type GovernanceInstallationOptions,
-} from "./app/governance-installation-composition.build.ts";
 import {
   PostgresGovernanceAdapter,
   type PostgresGovernanceAdapterOptions,
@@ -224,17 +219,6 @@ export function findAgentsListings(options: {
     sourceIds: options.sourceIds,
     projectId: options.projectId,
   });
-}
-
-/**
- * The whole Governance capability an API-role process installs, over the
- * connection and the peers it holds. Every repository and service behind it
- * stays private to this feature server.
- */
-export function createGovernanceInstallation(
-  options: GovernanceInstallationOptions,
-): GovernanceApi {
-  return GovernanceInstallationComposition.create(options).build();
 }
 
 /** Where a governance signal is stated, and where a failure to state it is reported. */

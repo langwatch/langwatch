@@ -63,3 +63,31 @@ Feature: Suite service
     Given a test suite whose attached evaluator reads one of its fields
     When an edit removes that field and keeps the evaluator
     Then the edit is refused with suite_field_in_use
+
+  # Main's SuiteRunService.startRun: a run the queue refused has no run and never
+  # will, so a caller waiting on its scenarioRunId would wait forever.
+  @unit @regression
+  Scenario: A run the queue refused is left out of the batch it answers
+    Given a suite run over two scenarios
+    And the queue refuses the first scenario's run
+    When the suite run is started
+    Then the answer counts one queued run
+    And lists only the run that was queued
+
+  # The suite starts its run on suite_run_processing and hands each scenario run
+  # to the scenario owner, which records the run's metadata (main's startRun).
+  @unit @regression
+  Scenario: Running a stored run plan through the process schedules its runs
+    Given the suite module installed in the api role over memory persistence
+    When a stored run plan is run
+    Then its suite run is started and its scenario run is queued by the scenario owner
+    And the run is not refused with service_unavailable
+
+  # Main stamped these beside the target on every suite run; the result atoms and
+  # run configurations read targetKey back out of the reserved namespace.
+  @unit @regression
+  Scenario: A suite run's target key, target overrides and plan models reach the queued run
+    Given a suite run against a target with overrides, on a plan naming both models
+    When the scenario owner queues one of its runs
+    Then the run's reserved namespace records the target key and the target's overrides
+    And it records the models the plan was configured with

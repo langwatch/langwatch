@@ -181,6 +181,17 @@ export class DatasetService {
     return this.naming.findNextAvailableName(input);
   }
 
+  /** Slug only, archived rows included, as main's `dataset.findFirst({ slug, projectId })` read. */
+  async findBySlug(input: { projectId: string; slug: string }): Promise<Dataset[]> {
+    const dataset = await this.options.repository.findBySlug({
+      projectId: input.projectId,
+      slug: input.slug,
+      includeArchived: true,
+    });
+
+    return dataset ? [dataset] : [];
+  }
+
   async getBySlugOrId(input: DatasetLookupInput): Promise<Dataset> {
     const parsed = datasetLookupInputSchema.parse(input);
     const dataset =

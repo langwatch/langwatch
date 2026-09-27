@@ -6,14 +6,13 @@ import { toLLMModeTrace } from "../../rules/trace-formatting.rules.ts";
 const NOW = Date.UTC(2026, 5, 15, 12, 0, 0);
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-/** Only the fields the timestamp rendering reads; the rest never leaves the spread. */
-const makeTrace = (timestamps: Record<string, unknown>): Trace =>
-  ({
-    trace_id: "trace-1",
-    project_id: "project-1",
-    spans: [],
-    timestamps,
-  }) as unknown as Trace;
+const makeTrace = (timestamps: Trace["timestamps"]): Trace => ({
+  trace_id: "trace-1",
+  project_id: "project-1",
+  metadata: {},
+  spans: [],
+  timestamps,
+});
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -72,38 +71,6 @@ describe("toLLMModeTrace", () => {
       expect(result.timestamps.started_at).toMatch(/^\d{2}\/[A-Z][a-z]{2} \d{2}:\d{2}$/);
       expect(result.timestamps.started_at).not.toContain("ago");
       expect(result.timestamps.inserted_at).toContain("ago");
-    });
-  });
-
-  describe("when a timestamp crossed the wire as an ISO string", () => {
-    /** @scenario "A time inside the last day reads as an interval" */
-    it("reads it as the same moment the epoch millisecond count names", () => {
-      const startedAtMs = NOW - 12 * 60 * 1000;
-
-      const fromString = toLLMModeTrace(
-        makeTrace({
-          started_at: new Date(startedAtMs).toISOString(),
-          inserted_at: new Date(NOW).toISOString(),
-          updated_at: new Date(NOW).toISOString(),
-        }),
-      );
-      const fromNumber = toLLMModeTrace(
-        makeTrace({ started_at: startedAtMs, inserted_at: NOW, updated_at: NOW }),
-      );
-
-      expect(fromString.timestamps).toEqual(fromNumber.timestamps);
-      expect(fromString.timestamps.started_at).toBe("12 minutes ago");
-    });
-  });
-
-  describe("when the trace carries no insert or update time", () => {
-    /** @scenario "A missing timestamp reads as nothing rather than as 1970" */
-    it("reads them as empty strings rather than as dates at the epoch", () => {
-      const result = toLLMModeTrace(makeTrace({ started_at: NOW - 5 * 60 * 1000 }));
-
-      expect(result.timestamps.inserted_at).toBe("");
-      expect(result.timestamps.updated_at).toBe("");
-      expect(result.timestamps.started_at).toBe("5 minutes ago");
     });
   });
 

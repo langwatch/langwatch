@@ -29,7 +29,6 @@ export {
  * doors get.
  */
 export type {
-  CallerProjectDisplay,
   CallerProjectScope,
   CodingAgentCallerScopeDependencies,
 } from "./services/coding-agent-caller-scope.service.ts";
@@ -59,7 +58,6 @@ export {
   OtelCodingAgentReadMetricsService,
 } from "./services/coding-agent-read-metrics-otel.service.ts";
 export type {
-  CodingAgentAuditSink,
   CodingAgentViewerVisibility,
   CodingAgentViewerVisibilityReader,
-} from "./app/coding-agent.app.ts";
+} from "./app/coding-agent.members.ts";

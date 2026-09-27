@@ -38,11 +38,11 @@ describe("governance backend services", () => {
     });
 
     await expect(
-      adapter.build().policy.resolveSourceNonBillable({
+      adapter.build().policy.isSourceBilled({
         organizationId: "org",
         sourceType: "codex",
       }),
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
   });
 
   /** @scenario "A cost-attribution resolution is cached and an explicit billable tile is honored" */
@@ -55,12 +55,12 @@ describe("governance backend services", () => {
       clock: () => 1,
     });
     await expect(
-      service.resolveSourceNonBillable({
+      service.isSourceBilled({
         organizationId: "org",
         sourceType: "claude_code",
       }),
-    ).resolves.toBe(false);
-    await service.resolveSourceNonBillable({
+    ).resolves.toBe(true);
+    await service.isSourceBilled({
       organizationId: "org",
       sourceType: "claude_code",
     });

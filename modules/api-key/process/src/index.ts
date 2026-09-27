@@ -25,7 +25,6 @@ export type {
 } from "./app/api-key.app.ts";
 export {
   apiKeyServer,
-  hashApiKeySecret,
   createAgentSandboxKeyReapService,
   createCliLoginKeyReapService,
 } from "./api-key.server.ts";

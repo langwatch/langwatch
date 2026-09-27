@@ -1,17 +1,16 @@
+import type { UiDatasetRecordSyncProps } from "@langwatch/browser-host/declarations";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { AutosaveState } from "@langwatch/dataset-browser-kit";
-import { useDatasetRecordSync } from "@langwatch/dataset-browser/dataset-record-sync";
 import { useCallback } from "react";
 
 import type { DatasetReference } from "../../model/experiments-v3/types.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 
 /**
- * Syncs saved dataset record changes from the workbench store to the database. Thin
- * adapter over the shared useDatasetRecordSync: resolves full records out of the
- * store's dataset state and reports status into the store's autosave indicator.
+ * What dataset's lent record sync needs from the workbench store: full records
+ * resolved out of the store's dataset state, and status into its autosave indicator.
  */
-export const useDatasetSync = () => {
+export const useDatasetSyncProps = (): UiDatasetRecordSyncProps => {
   const { project } = useOrganizationTeamProject();
 
   const { datasets, pendingSavedChanges, clearPendingChange, setAutosaveStatus } =
@@ -44,11 +43,11 @@ export const useDatasetSync = () => {
     [setAutosaveStatus],
   );
 
-  useDatasetRecordSync({
+  return {
     projectId: project?.id,
     pendingSavedChanges,
     resolveFullRecord,
     clearPendingChange,
     onStatus,
-  });
+  };
 };

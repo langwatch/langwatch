@@ -81,6 +81,57 @@ describe("given the id names a test suite", () => {
   });
 });
 
+describe("given a run plan with one evaluator attached to it", () => {
+  const attachment = {
+    id: "attachment-1",
+    evaluatorId: "evaluator-1",
+    required: true,
+    mappings: { output: { type: "value" as const, value: "refund issued" } },
+  };
+
+  /** @scenario "Reading a run plan answers the plan's own evaluators" */
+  it("answers the evaluator on the read and on the list", async () => {
+    const { api, world } = mountSuiteFamilies();
+    const plan = world.addPlan({ name: "Nightly" });
+    world.attachPlanEvaluators(plan.id, [attachment]);
+
+    const read = await api.get(`${BASE}/${plan.id}`);
+    const listed = await api.get(BASE);
+
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toMatchObject({ evaluators: [attachment] });
+    await expect(listed.json()).resolves.toMatchObject([{ id: plan.id, evaluators: [attachment] }]);
+  });
+});
+
+describe("given the project reads the Agent Testing interface", () => {
+  /** @scenario "A run plan links into Agent Testing when the project reads it" */
+  it("links the plan into the Agent Testing results", async () => {
+    const { api, world } = mountSuiteFamilies({ agentTesting: true });
+    const plan = world.addPlan({ name: "Nightly" });
+
+    const response = await api.get(`${BASE}/${plan.id}`);
+
+    await expect(response.json()).resolves.toMatchObject({
+      platformUrl: `https://app.langwatch.test/acme/agent-testing/results/${plan.slug}`,
+    });
+  });
+});
+
+describe("given the project does not read the Agent Testing interface", () => {
+  /** @scenario "A run plan links into the Simulations pages otherwise" */
+  it("links every listed plan into the Simulations pages", async () => {
+    const { api, world } = mountSuiteFamilies({ agentTesting: false });
+    const plan = world.addPlan({ name: "Nightly" });
+
+    const response = await api.get(BASE);
+
+    await expect(response.json()).resolves.toMatchObject([
+      { platformUrl: `https://app.langwatch.test/acme/simulations/run-plans/${plan.slug}` },
+    ]);
+  });
+});
+
 describe("given a configuration over one scenario and one agent", () => {
   describe("when it is run under a name nothing answers to", () => {
     /** @scenario "Running a configuration creates the run plan its name resolves" */
@@ -225,9 +276,7 @@ describe("given a configuration over one scenario and one agent", () => {
       });
 
       expect(response.status).toBe(200);
-      const langwatch = langwatchMetadata(commands.queued[0]?.metadata);
-      expect(langwatch).not.toHaveProperty("actorId");
-      expect(langwatch).not.toHaveProperty("actorLabel");
+      expect(commands.queued[0]?.actor).toBeUndefined();
     });
   });
 
@@ -254,10 +303,7 @@ describe("given a configuration over one scenario and one agent", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(langwatchMetadata(mounted.commands.queued[0]?.metadata)).toMatchObject({
-        actorId: "user-runner",
-        actorLabel: "api",
-      });
+      expect(mounted.commands.queued[0]?.actor).toEqual({ id: "user-runner", label: "api" });
     });
 
     /** @scenario "A run started from the command line records the cli actor" */
@@ -276,10 +322,7 @@ describe("given a configuration over one scenario and one agent", () => {
       );
 
       expect(response.status).toBe(200);
-      expect(langwatchMetadata(mounted.commands.queued[0]?.metadata)).toMatchObject({
-        actorId: "user-runner",
-        actorLabel: "cli",
-      });
+      expect(mounted.commands.queued[0]?.actor).toEqual({ id: "user-runner", label: "cli" });
     });
   });
 
@@ -413,8 +456,3 @@ describe("given the family's addresses", () => {
     expect(response.status).toBe(404);
   });
 });
-
-/** The `langwatch` block a queued run carries its actor in. */
-function langwatchMetadata(metadata: unknown): Record<string, unknown> {
-  return ((metadata ?? {}) as { langwatch?: Record<string, unknown> }).langwatch ?? {};
-}

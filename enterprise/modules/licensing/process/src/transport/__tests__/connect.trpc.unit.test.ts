@@ -7,7 +7,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { createTestLicensingApp } from "../../testing.ts";
+import { createTestLicensingApp } from "../../__tests__/testing.ts";
 import { connectTrpcTransport } from "../connect.trpc.ts";
 import {
   licensingTrpcTestMembers,

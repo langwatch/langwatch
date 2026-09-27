@@ -80,7 +80,7 @@ export const simulationRunMetadataSchema = z
     langwatch: z
       .looseObject({
         targetReferenceId: z.string(),
-        targetType: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+        targetType: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
         /**
          * The key the target folds under: the reference id alone, or the
          * reference id and a hash of its parameter overrides. Absent on runs

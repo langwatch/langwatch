@@ -5,11 +5,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { SuiteRunConfirmationDialog } from "@langwatch/suite-browser-kit";
+import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { SimulationSuite } from "../../../model/prisma-types.ts";
 import { useRunSuite } from "../use-run-suite.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -62,7 +62,7 @@ function buildSuite(): SimulationSuite {
     labels: [],
     simulatorModel: null,
     judgeModel: null,
-    kind: "custom",
+    kind: "run_plan",
     scope: null,
     archivedAt: null,
     createdAt: new Date(0),

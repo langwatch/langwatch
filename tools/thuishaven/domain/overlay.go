@@ -151,7 +151,7 @@ func (s Stack) OverlayEnv() []string {
 	if s.DisableGoogleDLP {
 		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
-	// The rest of the static seeded identity (see prisma/seed.ts's header comment
+	// The rest of the static seeded identity (see storage-seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
 	// can log in / authenticate without rediscovering them.
 	env = append(env,

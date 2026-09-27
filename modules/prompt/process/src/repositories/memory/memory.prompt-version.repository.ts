@@ -1,10 +1,10 @@
+import { generate } from "@langwatch/ksuid";
 import {
   NotFoundError,
   type SchemaVersion,
   parseLlmConfigVersion,
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
-import { nanoid } from "nanoid";
 
 import {
   LlmConfigVersionsRepository,
@@ -115,6 +115,6 @@ export class MemoryLlmConfigVersionsRepository extends LlmConfigVersionsReposito
     });
   }
   generateVersionId(): string {
-    return `prompt_version_${nanoid()}`;
+    return generate("promptversion").toString();
   }
 }

@@ -43,7 +43,7 @@ function composeService(licenseFeatures?: LicenseFeaturesResolver) {
     notifyLicensePurchase,
   };
   const generateLicense: LicenseGenerator = {
-    generate: () => ({
+    generate: async () => ({
       licenseKey: "key_1",
       licenseData: {
         licenseId: "lic_1",
@@ -76,7 +76,6 @@ describe("LicensePurchaseService", () => {
       await service.handle({
         checkoutSession: checkoutSession(),
         stripe: fakeStripe(),
-        privateKey: "priv",
       });
 
       expect(licenseFeatures.find).toHaveBeenCalledWith({ planType: "ACCELERATE" });
@@ -102,7 +101,6 @@ describe("LicensePurchaseService", () => {
       await service.handle({
         checkoutSession: checkoutSession(),
         stripe: fakeStripe(),
-        privateKey: "priv",
       });
 
       expect(sendLicenseEmail).toHaveBeenCalledWith(
@@ -121,7 +119,6 @@ describe("LicensePurchaseService", () => {
       await service.handle({
         checkoutSession: checkoutSession(),
         stripe: fakeStripe(),
-        privateKey: "priv",
       });
 
       const sent = sendLicenseEmail.mock.calls[0]?.[0];

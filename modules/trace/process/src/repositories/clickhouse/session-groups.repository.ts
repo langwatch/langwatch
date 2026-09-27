@@ -1,4 +1,5 @@
 import { EventUtils } from "@langwatch/eventing";
+import { z } from "zod";
 
 import type {
   SessionGroupRow,
@@ -8,6 +9,7 @@ import type {
   SessionGroupsRepository,
 } from "../session-groups.repository.ts";
 import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
+import { chString } from "./clickhouse.trace-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;
 
@@ -43,25 +45,43 @@ const SORT_EXPRESSIONS: Record<SessionGroupSortColumn, string> = {
 // TotalCost, TotalDurationMs, ...): ClickHouse resolves a same-named alias
 // INSTEAD of the column inside sibling aggregates, which reads as an
 // aggregate nested in an aggregate and fails the whole query.
-interface ClickHouseSessionGroupRow {
-  ConversationId: string;
-  TraceCount: number | string;
-  SessionCost: number | string;
-  SessionTokens: number | string;
-  SessionCacheReadTokens: number | string;
-  SessionCacheCreationTokens: number | string;
-  MaxContextSizeTokens: number | string;
-  SessionDurationMs: number | string;
-  StartedAtMs: number | string;
-  LastActivityMs: number | string;
-  SessionModels: string[];
-  PrimaryModels: string[];
-  SessionServices: string[];
-  SessionErrorCount: number | string;
-  SessionWarningCount: number | string;
-  SessionSpans: number | string;
-  LastTraceId: string;
-}
+const numeric = z.union([z.number(), z.string()]);
+
+const sessionGroupRowSchema = z.looseObject({
+  ConversationId: chString,
+  TraceCount: numeric,
+  SessionCost: numeric,
+  SessionTokens: numeric,
+  SessionCacheReadTokens: numeric,
+  SessionCacheCreationTokens: numeric,
+  MaxContextSizeTokens: numeric,
+  SessionDurationMs: numeric,
+  StartedAtMs: numeric,
+  LastActivityMs: numeric,
+  SessionModels: z.array(chString),
+  PrimaryModels: z.array(chString),
+  SessionServices: z.array(chString),
+  SessionErrorCount: numeric,
+  SessionWarningCount: numeric,
+  SessionSpans: numeric,
+  LastTraceId: chString,
+});
+
+const sessionGroupRowsSchema = z.array(sessionGroupRowSchema);
+
+type ClickHouseSessionGroupRow = z.infer<typeof sessionGroupRowSchema>;
+
+const totalHitsRowSchema = z.looseObject({ totalHits: numeric });
+
+const totalHitsRowsSchema = z.array(totalHitsRowSchema);
+
+const previewRowSchema = z.looseObject({
+  TraceId: chString,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+});
+
+const previewRowsSchema = z.array(previewRowSchema);
 
 function isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
   return timeRange.live === true;
@@ -192,8 +212,8 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       }),
     ]);
 
-    const rows = await result.json<ClickHouseSessionGroupRow>();
-    const countRows = await countResult.json<{ totalHits: number | string }>();
+    const rows = sessionGroupRowsSchema.parse(await result.json());
+    const countRows = totalHitsRowsSchema.parse(await countResult.json());
     const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
 
     const previews = await this.findPreviewsByTraceIds({
@@ -309,11 +329,7 @@ export class SessionGroupsClickHouseRepository implements SessionGroupsRepositor
       format: "JSONEachRow",
     });
 
-    const rows = await result.json<{
-      TraceId: string;
-      ComputedInput: string | null;
-      ComputedOutput: string | null;
-    }>();
+    const rows = previewRowsSchema.parse(await result.json());
     for (const row of rows) {
       previews.set(row.TraceId, {
         input: row.ComputedInput ?? null,

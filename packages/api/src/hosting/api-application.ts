@@ -12,8 +12,8 @@ import type { RestHost } from "../rest/host.ts";
 import { canonicalErrorAnswer } from "../rest/response.ts";
 import { TrpcHost } from "../trpc/host.ts";
 import { SseLane } from "../trpc/sse.ts";
+import { mountApiDiscovery } from "./api-discovery.ts";
 import type { HttpFailureAnswer } from "./http-mux.ts";
-import { openapiDocumentRoute } from "./openapi-document.ts";
 
 /** The tRPC lanes, then every REST family, then the 404 — mount order is match order. */
 export function composeApiApplication(
@@ -39,7 +39,7 @@ export function composeApiApplication(
   if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
 
   if (hosts.rest) {
-    root.get("/api/openapi.json", openapiDocumentRoute(hosts.rest.app));
+    mountApiDiscovery({ root, restApp: hosts.rest.app });
     root.route("/", hosts.rest.app);
   }
 
@@ -48,6 +48,19 @@ export function composeApiApplication(
   root.all("*", (context) => context.json({ error: "not_found" }, 404));
 
   return root;
+}
+
+/**
+ * The literal paths the application serves outside `/api`, one per resource: a process routes
+ * each here exactly, or the browser application answers them with its shell and a 200.
+ */
+export function apiRootPaths(application: Hono): string[] {
+  const paths = application.routes
+    .map(({ path }) => (path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path))
+    .filter((path) => path.startsWith("/") && path !== "/" && !/[*:]/.test(path))
+    .filter((path) => path !== "/api" && !path.startsWith("/api/"));
+
+  return [...new Set(paths)];
 }
 
 /**

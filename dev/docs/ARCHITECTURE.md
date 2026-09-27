@@ -569,7 +569,9 @@ graceful degenerates to run-to-completion. Migrations are tasks (§7), run befor
 so `apps/tasks` keeps them by hand. Every other task is a module's: `.withTasks(({ app,
 repositories, dependencies }) => [task])` builds it over the booted App in the tasks role only, and
 `server.composeProcess("tasks")` boots the installed list producer-only and runs the named tasks
-(coordinator ruling, 2026-09-25).
+(coordinator ruling, 2026-09-25). A task in `apps/tasks` may read and write the datastores
+directly (Prisma, ClickHouse, Redis): the dev/CI storage seed is such a task, and no module Api
+grows a seeding operation for it (Alex, 2026-09-27).
 
 **A test passes no server** — `createApp({ role: "api" })` registers nothing
 anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
@@ -1142,6 +1144,9 @@ schema's type through a self-referencing generic and sealed closures, like proje
 (Alex, 2026-09-25).
 A list mixing definitions of different types holds them as closures over `unknown` payloads, each
 parsing with its own schema at the queue boundary — never `any`, never a rule exception (Alex, 2026-09-26).
+Per-payload routing (group key, score, coalesce size, dedup id) travels in one reserved `__routing` field on
+the job envelope; `withEvents([])` types a pipeline's events as `never`; a command's lane parse is its only
+validation, handed to `processCommand` (Alex, 2026-09-27).
 Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
 eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
 

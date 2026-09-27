@@ -146,6 +146,18 @@ export class WorkflowService {
     return this.options.repository.findAll(input);
   }
 
+  /** Main's `getCustomEvaluators`: each evaluator workflow narrowed to its published version. */
+  async findEvaluatorWorkflows(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]> {
+    const workflows = await this.options.repository.findEvaluators(input);
+
+    return workflows.map((workflow) => ({
+      ...workflow,
+      versions: workflow.versions.filter((version) => version.id === workflow.publishedId),
+    }));
+  }
+
   getVersions(input: {
     workflowId: string;
     projectId: string;

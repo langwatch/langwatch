@@ -2,6 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment node
  * The feature boots as a whole: the installer, its repositories and the one app
@@ -9,6 +10,7 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -27,7 +29,7 @@ function process(role: "api" | "worker") {
     .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
     .withStores(memoryStores())
     .provide({
-      workflow: createApiFixture<WorkflowApi>(),
+      workflow: createApiFixture<WorkflowApi>({ findEvaluatorWorkflows: async () => [] }),
       trace: createApiFixture<TraceApi>(),
       "model-provider": createApiFixture<ModelProviderApi>({
         getExecutionProviders: async () => ({}),
@@ -35,6 +37,8 @@ function process(role: "api" | "worker") {
       "feature-flag": createApiFixture<FeatureFlagApi>(),
       evaluator: createApiFixture<EvaluatorApi>({ augmentResult: ({ result }) => result }),
       monitor: createApiFixture<MonitorApi>(),
+      dataset: createApiFixture<DatasetApi>(),
+      experiment: createApiFixture<ExperimentApi>(),
       automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({

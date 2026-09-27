@@ -1,6 +1,6 @@
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
-import { nanoid } from "nanoid";
 
 import { PromptTagRepository } from "../prompt-tag.repository.ts";
 
@@ -42,7 +42,7 @@ export class PrismaPromptTagRepository extends PromptTagRepository {
   }): Promise<PromptTag> {
     const tag = await this.prisma.promptTag.create({
       data: {
-        id: `ptag_${nanoid()}`,
+        id: generate("ptag").toString(),
         organizationId,
         name,
         createdById: createdById ?? null,
@@ -224,7 +224,7 @@ export class PrismaPromptTagRepository extends PromptTagRepository {
   async seedForOrg({ organizationId }: { organizationId: string }): Promise<void> {
     await this.prisma.promptTag.createMany({
       data: SEEDED_TAGS.map((tag) => ({
-        id: `ptag_${nanoid()}`,
+        id: generate("ptag").toString(),
         organizationId,
         name: tag,
       })),

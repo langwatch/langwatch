@@ -45,6 +45,7 @@ import {
   type RunsPageAnswer,
   type RunsPageRequest,
   type SavedRunAnswer,
+  type SavedWorkbenchRead,
   type SavedRunRequest,
   type WorkbenchRunAnswer,
   type ExperimentSlugLookup,
@@ -76,6 +77,7 @@ import {
   type ExperimentEvaluationsListPage,
   type ExperimentIdOrSlugInput,
   type ExperimentWizardSaveInput,
+  type TargetConfig,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
@@ -211,6 +213,11 @@ export interface ExperimentAppDependencies {
   modelCosts: ExperimentModelCosts;
   /** The slug this deployment derives from a name. */
   slugify(value: string): string;
+  /** Resolves a saved workbench's column names, over the prompts, agents and evaluators. */
+  workbenchTargetNames(input: {
+    projectId: string;
+    targets: TargetConfig[];
+  }): Promise<Record<string, string>>;
   /** The workbench run loop this deployment composed, or the holes where it did not. */
   runLoop: ExperimentV3RunLoop;
   /** Where a run is recorded and an unnamed failure reported. Both best-effort. */
@@ -312,6 +319,7 @@ export class ExperimentApp implements ExperimentApi {
     });
     this.#workbenchVersions = ExperimentWorkbenchVersionService.create({
       experiments: dependencies.experiments,
+      workbenchTargetNames: (input) => dependencies.workbenchTargetNames(input),
     });
     this.#workflowLinks = ExperimentWorkflowLinkService.create({
       experiments: dependencies.experiments,
@@ -888,8 +896,23 @@ export class ExperimentApp implements ExperimentApi {
     });
   }
 
+  resolveWorkbenchTargetNames(input: {
+    projectId: string;
+    targets: TargetConfig[];
+  }): Promise<Record<string, string>> {
+    return this.#dependencies.workbenchTargetNames(input);
+  }
+
   startSavedRun(input: SavedRunRequest): Promise<SavedRunAnswer> {
     return this.#workbenchRuns.startSavedRun(input);
+  }
+
+  projectSavedWorkbench(input: {
+    projectId: string;
+    slug: string;
+    includeResults?: boolean;
+  }): Promise<SavedWorkbenchRead> {
+    return this.#workbenchVersions.projectSavedBySlug(input);
   }
 
   executeWorkbenchRun(

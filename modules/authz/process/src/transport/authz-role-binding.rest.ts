@@ -16,39 +16,19 @@ import {
   roleBindingRestSchema,
   roleBindingRestUpdateSchema,
   type AuthzManagedOrganizationBinding,
-  type RoleBindingPrincipal,
   type RoleBindingRest,
   type RoleBindingRestListQuery,
 } from "@langwatch/authz-contract";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import { optimisticBindingWire } from "../rules/role-binding-read-back.rules.ts";
+import { bindingWire, optimisticBindingWire } from "../rules/role-binding-read-back.rules.ts";
 
 /** What the organization credential resolved, as this family reads it. */
 export const roleBindingRestFacts = defineRestMiddleware(
   "roleBindingRestFacts",
   z.object({ organizationId: z.string(), actor: grantsLedgerActorSchema }),
 );
-
-const principalOf = (row: AuthzManagedOrganizationBinding): RoleBindingPrincipal => {
-  if (row.userId) return { type: "user", id: row.userId, name: row.userName ?? null };
-  if (row.groupId) return { type: "group", id: row.groupId, name: row.groupName ?? null };
-
-  return { type: "apiKey", id: row.apiKeyId ?? "", name: row.apiKeyName ?? null };
-};
-
-const wire = (row: AuthzManagedOrganizationBinding): RoleBindingRest => ({
-  id: row.id,
-  principal: principalOf(row),
-  role: row.role,
-  customRoleId: row.customRoleId,
-  customRoleName: row.customRoleName,
-  scopeType: row.scopeType,
-  scopeId: row.scopeId,
-  scopeName: row.scopeName,
-  createdAt: row.createdAt,
-});
 
 const matchesFilters = (
   row: AuthzManagedOrganizationBinding,
@@ -76,7 +56,7 @@ const findWrittenBindings = async ({
 }): Promise<RoleBindingRest[]> => {
   const rows = await app.listManagedBindingsForOrganization({ organizationId });
 
-  return rows.filter((candidate) => candidate.id === bindingId).map(wire);
+  return rows.filter((candidate) => candidate.id === bindingId).map(bindingWire);
 };
 
 export const authzRoleBindingRest: Readonly<{
@@ -110,7 +90,7 @@ export const authzRoleBindingRest: Readonly<{
     const limit = input.limit ?? 50;
 
     return {
-      bindings: filtered.slice(offset, offset + limit).map(wire),
+      bindings: filtered.slice(offset, offset + limit).map(bindingWire),
       totalCount: filtered.length,
     };
   })
@@ -168,24 +148,13 @@ export const authzRoleBindingRest: Readonly<{
   .withMiddleware(roleBindingRestFacts)
   .handle(async ({ app, input }, organization) => {
     const organizationId = organization.organizationId;
-    const updated = await app.updateBinding({
+    return app.updateRoleBinding({
       organizationId,
       bindingId: input.id,
       role: input.role,
       ...(input.customRoleId !== undefined ? { customRoleId: input.customRoleId } : {}),
       actor: organization.actor,
     });
-    const [binding] = await findWrittenBindings({ app, organizationId, bindingId: updated.id });
-
-    // A patch, unlike a create, changed a row the service had already read from
-    // the projection, so lag cannot explain its absence: nothing the caller can
-    // act on, so it stays a plain Error and degrades to the generic failure plus
-    // a trace id (ADR-045).
-    if (!binding) {
-      throw new Error(`Role binding ${updated.id} was written but does not read back`);
-    }
-
-    return binding;
   })
 
   .delete("/:id", "deleteRoleBinding")

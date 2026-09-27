@@ -2,9 +2,11 @@ import type { Protections } from "@langwatch/trace-contract";
 /** ADR-087: The joined span read must never emit an empty time predicate. A
  * page of log-only traces (epoch sentinel) left nothing, scanning every weekly
  * part and dying with MEMORY_LIMIT_EXCEEDED. These assert on the SQL. */
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
+import { traceSummaryRow } from "./support/trace-summary-row.support.ts";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),
@@ -35,6 +37,11 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
+/** The repository's first import transforms a large graph; pay it once, outside any test. */
+beforeAll(async () => {
+  await import("../trace-legacy-read.repository.ts");
+}, 60_000);
+
 const protections = {
   canSeeCosts: true,
   canSeePiiData: true,
@@ -45,7 +52,7 @@ const NOW = Date.now();
 const RECENT_MS = NOW - 60 * 60 * 1000;
 
 function summaryRow(traceId: string, occurredAtMs: number) {
-  return {
+  return traceSummaryRow({
     ts_TraceId: traceId,
     ts_SpanCount: 1,
     ts_TotalDurationMs: 100,
@@ -72,7 +79,7 @@ function summaryRow(traceId: string, occurredAtMs: number) {
     ts_OccurredAt: occurredAtMs,
     ts_CreatedAt: occurredAtMs,
     ts_UpdatedAt: occurredAtMs,
-  };
+  });
 }
 
 /** The three reads fetchTracesWithSpansJoined fires with no time range are

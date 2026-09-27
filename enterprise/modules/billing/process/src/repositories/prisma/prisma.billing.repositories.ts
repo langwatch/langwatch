@@ -13,6 +13,7 @@ import { PrismaDuplicateSubscriptionsReportRepository } from "./prisma.duplicate
 import { PrismaNurturingProfileRepository } from "./prisma.nurturing-profile.repository.ts";
 import { PrismaOrganizationPricingRepository } from "./prisma.organization-pricing.repository.ts";
 import { PrismaProjectActiveDayRepository } from "./prisma.project-active-day.repository.ts";
+import { PrismaSeatEventSubscriptionRepository } from "./prisma.seat-event-subscription.repository.ts";
 import { PrismaBillingSubscriptionRepository } from "./prisma.subscription.repository.ts";
 import { PrismaBillingTenantOrganizationRepository } from "./prisma.tenant-organization.repository.ts";
 
@@ -39,6 +40,7 @@ export class PostgresBillingRepositories {
       organizationPricing: PrismaOrganizationPricingRepository.create(prisma),
       projectActiveDays: PrismaProjectActiveDayRepository.create(prisma),
       reportOrganizations: PrismaBillingReportOrganizationRepository.create(prisma),
+      seatEventSubscriptions: PrismaSeatEventSubscriptionRepository.create(prisma),
       subscriptions,
       tenantOrganizations: PrismaBillingTenantOrganizationRepository.create(prisma),
       webhookOrganizations: PrismaBillingWebhookOrganizationRepository.create({ database: prisma }),

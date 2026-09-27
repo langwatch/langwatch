@@ -3,41 +3,46 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { resolveRunParameters, type ScenarioApi } from "@langwatch/scenario-contract";
+import {
+  resolveRunParameters,
+  type QueueSimulationRunInput,
+  type ScenarioApi,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 
 const scenarioId = "scenario_refund";
 
 /** Delegates to the real parameter-resolution rules, with no encryption. */
-const declaringScenarios = createApiFixture<ScenarioApi>({
-  resolveRunParametersForScenarios: async ({ scenarios, values }) => {
-    const resolved = await resolveRunParameters({ scenarios, values });
-    return [...resolved].map(([id, value]) => ({
-      scenarioId: id,
-      parameters: value.parameters,
-      secretParameters: value.secretParameters,
-      scenarioVersion: 1,
-    }));
-  },
-});
+function declaringScenarios(queued: QueueSimulationRunInput[]): ScenarioApi {
+  return createApiFixture<ScenarioApi>({
+    resolveRunParametersForScenarios: async ({ scenarios, values }) => {
+      const resolved = await resolveRunParameters({ scenarios, values });
+      return [...resolved].map(([id, value]) => ({
+        scenarioId: id,
+        parameters: value.parameters,
+        secretParameters: value.secretParameters,
+        scenarioVersion: 1,
+      }));
+    },
+    queueSimulationRun: async (input) => {
+      queued.push(input);
+    },
+  });
+}
 
 function execute(
   runParameters: Record<string, unknown>,
-  tracking: { queued: QueueSimulationRunCommandData[]; started: boolean },
+  tracking: { queued: QueueSimulationRunInput[]; started: boolean },
 ): Promise<unknown> {
   const service = SuiteExecutionService.create({
     commands: {
       startSuiteRun: async () => {
         tracking.started = true;
       },
-      queueSimulationRun: async (data) => {
-        tracking.queued.push(data);
-      },
     },
-    scenarios: declaringScenarios,
+    scenarios: declaringScenarios(tracking.queued),
   });
 
   return service.execute({
@@ -68,7 +73,10 @@ function execute(
 describe("given a target override no scenario in the run declares", () => {
   /** @scenario "A target override no scenario in the run declares is refused" */
   it("rejects the run before anything is scheduled", async () => {
-    const tracking = { queued: [] as QueueSimulationRunCommandData[], started: false };
+    const tracking: { queued: QueueSimulationRunInput[]; started: boolean } = {
+      queued: [],
+      started: false,
+    };
 
     await expect(execute({ seats: 12 }, tracking)).rejects.toMatchObject({
       code: "scenario_parameter_unknown",

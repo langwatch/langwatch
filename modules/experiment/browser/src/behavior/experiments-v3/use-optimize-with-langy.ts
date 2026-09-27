@@ -1,6 +1,6 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { absorbContextTarget, useLangyStore } from "@langwatch/langy-browser-kit";
-import { useFeatureFlag } from "@langwatch/workflow-browser/feature-flag";
 import { useCallback } from "react";
 
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";

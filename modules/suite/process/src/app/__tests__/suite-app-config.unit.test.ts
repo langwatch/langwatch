@@ -6,7 +6,9 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
@@ -32,6 +34,8 @@ function buildProductionApp(
       }),
       evaluators: createApiFixture<EvaluatorApi>({}),
       retention,
+      featureFlags: createApiFixture<FeatureFlagApi>({}),
+      modelProviders: createApiFixture<ModelProviderApi>({}),
     },
     members: { clickhouse: clickHouseQueryClientDouble(), publicBaseUrl, redis: null },
     config: undefined,

@@ -15,10 +15,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./adapters/better-auth-identity-birth": {
-      "types": "./dist/services/better-auth-identity-birth.service.d.ts",
-      "default": "./src/services/better-auth-identity-birth.service.ts"
-    },
     "./composition/sso-connection-backoffice": {
       "types": "./dist/repositories/prisma/prisma.sso-connection-backoffice.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.sso-connection-backoffice.repository.ts"

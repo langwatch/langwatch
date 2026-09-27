@@ -41,7 +41,11 @@ import type {
   ConnectPresentedCredential,
   LicenseSyncBody,
 } from "./license-sync.ts";
-import type { StoreLicenseInput } from "./license.commands.ts";
+import type {
+  GenerateLicenseInput,
+  GenerateLicenseOutput,
+  StoreLicenseInput,
+} from "./license.commands.ts";
 import type {
   LicenseStatus,
   PlatformLicenseAccess,
@@ -112,6 +116,11 @@ export interface LicensingApi {
    * judge a presented token against the row rather than the blob.
    */
   issueLicense(input: IssueLicenseInput): Promise<SignedIssuedLicense>;
+  /**
+   * Signs a license with the key the caller holds, as main's `generateLicenseKey`
+   * did for a Stripe licence purchase. Records nothing: the caller records it.
+   */
+  generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput>;
   /** Records a license another flow already signed: the purchase, the script. */
   recordIssuedLicense(input: {
     licenseKey: string;

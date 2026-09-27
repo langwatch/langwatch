@@ -1,4 +1,5 @@
 import {
+  type BatchEvaluationEntry,
   type BatchEvaluationRecord,
   type BatchEvaluationSummary,
   DatasetNotFoundError,
@@ -54,6 +55,11 @@ export class MemoryBatchEvaluationRepository implements BatchEvaluationRepositor
         updatedAt: toDate(row.updatedAt),
         dataset: this.#dataset(row),
       }));
+  }
+
+  async create(input: BatchEvaluationEntry): Promise<void> {
+    const now = this.#database.now();
+    this.#database.putBatchEvaluation({ ...input, createdAt: now, updatedAt: now });
   }
 
   #of(projectId: string): MemoryBatchEvaluation[] {

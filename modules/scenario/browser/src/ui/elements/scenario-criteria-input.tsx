@@ -136,28 +136,31 @@ export function ScenarioCriteriaInput({
           </HStack>
         ) : (
           <HStack
+            asChild
             key={index}
             gap={1}
             align="start"
             py={1}
-            role="group"
+            width="full"
+            textAlign="left"
             cursor="pointer"
-            onClick={() => handleStartEdit(index)}
           >
-            <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="1px">
-              {index + 1}.
-            </Text>
-            <Text flex={1} fontSize="sm" whiteSpace="pre-wrap">
-              {criterion}
-            </Text>
-            <Pencil
-              size={14}
-              style={{
-                flexShrink: 0,
-                marginTop: "2px",
-                color: "var(--chakra-colors-fg-muted)",
-              }}
-            />
+            <button type="button" onClick={() => handleStartEdit(index)}>
+              <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="1px">
+                {index + 1}.
+              </Text>
+              <Text flex={1} fontSize="sm" whiteSpace="pre-wrap">
+                {criterion}
+              </Text>
+              <Pencil
+                size={14}
+                style={{
+                  flexShrink: 0,
+                  marginTop: "2px",
+                  color: "var(--chakra-colors-fg-muted)",
+                }}
+              />
+            </button>
           </HStack>
         ),
       )}

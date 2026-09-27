@@ -3,6 +3,7 @@ import {
   LangyUiHandlerFailedError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   type LangyUiActionDefinition,
@@ -11,6 +12,7 @@ import {
 } from "../app/langy.members.ts";
 import { extractTransformRefusalCode } from "../rules/langy-ui-action-refusal.rules.ts";
 import { LangyExplorerActionService } from "./langy-explorer-action.service.ts";
+import type { UiActionBackendRunner } from "./langy-ui-action.service.ts";
 
 /**
  * The away-fallback half of the UI-action channel: the same action kinds the
@@ -31,6 +33,8 @@ const LANGY_ACTOR_LABEL = "langy";
 
 export type LangyUiActionBackendServiceDependencies = {
   backend: LangyUiActionBackend;
+  /** The tenant's slug an away link is built from, for a runner handed only the project id. */
+  projects?: Pick<ProjectApi, "findIdentity">;
   /** The Trace Explorer's away form, which writes no document. */
   explorer?: LangyExplorerActionService;
 };
@@ -42,11 +46,19 @@ export class LangyUiActionBackendService {
 
   private readonly backend: LangyUiActionBackend;
   private readonly explorer: LangyExplorerActionService;
+  private readonly projects: Pick<ProjectApi, "findIdentity"> | undefined;
 
   private constructor(deps: LangyUiActionBackendServiceDependencies) {
     this.backend = deps.backend;
+    this.projects = deps.projects;
     this.explorer = deps.explorer ?? LangyExplorerActionService.create();
   }
+
+  /** The channel's away fallback: the same run, with the project's slug looked up first. */
+  readonly runner: UiActionBackendRunner = async (args) => {
+    const project = await this.projects?.findIdentity(args.projectId);
+    return this.run({ ...args, projectSlug: project?.slug ?? args.projectId });
+  };
 
   /** Runs one dispatched action against the saved document. */
   async run({

@@ -9,7 +9,8 @@ import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import type { AuthDirectory } from "../../app/auth.members.ts";
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
@@ -17,11 +18,16 @@ import {
   CliDeviceFlowService,
   type CliDeviceFlowCollaborators,
 } from "../../services/cli-device-flow.service.ts";
-import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
+import {
+  CliDeviceSessionService,
+  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
+} from "../../services/cli-device-session.service.ts";
 import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-device-flow.rest.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";
+const REFRESH_WINDOW_MS = DEFAULT_REFRESH_TOKEN_TTL_SECONDS * 1000;
+const deviceGrantSchema = z.object({ device_code: z.string(), user_code: z.string() });
 
 describe("given a CLI starting a device login", () => {
   describe("when the browser approves it and the CLI polls", () => {
@@ -389,6 +395,70 @@ describe("given a CLI starting a device login", () => {
     });
   });
 
+  describe("when the organization caps sessions and the CLI logs in then refreshes", () => {
+    let world: ReturnType<typeof deviceFlowWorld>;
+    let api: ReturnType<typeof mount>;
+    let grant: z.infer<typeof deviceGrantSchema>;
+
+    beforeEach(async () => {
+      world = deviceFlowWorld();
+      world.maxSessionDurationDays = 30;
+      api = mount(world);
+      grant = deviceGrantSchema.parse(
+        await (await api.post("/api/auth/cli/device-code", {})).json(),
+      );
+      await api.post("/api/auth/cli/approve", {
+        user_code: grant.user_code,
+        organization_id: ORGANIZATION_ID,
+      });
+    });
+
+    /** @scenario "the CLI key is minted with the session's expiry" */
+    it("mints the key anchored at the session start, under the ceiling and the refresh window", async () => {
+      const before = Date.now();
+
+      const exchanged = await api.post("/api/auth/cli/exchange", {
+        device_code: grant.device_code,
+        client_info: { hostname: "Bobs-MacBook-Pro" },
+      });
+
+      expect(exchanged.status).toBe(200);
+      const [minted] = world.mintedExpiries;
+      expect(minted?.sessionStartedAtMs).toBeGreaterThanOrEqual(before);
+      expect(minted?.sessionStartedAtMs).toBeLessThanOrEqual(Date.now());
+      expect(minted).toMatchObject({
+        maxSessionDurationDays: 30,
+        refreshWindowMs: REFRESH_WINDOW_MS,
+      });
+    });
+
+    /** @scenario "refreshing the session extends the CLI key's expiry" */
+    it("extends the key's expiry from the same session start on every refresh", async () => {
+      const exchanged = z.object({ refresh_token: z.string() }).parse(
+        await (
+          await api.post("/api/auth/cli/exchange", {
+            device_code: grant.device_code,
+            client_info: { hostname: "Bobs-MacBook-Pro" },
+          })
+        ).json(),
+      );
+
+      const refreshed = await api.post("/api/auth/cli/refresh", {
+        refresh_token: exchanged.refresh_token,
+      });
+
+      expect(refreshed.status).toBe(200);
+      expect(world.extendedExpiries).toEqual([
+        {
+          apiKeyId: "apikey-1",
+          sessionStartedAtMs: world.mintedExpiries[0]?.sessionStartedAtMs,
+          maxSessionDurationDays: 30,
+          refreshWindowMs: REFRESH_WINDOW_MS,
+        },
+      ]);
+    });
+  });
+
   describe("when the CLI calls the logout endpoint", () => {
     /** @scenario "logout revokes the CLI key" */
     it("revokes the CLI key along with the device session tokens", async () => {
@@ -554,6 +624,13 @@ function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
   };
 }
 
+/** What a CLI login key's expiry is computed from. */
+type KeyExpiryInput = {
+  sessionStartedAtMs?: number | undefined;
+  maxSessionDurationDays?: number | undefined;
+  refreshWindowMs?: number | undefined;
+};
+
 function deviceFlowWorld(
   overrides: {
     mintToken?: string;
@@ -576,6 +653,10 @@ function deviceFlowWorld(
     store: InMemoryDeviceSessionStore;
     mintedKeys: { deviceLabel: string; userId: string }[];
     revokedForLogout: { apiKeyId: string; userId: string }[];
+    /** The organization's session ceiling in days; 0 sets none. */
+    maxSessionDurationDays: number;
+    mintedExpiries: KeyExpiryInput[];
+    extendedExpiries: (KeyExpiryInput & { apiKeyId: string })[];
   }
   const world: DeviceFlowWorld = {
     activeMembership: true,
@@ -585,6 +666,9 @@ function deviceFlowWorld(
     store,
     mintedKeys: [],
     revokedForLogout: [],
+    maxSessionDurationDays: 0,
+    mintedExpiries: [],
+    extendedExpiries: [],
   };
 
   const directory: AuthDirectory = {
@@ -594,7 +678,7 @@ function deviceFlowWorld(
         ? Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" })
         : Promise.reject(new UserNotFoundError(userId)),
     getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
-    maxSessionDurationDays: () => Promise.resolve(0),
+    maxSessionDurationDays: () => Promise.resolve(world.maxSessionDurationDays),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
     getLiveProject: () =>
       world.project === null
@@ -615,10 +699,15 @@ function deviceFlowWorld(
       ),
     apiKeys: () =>
       ({
-        mintCliLoginKey: (input: { userId: string; deviceLabel: string }) => {
+        mintCliLoginKey: (input: { userId: string; deviceLabel: string } & KeyExpiryInput) => {
           if (overrides.mintError) return Promise.reject(overrides.mintError());
 
           world.mintedKeys.push({ deviceLabel: input.deviceLabel, userId: input.userId });
+          world.mintedExpiries.push({
+            sessionStartedAtMs: input.sessionStartedAtMs,
+            maxSessionDurationDays: input.maxSessionDurationDays,
+            refreshWindowMs: input.refreshWindowMs,
+          });
 
           return Promise.resolve({
             token: overrides.mintToken ?? "lw_cli_minted",
@@ -634,6 +723,16 @@ function deviceFlowWorld(
           return Promise.resolve(input.selection);
         },
         findDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
+        extendCliLoginKeyExpiry: (input: KeyExpiryInput & { apiKeyId: string }) => {
+          world.extendedExpiries.push({
+            apiKeyId: input.apiKeyId,
+            sessionStartedAtMs: input.sessionStartedAtMs,
+            maxSessionDurationDays: input.maxSessionDurationDays,
+            refreshWindowMs: input.refreshWindowMs,
+          });
+
+          return Promise.resolve();
+        },
         revokeCliLoginKeyForLogout: (input: { apiKeyId: string; userId: string }) => {
           world.revokedForLogout.push({ apiKeyId: input.apiKeyId, userId: input.userId });
 

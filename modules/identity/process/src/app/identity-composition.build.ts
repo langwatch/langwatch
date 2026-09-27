@@ -10,10 +10,7 @@ import {
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
 
-import {
-  IdentityLedgerStore,
-  type IdentityStagedSender,
-} from "../eventing/identity-ledger.store.ts";
+import { IdentityLedgerStore } from "../eventing/identity-ledger.store.ts";
 import { JoinRequestLedgerStore } from "../eventing/join-request-ledger.store.ts";
 import type { ScimSyncEvent } from "../eventing/scim-sync-state.projection.ts";
 import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
@@ -31,7 +28,11 @@ import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
 } from "../services/per-subject-cached-latch.service.ts";
-import type { IdentityEventing, IdentityInfrastructure } from "./identity.members.ts";
+import type {
+  IdentityEventing,
+  IdentityInfrastructure,
+  IdentityPipelineCommand,
+} from "./identity.members.ts";
 
 /** The one shape a command dispatcher has, checked rather than asserted. */
 type IdentityCommandSender = { send(data: unknown): Promise<unknown> };
@@ -164,11 +165,12 @@ export class ConnectedIdentityEventing implements IdentityEventing {
     );
   }
 
-  async tryPipelineCommand(input: {
+  async resolvePipelineCommand(input: {
     pipeline: string;
     command: string;
-  }): Promise<IdentityStagedSender | null> {
-    return this.#senders.get(input.pipeline)?.get(input.command) ?? null;
+  }): Promise<IdentityPipelineCommand> {
+    const sender = this.#senders.get(input.pipeline)?.get(input.command);
+    return sender ? { kind: "registered", sender } : { kind: "unregistered" };
   }
 }
 

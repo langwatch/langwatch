@@ -1,5 +1,4 @@
 import { allModelOptions } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import { LLMConfigField } from "@langwatch/prompt-browser/llm-config-field";
 import type { Output } from "@langwatch/prompt-browser/llm-config-popover";
 import type { LLMConfig } from "@langwatch/workflow-contract";
@@ -7,6 +6,7 @@ import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
 import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useModelSelection } from "../../../../../behavior/use-model-selection.ts";
 import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 
 type OptimizationStudioLLMConfigFieldProps = {
@@ -34,7 +34,11 @@ export function OptimizationStudioLLMConfigField({
   showStructuredOutputs = false,
 }: OptimizationStudioLLMConfigFieldProps) {
   const model = llmConfig?.model ?? "";
-  const { modelOption, isEmpty } = useModelSelectionOptions(allModelOptions, model, "chat");
+  const { modelOption, isEmpty } = useModelSelection({
+    options: allModelOptions,
+    model,
+    mode: "chat",
+  });
 
   const { hasCodeNodes } = useWorkflowStore((state) => ({
     hasCodeNodes: state.nodes.some((node) => node.type === "code"),

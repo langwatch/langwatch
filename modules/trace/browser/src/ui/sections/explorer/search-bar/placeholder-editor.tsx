@@ -164,7 +164,9 @@ function DecoratedSegmentView({
   if (segment.opLoc) {
     const { start, end } = segment.opLoc;
     return (
-      <span
+      <button
+        type="button"
+        tabIndex={-1}
         className={segment.className}
         data-filter-op-start={start}
         data-filter-op-end={end}
@@ -177,7 +179,7 @@ function DecoratedSegmentView({
         }}
       >
         {segment.text}
-      </span>
+      </button>
     );
   }
 
@@ -191,7 +193,9 @@ function DecoratedSegmentView({
       label: richLabel,
     });
     return (
-      <span
+      <button
+        type="button"
+        tabIndex={-1}
         className={segment.className}
         data-filter-chip-start={token.start}
         data-filter-chip-end={token.end}
@@ -214,7 +218,7 @@ function DecoratedSegmentView({
         }}
       >
         {segment.text}
-      </span>
+      </button>
     );
   }
 
@@ -261,9 +265,23 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
 
   return (
     <Box
+      // Read-only: focus swaps in the real editor, so this only names what it stands for.
       tabIndex={0}
-      role="textbox"
       aria-label={placeholderText}
+      // Chips are buttons here; strip the browser's button look so the chip classes paint alone.
+      css={{
+        "& :where(button)": {
+          font: "inherit",
+          color: "inherit",
+          background: "none",
+          border: "none",
+          padding: 0,
+          margin: 0,
+          lineHeight: "inherit",
+          letterSpacing: "inherit",
+          textAlign: "inherit",
+        },
+      }}
       data-placeholder={placeholderText}
       onFocus={onActivate}
       onMouseDown={onActivate}

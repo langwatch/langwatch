@@ -7,7 +7,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
-import { createTestLicensingApp, EXPIRED_LICENSE_KEY } from "../../testing.ts";
+import { createTestLicensingApp, EXPIRED_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { licenseTrpcTransport } from "../licensing.trpc.ts";
 import {
   licensingTrpcTestMembers,

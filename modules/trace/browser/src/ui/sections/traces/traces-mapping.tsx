@@ -1,239 +1,172 @@
-import { Box, Field, Grid, GridItem, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Field, Grid, GridItem, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import {
   type DatasetRecordEntry,
-  mapTraceToDatasetEntry,
-  type AllTraceMappingSources,
   type MappingState,
   SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
-  TRACE_MAPPING_LABELS,
-  TRACE_MAPPINGS,
 } from "@langwatch/dataset-contract";
 import { Switch } from "@langwatch/design-system/switch";
 import { nowInstant } from "@langwatch/time";
 import type { Trace } from "@langwatch/trace-contract";
-import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
 
 import { api } from "../../../behavior/trace-api.ts";
+import {
+  availableExpansionsFor,
+  datasetEntriesFor,
+  type LocalTraceMappingState,
+  mappingStateDiffers,
+  mappingStateWithDefaults,
+  mapsAnySource,
+  PROJECT_FIELD_NAME_SOURCES,
+  targetEdgesWithDefaults,
+  type TraceExpansion,
+  type WorkflowMappingTarget,
+  withExpansion,
+} from "../../../model/traces/mapping/traces-mapping.ts";
 import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
 import { useProjectEventTypes } from "../use-project-event-types.ts";
 import { useProjectSpanNames } from "../use-project-span-names.ts";
+import { type ProjectKeyNames, TracesMappingRow } from "./traces-mapping-row.tsx";
 
-/** Trace field options for the threads sub-field selector, excluding thread sources themselves. */
-const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)
-  .filter((key) => key !== "threads" && key !== "threads_until_current")
-  .map((key) => ({ label: key, value: key }));
+const EMPTY_MAPPING: MappingState = { mapping: {}, expansions: [] };
+
+/** The mapping state as the parent stores it: expansions as a list. */
+const storedMappingState = (state: LocalTraceMappingState): MappingState => ({
+  ...state,
+  expansions: Array.from(state.expansions),
+});
 
 /**
- * What a dataset column of a given name is filled from by default: a source on
- * its own, or a source and one of its fields when the source alone would leave
- * the column empty.
+ * The local mapping state, readable synchronously. Two updates in one tick (two
+ * switches clicked before React re-renders) would otherwise both build on the
+ * render's stale value, and the second would undo the first.
  */
-export type DatasetInferredMapping =
-  | keyof typeof TRACE_MAPPINGS
-  | { source: keyof typeof TRACE_MAPPINGS; key: string };
-
-export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, DatasetInferredMapping> = {
-  trace_id: "trace_id",
-  timestamp: "timestamp",
-  input: "input",
-  question: "input",
-  user_input: "input",
-  output: "output",
-  answer: "output",
-  response: "output",
-  result: "output",
-  expected_output: "output",
-  total_cost: "metrics.total_cost",
-  contexts: "contexts.string_list",
-  spans: "spans",
-  annotations: { source: "annotations", key: "ai_readable" },
-};
-
-/** The source half of an inferred mapping, which is all the workflow edges match on. */
-const inferredMappingSource = (inferred: DatasetInferredMapping): keyof typeof TRACE_MAPPINGS =>
-  typeof inferred === "string" ? inferred : inferred.source;
-
-/** How a column of this name is filled before anyone touches the mapping. */
-const inferredMappingFor = (
-  columnName: string,
-): {
-  source: AllTraceMappingSources | "";
-  key?: string;
-  selectedFields: string[];
-} => {
-  const inferred = DATASET_INFERRED_MAPPINGS_BY_NAME[columnName];
-  if (!inferred) {
-    return { source: "", selectedFields: [] };
-  }
-  if (typeof inferred === "string") {
-    return { source: inferred, selectedFields: [] };
-  }
-  return { source: inferred.source, key: inferred.key, selectedFields: [] };
-};
-
-const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
-  DATASET_INFERRED_MAPPINGS_BY_NAME,
-).reduce(
-  (acc, [key, inferred]) => {
-    const value = inferredMappingSource(inferred);
-    if (acc[value]) {
-      acc[value]!.push(key);
-    } else {
-      acc[value] = [key];
-    }
-    return acc;
-  },
-  {} as Record<string, string[]>,
-);
-
-type KeyOption = { key: string; label: string };
-
-type TraceMappingEntry = Extract<MappingState["mapping"][string], { type?: "trace" }>;
-
-type LocalTraceMappingState = {
-  mapping: Record<string, TraceMappingEntry>;
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-};
-
-function traceMappingEntryFor(
-  mapping: MappingState["mapping"],
-  name: string,
-): TraceMappingEntry | undefined {
-  const entry = mapping[name];
-  return entry?.type === "thread" ? undefined : entry;
+function useLocalMappingState(setTraceMapping?: (mapping: MappingState) => void) {
+  const [state, setState] = useState<LocalTraceMappingState>({
+    mapping: {},
+    expansions: new Set(),
+  });
+  const stateRef = React.useRef(state);
+  stateRef.current = state;
+  const replace = useCallback(
+    (next: LocalTraceMappingState) => {
+      stateRef.current = next;
+      setState(next);
+      setTraceMapping?.(storedMappingState(next));
+    },
+    [setTraceMapping],
+  );
+  const update = useCallback(
+    (callback: (state: LocalTraceMappingState) => LocalTraceMappingState) =>
+      replace(callback(stateRef.current)),
+    [replace],
+  );
+  return { state, replace, update };
 }
 
-function updateTraceMappingEntry(
-  entry: TraceMappingEntry | undefined,
-  changes: Partial<Omit<TraceMappingEntry, "source">>,
-): TraceMappingEntry {
+/** Every trace in the traces' threads, read the way the mapped traces were. */
+function useThreadTraces({
+  projectId,
+  traces,
+  withEditOverlay,
+}: {
+  projectId: string | undefined;
+  traces: Trace[];
+  withEditOverlay: boolean;
+}) {
+  const threadIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          traces.map((trace) => trace.metadata?.thread_id).filter((id): id is string => !!id),
+        ),
+      ),
+    [traces],
+  );
+  return api.traces.getTracesWithSpansByThreadIds.useQuery(
+    { projectId: projectId ?? "", threadIds, withEditOverlay },
+    { enabled: !!projectId && threadIds.length > 0, refetchOnWindowFocus: false },
+  ).data;
+}
+
+/**
+ * The project-wide names the key dropdowns offer, fetched only once a column
+ * maps a source that needs them, so opening the mapping alone costs no scan.
+ */
+function useProjectKeyNames({
+  projectId,
+  mapping,
+}: {
+  projectId: string | undefined;
+  mapping: LocalTraceMappingState["mapping"];
+}): ProjectKeyNames {
+  const fieldNames = useProjectSpanNames({
+    projectId,
+    enabled: mapsAnySource({ mapping, sources: PROJECT_FIELD_NAME_SOURCES }),
+  });
+  const eventTypes = useProjectEventTypes({
+    projectId,
+    enabled: mapsAnySource({ mapping, sources: ["events"] }),
+  });
+  const options = useMemo(
+    () => ({
+      spans: fieldNames.spanNames,
+      metadata: fieldNames.metadataKeys,
+      evaluations: fieldNames.evaluationNames,
+      events: eventTypes.eventTypes,
+    }),
+    [
+      fieldNames.spanNames,
+      fieldNames.metadataKeys,
+      fieldNames.evaluationNames,
+      eventTypes.eventTypes,
+    ],
+  );
   return {
-    source: entry?.source ?? "",
-    ...entry,
-    ...changes,
+    options,
+    fieldNamesLoading: fieldNames.isLoading,
+    eventTypesLoading: eventTypes.isLoading,
   };
 }
 
-/**
- * Sources whose key dropdowns are expanded with the project's distinct field names from
- * the last 30 days (not just the names on the loaded trace), served by
- * getDistinctFieldNames / useProjectSpanNames.
- */
-const PROJECT_FIELD_NAME_SOURCES: string[] = ["spans", "metadata", "evaluations"];
-
-/** Result subfields an evaluation always exposes (see the evaluations mapping). */
-const DEFAULT_EVALUATION_SUBKEYS: KeyOption[] = [
-  "passed",
-  "score",
-  "label",
-  "details",
-  "status",
-  "error",
-].map((key) => ({ key, label: key }));
-
-/** Placeholder shown while a source's project-wide names are still loading. */
-const FIELD_NAME_LOADING_LABEL: Record<string, string> = {
-  spans: "Loading span names…",
-  metadata: "Loading metadata keys…",
-  evaluations: "Loading evaluations…",
-  events: "Loading event types…",
-};
-
-/** Label for the "match everything" option at the top of a source's dropdown. */
-const FIELD_NAME_ANY_LABEL: Record<string, string> = {
-  spans: "* (any span)",
-  metadata: "* (all metadata)",
-  evaluations: "* (any evaluation)",
-  events: "* (any event)",
-};
-
-/** Whether two expansion selections say the same thing. */
-const sameExpansions = ({
+/** Switches that normalise the dataset to one row per expanded item. */
+function ExpansionSwitches({
+  available,
   expansions,
-  other,
+  onChange,
 }: {
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-  other: Set<keyof typeof TRACE_EXPANSIONS>;
-}): boolean =>
-  expansions.size === other.size && Array.from(expansions).every((key) => other.has(key));
-
-/**
- * The expansions after a column is mapped to a new source.
- */
-const expansionsAfterMapping = ({
-  expansions,
-  targetMapping,
-  availableExpansions,
-}: {
-  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-  targetMapping?: (typeof TRACE_MAPPINGS)[keyof typeof TRACE_MAPPINGS];
-  availableExpansions: Set<keyof typeof TRACE_EXPANSIONS>;
-}): Set<keyof typeof TRACE_EXPANSIONS> => {
-  const expandableBy =
-    targetMapping && "expandable_by" in targetMapping ? targetMapping.expandable_by : undefined;
-  if (!expandableBy || availableExpansions.has(expandableBy)) return expansions;
-  if (!TRACE_EXPANSIONS[expandableBy].enabledByDefault) return expansions;
-  return new Set([...expansions, expandableBy]);
-};
-
-/** Dedupe {key,label} options by key, preserving first-seen order. */
-const dedupeKeyOptions = (options: KeyOption[]): KeyOption[] => {
-  const seen = new Set<string>();
-  const result: KeyOption[] = [];
-  for (const option of options) {
-    if (!option || seen.has(option.key)) continue;
-    seen.add(option.key);
-    result.push(option);
-  }
-  return result;
-};
-
-function projectOptionsForSource({
-  source,
-  spans,
-  metadata,
-  evaluations,
-  events,
-}: {
-  source: string;
-  spans: KeyOption[];
-  metadata: KeyOption[];
-  evaluations: KeyOption[];
-  events: KeyOption[];
-}): KeyOption[] {
-  if (source === "spans") return spans;
-  if (source === "metadata") return metadata;
-  if (source === "evaluations") return evaluations;
-  if (source === "events") return events;
-  return [];
-}
-
-function subkeyOptions({
-  source,
-  key,
-  defaultSpanSubkeys,
-  computeSubkeys,
-}: {
-  source: string;
-  key: string | undefined;
-  defaultSpanSubkeys: KeyOption[];
-  computeSubkeys: (k: string) => KeyOption[];
-}): KeyOption[] {
-  // Spans always expose the same subfields, for any span name — including
-  // project-wide names not on the loaded trace, where discovery is empty.
-  if (source === "spans") {
-    return dedupeKeyOptions([...defaultSpanSubkeys, ...(key ? computeSubkeys(key) : [])]);
-  }
-  // Evaluations always expose the same result subfields, likewise.
-  if (source === "evaluations" && key) {
-    return dedupeKeyOptions([...DEFAULT_EVALUATION_SUBKEYS, ...computeSubkeys(key)]);
-  }
-  return computeSubkeys(key!);
+  available: Set<TraceExpansion>;
+  expansions: Set<TraceExpansion>;
+  onChange: (expansion: TraceExpansion, isChecked: boolean) => void;
+}) {
+  // The switches sit outside the field on purpose: a field hands one id to every
+  // control inside it, so each switch's label pointed at the first switch.
+  return (
+    <VStack width="full" align="start" paddingY={4} marginTop={2} gap={0}>
+      <Field.Root width="full">
+        <VStack align="start">
+          <Field.Label margin={0}>Expansions</Field.Label>
+          <Field.HelperText margin={0} fontSize="13px" marginBottom={2} maxWidth="600px">
+            Normalize the dataset to duplicate the rows and have one entry per line instead of an
+            array for the following mappings:
+          </Field.HelperText>
+        </VStack>
+      </Field.Root>
+      <VStack align="start" paddingTop={2} gap={2}>
+        {Array.from(available).map((expansion) => (
+          <Switch
+            key={expansion}
+            checked={expansions.has(expansion)}
+            onCheckedChange={(event) => onChange(expansion, event.checked)}
+          >
+            One row per {TRACE_EXPANSIONS[expansion].label}
+          </Switch>
+        ))}
+      </VStack>
+    </VStack>
+  );
 }
 
 export const TracesMapping = ({
@@ -251,12 +184,7 @@ export const TracesMapping = ({
   titles?: string[];
   traces: Trace[];
   traceMapping?: MappingState;
-  dsl?: {
-    sourceOptions: Record<string, { label: string; fields: string[] }>;
-    targetId: string;
-    targetEdges: StudioWorkflow["edges"];
-    setTargetEdges?: (edges: StudioWorkflow["edges"]) => void;
-  };
+  dsl?: WorkflowMappingTarget;
   targetFields: string[];
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
   setTraceMapping?: (mapping: MappingState) => void;
@@ -271,46 +199,26 @@ export const TracesMapping = ({
   shouldApplyCorrections?: boolean;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
 
-  // A dataset row carries what the reviewers said about the trace, and a
-  // reviewer who commented on one span said it about that trace too. Reading
-  // only the trace-level comments would drop the most specific reviews from
-  // both the mapping and its preview.
+  // A dataset row carries what the reviewers said about the trace, span-level
+  // comments included: they are the most specific reviews of all.
   const annotationScores = useAnnotationsByTraceIds({
-    projectId: project?.id ?? "",
+    projectId: projectId ?? "",
     traceIds: traces.map((trace) => trace.trace_id),
     enabled: !!project,
     anchor: "all",
   });
-  const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project?.id,
-      refetchOnWindowFocus: false,
-    },
-  );
-
-  // Get all unique thread_ids from the current traces
-  const threadIds = useMemo(() => {
-    const ids = traces.map((trace) => trace.metadata?.thread_id).filter((id): id is string => !!id);
-    return Array.from(new Set(ids));
-  }, [traces]);
-
-  // Fetch all traces for these thread_ids, read the same way the traces being
-  // mapped were: a thread_* column and a trace column filled from the same
-  // surface must not disagree about what the conversation said.
-  const allThreadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
-    {
-      projectId: project?.id ?? "",
-      threadIds,
-      withEditOverlay: shouldApplyCorrections,
-    },
-    {
-      enabled: !!project?.id && threadIds.length > 0,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const traces_ = useMemo(
+  const annotationScoreOptions = api.annotationScore.getAllActive.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId, refetchOnWindowFocus: false },
+  ).data;
+  const threadTraces = useThreadTraces({
+    projectId,
+    traces,
+    withEditOverlay: shouldApplyCorrections,
+  });
+  const annotatedTraces = useMemo(
     () =>
       traces.map((trace) => ({
         ...trace,
@@ -321,307 +229,89 @@ export const TracesMapping = ({
     [traces, annotationScores.data],
   );
 
-  const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
+  const currentMapping = traceMapping ?? EMPTY_MAPPING;
+  const { state, replace, update } = useLocalMappingState(setTraceMapping);
+  const mapping = state.mapping;
+  const names = useProjectKeyNames({ projectId, mapping });
 
-  const [traceMappingState, setTraceMappingState_] = useState<LocalTraceMappingState>({
-    mapping: {},
-    expansions: new Set(),
-  });
-  // The latest state, readable synchronously. Two updates in one tick (two
-  // switches clicked before React re-renders, or a click landing between the
-  // initialising effect and its re-render) would otherwise both build on the
-  // render's stale value, and the second would undo the first — which reads as
-  // one switch moving the other.
-  const traceMappingStateRef = React.useRef(traceMappingState);
-  traceMappingStateRef.current = traceMappingState;
-  const setTraceMappingState = useCallback(
-    (callback: (mappingState: LocalTraceMappingState) => LocalTraceMappingState) => {
-      const newMappingState = callback(traceMappingStateRef.current);
-      traceMappingStateRef.current = newMappingState;
-      setTraceMappingState_(newMappingState);
-      setTraceMapping?.({
-        ...newMappingState,
-        expansions: Array.from(newMappingState.expansions),
-      });
-    },
-    [setTraceMapping],
-  );
-  const mapping = traceMappingState.mapping;
-
-  // The spans, metadata and evaluations sources draw their project-wide names
-  // from getDistinctFieldNames. Fetch that 30-day list lazily — only when such a
-  // column is actually being mapped — so merely opening the drawer/wizard (or
-  // any other place that renders this component) doesn't trigger the heavier
-  // ClickHouse scan when none of those sources is in play.
-  const needsProjectFieldNames = useMemo(
-    () => Object.values(mapping).some((m) => PROJECT_FIELD_NAME_SOURCES.includes(m.source)),
-    [mapping],
-  );
-  const {
-    spanNames: projectSpanNames,
-    metadataKeys: projectMetadataKeys,
-    evaluationNames: projectEvaluationNames,
-    isLoading: projectFieldNamesLoading,
-  } = useProjectSpanNames({
-    projectId: project?.id,
-    enabled: needsProjectFieldNames,
-  });
-
-  // Events get the same project-wide treatment from a separate bounded source
-  // (the analytics event-type filter options), gated the same way.
-  const needsProjectEventTypes = useMemo(
-    () => Object.values(mapping).some((m) => m.source === "events"),
-    [mapping],
-  );
-  const { eventTypes: projectEventTypes, isLoading: projectEventTypesLoading } =
-    useProjectEventTypes({
-      projectId: project?.id,
-      enabled: needsProjectEventTypes,
-    });
-
-  // These dropdowns should offer every name the project produced in the last 30
-  // days, not just the names on the loaded trace(s) — otherwise a span (or
-  // evaluator, or event type) that exists elsewhere in the project cannot be
-  // selected for mapping.
-  const mergeProjectKeyOptions = useCallback(
-    (source: string, baseOptions: KeyOption[]): KeyOption[] => {
-      const projectOptions = projectOptionsForSource({
-        source,
-        spans: projectSpanNames,
-        metadata: projectMetadataKeys,
-        evaluations: projectEvaluationNames,
-        events: projectEventTypes,
-      });
-      if (projectOptions.length === 0) {
-        return baseOptions;
-      }
-      return dedupeKeyOptions([...baseOptions, ...projectOptions]).toSorted((a, b) =>
-        a.label.localeCompare(b.label),
-      );
-    },
-    [projectSpanNames, projectMetadataKeys, projectEvaluationNames, projectEventTypes],
-  );
-
-  // Check if any column uses a server-only source (e.g. formatted_trace)
-  const needsFormattedDigest = useMemo(
-    () =>
-      Object.values(mapping).some((m) =>
-        (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source),
-      ),
-    [mapping],
-  );
-
-  // Fetch formatted span digests from server when needed, read the same way the
-  // traces being mapped were: this column quotes the whole trace, so reading it
-  // uncorrected would put back every span the other columns leave out.
+  // A server-only column quotes the whole trace, read the way the mapped traces
+  // were, so an uncorrected read would put back what the other columns leave out.
   const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId: projectId ?? "",
       traceIds: traces.map((t) => t.trace_id),
       withEditOverlay: shouldApplyCorrections,
     },
     {
-      enabled: !!project?.id && needsFormattedDigest && traces.length > 0,
+      enabled:
+        !!projectId &&
+        traces.length > 0 &&
+        mapsAnySource({ mapping, sources: SERVER_ONLY_TRACE_SOURCES }),
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000,
     },
-  );
+  ).data;
 
-  const availableExpansions = useMemo(() => {
-    const result = new Set(
-      Object.values(mapping)
-        .map((mapping) => {
-          const source =
-            mapping.source && mapping.source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[mapping.source as keyof typeof TRACE_MAPPINGS]
-              : undefined;
-          if (source && "expandable_by" in source && source.expandable_by) {
-            return source.expandable_by;
-          }
-          return undefined;
-        })
-        .filter((x): x is keyof typeof TRACE_EXPANSIONS => x !== undefined),
-    );
-
-    return result;
-  }, [mapping]);
+  const availableExpansions = useMemo(() => availableExpansionsFor(mapping), [mapping]);
   const expansions = useMemo(
-    () =>
-      new Set(Array.from(traceMappingState.expansions).filter((x) => availableExpansions.has(x))),
-    [traceMappingState.expansions, availableExpansions],
+    () => new Set(Array.from(state.expansions).filter((x) => availableExpansions.has(x))),
+    [state.expansions, availableExpansions],
   );
 
   const now = useMemo(() => nowInstant().epochMilliseconds, []);
   const isInitializedRef = React.useRef(false);
-  // The entries effect rebuilds a fresh array on every run; without this guard
-  // it pushes a new reference to the parent on every render and the parent's
-  // re-render feeds back into the effect, exceeding React's update depth.
+  // The entries effect builds a fresh array every run; without this guard the
+  // parent's re-render feeds back into it past React's update depth.
   const lastEntriesRef = React.useRef<string | null>(null);
 
   useEffect(() => {
-    // Build the default mapping state with targetFields
-    const traceMappingStateWithDefaults: LocalTraceMappingState = {
-      mapping: Object.fromEntries(
-        targetFields.map((name) => [
-          name,
-          // Prefer existing mapping from traceMappingState, then currentMapping, then default
-          traceMappingState.mapping[name] ??
-            traceMappingEntryFor(currentMapping.mapping, name) ??
-            inferredMappingFor(name),
-        ]) ?? [],
-      ),
-      // Only before the first pass do the stored expansions stand in. After it
-      // the state is the whole truth, including the empty set: turning the last
-      // expansion off is an answer, not an absence of one, and reading it as
-      // "nothing chosen yet" is what used to put the stored ones straight back.
-      expansions: isInitializedRef.current
-        ? traceMappingState.expansions
-        : new Set(currentMapping.expansions),
-    };
-
-    // Check if we need to update (new columns added, columns removed, or initial setup)
-    const currentFieldsSet = new Set(Object.keys(traceMappingState.mapping));
-    const targetFieldsSet = new Set(targetFields);
-    const fieldsChanged =
-      currentFieldsSet.size !== targetFieldsSet.size ||
-      !Array.from(targetFieldsSet).every((f) => currentFieldsSet.has(f));
-
-    // `JSON.stringify` writes a Set as `{}`, so comparing the whole state that
-    // way cannot see the expansions at all. Compare each half the way it can
-    // actually be compared.
-    const mappingChanged =
-      JSON.stringify(traceMappingState.mapping) !==
-      JSON.stringify(traceMappingStateWithDefaults.mapping);
-    const expansionsChanged = !sameExpansions({
-      expansions: traceMappingState.expansions,
-      other: traceMappingStateWithDefaults.expansions,
+    const next = mappingStateWithDefaults({
+      state,
+      stored: currentMapping,
+      targetFields,
+      isInitialized: isInitializedRef.current,
     });
-
-    if (!isInitializedRef.current || fieldsChanged || mappingChanged || expansionsChanged) {
-      traceMappingStateRef.current = traceMappingStateWithDefaults;
-      setTraceMappingState_(traceMappingStateWithDefaults);
-      setTraceMapping?.({
-        ...traceMappingStateWithDefaults,
-        expansions: Array.from(traceMappingStateWithDefaults.expansions),
-      });
-
+    if (!isInitializedRef.current || mappingStateDiffers({ state, next })) {
+      replace(next);
       isInitializedRef.current = true;
     }
-
-    if (!dsl) return;
-
-    const currentTargetEdges = Object.fromEntries(
-      dsl.targetEdges.map((edge) => [edge.targetHandle?.split(".")[1] ?? "", edge]),
-    );
-    const targetEdgesWithDefaults = [
-      ...dsl.targetEdges.filter((edge) =>
-        dsl.sourceOptions[edge.source]?.fields.includes(edge.sourceHandle?.split(".")[1] ?? ""),
-      ),
-      ...(targetFields
-        .map((targetField) => {
-          if (currentTargetEdges[targetField]) {
-            return;
-          }
-
-          const inferred = DATASET_INFERRED_MAPPINGS_BY_NAME[targetField];
-          const mappingOptions = [
-            ...(inferred ? [inferredMappingSource(inferred)] : []),
-            ...(DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED[targetField] ?? []),
-          ].filter((x) => x);
-
-          let inferredSource: { source: string; sourceHandle: string } | undefined;
-          for (const [source, { fields }] of Object.entries(dsl.sourceOptions)) {
-            for (const option of mappingOptions) {
-              if (option && fields.includes(option)) {
-                inferredSource = { source, sourceHandle: `outputs.${option}` };
-                break;
-              }
-            }
-          }
-
-          if (!inferredSource) {
-            return;
-          }
-
-          const edge: StudioWorkflow["edges"][number] = {
-            id: `${nowInstant().epochMilliseconds}-${targetField}`,
-            source: inferredSource.source,
-            sourceHandle: inferredSource.sourceHandle,
-            target: dsl.targetId,
-            targetHandle: `inputs.${targetField}`,
-            type: "default",
-          };
-
-          return edge;
-        })
-        .filter((x) => x) as StudioWorkflow["edges"]),
-    ];
-
-    if (!skipSettingDefaultEdges) {
-      dsl.setTargetEdges?.(targetEdgesWithDefaults);
+    if (dsl && !skipSettingDefaultEdges) {
+      dsl.setTargetEdges?.(
+        targetEdgesWithDefaults({ dsl, targetFields, now: nowInstant().epochMilliseconds }),
+      );
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(targetFields), dsl?.sourceOptions, JSON.stringify(currentMapping)]);
 
   useEffect(() => {
-    let index = 0;
-    const entries: DatasetRecordEntry[] = [];
-
-    // Identify columns mapped to server-only sources
-    const serverOnlyColumns = Object.entries(mapping)
-      .filter(([, m]) => (SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(m.source))
-      .map(([col, m]) => ({ col, source: m.source }));
-
-    for (const trace of traces_) {
-      const mappedEntries = mapTraceToDatasetEntry({
-        trace,
-        mapping,
-        expansions,
-        annotationScoreOptions: getAnnotationScoreOptions.data,
-        allTraces: allThreadTraces.data ?? traces_,
-      });
-
-      // Add each expanded entry to the final results
-      for (const entry of mappedEntries) {
-        // Override server-only source columns with data from server
-        for (const { col, source } of serverOnlyColumns) {
-          if (source === "formatted_trace" && formattedDigests.data) {
-            entry[col] = formattedDigests.data[trace.trace_id] ?? "";
-          }
-        }
-
-        entries.push({
-          id: `${now}-${index}`,
-          selected: true,
-          ...entry,
-        });
-        index++;
-      }
-    }
-
+    const entries = datasetEntriesFor({
+      traces: annotatedTraces,
+      mapping,
+      expansions,
+      annotationScoreOptions,
+      allTraces: threadTraces ?? annotatedTraces,
+      formattedDigests,
+      now,
+    });
     const serialized = JSON.stringify(entries);
     if (serialized === lastEntriesRef.current) return;
     lastEntriesRef.current = serialized;
     setDatasetEntries?.(entries);
   }, [
     expansions,
-    getAnnotationScoreOptions.data,
+    annotationScoreOptions,
     mapping,
     setDatasetEntries,
-    traces_,
-    allThreadTraces.data,
-    formattedDigests.data,
-    project?.id,
+    annotatedTraces,
+    threadTraces,
+    formattedDigests,
     now,
   ]);
-
-  const isThreeColumns = !!dsl;
 
   return (
     <Grid
       width="full"
-      templateColumns={isThreeColumns ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
+      templateColumns={dsl ? "1fr auto 1fr auto 1fr" : "1fr auto 1fr"}
       alignItems="center"
       gap={2}
     >
@@ -630,392 +320,33 @@ export const TracesMapping = ({
           <Text fontWeight="semibold">{title}</Text>
         </GridItem>
       ))}
-      {Object.entries(mapping).map(([targetField, { source, key, subkey }], index) => {
-        const traceMappingDefinition =
-          source && source in TRACE_MAPPINGS
-            ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
-            : undefined;
-
-        // Get subkeys for the selected key
-        // For "Any span" (empty key), return default span subfields
-        const defaultSpanSubkeys = [
-          { key: "input", label: "input" },
-          { key: "output", label: "output" },
-          { key: "params", label: "params" },
-          { key: "contexts", label: "contexts" },
-        ];
-
-        const computeSubkeys = (k: string) =>
-          traceMappingDefinition && "subkeys" in traceMappingDefinition
-            ? traceMappingDefinition.subkeys(traces_, k, {
-                annotationScoreOptions: getAnnotationScoreOptions.data,
-              })
-            : [];
-
-        const subkeys =
-          traceMappingDefinition &&
-          "subkeys" in traceMappingDefinition &&
-          source !== "threads" &&
-          source !== "threads_until_current"
-            ? subkeyOptions({ source, key, defaultSpanSubkeys, computeSubkeys })
-            : undefined;
-
-        // The key dropdown waits on whichever project-wide list feeds it:
-        // getDistinctFieldNames for spans/metadata/evaluations, the event-type
-        // options for events.
-        const isLoadingFieldNames =
-          (projectFieldNamesLoading && PROJECT_FIELD_NAME_SOURCES.includes(source)) ||
-          (projectEventTypesLoading && source === "events");
-
-        // Options for the (searchable) key dropdown: the "match everything"
-        // entry plus every project-wide / trace name for this source. These
-        // lists can be large (hundreds of span names), which is why the key
-        // dropdown is a searchable select rather than a plain <select>.
-        const hasKeys = !!traceMappingDefinition && "keys" in traceMappingDefinition;
-        const keyOptions: KeyOption[] =
-          isLoadingFieldNames || !hasKeys
-            ? []
-            : [
-                { key: "", label: FIELD_NAME_ANY_LABEL[source] ?? "* (any)" },
-                ...mergeProjectKeyOptions(source, traceMappingDefinition.keys(traces_)),
-              ];
-        const selectedKeyOption = keyOptions.find((option) => option.key === (key ?? "")) ?? null;
-
-        const targetHandle = `inputs.${targetField}`;
-        const currentSourceMapping = dsl?.targetEdges
-          ?.filter((edge) => edge.targetHandle === `inputs.${targetField}`)
-          .map((edge) => `${edge.source}.${edge.sourceHandle}`)[0];
-
-        return (
-          <React.Fragment key={index}>
-            {dsl && (
-              <>
-                <GridItem>
-                  <NativeSelect.Root width="full">
-                    <NativeSelect.Field
-                      value={currentSourceMapping ?? ""}
-                      onChange={(e) => {
-                        const [source, sourceGroup, sourceField] = e.target.value.split(".");
-
-                        dsl.setTargetEdges?.([
-                          ...(dsl.targetEdges?.filter(
-                            (edge) => edge.targetHandle !== targetHandle,
-                          ) ?? []),
-                          {
-                            id: `${nowInstant().epochMilliseconds}-${index}`,
-                            source: source ?? "",
-                            target: dsl.targetId,
-                            sourceHandle: `${sourceGroup}.${sourceField}`,
-                            targetHandle: `inputs.${targetField}`,
-                            type: "default",
-                          },
-                        ]);
-                      }}
-                    >
-                      <option value="" aria-label="None"></option>
-                      {Object.entries(dsl.sourceOptions).map(([key, { label, fields }]) => {
-                        const options = fields.map((field) => (
-                          <option key={field} value={`${key}.outputs.${field}`}>
-                            {field}
-                          </option>
-                        ));
-
-                        if (options.length === 0) {
-                          return null;
-                        }
-
-                        if (Object.keys(dsl.sourceOptions).length === 1) {
-                          return options;
-                        }
-
-                        return (
-                          <optgroup key={key} label={label}>
-                            {options}
-                          </optgroup>
-                        );
-                      })}
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
-                </GridItem>
-                <GridItem>
-                  <ArrowRight style={{ flexShrink: 0 }} />
-                </GridItem>
-              </>
-            )}
-            {traceMapping && (
-              <>
-                <GridItem>
-                  <VStack align="start" width="full" gap={2}>
-                    <NativeSelect.Root width="full" minWidth="260px">
-                      <NativeSelect.Field
-                        onChange={(e) => {
-                          setTraceMappingState((prev) => {
-                            const targetMapping = e.target.value
-                              ? TRACE_MAPPINGS[e.target.value as keyof typeof TRACE_MAPPINGS]
-                              : undefined;
-
-                            const newExpansions = expansionsAfterMapping({
-                              expansions: prev.expansions,
-                              targetMapping,
-                              availableExpansions,
-                            });
-
-                            return {
-                              ...prev,
-                              mapping: {
-                                ...prev.mapping,
-                                [targetField]: {
-                                  source: e.target.value as AllTraceMappingSources | "",
-                                  key: undefined,
-                                  subkey: undefined,
-                                  selectedFields: [],
-                                },
-                              },
-                              expansions: newExpansions,
-                            };
-                          });
-                        }}
-                        value={source}
-                      >
-                        <option value="" aria-label="None"></option>
-                        <optgroup label="Current Trace">
-                          {[
-                            ...SERVER_ONLY_TRACE_SOURCES,
-                            ...Object.keys(TRACE_MAPPINGS).filter(
-                              (key) =>
-                                key !== "threads" &&
-                                key !== "threads_until_current" &&
-                                key !== "thread_id",
-                            ),
-                          ].map((key) => (
-                            <option key={key} value={key}>
-                              {TRACE_MAPPING_LABELS[key] ?? key}
-                            </option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Current Thread">
-                          {["thread_id", "threads_until_current", "threads"].map((key) => (
-                            <option key={key} value={key}>
-                              {TRACE_MAPPING_LABELS[key] ?? key}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                    {traceMappingDefinition && "keys" in traceMappingDefinition && (
-                      <HStack align="start" width="full">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="border.emphasized"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        {/* Searchable key dropdown: these lists can hold
-                                hundreds of names, so a plain <select> is hard to
-                                scan. While project-wide names load it shows a
-                                loading placeholder with a spinner. */}
-                        <MultiSelect
-                          isDisabled={isLoadingFieldNames}
-                          isLoading={isLoadingFieldNames}
-                          options={keyOptions.map((option) => ({
-                            value: option.key,
-                            label: option.label,
-                          }))}
-                          value={
-                            selectedKeyOption
-                              ? {
-                                  value: selectedKeyOption.key,
-                                  label: selectedKeyOption.label,
-                                }
-                              : null
-                          }
-                          onChange={(newValue) => {
-                            const selected = newValue as {
-                              value: string;
-                            } | null;
-                            setTraceMappingState((prev) => ({
-                              ...prev,
-                              mapping: {
-                                ...prev.mapping,
-                                [targetField]: updateTraceMappingEntry(prev.mapping[targetField], {
-                                  key: selected?.value ?? "",
-                                }),
-                              },
-                            }));
-                          }}
-                          placeholder={
-                            isLoadingFieldNames
-                              ? (FIELD_NAME_LOADING_LABEL[source] ?? "Loading…")
-                              : (FIELD_NAME_ANY_LABEL[source] ?? "* (any)")
-                          }
-                          chakraStyles={{
-                            container: (base) => ({
-                              ...base,
-                              width: "100%",
-                              minWidth: "260px",
-                            }),
-                            menu: (base) => ({ ...base, zIndex: 2 }),
-                          }}
-                        />
-                      </HStack>
-                    )}
-                    {subkeys && subkeys.length > 0 && (
-                      <HStack align="start" width="full">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="border.emphasized"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        <NativeSelect.Root width="full">
-                          <NativeSelect.Field
-                            onChange={(e) => {
-                              setTraceMappingState((prev) => ({
-                                ...prev,
-                                mapping: {
-                                  ...prev.mapping,
-                                  [targetField]: updateTraceMappingEntry(
-                                    prev.mapping[targetField],
-                                    {
-                                      subkey: e.target.value,
-                                    },
-                                  ),
-                                },
-                              }));
-                            }}
-                            value={subkey}
-                          >
-                            {/* "* (full object)" option — returns complete
-                                object for selected key */}
-                            <option value="">
-                              {source === "spans" ? "* (full span object)" : "* (full object)"}
-                            </option>
-                            {subkeys.map(({ key, label }: { key: string; label: string }) => (
-                              <option key={key} value={key}>
-                                {label}
-                              </option>
-                            ))}
-                          </NativeSelect.Field>
-                          <NativeSelect.Indicator />
-                        </NativeSelect.Root>
-                      </HStack>
-                    )}
-                    {(source === "threads" || source === "threads_until_current") && (
-                      <HStack align="start" width="full">
-                        <Box
-                          width="16px"
-                          minWidth="16px"
-                          height="24px"
-                          border="2px solid"
-                          borderRadius="0 0 0 6px"
-                          borderColor="border.emphasized"
-                          borderTop={0}
-                          borderRight={0}
-                          marginLeft="12px"
-                        />
-                        <MultiSelect
-                          isMulti
-                          options={THREAD_SUB_FIELD_OPTIONS}
-                          value={(mapping[targetField]?.selectedFields ?? []).map((field) => ({
-                            label: `thread.traces.${field}`,
-                            value: field,
-                          }))}
-                          onChange={(newValue) => {
-                            setTraceMappingState((prev) => ({
-                              ...prev,
-                              mapping: {
-                                ...prev.mapping,
-                                [targetField]: updateTraceMappingEntry(prev.mapping[targetField], {
-                                  selectedFields: newValue.map((v) => v.value),
-                                }),
-                              },
-                            }));
-                          }}
-                          placeholder="Select trace fields..."
-                          closeMenuOnSelect={false}
-                          hideSelectedOptions={false}
-                          chakraStyles={{
-                            container: (base) => ({
-                              ...base,
-                              width: "100%",
-                              minWidth: "150px",
-                            }),
-                          }}
-                        />
-                      </HStack>
-                    )}
-                  </VStack>
-                </GridItem>
-                <GridItem>
-                  <ArrowRight style={{ flexShrink: 0 }} />
-                </GridItem>
-              </>
-            )}
-            <GridItem>
-              <Text flexShrink={0} whiteSpace="nowrap">
-                {targetField}
-              </Text>
-            </GridItem>
-          </React.Fragment>
-        );
-      })}
-
-      {!disableExpansions &&
-        availableExpansions.size > 0 && (
-          // The switches sit outside the field on purpose. A field describes one
-          // control, so it hands the same id to every control inside it: each
-          // switch's label then pointed at the first switch's input, and clicking
-          // one moved another. Out here each switch owns its own id and label.
-          <VStack width="full" align="start" paddingY={4} marginTop={2} gap={0}>
-            <Field.Root width="full">
-              <VStack align="start">
-                <Field.Label margin={0}>Expansions</Field.Label>
-                <Field.HelperText margin={0} fontSize="13px" marginBottom={2} maxWidth="600px">
-                  Normalize the dataset to duplicate the rows and have one entry per line instead of
-                  an array for the following mappings:
-                </Field.HelperText>
-              </VStack>
-            </Field.Root>
-            <VStack align="start" paddingTop={2} gap={2}>
-              {Array.from(availableExpansions).map((expansion) => (
-                // The name is the switch's own label, so clicking the words
-                // toggles it rather than only the switch itself.
-                <Switch
-                  key={expansion}
-                  checked={expansions.has(expansion)}
-                  onCheckedChange={(event) => {
-                    const isChecked = event.checked;
-
-                    setTraceMappingState((prev) => {
-                      const newExpansions: Set<keyof typeof TRACE_EXPANSIONS> = isChecked
-                        ? new Set([...prev.expansions, expansion])
-                        : new Set(Array.from(prev.expansions).filter((x) => x !== expansion));
-
-                      return {
-                        ...prev,
-                        expansions: newExpansions,
-                      };
-                    });
-                  }}
-                >
-                  One row per {TRACE_EXPANSIONS[expansion].label}
-                </Switch>
-              ))}
-            </VStack>
-          </VStack>
-        )}
+      {Object.entries(mapping).map(([targetField, entry], index) => (
+        <TracesMappingRow
+          key={index}
+          targetField={targetField}
+          index={index}
+          dsl={dsl}
+          traceSource={
+            traceMapping && {
+              entry,
+              traces: annotatedTraces,
+              annotationScoreOptions,
+              names,
+              availableExpansions,
+              update,
+            }
+          }
+        />
+      ))}
+      {!disableExpansions && availableExpansions.size > 0 && (
+        <ExpansionSwitches
+          available={availableExpansions}
+          expansions={expansions}
+          onChange={(expansion, isChecked) =>
+            update((prev) => withExpansion({ state: prev, expansion, isChecked }))
+          }
+        />
+      )}
     </Grid>
   );
 };

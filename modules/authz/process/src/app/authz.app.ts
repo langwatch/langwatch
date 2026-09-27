@@ -27,6 +27,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
+import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
 import { AuthzBindingIdService } from "../services/authz-binding-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
@@ -305,6 +306,18 @@ export class AuthzApp implements AuthzApi {
   deleteRole: AuthzApi["deleteRole"] = (a) => this.#grants.deleteRole(a);
   createBinding: AuthzApi["createBinding"] = (a) => this.#grants.createBinding(a);
   updateBinding: AuthzApi["updateBinding"] = (a) => this.#grants.updateBinding(a);
+  // A patch changed a row the service already read, so projection lag cannot explain its
+  // absence: nothing the caller can act on, so a plain Error (ADR-045).
+  updateRoleBinding: AuthzApi["updateRoleBinding"] = async (a) => {
+    const updated = await this.#grants.updateBinding(a);
+    const rows = await this.#permissions.listManagedBindingsForOrganization({
+      organizationId: a.organizationId,
+    });
+    const binding = rows.find((row) => row.id === updated.id);
+    if (!binding) throw new Error(`Role binding ${updated.id} was written but does not read back`);
+
+    return bindingWire(binding);
+  };
   deleteBinding: AuthzApi["deleteBinding"] = (a) => this.#grants.deleteBinding(a);
   applyMemberBindings: AuthzApi["applyMemberBindings"] = (a) => this.#grants.applyMemberBindings(a);
 

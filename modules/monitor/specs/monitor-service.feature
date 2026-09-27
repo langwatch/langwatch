@@ -31,6 +31,12 @@ Feature: Monitor service boundary
     Then only that project's enabled ON_MESSAGE monitors are returned
 
   @unit
+  Scenario: A monitor is found by its slug inside its own project
+    Given a monitor with a slug in one project
+    When the slug is looked up in that project and in another
+    Then the first lookup finds the monitor and the second finds none
+
+  @unit
   Scenario: Replicating a monitor creates a disabled target monitor
     Given a monitor in a source project
     And any linked evaluator has been copied to the target project

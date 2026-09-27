@@ -944,8 +944,14 @@ export class ScenarioApp implements ScenarioApi {
       langwatch: {
         targetReferenceId: target.referenceId,
         targetType: target.type,
+        ...(input.targetKey !== undefined ? { targetKey: input.targetKey } : {}),
+        ...(input.targetParameters !== undefined
+          ? { targetParameters: input.targetParameters }
+          : {}),
         ...(input.scenarioVersion !== undefined ? { scenarioVersion: input.scenarioVersion } : {}),
         ...withActor(input.actor),
+        ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
+        ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
         ...withResolvedModels(input.resolvedModels),
       },
       ...withNote(input.note),

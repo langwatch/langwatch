@@ -18,7 +18,10 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { langyLocalControlConnectRest } from "../langy-local-control-connect.rest.ts";
+import {
+  langyLocalControlConnectDatedRests,
+  langyLocalControlConnectRest,
+} from "../langy-local-control-connect.rest.ts";
 
 const LIVE_KEY = "sk-lw-session-live";
 const HOLDER = { type: "user", id: "user-1" } as const;
@@ -56,7 +59,7 @@ const KEY_REFUSALS: Readonly<Record<string, () => Error>> = {
   "sk-lw-session-lapsed": () => new LangySessionKeyUnboundError({ reason: "binding_lapsed" }),
 };
 
-function family() {
+function family(router = langyLocalControlConnectRest, mount = "") {
   const ops = {
     verifyLocalControlSessionKey: vi.fn<LangyApi["verifyLocalControlSessionKey"]>(async (key) => {
       const refusal = KEY_REFUSALS[key.token];
@@ -93,11 +96,11 @@ function family() {
     instanceTokenHeader: INSTANCE_TOKEN_HEADER,
     verify: (presented) => app.verifyLocalControlSessionKey(presented),
   });
-  host.mount(langyLocalControlConnectRest.router(), () => app, {
+  host.mount(router.router(), () => app, {
     facts: [bindRestCredential("sessionKey", () => door)],
   });
   const request = (path: string, init: RequestInit = {}) =>
-    host.app.request(`http://api.test/api/v1/langy/control/connect${path}`, init);
+    host.app.request(`http://api.test/api/v1/langy/control${mount}/connect${path}`, init);
   const registerWith = (body: unknown, headers: Record<string, string>) =>
     request("/register", {
       method: "POST",
@@ -285,4 +288,36 @@ describe("posting a long-poll share's frames", () => {
     expect(response.status).toBe(422);
     expect(await response.text()).toBe(JSON.stringify({ accepted: 0 }));
   });
+});
+
+describe("the long-poll share at main's dated mounts", () => {
+  /** @scenario "The control family answers at main's dated and latest addresses" */
+  it.each([
+    { mount: "2026-08-27", index: 0 },
+    { mount: "latest", index: 1 },
+  ])(
+    "registers, polls and posts frames at /api/v1/langy/control/$mount",
+    async ({ mount, index }) => {
+      const dated = langyLocalControlConnectDatedRests[index];
+      if (!dated) throw new Error(`no family mounted at ${mount}`);
+      const api = family(dated, `/${mount}`);
+
+      const registered = await api.register(REGISTER_FRAME, LIVE_KEY);
+      const polled = await api.request("/poll", {
+        headers: { [INSTANCE_TOKEN_HEADER]: "lcs_token" },
+      });
+      const posted = await api.request("/frames", {
+        method: "POST",
+        body: JSON.stringify({
+          frames: [{ protocol: LOCAL_CONTROL_PROTOCOL_VERSION, type: "ack", callId: "call-1" }],
+        }),
+        headers: { "content-type": "application/json", [INSTANCE_TOKEN_HEADER]: "lcs_token" },
+      });
+
+      expect(registered.status).toBe(200);
+      expect(await registered.json()).toEqual(REGISTERED);
+      expect(polled.status).toBe(200);
+      expect(posted.status).toBe(200);
+    },
+  );
 });

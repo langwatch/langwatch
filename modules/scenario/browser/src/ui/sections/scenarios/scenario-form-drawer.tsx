@@ -23,7 +23,6 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
-import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import type { Scenario } from "@langwatch/scenario-contract";
 import {
   parseCallerVoiceConfig,
@@ -128,14 +127,12 @@ export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const router = useRouter();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, goBack } = useDrawer();
   const rawComplexProps = getComplexProps();
   const complexPropsData =
     rawComplexProps && "initialFormData" in rawComplexProps
       ? (rawComplexProps as Partial<ScenarioInitialData>)
       : {};
-  const utils = api.useUtils();
   const [formInstance, setFormInstance] = useState<ScenarioFormController | null>(null);
   const { runScenario, isRunning } = useRunScenario({
     projectId: project?.id,
@@ -151,248 +148,43 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const [reloadNonce, setReloadNonce] = useState(0);
 
   // Target selection with localStorage persistence
-  const { target: persistedTarget, setTarget: persistTarget } = useScenarioTarget(scenarioId);
-  const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
-  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
+  const { selectedTarget, handleTargetChange, persistTarget } = useSelectedTarget(scenarioId);
   const [parametersDialogOpen, setParametersDialogOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
   // confirms which user-simulator and judge models to run with. null = follow
   // the project default.
-  const [runModelDialogOpen, setRunModelDialogOpen] = useState(false);
-  const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
-  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(null);
-  const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
 
   // Initialize from persisted target when scenario loads
-  useEffect(() => {
-    if (persistedTarget && !selectedTarget) {
-      setSelectedTarget(persistedTarget);
-    }
-  }, [persistedTarget, selectedTarget]);
-
-  // Update persistence when target changes
-  const handleTargetChange = useCallback(
-    (target: TargetValue) => {
-      setSelectedTarget(target);
-      if (target && scenarioId) {
-        persistTarget(target);
-      }
-    },
-    [persistTarget, scenarioId],
-  );
-  const handleCreateAgent = useCallback(() => {
-    const onAgentSaved = (agent: TypedAgent) => {
-      const targetType = agent.type as NonNullable<TargetValue>["type"];
-      handleTargetChange({ type: targetType, id: agent.id });
-      toaster.create({
-        title: "Agent created",
-        description: `"${agent.name}" is now selected as the target.`,
-        type: "success",
-      });
-    };
-    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
-    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
-    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
-    /**
-     * The agent type selector is OPENED BY ADDRESS, not mounted here.
-     */
-    openDrawer("agentTypeSelector");
-  }, [handleTargetChange, openDrawer]);
+  const handleCreateAgent = useCreateAgentTarget({ handleTargetChange, openDrawer });
+  const handleCreatePrompt = useCreatePromptTarget({ handleTargetChange, openDrawer, goBack });
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
   const {
-    data: scenario,
-    isLoading: isScenarioLoading,
-    isError: isScenarioReadFailed,
-    error: scenarioReadError,
-    refetch: refetchScenario,
-  } = api.scenarios.getById.useQuery(
-    { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project && !!scenarioId },
-  );
-  // Editing an existing scenario means the fields are empty until the query answers.
-  const isHydrating = !!scenarioId && (!project || isScenarioLoading);
-  // A read that fails ends the wait without producing a record, so the form would come
-  // back with every field at its default.
-  const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
-  const showsFormSkeleton = !hasReadFailed && isHydrating;
-  const showsFormFields = !hasReadFailed && !isHydrating;
+    scenario,
+    scenarioReadError,
+    refetchScenario,
+    isHydrating,
+    hasReadFailed,
+    showsFormSkeleton,
+    showsFormFields,
+  } = useScenarioRead({ projectId: project?.id, scenarioId });
   // The version this form is editing. A save sends it as the expected
   // version, so a save over somebody else's newer save is refused rather
   // than written.
   const loadedVersion = scenario?.version ?? null;
-  const createMutation = api.scenarios.create.useMutation({
-    onSuccess: (data: Scenario) => {
-      void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
-      props.onSuccess?.(data);
-    },
-    onError: (error) => {
-      if (
-        formInstance &&
-        applyHandledErrorToForm({
-          error,
-          form: formInstance,
-          hasFormErrorSlot: true,
-        })
-      )
-        return;
-      showErrorToast({ error, fallbackTitle: "Couldn't create scenario" });
-    },
+  const { handleSave, isSaving } = useScenarioSave({
+    projectId: project?.id,
+    scenarioId,
+    scenario,
+    isAgentTesting,
+    loadedVersion,
+    formInstance,
+    onSuccess: props.onSuccess,
+    openDrawer,
+    setStaleVersion,
   });
-  const updateMutation = api.scenarios.update.useMutation({
-    onSuccess: (data: Scenario) => {
-      void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
-      // The saved record goes into the cache before the refetch, not after
-      // it. `loadedVersion` reads from here, and a person who saves twice in
-      // a row would otherwise send the version of the save before and be
-      // refused for a conflict with their own write.
-      utils.scenarios.getById.setData({ projectId: project?.id ?? "", id: data.id }, data);
-      void utils.scenarios.getById.invalidate({
-        projectId: project?.id ?? "",
-        id: data.id,
-      });
-      props.onSuccess?.(data);
-    },
-    onError: (error) => {
-      const handled = readHandledError(error);
-      if (handled?.code === "scenario_stale_version") {
-        const current = handled.meta.currentVersion;
-        setStaleVersion(typeof current === "number" ? current : 0);
-        return;
-      }
-      if (
-        formInstance &&
-        applyHandledErrorToForm({
-          error,
-          form: formInstance,
-          hasFormErrorSlot: true,
-        })
-      )
-        return;
-      showErrorToast({ error, fallbackTitle: "Couldn't save scenario" });
-    },
-  });
-
-  /**
-   * Transition from create mode to edit mode after first save.
-   * Updates the URL with the new scenarioId so subsequent saves
-   * trigger updates instead of creating duplicates.
-   */
-  const transitionToEditMode = useCallback(
-    (newScenarioId: string) => {
-      openDrawer(
-        "scenarioEditor",
-        {
-          urlParams: { scenarioId: newScenarioId },
-        },
-        { resetStack: true },
-      );
-    },
-    [openDrawer],
-  );
-
-  // Edit mode: the scenario already exists, so the save is a plain update.
-  // Mutation errors are caught here so a save failure never surfaces as
-  // "Failed to run scenario" in the save-and-run path — updateMutation's own
-  // onError toast is what the user sees.
-  const updateExisting = useCallback(
-    async ({
-      projectId,
-      scenarioId,
-      data,
-      models,
-    }: {
-      projectId: string;
-      scenarioId: string;
-      data: ScenarioFormData;
-      models?: ModelOverrides;
-    }): Promise<Scenario | null> => {
-      try {
-        return await updateMutation.mutateAsync({
-          projectId,
-          id: scenarioId,
-          ...data,
-          ...models,
-          // Only the Agent Testing editor guards against a lost race; the
-          // other write surfaces save over whatever is there, as they always
-          // did.
-          ...(isAgentTesting && loadedVersion !== null ? { expectedVersion: loadedVersion } : {}),
-        });
-      } catch {
-        // Error toast already surfaced by updateMutation.onError; return null
-        // so the save-and-run caller doesn't re-report it as a run failure.
-        return null;
-      }
-    },
-    [updateMutation, isAgentTesting, loadedVersion],
-  );
-
-  const createScenario = useCallback(
-    async ({
-      projectId,
-      data,
-      skipTransition,
-      models,
-    }: {
-      projectId: string;
-      data: ScenarioFormData;
-      skipTransition: boolean;
-      models?: ModelOverrides;
-    }): Promise<Scenario | null> => {
-      try {
-        const result = await createMutation.mutateAsync({
-          projectId,
-          ...data,
-          ...models,
-        });
-        // Transition to edit mode to prevent double-create on subsequent saves.
-        // Skip when the drawer is about to close (save-without-running).
-        if (!skipTransition) {
-          transitionToEditMode(result.id);
-        }
-        return result;
-      } catch {
-        // Error already handled by global mutation cache if license error
-        return null;
-      }
-    },
-    [createMutation, transitionToEditMode],
-  );
-
-  const handleSave = useCallback(
-    async ({
-      data,
-      skipTransition = false,
-      models,
-    }: {
-      data: ScenarioFormData;
-      skipTransition?: boolean;
-      models?: ModelOverrides;
-    }): Promise<Scenario | null> => {
-      const projectId = project?.id;
-      if (!projectId) return null;
-
-      // Branching on the loaded record alone made "we have not read it yet"
-      // and "there is nothing to read" the same condition, so a save during
-      // the read, or after one that failed, created a second scenario
-      // instead of updating the one being edited. Being pointed at a scenario
-      // is what decides this; the record only decides whether we can act yet.
-      if (scenarioId) {
-        if (!scenario) return null;
-        return updateExisting({
-          projectId,
-          scenarioId: scenario.id,
-          data,
-          models,
-        });
-      }
-
-      return createScenario({ projectId, data, skipTransition, models });
-    },
-    [project?.id, scenarioId, scenario, updateExisting, createScenario],
-  );
   /**
    * Parameter rows are edited in their own dialog, and the message for a bad
    * row shows on the row. When parameter validation rejects a submit, open the
@@ -401,147 +193,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const openParametersOnInvalid = useCallback((errors: FieldErrors<ScenarioFormData>) => {
     if (errors.parameters) setParametersDialogOpen(true);
   }, []);
-  const handleSaveAndRun = useCallback(
-    async (target: TargetValue) => {
-      const form = formInstance;
-      if (!form || !project?.id || !project?.slug) return;
-      if (!target) {
-        toaster.create({
-          title: "Select a target",
-          description: "Please select a prompt or agent to run the scenario against.",
-          type: "warning",
-        });
-        return;
-      }
-
-      // Gate: workflow agents require valid scenario mappings before running.
-      if (target.type === "workflow") {
-        try {
-          const agent = await utils.agents.getById.fetch({
-            id: target.id,
-            projectId: project.id,
-          });
-          if (agent) {
-            const config = agent.config as CustomComponentConfig;
-            const mappings = config.scenarioMappings ?? {};
-            // Run gate is input-only by design (#3412): a scenario needs only one
-            // input ("input" or "messages") mapped to be runnable; output mapping
-            // is optional (auto-populates to first output, or graceful stringify
-            // fallback). Uses shared hasScenarioInputMapping SSOT so the run gate
-            // and editor Save gate agree on the same input rule.
-            if (!hasScenarioInputMapping(mappings)) {
-              // Fallback affordance (#3411): even if the auto-open below races,
-              // is dismissed, or fails, the toast itself links back to the editor.
-              const openAgentEditor = () =>
-                openDrawer("agentWorkflowEditor", {
-                  urlParams: { agentId: target.id },
-                });
-              toaster.create({
-                title: "Configure scenario mappings",
-                description:
-                  'Map at least one scenario input, "input" or "messages", to an agent input before running this workflow agent.',
-                type: "warning",
-                action: {
-                  label: "Open agent editor",
-                  onClick: openAgentEditor,
-                },
-              });
-              // Auto-open the editor now; the toast action above is the manual
-              // fallback if this auto-open races, is dismissed, or fails.
-              openAgentEditor();
-              return;
-            }
-          }
-        } catch {
-          // If agent fetch fails, allow the run to proceed — server will validate.
-        }
-      }
-
-      // Validate the scenario before asking for models so the dialog never
-      // pops over an invalid form. Then pre-fill the run-model dialog from the
-      // scenario's stored choices (null = follow the project default) and open
-      // it — the actual save + run happens on confirm.
-      const valid = await form.validate();
-      if (!valid) {
-        openParametersOnInvalid(form.errors());
-        return;
-      }
-
-      setRunSimulatorModel(scenario?.simulatorModel ?? null);
-      setRunJudgeModel(scenario?.judgeModel ?? null);
-      setPendingRunTarget(target);
-      setRunModelDialogOpen(true);
-    },
-    [
-      project?.id,
-      project?.slug,
-      formInstance,
-      utils,
-      openDrawer,
-      scenario,
-      openParametersOnInvalid,
-    ],
-  );
-
-  const onRunStarted = props.onRunStarted;
-  const confirmRunWithModels = useCallback(async () => {
-    const form = formInstance;
-    const target = pendingRunTarget;
-    if (!form || !target || !project?.id || !project?.slug) return;
-    setRunModelDialogOpen(false);
-
-    try {
-      await form.submit(async (data) => {
-        // skipTransition: don't open the edit-mode drawer mid-save — we're navigating
-        // away to /simulations next, so the create→edit URL push would race with our
-        // redirect (lw#3586 F11).
-        const savedScenario = await handleSave({
-          data,
-          skipTransition: true,
-          models: {
-            simulatorModel: runSimulatorModel,
-            judgeModel: runJudgeModel,
-          },
-        });
-        if (!savedScenario) return;
-
-        // Persist the target selection for this scenario
-        persistTarget(target);
-
-        // Generate batchRunId so the simulations page can show a placeholder immediately
-        const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-
-        // Fire the run — no callbacks, simulations page picks up via SSE
-        void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
-
-        // Agent Testing stays on its page and opens the run in a drawer.
-        if (onRunStarted) {
-          onRunStarted({ scenarioId: savedScenario.id, batchRunId });
-          return;
-        }
-
-        // Navigate to simulations — drawer closes implicitly via route change.
-        // Intentionally NOT calling onClose() here: closeDrawer() does its
-        // own router.push to strip drawer.* params, which would race with
-        // this redirect and silently win (lw#3586 F11).
-        void router.push(`/${project.slug}/simulations?pendingBatch=${batchRunId}`);
-      });
-    } catch (error) {
-      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
-    }
-  }, [
+  const {
+    handleSaveAndRun,
+    confirmRunWithModels,
+    runModelDialogOpen,
+    setRunModelDialogOpen,
+    runSimulatorModel,
+    setRunSimulatorModel,
+    runJudgeModel,
+    setRunJudgeModel,
+  } = useScenarioRunFlow({
     formInstance,
-    pendingRunTarget,
-    project?.id,
-    project?.slug,
+    projectId: project?.id,
+    projectSlug: project?.slug,
+    scenario,
+    openDrawer,
+    openParametersOnInvalid,
     handleSave,
     persistTarget,
     runScenario,
-    router,
-    runSimulatorModel,
-    runJudgeModel,
-    onRunStarted,
-  ]);
+    onRunStarted: props.onRunStarted,
+  });
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
     if (!form) return;
@@ -564,29 +236,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const setFormController = useCallback((controller: ScenarioFormController | null) => {
     setFormInstance(controller);
   }, []);
-  const isSubmitting = createMutation.isPending || updateMutation.isPending || isRunning;
+  const isSubmitting = isSaving || isRunning;
 
   // Use initial data from complexProps (new scenario from modal) or from DB (editing)
   const initialFormData = props.initialFormData ?? complexPropsData.initialFormData;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => {
-    // A stored scenario carries its parameters as JSON, including the null a
-    // scenario that never declared any has, so they are read through the
-    // tolerant parser before the form sees them.
-    if (scenario) {
-      return {
-        ...scenario,
-        parameters: parseScenarioParameterDefinitions(scenario.parameters),
-        // Stored as JSON (null on a scenario that never set one); read through
-        // the tolerant parser so the form always has a full config to bind.
-        callerVoice: parseCallerVoiceConfig((scenario as { callerVoice?: unknown }).callerVoice),
-      };
-    }
-    // A new scenario made from inside a test suite starts filed in it.
-    if (props.testSuiteId !== undefined && props.testSuiteId !== null) {
-      return { ...initialFormData, testSuiteId: props.testSuiteId };
-    }
-    return initialFormData ?? undefined;
-  }, [scenario, initialFormData, props.testSuiteId]);
+  const defaultValues = useMemo(
+    () => defaultFormValuesOf({ scenario, initialFormData, testSuiteId: props.testSuiteId }),
+    [scenario, initialFormData, props.testSuiteId],
+  );
 
   return (
     <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
@@ -596,25 +253,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           {/* Being pointed at a scenario is enough to be editing one. Keying
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
-          <VStack align="start" gap={1}>
-            {isAgentTesting ? (
-              <HStack gap={2}>
-                <Heading size="md">
-                  {scenarioId || scenario ? "Edit scenario" : "New scenario"}
-                </Heading>
-                <CaseVersionChip version={scenario?.version} />
-              </HStack>
-            ) : (
-              <Heading size="md">
-                {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
-              </Heading>
-            )}
-            {isAgentTesting && (
-              <Text fontSize="sm" color="fg.muted">
-                {AGENT_TESTING_EDITOR_DESCRIPTION}
-              </Text>
-            )}
-          </VStack>
+          <ScenarioDrawerHeading
+            isAgentTesting={isAgentTesting}
+            isEditing={!!(scenarioId || scenario)}
+            version={scenario?.version}
+          />
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
@@ -628,37 +271,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               )}
               {showsFormSkeleton && <ScenarioFormSkeleton />}
               {showsFormFields && (
-                <>
-                  {formInstance && <FormServerError form={formInstance} />}
-                  {staleVersion !== null && (
-                    <StaleVersionNotice
-                      currentVersion={staleVersion}
-                      onReload={() => {
-                        void (async () => {
-                          await refetchScenario();
-                          setStaleVersion(null);
-                          setReloadNonce((nonce) => nonce + 1);
-                        })();
-                      }}
-                    />
-                  )}
-                  {/* Only the Agent Testing editor offers the test suite
-                      field, and only it pays for the folder query behind it. */}
-                  {isAgentTesting ? (
-                    <ScenarioFormWithSuites
-                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
-                      defaultValues={defaultValues}
-                      onControllerChange={setFormController}
-                    />
-                  ) : (
-                    <ScenarioForm
-                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
-                      defaultValues={defaultValues}
-                      onControllerChange={setFormController}
-                      callerVoiceGroup={renderCallerVoiceGroup}
-                    />
-                  )}
-                </>
+                <ScenarioFormFields
+                  formInstance={formInstance}
+                  staleVersion={staleVersion}
+                  onReloadStale={() => {
+                    void (async () => {
+                      await refetchScenario();
+                      setStaleVersion(null);
+                      setReloadNonce((nonce) => nonce + 1);
+                    })();
+                  }}
+                  isAgentTesting={isAgentTesting}
+                  formKey={`${scenarioId ?? "new"}-${reloadNonce}`}
+                  defaultValues={defaultValues}
+                  onControllerChange={setFormController}
+                />
               )}
             </GridItem>
             {/* Right: Help Sidebar */}
@@ -702,28 +329,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 The Run button uses the agent this scenario last ran against,
                 which the run dialog on the table remembers. */}
             {!hasReadFailed && isAgentTesting && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  loading={isSubmitting}
-                  onClick={() => void handleSaveWithoutRunning()}
-                >
-                  Save
-                </Button>
-                <Button
-                  colorPalette="blue"
-                  size="sm"
-                  loading={isSubmitting}
-                  disabled={!selectedTarget || isHydrating}
-                  title={selectedTarget ? undefined : NO_REMEMBERED_TARGET_HINT}
-                  onClick={() => void handleSaveAndRun(selectedTarget)}
-                  data-testid="editor-run"
-                >
-                  <Play size={14} />
-                  Run
-                </Button>
-              </>
+              <AgentTestingActions
+                isSubmitting={isSubmitting}
+                hasTarget={!!selectedTarget}
+                isHydrating={isHydrating}
+                onSave={() => void handleSaveWithoutRunning()}
+                onRun={() => void handleSaveAndRun(selectedTarget)}
+              />
             )}
             {!hasReadFailed && !isAgentTesting && (
               <SaveAndRunMenu
@@ -732,7 +344,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 onSaveAndRun={handleSaveAndRun}
                 onSaveWithoutRunning={handleSaveWithoutRunning}
                 onCreateAgent={handleCreateAgent}
-                onCreatePrompt={() => setPromptDrawerOpen(true)}
+                onCreatePrompt={handleCreatePrompt}
                 isLoading={isSubmitting || isHydrating}
               />
             )}
@@ -761,22 +373,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         onJudgeChange={setRunJudgeModel}
         onConfirm={confirmRunWithModels}
         isRunning={isSubmitting}
-      />
-
-      {/* Prompt Creation Drawer */}
-      <PromptEditorDrawer
-        open={promptDrawerOpen}
-        onClose={() => setPromptDrawerOpen(false)}
-        onSave={(prompt) => {
-          // Auto-select the newly created prompt
-          handleTargetChange({ type: "prompt", id: prompt.id });
-          setPromptDrawerOpen(false);
-          toaster.create({
-            title: "Prompt created",
-            description: `"${prompt.name}" is now selected as the target.`,
-            type: "success",
-          });
-        }}
       />
     </Drawer.Root>
   );
@@ -1005,4 +601,652 @@ function ParameterChip({
       {name}
     </ChipButton>
   );
+}
+
+type Dispatchers = ReturnType<typeof useDrawer>;
+type TrpcUtils = ReturnType<typeof api.useUtils>;
+
+/** Opens the agent type selector, selecting the agent the chosen editor saves. */
+function useCreateAgentTarget({
+  handleTargetChange,
+  openDrawer,
+}: {
+  handleTargetChange: (target: TargetValue) => void;
+  openDrawer: Dispatchers["openDrawer"];
+}) {
+  return useCallback(() => {
+    const onAgentSaved = (agent: TypedAgent) => {
+      const targetType = agent.type as NonNullable<TargetValue>["type"];
+      handleTargetChange({ type: targetType, id: agent.id });
+      toaster.create({
+        title: "Agent created",
+        description: `"${agent.name}" is now selected as the target.`,
+        type: "success",
+      });
+    };
+    setFlowCallbacks("agentHttpEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("agentCodeEditor", { onSave: onAgentSaved });
+    setFlowCallbacks("workflowSelector", { onSave: onAgentSaved });
+    /**
+     * The agent type selector is OPENED BY ADDRESS, not mounted here.
+     */
+    openDrawer("agentTypeSelector");
+  }, [handleTargetChange, openDrawer]);
+}
+
+/** Opens prompt's own editor by address; a saved prompt becomes the run target. */
+function useCreatePromptTarget({
+  handleTargetChange,
+  openDrawer,
+  goBack,
+}: {
+  handleTargetChange: (target: TargetValue) => void;
+  openDrawer: Dispatchers["openDrawer"];
+  goBack: Dispatchers["goBack"];
+}) {
+  return useCallback(() => {
+    setFlowCallbacks("promptEditor", {
+      onSave: (prompt: { id: string; name: string }) => {
+        handleTargetChange({ type: "prompt", id: prompt.id });
+        toaster.create({
+          title: "Prompt created",
+          description: `"${prompt.name}" is now selected as the target.`,
+          type: "success",
+        });
+      },
+    });
+    openDrawer("promptEditor", { onClose: goBack });
+  }, [handleTargetChange, openDrawer, goBack]);
+}
+
+/** Creates or updates the scenario, turning a stale edit into a reload prompt. */
+function useScenarioSave({
+  projectId,
+  scenarioId,
+  scenario,
+  isAgentTesting,
+  loadedVersion,
+  formInstance,
+  onSuccess,
+  openDrawer,
+  setStaleVersion,
+}: {
+  projectId: string | undefined;
+  scenarioId: string | undefined;
+  scenario: Scenario | undefined;
+  isAgentTesting: boolean;
+  loadedVersion: number | null;
+  formInstance: ScenarioFormController | null;
+  onSuccess: ScenarioFormDrawerProps["onSuccess"];
+  openDrawer: Dispatchers["openDrawer"];
+  setStaleVersion: (version: number | null) => void;
+}) {
+  const utils = api.useUtils();
+
+  const createMutation = api.scenarios.create.useMutation({
+    onSuccess: (data: Scenario) => {
+      void utils.scenarios.getAll.invalidate({ projectId: projectId ?? "" });
+      onSuccess?.(data);
+    },
+    onError: (error) =>
+      rejectScenarioSave({ error, form: formInstance, fallbackTitle: "Couldn't create scenario" }),
+  });
+  const updateMutation = api.scenarios.update.useMutation({
+    onSuccess: (data: Scenario) => {
+      void utils.scenarios.getAll.invalidate({ projectId: projectId ?? "" });
+      // The saved record goes into the cache before the refetch, not after
+      // it. `loadedVersion` reads from here, and a person who saves twice in
+      // a row would otherwise send the version of the save before and be
+      // refused for a conflict with their own write.
+      utils.scenarios.getById.setData({ projectId: projectId ?? "", id: data.id }, data);
+      void utils.scenarios.getById.invalidate({
+        projectId: projectId ?? "",
+        id: data.id,
+      });
+      onSuccess?.(data);
+    },
+    onError: (error) => {
+      const handled = readHandledError(error);
+      if (handled?.code === "scenario_stale_version") {
+        const current = handled.meta.currentVersion;
+        setStaleVersion(typeof current === "number" ? current : 0);
+        return;
+      }
+      rejectScenarioSave({ error, form: formInstance, fallbackTitle: "Couldn't save scenario" });
+    },
+  });
+
+  /**
+   * Transition from create mode to edit mode after first save.
+   * Updates the URL with the new scenarioId so subsequent saves
+   * trigger updates instead of creating duplicates.
+   */
+  const transitionToEditMode = useCallback(
+    (newScenarioId: string) => {
+      openDrawer(
+        "scenarioEditor",
+        {
+          urlParams: { scenarioId: newScenarioId },
+        },
+        { resetStack: true },
+      );
+    },
+    [openDrawer],
+  );
+
+  // Edit mode: the scenario already exists, so the save is a plain update.
+  // Mutation errors are caught here so a save failure never surfaces as
+  // "Failed to run scenario" in the save-and-run path — updateMutation's own
+  // onError toast is what the user sees.
+  const updateExisting = useCallback(
+    async ({
+      projectId,
+      scenarioId,
+      data,
+      models,
+    }: {
+      projectId: string;
+      scenarioId: string;
+      data: ScenarioFormData;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        return await updateMutation.mutateAsync({
+          projectId,
+          id: scenarioId,
+          ...data,
+          ...models,
+          // Only the Agent Testing editor guards against a lost race; the
+          // other write surfaces save over whatever is there, as they always
+          // did.
+          ...(isAgentTesting && loadedVersion !== null ? { expectedVersion: loadedVersion } : {}),
+        });
+      } catch {
+        // Error toast already surfaced by updateMutation.onError; return null
+        // so the save-and-run caller doesn't re-report it as a run failure.
+        return null;
+      }
+    },
+    [updateMutation, isAgentTesting, loadedVersion],
+  );
+
+  const createScenario = useCallback(
+    async ({
+      projectId,
+      data,
+      skipTransition,
+      models,
+    }: {
+      projectId: string;
+      data: ScenarioFormData;
+      skipTransition: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      try {
+        const result = await createMutation.mutateAsync({
+          projectId,
+          ...data,
+          ...models,
+        });
+        // Transition to edit mode to prevent double-create on subsequent saves.
+        // Skip when the drawer is about to close (save-without-running).
+        if (!skipTransition) {
+          transitionToEditMode(result.id);
+        }
+        return result;
+      } catch {
+        // Error already handled by global mutation cache if license error
+        return null;
+      }
+    },
+    [createMutation, transitionToEditMode],
+  );
+
+  const handleSave = useCallback(
+    async ({
+      data,
+      skipTransition = false,
+      models,
+    }: {
+      data: ScenarioFormData;
+      skipTransition?: boolean;
+      models?: ModelOverrides;
+    }): Promise<Scenario | null> => {
+      if (!projectId) return null;
+
+      // Branching on the loaded record alone made "we have not read it yet"
+      // and "there is nothing to read" the same condition, so a save during
+      // the read, or after one that failed, created a second scenario
+      // instead of updating the one being edited. Being pointed at a scenario
+      // is what decides this; the record only decides whether we can act yet.
+      if (scenarioId) {
+        if (!scenario) return null;
+        return updateExisting({
+          projectId,
+          scenarioId: scenario.id,
+          data,
+          models,
+        });
+      }
+
+      return createScenario({ projectId, data, skipTransition, models });
+    },
+    [projectId, scenarioId, scenario, updateExisting, createScenario],
+  );
+
+  return { handleSave, isSaving: createMutation.isPending || updateMutation.isPending };
+}
+
+/**
+ * A workflow agent needs at least one scenario input mapped before it can run; when it has
+ * none, points the author at the agent editor and says so.
+ */
+async function workflowLacksScenarioMapping({
+  utils,
+  agentId,
+  projectId,
+  openDrawer,
+}: {
+  utils: TrpcUtils;
+  agentId: string;
+  projectId: string;
+  openDrawer: Dispatchers["openDrawer"];
+}): Promise<boolean> {
+  try {
+    const agent = await utils.agents.getById.fetch({
+      id: agentId,
+      projectId,
+    });
+    if (agent) {
+      const config = agent.config as CustomComponentConfig;
+      const mappings = config.scenarioMappings ?? {};
+      // Run gate is input-only by design (#3412): a scenario needs only one
+      // input ("input" or "messages") mapped to be runnable; output mapping
+      // is optional (auto-populates to first output, or graceful stringify
+      // fallback). Uses shared hasScenarioInputMapping SSOT so the run gate
+      // and editor Save gate agree on the same input rule.
+      if (!hasScenarioInputMapping(mappings)) {
+        // Fallback affordance (#3411): even if the auto-open below races,
+        // is dismissed, or fails, the toast itself links back to the editor.
+        const openAgentEditor = () =>
+          openDrawer("agentWorkflowEditor", {
+            urlParams: { agentId },
+          });
+        toaster.create({
+          title: "Configure scenario mappings",
+          description:
+            'Map at least one scenario input, "input" or "messages", to an agent input before running this workflow agent.',
+          type: "warning",
+          action: {
+            label: "Open agent editor",
+            onClick: openAgentEditor,
+          },
+        });
+        // Auto-open the editor now; the toast action above is the manual
+        // fallback if this auto-open races, is dismissed, or fails.
+        openAgentEditor();
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    // If agent fetch fails, allow the run to proceed — server will validate.
+    return false;
+  }
+}
+
+function defaultFormValuesOf({
+  scenario,
+  initialFormData,
+  testSuiteId,
+}: {
+  scenario: Scenario | undefined;
+  initialFormData: Partial<ScenarioFormData> | undefined;
+  testSuiteId: string | null | undefined;
+}): Partial<ScenarioFormData> | undefined {
+  // A stored scenario carries its parameters as JSON, including the null a
+  // scenario that never declared any has, so they are read through the
+  // tolerant parser before the form sees them.
+  if (scenario) {
+    return {
+      ...scenario,
+      parameters: parseScenarioParameterDefinitions(scenario.parameters),
+      // Stored as JSON (null on a scenario that never set one); read through
+      // the tolerant parser so the form always has a full config to bind.
+      callerVoice: parseCallerVoiceConfig((scenario as { callerVoice?: unknown }).callerVoice),
+    };
+  }
+  // A new scenario made from inside a test suite starts filed in it.
+  if (testSuiteId !== undefined && testSuiteId !== null) {
+    return { ...initialFormData, testSuiteId: testSuiteId };
+  }
+  return initialFormData ?? undefined;
+}
+
+function ScenarioDrawerHeading({
+  isAgentTesting,
+  isEditing,
+  version,
+}: {
+  isAgentTesting: boolean;
+  isEditing: boolean;
+  version: number | undefined;
+}) {
+  return (
+    <VStack align="start" gap={1}>
+      {isAgentTesting ? (
+        <HStack gap={2}>
+          <Heading size="md">{isEditing ? "Edit scenario" : "New scenario"}</Heading>
+          <CaseVersionChip version={version} />
+        </HStack>
+      ) : (
+        <Heading size="md">{isEditing ? "Edit Scenario" : "Create Scenario"}</Heading>
+      )}
+      {isAgentTesting && (
+        <Text fontSize="sm" color="fg.muted">
+          {AGENT_TESTING_EDITOR_DESCRIPTION}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+/** Field errors land on the form when it has a slot for them; anything else toasts. */
+function rejectScenarioSave({
+  error,
+  form,
+  fallbackTitle,
+}: {
+  error: unknown;
+  form: ScenarioFormController | null;
+  fallbackTitle: string;
+}): void {
+  if (form && applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle });
+}
+
+/** Save and run: check the target, pick the run's models, then save, run and follow it. */
+function useScenarioRunFlow({
+  formInstance,
+  projectId,
+  projectSlug,
+  scenario,
+  openDrawer,
+  openParametersOnInvalid,
+  handleSave,
+  persistTarget,
+  runScenario,
+  onRunStarted,
+}: {
+  formInstance: ScenarioFormController | null;
+  projectId: string | undefined;
+  projectSlug: string | undefined;
+  scenario: Scenario | undefined;
+  openDrawer: Dispatchers["openDrawer"];
+  openParametersOnInvalid: (errors: FieldErrors<ScenarioFormData>) => void;
+  handleSave: ReturnType<typeof useScenarioSave>["handleSave"];
+  persistTarget: (target: NonNullable<TargetValue>) => void;
+  runScenario: ReturnType<typeof useRunScenario>["runScenario"];
+  onRunStarted: ScenarioFormDrawerProps["onRunStarted"];
+}) {
+  const utils = api.useUtils();
+  const router = useRouter();
+  const [runModelDialogOpen, setRunModelDialogOpen] = useState(false);
+  const [pendingRunTarget, setPendingRunTarget] = useState<TargetValue>(null);
+  const [runSimulatorModel, setRunSimulatorModel] = useState<string | null>(null);
+  const [runJudgeModel, setRunJudgeModel] = useState<string | null>(null);
+
+  const handleSaveAndRun = useCallback(
+    async (target: TargetValue) => {
+      const form = formInstance;
+      if (!form || !projectId || !projectSlug) return;
+      if (!target) {
+        toaster.create({
+          title: "Select a target",
+          description: "Please select a prompt or agent to run the scenario against.",
+          type: "warning",
+        });
+        return;
+      }
+
+      // Gate: workflow agents require valid scenario mappings before running.
+      if (
+        target.type === "workflow" &&
+        (await workflowLacksScenarioMapping({
+          utils,
+          agentId: target.id,
+          projectId: projectId,
+          openDrawer,
+        }))
+      ) {
+        return;
+      }
+
+      // Validate the scenario before asking for models so the dialog never
+      // pops over an invalid form. Then pre-fill the run-model dialog from the
+      // scenario's stored choices (null = follow the project default) and open
+      // it — the actual save + run happens on confirm.
+      const valid = await form.validate();
+      if (!valid) {
+        openParametersOnInvalid(form.errors());
+        return;
+      }
+
+      setRunSimulatorModel(scenario?.simulatorModel ?? null);
+      setRunJudgeModel(scenario?.judgeModel ?? null);
+      setPendingRunTarget(target);
+      setRunModelDialogOpen(true);
+    },
+    [projectId, projectSlug, formInstance, utils, openDrawer, scenario, openParametersOnInvalid],
+  );
+
+  const confirmRunWithModels = useCallback(async () => {
+    const form = formInstance;
+    const target = pendingRunTarget;
+    if (!form || !target || !projectId || !projectSlug) return;
+    setRunModelDialogOpen(false);
+
+    try {
+      await form.submit(async (data) => {
+        // skipTransition: don't open the edit-mode drawer mid-save — we're navigating
+        // away to /simulations next, so the create→edit URL push would race with our
+        // redirect (lw#3586 F11).
+        const savedScenario = await handleSave({
+          data,
+          skipTransition: true,
+          models: {
+            simulatorModel: runSimulatorModel,
+            judgeModel: runJudgeModel,
+          },
+        });
+        if (!savedScenario) return;
+
+        // Persist the target selection for this scenario
+        persistTarget(target);
+
+        // Generate batchRunId so the simulations page can show a placeholder immediately
+        const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+
+        // Fire the run — no callbacks, simulations page picks up via SSE
+        void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
+
+        // Agent Testing stays on its page and opens the run in a drawer.
+        if (onRunStarted) {
+          onRunStarted({ scenarioId: savedScenario.id, batchRunId });
+          return;
+        }
+
+        // Navigate to simulations — drawer closes implicitly via route change.
+        // Intentionally NOT calling onClose() here: closeDrawer() does its
+        // own router.push to strip drawer.* params, which would race with
+        // this redirect and silently win (lw#3586 F11).
+        void router.push(`/${projectSlug}/simulations?pendingBatch=${batchRunId}`);
+      });
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't run scenario" });
+    }
+  }, [
+    formInstance,
+    pendingRunTarget,
+    projectId,
+    projectSlug,
+    handleSave,
+    persistTarget,
+    runScenario,
+    router,
+    runSimulatorModel,
+    runJudgeModel,
+    onRunStarted,
+  ]);
+
+  return {
+    handleSaveAndRun,
+    confirmRunWithModels,
+    runModelDialogOpen,
+    setRunModelDialogOpen,
+    runSimulatorModel,
+    setRunSimulatorModel,
+    runJudgeModel,
+    setRunJudgeModel,
+  };
+}
+
+/** The form itself, under any server error and the stale-version notice. */
+function ScenarioFormFields({
+  formInstance,
+  staleVersion,
+  onReloadStale,
+  isAgentTesting,
+  formKey,
+  defaultValues,
+  onControllerChange,
+}: {
+  formInstance: ScenarioFormController | null;
+  staleVersion: number | null;
+  onReloadStale: () => void;
+  isAgentTesting: boolean;
+  formKey: string;
+  defaultValues: Partial<ScenarioFormData> | undefined;
+  onControllerChange: (controller: ScenarioFormController | null) => void;
+}) {
+  return (
+    <>
+      {formInstance && <FormServerError form={formInstance} />}
+      {staleVersion !== null && (
+        <StaleVersionNotice currentVersion={staleVersion} onReload={onReloadStale} />
+      )}
+      {/* Only the Agent Testing editor offers the test suite
+          field, and only it pays for the folder query behind it. */}
+      {isAgentTesting ? (
+        <ScenarioFormWithSuites
+          key={formKey}
+          defaultValues={defaultValues}
+          onControllerChange={onControllerChange}
+        />
+      ) : (
+        <ScenarioForm
+          key={formKey}
+          defaultValues={defaultValues}
+          onControllerChange={onControllerChange}
+          callerVoiceGroup={renderCallerVoiceGroup}
+        />
+      )}
+    </>
+  );
+}
+
+/** Agent Testing's Save and Run, the run going to the agent the scenario last ran against. */
+function AgentTestingActions({
+  isSubmitting,
+  hasTarget,
+  isHydrating,
+  onSave,
+  onRun,
+}: {
+  isSubmitting: boolean;
+  hasTarget: boolean;
+  isHydrating: boolean;
+  onSave: () => void;
+  onRun: () => void;
+}) {
+  return (
+    <>
+      <Button variant="outline" size="sm" loading={isSubmitting} onClick={onSave}>
+        Save
+      </Button>
+      <Button
+        colorPalette="blue"
+        size="sm"
+        loading={isSubmitting}
+        disabled={!hasTarget || isHydrating}
+        title={hasTarget ? undefined : NO_REMEMBERED_TARGET_HINT}
+        onClick={onRun}
+        data-testid="editor-run"
+      >
+        <Play size={14} />
+        Run
+      </Button>
+    </>
+  );
+}
+
+/** The run target: the one this scenario last ran against, until the author picks another. */
+function useSelectedTarget(scenarioId: string | undefined) {
+  const { target: persistedTarget, setTarget: persistTarget } = useScenarioTarget(scenarioId);
+  const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
+  useEffect(() => {
+    if (persistedTarget && !selectedTarget) {
+      setSelectedTarget(persistedTarget);
+    }
+  }, [persistedTarget, selectedTarget]);
+
+  // Update persistence when target changes
+  const handleTargetChange = useCallback(
+    (target: TargetValue) => {
+      setSelectedTarget(target);
+      if (target && scenarioId) {
+        persistTarget(target);
+      }
+    },
+    [persistTarget, scenarioId],
+  );
+
+  return { selectedTarget, handleTargetChange, persistTarget };
+}
+
+/** The scenario being edited, and which of skeleton, error or form the body shows. */
+function useScenarioRead({
+  projectId,
+  scenarioId,
+}: {
+  projectId: string | undefined;
+  scenarioId: string | undefined;
+}) {
+  const {
+    data: scenario,
+    isLoading: isScenarioLoading,
+    isError: isScenarioReadFailed,
+    error: scenarioReadError,
+    refetch: refetchScenario,
+  } = api.scenarios.getById.useQuery(
+    { projectId: projectId ?? "", id: scenarioId ?? "" },
+    { enabled: !!projectId && !!scenarioId },
+  );
+  // Editing an existing scenario means the fields are empty until the query answers.
+  const isHydrating = !!scenarioId && (!projectId || isScenarioLoading);
+  // A read that fails ends the wait without producing a record, so the form would come
+  // back with every field at its default.
+  const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
+  const showsFormSkeleton = !hasReadFailed && isHydrating;
+  const showsFormFields = !hasReadFailed && !isHydrating;
+
+  return {
+    scenario,
+    scenarioReadError,
+    refetchScenario,
+    isHydrating,
+    hasReadFailed,
+    showsFormSkeleton,
+    showsFormFields,
+  };
 }

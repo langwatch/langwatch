@@ -1,43 +1,38 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { QueueSimulationRunInput, ScenarioApi } from "@langwatch/scenario-contract";
 /**
  * Queued suite run model recording via SuiteExecutionService.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 
-import type { QueueSimulationRunCommandData } from "../../app/suite.app.ts";
 import { SuiteExecutionService } from "../suite-execution.service.ts";
 import type { SuiteRunModelsResolver } from "../suite-run-models.service.ts";
 
 const scenarioId = "scenario_refund";
 
-const noopScenarios = createApiFixture<ScenarioApi>({
-  resolveRunParametersForScenarios: async ({ scenarios }) =>
-    scenarios.map((scenario) => ({
-      scenarioId: scenario.id,
-      parameters: {},
-      secretParameters: {},
-      scenarioVersion: 1,
-    })),
-});
-
-/** Starts a run of one case and returns the queued command it dispatched. */
+/** Starts a run of one case and returns what it asked the scenario owner to queue. */
 async function queuedCommandFor(params: {
   simulatorModel?: string | null;
   judgeModel?: string | null;
   resolveRunModels?: SuiteRunModelsResolver;
-}): Promise<QueueSimulationRunCommandData> {
-  const queued: QueueSimulationRunCommandData[] = [];
+}): Promise<QueueSimulationRunInput> {
+  const queued: QueueSimulationRunInput[] = [];
   const service = SuiteExecutionService.create({
-    commands: {
-      startSuiteRun: async () => {},
-      queueSimulationRun: async (data) => {
-        queued.push(data);
+    commands: { startSuiteRun: async () => {} },
+    scenarios: createApiFixture<ScenarioApi>({
+      resolveRunParametersForScenarios: async ({ scenarios }) =>
+        scenarios.map((scenario) => ({
+          scenarioId: scenario.id,
+          parameters: {},
+          secretParameters: {},
+          scenarioVersion: 1,
+        })),
+      queueSimulationRun: async (input) => {
+        queued.push(input);
       },
-    },
-    scenarios: noopScenarios,
-    resolveRunModels: params.resolveRunModels,
+    }),
+    ...(params.resolveRunModels ? { resolveRunModels: params.resolveRunModels } : {}),
   });
 
   await service.execute({
@@ -65,13 +60,8 @@ async function queuedCommandFor(params: {
   });
 
   const command = queued[0];
-  if (!command) throw new Error("execute dispatched no queued command");
+  if (!command) throw new Error("execute queued no run");
   return command;
-}
-
-/** The reserved namespace of a queued command. */
-function reservedNamespace(command: QueueSimulationRunCommandData): Record<string, unknown> {
-  return (command.metadata as { langwatch: Record<string, unknown> }).langwatch;
 }
 
 describe("the models a queued suite run records", () => {
@@ -88,9 +78,10 @@ describe("the models a queued suite run records", () => {
           ),
       });
 
-      const langwatch = reservedNamespace(command);
-      expect(langwatch.resolvedSimulatorModel).toBe("openai/gpt-5-mini");
-      expect(langwatch.resolvedJudgeModel).toBe("openai/gpt-5");
+      expect(command.resolvedModels).toEqual({
+        simulatorModel: "openai/gpt-5-mini",
+        judgeModel: "openai/gpt-5",
+      });
     });
   });
 
@@ -111,9 +102,8 @@ describe("the models a queued suite run records", () => {
           ),
       });
 
-      const langwatch = reservedNamespace(command);
-      expect(langwatch.judgeModel).toBe("openai/gpt-5");
-      expect(langwatch.resolvedJudgeModel).toBe("openai/gpt-5");
+      expect(command.judgeModel).toBe("openai/gpt-5");
+      expect(command.resolvedModels?.judgeModel).toBe("openai/gpt-5");
     });
   });
 
@@ -124,9 +114,7 @@ describe("the models a queued suite run records", () => {
         resolveRunModels: async () => new Map(),
       });
 
-      const langwatch = reservedNamespace(command);
-      expect(langwatch).not.toHaveProperty("resolvedSimulatorModel");
-      expect(langwatch).not.toHaveProperty("resolvedJudgeModel");
+      expect(command.resolvedModels).toBeNull();
       expect(command.scenarioId).toBe(scenarioId);
     });
   });
@@ -135,9 +123,7 @@ describe("the models a queued suite run records", () => {
     it("queues the run recording no resolved model", async () => {
       const command = await queuedCommandFor({});
 
-      const langwatch = reservedNamespace(command);
-      expect(langwatch).not.toHaveProperty("resolvedSimulatorModel");
-      expect(langwatch).not.toHaveProperty("resolvedJudgeModel");
+      expect(command.resolvedModels).toBeNull();
     });
   });
 });

@@ -11,7 +11,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 
-import { TEST_PRIVATE_KEY } from "../../fixtures/license-keys.fixture.ts";
+import { TEST_PRIVATE_KEY } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { LicenseGenerationService } from "../license-generation.service.ts";
 import { NodeLicenseCryptographyService } from "../node-license-cryptography.service.ts";
 

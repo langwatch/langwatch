@@ -1,6 +1,7 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import {
   AZURE_SAFETY_ENV_VARS,
   EvaluationApi,
@@ -34,6 +35,7 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
@@ -48,7 +50,11 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type {
   EvaluationCustomEvaluators,
+  EvaluationExecution,
+  EvaluationExecutionIntent,
+  EvaluationInputsResolution,
   EvaluationInstallEnvironment,
+  EvaluationRetentionFloor,
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
@@ -68,11 +74,13 @@ import {
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
+import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
 import { EvaluationEventingService } from "../services/evaluation-eventing.service.ts";
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
 import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
+import { EvaluationExperimentRunService } from "../services/evaluation-experiment-run.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
 import {
@@ -81,6 +89,8 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../services/evaluation-inputs-offload.service.ts";
+import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
+import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import {
   EvaluationProcessingService,
@@ -89,6 +99,7 @@ import {
 } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
+import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
@@ -98,12 +109,6 @@ import { LangevalsClusteringService } from "../services/langevals-clustering.ser
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
-import type {
-  EvaluationExecution,
-  EvaluationExecutionIntent,
-  EvaluationInputsResolution,
-  EvaluationRetentionFloor,
-} from "./evaluation.members.ts";
 
 export type EvaluationInfrastructure = Readonly<{
   retentionFloor: EvaluationRetentionFloor;
@@ -251,12 +256,16 @@ export class EvaluationApp implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read when a queued evaluation runs, never in construction: MonitorApp depends on us. */
+    /** Read per request (queued runs, slug lookups), never in construction: MonitorApp needs us. */
     monitors: MonitorApi,
     /** Wakes trigger matching and graph alerts when an evaluation settles. */
     automations: AutomationApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
+    /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
+    datasets: DatasetApi,
+    /** The experiment and run history SDK batches and dataset evaluations are written into. */
+    experiments: ExperimentApi,
   };
   static readonly reads = reads("objectStorage");
   static readonly secrets = {
@@ -366,6 +375,11 @@ export class EvaluationApp implements EvaluationApiContract {
         })
       : NullLangevalsChannel.create();
     const telemetry = EvaluationExecutionMetricsService.create();
+    const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
+    const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
+    const datasets = EvaluationDatasetLookupService.create(dependencies.datasets);
+    const experiments = EvaluationExperimentRunService.create(dependencies.experiments);
+    const costs = EvaluationCostService.create({ repository: repositories.costs });
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
       storage: repositories.inputs,
@@ -401,7 +415,22 @@ export class EvaluationApp implements EvaluationApiContract {
 
     return EvaluationApp.fromInfrastructure({
       infrastructure: {
-        ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
+        ...unavailable,
+        customEvaluators: {
+          findAll: (input) => dependencies.workflows.findEvaluatorWorkflows(input),
+        },
+        experiments,
+        experimentRuns: experiments,
+        slugs: {
+          findMonitorBySlug: (input) => monitorLookup.findMonitorBySlug(input),
+          findDatasetBySlug: (input) => datasets.findDatasetBySlug(input),
+        },
+        savedEvaluators: EvaluationSavedEvaluatorService.create(dependencies.evaluators),
+        models: EvaluationModelCascadeService.create(dependencies.modelProviders),
+        ledger: {
+          recordCost: (input) => costs.recordEntry(input),
+          recordDatasetRow: (input) => datasets.recordDatasetRow(input),
+        },
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
         execution,
         inputResolution: inputs,
@@ -431,7 +460,7 @@ export class EvaluationApp implements EvaluationApiContract {
         }),
         executionReceipt: EvaluationExecutionReceiptService.create({
           execution,
-          costs: EvaluationCostService.create({ repository: repositories.costs }),
+          costs,
         }),
       }),
       eventing: EvaluationEventingService.create({

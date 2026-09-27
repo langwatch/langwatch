@@ -19,6 +19,7 @@ export interface MonitorRepository {
   findEnabledOnMessage(projectId: string): Promise<MonitorSummary[]>;
   findEnabledGuardrails(input: MonitorEnabledGuardrailInput): Promise<EnabledGuardrailMonitor[]>;
   findById(input: { id: string; projectId: string }): Promise<MonitorWithEvaluator | undefined>;
+  findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]>;
   findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]>;
   /** The monitor already holding this name in the project, if one does. */
   findIdByName(input: { projectId: string; name: string }): Promise<string | undefined>;

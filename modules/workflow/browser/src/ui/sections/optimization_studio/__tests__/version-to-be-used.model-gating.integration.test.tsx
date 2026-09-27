@@ -77,9 +77,8 @@ vi.mock("../use-version-state.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-selector", () => ({
-  allModelOptions: [],
-  useModelSelectionOptions: () => ({ modelOption: undefined }),
+vi.mock("../../../../behavior/use-model-selection.ts", () => ({
+  useModelSelection: () => ({ modelOption: undefined }),
 }));
 
 const { NewVersionFields } = await import("../version-to-be-used.tsx");

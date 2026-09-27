@@ -142,6 +142,14 @@ export class PrismaMonitorRepository
     return row ? mapMonitorWithEvaluator(row) : undefined;
   }
 
+  async findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
+    const row = await this.prisma.monitor.findUnique({
+      where: { projectId_slug: { projectId: input.projectId, slug: input.slug } },
+      include: { evaluator: true },
+    });
+
+    return row ? [mapMonitorWithEvaluator(row)] : [];
+  }
   async findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     if (input.monitorIds.length === 0) return [];
 

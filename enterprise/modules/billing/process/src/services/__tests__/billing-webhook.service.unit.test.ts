@@ -27,9 +27,12 @@ const createMockHost = (): {
 } => ({
   sendSlackSubscriptionEvent: mockSendSlackSubscriptionEvent,
   sendSlackBillingThresholdFailureAlert: mockSendSlackBillingThresholdFailureAlert,
-  listOrganizationRetentionRules: mockListOrganizationRetentionRules,
-  setOrganizationRetention: mockSetOrganizationRetention,
 });
+
+const retention = {
+  listOrganizationRules: mockListOrganizationRetentionRules,
+  setForScope: mockSetOrganizationRetention,
+};
 
 const createMockBillingSubscription = (): {
   [K in keyof BillingWebhookSubscriptionRepository]: Mock<BillingWebhookSubscriptionRepository[K]>;
@@ -161,6 +164,7 @@ describe("EEWebhookService", () => {
       stripe: mockStripeInstance as any,
       itemCalculator,
       host: host,
+      retention,
     });
   });
 
@@ -287,6 +291,7 @@ describe("EEWebhookService", () => {
               stripe: mockStripeInstance as any,
               itemCalculator,
               host: host,
+              retention,
             }),
             "EEWebhookService",
           );
@@ -338,6 +343,7 @@ describe("EEWebhookService", () => {
           stripe: mockStripeInstance as any,
           itemCalculator,
           host: host,
+          retention,
           inviteApprover: mockInviteApprover,
         });
 
@@ -633,6 +639,7 @@ describe("EEWebhookService", () => {
           stripe: localStripe as any,
           itemCalculator,
           host: host,
+          retention,
         });
 
         subRepo.findByStripeId.mockResolvedValue(
@@ -681,6 +688,7 @@ describe("EEWebhookService", () => {
           stripe: localStripe as any,
           itemCalculator,
           host: host,
+          retention,
         });
 
         subRepo.findByStripeId.mockResolvedValue(

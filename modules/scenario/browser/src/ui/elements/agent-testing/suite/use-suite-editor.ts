@@ -8,6 +8,7 @@
 import { getDrawerStack, useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
+import { generate } from "@langwatch/ksuid";
 import {
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
@@ -16,7 +17,6 @@ import {
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
 import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";
@@ -30,7 +30,7 @@ import { usePendingAttachmentEditor, useSuiteAttachments } from "./use-suite-att
 
 /** A fresh row, empty and ready to be named. */
 function freshRow(): SuiteFieldRow {
-  return { key: nanoid(), identifier: "", type: "text" };
+  return { key: generate("suite").toString(), identifier: "", type: "text" };
 }
 
 /** The draft a stored suite reads as. */
@@ -40,7 +40,7 @@ function draftFromSuite(suite: { name: string; fields: unknown; evaluators: unkn
   return {
     name: suite.name,
     showFields: fields.length > 0,
-    fields: fields.map((field) => ({ key: nanoid(), ...field })),
+    fields: fields.map((field) => ({ key: generate("suite").toString(), ...field })),
     showEvaluators: evaluators.length > 0,
     evaluators,
   };

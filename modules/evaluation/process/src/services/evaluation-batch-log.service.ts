@@ -13,6 +13,7 @@ import {
   mapLegacyExperimentTargets,
   type ESBatchEvaluation,
   type ExperimentRunCommandTarget,
+  type RecordEvaluatorResultInput,
 } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -68,7 +69,7 @@ export interface EvaluationExperimentRunWriter {
     targetId: string;
     evaluatorId: string;
     evaluatorName?: string | undefined;
-    status: string;
+    status: RecordEvaluatorResultInput["status"];
     score?: number | undefined;
     label?: string | undefined;
     passed?: boolean | undefined;

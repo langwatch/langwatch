@@ -5,8 +5,6 @@ import {
   type AnnotationMutations,
   type PopoverAnnotationFormInput,
   type TraceAnnotation,
-} from "@langwatch/annotation-browser/annotation-form";
-import {
   type AnnotationAnchorColumns,
   type AnnotationMode,
   type ScoreOptions,

@@ -3,7 +3,11 @@
  * legacy single sign-on refusal happens before storage, so the repository
  * records whether it was called at all and the rest throw.
  */
-import type { BrowserSessionApi } from "@langwatch/auth-contract";
+import type {
+  BrowserSessionApi,
+  BrowserSessionResolution,
+  BrowserSessionVerification,
+} from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -94,8 +98,12 @@ export class AuthStub implements BrowserSessionApi {
   async resolveAuthProvider(): Promise<string> {
     return "email";
   }
-  tryVerifyBrowserSession = vi.fn(async () => null);
-  tryResolveBrowserSession = vi.fn(async () => null);
+  verifyBrowserSession = vi.fn(async (): Promise<BrowserSessionVerification> => ({
+    kind: "anonymous",
+  }));
+  resolveBrowserSession = vi.fn(async (): Promise<BrowserSessionResolution> => ({
+    kind: "anonymous",
+  }));
   revokeAllBrowserSessions = vi.fn(async () => undefined);
   revokeBrowserSession = vi.fn(async () => undefined);
   revokeOtherBrowserSessions = vi.fn(async () => undefined);

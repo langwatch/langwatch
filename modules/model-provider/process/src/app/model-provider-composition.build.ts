@@ -6,7 +6,6 @@ import { nowInstant } from "@langwatch/time";
  * and config. Two intentional branches: managed is always Unmanaged (core
  * may not import Enterprise); spans is always undefined (no untyped peer).
  */
-import { nanoid } from "nanoid";
 
 import { modelProviderConnectionPingChannels } from "../channels/model-provider-connection-ping-channels.registry.ts";
 import { CodexAccountService } from "../services/codex-account.service.ts";
@@ -88,7 +87,7 @@ export function buildModelProviderInfrastructure(input: {
     connectionPing: modelProviderConnectionPingChannels.live.create({
       executionProxyBaseUrl: config.executionProxyBaseUrl,
     }),
-    ids: PrefixedModelProviderIdService.create({ suffix: () => nanoid() }),
+    ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
       limiter: RedisModelProviderRateLimit.create({ redis: members.redis }),

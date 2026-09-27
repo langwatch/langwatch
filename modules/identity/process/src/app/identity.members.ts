@@ -67,20 +67,21 @@ export interface IdentityBirthLedger {
   awaitFold(input: { userId: string; tenantId: string; events: IdentityEvent[] }): Promise<void>;
 }
 
+/** One pipeline command's sender, or that this process registered none for it. */
+export type IdentityPipelineCommand =
+  | { kind: "registered"; sender: { send(data: unknown): Promise<unknown> } }
+  | { kind: "unregistered" };
+
 /**
  * The event-sourcing stack an identity ledger STAGES through. ONE method, by
  * doctrine (ADR-110): the queued run is the sole appender, so appending here
- * too would double-write every fact. `try…` allows a deployment with no event stack.
+ * too would double-write every fact.
  */
 export interface IdentityEventing {
-  /**
-   * The named command sender on one pipeline, or `null` when this process
-   * composed no event stack (or the pipeline is not registered on it).
-   */
-  tryPipelineCommand(input: {
+  resolvePipelineCommand(input: {
     pipeline: string;
     command: string;
-  }): Promise<{ send(data: unknown): Promise<unknown> } | null>;
+  }): Promise<IdentityPipelineCommand>;
 }
 
 /**

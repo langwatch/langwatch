@@ -118,9 +118,6 @@ vi.mock("../../../scenarios/scenario-editor-sidebar.tsx", () => ({
 vi.mock("../../../scenarios/scenario-run-model-dialog.tsx", () => ({
   ScenarioRunModelDialog: () => null,
 }));
-vi.mock("@langwatch/prompt-browser/surfaces/prompt-editor-drawer", () => ({
-  PromptEditorDrawer: () => null,
-}));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({

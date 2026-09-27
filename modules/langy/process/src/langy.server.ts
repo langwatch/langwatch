@@ -25,8 +25,14 @@ import {
   type LangyTitleGeneratorDeps,
 } from "./services/langy-title-generator.service.ts";
 import { langyInternalRest } from "./transport/langy-internal.rest.ts";
-import { langyLocalControlConnectRest } from "./transport/langy-local-control-connect.rest.ts";
-import { langyLocalControlRest } from "./transport/langy-local-control.rest.ts";
+import {
+  langyLocalControlConnectDatedRests,
+  langyLocalControlConnectRest,
+} from "./transport/langy-local-control-connect.rest.ts";
+import {
+  langyLocalControlDatedRests,
+  langyLocalControlRest,
+} from "./transport/langy-local-control.rest.ts";
 import { createLangyLocalControlWebSocketProtocol } from "./transport/langy-local-control.ws.ts";
 import { langyLocalRest } from "./transport/langy-local.rest.ts";
 import { langyTurnsRest } from "./transport/langy-turns.rest.ts";
@@ -93,6 +99,8 @@ export const langyServer = defineServerModule("langy")
     langyLocalRest,
     langyLocalControlRest,
     langyLocalControlConnectRest,
+    ...langyLocalControlDatedRests,
+    ...langyLocalControlConnectDatedRests,
     createLangyLocalControlWebSocketProtocol(),
     setupSkillsTrpcTransport,
     langyTrpcTransport,

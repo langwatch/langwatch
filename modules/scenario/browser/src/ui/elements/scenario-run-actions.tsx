@@ -1,11 +1,12 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { Scenario } from "@langwatch/scenario-contract";
 import { Edit2, ExternalLink, ListTree, MessagesSquare, MoreVertical, Play } from "lucide-react";
 
 interface ScenarioRunActionsProps {
   /** The scenario data, or null/undefined if not found. */
-  scenario: { archivedAt: Date | null } | null | undefined;
+  scenario: Pick<Scenario, "archivedAt"> | null | undefined;
   /** Whether the scenario is currently being run. */
   isRunning: boolean;
   /**

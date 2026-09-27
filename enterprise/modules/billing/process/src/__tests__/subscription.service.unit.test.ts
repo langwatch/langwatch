@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   BillingPriceCatalogue,
   PlanTypes,
@@ -10,8 +11,13 @@ import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
 import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
+import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
-import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import {
+  type SeatCheckoutInvites,
+  SeatEventSubscriptionService,
+} from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -107,16 +113,8 @@ const createMockSeatEventService = () =>
   Object.assign(
     SeatEventSubscriptionService.create({
       stripe: stripeDouble(),
-      database: {
-        subscription: {
-          findMany: vi.fn(),
-          updateMany: vi.fn(),
-          update: vi.fn(),
-          create: vi.fn(),
-        },
-        organizationInvite: { deleteMany: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
-        $transaction: vi.fn(),
-      },
+      subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
+      invites: createApiFixture<SeatCheckoutInvites>({}),
       prices: TEST_PRICES,
       customerCurrency: StripeCustomerCurrencyService.create(StripeErrorTranslatorService.create()),
     }),

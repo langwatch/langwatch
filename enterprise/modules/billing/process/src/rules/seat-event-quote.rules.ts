@@ -9,30 +9,8 @@ import type Stripe from "stripe";
 
 export type InviteInput = {
   email: string;
-  role: string;
+  role: "ADMIN" | "MEMBER" | "EXTERNAL";
   teamIds: string;
-};
-
-/** The subscription row fields a seat change reads. */
-export type SeatSubscriptionRow = {
-  id: string;
-  status: string;
-  stripeSubscriptionId: string | null;
-};
-
-export type SeatEventDatabase = {
-  subscription: {
-    findMany(args: unknown): Promise<SeatSubscriptionRow[]>;
-    updateMany(args: unknown): Promise<{ count: number }>;
-    update(args: unknown): Promise<unknown>;
-    create(args: unknown): Promise<{ id: string }>;
-  };
-  organizationInvite: {
-    deleteMany(args: unknown): Promise<{ count: number }>;
-    findFirst(args: unknown): Promise<unknown>;
-    create(args: unknown): Promise<unknown>;
-  };
-  $transaction<T>(run: (transaction: SeatEventDatabase) => Promise<T>): Promise<T>;
 };
 
 /**

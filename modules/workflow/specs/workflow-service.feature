@@ -211,3 +211,11 @@ Feature: Workflow service boundary
     Given a Studio workflow DSL that carries no state field
     When the Studio schema parses it
     Then the graph parses with an empty state
+
+  @unit
+  Scenario: Evaluator workflows are listed with only their published version
+    Given a project holding evaluator workflows, one published and one never published, and a plain workflow
+    When the evaluator workflows are listed
+    Then each evaluator workflow comes back carrying only the version it published
+    And an evaluator workflow that never published comes back with no version
+    And no workflow of another project comes back

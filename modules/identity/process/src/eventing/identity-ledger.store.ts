@@ -103,7 +103,9 @@ export class IdentityLedgerStore implements IdentityLedger {
     this.stagedSender =
       deps.stagedSender ??
       ((command) =>
-        deps.eventing.tryPipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command }));
+        deps.eventing
+          .resolvePipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command })
+          .then((resolved) => (resolved.kind === "registered" ? resolved.sender : null)));
     this.convergence = deps.convergence ?? {
       timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
       pollMs: IDENTITY_CONVERGENCE_POLL_MS,

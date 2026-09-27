@@ -11,7 +11,12 @@ import {
   billingSecrets,
   type BillingServerConfig,
   type BillingStaff,
+  type BillingDisplayInvoice,
   type ConnectedAddCommitRequest,
+  type Currency,
+  type SubscribablePlan,
+  type SubscriptionBillingInterval,
+  type SubscriptionInvite,
   type CurrencyRequest,
   type DetectedCurrency,
   type ConnectedBillingAccountView,
@@ -42,10 +47,13 @@ import { Temporal, type Instant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import Stripe from "stripe";
 
+import { billingSubscriptionNotifierChannels } from "../channels/billing-subscription-notifier-channels.registry.ts";
+import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import { billingWebhookHostChannels } from "../channels/billing-webhook-host-channels.registry.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import {
   type BillingReportingDefinition,
@@ -56,7 +64,11 @@ import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
-import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
+import {
+  EEWebhookService,
+  type LicensePurchaseHandler,
+} from "../services/billing-stripe-webhook.service.ts";
+import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
 import { ConnectedBillingTickService } from "../services/connected-billing-tick.service.ts";
@@ -69,7 +81,11 @@ import { ConnectedMonthlyStatementService } from "../services/connected-monthly-
 import { ConnectedSeatChangeService } from "../services/connected-seat-change.service.ts";
 import { ConnectedUsageCeilingService } from "../services/connected-usage-ceiling.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
+import { CustomerService } from "../services/customer.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
+import { LicensePurchaseService } from "../services/license-purchase.service.ts";
+import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
 import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
@@ -77,8 +93,12 @@ import {
   ScenarioCreatedSignalService,
   type ScenarioSignalOrganizations,
 } from "../services/scenario-created-signal.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
+import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { StripeWebhookSignatureService } from "../services/stripe-webhook-signature.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
+import { BillingSubscriptionService } from "../services/subscription.service.ts";
 import { UsageLimitOrganizationService } from "../services/usage-limit-organization.service.ts";
 import {
   StripeUsageReportingBuilder,
@@ -86,6 +106,7 @@ import {
 } from "../services/usage-reporting.service.ts";
 import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhook.rest.ts";
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
+import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
 
 /** Both are the process's own facts: where it runs, and which price mode it bills in. */
 type BillingMembers = Readonly<{ isSaas: boolean; nodeEnvironment: string | undefined }>;
@@ -126,8 +147,28 @@ const STRIPE_API_VERSION = "2024-04-10";
 type StripeWebhookComposition = Readonly<{
   signing: StripeWebhookSignatureService;
   host: BillingWebhookHost;
+  /** Data-retention's rules, which a first seat activation stamps at the platform default. */
+  retention: SeatRetentionRules;
+  /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
+  licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
   invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
+}>;
+
+type SubscriptionComposition = Readonly<{
+  notifier: BillingSubscriptionNotifier;
+  organizations: Pick<
+    OrganizationApi,
+    | "getBillingProfile"
+    | "claimBillingCustomerId"
+    | "createPaymentPendingInvites"
+    | "cancelPaymentPendingInvites"
+  >;
+}>;
+
+type SubscriptionDoor = Readonly<{
+  customers: CustomerService;
+  subscriptions: BillingSubscriptionService;
 }>;
 
 type ConnectedBilling = Readonly<{
@@ -136,7 +177,9 @@ type ConnectedBilling = Readonly<{
   tick: ConnectedBillingTickService;
 }>;
 
-export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingCurrencyApi {
+export class BillingApp
+  implements BillingApi, BillingStripeWebhookApi, BillingCurrencyApi, BillingSubscriptionApi
+{
   static readonly contract = BillingApi;
   static readonly dependencies = {
     /** The commit and the contract budget live on the license, not here. */
@@ -172,6 +215,23 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
       StripeWebhookSignatureService.create(secret),
     );
     const notices = BillingApp.#composeNotices(setup);
+    const licensePurchase = await setup.secrets.into(
+      BillingApp.secrets.licensePrivateKey,
+      (privateKey) =>
+        privateKey
+          ? LicensePurchaseService.create({
+              generateLicense: LicensingLicenseGeneratorService.create({
+                licensing: setup.dependencies.licensing,
+                privateKey,
+              }),
+              delivery: LicensePurchaseDeliveryService.create({
+                licensing: setup.dependencies.licensing,
+                mail: licenseEmailChannels.ses.create(setup.members.mail),
+                notices,
+              }),
+            })
+          : void 0,
+    );
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingApp.assemble({
         members: setup.members,
@@ -182,11 +242,14 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
         usageWarnings: BillingApp.#composeUsageWarnings(setup, notices),
         webhook: {
           signing,
-          host: billingWebhookHostChannels.slack.create({
-            notices,
-            retention: setup.dependencies.dataRetention,
-          }),
+          host: billingWebhookHostChannels.slack.create({ notices }),
+          retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
+          licensePurchase,
+        },
+        subscription: {
+          notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
+          organizations: setup.dependencies.organizations,
         },
       }),
     );
@@ -241,6 +304,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
     statementMail,
     usageWarnings,
     webhook,
+    subscription,
   }: {
     members: BillingMembers;
     repositories: Pick<
@@ -254,6 +318,8 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
       | "organizationPricing"
       | "webhookSubscriptions"
       | "webhookOrganizations"
+      | "seatEventSubscriptions"
+      | "organizations"
     >;
     config: Pick<BillingServerConfig, "bankDetails" | "licensePaymentLinkId">;
     peers: ConnectedBillingPeers;
@@ -263,6 +329,8 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
     usageWarnings: MeteredUsageWarningService;
     /** The Stripe callback's signing secret and outside reach; absent, the callback answers 404. */
     webhook?: StripeWebhookComposition;
+    /** Main's subscription door; absent, every `subscription.*` procedure answers not found. */
+    subscription?: SubscriptionComposition;
   }): BillingApp {
     const { isSaas, nodeEnvironment } = members;
     const repository = repositories.connectedBilling;
@@ -310,6 +378,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
         ...gate,
         connected: void 0,
         stripeWebhook: BillingApp.#undispatchedWebhook(),
+        subscriptions: void 0,
       });
     }
 
@@ -349,6 +418,15 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
             connectedBilling: billing,
           })
         : BillingApp.#undispatchedWebhook(),
+      subscriptions:
+        subscription && isSaas
+          ? BillingApp.#composeSubscriptions({
+              subscription,
+              stripeSecretKey,
+              nodeEnvironment,
+              repositories,
+            })
+          : void 0,
       connected: {
         billing,
         seats,
@@ -381,6 +459,133 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
     });
   }
 
+  /** Main's `createSubscriptionRouter` services: customers, subscriptions and seat checkouts. */
+  static #composeSubscriptions({
+    subscription,
+    stripeSecretKey,
+    nodeEnvironment,
+    repositories,
+  }: {
+    subscription: SubscriptionComposition;
+    stripeSecretKey: string;
+    nodeEnvironment: string | undefined;
+    repositories: Pick<
+      BillingRepositories,
+      "subscriptions" | "organizations" | "seatEventSubscriptions"
+    >;
+  }): SubscriptionDoor {
+    const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
+    const prices = BillingPriceCatalogue.create(
+      getStripeEnvironmentFromNodeEnv(nodeEnvironment),
+    ).prices;
+    const stripeErrors = StripeErrorTranslatorService.create();
+    return {
+      customers: CustomerService.create({ stripe, organizations: subscription.organizations }),
+      subscriptions: BillingSubscriptionService.create({
+        repository: repositories.subscriptions,
+        organizationRepository: repositories.organizations,
+        stripe,
+        itemCalculator: SubscriptionItemCalculatorService.create(prices),
+        seatEventService: SeatEventSubscriptionService.create({
+          stripe,
+          subscriptions: repositories.seatEventSubscriptions,
+          invites: subscription.organizations,
+          prices,
+          customerCurrency: StripeCustomerCurrencyService.create(stripeErrors),
+        }),
+        notifier: subscription.notifier,
+        stripeErrors,
+      }),
+    };
+  }
+
+  /** The subscription door, or not found where main mounted no subscription router. */
+  get #subscriptionDoor(): SubscriptionDoor {
+    if (!this.#subscriptions) throw new NotFoundError("Subscriptions are not served here");
+    return this.#subscriptions;
+  }
+
+  async getOrCreateCustomerId(input: {
+    user: BillingSubscriber;
+    organizationId: string;
+  }): Promise<string> {
+    return this.#subscriptionDoor.customers.getOrCreateCustomerId(input);
+  }
+
+  async updateSubscriptionItems(input: {
+    organizationId: string;
+    plan: SubscribablePlan;
+    upgradeMembers: boolean;
+    upgradeTraces: boolean;
+    totalMembers: number;
+    totalTraces: number;
+    quotedAt?: number;
+  }): Promise<{ success: boolean }> {
+    return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
+  }
+
+  async createOrUpdateSubscription(input: {
+    organizationId: string;
+    baseUrl: string;
+    plan: SubscribablePlan;
+    membersToAdd?: number;
+    tracesToAdd?: number;
+    customerId: string;
+    currency?: Currency;
+    billingInterval?: SubscriptionBillingInterval;
+  }): Promise<{ url: string | null }> {
+    return this.#subscriptionDoor.subscriptions.createOrUpdateSubscription(input);
+  }
+
+  async createBillingPortalSession(input: {
+    customerId: string;
+    baseUrl: string;
+    organizationId: string;
+  }): Promise<{ url: string }> {
+    return this.#subscriptionDoor.subscriptions.createBillingPortalSession(input);
+  }
+
+  async findLastNonCancelledSubscription(input: { organizationId: string }): Promise<unknown> {
+    return this.#subscriptionDoor.subscriptions.findLastNonCancelledSubscription(
+      input.organizationId,
+    );
+  }
+
+  async previewProration(input: {
+    organizationId: string;
+    newTotalSeats: number;
+  }): Promise<unknown> {
+    return this.#subscriptionDoor.subscriptions.previewProration(input);
+  }
+
+  async notifyProspective(input: {
+    organizationId: string;
+    plan: SubscribablePlan;
+    customerName?: string;
+    customerEmail?: string;
+    note?: string;
+    /** The caller's own address; an account without one is refused by name. */
+    actorEmail: string | null;
+  }): Promise<unknown> {
+    return this.#subscriptionDoor.subscriptions.notifyProspective(input);
+  }
+
+  async createSubscriptionWithInvites(input: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    customerId: string;
+    currency?: Currency;
+    billingInterval?: SubscriptionBillingInterval;
+    invites: readonly SubscriptionInvite[];
+  }): Promise<{ url: string | null }> {
+    return this.#subscriptionDoor.subscriptions.createSubscriptionWithInvites(input);
+  }
+
+  async listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]> {
+    return this.#subscriptionDoor.subscriptions.listInvoices(input);
+  }
+
   /** Main's `EEWebhookService` behind the callback, over billing's own rows. */
   static #composeStripeWebhook({
     webhook,
@@ -409,7 +614,9 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,
       inviteApprover: webhook.invites,
+      licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,
+      retention: webhook.retention,
       connectedBilling,
     });
     return StripeWebhookReceiptService.create({
@@ -434,6 +641,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
   }
 
   readonly #stripeWebhook: StripeWebhookReceiptService;
+  readonly #subscriptions: SubscriptionDoor | undefined;
   readonly #connected: ConnectedBilling | undefined;
   readonly #operators: Pick<OpsApi, "isAdmin">;
   readonly #auditLog: Pick<AuditLogApi, "record">;
@@ -448,6 +656,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
 
   private constructor({
     stripeWebhook,
+    subscriptions,
     connected,
     operators,
     auditLog,
@@ -461,6 +670,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
     usageWarnings,
   }: {
     stripeWebhook: StripeWebhookReceiptService;
+    subscriptions: SubscriptionDoor | undefined;
     connected: ConnectedBilling | undefined;
     operators: Pick<OpsApi, "isAdmin">;
     auditLog: Pick<AuditLogApi, "record">;
@@ -474,6 +684,7 @@ export class BillingApp implements BillingApi, BillingStripeWebhookApi, BillingC
     usageWarnings: MeteredUsageWarningService;
   }) {
     this.#stripeWebhook = stripeWebhook;
+    this.#subscriptions = subscriptions;
     this.#connected = connected;
     this.#operators = operators;
     this.#auditLog = auditLog;

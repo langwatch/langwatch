@@ -150,7 +150,7 @@ export function EvaluationManualIntegration({
   form?: UseFormReturn<CheckConfigFormData>;
   checkType: string;
   name: string;
-  executionMode: EvaluationExecutionMode;
+  executionMode: EvaluationExecutionMode | undefined;
   settings: Record<string, unknown>;
   storeSettingsOnCode: boolean;
   checkSlug?: string;

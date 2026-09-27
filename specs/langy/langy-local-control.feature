@@ -553,3 +553,9 @@ Feature: Langy works in a folder shared from the developer's machine
     Given the call or question the worker polls has lapsed
     When the worker reads its answer
     Then the platform answers not found with the code langy_local_record_not_found
+
+  @unit
+  Scenario: The control family answers at main's dated and latest addresses
+    Given a command line that pinned the control family at 2026-08-27 or at latest
+    When it lists, approves or cancels a request, or registers, polls or posts frames
+    Then the platform answers as it does at the undated address

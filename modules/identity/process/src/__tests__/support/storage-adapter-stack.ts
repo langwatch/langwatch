@@ -16,7 +16,7 @@ import {
 } from "../../rules/identity-command-id.rules.ts";
 import type { IdentityAccounts, IdentityResolver } from "../../rules/identity-storage.rules.ts";
 import { BetterAuthCeremonyBridgeService } from "../../services/better-auth-ceremony-bridge.service.ts";
-import { BetterAuthIdentityBirthAdapter } from "../../services/better-auth-identity-birth.service.ts";
+import { BetterAuthIdentityBirthService } from "../../services/better-auth-identity-birth.service.ts";
 import { IdentityCeremoniesService } from "../../services/better-auth-identity-ceremonies.service.ts";
 import {
   BetterAuthIdentityStorageService,
@@ -233,7 +233,7 @@ export function identityStack({
     // The ceremonies fork on the SAME question the adapter does, and a
     // newborn whose adapter routed to identity while their ceremony declined
     // would get a legacy `Account` row anyway (ADR-116 §3).
-    isLatched: BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
+    isLatched: BetterAuthIdentityBirthService.create().birthAwareGate(isUserOnIdentityWrites),
     clock: { now: () => T0, newCommandId: newIdentityCommandId },
   });
 
@@ -279,7 +279,8 @@ export function identityStack({
 
   const bridge = BetterAuthCeremonyBridgeService.create({
     ceremonies,
-    routesToIdentity: BetterAuthIdentityBirthAdapter.birthAwareGate(isUserOnIdentityWrites),
+    routesToIdentity:
+      BetterAuthIdentityBirthService.create().birthAwareGate(isUserOnIdentityWrites),
   });
   const auth = authOver(
     BetterAuthIdentityStorageService.create({
@@ -292,6 +293,7 @@ export function identityStack({
       birth,
       // A stack that names no removal port is testing something else; the
       // refusal keeps a passkey delete from quietly taking the legacy path.
+      newborns: BetterAuthIdentityBirthService.create(),
       passkeyRemoval: passkeyRemoval ?? {
         deleteIfAnotherWayInRemains: async () => "not_found",
       },
@@ -341,7 +343,7 @@ export async function signUp(auth: AuthUnderTest, email: string): Promise<string
  * §3). Nothing below the marker re-decides the flag.
  */
 export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<string> {
-  return BetterAuthIdentityBirthAdapter.runWithIdentityBirth(() => signUp(auth, email));
+  return BetterAuthIdentityBirthService.create().runWithIdentityBirth(() => signUp(auth, email));
 }
 
 /**
@@ -350,7 +352,7 @@ export function flaggedSignUp(auth: AuthUnderTest, email: string): Promise<strin
  * that a refusal kept its handled code all the way out.
  */
 export function flaggedSignUpOrThrow(auth: AuthUnderTest, email: string): Promise<unknown> {
-  return BetterAuthIdentityBirthAdapter.runWithIdentityBirth(() =>
+  return BetterAuthIdentityBirthService.create().runWithIdentityBirth(() =>
     auth.api.signUpEmail({
       body: { email, password: PASSWORD, name: "Sam" },
     }),

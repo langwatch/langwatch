@@ -1,5 +1,8 @@
+import type { EvaluationCostRecord } from "@langwatch/evaluation-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isUniqueConstraintError } from "@langwatch/prisma-client/errors";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 
 import {
   EvaluationCostAlreadyRecordedError,
@@ -9,6 +12,12 @@ import {
 } from "../evaluation-cost.repository.ts";
 
 const costIdSelect = { id: true } as const;
+
+const prismaJsonInputSchema = z.custom<Prisma.InputJsonValue>((value) => value !== null);
+
+function jsonInput(value: Record<string, unknown>): Prisma.InputJsonValue {
+  return prismaJsonInputSchema.parse(z.json().parse(value));
+}
 
 export class PrismaEvaluationCostRepository
   extends PrismaRepository.for("Cost")
@@ -38,6 +47,22 @@ export class PrismaEvaluationCostRepository
 
       throw new EvaluationCostAlreadyRecordedError(input.id);
     }
+  }
+
+  async createEntry(input: EvaluationCostRecord): Promise<void> {
+    await this.prisma.cost.create({
+      data: {
+        id: input.id,
+        projectId: input.projectId,
+        costType: input.costType,
+        costName: input.costName,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        amount: input.amount,
+        currency: input.currency,
+        extraInfo: input.extraInfo === undefined ? undefined : jsonInput(input.extraInfo),
+      },
+    });
   }
 
   async findById(input: {

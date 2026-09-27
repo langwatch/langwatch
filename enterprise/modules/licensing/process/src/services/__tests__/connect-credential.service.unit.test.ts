@@ -2,8 +2,8 @@ import { registryHashForToken } from "@langwatch/gateway-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { TEST_PUBLIC_KEY } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import type { ConnectManagedKeys } from "../../app/licensing.members.ts";
-import { TEST_PUBLIC_KEY } from "../../fixtures/license-keys.fixture.ts";
 import type { IssuedLicenseRecord } from "../../repositories/issued-license.repository.ts";
 import { MemoryIssuedLicenseRepository } from "../../repositories/memory/memory.issued-license.repository.ts";
 import { ConnectCredentialService } from "../connect-credential.service.ts";

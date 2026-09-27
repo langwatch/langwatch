@@ -1,8 +1,9 @@
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Select } from "@langwatch/design-system/select";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { useOrganizationTeamProject } from "@langwatch/workflow-browser/studio-scope";
+import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useState } from "react";
 
 export const CopyExperimentDialog = ({
@@ -20,7 +21,8 @@ export const CopyExperimentDialog = ({
     copyDatasets: boolean;
   }) => void;
 }) => {
-  const { copyTargets, project } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
+  const copyTargets = useWorkflowHost().copyTargets();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 

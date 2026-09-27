@@ -422,10 +422,15 @@ export class GithubApp implements GithubApiContract {
   }
   /** Whether the person who started the install flow is the one signed in on this request. */
   async isSignedInAs(input: { request: Request; userId: string }): Promise<boolean> {
-    const verified = await this.#auth.tryVerifyBrowserSession({ headers: input.request.headers });
-    const session = await this.#auth.tryResolveBrowserSession({ verified });
+    const verification = await this.#auth.verifyBrowserSession({
+      headers: input.request.headers,
+    });
+    if (verification.kind === "anonymous") return false;
+    const resolution = await this.#auth.resolveBrowserSession({
+      verified: verification.verified,
+    });
 
-    return session?.user.id === input.userId;
+    return resolution.kind === "signed_in" && resolution.session.user.id === input.userId;
   }
   async recordAudit(entry: GithubConnectionAuditEntry): Promise<void> {
     await this.#auditLog.record(entry);

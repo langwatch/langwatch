@@ -5,8 +5,10 @@ import type { AutomationApi } from "@langwatch/automation-contract";
  * @vitest-environment node
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -69,6 +71,8 @@ describe("given a process that installs the evaluation module over its repositor
           "feature-flag": createApiFixture<FeatureFlagApi>(),
           evaluator: createApiFixture<EvaluatorApi>(),
           monitor: createApiFixture<MonitorApi>(),
+          dataset: createApiFixture<DatasetApi>(),
+          experiment: createApiFixture<ExperimentApi>(),
           automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({
@@ -115,6 +119,8 @@ describe("given a process that installs the evaluation module over its repositor
           "feature-flag": createApiFixture<FeatureFlagApi>(),
           evaluator: createApiFixture<EvaluatorApi>(),
           monitor: createApiFixture<MonitorApi>(),
+          dataset: createApiFixture<DatasetApi>(),
+          experiment: createApiFixture<ExperimentApi>(),
           automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({

@@ -17,7 +17,7 @@ const codingAssistantConfigSchema = z.looseObject({
 });
 
 export class PostgresGovernancePolicyService {
-  private readonly cache = new Map<string, { nonBillable: boolean; expiresAt: number }>();
+  private readonly cache = new Map<string, { billed: boolean; expiresAt: number }>();
 
   static create(
     repository: CostAttributionPolicyRepository,
@@ -42,25 +42,22 @@ export class PostgresGovernancePolicyService {
   async resolveOtlpReceiverPolicies(
     input: GovernanceOtlpPolicyInput,
   ): Promise<GovernanceOtlpReceiverPolicies> {
-    const nonBillable = await this.resolveSourceNonBillable(input);
-    return buildIngestKeyReceiverPolicies(input, nonBillable);
+    const billed = await this.isSourceBilled(input);
+    return buildIngestKeyReceiverPolicies(input, !billed);
   }
 
-  async resolveSourceNonBillable(input: {
-    organizationId: string;
-    sourceType: string;
-  }): Promise<boolean> {
+  async isSourceBilled(input: { organizationId: string; sourceType: string }): Promise<boolean> {
     const key = `${input.organizationId}::${input.sourceType}`;
     const now = (this.options.clock ?? Date.now)();
     const cached = this.cache.get(key);
     if (cached && cached.expiresAt > now) {
-      return cached.nonBillable;
+      return cached.billed;
     }
 
-    let nonBillable = true;
+    let billed = false;
     try {
       const configs = await this.repository.enabledCodingAssistantConfigs(input.organizationId);
-      nonBillable = !configs.some((candidate) => {
+      billed = configs.some((candidate) => {
         const parsed = codingAssistantConfigSchema.safeParse(candidate);
 
         return (
@@ -71,7 +68,7 @@ export class PostgresGovernancePolicyService {
       });
     } catch (error) {
       const diagnostics = this.options.diagnostics ?? silentGovernanceDiagnostics;
-      diagnostics.warn("failed to resolve bundled-plan policy; defaulting to non-billable", {
+      diagnostics.warn("failed to resolve bundled-plan policy; defaulting to not billed", {
         error,
         organizationId: input.organizationId,
         sourceType: input.sourceType,
@@ -79,11 +76,11 @@ export class PostgresGovernancePolicyService {
     }
 
     this.cache.set(key, {
-      nonBillable,
+      billed,
       expiresAt: now + (this.options.cacheTtlMs ?? 30_000),
     });
 
-    return nonBillable;
+    return billed;
   }
 
   resolveTraceDepartment(input: TraceDepartmentInput): string {

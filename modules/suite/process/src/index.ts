@@ -1,5 +1,4 @@
 export { RedisSuiteRunProcessingRepository } from "./repositories/redis/redis.suite-run-processing.repository.ts";
-export type { QueueSimulationRunCommandData } from "./app/suite.app.ts";
 export { SuiteExecutionService } from "./services/suite-execution.service.ts";
 export type { SuiteRunProcessingPipeline } from "./eventing/suite-run-processing.pipeline.ts";
 export { suiteServer } from "./suite.server.ts";

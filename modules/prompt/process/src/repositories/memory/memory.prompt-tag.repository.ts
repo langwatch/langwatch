@@ -1,6 +1,6 @@
+import { generate } from "@langwatch/ksuid";
 import type { PromptTag } from "@langwatch/prompt-contract";
 import { toDate, nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
 import { PromptTagRepository } from "../prompt-tag.repository.ts";
 import { type MemoryPromptState, clone, type StoredTag } from "./memory.prompt.store.ts";
@@ -22,7 +22,7 @@ export class MemoryPromptTagRepository extends PromptTagRepository {
   }): Promise<PromptTag> {
     const now = toDate(nowInstant());
     const tag: StoredTag = {
-      id: `ptag_${nanoid()}`,
+      id: generate("ptag").toString(),
       organizationId: params.organizationId,
       name: params.name,
       createdById: params.createdById ?? null,

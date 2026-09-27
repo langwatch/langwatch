@@ -10,6 +10,7 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
+import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
@@ -185,6 +186,7 @@ function createApp({
       github: createApiFixture<GithubApi>(),
       gateway: createApiFixture<GatewayApi>(),
       secrets: createApiFixture<SecretApi>(),
+      experiments: createApiFixture<ExperimentApi>(),
       modelProviders: createApiFixture<ModelProviderApi>(),
       apiKeys: createApiFixture<ApiKeyApi>(),
       authz: createApiFixture<AuthzApi>({ isDemoProject: () => false }),

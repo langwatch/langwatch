@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   LATEST_SCHEMA_VERSION,
   NotFoundError,
@@ -14,7 +15,6 @@ import {
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
 import type {
   CreateLlmConfigVersionParams,
@@ -303,7 +303,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     });
     const now = toDate(nowInstant());
     const config: StoredConfig = {
-      id: `prompt_${nanoid()}`,
+      id: generate("prompt").toString(),
       name: configData.name ?? "",
       projectId: configData.projectId,
       organizationId: configData.organizationId,
@@ -532,7 +532,7 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
       .parse(input);
     const row: StoredVersion = {
       ...clone(input),
-      id: `prompt_version_${nanoid()}`,
+      id: generate("promptversion").toString(),
       createdAt: toDate(nowInstant()),
       author: null,
     };
