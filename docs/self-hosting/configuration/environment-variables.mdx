@@ -44,6 +44,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
+| `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
 ### SSO Provider Variables
 
