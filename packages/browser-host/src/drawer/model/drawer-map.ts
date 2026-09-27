@@ -8,9 +8,11 @@ import type { ComponentType } from "react";
 
 import type { UiAddOrEditDatasetDrawerProps } from "../../declarations.ts";
 import type {
+  UiAgentEditorDrawerProps,
   UiAgentListDrawerProps,
   UiAgentTypeSelectorDrawerProps,
   UiAgentWorkflowEditorDrawerProps,
+  UiWorkflowSelectorDrawerProps,
 } from "./agent-drawers.ts";
 import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
 import type { UiSelectDatasetDrawerProps } from "./dataset-drawers.ts";
@@ -33,6 +35,8 @@ import type {
 /** Entries land owner by owner; until a drawer has one, its props read as an open record. */
 export type UiDrawerMap = {
   addOrEditDataset: UiAddOrEditDatasetDrawerProps;
+  agentCodeEditor: UiAgentEditorDrawerProps;
+  agentHttpEditor: UiAgentEditorDrawerProps;
   agentList: UiAgentListDrawerProps;
   agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
   agentTypeSelector: UiAgentTypeSelectorDrawerProps;
@@ -49,6 +53,7 @@ export type UiDrawerMap = {
   promptList: UiPromptListDrawerProps;
   scenarioRunDetail: UiScenarioRunDetailDrawerProps;
   selectDataset: UiSelectDatasetDrawerProps;
+  workflowSelector: UiWorkflowSelectorDrawerProps;
   workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
 };
 

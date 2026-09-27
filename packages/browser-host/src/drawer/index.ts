@@ -57,6 +57,7 @@ export {
   type UiFlowCallbacksStore,
 } from "./model/drawer-map.ts";
 export type {
+  UiAgentEditorDrawerProps,
   UiAgentListArchiveOptions,
   UiAgentListDrawerProps,
   UiAgentTypeSelectorDrawerProps,
@@ -64,6 +65,7 @@ export type {
   UiAgentWorkflowMappingProps,
   UiNewAgentType,
   UiWorkflowAgentEditorOptions,
+  UiWorkflowSelectorDrawerProps,
 } from "./model/agent-drawers.ts";
 export type {
   UiCodeEvaluatorEditorDrawerProps,

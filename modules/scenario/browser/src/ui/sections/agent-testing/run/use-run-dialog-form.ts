@@ -766,7 +766,7 @@ function useRunDialogTargeting({
   }, [setMode, setTarget, agentTargetBeforePrompt]);
 
   const handleSetupAgent = useCallback(() => {
-    const onAgentSaved = (agent: TypedAgent) => {
+    const onAgentSaved = (agent: Pick<TypedAgent, "id" | "name" | "type">) => {
       const targetType = agent.type as NonNullable<TargetValue>["type"];
       setTarget({ type: targetType, id: agent.id });
     };

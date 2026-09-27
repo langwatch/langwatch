@@ -67,6 +67,12 @@ Feature: A drawer that needs another drawer
       When it finishes its work
       Then it closes the drawer rather than returning to a caller that is not there
 
+    @integration
+    Scenario: Saving in a sub-flow returns to the drawer that opened it
+      Given a reader who walked from one drawer into an editor drawer
+      When they save in the editor
+      Then they are back in the drawer that opened it, not on the page behind it
+
     @integration @unimplemented
     Scenario: Pressing Escape in a sub-flow returns to the caller
       Given a reader is in a sub-flow opened from another drawer

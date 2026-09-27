@@ -73,3 +73,14 @@ export type UiAgentWorkflowEditorDrawerProps = UiWorkflowAgentEditorOptions & {
   renderMappings(props: UiAgentWorkflowMappingProps): ReactNode;
   onGoBack?: () => void;
 };
+
+/** What a caller hands agent's HTTP or code editor: the agent to edit, and where a save goes. */
+export type UiAgentEditorDrawerProps = {
+  agentId?: string;
+  onSave?: (agent: WireOf<AgentWithFields>) => void;
+};
+
+/** What a caller hands agent's workflow selector drawer: where the agent it creates goes. */
+export type UiWorkflowSelectorDrawerProps = {
+  onSave?: (agent: WireOf<AgentWithFields>) => void;
+};

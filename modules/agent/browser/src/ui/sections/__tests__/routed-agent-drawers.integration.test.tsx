@@ -8,7 +8,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
-const drawer = vi.hoisted(() => ({ closeDrawer: vi.fn(), goBack: vi.fn() }));
+const drawer = vi.hoisted(() => ({ closeDrawer: vi.fn(), goBack: vi.fn(), canGoBack: false }));
 const listed = vi.hoisted(() => ({ rows: [] as unknown[] }));
 const calls = vi.hoisted(() => ({
   navigate: [] as string[],
@@ -17,7 +17,7 @@ const calls = vi.hoisted(() => ({
 }));
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
-  useDrawer: () => ({ ...drawer, openDrawer: vi.fn(), canGoBack: false }),
+  useDrawer: () => ({ ...drawer, openDrawer: vi.fn() }),
 }));
 
 vi.mock("../../../model/agent-management-host.ts", () => ({
@@ -106,6 +106,8 @@ afterEach(() => {
   cleanup();
   listed.rows = [];
   drawer.closeDrawer.mockReset();
+  drawer.goBack.mockReset();
+  drawer.canGoBack = false;
   calls.navigate.length = 0;
   calls.workflowCreated.length = 0;
   calls.agentCreated.length = 0;
@@ -191,10 +193,33 @@ describe("the agent editors opened by address", () => {
 
     await vi.waitFor(() => expect(calls.navigate).toEqual(["/acme/studio/workflow_new"]));
     expect(calls.workflowCreated).toEqual([
-      expect.objectContaining({ projectId: "project_1", commitMessage: "Workflow creation for agent" }),
+      expect.objectContaining({
+        projectId: "project_1",
+        commitMessage: "Workflow creation for agent",
+      }),
     ]);
     expect(calls.agentCreated).toEqual([
-      expect.objectContaining({ type: "workflow", workflowId: "workflow_new", name: "Support flow" }),
+      expect.objectContaining({
+        type: "workflow",
+        workflowId: "workflow_new",
+        name: "Support flow",
+      }),
     ]);
+  });
+});
+
+describe("the HTTP editor opened from another drawer", () => {
+  /** @scenario "Saving in a sub-flow returns to the drawer that opened it" */
+  it("goes back to that drawer once the agent is saved, leaving the stack open", async () => {
+    drawer.canGoBack = true;
+    render(<RoutedAgentHttpEditorDrawer />, { wrapper });
+    const user = userEvent.setup();
+
+    await user.type(screen.getByTestId("agent-name-input"), "Support bot");
+    await user.type(screen.getByTestId("url-input"), "https://example.com/chat");
+    await user.click(screen.getByTestId("save-agent-button"));
+
+    await vi.waitFor(() => expect(drawer.goBack).toHaveBeenCalled());
+    expect(drawer.closeDrawer).not.toHaveBeenCalled();
   });
 });

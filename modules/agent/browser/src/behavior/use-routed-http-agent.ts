@@ -1,5 +1,6 @@
 import { httpAgentTestInputSchema } from "@langwatch/agent-contract";
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { useRef } from "react";
 
 import type { AgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
@@ -11,16 +12,22 @@ const explainTestError: HttpTestErrorExplanation = ({ error }) => ({
   ...(error ? { description: error } : {}),
 });
 
-/** What the HTTP agent editor reads and writes when the address opened it (main's editor). */
+/**
+ * What the HTTP agent editor reads and writes when the address opened it (main's editor). A save
+ * returns to the drawer that opened it when there is one; any other close ends the stack.
+ */
 export function useRoutedHttpAgent({
   agentId,
   onSave,
   close,
+  goBack,
 }: {
   agentId?: string;
   onSave?: (agent: AgentBrowser) => void;
   close: () => void;
+  goBack?: () => void;
 }) {
+  const saved = useRef(false);
   const host = useAgentManagementHost();
   const projectId = host.project()?.id ?? "";
   const utils = agentApi.useUtils();
@@ -39,8 +46,11 @@ export function useRoutedHttpAgent({
     isLoadingAgent: agentQuery.isLoading,
     isSaving: create.isPending || update.isPending,
     projectId,
-    onClose: close,
-    ...(onSave ? { onSave } : {}),
+    onClose: () => (saved.current && goBack ? goBack() : close()),
+    onSave: (agent) => {
+      saved.current = true;
+      onSave?.(agent);
+    },
     onCreate: async (input) => {
       const agent = await create.mutateAsync({ ...input, type: "http" });
       await utils.agents.getAll.invalidate({ projectId });
