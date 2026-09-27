@@ -34,7 +34,7 @@ export const usageReportRest = defineRestRouter(SaasApi)
     app.receiveUsageReport({ report: input, addressHeaders: headers }),
   )
 
-  .post("/api/v1/connect/stats", "receiveConnectUsageReport")
+  .post("/api/connect/v1/stats", "receiveConnectUsageReport")
   .withInput(usageReportRequestSchema)
   .withBodyLimit({ maxBytes: USAGE_REPORT_REQUEST_MAX_BYTES })
   .withAccess(USAGE_REPORT_DOOR)

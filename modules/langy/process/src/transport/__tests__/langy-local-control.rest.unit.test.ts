@@ -4,7 +4,7 @@ import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { type LangyApi, LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { langyLocalControlRest } from "../langy-local-control.rest.ts";
+import { langyLocalControlDatedRests, langyLocalControlRest } from "../langy-local-control.rest.ts";
 
 const OWNER = { type: "user", id: "user-1" } as const;
 const APPROVED = {
@@ -13,7 +13,7 @@ const APPROVED = {
   conversation: { id: "conversation-1", title: "A conversation", url: "https://app.test/c/1" },
 };
 
-function family(actor: typeof OWNER | null) {
+function family(actor: typeof OWNER | null, router = langyLocalControlRest) {
   const ops = {
     listLocalControlRequests: vi.fn<LangyApi["listLocalControlRequests"]>(async (input) => {
       if (!input.actor) throw new LangyLocalRequestInvalidError();
@@ -27,7 +27,7 @@ function family(actor: typeof OWNER | null) {
   };
   const hono = createRestRuntime({
     identity: { authenticate: () => ({ actor, scope: { tier: "project", id: "project-1" } }) },
-  }).mount(langyLocalControlRest.router(), {
+  }).mount(router.router(), {
     app: () => createApiFixture<LangyApi>(ops),
     onError: (error, context) => canonicalErrorResponse(error, context),
   });
@@ -84,6 +84,30 @@ describe("the terminal's control requests", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ id: "request-1", cancelled: true });
     expect(api.ops.cancelLocalControlRequest).toHaveBeenCalledWith({
+      actor: OWNER,
+      requestId: "request-1",
+    });
+  });
+});
+
+describe("the terminal's control requests at main's dated mounts", () => {
+  /** @scenario "The control family answers at main's dated and latest addresses" */
+  it.each([
+    { mount: "2026-08-27", index: 0 },
+    { mount: "latest", index: 1 },
+  ])("lists and approves at /api/v1/langy/control/$mount", async ({ mount, index }) => {
+    const dated = langyLocalControlDatedRests[index];
+    if (!dated) throw new Error(`no family mounted at ${mount}`);
+    const api = family(OWNER, dated);
+
+    const listed = await api.get(`/api/v1/langy/control/${mount}/requests`);
+    const approved = await api.post(`/api/v1/langy/control/${mount}/requests/request-1/approve`, {
+      workspace: { root: "/home/ada/repo", name: "repo", os: "darwin" },
+    });
+
+    expect(listed.status).toBe(200);
+    expect(approved.status).toBe(200);
+    expect(api.ops.approveLocalControlRequest).toHaveBeenCalledWith({
       actor: OWNER,
       requestId: "request-1",
     });

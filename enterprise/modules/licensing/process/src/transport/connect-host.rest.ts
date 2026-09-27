@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The connect host (ADR-156, section 6): what a self-hosted install calls on
- * LangWatch Cloud. `connect.langwatch.ai/v1/*` maps onto `/api/v1/connect/*`.
+ * LangWatch Cloud. `connect.langwatch.ai/v1/*` maps onto `/api/connect/v1/*`.
  * The presented bearer is the whole credential; refusals are thrown by code.
  */
 import { publicRoute } from "@langwatch/api/access";
@@ -31,7 +31,7 @@ export const connectHostRest = defineRestRouter(LicensingApi)
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
 
-  .post("/api/v1/connect/license/sync", "recordLicenseSync")
+  .post("/api/connect/v1/license/sync", "recordLicenseSync")
   .withInput(licenseSyncBodySchema)
   .withBodyLimit({ maxBytes: SYNC_MAX_BODY_BYTES })
   .withAccess(CONNECT_HOST_DOOR)
@@ -46,7 +46,7 @@ export const connectHostRest = defineRestRouter(LicensingApi)
     }),
   )
 
-  .post("/api/v1/connect/license/activate", "redeemActivationCode")
+  .post("/api/connect/v1/license/activate", "redeemActivationCode")
   .withInput(connectActivationRequestSchema)
   .withBodyLimit({ maxBytes: ACTIVATE_MAX_BODY_BYTES })
   .withAccess(CONNECT_HOST_DOOR)

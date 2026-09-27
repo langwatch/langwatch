@@ -43,7 +43,7 @@ const REPORT = { event: "daily_usage_stats", instance_id: "install-1", version: 
 
 describe("the usage-report receiver's doors", () => {
   /** @scenario "Both doors hand the report to the same operation" */
-  it.each(["/api/track_usage", "/api/v1/connect/stats"])(
+  it.each(["/api/track_usage", "/api/connect/v1/stats"])(
     "hands %s's body, unknown fields included, and the sender headers to the receiver",
     async (path) => {
       const received: IncomingUsageReportRequest[] = [];
@@ -91,7 +91,7 @@ describe("the usage-report receiver's doors", () => {
       receiveUsageReport: () => Promise.reject(new LangWatchCloudOnlyError()),
     });
 
-    const response = await hono.fetch(post("/api/v1/connect/stats", REPORT));
+    const response = await hono.fetch(post("/api/connect/v1/stats", REPORT));
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({ code: "langwatch_cloud_only" });
