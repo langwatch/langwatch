@@ -30,4 +30,25 @@ export const datasetWeb = defineWebModule("dataset")
         default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,
       }),
     },
+  })
+  /** The create-or-edit drawer, the record sync and the editor table, lent (§3.4 rule 7). */
+  .withCapabilities({
+    addOrEditDatasetDrawer: {
+      load: async () => ({
+        default: (await import("./ui/sections/datasets/lent-add-or-edit-dataset-drawer.tsx"))
+          .LentAddOrEditDatasetDrawer,
+      }),
+    },
+    datasetEditorTable: {
+      load: async () => ({
+        default: (await import("./ui/sections/datasets/lent-dataset-editor-table.tsx"))
+          .LentDatasetEditorTable,
+      }),
+    },
+    datasetRecordSync: {
+      load: async () => ({
+        default: (await import("./ui/sections/datasets/lent-dataset-record-sync.tsx"))
+          .LentDatasetRecordSync,
+      }),
+    },
   });

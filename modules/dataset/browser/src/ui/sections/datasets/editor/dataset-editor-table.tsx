@@ -30,7 +30,11 @@ import {
   useTableKeyboardNavigation,
   VirtualizedTableBody,
 } from "@langwatch/dataset-browser-kit";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+  InMemoryDataset,
+} from "@langwatch/dataset-contract";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
 import { Pagination } from "@langwatch/design-system/pagination";
@@ -40,12 +44,21 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { keepPreviousData } from "@tanstack/react-query";
 import {
   type ColumnDef,
+  type Header,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useDebounce } from "use-debounce";
 import { useStore } from "zustand";
@@ -66,13 +79,6 @@ import {
 import { AttachmentCell } from "../../attachment-cell.tsx";
 import { AddOrEditDatasetDrawer } from "../add-or-edit-dataset-drawer.tsx";
 import { AddRowsFromCSVModal } from "../add-rows-from-csv-modal.tsx";
-
-export type InMemoryDataset = {
-  datasetId?: string;
-  name?: string;
-  datasetRecords: DatasetRecordEntry[];
-  columnTypes: DatasetColumns;
-};
 
 /**
  * Imperative surface for external writers that stream changes into the
@@ -188,61 +194,19 @@ function rowCountLabel({
   return plainRecordCount(unsearchedRecordCount);
 }
 
-export function DatasetEditorTable({
+/**
+ * One page of a saved dataset (classic page N of M), narrowed by the debounced row search: the
+ * read, its error report, the per-dataset reset and the page clamp. In-memory mode reads nothing.
+ */
+function useEditorDatasetPage({
   datasetId,
-  inMemoryDataset,
-  onUpdateDataset,
-  title,
-  hideButtons = false,
-  isEmbedded = false,
-  floatingSelectionBar = false,
-  canEditDatasetRecord = true,
-  bottomSpace,
-  controllerRef,
-  onColumnsChanged,
-  editorPortalRef,
-  headerActions,
-  readEnabled = true,
+  readEnabled,
+  project,
 }: {
-  datasetId?: string;
-  inMemoryDataset?: InMemoryDataset;
-  onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
-  title?: ReactNode;
-  hideButtons?: boolean;
-  isEmbedded?: boolean;
-  /** Gate the record read: when false the editor does not fetch records (the
-   *  dataset is still preparing or failed, ADR-032 I-READY). Defaults to true
-   *  so existing hosts are unaffected. */
-  readEnabled?: boolean;
-  /** Render the row-selection actions as a floating bottom-center bar instead
-   *  of an inline toolbar button. For standalone pages (the dataset detail
-   *  page); leave off inside modals/drawers where a viewport-fixed bar would
-   *  sit behind the overlay. */
-  floatingSelectionBar?: boolean;
-  /** Page-specific actions rendered at the end of the chrome button row. */
-  headerActions?: ReactNode;
-  /** Disable editing the dataset definition (columns) in the database. */
-  canEditDatasetRecord?: boolean;
-  bottomSpace?: string;
-  controllerRef?: React.MutableRefObject<DatasetEditorController | null>;
-  /** Called after column changes are saved (saved mode), so hosts can
-   *  propagate the new shape (e.g. the workflow node merges new columns
-   *  into its outputs). */
-  onColumnsChanged?: (columnTypes: DatasetColumns) => void;
-  /** Pass when hosting the editor inside a modal dialog so the floating
-   *  cell editor stays within the dialog's pointer-events scope. */
-  editorPortalRef?: React.RefObject<HTMLDivElement | null>;
+  datasetId: string | undefined;
+  readEnabled: boolean;
+  project: ReturnType<typeof useOrganizationTeamProject>["project"];
 }) {
-  const { project } = useOrganizationTeamProject();
-  const [store] = useState(() => createDatasetEditorStore());
-  const editColumnsDrawer = useDisclosure();
-  const addRowsFromCSVModal = useDisclosure();
-
-  // ── Data loading ──────────────────────────────────────────────────
-
-  // Saved datasets are read one page at a time (classic page N of M) instead of
-  // the whole dataset, which previously truncated past a byte cap and silently
-  // hid the rest. In-memory mode (no datasetId) keeps its full local copy.
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DATASET_EDITOR_PAGE_SIZE);
 
@@ -353,6 +317,457 @@ export function DatasetEditorTable({
     if (page > count) setPage(count);
   }, [serverRecordCount, pageSize, page, holdingPreviousData, isSearchSettling]);
 
+  return {
+    activeSearch,
+    currentPage,
+    databaseDataset,
+    databaseDatasetError,
+    hasSearchTakenTheGrid,
+    holdingPreviousData,
+    isLastPage,
+    isSearching,
+    page,
+    pageBeforeSearch,
+    pageSize,
+    searchInput,
+    serverRecordCount,
+    setPage,
+    setPageSize,
+    setSearchInput,
+    unsearchedRecordCount,
+  };
+}
+
+/** A saved read's rows as the editor holds them: entries flattened under their ids. */
+function savedEditorData(read: {
+  columnTypes?: unknown;
+  datasetRecords?: { id: string; entry: unknown }[];
+}): { columns: EditorColumn[]; records: EditorRecord[] } {
+  const columnTypes = (read.columnTypes ?? []) as DatasetColumns;
+  const entries = (read.datasetRecords ?? []).map((record) => ({
+    id: record.id,
+    ...(record.entry as Record<string, unknown>),
+  }));
+  return { columns: toEditorColumns(columnTypes), records: toEditorRecords(entries, columnTypes) };
+}
+
+/**
+ * What to load into the store: a settled page of a saved dataset, or an in-memory dataset once
+ * (the editor owns that working copy afterwards). `false` means there is nothing to load.
+ */
+function editorDataToLoad({
+  datasetId,
+  page,
+  inMemoryDataset,
+}: {
+  datasetId: string | undefined;
+  page: { columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] } | undefined;
+  inMemoryDataset: InMemoryDataset | undefined;
+}): { columns: EditorColumn[]; records: EditorRecord[]; dbDatasetId: string | undefined } | false {
+  if (datasetId) return page ? { ...savedEditorData(page), dbDatasetId: datasetId } : false;
+  if (!inMemoryDataset) return false;
+  return {
+    columns: toEditorColumns(inMemoryDataset.columnTypes),
+    records: toEditorRecords(inMemoryDataset.datasetRecords, inMemoryDataset.columnTypes),
+    dbDatasetId: undefined,
+  };
+}
+
+/**
+ * Saved columns take effect: a saved dataset is re-read and the host told; an in-memory one is
+ * re-keyed onto the new columns, its propagation meta refreshed BEFORE setData so the update
+ * the store emits upward carries the new name.
+ */
+function applySavedColumns({
+  updated,
+  datasetId,
+  refetch,
+  onColumnsChanged,
+  store,
+  inMemoryMetaRef,
+  inMemoryDatasetId,
+}: {
+  updated: { name: string; columnTypes: DatasetColumns };
+  datasetId: string | undefined;
+  refetch: () => void;
+  onColumnsChanged: ((columnTypes: DatasetColumns) => void) | undefined;
+  store: ReturnType<typeof createDatasetEditorStore>;
+  inMemoryMetaRef: { current: { datasetId: string | undefined; name: string | undefined } };
+  inMemoryDatasetId: string | undefined;
+}): void {
+  if (datasetId) {
+    refetch();
+    onColumnsChanged?.(updated.columnTypes);
+    return;
+  }
+  const state = store.getState();
+  const records = rekeyEditorRecords(state.records, state.columns, updated.columnTypes);
+  inMemoryMetaRef.current = { datasetId: inMemoryDatasetId, name: updated.name };
+  state.setData({ columns: toEditorColumns(updated.columnTypes), records, dbDatasetId: undefined });
+}
+
+/**
+ * What a CSV download exports: the WHOLE saved dataset (the store only holds one page), or the
+ * in-memory copy as held. `false` when the saved read failed and the reader was told.
+ */
+async function exportedEditorData({
+  datasetId,
+  held,
+  fetchWhole,
+}: {
+  datasetId: string | undefined;
+  held: { columns: EditorColumn[]; records: EditorRecord[] };
+  fetchWhole: (
+    datasetId: string,
+  ) => Promise<{ columnTypes?: unknown; datasetRecords?: { id: string; entry: unknown }[] }>;
+}): Promise<{ columns: EditorColumn[]; records: EditorRecord[] } | false> {
+  if (!datasetId) return held;
+  try {
+    return savedEditorData(await fetchWhole(datasetId));
+  } catch (error) {
+    showErrorToast({ error, fallbackTitle: "Couldn't download dataset" });
+    return false;
+  }
+}
+
+/** Embedded in a dialog the editor fills it; standalone, the grid is capped to the viewport. */
+function editorLayout(isEmbedded: boolean) {
+  return isEmbedded
+    ? { height: "full", gridFlex: 1, gridMaxHeight: undefined }
+    : { height: undefined, gridFlex: undefined, gridMaxHeight: "calc(100vh - 250px)" };
+}
+
+/** Saves the exported rows as `<dataset name>.csv`, or `draft_dataset.csv` for an unnamed draft. */
+function downloadEditorCsv({
+  columns,
+  records,
+  datasetName,
+}: {
+  columns: EditorColumn[];
+  records: EditorRecord[];
+  datasetName: string | null | undefined;
+}): void {
+  downloadCsv({
+    fields: columns.map((col) => col.name),
+    rows: records.map((record) => columns.map((col) => record[col.name] ?? "")),
+    fileName: `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"}.csv`,
+  });
+}
+
+/** The nearest ancestor that scrolls, which the row virtualizer measures against. */
+function scrollContainerOf(element: HTMLElement | null): HTMLElement | null {
+  let parent = element?.parentElement ?? null;
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    if (style.overflow === "auto" || style.overflowY === "auto") return parent;
+    parent = parent.parentElement;
+  }
+  return null;
+}
+
+/** The selection checkbox column, then one column per dataset column. */
+function buildTableColumns({
+  columnHelper,
+  columns,
+  allSelected,
+  rowCount,
+  selectedRows,
+  clearRowSelection,
+  selectAllRows,
+  toggleRowSelection,
+}: {
+  columnHelper: ReturnType<typeof createColumnHelper<DatasetTableRowData>>;
+  columns: EditorColumn[];
+  allSelected: boolean;
+  rowCount: number;
+  selectedRows: Set<number>;
+  clearRowSelection: () => void;
+  selectAllRows: (rowCount: number) => void;
+  toggleRowSelection: (row: number) => void;
+}): ColumnDef<DatasetTableRowData>[] {
+  const cols: ColumnDef<DatasetTableRowData>[] = [];
+
+  cols.push(
+    columnHelper.display({
+      id: "select",
+      header: () => (
+        <Checkbox.Root
+          size="sm"
+          top="1px"
+          aria-label="Select all rows"
+          checked={allSelected}
+          onCheckedChange={() => (allSelected ? clearRowSelection() : selectAllRows(rowCount))}
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+        </Checkbox.Root>
+      ),
+      cell: (info) => (
+        <RowCheckbox
+          rowIndex={info.row.index}
+          checked={selectedRows.has(info.row.index)}
+          onToggle={toggleRowSelection}
+        />
+      ),
+      size: CHECKBOX_WIDTH_PX,
+      enableResizing: false,
+      meta: { columnType: "checkbox", columnId: "__checkbox__" },
+    }) as ColumnDef<DatasetTableRowData>,
+  );
+
+  for (const column of columns) {
+    cols.push(
+      columnHelper.accessor((row) => row.dataset[column.id], {
+        id: `dataset.${column.id}`,
+        header: () => (
+          <HStack gap={1}>
+            <ColumnTypeIcon type={column.type} />
+            <Text fontSize="13px" fontWeight="medium">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        cell: (info) => info.getValue(),
+        meta: {
+          columnType: "dataset",
+          columnId: column.id,
+          dataType: column.type,
+        },
+      }) as ColumnDef<DatasetTableRowData>,
+    );
+  }
+
+  return cols;
+}
+
+/** Typing a search puts the reader on page 1; clearing it puts them back where they were. */
+function useSearchChange({
+  setSearchInput,
+  setPage,
+  page,
+  pageBeforeSearch,
+  clearRowSelection,
+}: {
+  setSearchInput: (next: string) => void;
+  setPage: (page: number) => void;
+  page: number;
+  pageBeforeSearch: { current: number | undefined };
+  clearRowSelection: () => void;
+}) {
+  // An event handler rather than an effect, so StrictMode cannot replay it.
+  return useCallback(
+    (next: string) => {
+      setSearchInput(next);
+      if (next.trim()) {
+        pageBeforeSearch.current ??= page;
+        setPage(1);
+      } else {
+        setPage(pageBeforeSearch.current ?? 1);
+        pageBeforeSearch.current = undefined;
+      }
+      clearRowSelection();
+    },
+    [clearRowSelection, page, pageBeforeSearch, setPage, setSearchInput],
+  );
+}
+
+/**
+ * In-memory mode: every change to the working copy flows to the host through `onUpdateDataset`.
+ * Subscribes to the store directly, since render-effect ordering would race the initial load.
+ */
+function useInMemoryPropagation({
+  datasetId,
+  store,
+  loadedRef,
+  lastPropagatedRef,
+  onUpdateDataset,
+  inMemoryDataset,
+}: {
+  datasetId: string | undefined;
+  store: ReturnType<typeof createDatasetEditorStore>;
+  loadedRef: { current: boolean };
+  lastPropagatedRef: { current: EditorRecord[] | null };
+  onUpdateDataset: ((dataset: InMemoryDataset & { datasetId?: string }) => void) | undefined;
+  inMemoryDataset: InMemoryDataset | undefined;
+}) {
+  const onUpdateDatasetRef = useRef(onUpdateDataset);
+  onUpdateDatasetRef.current = onUpdateDataset;
+  const inMemoryMetaRef = useRef({
+    datasetId: inMemoryDataset?.datasetId,
+    name: inMemoryDataset?.name,
+  });
+  useEffect(() => {
+    if (datasetId) return;
+    return store.subscribe((state, prevState) => {
+      if (!loadedRef.current) return;
+      if (state.records === prevState.records) return;
+      if (lastPropagatedRef.current === state.records) return;
+      lastPropagatedRef.current = state.records;
+      onUpdateDatasetRef.current?.({
+        datasetId: inMemoryMetaRef.current.datasetId,
+        name: inMemoryMetaRef.current.name,
+        columnTypes: state.columns.map(({ name, type }) => ({ name, type })),
+        datasetRecords: state.records.map((r) => ({ ...r })),
+      });
+    });
+  }, [datasetId, lastPropagatedRef, loadedRef, store]);
+
+  return inMemoryMetaRef;
+}
+
+/** The imperative controller external writers (AI generation streams) push rows through. */
+function useEditorController({
+  controllerRef,
+  store,
+}: {
+  controllerRef: React.MutableRefObject<DatasetEditorController | null> | undefined;
+  store: ReturnType<typeof createDatasetEditorStore>;
+}) {
+  useEffect(() => {
+    if (!controllerRef) return;
+    controllerRef.current = {
+      addRow: (record) => store.getState().upsertExternalRecord(record),
+      updateRow: (record) => store.getState().upsertExternalRecord(record),
+      removeRow: (recordId) => store.getState().removeExternalRecord(recordId),
+      getColumns: () => store.getState().columns,
+    };
+    return () => {
+      controllerRef.current = null;
+    };
+  }, [controllerRef, store]);
+}
+
+/** Closes a disclosure the moment its content is withdrawn, so the two cannot disagree. */
+function useCloseWhen({ shouldClose, close }: { shouldClose: boolean; close: () => void }) {
+  useEffect(() => {
+    if (shouldClose) close();
+  }, [shouldClose, close]);
+}
+
+/** A click outside the table clears the selected cell. */
+function useClearSelectionOnOutsideClick({
+  store,
+  tableRef,
+  setSelectedCell,
+}: {
+  store: ReturnType<typeof createDatasetEditorStore>;
+  tableRef: { readonly current: HTMLTableElement | null };
+  setSelectedCell: (cell: undefined) => void;
+}) {
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!store.getState().selectedCell) return;
+      if (tableRef.current?.contains(e.target as Node)) return;
+      setSelectedCell(undefined);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [store, tableRef, setSelectedCell]);
+}
+
+/** Downloads the dataset as CSV: the whole saved dataset, or the in-memory copy as held. */
+function useEditorCsvDownload({
+  projectId,
+  datasetId,
+  datasetName,
+  columns,
+  store,
+}: {
+  projectId: string | undefined;
+  datasetId: string | undefined;
+  datasetName: string | null | undefined;
+  columns: EditorColumn[];
+  store: ReturnType<typeof createDatasetEditorStore>;
+}) {
+  const downloadDataset = api.datasetRecord.download.useMutation();
+  const downloadCSV = useCallback(async () => {
+    const exported = await exportedEditorData({
+      datasetId,
+      held: { columns, records: store.getState().records },
+      fetchWhole: (id) =>
+        downloadDataset.mutateAsync({ projectId: projectId ?? "", datasetId: id }),
+    });
+    if (exported) downloadEditorCsv({ ...exported, datasetName });
+  }, [columns, datasetId, datasetName, downloadDataset, projectId, store]);
+
+  return { downloadCSV, isDownloading: downloadDataset.isPending };
+}
+
+export function DatasetEditorTable({
+  datasetId,
+  inMemoryDataset,
+  onUpdateDataset,
+  title,
+  hideButtons = false,
+  isEmbedded = false,
+  floatingSelectionBar = false,
+  canEditDatasetRecord = true,
+  bottomSpace,
+  controllerRef,
+  onColumnsChanged,
+  editorPortalRef,
+  headerActions,
+  readEnabled = true,
+}: {
+  datasetId?: string;
+  inMemoryDataset?: InMemoryDataset;
+  onUpdateDataset?: (dataset: InMemoryDataset & { datasetId?: string }) => void;
+  title?: ReactNode;
+  hideButtons?: boolean;
+  isEmbedded?: boolean;
+  /** Gate the record read: when false the editor does not fetch records (the
+   *  dataset is still preparing or failed, ADR-032 I-READY). Defaults to true
+   *  so existing hosts are unaffected. */
+  readEnabled?: boolean;
+  /** Render the row-selection actions as a floating bottom-center bar instead
+   *  of an inline toolbar button. For standalone pages (the dataset detail
+   *  page); leave off inside modals/drawers where a viewport-fixed bar would
+   *  sit behind the overlay. */
+  floatingSelectionBar?: boolean;
+  /** Page-specific actions rendered at the end of the chrome button row. */
+  headerActions?: ReactNode;
+  /** Disable editing the dataset definition (columns) in the database. */
+  canEditDatasetRecord?: boolean;
+  bottomSpace?: string;
+  controllerRef?: React.MutableRefObject<DatasetEditorController | null>;
+  /** Called after column changes are saved (saved mode), so hosts can
+   *  propagate the new shape (e.g. the workflow node merges new columns
+   *  into its outputs). */
+  onColumnsChanged?: (columnTypes: DatasetColumns) => void;
+  /** Pass when hosting the editor inside a modal dialog so the floating
+   *  cell editor stays within the dialog's pointer-events scope. */
+  editorPortalRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const [store] = useState(() => createDatasetEditorStore());
+  const editColumnsDrawer = useDisclosure();
+  const addRowsFromCSVModal = useDisclosure();
+
+  // ── Data loading ──────────────────────────────────────────────────
+
+  // Saved datasets are read one page at a time (classic page N of M) instead of
+  // the whole dataset, which previously truncated past a byte cap and silently
+  // hid the rest. In-memory mode (no datasetId) keeps its full local copy.
+  const {
+    activeSearch,
+    currentPage,
+    databaseDataset,
+    databaseDatasetError,
+    hasSearchTakenTheGrid,
+    holdingPreviousData,
+    isLastPage,
+    page,
+    pageBeforeSearch,
+    pageSize,
+    searchInput,
+    serverRecordCount,
+    setPage,
+    setPageSize,
+    setSearchInput,
+    unsearchedRecordCount,
+  } = useEditorDatasetPage({ datasetId, readEnabled, project });
+  const isSearching = !!activeSearch;
+
   const datasetName = datasetId ? databaseDataset.data?.name : inMemoryDataset?.name;
   const columnTypes: DatasetColumns = useMemo(
     () =>
@@ -369,45 +784,19 @@ export function DatasetEditorTable({
   const loadedRef = useRef(false);
   const lastPropagatedRef = useRef<EditorRecord[] | null>(null);
   useEffect(() => {
-    if (datasetId && databaseDataset.data && !holdingPreviousData) {
-      const columns = toEditorColumns((databaseDataset.data.columnTypes ?? []) as DatasetColumns);
-      const records = toEditorRecords(
-        (databaseDataset.data.datasetRecords ?? []).map(
-          (record: { id: string; entry: unknown }) => ({
-            id: record.id,
-            ...(record.entry as Record<string, unknown>),
-          }),
-        ),
-        (databaseDataset.data.columnTypes ?? []) as DatasetColumns,
-      );
-      store.getState().setData({ columns, records, dbDatasetId: datasetId });
-      loadedRef.current = true;
-      lastPropagatedRef.current = store.getState().records;
-    } else if (!datasetId && inMemoryDataset && !loadedRef.current) {
-      store.getState().setData({
-        columns: toEditorColumns(inMemoryDataset.columnTypes),
-        records: toEditorRecords(inMemoryDataset.datasetRecords, inMemoryDataset.columnTypes),
-        dbDatasetId: undefined,
-      });
-      loadedRef.current = true;
-      lastPropagatedRef.current = store.getState().records;
-    }
+    const loaded = editorDataToLoad({
+      datasetId,
+      page: holdingPreviousData ? undefined : databaseDataset.data,
+      inMemoryDataset: loadedRef.current ? undefined : inMemoryDataset,
+    });
+    if (!loaded) return;
+    store.getState().setData(loaded);
+    loadedRef.current = true;
+    lastPropagatedRef.current = store.getState().records;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datasetId, databaseDataset.data, holdingPreviousData, store]);
 
-  // Imperative controller for external writers (AI generation streams)
-  useEffect(() => {
-    if (!controllerRef) return;
-    controllerRef.current = {
-      addRow: (record) => store.getState().upsertExternalRecord(record),
-      updateRow: (record) => store.getState().upsertExternalRecord(record),
-      removeRow: (recordId) => store.getState().removeExternalRecord(recordId),
-      getColumns: () => store.getState().columns,
-    };
-    return () => {
-      controllerRef.current = null;
-    };
-  }, [controllerRef, store]);
+  useEditorController({ controllerRef, store });
 
   // ── Store subscriptions ───────────────────────────────────────────
 
@@ -436,47 +825,24 @@ export function DatasetEditorTable({
     setAutosave,
   } = store.getState();
 
-  // Search resets page/selection immediately; use event handler to avoid StrictMode replay.
-  const onSearchChange = useCallback(
-    (next: string) => {
-      setSearchInput(next);
-      if (next.trim()) {
-        pageBeforeSearch.current ??= page;
-        setPage(1);
-      } else {
-        setPage(pageBeforeSearch.current ?? 1);
-        pageBeforeSearch.current = undefined;
-      }
-      clearRowSelection();
-    },
-    [clearRowSelection, page],
-  );
+  const onSearchChange = useSearchChange({
+    setSearchInput,
+    setPage,
+    page,
+    pageBeforeSearch,
+    clearRowSelection,
+  });
 
   // ── In-memory propagation ─────────────────────────────────────────
 
-  const onUpdateDatasetRef = useRef(onUpdateDataset);
-  onUpdateDatasetRef.current = onUpdateDataset;
-  const inMemoryMetaRef = useRef({
-    datasetId: inMemoryDataset?.datasetId,
-    name: inMemoryDataset?.name,
+  const inMemoryMetaRef = useInMemoryPropagation({
+    datasetId,
+    store,
+    loadedRef,
+    lastPropagatedRef,
+    onUpdateDataset,
+    inMemoryDataset,
   });
-  useEffect(() => {
-    if (datasetId) return;
-    // Subscribe to the store directly: render-effect ordering would otherwise
-    // race the initial setData and propagate stale/empty snapshots.
-    return store.subscribe((state, prevState) => {
-      if (!loadedRef.current) return;
-      if (state.records === prevState.records) return;
-      if (lastPropagatedRef.current === state.records) return;
-      lastPropagatedRef.current = state.records;
-      onUpdateDatasetRef.current?.({
-        datasetId: inMemoryMetaRef.current.datasetId,
-        name: inMemoryMetaRef.current.name,
-        columnTypes: state.columns.map(({ name, type }) => ({ name, type })),
-        datasetRecords: state.records.map((r) => ({ ...r })),
-      });
-    });
-  }, [datasetId, store]);
 
   // ── Autosave sync (saved mode) ────────────────────────────────────
 
@@ -509,11 +875,10 @@ export function DatasetEditorTable({
   // disclosure still believes it's open, so clearing the search would reopen
   // it, stale and empty, without being asked. Tell the disclosure it closed,
   // so "withdrawn" and "closed" cannot disagree.
-  const isCsvModalOpen = addRowsFromCSVModal.open;
-  const closeCsvModal = addRowsFromCSVModal.onClose;
-  useEffect(() => {
-    if (hasSearchTakenTheGrid && isCsvModalOpen) closeCsvModal();
-  }, [hasSearchTakenTheGrid, isCsvModalOpen, closeCsvModal]);
+  useCloseWhen({
+    shouldClose: hasSearchTakenTheGrid && addRowsFromCSVModal.open,
+    close: addRowsFromCSVModal.onClose,
+  });
 
   // ── Table assembly ────────────────────────────────────────────────
 
@@ -557,76 +922,29 @@ export function DatasetEditorTable({
 
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
 
-  const tableColumns = useMemo(() => {
-    const cols: ColumnDef<DatasetTableRowData>[] = [];
-
-    cols.push(
-      columnHelper.display({
-        id: "select",
-        header: () => (
-          <Checkbox.Root
-            size="sm"
-            top="1px"
-            aria-label="Select all rows"
-            checked={allSelected}
-            onCheckedChange={() => {
-              if (allSelected) {
-                clearRowSelection();
-              } else {
-                selectAllRows(rowCount);
-              }
-            }}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-          </Checkbox.Root>
-        ),
-        cell: (info) => (
-          <RowCheckbox
-            rowIndex={info.row.index}
-            checked={selectedRows.has(info.row.index)}
-            onToggle={toggleRowSelection}
-          />
-        ),
-        size: CHECKBOX_WIDTH_PX,
-        enableResizing: false,
-        meta: { columnType: "checkbox", columnId: "__checkbox__" },
-      }) as ColumnDef<DatasetTableRowData>,
-    );
-
-    for (const column of columns) {
-      cols.push(
-        columnHelper.accessor((row) => row.dataset[column.id], {
-          id: `dataset.${column.id}`,
-          header: () => (
-            <HStack gap={1}>
-              <ColumnTypeIcon type={column.type} />
-              <Text fontSize="13px" fontWeight="medium">
-                {column.name}
-              </Text>
-            </HStack>
-          ),
-          cell: (info) => info.getValue(),
-          meta: {
-            columnType: "dataset",
-            columnId: column.id,
-            dataType: column.type,
-          },
-        }) as ColumnDef<DatasetTableRowData>,
-      );
-    }
-
-    return cols;
-  }, [
-    columnHelper,
-    columns,
-    allSelected,
-    rowCount,
-    selectedRows,
-    clearRowSelection,
-    selectAllRows,
-    toggleRowSelection,
-  ]);
+  const tableColumns = useMemo(
+    () =>
+      buildTableColumns({
+        columnHelper,
+        columns,
+        allSelected,
+        rowCount,
+        selectedRows,
+        clearRowSelection,
+        selectAllRows,
+        toggleRowSelection,
+      }),
+    [
+      columnHelper,
+      columns,
+      allSelected,
+      rowCount,
+      selectedRows,
+      clearRowSelection,
+      selectAllRows,
+      toggleRowSelection,
+    ],
+  );
 
   const table = useReactTable({
     data: rowData,
@@ -638,28 +956,11 @@ export function DatasetEditorTable({
   const tableRef = useRef<HTMLTableElement>(null);
   const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
   useEffect(() => {
-    if (!tableRef.current) return;
-    let parent = tableRef.current.parentElement;
-    while (parent) {
-      const style = window.getComputedStyle(parent);
-      if (style.overflow === "auto" || style.overflowY === "auto") {
-        setScrollContainer(parent);
-        break;
-      }
-      parent = parent.parentElement;
-    }
+    const container = scrollContainerOf(tableRef.current);
+    if (container) setScrollContainer(container);
   }, []);
 
-  // Clear cell selection when clicking outside the table
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!store.getState().selectedCell) return;
-      if (tableRef.current?.contains(e.target as Node)) return;
-      setSelectedCell(undefined);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [store, setSelectedCell]);
+  useClearSelectionOnOutsideClick({ store, tableRef, setSelectedCell });
 
   useTableKeyboardNavigation({
     datasetColumns: columns,
@@ -705,37 +1006,15 @@ export function DatasetEditorTable({
 
   // ── Actions chrome ────────────────────────────────────────────────
 
-  const downloadDataset = api.datasetRecord.download.useMutation();
-  const downloadCSV = useCallback(async () => {
-    let exportColumns = columns;
-    let exportRecords = store.getState().records;
-    if (datasetId) {
-      try {
-        const fullDataset = await downloadDataset.mutateAsync({
-          projectId: project?.id ?? "",
-          datasetId,
-        });
-        const fullColumnTypes = (fullDataset?.columnTypes ?? []) as DatasetColumns;
-        exportColumns = toEditorColumns(fullColumnTypes);
-        exportRecords = toEditorRecords(
-          (fullDataset?.datasetRecords ?? []).map((record: { id: string; entry: unknown }) => ({
-            id: record.id,
-            ...(record.entry as Record<string, unknown>),
-          })),
-          fullColumnTypes,
-        );
-      } catch (error) {
-        showErrorToast({ error, fallbackTitle: "Couldn't download dataset" });
-        return;
-      }
-    }
+  const { downloadCSV, isDownloading } = useEditorCsvDownload({
+    projectId: project?.id,
+    datasetId,
+    datasetName,
+    columns,
+    store,
+  });
 
-    downloadCsv({
-      fields: exportColumns.map((col) => col.name),
-      rows: exportRecords.map((record) => exportColumns.map((col) => record[col.name] ?? "")),
-      fileName: `${datasetName?.toLowerCase().replace(/ /g, "_") ?? "draft_dataset"}.csv`,
-    });
-  }, [columns, datasetId, datasetName, downloadDataset, project?.id, store]);
+  const layout = editorLayout(isEmbedded);
 
   // "Add row" only appends an empty row at the bottom. It must not steal focus
   // into the first cell or pop the cell editor open: on an empty dataset the
@@ -750,101 +1029,39 @@ export function DatasetEditorTable({
       align="stretch"
       gap={3}
       width="full"
-      height={isEmbedded ? "full" : undefined}
+      height={layout.height}
       data-testid="dataset-editor-table"
     >
-      <HStack gap={3} align="center" width="full">
-        <EditorTableHeading datasetName={datasetName} title={title} />
-        <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
-          {/* With no match count to report (see `isMatchCountKnown`), the count
-              on hand describes unsearched rows, so reporting it as the result
-              of the search would be false. Report the dataset's own size
-              instead, and say nothing at all when even that is not known. */}
-          {rowCountLabel({
-            isSearching,
-            isMatchCountKnown,
-            totalRecordCount,
-            unsearchedRecordCount: unsearchedRecordCount.current,
-          })}
-        </Text>
-        {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
-        <Spacer />
-        {/* Saved datasets only — see the `activeSearch` note above. Placed
-            outside the `!hideButtons` group on purpose: that group is the
-            dataset-management toolbar, and search is a way of reading the grid,
-            not of managing the dataset. */}
-        {datasetId && (
-          <Box maxWidth="240px">
-            <SearchInput
-              size="sm"
-              // `SearchInput` carries `role="searchbox"`, which keeps this
-              // distinct from the grid's cell editors (`textbox`) for both
-              // assistive tech and role-based queries.
-              aria-label="Search rows"
-              placeholder="Search rows"
-              data-testid="dataset-row-search"
-              value={searchInput}
-              // Gated on pending writes for the same reason page navigation is:
-              // a new search reloads the store, and an edit still on its way to
-              // being saved refers to a row that reload drops — it would be
-              // discarded with nothing shown. The autosave debounce is short.
-              disabled={hasPendingWrites}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </Box>
-        )}
-        {!floatingSelectionBar && selectedRows.size > 0 && (
-          <Button
-            size="sm"
-            colorPalette="red"
-            variant="outline"
-            data-testid="delete-selected-rows"
-            onClick={() => deleteSelectedRows()}
-          >
-            <X size={14} /> Delete {selectedRows.size} {selectedRows.size === 1 ? "row" : "rows"}
-          </Button>
-        )}
-        {!hideButtons && (
-          <>
-            <Button
-              size="sm"
-              variant="ghost"
-              data-testid="download-csv"
-              loading={downloadDataset.isPending}
-              onClick={() => void downloadCSV()}
-            >
-              <Download size={16} /> Download as CSV
-            </Button>
-            {datasetId && !hasSearchTakenTheGrid && (
-              <Button
-                size="sm"
-                variant="ghost"
-                data-testid="add-rows-from-csv"
-                onClick={() => addRowsFromCSVModal.onOpen()}
-              >
-                <Upload size={16} /> Add rows
-              </Button>
-            )}
-            {canEditDatasetRecord && (
-              <Button
-                size="sm"
-                variant="outline"
-                data-testid="edit-columns"
-                onClick={() => editColumnsDrawer.onOpen()}
-              >
-                <Edit2 size={14} /> Edit columns
-              </Button>
-            )}
-          </>
-        )}
-        {headerActions}
-      </HStack>
+      <EditorToolbar
+        datasetName={datasetName}
+        title={title}
+        isSearching={isSearching}
+        isMatchCountKnown={isMatchCountKnown}
+        totalRecordCount={totalRecordCount}
+        unsearchedRecordCount={unsearchedRecordCount.current}
+        datasetId={datasetId}
+        autosave={autosave}
+        searchInput={searchInput}
+        hasPendingWrites={hasPendingWrites}
+        onSearchChange={onSearchChange}
+        floatingSelectionBar={floatingSelectionBar}
+        selectedRowCount={selectedRows.size}
+        onDeleteSelected={() => deleteSelectedRows()}
+        hideButtons={hideButtons}
+        isDownloading={isDownloading}
+        onDownload={() => void downloadCSV()}
+        hasSearchTakenTheGrid={hasSearchTakenTheGrid}
+        onAddRows={() => addRowsFromCSVModal.onOpen()}
+        canEditDatasetRecord={canEditDatasetRecord}
+        onEditColumns={() => editColumnsDrawer.onOpen()}
+        headerActions={headerActions}
+      />
 
       <Box
         width="full"
         overflowY="auto"
-        flex={isEmbedded ? 1 : undefined}
-        maxHeight={isEmbedded ? undefined : "calc(100vh - 250px)"}
+        flex={layout.gridFlex}
+        maxHeight={layout.gridMaxHeight}
         borderWidth="1px"
         borderColor="border.emphasized"
         borderRadius="md"
@@ -871,11 +1088,7 @@ export function DatasetEditorTable({
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
-                    </th>
+                    <HeaderCell key={header.id} header={header} />
                   ))}
                 </tr>
               ))}
@@ -900,33 +1113,12 @@ export function DatasetEditorTable({
               it looks like a dataset with no rows. Sits INSIDE the grid's
               border, held until the read settles so the message doesn't flash
               between keystrokes. */}
-          {hasSearchFailed && (
-            <Text
-              fontSize="13px"
-              color="fg.muted"
-              paddingX={3}
-              paddingY={4}
-              data-testid="dataset-search-failed"
-            >
-              {searchFailedMessage(activeSearch)}
-            </Text>
-          )}
-
-          {isSearching &&
-            !hasSearchFailed &&
-            !databaseDataset.isLoading &&
-            !holdingPreviousData &&
-            rowCount === 0 && (
-              <Text
-                fontSize="13px"
-                color="fg.muted"
-                paddingX={3}
-                paddingY={4}
-                data-testid="dataset-search-empty"
-              >
-                {noSearchMatchesMessage(activeSearch)}
-              </Text>
-            )}
+          <SearchNotices
+            activeSearch={activeSearch}
+            hasSearchFailed={hasSearchFailed}
+            isSettled={!databaseDataset.isLoading && !holdingPreviousData}
+            rowCount={rowCount}
+          />
         </DatasetTableProvider>
       </Box>
 
@@ -939,30 +1131,172 @@ export function DatasetEditorTable({
         <Spacer />
       </HStack>
       {datasetId && (
-        <Pagination
+        <EditorPager
           page={currentPage}
           pageSize={pageSize}
           totalCount={totalRecordCount}
           isLoading={databaseDataset.isLoading}
-          // Block navigation while a record save is queued or in flight; a page
-          // switch reloads the store and would strand an unsaved edit.
           navDisabled={hasPendingWrites}
-          onPageChange={(nextPage) => {
-            clearRowSelection();
-            setPage(nextPage);
-          }}
-          onPageSizeChange={(nextSize) => {
-            clearRowSelection();
-            setPageSize(nextSize);
-            setPage(1);
-          }}
+          clearRowSelection={clearRowSelection}
+          setPage={setPage}
+          setPageSize={setPageSize}
         />
       )}
       {bottomSpace && <Box height={bottomSpace} flexShrink={0} />}
 
-      {floatingSelectionBar && selectedRows.size > 0 && (
+      <EditorOverlays
+        floatingSelectionBar={floatingSelectionBar}
+        selectedRowCount={selectedRows.size}
+        clearRowSelection={clearRowSelection}
+        onDeleteSelected={() => deleteSelectedRows()}
+        isEditColumnsOpen={editColumnsDrawer.open}
+        onCloseEditColumns={editColumnsDrawer.onClose}
+        datasetId={datasetId}
+        datasetName={datasetName}
+        columnTypes={columnTypes}
+        onColumnsSaved={(updated) =>
+          applySavedColumns({
+            updated,
+            datasetId,
+            refetch: () => void databaseDataset.refetch(),
+            onColumnsChanged,
+            store,
+            inMemoryMetaRef,
+            inMemoryDatasetId: inMemoryDataset?.datasetId,
+          })
+        }
+        isCsvModalOpen={addRowsFromCSVModal.open}
+        hasSearchTakenTheGrid={hasSearchTakenTheGrid}
+        onCloseCsvModal={() => {
+          addRowsFromCSVModal.onClose();
+          void databaseDataset.refetch();
+        }}
+      />
+    </VStack>
+  );
+}
+
+/**
+ * What a search that owns the grid says when its answer is not rows: that the search failed,
+ * or, once the read settles, that nothing matched. The grid alone would read as an empty dataset.
+ */
+function SearchNotices({
+  activeSearch,
+  hasSearchFailed,
+  isSettled,
+  rowCount,
+}: {
+  activeSearch: string | undefined;
+  hasSearchFailed: boolean;
+  isSettled: boolean;
+  rowCount: number;
+}) {
+  if (!activeSearch) return null;
+  if (hasSearchFailed) {
+    return (
+      <Text
+        fontSize="13px"
+        color="fg.muted"
+        paddingX={3}
+        paddingY={4}
+        data-testid="dataset-search-failed"
+      >
+        {searchFailedMessage(activeSearch)}
+      </Text>
+    );
+  }
+  if (!isSettled || rowCount > 0) return null;
+  return (
+    <Text
+      fontSize="13px"
+      color="fg.muted"
+      paddingX={3}
+      paddingY={4}
+      data-testid="dataset-search-empty"
+    >
+      {noSearchMatchesMessage(activeSearch)}
+    </Text>
+  );
+}
+
+/** Page N of M; a page or size change clears the row selection. */
+function EditorPager({
+  clearRowSelection,
+  setPage,
+  setPageSize,
+  ...pagination
+}: {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  isLoading: boolean;
+  /** Blocked while a record save is queued or in flight: a page switch would strand the edit. */
+  navDisabled: boolean;
+  clearRowSelection: () => void;
+  setPage: (page: number) => void;
+  setPageSize: (pageSize: number) => void;
+}) {
+  return (
+    <Pagination
+      {...pagination}
+      onPageChange={(nextPage) => {
+        clearRowSelection();
+        setPage(nextPage);
+      }}
+      onPageSizeChange={(nextSize) => {
+        clearRowSelection();
+        setPageSize(nextSize);
+        setPage(1);
+      }}
+    />
+  );
+}
+
+function HeaderCell({ header }: { header: Header<DatasetTableRowData, unknown> }) {
+  return (
+    <th>
+      {header.isPlaceholder
+        ? null
+        : flexRender(header.column.columnDef.header, header.getContext())}
+    </th>
+  );
+}
+
+/** The floating row-selection bar, the edit-columns drawer and the CSV import dialog. */
+function EditorOverlays({
+  floatingSelectionBar,
+  selectedRowCount,
+  clearRowSelection,
+  onDeleteSelected,
+  isEditColumnsOpen,
+  onCloseEditColumns,
+  datasetId,
+  datasetName,
+  columnTypes,
+  onColumnsSaved,
+  isCsvModalOpen,
+  hasSearchTakenTheGrid,
+  onCloseCsvModal,
+}: {
+  floatingSelectionBar: boolean;
+  selectedRowCount: number;
+  clearRowSelection: () => void;
+  onDeleteSelected: () => void;
+  isEditColumnsOpen: boolean;
+  onCloseEditColumns: () => void;
+  datasetId: string | undefined;
+  datasetName: string | null | undefined;
+  columnTypes: DatasetColumns;
+  onColumnsSaved: (updated: { name: string; columnTypes: DatasetColumns }) => void;
+  isCsvModalOpen: boolean;
+  hasSearchTakenTheGrid: boolean;
+  onCloseCsvModal: () => void;
+}) {
+  return (
+    <>
+      {floatingSelectionBar && selectedRowCount > 0 && (
         <SelectionActionBar
-          label={`${selectedRows.size} selected`}
+          label={`${selectedRowCount} selected`}
           onClear={clearRowSelection}
           testId="dataset-selection-bar"
         >
@@ -971,17 +1305,17 @@ export function DatasetEditorTable({
             variant="outline"
             colorPalette="red"
             data-testid="delete-selected-rows"
-            onClick={() => deleteSelectedRows()}
+            onClick={onDeleteSelected}
           >
             <Trash2 size={14} /> Delete
           </Button>
         </SelectionActionBar>
       )}
 
-      {editColumnsDrawer.open && (
+      {isEditColumnsOpen && (
         <AddOrEditDatasetDrawer
-          open={editColumnsDrawer.open}
-          onClose={editColumnsDrawer.onClose}
+          open={isEditColumnsOpen}
+          onClose={onCloseEditColumns}
           datasetToSave={{
             datasetId,
             name: datasetName ?? undefined,
@@ -989,51 +1323,28 @@ export function DatasetEditorTable({
           }}
           localOnly={!datasetId}
           onSuccess={(updated) => {
-            editColumnsDrawer.onClose();
-            if (datasetId) {
-              void databaseDataset.refetch();
-              onColumnsChanged?.(updated.columnTypes);
-            } else {
-              // Re-key the records onto the new columns and refresh the
-              // propagation meta BEFORE setData: the store subscription
-              // emits the update upward and must carry the new name.
-              const state = store.getState();
-              const rekeyedRecords = rekeyEditorRecords(
-                state.records,
-                state.columns,
-                updated.columnTypes,
-              );
-              inMemoryMetaRef.current = {
-                datasetId: inMemoryDataset?.datasetId,
-                name: updated.name,
-              };
-              state.setData({
-                columns: toEditorColumns(updated.columnTypes),
-                records: rekeyedRecords,
-                dbDatasetId: undefined,
-              });
-            }
+            onCloseEditColumns();
+            onColumnsSaved(updated);
           }}
         />
       )}
 
       {/* Withdrawn once a search owns the grid, for the same reason its toolbar
-          button is: rows imported here land at the end of the dataset, outside
-          the matches on screen. The effect above is what makes the withdrawal
-          stick — unmounting alone would leave the disclosure believing it is
-          still open, and clearing the search would bring it back. */}
-      {datasetId && addRowsFromCSVModal.open && !hasSearchTakenTheGrid && (
+        button is: rows imported here land at the end of the dataset, outside
+        the matches on screen. The effect above is what makes the withdrawal
+        stick — unmounting alone would leave the disclosure believing it is
+        still open, and clearing the search would bring it back. */}
+      {datasetId && isCsvModalOpen && !hasSearchTakenTheGrid && (
         <AddRowsFromCSVModal
-          isOpen={addRowsFromCSVModal.open}
+          isOpen={isCsvModalOpen}
           onClose={() => {
-            addRowsFromCSVModal.onClose();
-            void databaseDataset.refetch();
+            onCloseCsvModal();
           }}
           datasetId={datasetId}
           columnTypes={columnTypes}
         />
       )}
-    </VStack>
+    </>
   );
 }
 
@@ -1057,6 +1368,134 @@ function RowCheckbox({
       <Checkbox.HiddenInput />
       <Checkbox.Control />
     </Checkbox.Root>
+  );
+}
+
+/** The editor's chrome row: heading, counts, save state, row search and dataset management. */
+function EditorToolbar({
+  datasetName,
+  title,
+  isSearching,
+  isMatchCountKnown,
+  totalRecordCount,
+  unsearchedRecordCount,
+  datasetId,
+  autosave,
+  searchInput,
+  hasPendingWrites,
+  onSearchChange,
+  floatingSelectionBar,
+  selectedRowCount,
+  onDeleteSelected,
+  hideButtons,
+  isDownloading,
+  onDownload,
+  hasSearchTakenTheGrid,
+  onAddRows,
+  canEditDatasetRecord,
+  onEditColumns,
+  headerActions,
+}: {
+  datasetName: ComponentProps<typeof EditorTableHeading>["datasetName"];
+  title: ReactNode;
+  isSearching: boolean;
+  isMatchCountKnown: boolean;
+  totalRecordCount: Parameters<typeof rowCountLabel>[0]["totalRecordCount"];
+  unsearchedRecordCount: number | undefined;
+  datasetId: string | undefined;
+  autosave: { state: AutosaveState; error?: string };
+  searchInput: string;
+  hasPendingWrites: boolean;
+  onSearchChange: (next: string) => void;
+  floatingSelectionBar: boolean;
+  selectedRowCount: number;
+  onDeleteSelected: () => void;
+  hideButtons: boolean;
+  isDownloading: boolean;
+  onDownload: () => void;
+  hasSearchTakenTheGrid: boolean;
+  onAddRows: () => void;
+  canEditDatasetRecord: boolean;
+  onEditColumns: () => void;
+  headerActions: ReactNode;
+}) {
+  return (
+    <HStack gap={3} align="center" width="full">
+      <EditorTableHeading datasetName={datasetName} title={title} />
+      <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
+        {/* With no match count to report (see `isMatchCountKnown`), the count
+          on hand describes unsearched rows, so reporting it as the result
+          of the search would be false. Report the dataset's own size
+          instead, and say nothing at all when even that is not known. */}
+        {rowCountLabel({
+          isSearching,
+          isMatchCountKnown,
+          totalRecordCount,
+          unsearchedRecordCount,
+        })}
+      </Text>
+      {datasetId && <SaveStatusChip state={autosave.state} error={autosave.error} />}
+      <Spacer />
+      {/* Saved datasets only — see the `activeSearch` note above. Placed
+        outside the `!hideButtons` group on purpose: that group is the
+        dataset-management toolbar, and search is a way of reading the grid,
+        not of managing the dataset. */}
+      {datasetId && (
+        <Box maxWidth="240px">
+          <SearchInput
+            size="sm"
+            // `SearchInput` carries `role="searchbox"`, which keeps this
+            // distinct from the grid's cell editors (`textbox`) for both
+            // assistive tech and role-based queries.
+            aria-label="Search rows"
+            placeholder="Search rows"
+            data-testid="dataset-row-search"
+            value={searchInput}
+            // Gated on pending writes for the same reason page navigation is:
+            // a new search reloads the store, and an edit still on its way to
+            // being saved refers to a row that reload drops — it would be
+            // discarded with nothing shown. The autosave debounce is short.
+            disabled={hasPendingWrites}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </Box>
+      )}
+      {!floatingSelectionBar && selectedRowCount > 0 && (
+        <Button
+          size="sm"
+          colorPalette="red"
+          variant="outline"
+          data-testid="delete-selected-rows"
+          onClick={onDeleteSelected}
+        >
+          <X size={14} /> Delete {selectedRowCount} {selectedRowCount === 1 ? "row" : "rows"}
+        </Button>
+      )}
+      {!hideButtons && (
+        <>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="download-csv"
+            loading={isDownloading}
+            onClick={onDownload}
+          >
+            <Download size={16} /> Download as CSV
+          </Button>
+          {datasetId && !hasSearchTakenTheGrid && (
+            <Button size="sm" variant="ghost" data-testid="add-rows-from-csv" onClick={onAddRows}>
+              <Upload size={16} /> Add rows
+            </Button>
+          )}
+          {canEditDatasetRecord && (
+            <Button size="sm" variant="outline" data-testid="edit-columns" onClick={onEditColumns}>
+              <Edit2 size={14} /> Edit columns
+            </Button>
+          )}
+        </>
+      )}
+      {headerActions}
+    </HStack>
   );
 }
 

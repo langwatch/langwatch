@@ -60,6 +60,29 @@ export type UiAddOrEditDatasetDrawerProps = {
   isColumnsLocked?: boolean;
 };
 
+/** A dataset a borrower holds in memory, with plain columns, as dataset's lent editor reads it. */
+export type UiInMemoryDataset = {
+  datasetId?: string;
+  name?: string;
+  datasetRecords: ({ id: string } & Record<string, unknown>)[];
+  columnTypes: UiDatasetColumn[];
+};
+
+/** What a screen hands dataset's lent editor table: a saved dataset by id, or one in memory. */
+export type UiDatasetEditorTableProps = {
+  datasetId?: string;
+  inMemoryDataset?: UiInMemoryDataset;
+  onUpdateDataset?: (dataset: UiInMemoryDataset & { datasetId?: string }) => void;
+  title?: ReactNode;
+  headerActions?: ReactNode;
+  readEnabled?: boolean;
+  floatingSelectionBar?: boolean;
+  /** Called after column changes are saved, so the host can follow the new shape. */
+  onColumnsChanged?: (columnTypes: UiDatasetColumn[]) => void;
+  /** The dialog's portal target, so the floating cell editor stays inside its pointer scope. */
+  editorPortalRef?: { readonly current: HTMLDivElement | null };
+};
+
 /** What a screen hands dataset's lent record sync, which renders nothing and saves edits. */
 export type UiDatasetRecordSyncProps = {
   projectId: string | undefined;
@@ -307,6 +330,7 @@ export type UiDeclaredCapabilities = {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;

@@ -20,6 +20,7 @@ import type {
   DatasetColumns,
   DatasetConfirmColumns,
   DatasetRecordEntry,
+  InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
@@ -52,7 +53,6 @@ import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
 } from "./add-or-edit-dataset-drawer.tsx";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 const logger = createLogger("UploadCSVDrawer");
 

@@ -5,13 +5,13 @@
  */
 import { Box, Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import {
-  DatasetEditorTable,
-  type InMemoryDataset,
-} from "@langwatch/dataset-browser/dataset-editor-table";
 import { DatasetPickerList } from "@langwatch/dataset-browser/dataset-picker-list";
 import { UploadCSVDrawer } from "@langwatch/dataset-browser/upload-csv-drawer";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
+import {
+  datasetColumnsSchema,
+  type DatasetColumns,
+  type InMemoryDataset,
+} from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import {
   datasetColumnsToFields,
@@ -25,6 +25,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
+import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
@@ -60,7 +61,7 @@ function DatasetEditorBody({
         editorPortalRef={editorPortalRef}
         floatingSelectionBar
         onColumnsChanged={(columnTypes) => {
-          attachDataset(editingDataset, columnTypes);
+          attachDataset(editingDataset, datasetColumnsSchema.parse(columnTypes));
         }}
       />
     );
@@ -79,7 +80,9 @@ function DatasetEditorBody({
         columnTypes: inline.columnTypes,
         datasetRecords: transposeColumnsFirstToRowsFirstWithId(inline.records),
       }}
-      onUpdateDataset={onDraftChange}
+      onUpdateDataset={(dataset) =>
+        onDraftChange({ ...dataset, columnTypes: datasetColumnsSchema.parse(dataset.columnTypes) })
+      }
       headerActions={
         <Button
           size="sm"

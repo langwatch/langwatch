@@ -20,6 +20,7 @@ import {
   type DatasetColumns,
   type DatasetRecordForm,
   datasetRecordFormSchema,
+  type InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
@@ -32,7 +33,6 @@ import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-h
 import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
