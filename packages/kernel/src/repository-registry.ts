@@ -112,14 +112,14 @@ export function defineRepositories<
   return Object.freeze({ definitions: Object.freeze(captured) });
 }
 
-function freezeProvider<Provider extends RepositoryProvider>(provider: Provider): Provider {
+function freezeProvider(provider: RepositoryProvider): RepositoryProvider {
   const snapshot = {
     ...provider,
     requires: Object.freeze([...provider.requires]),
     repositories: snapshotRepositories(provider.repositories),
     create: provider.create.bind(provider),
   };
-  return Object.freeze(snapshot) as unknown as Provider;
+  return Object.freeze(snapshot);
 }
 
 export function instantiateRepositories<

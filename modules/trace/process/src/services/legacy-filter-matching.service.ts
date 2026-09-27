@@ -216,7 +216,7 @@ function matchSimpleArray({
     return false;
   }
 
-  const resolved = matcher(traceData, filterValues[0]!, key, subkey);
+  const resolved = matcher({ data: traceData, value: filterValues[0]!, key, subkey });
 
   if (resolved == null) {
     return false;

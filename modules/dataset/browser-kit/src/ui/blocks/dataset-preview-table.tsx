@@ -49,6 +49,12 @@ export type DatasetPreviewTableProps = {
   renderImage?: (value: string) => ReactNode | null;
 };
 
+type PreviewColumn = {
+  id: string;
+  name: string;
+  type: DatasetPreviewTableProps["columns"][number]["type"];
+};
+
 const renderNoImage = (): null => null;
 
 export function DatasetPreviewTable({
@@ -66,7 +72,7 @@ export function DatasetPreviewTable({
   renderImage = renderNoImage,
 }: DatasetPreviewTableProps) {
   const visibleColumns = useMemo(
-    () =>
+    (): PreviewColumn[] =>
       columns.slice(0, maxColumns).map((col, index) => ({
         id: `${col.name}_${index}`,
         name: col.name,
@@ -107,15 +113,7 @@ export function DatasetPreviewTable({
       setCellValue: ({ row: rowIndex, columnId, value }) => {
         const column = visibleColumns.find((col) => col.id === columnId);
         if (!column) return;
-        let parsed: unknown = value;
-        if (JSON_LIKE_TYPES.includes(column.type)) {
-          try {
-            parsed = JSON.parse(value);
-          } catch {
-            // Not valid JSON: keep the raw edited string.
-          }
-        }
-        onCellEdit?.(rowIndex, column.name, parsed);
+        onCellEdit?.(rowIndex, column.name, parseEditedCell(value, column.type));
       },
       // Without an edit callback the cells are read-only: double-click
       // selects but never opens the floating editor.
@@ -149,90 +147,18 @@ export function DatasetPreviewTable({
     ],
   );
 
-  const columnHelper = useMemo(() => createColumnHelper<DatasetTableRowData>(), []);
-
-  const tableColumns = useMemo(() => {
-    const cols: ColumnDef<DatasetTableRowData>[] = [];
-
-    if (isSelectable) {
-      cols.push(
-        columnHelper.display({
-          id: "select",
-          header: () => (
-            <Checkbox.Root
-              size="sm"
-              top="1px"
-              aria-label="Select all rows"
-              checked={areAllSelected}
-              onCheckedChange={() => onToggleAll?.(!areAllSelected)}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-            </Checkbox.Root>
-          ),
-          cell: (info) => (
-            <Checkbox.Root
-              size="sm"
-              aria-label={`Select row ${info.row.index + 1}`}
-              checked={!!rows[info.row.index]?.isSelected}
-              onCheckedChange={() =>
-                onToggleRow?.(info.row.index, !rows[info.row.index]?.isSelected)
-              }
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-            </Checkbox.Root>
-          ),
-          size: CHECKBOX_WIDTH_PX,
-          enableResizing: false,
-          meta: { columnType: "checkbox", columnId: "__checkbox__" },
-        }) as ColumnDef<DatasetTableRowData>,
-      );
-    } else {
-      cols.push(
-        columnHelper.display({
-          id: "rowNumber",
-          header: () => (
-            <Text fontSize="13px" color="fg.muted">
-              #
-            </Text>
-          ),
-          cell: (info) => (
-            <Text fontSize="13px" color="fg.muted">
-              {info.row.index + 1}
-            </Text>
-          ),
-          size: ROW_NUMBER_WIDTH_PX,
-          enableResizing: false,
-        }) as ColumnDef<DatasetTableRowData>,
-      );
-    }
-
-    for (const column of visibleColumns) {
-      cols.push(
-        columnHelper.accessor((row) => row.dataset[column.id], {
-          id: `dataset.${column.id}`,
-          header: () => (
-            <HStack gap={1}>
-              <ColumnTypeIcon type={column.type} />
-              <Text fontSize="13px" fontWeight="medium">
-                {column.name}
-              </Text>
-            </HStack>
-          ),
-          cell: (info) => info.getValue(),
-          meta: {
-            columnType: "dataset",
-            columnId: column.id,
-            dataType: column.type,
-          },
-        }) as ColumnDef<DatasetTableRowData>,
-      );
-    }
-
-    return cols;
-  }, [columnHelper, visibleColumns, isSelectable, areAllSelected, rows, onToggleAll, onToggleRow]);
+  const tableColumns = useMemo(
+    () =>
+      buildPreviewColumns({
+        visibleColumns,
+        isSelectable,
+        areAllSelected,
+        rows,
+        onToggleAll,
+        onToggleRow,
+      }),
+    [visibleColumns, isSelectable, areAllSelected, rows, onToggleAll, onToggleRow],
+  );
 
   const table = useReactTable({
     data: rowData,
@@ -317,4 +243,111 @@ export function DatasetPreviewTable({
       </DatasetTableProvider>
     </Box>
   );
+}
+
+/** The preview's columns: a checkbox or a row number, then the visible dataset columns. */
+function buildPreviewColumns({
+  visibleColumns,
+  isSelectable,
+  areAllSelected,
+  rows,
+  onToggleAll,
+  onToggleRow,
+}: {
+  visibleColumns: PreviewColumn[];
+  isSelectable: boolean;
+  areAllSelected: boolean;
+  rows: DatasetPreviewTableProps["rows"];
+  onToggleAll: DatasetPreviewTableProps["onToggleAll"];
+  onToggleRow: DatasetPreviewTableProps["onToggleRow"];
+}): ColumnDef<DatasetTableRowData>[] {
+  const columnHelper = createColumnHelper<DatasetTableRowData>();
+  const cols: ColumnDef<DatasetTableRowData>[] = [];
+
+  if (isSelectable) {
+    cols.push(
+      columnHelper.display({
+        id: "select",
+        header: () => (
+          <Checkbox.Root
+            size="sm"
+            top="1px"
+            aria-label="Select all rows"
+            checked={areAllSelected}
+            onCheckedChange={() => onToggleAll?.(!areAllSelected)}
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+          </Checkbox.Root>
+        ),
+        cell: (info) => (
+          <Checkbox.Root
+            size="sm"
+            aria-label={`Select row ${info.row.index + 1}`}
+            checked={!!rows[info.row.index]?.isSelected}
+            onCheckedChange={() => onToggleRow?.(info.row.index, !rows[info.row.index]?.isSelected)}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+          </Checkbox.Root>
+        ),
+        size: CHECKBOX_WIDTH_PX,
+        enableResizing: false,
+        meta: { columnType: "checkbox", columnId: "__checkbox__" },
+      }) as ColumnDef<DatasetTableRowData>,
+    );
+  } else {
+    cols.push(
+      columnHelper.display({
+        id: "rowNumber",
+        header: () => (
+          <Text fontSize="13px" color="fg.muted">
+            #
+          </Text>
+        ),
+        cell: (info) => (
+          <Text fontSize="13px" color="fg.muted">
+            {info.row.index + 1}
+          </Text>
+        ),
+        size: ROW_NUMBER_WIDTH_PX,
+        enableResizing: false,
+      }) as ColumnDef<DatasetTableRowData>,
+    );
+  }
+
+  for (const column of visibleColumns) {
+    cols.push(
+      columnHelper.accessor((row) => row.dataset[column.id], {
+        id: `dataset.${column.id}`,
+        header: () => (
+          <HStack gap={1}>
+            <ColumnTypeIcon type={column.type} />
+            <Text fontSize="13px" fontWeight="medium">
+              {column.name}
+            </Text>
+          </HStack>
+        ),
+        cell: (info) => info.getValue(),
+        meta: {
+          columnType: "dataset",
+          columnId: column.id,
+          dataType: column.type,
+        },
+      }) as ColumnDef<DatasetTableRowData>,
+    );
+  }
+
+  return cols;
+}
+
+/** An edited JSON-like cell parses back into a value; text that is not JSON stays as typed. */
+function parseEditedCell(value: string, type: PreviewColumn["type"]): unknown {
+  if (!JSON_LIKE_TYPES.includes(type)) return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 }

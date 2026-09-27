@@ -6,7 +6,6 @@ import {
   type AnalyticsTable,
   type AnalyticsTimeseriesInput,
   type AnalyticsTimeseriesResult,
-  type AnalyticsTimeseriesBuilderInput,
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
@@ -21,6 +20,7 @@ import {
   buildFeedbacksQuery,
   buildTimeseriesQuery,
   buildTopDocumentsQuery,
+  type TimeseriesQueryInput,
 } from "./clickhouse.aggregation-builder.mapper.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
@@ -37,7 +37,7 @@ export class AnalyticsClientUnavailableError extends Error {
   }
 }
 
-type TimeseriesBuilder = (input: AnalyticsTimeseriesBuilderInput) => {
+type TimeseriesBuilder = (input: TimeseriesQueryInput) => {
   sql: string;
   params: Record<string, unknown>;
 };
@@ -91,7 +91,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     const client = await this.resolveClient(query.tenantId);
     if (!client) throw new AnalyticsClientUnavailableError(query.tenantId);
 
-    const builderInput = {
+    const builderInput: TimeseriesQueryInput = {
       projectId: query.tenantId,
       startDate: toDate(query.startDate),
       endDate: toDate(query.endDate),
@@ -105,7 +105,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
       traceIds: query.input.traceIds,
       negateFilters: query.input.negateFilters,
       excludeOrigins: query.input.excludeOrigins,
-    } as AnalyticsTimeseriesBuilderInput;
+    };
     const built = builderFor(query.table)(builderInput);
 
     try {

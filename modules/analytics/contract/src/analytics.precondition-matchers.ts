@@ -60,12 +60,12 @@ export type PreconditionField = FilterField | "input" | "output";
  * Resolves a field value from trace data for precondition evaluation; returns
  * string, string array, or null.
  */
-export type PreconditionFieldMatcher = (
-  data: PreconditionTraceData,
-  value: string,
-  key?: string,
-  subkey?: string,
-) => string | string[] | null | undefined;
+export type PreconditionFieldMatcher = (input: {
+  data: PreconditionTraceData;
+  value: string;
+  key?: string;
+  subkey?: string;
+}) => string | string[] | null | undefined;
 
 // ---------------------------------------------------------------------------
 // Matcher registry — one matcher per PreconditionField
@@ -81,22 +81,22 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   PreconditionFieldMatcher | null
 > = {
   // Precondition-only fields
-  input: (data) => data.input,
-  output: (data) => data.output,
+  input: ({ data }) => data.input,
+  output: ({ data }) => data.output,
 
   // Trace fields
-  "traces.origin": (data) => data.origin ?? null,
-  "traces.error": (data) => (data.hasError ? "true" : "false"),
+  "traces.origin": ({ data }) => data.origin ?? null,
+  "traces.error": ({ data }) => (data.hasError ? "true" : "false"),
   "traces.name": null, // ClickHouse-only analytics dimension, not in trace data
 
   // Metadata fields
-  "metadata.user_id": (data) => data.userId,
-  "metadata.thread_id": (data) => data.threadId,
-  "metadata.customer_id": (data) => data.customerId,
-  "metadata.labels": (data) => data.labels,
-  "metadata.prompt_ids": (data) => data.promptIds,
+  "metadata.user_id": ({ data }) => data.userId,
+  "metadata.thread_id": ({ data }) => data.threadId,
+  "metadata.customer_id": ({ data }) => data.customerId,
+  "metadata.labels": ({ data }) => data.labels,
+  "metadata.prompt_ids": ({ data }) => data.promptIds,
   "metadata.key": null, // key selector — not matchable
-  "metadata.value": (data, _value, key) => {
+  "metadata.value": ({ data, key }) => {
     if (!key) return null;
     const decoded = key.replaceAll("·", ".");
     let resolved = decoded;
@@ -131,12 +131,12 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   },
 
   // Span fields
-  "spans.type": (data) => data.spanTypes,
-  "spans.model": (data) => data.spanModels,
+  "spans.type": ({ data }) => data.spanTypes,
+  "spans.model": ({ data }) => data.spanModels,
 
   // Topic fields
-  "topics.topics": (data) => (data.topicId ? [data.topicId] : null),
-  "topics.subtopics": (data) => (data.subTopicId ? [data.subTopicId] : null),
+  "topics.topics": ({ data }) => (data.topicId ? [data.topicId] : null),
+  "topics.subtopics": ({ data }) => (data.subTopicId ? [data.subTopicId] : null),
 
   // Evaluation fields — not available at trace arrival time
   "evaluations.evaluator_id": null,
@@ -150,21 +150,21 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "evaluations.label": null,
 
   // Event fields — fetched on demand when event preconditions exist
-  "events.event_type": (data) => data.events?.map((e) => e.event_type) ?? null,
-  "events.metrics.key": (data, _value, key) => {
+  "events.event_type": ({ data }) => data.events?.map((e) => e.event_type) ?? null,
+  "events.metrics.key": ({ data, key }) => {
     if (!key || !data.events) return null;
     const event = data.events.find((e) => e.event_type === key);
     return event?.metrics.map((m) => m.key) ?? null;
   },
   "events.metrics.value": null, // numeric range; matched separately
-  "events.event_details.key": (data, _value, key) => {
+  "events.event_details.key": ({ data, key }) => {
     if (!key || !data.events) return null;
     const event = data.events.find((e) => e.event_type === key);
     return event?.event_details.map((d) => d.key) ?? null;
   },
 
   // Annotation fields
-  "annotations.hasAnnotation": (data) => {
+  "annotations.hasAnnotation": ({ data }) => {
     if (data.annotationIds == null) return null;
     return data.annotationIds.length > 0 ? "true" : "false";
   },

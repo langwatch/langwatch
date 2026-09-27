@@ -4,12 +4,9 @@
  * aggregation compositions; anything unsupported throws (programmer error).
  */
 
-import type {
-  AnalyticsAggregation,
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation, BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   dateTrunc,
@@ -123,9 +120,7 @@ function evalRollupAggExpression(metric: EvalMetricKey, agg: EvalRollupAggregati
   }
 }
 
-export function buildEvalRollupTimeseriesQuery(
-  input: AnalyticsTimeseriesBuilderInput,
-): BuiltAnalyticsQuery {
+export function buildEvalRollupTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const selectExprs: string[] = [];

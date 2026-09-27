@@ -7,10 +7,10 @@
 import type {
   AnalyticsAggregation,
   AnalyticsFilterValue,
-  AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
 
+import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import {
   appendMetadataValueFilterClauses,
@@ -147,7 +147,7 @@ const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTim
  * serves into a WHERE fragment + params. Anything else MUST have been
  * rejected by `pickAnalyticsTable` already.
  */
-function buildEvalSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filters"]): {
+function buildEvalSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   whereClause: string;
   params: Record<string, unknown>;
 } {
@@ -214,9 +214,7 @@ function appendEvalSlimFilterClause({
  * it hoists `EvaluatorType`, not `EvaluatorId`, so keyed series route to
  * `evaluation_runs` instead.
  */
-export function buildEvalSlimTimeseriesQuery(
-  input: AnalyticsTimeseriesBuilderInput,
-): BuiltAnalyticsQuery {
+export function buildEvalSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnalyticsQuery {
   const timeZone = input.timeZone ?? "UTC";
 
   const selectExprs: string[] = [];
