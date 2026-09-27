@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { EventingGithubMaintenanceAdapter } from "../github-maintenance.service.ts";
+import { buildGithubMaintenancePipeline } from "../github-maintenance.pipeline.ts";
 
 function build(
   sweep = {
@@ -13,10 +13,10 @@ function build(
   },
 ) {
   const deleteDispatchedBefore = vi.fn(async () => 0);
-  const definition = EventingGithubMaintenanceAdapter.create({
+  const definition = buildGithubMaintenancePipeline({
     github: sweep,
     processStore: { deleteDispatchedBefore } as never,
-  }).build();
+  });
   return { definition, sweep, deleteDispatchedBefore };
 }
 

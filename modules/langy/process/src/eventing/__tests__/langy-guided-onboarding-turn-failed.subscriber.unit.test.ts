@@ -7,6 +7,7 @@ import type { EventSubscriberContext } from "@langwatch/eventing";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
+import { analyticsUuidForEvent } from "../../rules/langy-analytics-event-uuid.rules.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingForProject,
@@ -91,6 +92,7 @@ describe("given the organization's guided onboarding conversation", () => {
             organization_id: "org-1",
             ...EXPERIMENT,
           },
+          uuid: analyticsUuidForEvent("evt_failed"),
         },
       ]);
     });

@@ -1,4 +1,4 @@
-import type { ProcessStore } from "@langwatch/eventing";
+import type { Projection, StaticPipelineDefinition } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
 import { defineServerModule } from "@langwatch/kernel";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
@@ -10,7 +10,11 @@ import {
   type GithubBranchDemandComposition,
 } from "./app/github.app.ts";
 import type { GithubBranchMaintenance, GithubBranchDemand } from "./app/github.members.ts";
-import { githubMaintenanceEventing } from "./eventing/github-maintenance.pipeline.ts";
+import {
+  buildGithubMaintenancePipeline,
+  githubMaintenanceEventing,
+  type GithubMaintenancePipelineDeps,
+} from "./eventing/github-maintenance.pipeline.ts";
 import { githubRepositories } from "./repositories/github-repositories.registry.ts";
 import type { GithubRepositories } from "./repositories/github.repositories.ts";
 import {
@@ -24,7 +28,6 @@ import {
 import { GithubInstallNonceRedisRepository } from "./repositories/redis/redis.github-install-nonce.repository.ts";
 import { GithubPullRequestStatusCacheRedisRepository } from "./repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubTokenCacheRedisRepository } from "./repositories/redis/redis.github-token-cache.repository.ts";
-import { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.service.ts";
 import { githubInstallRest } from "./transport/github-install.rest.ts";
 import { githubTrpcTransport } from "./transport/github.trpc.ts";
 
@@ -92,9 +95,8 @@ export function composeGithubBranchDemand(
  * The worker's registration pipeline for GitHub pull-request linkage
  * maintenance, over its own process store.
  */
-export function createGithubMaintenancePipeline(deps: {
-  github: GithubBranchMaintenance;
-  processStore: ProcessStore;
-}): ReturnType<ReturnType<typeof EventingGithubMaintenanceAdapter.create>["build"]> {
-  return EventingGithubMaintenanceAdapter.create(deps).build();
+export function createGithubMaintenancePipeline(
+  deps: GithubMaintenancePipelineDeps,
+): StaticPipelineDefinition<never, Record<string, Projection>, never> {
+  return buildGithubMaintenancePipeline(deps);
 }
