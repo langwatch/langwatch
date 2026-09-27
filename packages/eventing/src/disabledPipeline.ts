@@ -2,9 +2,8 @@ import { createLogger } from "@langwatch/observability";
 
 import type { AggregateType } from "./domain/aggregateType.ts";
 import type { Event, Projection } from "./domain/types.ts";
-import type { PipelineMetadata, RegisteredPipeline } from "./pipeline/types.ts";
+import type { PipelineMetadata, PipelineService, RegisteredPipeline } from "./pipeline/types.ts";
 import type { EventSourcedQueueProcessor } from "./queues/index.ts";
-import type { EventSourcingService } from "./services/eventSourcingService.ts";
 
 const logger = createLogger("langwatch:event-sourcing:disabled");
 
@@ -53,19 +52,23 @@ class DisabledQueueProcessor<
 /**
  * A no-op service that logs warnings when methods are called.
  */
-class DisabledEventSourcingService {
+class DisabledEventSourcingService<EventType extends Event> implements PipelineService<EventType> {
   constructor(private readonly pipelineName: string) {}
 
   async storeEvents(): Promise<void> {
     logger.warn({ pipeline: this.pipelineName }, "storeEvents ignored: event sourcing is disabled");
   }
 
-  getCommandQueues() {
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<Record<string, unknown>>> {
     return new Map();
   }
 
-  registerJob(): null {
-    return null;
+  async waitUntilReady(): Promise<void> {
+    // No-op - a disabled pipeline is always "ready"
+  }
+
+  async close(): Promise<void> {
+    // No-op
   }
 }
 
@@ -79,7 +82,7 @@ export class DisabledPipeline<
 > implements RegisteredPipeline<EventType, ProjectionTypes> {
   readonly name: string;
   readonly aggregateType: AggregateType;
-  readonly service: EventSourcingService<EventType, ProjectionTypes>;
+  readonly service: PipelineService<EventType>;
   readonly commands: Record<string, EventSourcedQueueProcessor<Record<string, unknown>>>;
   readonly metadata: PipelineMetadata;
 
@@ -87,10 +90,7 @@ export class DisabledPipeline<
     this.name = name;
     this.aggregateType = aggregateType;
     this.metadata = metadata;
-    this.service = new DisabledEventSourcingService(name) as unknown as EventSourcingService<
-      EventType,
-      ProjectionTypes
-    >;
+    this.service = new DisabledEventSourcingService<EventType>(name);
 
     // Create a proxy that returns DisabledQueueProcessor for any command
     this.commands = new Proxy<DisabledPipeline["commands"]>(

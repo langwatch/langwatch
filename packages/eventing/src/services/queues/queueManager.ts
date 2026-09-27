@@ -360,7 +360,7 @@ export class QueueManager<EventType extends Event = Event> {
     const namespaceDedupId = (id: string) => `${pipelineName}/${jobType}/${jobName}/${id}`;
     this.globalJobRegistry.set(
       this.registryKey(jobType, jobName),
-      sealJobLane(lane, namespaceDedupId),
+      sealJobLane(lane, namespaceDedupId, `${pipelineName}:${jobType}:${jobName}`),
     );
 
     const envelopeOf = (payload: P, deduplication: DeduplicationConfig<P> | undefined) => ({

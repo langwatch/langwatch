@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { QueuedPayloadInvalidError } from "../../errorHandling.ts";
 import { type JobLane, routeJob, sealJobLane } from "../jobLane.ts";
 
 const payloadSchema = z.object({ tenantId: z.string(), id: z.string(), oversized: z.boolean() });
@@ -69,11 +70,20 @@ describe("routing a job at send", () => {
 
 describe("reading a dequeued batch", () => {
   describe("given one payload that fails its lane's schema", () => {
-    it("refuses the batch before the handler runs", () => {
+    it("refuses the batch non-retryably, by path, before the handler runs", () => {
       const processBatch = vi.fn().mockResolvedValue(undefined);
-      const entry = sealJobLane(laneWith({ processBatch }), (id) => id);
+      const entry = sealJobLane(laneWith({ processBatch }), (id) => id, "p:job:test");
 
-      expect(() => entry.readBatch?.([payload, { tenantId: "tenant-a" }])).toThrow(z.ZodError);
+      const refusal = (() => {
+        try {
+          return entry.readBatch?.([payload, { tenantId: "tenant-a" }]);
+        } catch (error) {
+          return error;
+        }
+      })();
+
+      expect(refusal).toBeInstanceOf(QueuedPayloadInvalidError);
+      expect(refusal).toMatchObject({ retryable: false, jobPath: "p:job:test" });
       expect(processBatch).not.toHaveBeenCalled();
     });
   });

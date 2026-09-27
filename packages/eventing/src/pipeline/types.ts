@@ -11,9 +11,8 @@ import type {
 } from "../projections/sealedProjection.ts";
 import type { EventSourcedQueueProcessor } from "../queues/index.ts";
 import type { ExecutionTarget, RetentionPolicyResolver } from "../runtime.types.ts";
-import type { EventSourcingService } from "../services/eventSourcingService.ts";
 import type { JobRegistryEntry } from "../services/queues/queueManager.ts";
-import type { EventStore } from "../stores/eventStore.types.ts";
+import type { EventStore, EventStoreReadContext } from "../stores/eventStore.types.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
 import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
 
@@ -82,13 +81,24 @@ export interface EventSourcingPipelineDefinition<
   warnWhenProjectionsRunInline?: boolean;
 }
 
+/** What a registered pipeline's service answers; a disabled pipeline answers it inertly. */
+export interface PipelineService<EventType extends Event = Event> {
+  storeEvents(
+    events: readonly EventType[],
+    context: EventStoreReadContext<EventType>,
+  ): Promise<void>;
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<Record<string, unknown>>>;
+  waitUntilReady(): Promise<void>;
+  close(): Promise<void>;
+}
+
 export interface RegisteredPipeline<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
+  _ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
 > {
   name: string;
   aggregateType: AggregateType;
-  service: EventSourcingService<EventType, ProjectionTypes>;
+  service: PipelineService<EventType>;
   metadata: PipelineMetadata;
 }
 

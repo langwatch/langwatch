@@ -73,6 +73,7 @@ export type {
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   PipelineWithCommandHandlers,
+  PipelineService,
   RegisteredPipeline,
 } from "./pipeline/types.ts";
 export type { MapEventHandlers } from "./projections/abstractMapProjection.ts";

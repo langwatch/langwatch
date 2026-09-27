@@ -192,6 +192,27 @@ export class QueuedCommandPayloadInvalidError extends NonRetryableGroupQueueErro
 }
 
 /**
+ * A dequeued job whose payload its lane's schema no longer reads. Non-retryable, so the queue
+ * dead-letters it at once (kept and redrivable) instead of retrying into a group quarantine.
+ */
+export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
+  override readonly name = "QueuedPayloadInvalidError";
+  readonly jobPath: string;
+  readonly issues: { path: string; code: string; message: string }[];
+
+  constructor(params: {
+    jobPath: string;
+    issues: { path: string; code: string; message: string }[];
+  }) {
+    super(
+      `Queued payload for "${params.jobPath}" failed its schema at dispatch; refusing it so the queue dead-letters it`,
+    );
+    this.jobPath = params.jobPath;
+    this.issues = params.issues;
+  }
+}
+
+/**
  * Error thrown when validation fails (invalid data, missing fields, etc.).
  */
 export class ValidationError extends CriticalError {

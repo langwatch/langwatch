@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { DeduplicationConfig } from "../../queues/index.ts";
 import type { JobDelivery } from "../../queues/queue.types.ts";
+import { mapValidationIssues } from "../../utils/errors.ts";
+import { QueuedPayloadInvalidError, ValidationError } from "../errorHandling.ts";
 
 type SpanAttributes = Record<string, string | number | boolean>;
 
@@ -75,19 +77,53 @@ function tenantsOf<P>(lane: JobLane<P>, payload: P): JobTenants {
   };
 }
 
+/** A schema refusal read structurally, so either Zod major's error is recognised. */
+const schemaRefusalSchema = z.object({
+  issues: z.array(
+    z.object({
+      path: z.array(z.union([z.string(), z.number()])),
+      code: z.string(),
+      message: z.string(),
+    }),
+  ),
+});
+
+/** Parses a dequeued payload; one its schema no longer reads is refused non-retryably, by path. */
+function parseDequeued<P>(lane: JobLane<P>, jobPath: string, payload: unknown): P {
+  try {
+    return lane.parse(payload);
+  } catch (error) {
+    const refusal = schemaRefusalSchema.safeParse(error);
+    if (refusal.success) {
+      throw new QueuedPayloadInvalidError({
+        jobPath,
+        issues: mapValidationIssues(refusal.data.issues),
+      });
+    }
+    if (error instanceof ValidationError) {
+      throw new QueuedPayloadInvalidError({
+        jobPath,
+        issues: [{ path: error.field ?? "", code: "undeclared", message: error.reason }],
+      });
+    }
+    throw error;
+  }
+}
+
 export function sealJobLane<P>(
   lane: JobLane<P>,
   namespaceDedupId: (id: string) => string,
+  jobPath = "job",
 ): JobRegistryEntry {
   const processBatch = lane.processBatch;
   return {
     read: (payload) => {
-      const parsed = lane.parse(payload);
+      const parsed = parseDequeued(lane, jobPath, payload);
       return { ...tenantsOf(lane, parsed), run: (delivery) => lane.process(parsed, delivery) };
     },
     readBatch: processBatch
       ? (payloads) => {
-          const parsed = payloads.map((payload) => lane.parse(payload));
+          const parsed = payloads.map((payload) => parseDequeued(lane, jobPath, payload));
           return {
             jobs: parsed.map((payload) => tenantsOf(lane, payload)),
             run: (delivery) => processBatch(parsed, delivery),

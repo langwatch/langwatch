@@ -464,9 +464,9 @@ export class EventSourcing {
     const commandProcessors = pipeline.service.getCommandQueues();
     const dispatchers = Object.fromEntries(commandProcessors);
 
-    const result = Object.assign(pipeline, {
-      commands: dispatchers,
-    });
+    const result: RegisteredPipeline<EventType, ProjectionTypes> & {
+      commands: typeof dispatchers;
+    } = Object.assign(pipeline, { commands: dispatchers });
 
     this.pipelines.set(definition.metadata.name, result);
     return result as ReturnType;
