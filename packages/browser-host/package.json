@@ -46,6 +46,10 @@
       "types": "./dist/use-router.d.ts",
       "default": "./src/use-router.ts"
     },
+    "./browser-notifications": {
+      "types": "./dist/browser-notifications.d.ts",
+      "default": "./src/browser-notifications.ts"
+    },
     "./toaster": {
       "types": "./dist/toaster.d.ts",
       "default": "./src/toaster.ts"

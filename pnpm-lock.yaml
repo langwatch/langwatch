@@ -9623,6 +9623,9 @@ importers:
       '@langwatch/ui-kernel':
         specifier: workspace:*
         version: link:../../../packages/ui-kernel
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       '@tanstack/react-virtual':
         specifier: 'catalog:'
         version: 3.14.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

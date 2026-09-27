@@ -51,6 +51,7 @@ import {
   stripReasoningTitles,
 } from "../../../../model/langy-reasoning-titles.ts";
 import { sayToolText } from "../../../../model/langy-say-tool.ts";
+import { offerNotificationsCallId } from "../../../../model/langy-notifications.ts";
 import { secretSnippetCalls } from "../../../../model/langy-secret-snippet-tool.ts";
 import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
 import {
@@ -65,6 +66,7 @@ import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.t
 import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
 import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangySecretSnippetCard } from "../../../../ui/sections/derived-cards/langy-secret-snippet-card.tsx";
+import { LangyNotificationsOfferCard } from "./langy-notifications-offer-card.tsx";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { LangyGuidedPrCard } from "../elements/github/langy-guided-pr-card.tsx";
 import { GuidedTourCard } from "./derived-cards/guided-tour-card.tsx";
@@ -251,6 +253,9 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
   const codeAccessCall = useMemo(() => codeAccessCallId(parts), [parts]);
   const codeAccessDescribe = useMemo(() => codeAccessOffersDescribe(parts), [parts]);
   const secretSnippets = useMemo(() => secretSnippetCalls(parts), [parts]);
+  // The notifications offer (`offer_notifications`). The answer lives on the account, so the
+  // card reads it there and a reload shows what was chosen.
+  const offersNotifications = useMemo(() => offerNotificationsCallId(parts) !== null, [parts]);
   const pullRequestLinks = useMemo(() => pullRequestLinksFromToolParts(parts), [parts]);
   // The live turn prefers the manager's typed plan snapshot; settled ones do not subscribe.
   const livePlan = useLangyStore((s) => (isStreaming ? s.turnPlan : null));
@@ -269,6 +274,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     codeAccessCall,
     codeAccessDescribe,
     secretSnippets,
+    offersNotifications,
     pullRequestLinks,
     plan,
     feedbackDirective,
@@ -299,6 +305,7 @@ function answerHasContent(reading: AnswerReading): boolean {
     reading.displayText ||
     reading.hasBlocks ||
     cardCount > 0 ||
+    reading.offersNotifications ||
     reading.showsActivity ||
     reading.plan,
   );
@@ -492,6 +499,11 @@ function AnswerCards({
           <LangySecretSnippetCard organizationId={organizationId} call={call} />
         </LangyCardBoundary>
       ))}
+      {reading.offersNotifications ? (
+        <LangyCardBoundary scope="the notifications card">
+          <LangyNotificationsOfferCard />
+        </LangyCardBoundary>
+      ) : null}
     </>
   );
 }

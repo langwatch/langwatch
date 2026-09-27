@@ -106,6 +106,8 @@ export function useLangyLocalWaits({
     questionCardsByToolCall,
     awaitingAnswer,
     workspace: localWorkspace.data,
+    /** The folder read has answered once, so the waits above are a baseline, not a guess. */
+    workspaceFetched: localWorkspace.isFetched,
     // The ask holding the turn is open in the sharing terminal too, so both places are named.
     terminalConnected: localWorkspace.data?.connected === true,
   };

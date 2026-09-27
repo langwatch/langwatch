@@ -14,6 +14,7 @@ import type { organizationTrpc } from "@langwatch/organization-contract";
 import type { promptTrpc } from "@langwatch/prompt-contract";
 import type { secretTrpc } from "@langwatch/secret-contract";
 import type { tracesTrpc } from "@langwatch/trace-contract";
+import type { userTrpc } from "@langwatch/user-contract";
 
 export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof modelProviderTrpc> &
@@ -27,7 +28,8 @@ export type LangyApiMap = ContractApiMap<typeof langyTrpc> &
   ContractApiMap<typeof datasetTrpc> &
   ContractApiMap<typeof promptTrpc> &
   ContractApiMap<typeof experimentsTrpc> &
-  ContractApiMap<typeof secretTrpc>;
+  ContractApiMap<typeof secretTrpc> &
+  ContractApiMap<typeof userTrpc>;
 
 /** What each procedure in the map answers, as the browser receives it. */
 export type RouterOutputs = OutputsFromMap<LangyApiMap>;

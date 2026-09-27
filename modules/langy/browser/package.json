@@ -55,6 +55,7 @@
     "@langwatch/trace-browser-kit": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@tanstack/react-virtual": "catalog:",
     "ai": "catalog:",
     "lucide-react": "catalog:",
