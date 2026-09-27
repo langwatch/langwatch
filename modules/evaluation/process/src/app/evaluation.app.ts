@@ -81,6 +81,8 @@ import {
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../services/evaluation-inputs-offload.service.ts";
+import { EvaluationModelCascadeService } from "../services/evaluation-model-cascade.service.ts";
+import { EvaluationMonitorLookupService } from "../services/evaluation-monitor-lookup.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import {
   EvaluationProcessingService,
@@ -89,6 +91,7 @@ import {
 } from "../services/evaluation-processing.service.ts";
 import { EvaluationRetentionFloorService } from "../services/evaluation-retention-floor.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
+import { EvaluationSavedEvaluatorService } from "../services/evaluation-saved-evaluator.service.ts";
 import { EvaluationSettingsRecoverySwitchService } from "../services/evaluation-settings-recovery-switch.service.ts";
 import { EvaluationSpanDigestService } from "../services/evaluation-span-digest.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
@@ -251,7 +254,7 @@ export class EvaluationApp implements EvaluationApiContract {
     retention: DataRetentionApi,
     featureFlags: FeatureFlagApi,
     evaluators: EvaluatorApi,
-    /** Read when a queued evaluation runs, never in construction: MonitorApp depends on us. */
+    /** Read per request (queued runs, slug lookups), never in construction: MonitorApp needs us. */
     monitors: MonitorApi,
     /** Wakes trigger matching and graph alerts when an evaluation settles. */
     automations: AutomationApi,
@@ -366,6 +369,9 @@ export class EvaluationApp implements EvaluationApiContract {
         })
       : NullLangevalsChannel.create();
     const telemetry = EvaluationExecutionMetricsService.create();
+    const unavailable = createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME);
+    const monitorLookup = EvaluationMonitorLookupService.create(dependencies.monitors);
+    const costs = EvaluationCostService.create({ repository: repositories.costs });
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
       storage: repositories.inputs,
@@ -401,7 +407,17 @@ export class EvaluationApp implements EvaluationApiContract {
 
     return EvaluationApp.fromInfrastructure({
       infrastructure: {
-        ...createUnavailableEvaluationInfrastructure(EVALUATION_PROCESS_NAME),
+        ...unavailable,
+        slugs: {
+          findMonitorBySlug: (input) => monitorLookup.findMonitorBySlug(input),
+          findDatasetBySlug: (input) => unavailable.slugs.findDatasetBySlug(input),
+        },
+        savedEvaluators: EvaluationSavedEvaluatorService.create(dependencies.evaluators),
+        models: EvaluationModelCascadeService.create(dependencies.modelProviders),
+        ledger: {
+          recordCost: (input) => costs.recordEntry(input),
+          recordDatasetRow: (input) => unavailable.ledger.recordDatasetRow(input),
+        },
         retentionFloor: EvaluationRetentionFloorService.create(dependencies.retention),
         execution,
         inputResolution: inputs,
@@ -431,7 +447,7 @@ export class EvaluationApp implements EvaluationApiContract {
         }),
         executionReceipt: EvaluationExecutionReceiptService.create({
           execution,
-          costs: EvaluationCostService.create({ repository: repositories.costs }),
+          costs,
         }),
       }),
       eventing: EvaluationEventingService.create({

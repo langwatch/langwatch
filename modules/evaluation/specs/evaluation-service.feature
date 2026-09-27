@@ -93,6 +93,32 @@ Feature: Evaluation service boundary
     And a row belonging to another project is never read back for this one
 
   @unit
+  Scenario: A public evaluate call writes its cost to the ledger
+    Given an evaluate call whose evaluator reported a cost
+    When the cost is recorded
+    Then the ledger holds one entry under the id the call chose, inside its project only
+
+  @unit
+  Scenario: An evaluate call reads the monitor it names by slug from the monitor module
+    Given a process that installs the evaluation feature beside a monitor owner
+    When an evaluate call names a monitor slug the project holds
+    Then the monitor's id, name, check type, settings and enabled flag come back
+    And a slug the project does not hold answers no monitor rather than an error
+
+  @unit
+  Scenario: An evaluate call resolves a saved evaluator through the evaluator module
+    Given a process that installs the evaluation feature beside an evaluator owner
+    When an evaluate call names a saved evaluator by slug or id
+    Then the evaluator's check type, settings, name, id and required fields come back
+    And an evaluator the project does not hold is refused with the owner's own code
+
+  @unit
+  Scenario: An evaluate call reads the project's default models from the cascade
+    Given a process that installs the evaluation feature beside a model provider owner
+    When an evaluate call asks for the model a feature resolves to
+    Then the cascade's model comes back, and nothing when the cascade sets none
+
+  @unit
   Scenario: An installed evaluation module reads back the runs it wrote
     Given a process that installs the evaluation module over its repositories
     When a run is upserted for a trace

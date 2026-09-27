@@ -1,3 +1,5 @@
+import type { EvaluationCostRecord, EvaluationSlugMatch } from "@langwatch/evaluation-contract";
+
 import { type EvaluationCostRecorder } from "../app/evaluation.members.ts";
 import {
   EvaluationCostAlreadyRecordedError,
@@ -57,5 +59,12 @@ export class EvaluationCostService implements EvaluationCostRecorder {
 
       return recorded.id;
     }
+  }
+
+  /** One ledger entry a public evaluate door shaped, written as main writes it. */
+  async recordEntry(input: EvaluationCostRecord): Promise<EvaluationSlugMatch> {
+    await this.#repository.createEntry(input);
+
+    return { id: input.id };
   }
 }

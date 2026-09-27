@@ -81,6 +81,20 @@ function contractCases(backend: Backend): void {
       expect(written.mappings).toEqual({ mapping: {}, expansions: [] });
     });
 
+    /** @scenario "A monitor is found by its slug inside its own project" */
+    it("finds it by its slug inside that project and nowhere else", async () => {
+      const written = await backend.repository().create(creation({ name: "By slug" }));
+
+      await expect(
+        backend.repository().findBySlug({ projectId: backend.projectId(), slug: written.slug }),
+      ).resolves.toMatchObject([{ id: written.id, name: "By slug" }]);
+      await expect(
+        backend
+          .repository()
+          .findBySlug({ projectId: backend.otherProjectId(), slug: written.slug }),
+      ).resolves.toEqual([]);
+    });
+
     it("answers the id holding a taken name, and nothing for a free one", async () => {
       const written = await backend.repository().create(creation({ name: "Taken" }));
 

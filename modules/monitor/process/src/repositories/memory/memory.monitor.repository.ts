@@ -115,6 +115,12 @@ export class MemoryMonitorRepository implements MonitorRepository {
     return row ? this.#withEvaluator(row) : undefined;
   }
 
+  async findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
+    return this.#rows
+      .filter((row) => row.projectId === input.projectId && row.slug === input.slug)
+      .map((row) => this.#withEvaluator(row));
+  }
+
   async findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     if (input.monitorIds.length === 0) return [];
 

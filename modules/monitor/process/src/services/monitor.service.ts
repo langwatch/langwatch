@@ -76,6 +76,10 @@ export class MonitorService {
     return this.options.repository.findById(monitorIdInputSchema.parse(input));
   }
 
+  findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
+    return this.options.repository.findBySlug(input);
+  }
+
   getAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]> {
     return this.options.repository.findAllByIds(input);
   }

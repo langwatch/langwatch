@@ -37,6 +37,8 @@ export interface MonitorApi {
   getById(input: MonitorIdInput): Promise<MonitorWithEvaluator>;
   /** One monitor, or `undefined` when the project has none. */
   findById(input: MonitorIdInput): Promise<MonitorWithEvaluator | undefined>;
+  /** The project's monitor carrying this slug, or none. */
+  findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]>;
   isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }>;
   /** Refuses by name when this check cannot run; answers nothing when it can. */
   assertCheckRunnable(input: MonitorRunnableCheckInput): Promise<void>;

@@ -180,6 +180,10 @@ export class MonitorApp implements MonitorApi {
     return this.#monitors.findById(input);
   }
 
+  findBySlug(input: { projectId: string; slug: string }): Promise<MonitorWithEvaluator[]> {
+    return this.#monitors.findBySlug(input);
+  }
+
   isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {
     return this.#monitors.isNameAvailable(input);
   }
