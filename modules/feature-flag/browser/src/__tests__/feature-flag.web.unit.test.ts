@@ -25,7 +25,7 @@ describe("given a browser that installs feature-flag", () => {
   });
 
   describe("when the surface the declaration publishes is asked for", () => {
-    it("resolves the operator catalogue view", async () => {
+    it("resolves the experiment catalogue surface", async () => {
       const publication = featureFlagWeb.installation.publications["surfaces/experiment-catalogue"];
       const loaded = await publication?.load();
 

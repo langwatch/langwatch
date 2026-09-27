@@ -10357,9 +10357,6 @@ importers:
       '@langwatch/enterprise-sso-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/sso/contract
-      '@langwatch/feature-flag-browser':
-        specifier: workspace:*
-        version: link:../../feature-flag/browser
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract

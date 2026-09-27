@@ -42,9 +42,6 @@
       "path": "../../../enterprise/modules/sso/contract/tsconfig.build.json"
     },
     {
-      "path": "../../feature-flag/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {

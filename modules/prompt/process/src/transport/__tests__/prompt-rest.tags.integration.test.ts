@@ -4,12 +4,13 @@
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { PromptTag } from "@langwatch/prisma-client/generated";
+import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
 import {
   PromptTagMissingError,
   PromptTagNotFoundError,
   type PromptApi,
 } from "@langwatch/prompt-contract";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaPromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
@@ -26,79 +27,93 @@ class DuplicateTagError extends Error {
  * The tag table, in memory: enough of `promptTag` for the repository, plus the
  * two tables its delete-by-name transaction sweeps.
  */
-function inMemoryTagDatabase() {
+function inMemoryTagDatabase(): PromptTagDatabase {
   const rows: PromptTag[] = [];
   let clock = 0;
 
-  const matches = (row: PromptTag, where: Record<string, unknown>) =>
+  const matches = (row: PromptTag, where: unknown) =>
+    typeof where !== "object" ||
+    where === null ||
     Object.entries(where).every(([key, value]) => row[key as keyof PromptTag] === value);
+  const clashes = (write: TagWrite) =>
+    rows.some((row) => row.organizationId === write.organizationId && row.name === write.name);
 
   const promptTag = {
-    create: ({ data }: { data: Record<string, unknown> }) => {
-      if (
-        rows.some((row) => row.organizationId === data.organizationId && row.name === data.name)
-      ) {
-        return Promise.reject(new DuplicateTagError("Unique constraint failed"));
-      }
-      const row = {
-        ...data,
-        createdAt: new Date(++clock),
-        updatedAt: new Date(clock),
-        updatedById: null,
-      } as unknown as PromptTag;
+    create: ({ data }: { data: unknown }) => {
+      if (!isTagWrite(data)) return Promise.reject(new Error("unexpected tag write"));
+      if (clashes(data)) return Promise.reject(new DuplicateTagError("Unique constraint failed"));
+      const row = storedTag({ write: data, at: ++clock });
       rows.push(row);
       return Promise.resolve(row);
     },
-    createMany: ({
-      data,
-      skipDuplicates,
-    }: {
-      data: Record<string, unknown>[];
-      skipDuplicates?: boolean;
-    }) => {
-      for (const entry of data) {
-        const clash = rows.some(
-          (row) => row.organizationId === entry.organizationId && row.name === entry.name,
-        );
-        if (clash && skipDuplicates) continue;
-        if (clash) return Promise.reject(new DuplicateTagError("Unique constraint failed"));
-        rows.push({
-          ...entry,
-          createdAt: new Date(++clock),
-          updatedAt: new Date(clock),
-          updatedById: null,
-        } as unknown as PromptTag);
+    createMany: (args?: { data?: unknown; skipDuplicates?: boolean }) => {
+      const entries = Array.isArray(args?.data) ? args.data : [args?.data];
+      for (const entry of entries) {
+        if (!isTagWrite(entry)) return Promise.reject(new Error("unexpected tag write"));
+        if (clashes(entry) && args?.skipDuplicates) continue;
+        if (clashes(entry)) {
+          return Promise.reject(new DuplicateTagError("Unique constraint failed"));
+        }
+        rows.push(storedTag({ write: entry, at: ++clock }));
       }
-      return Promise.resolve({ count: data.length });
+      return Promise.resolve({ count: entries.length });
     },
-    findMany: ({ where }: { where: Record<string, unknown> }) =>
+    findMany: (args?: { where?: unknown }) =>
       Promise.resolve(
         rows
-          .filter((row) => matches(row, where))
+          .filter((row) => matches(row, args?.where))
           .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
       ),
-    findFirst: ({ where }: { where: Record<string, unknown> }) =>
-      Promise.resolve(rows.find((row) => matches(row, where)) ?? null),
-    delete: ({ where }: { where: Record<string, unknown> }) => {
-      const at = rows.findIndex((row) => matches(row, where));
+    findFirst: (args?: { where?: unknown }) =>
+      Promise.resolve(rows.find((row) => matches(row, args?.where)) ?? null),
+    delete: (args: { where?: unknown }) => {
+      const at = rows.findIndex((row) => matches(row, args.where));
       return Promise.resolve(at === -1 ? null : rows.splice(at, 1)[0]);
     },
-    deleteMany: ({ where }: { where: Record<string, unknown> }) => {
-      const kept = rows.filter((row) => !matches(row, where));
+    deleteMany: (args?: { where?: unknown }) => {
+      const kept = rows.filter((row) => !matches(row, args?.where));
       const count = rows.length - kept.length;
       rows.splice(0, rows.length, ...kept);
       return Promise.resolve({ count });
     },
   };
 
-  const client = {
+  const client: PrismaClient = prismaDouble({
     promptTag,
     project: { findMany: () => Promise.resolve([]) },
     promptTagAssignment: { deleteMany: () => Promise.resolve({ count: 0 }) },
-    $transaction: (run: (tx: unknown) => Promise<unknown>) => run(client),
-  };
+    $transaction: (run: (tx: PrismaClient) => Promise<unknown>) => run(client),
+  });
 
-  return client as unknown as PromptTagDatabase;
+  return client;
+}
+
+type TagWrite = { id: string; organizationId: string; name: string; createdById?: unknown };
+
+function isTagWrite(value: unknown): value is TagWrite {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "id" in value &&
+    typeof value.id === "string" &&
+    "organizationId" in value &&
+    typeof value.organizationId === "string" &&
+    "name" in value &&
+    typeof value.name === "string"
+  );
+}
+
+/** A tag row as the table stores it, from the data a write carried. */
+function storedTag({ write, at }: { write: TagWrite; at: number }): PromptTag {
+  return {
+    id: write.id,
+    organizationId: write.organizationId,
+    name: write.name,
+    createdAt: new Date(at),
+    updatedAt: new Date(at),
+    createdById: typeof write.createdById === "string" ? write.createdById : null,
+    updatedById: null,
+  };
 }
 
 function buildApi() {
