@@ -15,7 +15,7 @@ vi.mock("@langwatch/analytics-browser-kit", async (importOriginal) => ({
   usePeriodSelector: () => ({ ...period, setRelativePeriod }),
 }));
 
-vi.mock("@langwatch/analytics-browser/surfaces/custom-graph", () => ({
+vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
   CustomGraph: ({
     emptyState,
     input,

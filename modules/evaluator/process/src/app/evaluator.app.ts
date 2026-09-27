@@ -37,13 +37,12 @@ import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { MonitorApi } from "@langwatch/monitor-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
-import { EvaluatorGraphAdapter } from "../repositories/prisma/prisma.evaluator-graph.repository.ts";
 import { evaluatorPlatformUrl } from "../rules/evaluator-platform-url.rules.ts";
 import { findTraceIdsPassingPreconditions } from "../rules/precondition-trace-data.rules.ts";
 import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execution.service.ts";
@@ -53,11 +52,7 @@ import { EvaluatorReplicationService } from "../services/evaluator-replication.s
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts";
 
-/**
- * The workflow and monitor rows an evaluator is entangled with. Both belong to
- * other modules, so the process reads and writes them; this module only says
- * what it needs of them.
- */
+/** The workflow and monitor rows an evaluator is entangled with, read through their owners. */
 export interface EvaluatorGraph {
   /** The evaluator's linked workflow, scoped to the project and not archived. */
   findLinkedWorkflow: (
@@ -96,7 +91,6 @@ export interface EvaluatorGraph {
  * absent where the deployment named no `BASE_HOST`.
  */
 type EvaluatorMembers = Readonly<{
-  prisma: PrismaClient;
   publicBaseUrl: string | undefined;
 }>;
 
@@ -129,14 +123,16 @@ export class EvaluatorApp implements EvaluatorApi {
     workflows: WorkflowApi,
     /** Resolves the project's default and embeddings models. */
     modelProviders: ModelProviderApi,
+    /** The monitors that run an evaluator, read and removed with its cascade. */
+    monitors: MonitorApi,
   };
-  /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["prisma", "publicBaseUrl"] as const;
+  /** From the process's vocabulary; boot refuses by name. */
+  static readonly reads = ["publicBaseUrl"] as const;
 
   static create(setup: EvaluatorSetup): EvaluatorApp {
     const graph = EvaluatorLinkedRowsService.create({
       workflows: setup.dependencies.workflows,
-      monitors: EvaluatorGraphAdapter.create({ prisma: setup.members.prisma }),
+      monitors: setup.dependencies.monitors,
     });
 
     return EvaluatorApp.createWithGraph(setup, graph);

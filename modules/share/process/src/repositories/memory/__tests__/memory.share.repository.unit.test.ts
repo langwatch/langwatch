@@ -79,4 +79,27 @@ describe("MemoryShareRepository", () => {
       await expect(repository.findAllByResource(traceScope)).resolves.toEqual([]);
     });
   });
+
+  describe("given a link stored under the older nanoid id format", () => {
+    it("still reads back by that id", async () => {
+      const { memory, repository } = build();
+      const minted = await repository.create({ ...traceScope, token: "tok_legacy" });
+      const legacyId = "V1StGXR8_Z5jdHi6B-myT";
+      memory.links.splice(0, memory.links.length, { ...minted, id: legacyId });
+
+      await expect(
+        repository.findById({ id: legacyId, projectId: PROJECT_ID }),
+      ).resolves.toMatchObject({ id: legacyId, token: "tok_legacy" });
+    });
+  });
+
+  describe("when a link is minted", () => {
+    it("mints a share KSUID", async () => {
+      const { repository } = build();
+
+      const link = await repository.create({ ...traceScope, token: "tok_new" });
+
+      expect(link.id).toMatch(/^share_[a-zA-Z0-9]+$/);
+    });
+  });
 });

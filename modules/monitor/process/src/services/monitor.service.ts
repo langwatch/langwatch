@@ -55,6 +55,17 @@ export class MonitorService {
     return this.options.repository.findAll(input);
   }
 
+  async findByEvaluator(input: {
+    projectId: string;
+    evaluatorId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    const monitors = await this.options.repository.findAll({ projectId: input.projectId });
+
+    return monitors
+      .filter((monitor) => monitor.evaluatorId === input.evaluatorId)
+      .map(({ id, name }) => ({ id, name }));
+  }
+
   async listEnabledGuardrailMonitors(
     input: MonitorEnabledGuardrailInput,
   ): Promise<EnabledGuardrailMonitor[]> {

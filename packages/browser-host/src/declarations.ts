@@ -4,9 +4,11 @@
  * to its screens. ARCHITECTURE.md §10.1, "A capability travels by declaration".
  */
 
+import type { SystemStyleObject } from "@chakra-ui/react";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
+import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
 import type { MediaPartProps, ScenarioParameterDefinition } from "@langwatch/scenario-contract";
@@ -37,6 +39,13 @@ export type UiAuthenticationOverviewCardProps = {
 
 /** What a landing hero hands project's lent inline command palette. */
 export type UiHeroAskFieldProps = { placeholder: string };
+
+/** What a screen hands analytics' lent graph: the graph to draw, and what to show when empty. */
+export type UiCustomGraphProps = {
+  input: CustomGraphInput;
+  titleProps?: SystemStyleObject;
+  emptyState?: ReactNode;
+};
 
 /** What a surface hands navigation's lent command palette, drawn inline rather than as the bar. */
 export type UiInlineCommandPaletteProps = { placeholder: string };
@@ -539,6 +548,7 @@ export type UiDeclaredCapabilities = {
     readonly section?: "sign-in" | "provisioning";
   };
   conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  customGraph: UiDeclaredComponent<UiCustomGraphProps>;
   datasetEditorTable: UiDeclaredComponent<UiDatasetEditorTableProps>;
   datasetRecordSync: UiDeclaredComponent<UiDatasetRecordSyncProps>;
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;

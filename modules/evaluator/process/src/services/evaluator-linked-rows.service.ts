@@ -1,20 +1,15 @@
 import { EvaluatorWorkflowVersionRequiredError } from "@langwatch/evaluator-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 type WorkflowReference = Readonly<{ workflowId: string; projectId: string }>;
 type EvaluatorReference = Readonly<{ evaluatorId: string; projectId: string }>;
 
-/** The monitor rows an evaluator's cascade reads and removes; monitor owns them. */
-export type EvaluatorMonitorRows = {
-  findMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ id: string; name: string }[]>;
-  deleteMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ count: number }>;
-};
-
 /** The workflow and monitor rows an evaluator is entangled with, through their owners. */
 export class EvaluatorLinkedRowsService {
   private constructor(
     private readonly workflows: WorkflowApi,
-    private readonly monitors: EvaluatorMonitorRows,
+    private readonly monitors: Pick<MonitorApi, "findByEvaluator" | "delete">,
   ) {}
 
   static create({
@@ -22,7 +17,7 @@ export class EvaluatorLinkedRowsService {
     monitors,
   }: {
     workflows: WorkflowApi;
-    monitors: EvaluatorMonitorRows;
+    monitors: Pick<MonitorApi, "findByEvaluator" | "delete">;
   }): EvaluatorLinkedRowsService {
     return new EvaluatorLinkedRowsService(workflows, monitors);
   }
@@ -37,11 +32,17 @@ export class EvaluatorLinkedRowsService {
   }
 
   findMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ id: string; name: string }[]> {
-    return this.monitors.findMonitorsUsingEvaluator(input);
+    return this.monitors.findByEvaluator(input);
   }
 
-  deleteMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ count: number }> {
-    return this.monitors.deleteMonitorsUsingEvaluator(input);
+  /** Monitors are configuration: the cascade removes each one, through monitor. */
+  async deleteMonitorsUsingEvaluator(input: EvaluatorReference): Promise<{ count: number }> {
+    const monitors = await this.monitors.findByEvaluator(input);
+    for (const monitor of monitors) {
+      await this.monitors.delete({ id: monitor.id, projectId: input.projectId });
+    }
+
+    return { count: monitors.length };
   }
 
   archiveLinkedWorkflow(input: WorkflowReference): Promise<{ id: string }> {

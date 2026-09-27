@@ -1,7 +1,6 @@
 /**
  * Builds EvaluatorApp collaborators; NLP dispatcher is a structural type to
- * avoid module dependencies. The workflow-graph reads and writes themselves
- * live in `repositories/prisma/prisma.evaluator-graph.repository.ts`.
+ * avoid module dependencies.
  */
 import type { EvaluatorNlpDispatcher } from "../services/evaluator-code-execution.service.ts";
 

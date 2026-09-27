@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 
+import { generate } from "@langwatch/ksuid";
+
 export abstract class ProjectCredentials {
   abstract generateProjectId(): string;
   abstract generateApiKey(): string;
@@ -13,8 +15,8 @@ const API_KEY_PREFIX = "sk-lw-";
 const API_KEY_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 const API_KEY_CHARS = 48;
 
-const PROJECT_ID_ALPHABET = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
-const PROJECT_ID_CHARS = 21;
+/** The project's KSUID resource (`KSUID_RESOURCES.PROJECT`); older rows keep their nanoid ids. */
+const PROJECT_KSUID_RESOURCE = "project";
 
 /** Unbiased: a byte is masked to six bits and redrawn when it falls past the alphabet. */
 function randomString({ alphabet, length }: { alphabet: string; length: number }): string {
@@ -38,7 +40,7 @@ export class ProjectCredentialsService extends ProjectCredentials {
   }
 
   generateProjectId(): string {
-    return randomString({ alphabet: PROJECT_ID_ALPHABET, length: PROJECT_ID_CHARS });
+    return generate(PROJECT_KSUID_RESOURCE).toString();
   }
 
   generateApiKey(): string {

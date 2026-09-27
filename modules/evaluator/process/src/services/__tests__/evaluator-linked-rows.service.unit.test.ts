@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { Temporal, toDate } from "@langwatch/time";
 import {
   studioWorkflowSchema,
@@ -9,10 +10,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  EvaluatorLinkedRowsService,
-  type EvaluatorMonitorRows,
-} from "../evaluator-linked-rows.service.ts";
+import { EvaluatorLinkedRowsService } from "../evaluator-linked-rows.service.ts";
 
 const timestamp = toDate(Temporal.Instant.fromEpochMilliseconds(0));
 const dsl = studioWorkflowSchema.parse({
@@ -62,10 +60,7 @@ function linkedWorkflow({ withVersion }: { withVersion: boolean }): WorkflowWith
   };
 }
 
-const monitors: EvaluatorMonitorRows = {
-  findMonitorsUsingEvaluator: async () => [],
-  deleteMonitorsUsingEvaluator: async () => ({ count: 0 }),
-};
+const monitors = createApiFixture<MonitorApi>();
 
 const replication = {
   workflowId: "workflow_1",
@@ -139,6 +134,28 @@ describe("EvaluatorLinkedRowsService", () => {
         workflowId: "workflow_copy",
         projectId: "project_target",
       });
+    });
+  });
+
+  describe("when an archived evaluator's monitors are removed", () => {
+    it("deletes each monitor that runs it, through monitor", async () => {
+      const remove = vi.fn(async () => ({ success: true as const }));
+      const rows = EvaluatorLinkedRowsService.create({
+        workflows: createApiFixture<WorkflowApi>(),
+        monitors: createApiFixture<MonitorApi>({
+          findByEvaluator: async () => [
+            { id: "monitor_1", name: "Guard" },
+            { id: "monitor_2", name: "Tone" },
+          ],
+          delete: remove,
+        }),
+      });
+
+      await expect(
+        rows.deleteMonitorsUsingEvaluator({ evaluatorId: "evaluator_1", projectId: "project_1" }),
+      ).resolves.toEqual({ count: 2 });
+      expect(remove).toHaveBeenCalledWith({ id: "monitor_1", projectId: "project_1" });
+      expect(remove).toHaveBeenCalledWith({ id: "monitor_2", projectId: "project_1" });
     });
   });
 });

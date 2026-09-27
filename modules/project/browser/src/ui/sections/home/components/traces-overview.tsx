@@ -1,13 +1,11 @@
 import { Box, chakra, Grid, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { usePeriodSelector, analyticsMetrics } from "@langwatch/analytics-browser-kit";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "@langwatch/analytics-browser/surfaces/custom-graph";
+import type { UiCustomGraphProps } from "@langwatch/browser-host/declarations";
 import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-browser-kit";
 import { useState } from "react";
 import { LuArrowRight, LuChevronDown, LuChevronRight } from "react-icons/lu";
 
+import { CustomGraph } from "../../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 import { HomeCard } from "./home-card.tsx";
@@ -133,7 +131,7 @@ export function TracesOverview({
   const showTrend =
     trendIsMeaningful && (variant === "trend" || (variant === "strip" && chartOpen));
 
-  const tracesOverviewGraph: CustomGraphInput = {
+  const tracesOverviewGraph: UiCustomGraphProps["input"] = {
     graphId: "tracesOverview",
     graphType: "summary",
     // Langy's own turns trace into the project (ADR-061) but the customer never

@@ -172,6 +172,13 @@ export class MonitorApp implements MonitorApi {
     return this.#monitors.getAllForProject(input);
   }
 
+  findByEvaluator(input: {
+    projectId: string;
+    evaluatorId: string;
+  }): Promise<{ id: string; name: string }[]> {
+    return this.#monitors.findByEvaluator(input);
+  }
+
   getById(input: MonitorIdInput): Promise<MonitorWithEvaluator> {
     return this.#monitors.getById(input);
   }

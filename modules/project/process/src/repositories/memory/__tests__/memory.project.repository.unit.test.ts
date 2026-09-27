@@ -2,6 +2,7 @@ import { PROJECT_KIND, ProjectNotFoundError, type Team } from "@langwatch/projec
 import { fromDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ProjectCredentialsService } from "../../../services/project-credentials.service.ts";
 import { MemoryProjectDatabase } from "../memory.project.database.ts";
 import { MemoryProjectRepository } from "../memory.project.repository.ts";
 
@@ -393,6 +394,27 @@ describe("MemoryProjectRepository", () => {
       });
 
       expect(await repository.findLiveNonGovernanceIds(ORGANIZATION_ID)).toEqual(["project_1"]);
+    });
+  });
+
+  describe("given projects minted under either id format", () => {
+    it("reads back a project minted with a project KSUID", async () => {
+      const { repository } = seeded();
+      const id = ProjectCredentialsService.create().generateProjectId();
+
+      await repository.create({ ...creation, id });
+
+      expect(id).toMatch(/^project_[a-zA-Z0-9]+$/);
+      await expect(repository.findById(id)).resolves.toMatchObject({ id });
+    });
+
+    it("still reads back a project stored under the older nanoid id format", async () => {
+      const { repository } = seeded();
+      const legacyId = "V1StGXR8_Z5jdHi6B-myT";
+
+      await repository.create({ ...creation, id: legacyId });
+
+      await expect(repository.findById(legacyId)).resolves.toMatchObject({ id: legacyId });
     });
   });
 });

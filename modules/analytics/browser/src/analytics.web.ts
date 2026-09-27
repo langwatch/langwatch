@@ -54,6 +54,12 @@ export const analyticsWeb = defineWebModule("analytics")
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
   .withCapabilities({
+    /** A custom graph over the project's traces, lent to modules that chart it (§3.4 rule 7). */
+    customGraph: {
+      load: async () => ({
+        default: (await import("./ui/sections/custom-graph.tsx")).CustomGraph,
+      }),
+    },
     filterSidebar: {
       load: async () => ({
         default: (await import("./ui/sections/filters/filter-sidebar.tsx")).FilterSidebar,
