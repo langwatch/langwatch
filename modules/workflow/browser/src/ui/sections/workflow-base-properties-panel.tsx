@@ -634,11 +634,6 @@ export function WorkflowBasePropertiesPanel({
   const [isEditingName, setIsEditingName] = useState(false);
   const [name, setName] = useState<string | undefined>(undefined);
 
-  const isWorkflow = (node: Node<Component> | StudioWorkflow): node is StudioWorkflow =>
-    !("data" in node);
-  const parsedComponentType = !isWorkflow(node)
-    ? componentTypeSchema.safeParse(node.type)
-    : undefined;
   const nodeDescription = !isWorkflow(node) ? node.data.description : undefined;
 
   const hasHeader = Boolean(header);
@@ -686,64 +681,25 @@ export function WorkflowBasePropertiesPanel({
             <HStack gap={2}>
               {hasHeader && header}
               {!hasHeader && !isWorkflow(node) && (
-                <>
-                  {parsedComponentType?.success &&
-                    renderNodeIcon?.({
-                      type: parsedComponentType.data,
-                      cls: node.data.cls,
-                      size: "lg",
-                    })}
-                  {isEditingName ? (
-                    <NodeNameInput
-                      node={node}
-                      name={name}
-                      setName={setName}
-                      setIsEditingName={setIsEditingName}
-                      handleNameChange={handleNameChange}
-                    />
-                  ) : (
-                    (renderNodeName?.({
-                      name: getNodeDisplayName(node),
-                      onClick: () => {
-                        if (node.type !== "prompting_technique") {
-                          setIsEditingName(true);
-                        }
-                      },
-                      cursor: node.type === "prompting_technique" ? undefined : "pointer",
-                    }) ?? (
-                      <Text fontSize="15px" fontWeight={500}>
-                        {getNodeDisplayName(node)}
-                      </Text>
-                    ))
-                  )}
-                </>
+                <NodeTitle
+                  node={node}
+                  isEditingName={isEditingName}
+                  setIsEditingName={setIsEditingName}
+                  name={name}
+                  setName={setName}
+                  handleNameChange={handleNameChange}
+                  renderNodeIcon={renderNodeIcon}
+                  renderNodeName={renderNodeName}
+                />
               )}
             </HStack>
             <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
               {!isWorkflow(node) && isExecutableComponent(node) && (
-                <>
-                  <HStack
-                    gap={2}
-                    onClick={() => {
-                      if (!propertiesExpanded) {
-                        setPropertiesExpanded(true);
-                      }
-                    }}
-                  >
-                    <ComponentExecutionButton node={node} size="sm" iconSize={16} />
-                  </HStack>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    color="fg.muted"
-                    onClick={() => {
-                      setPropertiesExpanded(!propertiesExpanded);
-                    }}
-                  >
-                    <Columns size={16} />
-                  </Button>
-                </>
+                <ExecutionControls
+                  node={node}
+                  propertiesExpanded={propertiesExpanded}
+                  setPropertiesExpanded={setPropertiesExpanded}
+                />
               )}
               <Button
                 variant="ghost"
@@ -800,5 +756,90 @@ export function WorkflowBasePropertiesPanel({
       )}
       {fieldsAfter}
     </VStack>
+  );
+}
+
+function isWorkflow(node: Node<Component> | StudioWorkflow): node is StudioWorkflow {
+  return !("data" in node);
+}
+
+function NodeTitle({
+  node,
+  isEditingName,
+  setIsEditingName,
+  name,
+  setName,
+  handleNameChange,
+  renderNodeIcon,
+  renderNodeName,
+}: {
+  node: Node<Component>;
+  isEditingName: boolean;
+  setIsEditingName: (editing: boolean) => void;
+  name: string | undefined;
+  setName: (name: string | undefined) => void;
+  handleNameChange: (value: string, id: string) => void;
+  renderNodeIcon?: (props: WorkflowNodeIconProps) => ReactNode;
+  renderNodeName?: (props: WorkflowNodeNameProps) => ReactNode;
+}) {
+  const parsedComponentType = componentTypeSchema.safeParse(node.type);
+  const renamable = node.type !== "prompting_technique";
+  return (
+    <>
+      {parsedComponentType.success &&
+        renderNodeIcon?.({ type: parsedComponentType.data, cls: node.data.cls, size: "lg" })}
+      {isEditingName ? (
+        <NodeNameInput
+          node={node}
+          name={name}
+          setName={setName}
+          setIsEditingName={setIsEditingName}
+          handleNameChange={handleNameChange}
+        />
+      ) : (
+        (renderNodeName?.({
+          name: getNodeDisplayName(node),
+          onClick: () => {
+            if (renamable) setIsEditingName(true);
+          },
+          cursor: renamable ? "pointer" : undefined,
+        }) ?? (
+          <Text fontSize="15px" fontWeight={500}>
+            {getNodeDisplayName(node)}
+          </Text>
+        ))
+      )}
+    </>
+  );
+}
+
+function ExecutionControls({
+  node,
+  propertiesExpanded,
+  setPropertiesExpanded,
+}: {
+  node: Node<Component>;
+  propertiesExpanded: boolean;
+  setPropertiesExpanded: (expanded: boolean) => void;
+}) {
+  return (
+    <>
+      <HStack
+        gap={2}
+        onClick={() => {
+          if (!propertiesExpanded) setPropertiesExpanded(true);
+        }}
+      >
+        <ComponentExecutionButton node={node} size="sm" iconSize={16} />
+      </HStack>
+      <Button
+        variant="ghost"
+        size="sm"
+        color="fg.muted"
+        onClick={() => setPropertiesExpanded(!propertiesExpanded)}
+      >
+        <Columns size={16} />
+      </Button>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import type { StoredProjection } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
 import type { IngestionPullRunStatusData } from "../../../eventing/ingestion-pull-run-status-eventing.projection.ts";
@@ -73,13 +73,8 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
       await runGuard("findUnique", args);
       return null;
     });
-    const prisma = {
-      ingestionPullRunProjection: {
-        findUnique,
-      },
-    };
     const repository = PrismaIngestionPullRunProjectionRepository.create(
-      prisma as unknown as PrismaClient,
+      prismaDouble({ ingestionPullRunProjection: { findUnique } }),
     );
 
     await expect(
@@ -97,20 +92,12 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
     const upsert = vi.fn(async (args: GuardParams["args"]) => {
       await runGuard("upsert", args);
     });
-    const tx = {
-      ingestionPullRunProjection: {
-        upsert,
-      },
-      ingestionSource: {
-        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
-      },
-    };
-    const prisma = {
-      $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
-    };
-    const repository = PrismaIngestionPullRunProjectionRepository.create(
-      prisma as unknown as PrismaClient,
-    );
+    const tx = prismaDouble({
+      ingestionPullRunProjection: { upsert },
+      ingestionSource: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    });
+    const prisma = prismaDouble({ $transaction: vi.fn(async (callback) => callback(tx)) });
+    const repository = PrismaIngestionPullRunProjectionRepository.create(prisma);
 
     await expect(
       repository.store(storedProjection(), {

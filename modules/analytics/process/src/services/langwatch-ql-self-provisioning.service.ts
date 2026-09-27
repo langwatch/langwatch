@@ -7,10 +7,6 @@
 
 import { createHash } from "node:crypto";
 
-import {
-  LWQL_CONNECTION_DEFAULTS,
-  deriveLwqlConnectionFromEnv,
-} from "../langwatch-ql/connection.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
 import { LangWatchQLAccessModelDefinitionService } from "./langwatch-ql-access-model-definition.service.ts";
@@ -19,6 +15,10 @@ import {
   type LangWatchQLNames,
 } from "./langwatch-ql-access-model.service.ts";
 import { LangWatchQLCatalogShapesService } from "./langwatch-ql-catalog-shapes.service.ts";
+import {
+  LangWatchQLConnectionService,
+  LWQL_CONNECTION_DEFAULTS,
+} from "./langwatch-ql-connection.service.ts";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   LangWatchQLPostgresMappingService,
@@ -31,6 +31,7 @@ import { SHIPPED_LWQL_DEDUP } from "./langwatch-ql-view-statements.service.ts";
 const accessModel = LangWatchQLAccessModelService.create();
 const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
 const catalogShapes = LangWatchQLCatalogShapesService.create();
+const connections = LangWatchQLConnectionService.create();
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
@@ -92,7 +93,7 @@ export class LangWatchQLSelfProvisioningService {
    */
   request({ source }: { source: Record<string, string | undefined> }): LwqlSelfProvisionRequest {
     if (!source.LWQL_CLICKHOUSE_PASSWORD) return { requested: false };
-    const connection = deriveLwqlConnectionFromEnv(source);
+    const connection = connections.deriveFromSource({ source });
     if (!connection) {
       return { requested: true, complete: false, missing: "the restricted connection" };
     }

@@ -24,7 +24,6 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 }));
 
 vi.mock("../../../../../behavior/langy-api.ts", () => ({
-  trpcClient: {},
   api: {
     useUtils: () => ({}),
     dashboards: {

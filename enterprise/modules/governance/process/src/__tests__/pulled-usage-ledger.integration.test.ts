@@ -6,7 +6,6 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
  * half read through the gateway's own `check`. ADR-088.
  */
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
-import type { GatewayBudgetSpend } from "@langwatch/gateway-process";
 import {
   GatewayBudgetClickHouseRepository,
   PrismaGatewayAdapter,
@@ -55,6 +54,8 @@ const NEARLY_SPENT_NANO = 990_000_000; // $0.99 of the $1 limit.
 const WINDOW_FROM = new Date("2026-08-01T00:00:00.000Z");
 const WINDOW_TO = new Date("2026-09-01T00:00:00.000Z");
 const BUCKET_AT = new Date("2026-08-03T00:00:00.000Z");
+
+type GatewayBudgetSpend = ReturnType<typeof GatewayBudgetClickHouseRepository.create>;
 
 let budgets: GatewayBudgetSpend;
 let gateway: GatewayService;

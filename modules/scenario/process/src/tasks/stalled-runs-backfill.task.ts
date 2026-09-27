@@ -9,7 +9,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type SimulationStalledRun,
-} from "#repositories/clickhouse/clickhouse.simulation-eventing.repository";
+} from "#eventing/simulation-eventing.store";
 
 export type StalledRunFinder = {
   findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]>;

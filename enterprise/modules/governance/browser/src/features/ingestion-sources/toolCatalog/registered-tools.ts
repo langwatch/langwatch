@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AiToolEntry, AiToolTileType } from "../../ai-tools/model/ai-tool-tile.ts";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+
+import type { AiToolTileType } from "../../ai-tools/model/ai-tool-tile.ts";
 import { TOOL_CARD_ROWS, type ToolCard, type ToolCardBadge, type ToolCardRow } from "./tool-cards";
 
 /**
@@ -298,6 +300,6 @@ export function asRegisteredTools(entries: readonly AiToolEntry[] | undefined): 
     type: entry.type,
     iconAsset: entry.iconAsset ?? null,
     enabled: entry.enabled,
-    config: entry.config as unknown as Record<string, unknown>,
+    config: entry.config,
   }));
 }

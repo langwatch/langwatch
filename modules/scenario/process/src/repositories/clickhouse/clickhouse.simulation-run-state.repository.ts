@@ -17,8 +17,6 @@ import type {
   SimulationRunState,
   SimulationRunStateData,
 } from "../../eventing/simulation-run-state.projection.ts";
-import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
-import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
@@ -30,7 +28,9 @@ import {
   columnsToEvaluations,
   EVALUATION_COLUMNS_SQL,
   evaluationsToColumns,
-} from "./simulation-evaluations.columns.ts";
+} from "../../rules/simulation-evaluation-columns.rules.ts";
+import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
 
 const TABLE_NAME = "simulation_runs" as const;
 

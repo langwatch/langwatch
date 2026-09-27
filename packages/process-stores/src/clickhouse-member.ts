@@ -1,6 +1,6 @@
 /** One ClickHouse client that routes itself. Modules never resolve endpoints
  * because every statement carries tenantId filtering, enforced by this driver. */
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
 import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
@@ -19,10 +19,7 @@ import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "@langwatch/eventing";
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 
-/**
- * The vendor client, built once per physical endpoint this process reaches. ISO
- * timestamps parse as main's managed client parsed them (best_effort).
- */
+/** The vendor client, built once per physical endpoint this process reaches. */
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
   constructor(private readonly config: ClickHouseConfig) {
     super();
@@ -35,12 +32,16 @@ class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseCl
       ...(this.config.requestTimeoutMs === undefined
         ? {}
         : { request_timeout: this.config.requestTimeoutMs }),
-      clickhouse_settings: {
-        date_time_input_format: "best_effort",
-        ...(this.config.settings as Record<string, never> | undefined),
-      },
+      clickhouse_settings: vendorClickHouseSettings(this.config.settings),
     });
   }
+}
+
+/** JS Dates travel as ISO strings, which ClickHouse parses only best-effort, as main always set. */
+export function vendorClickHouseSettings(
+  settings: ClickHouseConfig["settings"],
+): ClickHouseSettings {
+  return { date_time_input_format: "best_effort", ...settings };
 }
 
 /**

@@ -289,19 +289,15 @@ function GovernanceHostHarness({
 function installBrowserApisJsdomLacks(): void {
   if (typeof window === "undefined") return;
   if (!window.matchMedia) {
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      writable: true,
-      value: (query: string) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        dispatchEvent: () => false,
-      }),
+    window.matchMedia = (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
     });
   }
   if (!window.Element.prototype.scrollIntoView) {
@@ -319,15 +315,11 @@ function installBrowserApisJsdomLacks(): void {
     });
   }
   if (!window.ResizeObserver) {
-    Object.defineProperty(window, "ResizeObserver", {
-      configurable: true,
-      writable: true,
-      value: class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      },
-    });
+    window.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
   }
 }
 

@@ -437,12 +437,18 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
   // script itself.
   describe("given the marker is held by somebody else", () => {
     describe("when the fenced write script runs", () => {
+      let counterKey = "";
+      let driftKey = "";
+
+      beforeEach(async () => {
+        const prefix = `${queueName}:gq:`;
+        counterKey = `${prefix}stats:total-pending`;
+        driftKey = `${prefix}stats:pending-drift`;
+        await redis.del(counterKey, driftKey);
+      });
+
       /** @scenario A pass that loses the marker publishes neither the count nor the drift */
       it("writes neither the counter nor the drift", async () => {
-        const prefix = `${queueName}:gq:`;
-        const counterKey = `${prefix}stats:total-pending`;
-        const driftKey = `${prefix}stats:pending-drift`;
-        await redis.del(counterKey, driftKey);
         await redis.set(markerKey, "another-instances-token");
 
         const wrote = await redis.eval(
@@ -463,10 +469,6 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.reconcileTotalPending", () => {
       });
 
       it("writes both once the marker is ours", async () => {
-        const prefix = `${queueName}:gq:`;
-        const counterKey = `${prefix}stats:total-pending`;
-        const driftKey = `${prefix}stats:pending-drift`;
-        await redis.del(counterKey, driftKey);
         await redis.set(markerKey, "our-token");
 
         const wrote = await redis.eval(

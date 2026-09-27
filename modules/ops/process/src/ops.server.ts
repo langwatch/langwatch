@@ -32,9 +32,7 @@ export const opsServer = defineServerModule("ops")
   // precedence the project door reads a token at (Basic, Bearer,
   // X-Auth-Token). Unverified: a bad token still files the report.
   .withTransportFacts(() => [
-    bindRestMiddleware(bugReportCredential, (context) =>
-      apiKeyRequestCredentialOf(context.req.raw),
-    ),
+    bindRestMiddleware(bugReportCredential, (context) => extractRequestCredential(context.req.raw)),
   ])
   .withEventing(usageReportEventing)
   .withEventing(anomalyDetectionEventing)
@@ -44,7 +42,7 @@ export const opsServer = defineServerModule("ops")
   ]);
 
 /** One request's presented project credential, unverified, or none at all. */
-function apiKeyRequestCredentialOf(
+function extractRequestCredential(
   request: Request,
 ): { token: string; projectId: string | null } | null {
   const authorization = request.headers.get("authorization");

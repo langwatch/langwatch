@@ -236,7 +236,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     };
   }
 
-  async tryFindById({
+  async findById({
     queueName,
     projectId,
     hash,
@@ -244,15 +244,14 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
     queueName: string;
     projectId: string;
     hash: string;
-  }): Promise<OpsBlobSummary | null> {
+  }): Promise<OpsBlobSummary[]> {
     const key = redisBlobKey({
       queueName,
       projectId: createTenantId(projectId),
       hash,
     });
     const facts = await this.describe(queueName, [key]);
-    const [summary] = await this.withOutcomes(queueName, facts);
-    return summary ?? null;
+    return this.withOutcomes(queueName, facts);
   }
 
   /** Batches the per-blob reads so a page of 200 is a handful of round trips, not 800. */

@@ -23,9 +23,9 @@ export { HttpLitellmModelChannel } from "./channels/http/http.litellm-model.chan
 export type { LitellmModelChannel, LitellmModelInput } from "./channels/litellm-model.channel.ts";
 export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
 export type { NlpFetchChannel, NlpFetchTimeouts } from "./channels/nlp-fetch.channel.ts";
-export * from "./services/node-scenario-child-process.service.ts";
-export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
-export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
+export * from "./services/node-scenario-child.service.ts";
+export { ScenarioProcessorMetricsService } from "./services/scenario-processor-metrics.service.ts";
+export * from "./channels/redis/redis.scenario-cancellation.channel.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
 export * from "./services/scenario-child-execution.service.ts";
 export * from "./channels/serialized-agent-channels.registry.ts";
@@ -35,11 +35,11 @@ export * from "./channels/http/http.serialized-prompt-config.channel.ts";
 export * from "./channels/http/http.serialized-workflow-agent.channel.ts";
 export {
   BACKFILL_STALE_THRESHOLD_MS,
-  SimulationRunMetricsStoreAdapter,
-  SimulationRunStateStoreAdapter,
-  SimulationStalledRunAdapter,
+  SimulationRunMetricsStore,
+  SimulationRunStateStore,
+  SimulationStalledRunStore,
   type SimulationStalledRun,
-} from "./repositories/clickhouse/clickhouse.simulation-eventing.repository.ts";
+} from "./eventing/simulation-eventing.store.ts";
 export * from "./eventing/simulation-processing.commands.ts";
 export {
   SimulationProcessingPipelineAdapter,

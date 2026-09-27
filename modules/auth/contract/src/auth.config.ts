@@ -1,15 +1,22 @@
 import { Config, signInProviders, type ConfigOf } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
+import { SignInMethodPolicyService } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 /**
  * Browser-session identity. Secret and URL are a refinement (both or neither);
- * mfaEnrollmentOpen and passkeysEnabled are literal "on", other values refused.
+ * mfaEnrollmentOpen is literal "on"; passkeys are offered unless "off"; other values refused.
  */
 const onSwitch = z
   .union([z.literal("on"), z.literal("")])
   .optional()
   .transform((value) => value === "on");
+
+/** Passkeys are offered on every deployment an operator has not turned them off on. */
+const passkeySwitch = z
+  .enum(["off", "on"])
+  .optional()
+  .transform((value) => SignInMethodPolicyService.deploymentOffersPasskeys(value));
 
 /** An explicit on/off switch, off when unset. */
 const onOffSwitch = z
@@ -20,7 +27,7 @@ const onOffSwitch = z
 export const authServerConfig = Config.define((c) => ({
   sessionUrl: c.env("NEXTAUTH_URL", z.string().optional()),
   mfaEnrollmentOpen: c.env("MFA_ENROLLMENT_OPEN", onSwitch),
-  passkeysEnabled: c.env("PASSKEYS_ENABLED", onSwitch),
+  passkeysEnabled: c.env("PASSKEYS_ENABLED", passkeySwitch),
   /** Absent falls back to the session secret; a passkey handle must stay stable. */
   passkeyHandleSecret: c.env("PASSKEY_HANDLE_SECRET", z.string().optional()),
   /**

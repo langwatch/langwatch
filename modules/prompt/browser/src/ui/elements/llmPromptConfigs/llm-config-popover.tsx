@@ -1,23 +1,16 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Popover } from "@langwatch/design-system/popover";
-import { allModelOptions, clampMaxTokens } from "@langwatch/model-provider-browser-kit";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
+import { allModelOptions } from "@langwatch/model-provider-browser-kit";
 import {
-  buildModelChangeValues,
-  DEFAULT_SUPPORTED_PARAMETERS,
-  getDisplayParameters,
-  getMaxTokenLimit,
   getParameterConfigWithModelOverrides,
   getParamValue,
   type LLMConfigValues,
-  normalizeMaxTokens,
   ParameterRow,
-  toFormKey,
 } from "@langwatch/prompt-browser-kit";
-import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
+import { useLlmConfigPopoverState } from "../../../behavior/use-llm-config-popover-state.ts";
 import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section.tsx";
 
 // Default output when structured outputs is disabled
@@ -58,96 +51,25 @@ export function LLMConfigPopover({
   showStructuredOutputs = false,
 }: LLMConfigPopoverProps) {
   const { project } = useOrganizationTeamProject();
-
-  // State for tracking which parameter popover is open
-  const [openParameter, setOpenParameter] = useState<string | null>(null);
-  const { modelMetadata } = useModelProvidersSettings({
+  const {
+    currentModelMetadata,
+    reasoningConfig,
+    displayParameters,
+    maxTokenLimit,
+    openParameter,
+    setOpenParameter,
+    handleParamChange,
+    handleModelChange,
+    isStructuredOutputsEnabled,
+    handleStructuredOutputsToggle,
+  } = useLlmConfigPopoverState({
     projectId: project?.id,
+    values,
+    onChange,
+    outputs,
+    onOutputsChange,
+    defaultOutput: DEFAULT_OUTPUT,
   });
-
-  // Get metadata for the currently selected model
-  const currentModelMetadata = values.model ? modelMetadata?.[values.model] : undefined;
-
-  // Get reasoning config for the model
-  const reasoningConfig = currentModelMetadata?.reasoningConfig;
-
-  // Determine which parameters to display
-  // Uses unified 'reasoning' parameter - no provider-specific substitution needed
-  const displayParameters = useMemo(() => {
-    const supportedParams =
-      currentModelMetadata?.supportedParameters ?? DEFAULT_SUPPORTED_PARAMETERS;
-    return getDisplayParameters(supportedParams);
-  }, [currentModelMetadata?.supportedParameters]);
-
-  // Get max token limit for the model
-  const maxTokenLimit = useMemo(() => {
-    return getMaxTokenLimit(currentModelMetadata);
-  }, [currentModelMetadata]);
-
-  // Clamp saved maxTokens against the configured model ceiling.
-  // The configured max (from the custom-model dialog / model metadata) is the
-  // source of truth — a stale form value above it would otherwise display raw
-  // in the collapsed row while the popover silently clamps it, and get persisted
-  // out of bounds on save.
-  useEffect(() => {
-    if (!currentModelMetadata) return;
-    const currentMaxTokens = getParamValue(values, "max_tokens");
-    if (typeof currentMaxTokens !== "number") return;
-    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
-    if (clamped !== undefined && clamped !== currentMaxTokens) {
-      onChange(normalizeMaxTokens(values, clamped));
-    }
-  }, [currentModelMetadata, maxTokenLimit, values, onChange]);
-
-  // Handle parameter change - outputs camelCase keys for form compatibility
-  const handleParamChange = (paramName: string, value: number | string) => {
-    const formKey = toFormKey(paramName);
-
-    if (paramName === "max_tokens") {
-      onChange(normalizeMaxTokens(values, value as number));
-    } else {
-      // Remove BOTH potential keys (snake_case and camelCase) to avoid duplicates
-      // This ensures the new value replaces the old regardless of key format
-      const { [paramName]: _snake, [formKey]: _camel, ...rest } = values as Record<string, unknown>;
-      onChange({ ...rest, [formKey]: value } as LLMConfigValues);
-    }
-  };
-
-  // Structured outputs state
-  const hasNonDefaultOutputs =
-    outputs &&
-    (outputs.length !== 1 || outputs[0]?.identifier !== "output" || outputs[0]?.type !== "str");
-
-  const [isStructuredOutputsEnabled, setIsStructuredOutputsEnabled] = useState(
-    hasNonDefaultOutputs ?? false,
-  );
-
-  // Track user-initiated toggle to prevent race condition with sync effect
-  const userInitiatedToggleRef = useRef(false);
-
-  // Sync state when outputs change externally (e.g., loading a prompt)
-  useEffect(() => {
-    // Skip sync if user just toggled - let the outputs update first
-    if (userInitiatedToggleRef.current) {
-      userInitiatedToggleRef.current = false;
-      return;
-    }
-    if (hasNonDefaultOutputs && !isStructuredOutputsEnabled) {
-      setIsStructuredOutputsEnabled(true);
-    }
-  }, [hasNonDefaultOutputs, isStructuredOutputsEnabled]);
-
-  const handleStructuredOutputsToggle = (checked: boolean) => {
-    if (!onOutputsChange) return;
-    // Guard against duplicate calls from nested click handlers
-    if (checked === isStructuredOutputsEnabled) return;
-
-    userInitiatedToggleRef.current = true;
-    setIsStructuredOutputsEnabled(checked);
-    if (!checked) {
-      onOutputsChange([DEFAULT_OUTPUT]);
-    }
-  };
 
   return (
     <Popover.Content minWidth="260px" maxWidth="100%">
@@ -166,18 +88,7 @@ export function LLMConfigPopover({
           <ModelSelector
             model={values?.model ?? ""}
             options={allModelOptions}
-            onChange={(model) => {
-              const newModelMetadata = modelMetadata?.[model];
-              onChange(
-                buildModelChangeValues(
-                  model,
-                  undefined,
-                  newModelMetadata,
-                  values,
-                  currentModelMetadata,
-                ),
-              );
-            }}
+            onChange={handleModelChange}
             mode="chat"
             size="full"
             showConfigureAction={true}

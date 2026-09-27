@@ -17,6 +17,7 @@ import {
   scenarioVersionListInputSchema,
   scenarioVersionRestoreInputSchema,
   type Scenario,
+  type ScenarioLookup,
   type ScenarioCreateInput,
   type ScenarioTestSuite,
   type ScenarioTestSuiteCreateInput,
@@ -155,8 +156,8 @@ export class ScenarioService {
     return this.options.repository.findById(scenarioIdInputSchema.parse(input));
   }
 
-  tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.options.repository.tryFindByIdIncludingArchived(scenarioIdInputSchema.parse(input));
+  readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup> {
+    return this.options.repository.readByIdIncludingArchived(scenarioIdInputSchema.parse(input));
   }
 
   list(input: { projectId: string }): Promise<Scenario[]> {

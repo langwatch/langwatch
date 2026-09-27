@@ -36,6 +36,7 @@ import {
   type QueueSummaryInfo,
 } from "@langwatch/ops-contract";
 
+import type { OpsExplorers } from "../app/ops.app.ts";
 import type { AnomalyStateRepository } from "../repositories/anomaly.repository.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
 import type { AdminBackofficeService } from "./admin-backoffice.service.ts";
@@ -53,6 +54,10 @@ export class OpsService {
   private readonly scheduler: SchedulerOpsService;
   private readonly anomalyState: AnomalyStateRepository | null;
   private readonly queues: QueueService;
+  readonly eventExplorer: OpsExplorers["eventExplorer"];
+  readonly managerExplorer: OpsExplorers["managerExplorer"];
+  readonly replay: OpsExplorers["replay"];
+  readonly snapshots: OpsExplorers["snapshots"];
 
   private constructor(deps: {
     access: AdminAccess;
@@ -62,7 +67,12 @@ export class OpsService {
     scheduler: SchedulerOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
+    explorers: OpsExplorers;
   }) {
+    this.eventExplorer = deps.explorers.eventExplorer;
+    this.managerExplorer = deps.explorers.managerExplorer;
+    this.replay = deps.explorers.replay;
+    this.snapshots = deps.explorers.snapshots;
     this.access = deps.access;
     this.impersonation = deps.impersonation;
     this.adminBackoffice = deps.adminBackoffice;
@@ -80,16 +90,9 @@ export class OpsService {
     scheduler: SchedulerOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
+    explorers: OpsExplorers;
   }): OpsService {
-    return new OpsService({
-      access: options.access,
-      impersonation: options.impersonation,
-      adminBackoffice: options.adminBackoffice,
-      blobStore: options.blobStore,
-      scheduler: options.scheduler,
-      anomalyState: options.anomalyState,
-      queues: options.queues,
-    });
+    return new OpsService(options);
   }
 
   isAdmin(identity: AdminIdentity): boolean {
@@ -120,8 +123,9 @@ export class OpsService {
     return this.blobStore.getBlobs(input);
   }
 
-  findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null> {
-    return this.blobStore.tryGetBlobById(input);
+  async findBlob(input: GetBlobInput): Promise<OpsBlobSummary | null> {
+    const [blob] = await this.blobStore.findBlobsById(input);
+    return blob ?? null;
   }
 
   runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport> {
@@ -199,8 +203,9 @@ export class OpsService {
     return this.queues.getGroups(input);
   }
 
-  findQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null> {
-    return this.queues.tryGetGroupDetail(input);
+  async findQueueGroup(input: { queueName: string; groupId: string }): Promise<GroupInfo | null> {
+    const [group] = await this.queues.findGroupsById(input);
+    return group ?? null;
   }
 
   listQueueGroupJobs(input: {

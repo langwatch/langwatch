@@ -390,6 +390,7 @@ describe("the tRPC error formatter", () => {
       expect(foreignZodError instanceof z.ZodError).toBe(false);
     });
 
+    /** @scenario "Validation failures travel that channel whichever zod threw them" */
     it("still becomes a handled validation error rather than an unknown failure", () => {
       const formatted = format(foreignZodError);
 
@@ -397,6 +398,7 @@ describe("the tRPC error formatter", () => {
       expect(formatted.data.error).toMatchObject({ code: "validation_error" });
     });
 
+    /** @scenario "Validation failures travel that channel whichever zod threw them" */
     it("carries the field errors, so a form can mark the offending input", () => {
       const formatted = format(foreignZodError);
 
@@ -407,23 +409,45 @@ describe("the tRPC error formatter", () => {
   });
 
   describe("given a validation failure from this package's own zod", () => {
+    /** @scenario "Validation failures travel the one handled-error channel" */
     it("is treated identically", () => {
       const parsed = z.object({ email: z.string() }).safeParse({ email: 1 });
 
       const formatted = format(parsed.success ? null : parsed.error);
 
       expect(formatted.message).toBe("validation_error");
+      expect(formatted.data.error).toMatchObject({
+        code: "validation_error",
+        meta: { fieldErrors: { email: expect.any(Array) } },
+      });
+      expect(formatted.data).not.toHaveProperty("zodError");
     });
   });
 
   describe("given a failure that is not a validation error at all", () => {
+    /** @scenario "A database crash is reported to the client as unknown" */
     it("keeps the stack off the wire and reports no handled error", () => {
       const formatted = format(new Error("a database socket died"));
 
       expect(formatted.data.error).toBeNull();
       expect(formatted.data).not.toHaveProperty("stack");
+      expect(formatted.message).toBe(HandledError.toUserMessage(new Error("x")));
+      expect(JSON.stringify(formatted)).not.toContain("a database socket died");
+      expect(formatted.data.traceId).toBe("trace-1");
     });
 
+    /** @scenario "A known failure is serialised as a handled error over tRPC" */
+    it("carries a not-found error's code, its id and its 404", () => {
+      const formatted = format(new NotFoundError("evaluation_not_found", "Evaluation", "eval-1"));
+
+      expect(formatted.data.error).toMatchObject({
+        code: "evaluation_not_found",
+        meta: { id: "eval-1" },
+        httpStatus: 404,
+      });
+    });
+
+    /** @scenario "A handled error's free-text message does not cross the tRPC boundary" */
     it("sends a handled error's code as the message, never its prose", () => {
       class TeapotError extends HandledError {
         constructor() {
@@ -434,6 +458,7 @@ describe("the tRPC error formatter", () => {
       const formatted = format(new TeapotError());
 
       expect(formatted.message).toBe("validation_error");
+      expect(JSON.stringify(formatted)).not.toContain("prose no one reviewed");
     });
   });
 });

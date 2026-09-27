@@ -26,7 +26,7 @@ export type { GovernanceAppDependencies, GovernanceBespokeMembers } from "./app/
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
-export { GovernanceEventsAdapter } from "./services/governance-events.service.ts";
+export { GovernanceEventsAdapter } from "./eventing/governance-events.pipeline.ts";
 export type * from "./app/governance.members.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
 export type * from "./repositories/anomaly-rule.repository.ts";
@@ -155,7 +155,6 @@ export type {
  * process that has both registers these through the endpoint's session-tool seam.
  */
 export {
-  GovernanceMcpPermissionProbe,
-  registerGovernanceMcpTools,
-  type GovernanceMcpContext,
-} from "./transport/api-mcp/governance-tools.api.ts";
+  GovernanceMcpToolsService,
+  type GovernanceMcpServer,
+} from "./services/governance-mcp-tools.service.ts";

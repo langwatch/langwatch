@@ -7,6 +7,7 @@ import {
   ScenarioNotFoundError,
   ScenarioTestSuiteNotFoundError,
   type Scenario,
+  type ScenarioLookup,
   type ScenarioActor,
   type ScenarioCreateInput,
   type ScenarioReferenceState,
@@ -24,7 +25,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { type Instant, Temporal, toDate } from "@langwatch/time";
+import { fromDate, type Instant, Temporal, toDate } from "@langwatch/time";
 
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
@@ -79,9 +80,11 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return row;
   }
 
-  tryFindByIdIncludingArchived(input: { id: string; projectId: string }): Promise<Scenario | null> {
+  readByIdIncludingArchived(input: { id: string; projectId: string }): Promise<ScenarioLookup> {
     const row = this.rows.get(input.id);
-    return Promise.resolve(row?.projectId === input.projectId ? row : null);
+    return Promise.resolve(
+      row?.projectId === input.projectId ? { found: true, scenario: row } : { found: false },
+    );
   }
 
   findAll(input: { projectId: string }): Promise<Scenario[]> {
@@ -97,8 +100,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   }
 
   async update(input: ScenarioUpdateInput & { actor: ScenarioActor }): Promise<Scenario> {
-    const existing = await this.tryFindByIdIncludingArchived(input);
-    if (!existing) throw new ScenarioNotFoundError(input.id);
+    const existing = await this.findByIdIncludingArchived(input);
     const {
       actor: _,
       changeDescription: __,
@@ -131,8 +133,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   }
 
   async archive(input: { id: string; projectId: string; archivedAt: Instant }): Promise<Scenario> {
-    const existing = await this.tryFindByIdIncludingArchived(input);
-    if (!existing) throw new ScenarioNotFoundError(input.id);
+    const existing = await this.findByIdIncludingArchived(input);
     const row = { ...existing, archivedAt: existing.archivedAt ?? toDate(input.archivedAt) };
     this.rows.set(row.id, row);
     return row;
@@ -176,7 +177,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   }): Promise<ScenarioReferenceState[]> {
     return [...this.rows.values()]
       .filter((row) => input.ids.includes(row.id) && row.projectId === input.projectId)
-      .map(({ id, archivedAt }) => ({ id, archivedAt }));
+      .map(({ id, archivedAt }) => ({ id, archivedAt: archivedAt ? fromDate(archivedAt) : null }));
   }
 
   async findNamesByIds(input: {

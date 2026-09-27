@@ -66,6 +66,7 @@ describe("changing an existing password", () => {
       });
     });
 
+    /** @scenario "An impersonating operator cannot set or change a password" */
     it("refuses outright, and ends no session", async () => {
       await expect(
         app.changeOwnPassword({

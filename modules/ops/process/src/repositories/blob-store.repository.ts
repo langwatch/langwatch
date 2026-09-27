@@ -25,11 +25,11 @@ export abstract class BlobStoreRepository {
     projectId?: string | null;
     sort?: OpsBlobSort;
   }): Promise<OpsBlobPage>;
-  abstract tryFindById(params: {
+  abstract findById(params: {
     queueName: string;
     projectId: string;
     hash: string;
-  }): Promise<OpsBlobSummary | null>;
+  }): Promise<OpsBlobSummary[]>;
   abstract findStats(params: { sampleLimit: number }): Promise<OpsBlobStoreStats>;
   abstract deleteOne(params: {
     queueName: string;
@@ -56,8 +56,8 @@ export class NullBlobStoreRepository implements BlobStoreRepository {
       rankedFromSample: false,
     };
   }
-  async tryFindById(): Promise<OpsBlobSummary | null> {
-    return null;
+  async findById(): Promise<OpsBlobSummary[]> {
+    return [];
   }
   async findStats(): Promise<OpsBlobStoreStats> {
     return { queues: [] };

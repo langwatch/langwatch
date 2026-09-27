@@ -15,7 +15,6 @@ import type {
   JobEntry,
   QueueRepository,
 } from "../repositories/queue.repository.ts";
-import { NullQueueAuditSinkService } from "./null.queue-audit-sink.service.ts";
 
 /** What an error with no recognizable class name is recorded as. */
 const UNTYPED_ERROR_SHAPE = "untyped_error";
@@ -38,11 +37,11 @@ function summarizeErrorShapes(messages: string[]): string[] {
 
 export class QueueService {
   private readonly repository: QueueRepository;
-  private readonly audit: QueueAuditSink;
+  private readonly audit: QueueAuditSink | undefined;
 
   private constructor(params: { repo: QueueRepository; audit?: QueueAuditSink }) {
     this.repository = params.repo;
-    this.audit = params.audit ?? NullQueueAuditSinkService.create();
+    this.audit = params.audit;
   }
 
   static create(params: { repo: QueueRepository; audit?: QueueAuditSink }): QueueService {
@@ -89,19 +88,12 @@ export class QueueService {
     };
   }
 
-  async tryGetGroupDetail(params: {
-    queueName: string;
-    groupId: string;
-  }): Promise<GroupInfo | null> {
+  async findGroupsById(params: { queueName: string; groupId: string }): Promise<GroupInfo[]> {
     const queues = await this.repository.scanQueues({
       queueNames: [params.queueName],
     });
-    const queue = queues[0];
-    if (!queue) {
-      return null;
-    }
 
-    return queue.groups.find((g) => g.groupId === params.groupId) ?? null;
+    return queues[0]?.groups.filter((g) => g.groupId === params.groupId) ?? [];
   }
 
   async getGroupJobs(params: {
@@ -202,7 +194,7 @@ export class QueueService {
     // blocked is a misread of the dashboard, not an act, and auditing it would
     // bury the acts that did happen.
     if (result.wasBlocked) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_unblock_group",
         queueName: params.queueName,
@@ -220,7 +212,7 @@ export class QueueService {
     const { requestedBy, ...rest } = params;
     const result = await this.repository.unblockAll(rest);
     if (result.unblockedCount > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_unblock_all",
         queueName: params.queueName,
@@ -241,7 +233,7 @@ export class QueueService {
     // A drain removes the jobs outright, so this row is the only thing that
     // survives to say the group was emptied and by whom.
     if (result.jobsRemoved > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_drain_group",
         queueName: params.queueName,
@@ -296,7 +288,7 @@ export class QueueService {
     // that selected them is recorded too, because "which groups" is not
     // recoverable from the counts once the jobs are gone.
     if (result.groupsDrained > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_drain_tenant",
         queueName: params.queueName,
@@ -319,7 +311,7 @@ export class QueueService {
     const { requestedBy, ...rest } = params;
     const result = await this.repository.moveToDlq(rest);
     if (result.jobsMoved > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_move_group_to_dlq",
         queueName: params.queueName,
@@ -339,7 +331,7 @@ export class QueueService {
     const { requestedBy, ...rest } = params;
     const result = await this.repository.moveAllBlockedToDlq(rest);
     if (result.movedCount > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_move_all_blocked_to_dlq",
         queueName: params.queueName,
@@ -382,7 +374,7 @@ export class QueueService {
     const { requestedBy, ...rest } = params;
     const result = await this.repository.redriveManyFromDlq(rest);
     if (result.redrivenCount > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_redrive_dlq_groups",
         queueName: params.queueName,
@@ -410,7 +402,7 @@ export class QueueService {
     const { requestedBy, ...rest } = params;
     const { lastErrors, ...result } = await this.repository.discardManyFromDlq(rest);
     if (result.discardedCount > 0) {
-      await this.audit.append({
+      await this.audit?.append({
         actorUserId: requestedBy,
         action: "queue_discard_dlq_groups",
         queueName: params.queueName,

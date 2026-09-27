@@ -235,18 +235,15 @@ export function getInputsForExecution({
 }: {
   node: Node<Component>;
   inputs?: Record<string, string>;
-}): { missingFields: Field[]; inputs: Record<string, string> } {
+}): { missingFields: Field[]; inputs: Record<string, unknown> } {
   const allFields = new Set(node.data.inputs?.map((field) => field.identifier) ?? []);
   const requiredFields = node.data.inputs?.filter((field) => !field.optional) ?? [];
-  const defaultValues = node.data.inputs?.reduce(
-    (acc, field) => {
-      if (field.value !== undefined) {
-        acc[field.identifier] = field.value;
-      }
-      return acc;
-    },
-    {} as Record<string, any>,
-  );
+  const defaultValues = node.data.inputs?.reduce<Record<string, Field["value"]>>((acc, field) => {
+    if (field.value !== undefined) {
+      acc[field.identifier] = field.value;
+    }
+    return acc;
+  }, {});
 
   const inputs_ = Object.fromEntries(
     Object.entries({

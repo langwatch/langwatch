@@ -78,6 +78,30 @@ async function runPostgresStatements({
   }
 }
 
+/** Tenants read per round of the backfill: each read is one tenant-scoped query. */
+const KEY_MAP_READ_BATCH = 20;
+
+/** The key-map hashes already written for these projects, read one tenant at a time. */
+async function existingKeyMapHashes({
+  repository,
+  table,
+  projects,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  table: string;
+  projects: readonly { id: string }[];
+}): Promise<Set<string>> {
+  const hashes = new Set<string>();
+  for (let start = 0; start < projects.length; start += KEY_MAP_READ_BATCH) {
+    const batch = projects.slice(start, start + KEY_MAP_READ_BATCH);
+    const found = await Promise.all(
+      batch.map((project) => repository.findKeyMapHashes({ table, tenantId: project.id })),
+    );
+    for (const hash of found.flat()) hashes.add(hash);
+  }
+  return hashes;
+}
+
 /** Inserts only the rows the key map lacks; a blank key is reported, never written. */
 async function backfillKeyMap({
   repository,
@@ -92,7 +116,7 @@ async function backfillKeyMap({
 }): Promise<void> {
   const projects = await database.project.findMany({ select: { id: true, lwqlKey: true } });
   const table = lwqlProvisioning.keyMapTableQualifiedName({ names, sourceDatabase });
-  const existingHashes = new Set(await repository.findKeyMapHashes({ table }));
+  const existingHashes = await existingKeyMapHashes({ repository, table, projects });
   const plan = lwqlProvisioning.planKeyMapBackfill({ projects, existingHashes });
   if (plan.blankKeyProjectIds.length > 0) {
     logger.error(

@@ -2,28 +2,24 @@
  * The procedures the Langy dock calls, and the two ways it calls them.
  */
 
-import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   LangyConversationListCursorDto,
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
-import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
+import type { modelProviderTrpc } from "@langwatch/model-provider-contract";
+import type { tracesTrpc } from "@langwatch/trace-contract";
 
-/**
- * A payload no contract package publishes yet.
- */
+/** A borrowed procedure's payload, where its owner's contract is not yet a dependency. */
 type Unpublished = any;
 
 type Q = { query: { input: Unpublished; output: Unpublished } };
-
-/**
- * A LIST procedure, stated as a list.
- */
 type QL = { query: { input: Unpublished; output: Unpublished[] } };
 type M = { mutation: { input: Unpublished; output: Unpublished } };
 type S = { subscription: { input: Unpublished; output: Unpublished } };
 
-export type LangyApiMap = {
+/** Procedures whose owner's contract is not a dependency of this package yet. */
+type BorrowedProcedures = {
   langy: {
     /**
      * The conversation list, paged.
@@ -80,19 +76,6 @@ export type LangyApiMap = {
   };
 
   /**
-   * THE BORROWED VOCABULARY, one segment per feature the dock reaches.
-   */
-  modelProvider: {
-    getResolvedDefault: {
-      query: {
-        input: { projectId: string; featureKey: string };
-        output: ModelDefaultResolvedTrpcOutput;
-      };
-    };
-    setFeatureOverrideForScope: M;
-    setRoleAssignmentForScope: M;
-  };
-  /**
    * The workspace graph, narrowed to what this family needs.
    */
   organization: {
@@ -131,8 +114,6 @@ export type LangyApiMap = {
   integrationsChecks: { getCheckStatus: Q };
   /** The connect-your-repository card the GitHub skill offers. */
   github: { getConnectionStatus: Q; getInstallation: Q; getRepositories: QL; setRepository: M };
-  /** The rows a capability card hydrates fresh, rather than trusting the turn's copy. */
-  traces: { list: Q; header: Q; discover: Q };
   dataset: { getAll: QL; getById: Q };
   prompts: { getAllPromptsForProject: QL; getByIdOrHandle: Q };
   experiments: { getAllByProjectId: QL; getExperimentBySlug: Q };
@@ -140,75 +121,17 @@ export type LangyApiMap = {
   secrets: { revealOnce: M };
 };
 
-/** What each procedure in the map takes. */
-export type RouterInputs = { [K in keyof LangyApiMap]: InputsOf<LangyApiMap[K]> };
+export type LangyApiMap = ContractApiMap<typeof modelProviderTrpc> &
+  ContractApiMap<typeof tracesTrpc> &
+  BorrowedProcedures;
 
 /** What each procedure in the map answers, as the browser receives it. */
 export type RouterOutputs = OutputsFromMap<LangyApiMap>;
-
-type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
-  ? TIn
-  : TNode extends { mutation: { input: infer TIn } }
-    ? TIn
-    : TNode extends { subscription: { input: infer TIn } }
-      ? TIn
-      : { [K in keyof TNode]: InputsOf<TNode[K]> };
 
 export const api = createModuleApi<LangyApiMap>();
 
 /** The same object, under the name the process shell mounts it by. */
 export const langyApi = api;
 
-/**
- * The one untyped client the shell built, as this package addresses it.
- */
-type UntypedClient = {
-  mutation: (path: string, input?: unknown, opts?: unknown) => Promise<unknown>;
-  query: (path: string, input?: unknown, opts?: unknown) => Promise<unknown>;
-  subscription: (path: string, input: unknown, opts: unknown) => { unsubscribe: () => void };
-};
-
-let untyped: UntypedClient | undefined;
-
-/** Called by the application when it mounts this family's transport. */
-export function setLangyTrpcClient(client: unknown): void {
-  untyped = client as UntypedClient | undefined;
-}
-
-function callUntyped(kind: keyof UntypedClient, path: string, args: unknown[]): unknown {
-  if (!untyped) {
-    throw new Error(
-      `Langy called ${path} before the application handed it a transport. ` +
-        "Call setLangyTrpcClient from the feature's host provider.",
-    );
-  }
-  if (kind === "subscription") {
-    return untyped.subscription(path, args[0], args[1]);
-  }
-  return untyped[kind](path, args[0], args[1]);
-}
-
-/**
- * `trpcClient.langy.onTurnStream.subscribe(input, opts)`, unchanged.
- */
-function addressProxy(prefix: string[]): Record<string, unknown> {
-  return new Proxy(
-    {},
-    {
-      get(_target, property: string) {
-        if (property === "mutate") {
-          return (...args: unknown[]) => callUntyped("mutation", prefix.join("."), args);
-        }
-        if (property === "query") {
-          return (...args: unknown[]) => callUntyped("query", prefix.join("."), args);
-        }
-        if (property === "subscribe") {
-          return (...args: unknown[]) => callUntyped("subscription", prefix.join("."), args);
-        }
-        return addressProxy([...prefix, property]);
-      },
-    },
-  );
-}
-
-export const trpcClient: any = addressProxy([]);
+/** The typed imperative client the api's provider carries, for code that runs outside a hook. */
+export type LangyTrpcClient = ReturnType<typeof api.useUtils>["client"];

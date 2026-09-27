@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
 
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type {
@@ -65,7 +66,7 @@ export class ScenarioRunExportDownloadService {
       },
     });
 
-    const exportId = crypto.randomUUID();
+    const exportId = generate(KSUID_RESOURCES.EXPORT).toString();
     const totalCount = await this.#exports.getTotalCount({ request });
     input.signal?.throwIfAborted();
 

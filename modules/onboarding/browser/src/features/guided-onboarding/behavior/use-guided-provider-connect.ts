@@ -1,7 +1,7 @@
 /**
  * The provider takeover step's own writes: records the connection once the
  * shared credential form has saved a row (pointing Langy's own role at the
- * connected model first, same as upstream), or records a skip.
+ * picked or typed model first, same as upstream), or records a skip.
  */
 import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import type { GuidedProvider } from "@langwatch/onboarding-browser-kit";
@@ -39,10 +39,10 @@ export function useGuidedProviderConnect({
   const setRoleAssignment = onboardingApi.modelProvider.setRoleAssignmentForScope.useMutation();
 
   const onSaved = useCallback(
-    async (provider: GuidedProvider) => {
+    async (provider: GuidedProvider, saved: { chatModel?: string } = {}) => {
       const refetched = await refetch();
       const providers = refetched.data as Record<string, StoredProviderRow> | undefined;
-      const model = connectedModel(providers?.[provider.registryKey]);
+      const model = saved.chatModel ?? connectedModel(providers?.[provider.registryKey]);
       await setRoleAssignment.mutateAsync({
         scopeType: "ORGANIZATION",
         scopeId: organizationId,

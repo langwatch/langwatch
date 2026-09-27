@@ -22,6 +22,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

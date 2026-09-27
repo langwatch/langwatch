@@ -252,6 +252,84 @@ export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRef
   }
 }
 
+/** The setup journey names the precondition it stopped on; the guard's
+ *  `sso_connection_activation_blocked` still holds underneath (ADR-124). */
+export abstract class SsoActivationPreconditionError extends SsoConnectionCommandRefusedError {}
+
+/** No domain of this organization's has been proved, so nothing routes. */
+export class SsoActivationDomainUnprovedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_domain_unproved", "sso_activation_domain_unproved", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationDomainUnprovedError";
+  }
+}
+
+/** Nobody has signed in through the connection yet; cleared by signing in. */
+export class SsoActivationTestSignInMissingError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_test_sign_in_missing", "sso_activation_test_sign_in_missing", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationTestSignInMissingError";
+  }
+}
+
+/** Nobody can get in without the identity provider. */
+export class SsoActivationBreakGlassMissingError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_break_glass_missing", "sso_activation_break_glass_missing", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationBreakGlassMissingError";
+  }
+}
+
+/** Nobody has said what this connection does with somebody it has never seen. */
+export class SsoActivationArrivalsUndecidedError extends SsoActivationPreconditionError {
+  constructor(detail: string) {
+    super("sso_activation_arrivals_undecided", "sso_activation_arrivals_undecided", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoActivationArrivalsUndecidedError";
+  }
+}
+
+/** Self-serve setup on an installation holding no genuine licence at startup (D05 tier 2);
+ *  the words name activating a licence and nothing internal. */
+export class SsoLicenseRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_license_required", "sso_license_required", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoLicenseRequiredError";
+  }
+}
+
+/** A hosted organization not opted in to setting single sign-on up itself (D05 tier 3);
+ *  the words offer a conversation and name no flag. */
+export class SsoSelfServeUnavailableError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_self_serve_unavailable", "sso_self_serve_unavailable", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSelfServeUnavailableError";
+  }
+}
+
 /**
  * Teardown would leave people with no way in. The detail carries how many
  * users for the log; the copy tells the operator what to do about it, which

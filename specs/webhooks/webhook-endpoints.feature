@@ -465,6 +465,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       And the admitted record never appears
       And filtering by an unknown type yields an empty page
 
+    @unit
+    Scenario: Every emitted-events statement names exactly one tenant
+      Given an organization with two projects
+      When its events log is listed or an event is read by id
+      Then each project is read by its own statement bound to that project's tenant
+      And no statement reads several tenants at once
+
+    @integration
+    Scenario: The events listing reads each of the organization's projects under its own tenant
+      Given spend records in two of the organization's projects
+      When the events log is read and paged, and one event is read by id
+      Then each project is read by a statement scoped to that project's tenant alone
+      And the pages merge newest first across both projects with a continuation cursor
+      And an event is found only when its project is among the organization's projects
+
     @integration
     Scenario: Each endpoint retries independently on its own ladder
       Given two endpoints where one receiver is down
@@ -558,6 +573,13 @@ Feature: Webhook endpoints, signed outbound event delivery
     Scenario: No Load more when the page is the last
       Given a deliveries page with no next cursor
       Then no load-more control is shown
+
+    @unit
+    Scenario: The delivery-log prune is admitted by the tenancy guard
+      Given the delivery log behind the production tenancy guard
+      When the hourly maintenance prunes deliveries older than 30 days
+      Then it runs the one system-owned retention sweep across every tenant
+      And the guard does not refuse it as a cross-tenant delete
 
     @unit
     Scenario: Webhook management is an organization-scoped permission

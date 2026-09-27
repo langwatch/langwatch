@@ -270,7 +270,7 @@ describe("VersionHistoryListPopover", () => {
             commitMessage: "Initial version",
             author: { name: "User 1" },
           },
-        ] as unknown as WireVersionedPrompt[],
+        ],
         isLoading: false,
       });
 

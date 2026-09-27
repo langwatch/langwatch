@@ -42,7 +42,7 @@ export function OptimizationStudioLLMConfigField({
 
   const { modelProviders } = useOrganizationTeamProject();
   const providerIsConfigured = Object.values(modelProviders ?? {}).some(
-    (modelProvider: any) =>
+    (modelProvider) =>
       model.split("/")[0] === modelProvider.provider &&
       (modelProvider.enabled || modelProvider.customKeys),
   );

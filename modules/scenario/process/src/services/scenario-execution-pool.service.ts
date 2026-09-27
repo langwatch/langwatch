@@ -10,7 +10,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
 
 import type { ScenarioExecutionRunner, ScenarioExecutionPool } from "../app/scenario.app.ts";
-import type { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
+import type { VoiceConcurrencyGateService } from "./voice-concurrency-gate.service.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -43,13 +43,13 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
    * otherwise it waits in `_pending` like any full-pool job. Absent = no voice cap, so a pool built
    * without one behaves exactly as it did before the cap existed.
    */
-  private readonly _voiceGate: VoiceConcurrencyGate | null;
+  private readonly _voiceGate: VoiceConcurrencyGateService | null;
   private readonly acceptJob: ((job: ExecutionJobData) => boolean) | undefined;
   private runner: ScenarioExecutionRunner | undefined = void 0;
 
   static create(options: {
     concurrency: number;
-    voiceGate?: VoiceConcurrencyGate;
+    voiceGate?: VoiceConcurrencyGateService;
     acceptJob?: (job: ExecutionJobData) => boolean;
   }): ScenarioExecutionPoolService {
     return new ScenarioExecutionPoolService(options);
@@ -61,7 +61,7 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
     acceptJob,
   }: {
     concurrency: number;
-    voiceGate?: VoiceConcurrencyGate;
+    voiceGate?: VoiceConcurrencyGateService;
     acceptJob?: (job: ExecutionJobData) => boolean;
   }) {
     this._concurrency = concurrency;

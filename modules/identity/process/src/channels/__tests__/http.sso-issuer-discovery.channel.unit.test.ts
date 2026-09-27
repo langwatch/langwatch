@@ -91,6 +91,7 @@ describe("given an issuer an administrator typed", () => {
     expect(asked).toEqual([]);
   });
 
+  /** @scenario "An issuer that only answers on a private network is refused" */
   it("says nothing about where a refused name resolved", async () => {
     const { channel } = channelAnswering(
       async () => respond(200, DISCOVERY_DOCUMENT),
@@ -186,6 +187,7 @@ describe("given an issuer origin an operator vouched for", () => {
     };
   }
 
+  /** @scenario "An issuer inside the network an operator vouched for is dialled" */
   it("reads its document although it answers on a private address", async () => {
     const { channel, asked } = vouchedChannel({
       validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),
@@ -198,6 +200,7 @@ describe("given an issuer origin an operator vouched for", () => {
     expect(asked).toEqual([`${VOUCHED}/realms/acme/.well-known/openid-configuration`]);
   });
 
+  /** @scenario "Vouching for an origin does not vouch for where it redirects" */
   it("judges a redirect out of the vouched origin by the fence again", async () => {
     const { channel } = vouchedChannel({
       validateVouched: async (url) => ({ ...admitted(url), resolvedIp: "10.0.0.7" }),

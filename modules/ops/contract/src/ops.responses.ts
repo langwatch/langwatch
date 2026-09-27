@@ -286,3 +286,25 @@ export type OpsExplainAnswer =
   | Readonly<{ status: "not_configured_in_production" }>
   | Readonly<{ status: "unavailable" }>
   | Readonly<{ status: "failed" }>;
+
+/** A status a literal door answers with, in the codes its released callers read. */
+export type OpsDoorStatus =
+  | 200
+  | 201
+  | 400
+  | 401
+  | 403
+  | 404
+  | 409
+  | 413
+  | 422
+  | 429
+  | 500
+  | 502
+  | 503;
+
+/** One literal door's answer: its status and the exact JSON body released callers parse. */
+export type OpsDoorAnswer = Readonly<{
+  status: OpsDoorStatus;
+  body: Readonly<Record<string, unknown>>;
+}>;

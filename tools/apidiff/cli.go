@@ -234,6 +234,9 @@ func (probe *probeFlags) applyRunDefaults() {
 	if probe.keys.ScimKey == "" {
 		probe.keys.ScimKey = scimProbeToken
 	}
+	probe.keys.WidgetProjectKey = WidgetProjectKey
+	probe.keys.LangyInternalSecret = throwawayLangyInternalSecret
+	probe.keys.GatewayInternalSecret = throwawayGatewayInternalSecret
 	if probe.keys.ProjectKeyB == "" {
 		probe.keys.ProjectKeyB = ProjectKeyB
 	}

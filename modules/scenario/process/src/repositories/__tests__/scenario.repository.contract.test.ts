@@ -49,8 +49,8 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
         code: "scenario_not_found",
       });
       await expect(
-        repository.tryFindByIdIncludingArchived({ id, projectId: PROJECT_ID }),
-      ).resolves.toMatchObject({ id, archivedAt: toDate(archivedAt) });
+        repository.readByIdIncludingArchived({ id, projectId: PROJECT_ID }),
+      ).resolves.toMatchObject({ found: true, scenario: { id, archivedAt: toDate(archivedAt) } });
     });
   });
 

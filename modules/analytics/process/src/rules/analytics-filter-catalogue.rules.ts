@@ -19,9 +19,9 @@ const FIELDS_REQUIRING_KEY: readonly FilterField[] = [
 const FIELDS_REQUIRING_SUBKEY: readonly FilterField[] = ["events.metrics.value"];
 
 /** Whether this field's options can only be read once a key is chosen. */
-export const filterFieldRequiresKey = (field: FilterField): boolean =>
-  FIELDS_REQUIRING_KEY.includes(field);
+export const filterFieldRequiresKey = (field: string): boolean =>
+  FIELDS_REQUIRING_KEY.some((required) => required === field);
 
 /** Whether this field's options can only be read once a subkey is chosen. */
-export const filterFieldRequiresSubkey = (field: FilterField): boolean =>
-  FIELDS_REQUIRING_SUBKEY.includes(field);
+export const filterFieldRequiresSubkey = (field: string): boolean =>
+  FIELDS_REQUIRING_SUBKEY.some((required) => required === field);

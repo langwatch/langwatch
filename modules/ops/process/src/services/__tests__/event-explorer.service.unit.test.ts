@@ -15,10 +15,8 @@ const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [
   {
     projectionName: "traceMetrics",
     eventTypes: ["TraceIngested", "TraceUpdated"],
-    init: () => ({ count: 0 }),
-    apply: (state: unknown, _event: { type: string }) => ({
-      count: (state as { count: number }).count + 1,
-    }),
+    replay: (use) =>
+      use({ init: () => ({ count: 0 }), apply: (state) => ({ count: state.count + 1 }) }),
   },
 ];
 
@@ -378,12 +376,14 @@ describe("EventExplorerService", () => {
           {
             projectionName: "traceMetrics",
             eventTypes: ["TraceIngested"],
-            init: () => ({ count: 0 }),
-            apply: (state: unknown, _event: { type: string }) => {
-              const current = state as { count: number };
-              if (current.count === 0) throw new Error("bad event");
-              return { count: current.count + 1 };
-            },
+            replay: (use) =>
+              use({
+                init: () => ({ count: 0 }),
+                apply: (state) => {
+                  if (state.count === 0) throw new Error("bad event");
+                  return { count: state.count + 1 };
+                },
+              }),
           },
         ];
 

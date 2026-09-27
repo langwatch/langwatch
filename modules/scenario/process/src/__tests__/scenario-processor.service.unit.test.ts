@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import {
-  type NodeScenarioChildProcessAdapter,
+  type NodeScenarioChildService,
   ScenarioExecutionPoolService,
   ScenarioProcessorService,
   buildOtelResourceAttributes,
@@ -73,7 +73,7 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
 function processorFixture() {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   const execution = createApiFixture<ScenarioExecutionService>();
-  const childProcesses = createApiFixture<NodeScenarioChildProcessAdapter>();
+  const childProcesses = createApiFixture<NodeScenarioChildService>();
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
   const cancellations = new TestCancellationSubscriber();
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;
@@ -193,6 +193,7 @@ describe("ScenarioProcessorService", () => {
       );
     });
 
+    /** @scenario Failure handler errors do not crash worker */
     it("isolates a completion failure so every run is attempted", async () => {
       fixture.finishUnsuccessfulRun
         .mockRejectedValueOnce(new Error("first write failed"))
@@ -262,6 +263,7 @@ describe("ScenarioProcessorService", () => {
   });
 
   /** @scenario "Child startup overlaps slow preparation" */
+  /** @scenario Worker does not call failure handler on success */
   it("boots the isolated child while target and model prefetch continue", async () => {
     const fixture = processorFixture();
     const result = deferred<ScenarioExecutionPrefetchResult>();
@@ -317,6 +319,7 @@ describe("ScenarioProcessorService", () => {
 
     await execution;
     expect(session.execute).toHaveBeenCalledTimes(1);
+    expect(fixture.finishUnsuccessfulRun).not.toHaveBeenCalled();
   });
 
   /** @scenario "Child startup overlaps slow preparation" */

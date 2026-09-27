@@ -652,9 +652,28 @@ Procedures are not probed over the batch link, and the declared access policy
 is not compared. On main most outputs are inferred types, so an output schema
 is compared only where both sides declare one.
 
-No worker process is booted on either side, so anything whose observable
-result depends on a queue, projection or scheduler is compared in a state
-neither instance reaches in production.
+On the compose path (`-no-haven`) each side boots a worker beside its API
+(respawned once if it dies during its own boot), and the run stands up the
+collaborators the gated families need, identically on both sides
+(`collaborators.go`, `side-credentials.go`):
+
+- LangWatchQL: throwaway passwords, sql access-model mode, one restricted user
+  per side, and the `lwql:provision` task after the fixtures; the compose
+  ClickHouse gets access management and the `custom_` settings prefix.
+- An Instant Evals judge key aimed at a dead https port.
+- A stub Langy agent manager (accepts warm, dispatch and cancel), plus the
+  Langy internal secret and a dead gateway base URL.
+- A widget project with `release_custom_chart_playground` targeted at it
+  through the flag store; every dashboard-widget route is sent there.
+- Before the first probe: the fixture trace, a Claude Code OTLP log for the
+  seeded coding-agent session, and a device-login bearer per side (seeded admin
+  sign-in, device-code, approve, exchange) for the CLI bearer routes.
+- After the webhook endpoint is created: a signed admit + confirm spend batch
+  through the gateway's own door, so webhook events and deliveries exist.
+
+Reads filled by a projection (`settledReads` in `probe-cases.go`) are re-read
+for up to 45 s until both sides have content. Ruled-retired REST operations
+are not probed and not counted.
 
 ### The union blind spot — a route absent from _both_ documents
 

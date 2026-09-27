@@ -1,11 +1,11 @@
 import { useChat } from "@ai-sdk/react";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
 import type { LangyMessageDto } from "@langwatch/langy-contract";
-import type { UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../../../behavior/langy-api.ts";
 import { isLangyTranscriptMessage } from "../../../model/langy-transcript.ts";
+import { toEngineMessage } from "../model/langy-engine-parts.ts";
 import type { createLangyChatTransport } from "./logic/langy-chat-transport.ts";
 
 /**
@@ -68,22 +68,13 @@ export function useLangyChatEngine({
   const applyHistoryToEngine = useCallback((history: LangyMessageDto[]) => {
     const uiMessages = history
       .filter(isLangyTranscriptMessage)
-      // `recorded` marks a message that came from the durable fold rather than
-      // from this browser's own stream. The relay stamped its card fences into
-      // typed parts already, so a fence still sitting in its TEXT is one the
-      // relay decided was not a block, and the renderer must leave it alone
-      // (ADR-060 §1). A streamed message carries no such verdict.
-      .map((m) => ({
-        id: m.id,
-        role: m.role,
-        parts: m.parts,
-        metadata: { recorded: true },
-      }));
-    // `parts` is the part array the message projection stored VERBATIM off the
-    // stream, typed on the wire as opaque records (see langyMessageSchema).
-    // Re-entering the SDK's discriminated part union from that wire shape is
-    // the engine's one honest cast; the renderers narrow it structurally.
-    setMessagesRef.current(uiMessages as unknown as UIMessage[]);
+      // `recorded` marks a message off the durable fold: a card fence still in its
+      // TEXT is one the relay decided was not a block (ADR-060 §1). Its `parts`
+      // were stored VERBATIM off the stream and re-enter the engine checked.
+      .map((m) =>
+        toEngineMessage({ id: m.id, role: m.role, parts: m.parts, metadata: { recorded: true } }),
+      );
+    setMessagesRef.current(uiMessages);
   }, []);
 
   const resetEngine = useCallback(

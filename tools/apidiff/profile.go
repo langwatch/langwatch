@@ -37,6 +37,7 @@ type bootProfile struct {
 	prismaMigrateArgv     []string
 	clickhouseMigrateArgv []string
 	seedArgv              []string
+	lwqlProvisionArgv     []string // converges the LangWatchQL access model (ADR-159)
 	startArgv             []string
 	workerArgv            []string // the worker that projects what the API ingests
 	overlay               bool     // write the composed env to overlayEnvFile
@@ -60,6 +61,7 @@ var (
 		prismaMigrateArgv:     []string{"run", "prisma:migrate"},
 		clickhouseMigrateArgv: []string{"run", "clickhouse:migrate"},
 		seedArgv:              []string{"run", "prisma:seed"},
+		lwqlProvisionArgv:     []string{"run", "lwql:provision"},
 		startArgv:             []string{"--filter", "@langwatch/platform-api", "start"},
 		workerArgv:            []string{"--filter", "@langwatch/worker", "start"},
 		// The modular api has no /api/health route of its own; /healthz is
@@ -78,6 +80,7 @@ var (
 		prismaMigrateArgv:     []string{"run", "prisma:migrate"},
 		clickhouseMigrateArgv: []string{"--filter", "@langwatch/web", "clickhouse:migrate"},
 		seedArgv:              []string{"run", "prisma:seed"},
+		lwqlProvisionArgv:     []string{"--filter", "@langwatch/web", "lwql:provision"},
 		startArgv:             []string{"--filter", "@langwatch/web", "start:app:dev"},
 		workerArgv:            []string{"--filter", "@langwatch/web", "start:workers:dev"},
 		overlay:               true,

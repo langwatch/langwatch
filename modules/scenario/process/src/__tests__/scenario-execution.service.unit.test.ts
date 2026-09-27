@@ -7,10 +7,10 @@ import type {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import type { CancellationPublisher } from "../app/scenario.app.ts";
 import {
   type ScenarioExecutionPrefetcherService,
   type ScenarioFailureHandlerService,
-  type CancellationPublisher,
   ScenarioExecutionPoolService,
   ScenarioExecutionService,
   type ScenarioExecutionRunner,

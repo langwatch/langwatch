@@ -37,8 +37,7 @@ function SortChip({
   return (
     <button
       type="button"
-      role="radio"
-      aria-checked={active}
+      aria-pressed={active}
       onClick={onClick}
       style={{
         padding: "4px 12px",
@@ -223,7 +222,7 @@ function SortChips({
     { key: "lastActivity", label: "Last active" },
   ];
   return (
-    <HStack gap={1} role="radiogroup" aria-labelledby={ariaLabelledBy}>
+    <HStack as="fieldset" gap={1} aria-labelledby={ariaLabelledBy}>
       {opts.map((o) => (
         <SortChip
           key={o.key}

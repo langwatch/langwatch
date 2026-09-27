@@ -13,7 +13,7 @@ import type {
   AnomalyAlertHttpClient,
   GovernanceDiagnosticsSink,
 } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const DEFAULT_MAX_RETRIES = 2;
@@ -55,7 +55,7 @@ export class AnomalyAlertDispatcherService {
   }): AnomalyAlertDispatcherService {
     return new AnomalyAlertDispatcherService({
       http: options.http,
-      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
       timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       maxRetries: options.maxRetries ?? DEFAULT_MAX_RETRIES,
       retryBackoffMs: options.retryBackoffMs ?? DEFAULT_RETRY_BACKOFF_MS,

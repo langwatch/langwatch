@@ -1,5 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { IngestionPullLifecycleDatabase } from "../../ingestion-pull-lifecycle.repository.ts";
+import type { IngestionPullLifecycleDatabase } from "../prisma.ingestion-pull-lifecycle.repository.ts";
 import { PrismaIngestionPullLifecycleRepository } from "../prisma.ingestion-pull-lifecycle.repository.ts";
 
 describe("PrismaIngestionPullLifecycleRepository", () => {

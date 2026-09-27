@@ -174,50 +174,52 @@ export class EventExplorerService {
       };
     }
 
-    let state = dejaViewProj.init();
-    let appliedCount = 0;
-    for (const row of rows) {
-      let parsedPayload: unknown;
-      try {
-        parsedPayload = typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload;
-      } catch {
-        parsedPayload = {};
-      }
-
-      const timestampMs = parseInt(row.eventTimestamp, 10);
-      const event = {
+    const events = rows.map((row) => ({
+      row,
+      event: {
         id: row.eventId,
         aggregateId: params.aggregateId,
         aggregateType: projection.aggregateType,
         tenantId: params.tenantId,
-        createdAt: timestampMs,
-        occurredAt: timestampMs,
+        createdAt: parseInt(row.eventTimestamp, 10),
+        occurredAt: parseInt(row.eventTimestamp, 10),
         type: row.eventType,
         version: "",
-        data: parsedPayload,
-      };
-      if (dejaViewProj.eventTypes.includes(row.eventType)) {
+        data: parsePayload(row.payload),
+      },
+    }));
+    const folded = dejaViewProj.replay<{ state: unknown; applied: number }>((fold) => {
+      let state = fold.init();
+      let applied = 0;
+      for (const { row, event } of events) {
+        if (!dejaViewProj.eventTypes.includes(row.eventType)) continue;
         try {
-          state = dejaViewProj.apply(state, event);
-          appliedCount++;
+          state = fold.apply(state, event);
+          applied++;
         } catch (err) {
           logger.warn(
-            {
-              error: err,
-              eventId: row.eventId,
-              projectionName: params.projectionName,
-            },
+            { error: err, eventId: row.eventId, projectionName: params.projectionName },
             "Skipping event that failed to apply during projection state computation",
           );
         }
       }
-    }
+      return { state, applied };
+    });
 
     return {
-      state,
-      appliedEventCount: appliedCount,
+      state: folded.state,
+      appliedEventCount: folded.applied,
       projectionName: params.projectionName,
       aggregateType: projection.aggregateType,
     };
+  }
+}
+
+/** A stored payload as the fold reads it; one that does not parse folds as an empty object. */
+function parsePayload(payload: string): unknown {
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return {};
   }
 }

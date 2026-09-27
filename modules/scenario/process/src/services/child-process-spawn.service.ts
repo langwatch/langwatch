@@ -26,7 +26,7 @@ export class ChildProcessSpawnService {
 
   private constructor() {}
 
-  static resolve({
+  resolve({
     packageRoot,
     nodeEnv,
     sourcePath,

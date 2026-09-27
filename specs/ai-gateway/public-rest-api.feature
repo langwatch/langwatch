@@ -332,7 +332,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest
   Scenario: The page size is capped
     When I send `?limit=500`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest
   Scenario: The spend window is epoch milliseconds, like every spend endpoint
@@ -343,7 +343,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 200
     And the echoed `window` is in the same unit, so it can be sent straight back
     When I send the ISO-8601 form this route used to take
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @budgets
   Scenario: One budget can be read on its own
@@ -410,7 +410,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest @budgets
   Scenario: An invalid scope_type filter is refused
     When I send `GET /api/gateway/v1/budgets?scope_type=BANANA`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @budgets
   Scenario: A PRINCIPAL budget must target a member of the org
@@ -499,7 +499,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest @spend
   Scenario: The spend read validates its window
     When I send `from` after `to`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @spend
   Scenario: Spend for an unknown key is a 404, not a zero

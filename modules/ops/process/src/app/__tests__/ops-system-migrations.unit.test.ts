@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
-import { OpsSystemMigrations } from "../ops-system-migrations.ts";
+import { OpsSystemMigrations } from "../ops-system-migrations-composition.build.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 

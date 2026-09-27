@@ -2,7 +2,7 @@ import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { format } from "@langwatch/time";
 
-type MonitorRow = Readonly<Record<string, number>>;
+type MonitorRow = Readonly<Record<string, number | string>>;
 
 export type MonitorSummary = {
   isPassRate: boolean;
@@ -71,7 +71,10 @@ export function monitorPeriodLabel({
 }
 
 function seriesValues(rows: readonly MonitorRow[] | undefined, key: string): number[] | undefined {
-  return rows?.map((entry) => entry[key]!).filter((x) => x !== undefined && x !== null);
+  return rows?.flatMap((entry) => {
+    const value = entry[key];
+    return typeof value === "number" ? [value] : [];
+  });
 }
 
 function average(values: number[] | undefined): number | undefined {

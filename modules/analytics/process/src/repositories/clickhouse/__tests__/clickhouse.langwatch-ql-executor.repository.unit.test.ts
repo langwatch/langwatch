@@ -6,7 +6,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../clickhouse.langwatch-ql-executor.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../clickhouse.langwatch-ql-executor.repository.ts";
 
 const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
 
@@ -14,7 +14,7 @@ vi.mock("@clickhouse/client", () => ({
   createClient: () => ({ query: queryMock, close: async () => undefined }),
 }));
 
-const executor = ClickHouseLangWatchQLExecutorAdapter.create({
+const executor = ClickHouseLangWatchQLExecutorRepository.create({
   connection: {
     url: "http://clickhouse.invalid:8123",
     username: "lwql_reader",

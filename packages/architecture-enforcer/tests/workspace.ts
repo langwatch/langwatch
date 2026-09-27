@@ -53,7 +53,7 @@ export const POLICY_ANCHORS: Readonly<Record<string, string>> = {
   "apps/worker/src/main.ts": "",
   "apps/tasks/src/main.ts": "",
   "apps/server/src/cli.ts": "",
-  "packages/scenario-child/src/scenario-child.entrypoint.ts": "",
+  "apps/scenario-child/src/main.ts": "",
 };
 
 /** Writes each anchor that is not already there, so a fixture's own copy wins. */

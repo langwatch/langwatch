@@ -404,6 +404,7 @@ describe("given a domain-matched organization to join", () => {
 });
 
 describe("given the queue will not take the request behind an arrival", () => {
+  /** @scenario "A sign-in never fails because the queue would not take the request behind it" */
   it("leaves the sign-in succeeding rather than raising at the person signing in", async () => {
     const parts = serviceOver({ row: connection() });
     parts.requestFromSsoArrival.mockRejectedValue(
@@ -413,6 +414,7 @@ describe("given the queue will not take the request behind an arrival", () => {
     await expect(admit(parts)).resolves.toBeUndefined();
   });
 
+  /** @scenario "An arrival already in the queue is recorded as routine, not as a failure" */
   it("files a duplicate as an ordinary outcome and a surprise as a failure", async () => {
     const routine = serviceOver({ row: connection() });
     routine.requestFromSsoArrival.mockRejectedValue(
@@ -445,6 +447,7 @@ describe("given the queue will not take the request behind an arrival", () => {
 });
 
 describe("given somebody who already belongs to the organization", () => {
+  /** @scenario "Somebody who is already a member is nothing to admit and nothing to ask about" */
   it("asks for nothing and writes nothing", async () => {
     const parts = serviceOver({ row: connection(), member: true });
 
@@ -466,6 +469,7 @@ describe("given somebody who already belongs to the organization", () => {
 
 describe("administrator notices after an automatic admission", () => {
   for (const schedule of ["repeat", "concurrent"] as const) {
+    /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
     it(`sends one notice per new membership for ${schedule} callbacks`, async () => {
       const members = new Set<string>();
       const parts = serviceOver({
@@ -495,6 +499,7 @@ describe("administrator notices after an automatic admission", () => {
     });
   }
 
+  /** @scenario "A failed automatic SSO notice leaves admission pending for retry" */
   it("leaves the admission pending when the durable notice handoff fails", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
     parts.joinedAutomatically.mockRejectedValue(new Error("SMTP unavailable"));
@@ -525,6 +530,7 @@ describe("administrator notices after an automatic admission", () => {
 });
 
 describe("identity adoption after an authenticated arrival", () => {
+  /** @scenario "An admitted SSO user is adopted without a fleet-wide migration pass" */
   it("adopts only the newly admitted person, after the membership is created", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
 
@@ -536,6 +542,7 @@ describe("identity adoption after an authenticated arrival", () => {
     );
   });
 
+  /** @scenario "Existing SSO members retry adoption when new arrivals are refused" */
   it("retries adoption for an existing member when new arrivals are refused", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "refuse" }), member: true });
 
@@ -558,6 +565,7 @@ describe("identity adoption after an authenticated arrival", () => {
 });
 
 describe("an unfinished admission", () => {
+  /** @scenario "A later SSO sign-in completes a failed admission grant" */
   it("retries the same grant after a membership survived a failed append", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
     parts.attachBindings.mockRejectedValueOnce(new Error("Ledger unavailable"));
@@ -581,6 +589,7 @@ describe("an unfinished admission", () => {
     expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
   });
 
+  /** @scenario "An SSO admission retry never restores revoked access" */
   it("closes a revoked intent without attaching a replacement grant", async () => {
     const parts = serviceOver({
       row: connection({ arrivalPolicy: "admit" }),
@@ -604,6 +613,7 @@ describe("an unfinished admission", () => {
     expect(parts.joinedAutomatically).not.toHaveBeenCalled();
   });
 
+  /** @scenario "An accepted SSO grant remains pending until projection confirmation" */
   it("neither confirms nor announces a command whose projection has not landed", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
     parts.attachBindings.mockResolvedValue({ attached: ["rb_admission"], duplicates: [] });

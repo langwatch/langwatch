@@ -15,4 +15,17 @@ export const workflowWeb = defineWebModule("workflow").withScreens({
   "pages/[project]/chat/[workflow]": {
     load: () => import("./ui/sections/workflows/workflow-chat-screen.tsx"),
   },
-});
+})
+  /** The expandable text and the redaction marker, lent to evaluator (§3.4 rule 7). */
+  .withCapabilities({
+    hoverableBigText: {
+      load: async () => ({
+        default: (await import("./ui/sections/hoverable-big-text.tsx")).HoverableBigText,
+      }),
+    },
+    redactedField: {
+      load: async () => ({
+        default: (await import("./ui/sections/redacted-field.tsx")).RedactedField,
+      }),
+    },
+  });

@@ -2904,6 +2904,36 @@ const presentations = {
     describe: () =>
       "Another single sign-on connection has already proved ownership of this domain. Contact support to resolve the claim.",
   },
+  sso_activation_domain_unproved: {
+    title: "Prove a domain first",
+    describe: () =>
+      "Nobody can be sent to your identity provider until a domain is proved to be yours. Claim the domain and publish the record we give you.",
+  },
+  sso_activation_test_sign_in_missing: {
+    title: "Sign in through it once first",
+    describe: () =>
+      "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
+  },
+  sso_activation_arrivals_undecided: {
+    title: "Say who this connection lets in",
+    describe: () =>
+      "Somebody signs in through your identity provider and you have never seen them before — they can join on a domain you verified, they can ask and wait for your approval, or they can be turned away. Choose one, then turn the connection on.",
+  },
+  sso_license_required: {
+    title: "Single sign-on needs an active licence",
+    describe: () =>
+      "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
+  },
+  sso_self_serve_unavailable: {
+    title: "Setting single sign-on up yourself isn't switched on yet",
+    describe: () =>
+      "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
+  },
+  sso_activation_break_glass_missing: {
+    title: "Name someone who can still get in",
+    describe: () =>
+      "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
+  },
   sso_connection_activation_blocked: {
     title: "This connection isn't ready to go live",
     describe: () =>
@@ -4730,16 +4760,8 @@ const presentations = {
     describe: () =>
       "A key can only use guardrails from its own project. Pick one from this project instead.",
   },
-  gateway_spend_unavailable: {
-    // fault: platform. Says what is missing, not which engine is missing it.
-    title: "Spend isn't available for this key",
-    describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
-  },
   spend_source_unavailable: {
-    // The public REST spelling of the refusal above. Both doors answer the
-    // same way on a deployment with no per-key spend ledger; the wire code
-    // differs because the REST one is published in the management API docs
-    // and callers already branch on it.
+    // fault: platform. Says what is missing, not which engine is missing it.
     title: "Spend isn't available for this key",
     describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
   },

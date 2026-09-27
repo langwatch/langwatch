@@ -1,3 +1,4 @@
+import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorPagedWindowQuery,
@@ -246,6 +247,8 @@ export interface GovernanceDiagnosticsSink {
   warn(message: string, context: Record<string, unknown>): void;
 }
 
+export const silentGovernanceDiagnostics: GovernanceDiagnosticsSink = { warn: () => {} };
+
 export interface GovernanceEncryptor {
   encrypt(plaintext: string): string;
   decrypt(ciphertext: string): string;
@@ -426,7 +429,7 @@ export interface PulledUsageEntitlements {
   isEnabled(organizationId: string): Promise<boolean>;
 }
 
-/** ADR-128 §12: the discovery feed's trigger for the identity match engine (main `pullerWorker.ts:156`). */
+/** ADR-128 §12: the discovery feed's trigger for the identity match engine. */
 export interface DiscoveredPeopleMatcher {
   runFor(input: { organizationId: string }): Promise<void>;
 }
@@ -437,6 +440,13 @@ export interface IngestionPullDiagnosticsSink {
   error(message: string, context: Record<string, unknown>): void;
   capture(error: Error, context: Record<string, unknown>): void;
 }
+
+export const silentIngestionPullDiagnostics: IngestionPullDiagnosticsSink = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  capture: () => {},
+};
 
 export interface IngestionSourceEntitlements {
   hasEnterprisePlan(organizationId: string): Promise<boolean>;
@@ -711,6 +721,7 @@ export interface GovernanceClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    clickhouse_settings?: Record<string, number>;
   }): Promise<GovernanceClickHouseResult>;
 }
 
@@ -807,4 +818,19 @@ export interface AnomalySpendReader {
     baselineStart: Instant;
     sourceFilter: AnomalySpendSourceFilter;
   }): Promise<{ currentSpend: number; baselineSpend: number }>;
+}
+
+/** The receivers' per-caller throttle, before the secret lookup; open-fail by contract. */
+export interface GovernanceIngestRateLimiter {
+  /** `retryAfterSec` is the remaining window, as the receiver puts it on `Retry-After`. */
+  check(input: { ip: string }): Promise<Readonly<{ allowed: boolean; retryAfterSec: number }>>;
+}
+
+/** Whether the caller holds a permission on an organization, from the process's own AuthZ graph. */
+export interface GovernanceMcpPermissionProbe {
+  holdsOrganizationPermission(input: {
+    userId: string;
+    organizationId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
 }

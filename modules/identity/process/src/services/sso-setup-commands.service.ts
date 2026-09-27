@@ -2,16 +2,23 @@ import {
   type SelfServeActor,
   type SsoArrivalPolicy,
   type SsoMigrationRoute,
-  SsoConnectionActivationBlockedError,
+  SsoActivationArrivalsUndecidedError,
+  SsoActivationBreakGlassMissingError,
+  SsoActivationDomainUnprovedError,
+  SsoActivationTestSignInMissingError,
   SsoConnectionAlreadyRegisteredError,
   type SsoConnectionRemoval,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
   type SsoIdpRegistration,
   type SsoSetupCommand,
+  ssoDomainVouchesForNewPeople,
 } from "@langwatch/identity-contract";
 
-import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
+import type {
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+} from "../repositories/sso-connection.repository.ts";
 import type { SsoCredentialRepository } from "../repositories/sso-credential.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "../repositories/sso-migration-evidence.repository.ts";
 import { newSsoConnectionCommandId, newSsoConnectionId } from "../rules/sso-connection-id.rules.ts";
@@ -40,6 +47,8 @@ export interface SsoSetupCommandsServiceDeps {
   /** The trail going live reads the test sign-in off. */
   activity: SsoMigrationEvidenceRepository;
   credentials: SsoCredentialRepository;
+  /** The same "is there a way back in" answer the sign-in exemption reads. */
+  breakGlass: SsoBreakGlassBindingRepository;
   registrations: SsoIdpRegistrationService;
   /** The cutover's last verb, which is a ceremony of its own. */
   finalization: SsoMigrationFinalizationService;
@@ -182,10 +191,37 @@ export class SsoSetupCommandsService {
    */
   async activate({ organizationId, connectionId, actor }: SsoSetupCommand): Promise<void> {
     const state = await this.requireOrganizationConnection({ organizationId, connectionId });
+    if (state.state !== "ACTIVE") await this.requirePreconditionsInScreenOrder(state);
     await this.deps.connections().activateConnection({
       ...this.command({ organizationId, connectionId, actor }),
       testLoginAccountId: await this.testSignInAccountOf(state),
     });
+  }
+
+  /** Names the first unmet precondition; the guard rechecks all of them for every caller. */
+  private async requirePreconditionsInScreenOrder(state: SsoConnectionState): Promise<void> {
+    const domainProved = state.verifiedDomains.some((domain) =>
+      ssoDomainVouchesForNewPeople({ state, domain }),
+    );
+    if (!domainProved) {
+      throw new SsoActivationDomainUnprovedError(
+        `connection ${state.connectionId}: no domain is proved`,
+      );
+    }
+    await this.testSignInAccountOf(state);
+    const wayBackIn = await this.deps.breakGlass.hasLiveBinding({
+      organizationId: state.organizationId,
+    });
+    if (!wayBackIn) {
+      throw new SsoActivationBreakGlassMissingError(
+        `organization ${state.organizationId}: no live way in without the identity provider`,
+      );
+    }
+    if (state.arrivalPolicyDecidedAtMs === null) {
+      throw new SsoActivationArrivalsUndecidedError(
+        `connection ${state.connectionId}: nobody has said who it admits`,
+      );
+    }
   }
 
   /** The subject the newest recorded sign-in asserted. A connection nobody
@@ -200,7 +236,7 @@ export class SsoSetupCommandsService {
     });
     const asserted = recent.find((record) => record.providerAccountId !== null);
     if (!asserted?.providerAccountId) {
-      throw new SsoConnectionActivationBlockedError(
+      throw new SsoActivationTestSignInMissingError(
         `connection ${state.connectionId}: nobody has signed in through it`,
       );
     }
@@ -255,7 +291,13 @@ export class SsoSetupCommandsService {
       return { removal: "discarded" };
     }
 
-    await this.deps.connections().requestTeardown({ ...command, reason, graceMs });
+    // A paused connection carries nobody, so the week would protect nobody.
+    const carriesNobody = state.state === "SUSPENDED";
+    await this.deps.connections().requestTeardown({
+      ...command,
+      reason,
+      graceMs: carriesNobody ? 0 : graceMs,
+    });
     return { removal: "teardown-requested" };
   }
 

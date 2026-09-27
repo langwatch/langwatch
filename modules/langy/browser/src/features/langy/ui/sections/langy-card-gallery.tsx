@@ -37,6 +37,7 @@ import {
   explainLangyError,
   KNOWN_LANGY_ERROR_KINDS,
 } from "../../behavior/logic/langy-error-explainer.ts";
+import { toEngineMessage } from "../../model/langy-engine-parts.ts";
 import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { LangyCapabilityPendingCard } from "./capabilities/langy-capability-pending-card.tsx";
 import { LangyCapabilityRenderer } from "./capabilities/langy-capability-renderer.tsx";
@@ -102,7 +103,7 @@ function toolMessage(
     output?: unknown;
   }[],
 ): UIMessage {
-  return {
+  return toEngineMessage({
     id: "gallery",
     role: "assistant",
     parts: parts.map((part, index) => ({
@@ -112,11 +113,7 @@ function toolMessage(
       input: part.input,
       output: part.output,
     })),
-    // Fixture boundary: a runtime-assembled tool part can't satisfy the SDK's
-    // per-state discriminated union (each `state` literal demands different
-    // required fields). The gallery's whole point is feeding the REAL cards
-    // real-shaped data, and the cards narrow these parts structurally.
-  } as unknown as UIMessage;
+  });
 }
 
 const PROPOSAL: LangyProposal = {

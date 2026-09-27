@@ -88,6 +88,7 @@ describe("ApiKeyLifecycleService.revoke", () => {
   describe("given a login key with ingestion keys minted under it", () => {
     /** @scenario "Revoking a login key retires its ingest keys" */
     /** @scenario "A re-login from the same device retires the keys of the session it replaces" */
+    /** @scenario Revoking a login key from the API keys page retires its ingest keys */
     it("retires each child, recording that the session went rather than a decision about it", async () => {
       const { service, revoke } = makeService({
         children: [{ id: "ak_child_a" }, { id: "ak_child_b" }],
@@ -106,6 +107,7 @@ describe("ApiKeyLifecycleService.revoke", () => {
     });
 
     /** @scenario "A cause other than a person's own revoke passes through to the children unchanged" */
+    /** @scenario A re-login names rotation as the cause of the login key it replaces */
     it("passes a non-user cause straight through instead of remapping it", async () => {
       const { service, revoke } = makeService({ children: [{ id: "ak_child" }] });
 

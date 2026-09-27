@@ -58,6 +58,80 @@ export type CodeEvaluatorEditorDrawerProps = {
   onRemove?: () => void;
 };
 
+function seedFromSavedEvaluator(
+  data: { name: string; config: unknown },
+  setters: {
+    setName: (name: string) => void;
+    setCode: (code: string) => void;
+    setInputs: (inputs: EditableField[]) => void;
+  },
+) {
+  const config = data.config as Partial<CodeEvaluatorConfig> | null;
+  setters.setName(data.name);
+  if (config?.code) setters.setCode(config.code);
+  if (config?.inputs?.length) setters.setInputs(config.inputs.map((f) => ({ ...f })));
+}
+
+function withMapping(
+  prev: Record<string, UIFieldMapping>,
+  identifier: string,
+  mapping: UIFieldMapping | undefined,
+): Record<string, UIFieldMapping> {
+  const next = { ...prev };
+  if (mapping) next[identifier] = mapping;
+  else delete next[identifier];
+  return next;
+}
+
+/** Flow callbacks take precedence over the prop; with none, the drawer closes. */
+function handOffSaved({
+  evaluator,
+  onSave: propOnSave,
+  closeDrawer,
+}: {
+  evaluator: { id: string; name: string };
+  onSave: CodeEvaluatorEditorDrawerProps["onSave"];
+  closeDrawer: () => void;
+}) {
+  const onSave =
+    getFlowCallbacks("codeEvaluatorEditor")?.onSave ??
+    getFlowCallbacks("evaluatorEditor")?.onSave ??
+    propOnSave;
+  if (!onSave) {
+    closeDrawer();
+    return;
+  }
+  (onSave as (evaluator: { id: string; name: string }) => void)({
+    id: evaluator.id,
+    name: evaluator.name,
+  });
+}
+
+/** Why the button is disabled, so it explains itself; silent while saving or loading. */
+function saveAvailability({
+  name,
+  code,
+  inputs,
+  busy,
+  isEditing,
+}: {
+  name: string;
+  code: string;
+  inputs: EditableField[];
+  busy: boolean;
+  isEditing: boolean;
+}) {
+  const hasName = !!name.trim();
+  const hasCode = code.trim() !== "";
+  const hasInput = validCodeEvaluatorFields(inputs).length > 0;
+  return {
+    canSave: hasName && hasCode && hasInput && !busy,
+    disabledReason: busy
+      ? null
+      : codeEvaluatorDisabledReason({ hasName, hasCode, hasInput, isEditing }),
+  };
+}
+
 /** Form state and the create/update mutation behind the drawer; no JSX in here. */
 function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
@@ -99,12 +173,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     const data = evaluatorQuery.data;
     if (!data || seededForRef.current === data.id) return;
     seededForRef.current = data.id;
-    const config = data.config as Partial<CodeEvaluatorConfig> | null;
-    setName(data.name);
-    if (config?.code) setCode(config.code);
-    if (config?.inputs?.length) {
-      setInputs(config.inputs.map((f) => ({ ...f })));
-    }
+    seedFromSavedEvaluator(data, { setName, setCode, setInputs });
   }, [evaluatorQuery.data]);
 
   // Keep the Python __call__ signature in sync with the declared inputs, the
@@ -120,15 +189,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   };
 
   const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
-    setMappings((prev) => {
-      const next = { ...prev };
-      if (mapping) {
-        next[identifier] = mapping;
-      } else {
-        delete next[identifier];
-      }
-      return next;
-    });
+    setMappings((prev) => withMapping(prev, identifier, mapping));
     onMappingChange?.(identifier, mapping);
   };
 
@@ -144,18 +205,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
       title: isEditing ? "Code evaluator saved" : "Code evaluator created",
       type: "success",
     });
-    const onSave =
-      getFlowCallbacks("codeEvaluatorEditor")?.onSave ??
-      getFlowCallbacks("evaluatorEditor")?.onSave ??
-      props.onSave;
-    if (onSave) {
-      (onSave as (evaluator: { id: string; name: string }) => void)({
-        id: evaluator.id,
-        name: evaluator.name,
-      });
-    } else {
-      closeDrawer();
-    }
+    handOffSaved({ evaluator, onSave: props.onSave, closeDrawer });
   };
 
   const createMutation = api.evaluators.create.useMutation({
@@ -199,25 +249,13 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const isLoadingEvaluator = isEditing && evaluatorQuery.isLoading;
-  const canSave =
-    !!name.trim() &&
-    code.trim() !== "" &&
-    validCodeEvaluatorFields(inputs).length > 0 &&
-    !isPending &&
-    !isLoadingEvaluator;
-
-  // Why the button is disabled, so it explains itself instead of being a
-  // silent dead button. Suppressed while saving/loading (those are transient
-  // and the button shows its own loading state).
-  const disabledReason =
-    isPending || isLoadingEvaluator
-      ? null
-      : codeEvaluatorDisabledReason({
-          hasName: !!name.trim(),
-          hasCode: code.trim() !== "",
-          hasInput: validCodeEvaluatorFields(inputs).length > 0,
-          isEditing,
-        });
+  const { canSave, disabledReason } = saveAvailability({
+    name,
+    code,
+    inputs,
+    busy: isPending || isLoadingEvaluator,
+    isEditing,
+  });
 
   return {
     name,

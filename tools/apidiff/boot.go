@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -196,7 +197,10 @@ func chDatabaseURL(serverURL, database string) (string, error) {
 // volumes must not leak into this stack. Memory: ClickHouse is capped at 2g
 // (the dev stack's 4g does not fit a 4 GiB VM beside everything else) and
 // postgres raised to 512m — the dev stack's 256m cgroup limit is a plausible
-// kill reason when 297 migrations run while two Node APIs boot.
+// kill reason when 297 migrations run while two Node APIs boot. ClickHouse
+// also gets what the LangWatchQL access model needs: access management for
+// the default user and the custom_ settings prefix (inline, as a compose
+// config, since the run's work root is not mounted into a container VM).
 func portsOverrideYAML(pgPort, chPort, redisPort int) string {
 	return fmt.Sprintf(`services:
   postgres:
@@ -215,6 +219,11 @@ func portsOverrideYAML(pgPort, chPort, redisPort int) string {
     volumes: !override
       - apidiff-redis-data:/data
   clickhouse:
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    configs:
+      - source: apidiff-lwql-prefixes
+        target: /etc/clickhouse-server/config.d/apidiff-lwql.xml
     ports: !override
       - "127.0.0.1:%d:8123"
     volumes: !override
@@ -224,6 +233,10 @@ func portsOverrideYAML(pgPort, chPort, redisPort int) string {
         limits:
           memory: 2g
           cpus: "1.0"
+configs:
+  apidiff-lwql-prefixes:
+    content: |
+      <clickhouse><custom_settings_prefixes>custom_</custom_settings_prefixes></clickhouse>
 volumes:
   apidiff-pg-data:
   apidiff-redis-data:
@@ -247,14 +260,15 @@ var managedEnvKeys = []string{
 
 // instanceEnvSpec carries the per-instance values instanceEnv composes.
 type instanceEnvSpec struct {
-	port         int
-	portEnv      []string // profile-specific port variables
-	extraEnv     []string // profile-specific extras (see bootProfile.extraEnv)
-	database     string
-	chDatabase   string
-	redisURL     string
-	redisDBIndex string
-	storagePath  string // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
+	port          int
+	portEnv       []string // profile-specific port variables
+	extraEnv      []string // profile-specific extras (see bootProfile.extraEnv)
+	database      string
+	chDatabase    string
+	redisURL      string
+	redisDBIndex  string
+	storagePath   string   // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
+	collaborators []string // collaboratorEnv: LangWatchQL, the judge, the Langy agent stub
 }
 
 // instanceEnv composes one instance's process environment: user env
@@ -262,6 +276,9 @@ type instanceEnvSpec struct {
 func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 	managed := map[string]bool{}
 	for _, key := range managedEnvKeys {
+		managed[key] = true
+	}
+	for _, key := range collaboratorEnvKeys {
 		managed[key] = true
 	}
 	env := make([]string, 0, len(inherit)+10)
@@ -293,6 +310,7 @@ func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
 	if spec.storagePath != "" {
 		env = append(env, "LANGWATCH_LOCAL_STORAGE_PATH="+spec.storagePath)
 	}
+	env = append(env, spec.collaborators...)
 	env = append(env, spec.extraEnv...)
 	return append(env, spec.portEnv...)
 }
@@ -485,12 +503,18 @@ type bootState struct {
 	override   string
 	infra      infraURLs
 	processes  []*exec.Cmd
+	// processesMu guards processes: a worker respawn appends from its own
+	// goroutine while teardown may be killing.
+	processesMu sync.Mutex
 	// havenSlugs are the stacks this run started, in order. The teardown
 	// destroys these and nothing else.
 	havenSlugs []string
 	// inherit overrides the process environment the child commands are
 	// composed from; nil means os.Environ(). Tests supply their own.
 	inherit []string
+	// langyStub stands in for the Langy agent manager on both sides (compose
+	// and external-infra paths only), started before the first migrate.
+	langyStub *langyAgentStub
 }
 
 // environ is the environment child commands inherit.
@@ -646,6 +670,7 @@ func (state *bootState) prepareInstances(booted *Booted) error {
 // bootInstances runs the per-instance bring-up stages in order.
 func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error {
 	stages := []func() error{
+		func() error { return state.startLangyStub() },
 		func() error { return state.resolveInfra() },
 		func() error { return state.preflight(ctx) },
 		func() error { return state.install(ctx, booted.A) },
@@ -661,6 +686,8 @@ func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error
 		func() error { return state.migrateAndSeed(ctx, booted.B) },
 		func() error { return state.verifyMigrationTarget(ctx, booted.B) },
 		func() error { return state.provision(ctx, booted.B) },
+		func() error { return state.provisionLwql(ctx, booted.A) },
+		func() error { return state.provisionLwql(ctx, booted.B) },
 		func() error { return state.startAPI(ctx, &booted.A) },
 		func() error { return state.startAPI(ctx, &booted.B) },
 		func() error { return state.startWorker(ctx, &booted.A) },
@@ -1129,6 +1156,37 @@ func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) e
 	return nil
 }
 
+// startLangyStub starts the stub Langy agent manager both instances dial.
+func (state *bootState) startLangyStub() error {
+	stub, err := startLangyAgentStub()
+	if err != nil {
+		return err
+	}
+	state.langyStub = stub
+	state.logf("langy agent stub on %s", stub.URL("<instance>"))
+	return nil
+}
+
+// provisionLwql converges the LangWatchQL access model into one instance's
+// databases, after the fixtures so the key map covers every fixture project.
+// The task is non-fatal by design, and so is this step: a refused statement
+// leaves LangWatchQL refused on that side, which the probes then compare.
+func (state *bootState) provisionLwql(ctx context.Context, instance Instance) error {
+	if len(instance.Profile.lwqlProvisionArgv) == 0 {
+		return nil
+	}
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
+	state.logf("lwql %s: provision the access model", instance.Name)
+	spec := commandSpec{name: "pnpm", args: instance.Profile.lwqlProvisionArgv, dir: instance.Dir, env: env}
+	if err := state.run(ctx, spec, state.stderr); err != nil {
+		state.logf("lwql %s: provisioning failed (%v); LangWatchQL stays refused on this side", instance.Name, err)
+	}
+	return nil
+}
+
 // provision inserts the run's fixed fixtures into one instance's database:
 // the SCIM probe token and the permission-probe projects/orgs.
 func (state *bootState) provision(ctx context.Context, instance Instance) error {
@@ -1183,15 +1241,20 @@ func (state *bootState) envFor(instance Instance) ([]string, error) {
 	if err := os.MkdirAll(storagePath, 0o700); err != nil {
 		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
 	}
+	langyURL := ""
+	if state.langyStub != nil {
+		langyURL = state.langyStub.URL(instance.Name)
+	}
 	return instanceEnv(os.Environ(), instanceEnvSpec{
-		port:         instance.Port,
-		portEnv:      instance.Profile.portEnv(instance.Port),
-		extraEnv:     instance.Profile.extraEnv(baseURL),
-		database:     database,
-		chDatabase:   chDatabase,
-		redisURL:     state.infra.redisServer,
-		redisDBIndex: strconv.Itoa(redisIndex),
-		storagePath:  storagePath,
+		collaborators: collaboratorEnv(instance.Name, langyURL),
+		port:          instance.Port,
+		portEnv:       instance.Profile.portEnv(instance.Port),
+		extraEnv:      instance.Profile.extraEnv(baseURL),
+		database:      database,
+		chDatabase:    chDatabase,
+		redisURL:      state.infra.redisServer,
+		redisDBIndex:  strconv.Itoa(redisIndex),
+		storagePath:   storagePath,
 	}), nil
 }
 
@@ -1238,15 +1301,34 @@ func (state *bootState) startWorker(ctx context.Context, instance *Instance) err
 	if err != nil {
 		return err
 	}
-	command, logPath, err := state.spawn(ctx, instanceProcess{
+	process := instanceProcess{
 		instance: *instance, argv: instance.Profile.workerArgv, logName: instance.Name + "-worker",
 		extraEnv: []string{fmt.Sprintf("WORKER_METRICS_PORT=%d", port)},
-	})
+	}
+	command, logPath, err := state.spawn(ctx, process)
 	if err != nil {
 		return err
 	}
 	state.logf("start %s worker (pid %d, log %s)", instance.Name, command.Process.Pid, logPath)
+	go state.respawnOnEarlyExit(ctx, command, process)
 	return nil
+}
+
+// workerRespawnWindow is how soon after start a worker exit counts as a boot
+// failure worth one retry: main's worker migrates before it serves, and one
+// refused database connection there left a whole run with no projections.
+var workerRespawnWindow = 5 * time.Minute
+
+// respawnOnEarlyExit restarts a worker once when it dies during its own boot.
+func (state *bootState) respawnOnEarlyExit(ctx context.Context, command *exec.Cmd, process instanceProcess) {
+	started := time.Now()
+	if err := command.Wait(); err == nil || ctx.Err() != nil || time.Since(started) > workerRespawnWindow {
+		return
+	}
+	state.logf("%s exited during boot; starting it once more", process.logName)
+	if _, _, err := state.spawn(ctx, process); err != nil {
+		state.logf("%s restart: %v", process.logName, err)
+	}
 }
 
 // instanceProcess is one process an instance runs on its composed env.
@@ -1284,7 +1366,9 @@ func (state *bootState) spawn(ctx context.Context, process instanceProcess) (*ex
 		logFile.Close()
 		return nil, "", fmt.Errorf("start %s: %w", process.logName, err)
 	}
+	state.processesMu.Lock()
 	state.processes = append(state.processes, command)
+	state.processesMu.Unlock()
 	return command, logPath, nil
 }
 
@@ -1332,6 +1416,9 @@ func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
 func (state *bootState) teardown() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
+	if state.langyStub != nil {
+		defer state.langyStub.Close()
+	}
 	if state.cfg.Keep {
 		if state.cfg.UseHaven {
 			state.logf("teardown: -keep set, leaving the stacks up - `haven destroy %s` when you are done",
@@ -1386,6 +1473,8 @@ func (state *bootState) removeWorktree(ctx context.Context, dir string) {
 // killAPIProcesses kills each started API's whole process group — the pnpm
 // wrapper and its tsx child share the group Setpgid created.
 func (state *bootState) killAPIProcesses() {
+	state.processesMu.Lock()
+	defer state.processesMu.Unlock()
 	for _, command := range state.processes {
 		if command.Process != nil {
 			// Negative pid targets the process group.

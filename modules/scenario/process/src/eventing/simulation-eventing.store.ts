@@ -1,0 +1,202 @@
+import {
+  RepositoryFoldStore,
+  type AppendStore,
+  type BulkAppendContext,
+  type FoldProjectionStore,
+  type Projection,
+  type ProjectionStore,
+  type ProjectionStoreReadContext,
+  type ProjectionStoreWriteContext,
+  type ProjectionStoreContext,
+  type FoldStateRead,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
+
+import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts";
+import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository.ts";
+import type { SimulationEventingClickHouseResolver } from "../repositories/clickhouse/clickhouse.simulation-session.store.ts";
+import {
+  ClickHouseStalledSimulationRunRepository,
+  type StalledSimulationRunClickHouseClient,
+} from "../repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts";
+import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository.ts";
+import {
+  BACKFILL_STALE_THRESHOLD_MS,
+  type StalledHistoricalRun,
+} from "../repositories/stalled-simulation-run.repository.ts";
+import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metrics.projection.ts";
+import { SimulationRunMetricsAppendStore } from "./simulation-run-metrics.store.ts";
+import {
+  SimulationRunStateFoldProjection,
+  type SimulationRunStateData,
+} from "./simulation-run-state.projection.ts";
+
+const logger = createLogger("scenario:simulation-run-state-fold-store");
+
+/**
+ * Fold store for simulation run state, with the gate that keeps a cost figure from inventing a run.
+ */
+class GatedSimulationRunStateFoldStore implements FoldProjectionStore<SimulationRunStateData> {
+  constructor(private readonly inner: FoldProjectionStore<SimulationRunStateData>) {}
+
+  async store(state: SimulationRunStateData, context: ProjectionStoreContext): Promise<void> {
+    if (!SimulationRunStateFoldProjection.hasRunDefiningEvent(state)) {
+      this.reportDeclined(context);
+      return;
+    }
+    await this.inner.store(state, context);
+  }
+
+  async storeBatch(
+    entries: { state: SimulationRunStateData; context: ProjectionStoreContext }[],
+  ): Promise<void> {
+    const writable = entries.filter(({ state, context }) => {
+      if (SimulationRunStateFoldProjection.hasRunDefiningEvent(state)) return true;
+      this.reportDeclined(context);
+      return false;
+    });
+    if (writable.length === 0) return;
+    if (this.inner.storeBatch) {
+      await this.inner.storeBatch(writable);
+      return;
+    }
+    for (const { state, context } of writable) await this.inner.store(state, context);
+  }
+
+  async get(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<FoldStateRead<SimulationRunStateData>> {
+    return this.inner.get(aggregateId, context);
+  }
+
+  private reportDeclined(context: ProjectionStoreContext): void {
+    logger.warn(
+      {
+        tenantId: String(context.tenantId),
+        scenarioRunId: String(context.key ?? context.aggregateId),
+      },
+      "Simulation run cost arrived for a run with no lifecycle event, holding it out of simulation_runs",
+    );
+  }
+}
+
+export type SimulationStalledRun = StalledHistoricalRun;
+export { BACKFILL_STALE_THRESHOLD_MS };
+
+type SimulationRunMetricsAppend = {
+  append(
+    record: SimulationRunMetricsProjectionRecord,
+    context: ProjectionStoreContext,
+  ): Promise<void>;
+  bulkAppend(
+    records: SimulationRunMetricsProjectionRecord[],
+    context: BulkAppendContext,
+  ): Promise<void>;
+};
+
+export class SimulationRunStateStore implements ProjectionStore {
+  static create(
+    options:
+      | {
+          type: "clickhouse";
+          resolveClient: SimulationEventingClickHouseResolver;
+          defaultRetentionDays: () => number;
+        }
+      | { type: "memory" },
+  ): SimulationRunStateStore {
+    const store =
+      options.type === "clickhouse"
+        ? ClickHouseSimulationRunStateRepository.create(options)
+        : MemorySimulationRunStateRepository.create();
+
+    return new SimulationRunStateStore(store);
+  }
+
+  private constructor(private readonly store: ProjectionStore) {}
+
+  createFoldStore(): FoldProjectionStore<SimulationRunStateData> {
+    return new GatedSimulationRunStateFoldStore(
+      new RepositoryFoldStore<SimulationRunStateData>(
+        this,
+        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      ),
+    );
+  }
+
+  findProjection(
+    aggregateId: string,
+    context: ProjectionStoreReadContext,
+  ): Promise<Projection | null> {
+    return this.store.findProjection(aggregateId, context);
+  }
+
+  storeProjection(projection: Projection, context: ProjectionStoreWriteContext): Promise<void> {
+    return this.store.storeProjection(projection, context);
+  }
+
+  async storeProjectionBatch(
+    projections: Projection[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (this.store.storeProjectionBatch) {
+      await this.store.storeProjectionBatch(projections, context);
+      return;
+    }
+
+    for (const projection of projections) {
+      await this.store.storeProjection(projection, context);
+    }
+  }
+}
+
+export class SimulationRunMetricsStore implements AppendStore<SimulationRunMetricsProjectionRecord> {
+  static create(
+    options:
+      | {
+          type: "clickhouse";
+          resolveClient: SimulationEventingClickHouseResolver;
+        }
+      | { type: "null" },
+  ): SimulationRunMetricsStore {
+    if (options.type === "null") {
+      return new SimulationRunMetricsStore({
+        async append() {},
+        async bulkAppend() {},
+      });
+    }
+
+    const repository = ClickHouseSimulationRunMetricsRepository.create(options.resolveClient);
+    const store = SimulationRunMetricsAppendStore.create(repository);
+    return new SimulationRunMetricsStore(store);
+  }
+
+  private constructor(private readonly store: SimulationRunMetricsAppend) {}
+
+  append(
+    record: SimulationRunMetricsProjectionRecord,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    return this.store.append(record, context);
+  }
+
+  bulkAppend(
+    records: SimulationRunMetricsProjectionRecord[],
+    context: BulkAppendContext,
+  ): Promise<void> {
+    return this.store.bulkAppend(records, context);
+  }
+}
+
+export class SimulationStalledRunStore {
+  static create(client: StalledSimulationRunClickHouseClient): SimulationStalledRunStore {
+    return new SimulationStalledRunStore(ClickHouseStalledSimulationRunRepository.create(client));
+  }
+
+  private constructor(private readonly repository: ClickHouseStalledSimulationRunRepository) {}
+
+  findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]> {
+    return this.repository.findStalledRuns(input);
+  }
+}

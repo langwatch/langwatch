@@ -15,8 +15,14 @@ import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { OpsOperations } from "../app/ops-operations.ts";
-import type { QueuePayloadDecoder, QueuePayloadDecoding } from "../app/ops.app.ts";
+import { OpsOperations } from "../app/ops-composition.build.ts";
+import type {
+  OpsEventExplorer,
+  OpsProcessExplorer,
+  OpsReplayRunner,
+  QueuePayloadDecoder,
+  QueuePayloadDecoding,
+} from "../app/ops.app.ts";
 import type { OpsService } from "../services/ops.service.ts";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
@@ -77,6 +83,12 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       scheduler: {
         schedules,
         projects,
+      },
+      explorers: {
+        eventExplorer: createApiFixture<OpsEventExplorer>(),
+        managerExplorer: createApiFixture<OpsProcessExplorer>(),
+        replay: createApiFixture<OpsReplayRunner>(),
+        snapshots: null,
       },
     }).build();
   });

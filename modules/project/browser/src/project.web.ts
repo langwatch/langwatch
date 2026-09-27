@@ -28,4 +28,12 @@ export const projectWeb = defineWebModule("project")
       label: "Project Settings",
       load: () => import("./ui/sections/project-settings/project-settings-screen.tsx"),
     },
+  })
+  /** The inline command palette, lent to governance's overview hero (§3.4 rule 7). */
+  .withCapabilities({
+    heroAskField: {
+      load: async () => ({
+        default: (await import("./ui/sections/home/components/hero-ask-field.tsx")).HeroAskField,
+      }),
+    },
   });

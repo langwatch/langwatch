@@ -17,9 +17,10 @@ Feature: The API process serves the auth door
   fail, it would verify nothing and answer "signed out" to everybody — so the
   family is left off rather than served over a guess.
 
-  Order is behaviour. The catch-all claims `/auth/*`, so it swallows every
-  sibling registered after it. The two `/api/auth/cli` halves are registered
-  first, and that ordering is what keeps `langwatch login` reachable.
+  Order is behaviour. The catch-all claims `/auth/*`, so it would swallow every
+  sibling registered after it. The CLI device grant is registered first; the
+  governance CLI plane installs after the auth family, so the catch-all declines
+  every `/api/auth/cli` path and hands it on, which keeps both reachable.
 
   @integration
   Scenario: The browser can read who is signed in
@@ -39,6 +40,13 @@ Feature: The API process serves the auth door
     And the CLI device grant is composed alongside it
     When the CLI asks for a device code
     Then the device grant answers it rather than the Better Auth catch-all
+
+  @integration
+  Scenario: The CLI governance routes mounted after the auth family still reach their own routes
+    Given the auth family mounted before a family serving "/api/auth/cli/bootstrap" and "/api/auth/cli/project-key"
+    When a CLI reads "/api/auth/cli/bootstrap" with its bearer
+    Then that family answers it rather than the Better Auth catch-all
+    And a CLI POST to "/api/auth/cli/project-key" is not refused by the sign-in door's origin gate
 
   @integration
   Scenario: A process handed someone else's transport mounts no auth door

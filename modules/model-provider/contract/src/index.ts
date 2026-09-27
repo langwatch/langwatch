@@ -22,6 +22,7 @@ export * from "./catalog/codex-refusal-message.ts";
 export * from "./catalog/codex-restrictions.ts";
 export * from "./catalog/langy-skip-permissions.ts";
 export * from "./catalog/latest-aliases.ts";
+export * from "./catalog/recommended-chat-models.ts";
 export * from "./catalog/latest-flagship.ts";
 export * from "./catalog/model-catalog.ts";
 export * from "./catalog/model-catalog.types.ts";

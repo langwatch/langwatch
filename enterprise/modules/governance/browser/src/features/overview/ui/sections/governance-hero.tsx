@@ -13,11 +13,11 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@langwatch/design-system/menu";
-import { HeroAskField } from "@langwatch/project-browser/surfaces/hero-ask-field";
 import { Bot, Building2, PackageOpen, Settings2 } from "lucide-react";
 import type React from "react";
 
 import { useGovernanceRouter } from "../../../../behavior/governance-router.ts";
+import { HeroAskField } from "../../../../behavior/lent-hero-ask-field.tsx";
 import { useGovernanceHost } from "../../../../model/governance-host.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { SourceType } from "../../../ingestion-sources/model/ingestion-source-catalog.ts";

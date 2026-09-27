@@ -99,7 +99,7 @@ function deterministicEventId({
 
 // OTLP metrics come as doubleValue or intValue (the latter as
 // number/string/Long); must read both to avoid dropping valid feedback.
-function readMetricValue(value: OtlpAnyValue | undefined): number | undefined {
+function parseMetricValue(value: OtlpAnyValue | undefined): number | undefined {
   const raw = value?.doubleValue ?? value?.intValue;
   if (raw === null || raw === undefined) return undefined;
 
@@ -116,7 +116,7 @@ function readMetricValue(value: OtlpAnyValue | undefined): number | undefined {
  * encoding. `event.type` and every `event.details.<key>` are string-only, so an
  * attribute arriving as an int or a bool is dropped rather than coerced.
  */
-function readStringValue(value: OtlpAnyValue | undefined): string | undefined {
+function parseStringValue(value: OtlpAnyValue | undefined): string | undefined {
   if (value && "stringValue" in value && typeof value.stringValue === "string") {
     return value.stringValue;
   }
@@ -138,7 +138,7 @@ function collectMetricAttribute({
   value: OtlpAnyValue | undefined;
 }): void {
   const metricKey = key.slice(METRICS_PREFIX.length);
-  const num = readMetricValue(value);
+  const num = parseMetricValue(value);
   if (metricKey.length > 0 && num !== undefined) {
     metrics[metricKey] = num;
   }
@@ -158,7 +158,7 @@ function collectDetailAttribute({
   value: OtlpAnyValue | undefined;
 }): void {
   const detailKey = key.slice(DETAILS_PREFIX.length);
-  const detailValue = readStringValue(value);
+  const detailValue = parseStringValue(value);
   if (detailKey.length > 0 && detailValue !== undefined) {
     eventDetails[detailKey] = detailValue;
   }
@@ -169,7 +169,7 @@ function collectDetailAttribute({
  * `langwatch.event` span event's attributes. Returns undefined when the event
  * carries no usable `event.type`, so the caller drops it.
  */
-function reconstructTrackedEvent({
+function toTrackedEvent({
   event,
   occurrenceIndex,
 }: {
@@ -183,7 +183,7 @@ function reconstructTrackedEvent({
   for (const attr of event.attributes) {
     const value = attr.value;
     if (attr.key === EVENT_TYPE_KEY) {
-      eventType = readStringValue(value) ?? eventType;
+      eventType = parseStringValue(value) ?? eventType;
       continue;
     }
     if (attr.key.startsWith(METRICS_PREFIX)) {
@@ -259,6 +259,11 @@ function toError(error: unknown): Error {
  * (rather than throwing) so the caller finishes remaining events first,
  * then rethrows the first so the framework retries the whole span.
  */
+type TrackedEventRecording =
+  | { outcome: "recorded" }
+  | { outcome: "discarded" }
+  | { outcome: "failed"; error: Error };
+
 async function recordReconstructedEvent({
   deps,
   trackedEvent,
@@ -273,13 +278,13 @@ async function recordReconstructedEvent({
   traceId: string;
   spanId: string;
   timestamp: number;
-}): Promise<Error | undefined> {
+}): Promise<TrackedEventRecording> {
   if (!isValidTrackedEvent({ event: trackedEvent, traceId })) {
     logger.warn(
       { tenantId, traceId, eventType: trackedEvent.event_type },
       "Discarding malformed langwatch.event feedback (schema validation failed)",
     );
-    return undefined;
+    return { outcome: "discarded" };
   }
 
   const eventId = deterministicEventId({
@@ -301,7 +306,7 @@ async function recordReconstructedEvent({
         timestamp,
       },
     });
-    return undefined;
+    return { outcome: "recorded" };
   } catch (error) {
     const failure = toError(error);
     logger.error(
@@ -313,7 +318,7 @@ async function recordReconstructedEvent({
       },
       "Failed to record tracked event from span feedback",
     );
-    return failure;
+    return { outcome: "failed", error: failure };
   }
 }
 
@@ -343,7 +348,7 @@ async function syncTrackedEventsFromSpan({
   const errors: Error[] = [];
 
   for (const trackedEvent of trackedEvents) {
-    const failure = await recordReconstructedEvent({
+    const recording = await recordReconstructedEvent({
       deps,
       trackedEvent,
       tenantId,
@@ -351,7 +356,7 @@ async function syncTrackedEventsFromSpan({
       spanId,
       timestamp: event.occurredAt,
     });
-    if (failure !== undefined) errors.push(failure);
+    if (recording.outcome === "failed") errors.push(recording.error);
   }
 
   if (errors.length > 0) {
@@ -373,7 +378,7 @@ export function extractTrackedEventsFromSpan(span: OtlpSpan): ReconstructedTrack
   for (const [occurrenceIndex, event] of (span.events ?? []).entries()) {
     if (event.name !== FEEDBACK_EVENT_NAME) continue;
 
-    const reconstructed = reconstructTrackedEvent({ event, occurrenceIndex });
+    const reconstructed = toTrackedEvent({ event, occurrenceIndex });
     if (reconstructed !== undefined) events.push(reconstructed);
   }
 

@@ -118,7 +118,7 @@ describe("the ingestionSources tRPC namespace", () => {
     const { caller } = mount();
     await expect(
       caller.create({ organizationId: "org_1", sourceType: "otel_generic", name: "x".repeat(129) }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
   it("updates, rotates, archives and validates OTTL under ingestionSources:manage", async () => {
@@ -141,6 +141,6 @@ describe("the ingestionSources tRPC namespace", () => {
     const { caller } = mount();
     await expect(
       caller.validateOttl({ organizationId: "org_1", statements: Array(65).fill("x") }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

@@ -134,8 +134,8 @@ export function useChoicesRefRows(
     if (!projectId || hydratable.size === 0) return;
     let cancelled = false;
 
-    void hydrateAllRefTypes(hydratable, utils, projectId).then((next) => {
-      if (!cancelled) setResolved(next);
+    void hydrateAllRefTypes(hydratable, utils, projectId).then((rows) => {
+      if (!cancelled) setResolved(rows);
     });
 
     return () => {

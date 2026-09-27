@@ -5,12 +5,12 @@ import type {
   IngestionPullLifecycleChannel,
   IngestionPullTenantResolver,
 } from "../app/governance.members.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 import type {
   IngestionPullLifecycleRepository,
   IngestionPullLifecycleSource,
 } from "../repositories/ingestion-pull-lifecycle.repository.ts";
 import { schedulerWillPull } from "../rules/pull-schedule.rules.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class IngestionPullLifecycleService {
   private readonly repository: IngestionPullLifecycleRepository;
@@ -56,7 +56,7 @@ export class IngestionPullLifecycleService {
       projects: options.projects,
       tenant: options.tenant,
       commands: options.commands,
-      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
       now: options.now ?? Date.now,
     });
   }

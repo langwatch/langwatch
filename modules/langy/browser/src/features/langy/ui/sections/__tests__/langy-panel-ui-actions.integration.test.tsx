@@ -94,7 +94,23 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   const { createTrpcUtils, idleQuery, withFallback } =
     await import("../../../__tests__/support/langy-api-mock.ts");
 
-  const trpcUtils = createTrpcUtils();
+  const trpcUtils = createTrpcUtils({
+    client: {
+      langy: {
+        createConversation: {
+          mutate: (input: unknown) => mutation("langy.createConversation", input),
+        },
+        continueConversation: {
+          mutate: (input: unknown) => mutation("langy.continueConversation", input),
+        },
+        onTurnStream: {
+          subscribe: (input: unknown, options: unknown) => subscription(input, options),
+        },
+        claimUiAction: { mutate: (input: unknown) => claimUiAction(input) },
+        completeUiAction: { mutate: (input: unknown) => completeUiAction(input) },
+      },
+    },
+  });
 
   const explicitApi: Record<string, unknown> = {
     langy: withFallback({
@@ -170,21 +186,6 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
 
   return {
     api: withFallback(explicitApi),
-    trpcClient: {
-      langy: {
-        createConversation: {
-          mutate: (input: unknown) => mutation("langy.createConversation", input),
-        },
-        continueConversation: {
-          mutate: (input: unknown) => mutation("langy.continueConversation", input),
-        },
-        onTurnStream: {
-          subscribe: (input: unknown, options: unknown) => subscription(input, options),
-        },
-        claimUiAction: { mutate: (input: unknown) => claimUiAction(input) },
-        completeUiAction: { mutate: (input: unknown) => completeUiAction(input) },
-      },
-    },
   };
 });
 

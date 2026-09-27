@@ -38,14 +38,14 @@ function protectSpan(
       ? {}
       : {
           input: protections.canSeeCapturedInput
-            ? protectContent(span.input, redactions)
+            ? deriveProtectedContent(span.input, redactions)
             : { type: "text", value: "[REDACTED]" },
         }),
     ...(span.output === void 0 || span.output === null
       ? {}
       : {
           output: protections.canSeeCapturedOutput
-            ? protectContent(span.output, redactions)
+            ? deriveProtectedContent(span.output, redactions)
             : { type: "text", value: "[REDACTED]" },
         }),
     ...(span.params === void 0 || span.params === null
@@ -54,7 +54,7 @@ function protectSpan(
     ...(span.metrics === void 0 || span.metrics === null
       ? {}
       : {
-          metrics: protectMetrics(span.metrics, protections.canSeeCosts),
+          metrics: deriveProtectedMetrics(span.metrics, protections.canSeeCosts),
         }),
   };
 }
@@ -78,7 +78,7 @@ function protectEvent(
   };
 }
 
-function protectContent(
+function deriveProtectedContent(
   content: { type?: string; value: TraceRecordValue } | null | undefined,
   redactions: Set<string>,
 ): { type?: string; value: TraceRecordValue } | null | undefined {
@@ -86,7 +86,7 @@ function protectContent(
   return { ...content, value: redactValue(content.value, redactions) };
 }
 
-function protectMetrics(
+function deriveProtectedMetrics(
   metrics: Record<string, TraceRecordValue> | null | undefined,
   canSeeCosts: boolean,
 ): Record<string, TraceRecordValue> | null | undefined {
@@ -179,10 +179,12 @@ export function applyTraceFullReadProtections(
 
   const spans = trace.spans.map((span) => protectSpan(span, protections, redactions));
   const events = trace.events?.map((event) => protectEvent(event, protections, redactions));
-  const metrics = protectMetrics(trace.metrics, protections.canSeeCosts);
-  const input = protections.canSeeCapturedInput ? protectContent(trace.input, redactions) : void 0;
+  const metrics = deriveProtectedMetrics(trace.metrics, protections.canSeeCosts);
+  const input = protections.canSeeCapturedInput
+    ? deriveProtectedContent(trace.input, redactions)
+    : void 0;
   const output = protections.canSeeCapturedOutput
-    ? protectContent(trace.output, redactions)
+    ? deriveProtectedContent(trace.output, redactions)
     : void 0;
 
   return {

@@ -3,7 +3,7 @@ import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
 
-import { analyticsApi } from "../../../behavior/analytics-api.ts";
+import { analyticsApi, type AnalyticsMonitorSummary } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -50,7 +50,7 @@ const aggregatePassFailTrend: CustomGraphInput = {
 };
 
 const renderGridItems = (
-  checks: any,
+  checks: readonly AnalyticsMonitorSummary[],
   onGraphClick: (params: {
     evaluatorId: string;
     groupKey?: string;
@@ -61,7 +61,7 @@ const renderGridItems = (
     isGuardrail: boolean;
   }) => void,
 ) => {
-  return checks.map((check: any) => {
+  return checks.map((check) => {
     // Both are assigned in every branch below; declared without an initialiser
     // so a branch that forgot one is a compile error rather than an empty card.
     let checksAverage: CustomGraphInput | Record<string, never>;

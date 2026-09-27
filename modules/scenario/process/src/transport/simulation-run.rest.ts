@@ -10,11 +10,7 @@ import {
  */
 import { createLogger } from "@langwatch/observability";
 import {
-  BatchRunNotFoundError,
-  SimulationRunNotFoundError,
   ScenarioApi,
-  type BatchSummary,
-  type ScenarioRunData,
   scenarioLegacyErrorBodySchema,
   scenarioRunRestResponseWithPlatformUrlSchema,
   simulationBatchSummaryRestSchema,
@@ -25,7 +21,8 @@ import {
   simulationRunListResponseSchema,
   simulationBatchListResponseSchema,
 } from "@langwatch/scenario-contract";
-import type { z } from "zod";
+
+import { toBatchSummaryResponse } from "../rules/simulation-batch-summary.rules.ts";
 
 const logger = createLogger("langwatch:api:simulation-runs");
 
@@ -37,75 +34,6 @@ export type ScenarioRunPlatformUrlBuilder = (args: {
   projectSlug: string;
   scenarioRunId: string;
 }) => string;
-
-/**
- * Adds the completion flag the API exposes on top of the stored counts.
- * An empty batch is never complete: it has nothing that settled.
- */
-function toBatchSummaryResponse(batch: BatchSummary): {
-  batchRunId: string;
-  totalCount: number;
-  passCount: number;
-  failCount: number;
-  runningCount: number;
-  settledCount: number;
-  stalledCount: number;
-  lastRunAt: number;
-  lastUpdatedAt: number;
-  firstCompletedAt: number | null;
-  allCompletedAt: number | null;
-  isComplete: boolean;
-  note: string | null;
-} {
-  return {
-    batchRunId: batch.batchRunId,
-    totalCount: batch.totalCount,
-    passCount: batch.passCount,
-    failCount: batch.failCount,
-    runningCount: batch.runningCount,
-    settledCount: batch.settledCount,
-    stalledCount: batch.stalledCount,
-    lastRunAt: batch.lastRunAt,
-    lastUpdatedAt: batch.lastUpdatedAt,
-    firstCompletedAt: batch.firstCompletedAt,
-    allCompletedAt: batch.allCompletedAt,
-    isComplete: batch.settledCount === batch.totalCount && batch.totalCount > 0,
-    note: batch.note,
-  };
-}
-
-/**
- * The API's view of one run. The published fields are mapped one by one off
- * the run's metadata, and the metadata itself stays out of the response: its
- * layout is internal, the fields are the contract.
- */
-function toRunResponse(run: ScenarioRunData): Omit<
-  ScenarioRunData,
-  "metadata" | "results" | "messages" | "name" | "description" | "updatedAt"
-> & {
-  name: string | null;
-  description: string | null;
-  results: NonNullable<ScenarioRunData["results"]> | null;
-  updatedAt: number;
-  messages: { role: string; content: string }[];
-  note: string | null;
-  scenarioVersion: number | null;
-} {
-  const { metadata, results, messages, ...rest } = run;
-  return {
-    ...rest,
-    name: run.name ?? null,
-    description: run.description ?? null,
-    results: results ?? null,
-    updatedAt: run.updatedAt ?? run.timestamp,
-    messages: messages.map((m) => ({
-      role: typeof m.role === "string" ? m.role : "",
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
-    })),
-    note: metadata?.note ?? null,
-    scenarioVersion: metadata?.langwatch?.scenarioVersion ?? null,
-  };
-}
 
 const notFoundResponse = {
   404: {
@@ -136,61 +64,14 @@ export function createSimulationRunsRest(): Readonly<{
         "List simulation runs, optionally filtered by scenarioSetId or batchRunId. Set-level and unfiltered listings trim each run to its first few messages and report the trim as `messagesTruncated`; pass `include=messages` to read whole conversations, which caps the page at 20 runs, ending on a batch boundary. A batch-scoped listing always carries whole conversations.",
     })
     .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
-      const { scenarioSetId, batchRunId, limit, cursor, include } = input;
-      const projectId = scope.id;
-      logger.info({ projectId, scenarioSetId, batchRunId }, "Listing simulation runs");
-
-      if (batchRunId) {
-        return batchRunsWithPlatformUrls({
-          app,
-          projectId,
-          scenarioSetId,
-          batchRunId,
-          projectSlug: project.projectSlug,
-        });
-      }
-
-      if (scenarioSetId) {
-        const result = await app.getRunDataForScenarioSet({
-          projectId,
-          scenarioSetId,
-          limit,
-          cursor,
-          shouldIncludeMessages: include === "messages",
-        });
-
-        return {
-          runs: await withPlatformUrls({
-            app,
-            runs: result.runs,
-            projectId,
-            projectSlug: project.projectSlug,
-          }),
-          hasMore: result.hasMore,
-          nextCursor: result.nextCursor ?? undefined,
-        };
-      }
-
-      const result = await app.getRunDataForAllSuites({
-        projectId,
-        limit,
-        cursor,
-        shouldIncludeMessages: include === "messages",
+    .handle(({ app, input, scope }, project) => {
+      const { scenarioSetId, batchRunId } = input;
+      logger.info({ projectId: scope.id, scenarioSetId, batchRunId }, "Listing simulation runs");
+      return app.listSimulationRuns({
+        ...input,
+        projectId: scope.id,
+        projectSlug: project.projectSlug,
       });
-
-      if (!result.changed) return { runs: [], hasMore: false };
-
-      return {
-        runs: await withPlatformUrls({
-          app,
-          runs: result.runs,
-          projectId,
-          projectSlug: project.projectSlug,
-        }),
-        hasMore: result.hasMore,
-        nextCursor: result.nextCursor,
-      };
     })
 
     .get("/:scenarioRunId", "getApiSimulationRunsByScenarioRunId")
@@ -202,17 +83,14 @@ export function createSimulationRunsRest(): Readonly<{
       responses: notFoundResponse,
     })
     .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, project) => {
+    .handle(({ app, input, scope }, project) => {
       const projectId = scope.id;
       logger.info({ projectId, scenarioRunId: input.scenarioRunId }, "Getting simulation run");
-
-      const run = await app.findScenarioRunData({
+      return app.getSimulationRun({
         projectId,
+        projectSlug: project.projectSlug,
         scenarioRunId: input.scenarioRunId,
       });
-      if (!run) throw new SimulationRunNotFoundError(input.scenarioRunId);
-
-      return withPlatformUrl({ app, run, projectId, projectSlug: project.projectSlug });
     })
 
     .get("/batches/list", "getApiSimulationRunsBatchesList")
@@ -249,70 +127,11 @@ export function createSimulationRunsRest(): Readonly<{
       description: "Get the summary of a single batch run, including its completion flag",
       responses: notFoundResponse,
     })
-    .handle(async ({ app, input, scope }) => {
+    .handle(({ app, input, scope }) => {
       const projectId = scope.id;
       logger.info({ projectId, batchRunId: input.batchRunId }, "Getting batch summary");
-
-      const batch = await app.findBatchSummary({ projectId, batchRunId: input.batchRunId });
-      if (!batch) throw new BatchRunNotFoundError(input.batchRunId);
-
-      return toBatchSummaryResponse(batch);
+      return app.getBatchSummary({ projectId, batchRunId: input.batchRunId });
     })
 
     .build();
-}
-
-async function batchRunsWithPlatformUrls({
-  app,
-  projectId,
-  scenarioSetId,
-  batchRunId,
-  projectSlug,
-}: {
-  app: ScenarioApi;
-  projectId: string;
-  scenarioSetId: string | undefined;
-  batchRunId: string;
-  projectSlug: string;
-}): Promise<{
-  runs: z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>[];
-  hasMore: boolean;
-}> {
-  // The scenario set id narrows the query when given, but the batch id
-  // alone is enough: the CLI's --wait polls with just the batch id it
-  // was handed at scheduling time.
-  const result = await app.getRunDataForBatchRun({ projectId, scenarioSetId, batchRunId });
-
-  if ("changed" in result && result.changed === false) {
-    return { runs: [], hasMore: false };
-  }
-
-  const runs = "runs" in result ? result.runs : [];
-  return { runs: await withPlatformUrls({ app, runs, projectId, projectSlug }), hasMore: false };
-}
-
-function withPlatformUrls(input: {
-  app: ScenarioApi;
-  runs: readonly ScenarioRunData[];
-  projectId: string;
-  projectSlug: string;
-}): Promise<z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>[]> {
-  return Promise.all(input.runs.map((run) => withPlatformUrl({ ...input, run })));
-}
-
-/** Main's `scenarioRunPlatformUrl`: the run detail drawer, in the interface the project reads. */
-async function withPlatformUrl(input: {
-  app: ScenarioApi;
-  run: ScenarioRunData;
-  projectId: string;
-  projectSlug: string;
-}): Promise<z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>> {
-  return {
-    ...toRunResponse(input.run),
-    platformUrl: await input.app.platformUrl({
-      projectId: input.projectId,
-      projectSlug: input.projectSlug,
-      resource: { scenarioRunId: input.run.scenarioRunId },
-    }),
-  };
 }

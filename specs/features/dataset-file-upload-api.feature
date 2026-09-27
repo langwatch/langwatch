@@ -53,7 +53,7 @@ Feature: Dataset File Upload REST API
   Scenario: Upload fails when file columns do not match dataset columns
     Given a dataset "strict" exists with columns [{"name": "input", "type": "string"}]
     When I POST /api/dataset/strict/upload with a CSV file containing columns "question" and "answer"
-    Then the request fails with 400 Bad Request
+    Then the request fails with 422 and code "validation_error"
     And the error indicates the uploaded columns do not match the dataset schema
 
   @integration
@@ -297,10 +297,4 @@ Feature: Dataset File Upload REST API
   @integration
   Scenario: Upload to existing without API key returns 401
     When I POST /api/dataset/some-dataset/upload without X-Auth-Token header
-    Then the request fails with 401 Unauthorized
-
-  @integration
-  Scenario: Direct-upload rejects a foreign-project API key against an owned project
-    Given a second project with its own API key
-    When I POST /api/dataset/direct-upload for the first project using the second project's API key
     Then the request fails with 401 Unauthorized

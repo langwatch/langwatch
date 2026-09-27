@@ -46,10 +46,17 @@ function firstSelect(tree: Record<string, unknown>): Record<string, unknown> {
   return selects[0] as Record<string, unknown>;
 }
 
+/** The mutated tree as the statement a parser hands back; its root kind is never mutated. */
+function statementOf(tree: Record<string, unknown>): SqlAstNode {
+  const { type } = tree;
+  if (typeof type !== "string") throw new Error("fixture tree must name its node type");
+  return { ...tree, type };
+}
+
 function validateTree(tree: Record<string, unknown>): LangWatchQLValidation {
   return validateLangWatchQL({
     sql: BASE_SQL,
-    parser: parserOf([tree as unknown as SqlAstNode]),
+    parser: parserOf([statementOf(tree)]),
     ...POLICY,
   });
 }

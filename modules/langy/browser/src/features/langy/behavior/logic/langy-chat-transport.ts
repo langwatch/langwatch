@@ -5,12 +5,20 @@ import type {
 } from "@langwatch/langy-contract";
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
 
-import { trpcClient } from "../../../../behavior/langy-api.ts";
+import type { LangyTrpcClient } from "../../../../behavior/langy-api.ts";
 
 /**
  * What a tRPC subscription hands back.
  */
 type Unsubscribable = { unsubscribe: () => void };
+
+/** The three procedures a turn runs on, off the api provider's own client. */
+export type LangyTurnClient = {
+  langy: Pick<
+    LangyTrpcClient["langy"],
+    "createConversation" | "continueConversation" | "onTurnStream"
+  >;
+};
 
 /**
  * The per-turn request inputs the transport owns.
@@ -49,6 +57,8 @@ export type LangyTurnSignalEntry =
 export type LangyTurnSettleReason = "end" | "error" | "closed";
 
 export interface LangyChatTransportDeps {
+  /** The client the turn's mutations and stream subscription go through. */
+  client: LangyTurnClient;
   /** Read the current turn inputs at send time (owns projectId → fixes regenerate). */
   getContext: () => LangyTurnRequestContext;
   /** Adopt the conversation + turn the server started (replaces the header scrape). */
@@ -104,10 +114,11 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
-      const { conversationId, turnId } = await startTurn({ ctx, options });
+      const { conversationId, turnId } = await startTurn({ client: deps.client, ctx, options });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
+        client: deps.client,
         projectId: ctx.projectId,
         conversationId,
         turnId,
@@ -122,16 +133,18 @@ export function createLangyChatTransport(deps: LangyChatTransportDeps): ChatTran
     async reconnectToStream() {
       const target = deps.getResumeTarget?.();
       if (!target) return null;
-      return subscribeTurnStream({ ...target, ...streamCallbacks(deps) });
+      return subscribeTurnStream({ client: deps.client, ...target, ...streamCallbacks(deps) });
     },
   };
 }
 
 /** Admits the turn: continues the open conversation, or creates one carrying only this send. */
 async function startTurn({
+  client,
   ctx,
   options,
 }: {
+  client: LangyTurnClient;
   ctx: LangyTurnRequestContext;
   options: Parameters<ChatTransport<UIMessage>["sendMessages"]>[0];
 }): Promise<StartTurnResponse> {
@@ -153,12 +166,12 @@ async function startTurn({
   };
 
   if (ctx.conversationId) {
-    return trpcClient.langy.continueConversation.mutate({
+    return client.langy.continueConversation.mutate({
       ...turnInput,
       conversationId: ctx.conversationId,
     });
   }
-  return trpcClient.langy.createConversation.mutate({
+  return client.langy.createConversation.mutate({
     ...turnInput,
     messages: lastUserMessage ? [lastUserMessage] : [],
     // Adopt the warmed conversation when the panel holds one, so the
@@ -185,6 +198,7 @@ function streamCallbacks(deps: LangyChatTransportDeps) {
  * The mapping mirrors the deleted `attachTurnStream` exactly.
  */
 function subscribeTurnStream({
+  client,
   projectId,
   conversationId,
   turnId,
@@ -197,6 +211,7 @@ function subscribeTurnStream({
   onWireEntry,
   abortSignal,
 }: {
+  client: LangyTurnClient;
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -325,10 +340,10 @@ function subscribeTurnStream({
         }
       };
 
-      sub = trpcClient.langy.onTurnStream.subscribe(
+      sub = client.langy.onTurnStream.subscribe(
         { projectId, conversationId, turnId },
         {
-          onData: (entry: unknown) => onEntry(entry as LangyStreamEntry),
+          onData: onEntry,
           onError: (err: unknown) => {
             if (closed) return;
             controller.enqueue({

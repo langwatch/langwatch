@@ -71,7 +71,13 @@ function forbidStringEvaluation(): Hardening {
   refusingFunction.prototype = realFunction.prototype;
 
   globalThis.eval = refusesStringEvaluation;
-  globalThis.Function = refusingFunction as unknown as FunctionConstructor;
+  // Installed as a property: a plain function is not a constructor type, and this one never
+  // constructs anything.
+  Object.defineProperty(globalThis, "Function", {
+    value: refusingFunction,
+    configurable: true,
+    writable: true,
+  });
 
   return {
     release: () => {
@@ -80,17 +86,13 @@ function forbidStringEvaluation(): Hardening {
     },
     isRefusing: () => {
       let evalRefused = false;
-      let functionRefused = false;
       try {
         globalThis.eval("1");
       } catch {
         evalRefused = true;
       }
-      try {
-        globalThis.Function("return 1");
-      } catch {
-        functionRefused = true;
-      }
+      // Still the refusing stub, not a constructor something put back during the render.
+      const functionRefused = Object.is(globalThis.Function, refusingFunction);
       return evalRefused && functionRefused;
     },
   };

@@ -276,7 +276,7 @@ describe("ops replay full rebuild", () => {
   }: {
     tenantId: string;
     traceId: string;
-    bulkAppend: () => Promise<void>;
+    bulkAppend: (records: { src: string }[]) => Promise<void>;
   }): ReplayService {
     const event: ReplayEvent = {
       id: `evt-${traceId}`,
@@ -344,7 +344,9 @@ describe("ops replay full rebuild", () => {
       it("skips the aggregate the earlier run had finished", async () => {
         const tenantId = `tenant-skip-${Date.now()}`;
         const traceId = `trace-skip-${Date.now()}`;
-        const bulkAppend = vi.fn(async () => undefined);
+        const bulkAppend = vi.fn<(records: { src: string }[]) => Promise<void>>(
+          async () => undefined,
+        );
         await seedCompletedMarker(tenantId, traceId);
 
         const service = opsServiceOver({ tenantId, traceId, bulkAppend });
@@ -367,7 +369,9 @@ describe("ops replay full rebuild", () => {
       it("clears the markers before discovery so the aggregate is replayed", async () => {
         const tenantId = `tenant-rebuild-${Date.now()}`;
         const traceId = `trace-rebuild-${Date.now()}`;
-        const bulkAppend = vi.fn(async () => undefined);
+        const bulkAppend = vi.fn<(records: { src: string }[]) => Promise<void>>(
+          async () => undefined,
+        );
         await seedCompletedMarker(tenantId, traceId);
 
         const service = opsServiceOver({ tenantId, traceId, bulkAppend });
@@ -382,9 +386,7 @@ describe("ops replay full rebuild", () => {
         await waitForIdle(service);
 
         expect(bulkAppend).toHaveBeenCalledTimes(1);
-        const records = (
-          bulkAppend.mock.calls as unknown as [{ src: string }[], unknown][]
-        ).flatMap(([recs]) => recs);
+        const records = bulkAppend.mock.calls.flatMap(([recs]) => recs);
         expect(records.map((record) => record.src)).toEqual([traceId]);
       });
     });

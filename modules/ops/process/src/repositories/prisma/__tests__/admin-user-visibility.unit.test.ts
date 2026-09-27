@@ -1,10 +1,9 @@
 import type { UserWithBackofficeIncludes } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
-import { PrismaAdminUserMapper } from "../prisma.admin-user.mapper.ts";
+import { toBackofficeUserRow } from "../../../rules/backoffice-user-row.rules.ts";
 
-const mapUserToBackofficeRow = (user: UserWithBackofficeIncludes) =>
-  PrismaAdminUserMapper.map(user);
+const mapUserToBackofficeRow = (user: UserWithBackofficeIncludes) => toBackofficeUserRow(user);
 
 /** Regression test for project-visibility rule: OrganizationUser without
  * TeamUser sees all non-archived projects. */

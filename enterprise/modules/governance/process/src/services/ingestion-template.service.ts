@@ -43,13 +43,13 @@ export class IngestionTemplateService {
   }
 
   async listForUser(input: { organizationId: string }): Promise<IngestionTemplate[]> {
-    const templates = await this.repository.listUserVisible(input.organizationId);
+    const templates = await this.repository.findUserVisible(input.organizationId);
 
     return templates.map((template) => ({ ...template, ottlRules: "" }));
   }
 
   listForOrgAdmin(input: { organizationId: string }): Promise<IngestionTemplate[]> {
-    return this.repository.listAdminVisible(input.organizationId);
+    return this.repository.findAdminVisible(input.organizationId);
   }
 
   findByIdForOrg(input: { id: string; organizationId: string }): Promise<IngestionTemplate | null> {

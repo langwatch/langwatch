@@ -81,6 +81,51 @@ const DEFERRED_NOTE: Record<string, string> = {
     "This environment's gateway doesn't support statement checking yet, so these haven't been checked. You can still save them.",
 };
 
+type OttlValidationResult = Awaited<ReturnType<GovernanceOttlValidationClient["validate"]>>;
+
+/**
+ * Each statement's dot, from the gateway's answer. A deferred answer means
+ * nothing checked these, so every dot stays neutral and the note says why.
+ */
+function readValidation({
+  result,
+  statements,
+}: {
+  result: OttlValidationResult;
+  statements: string[];
+}): { deferredReason: string | null; statuses: PerStatementStatus[] } {
+  if (result.status === "deferred") {
+    return { deferredReason: result.reason, statuses: statements.map(() => UNKNOWN_STATUS) };
+  }
+  if (result.status === "valid") {
+    return { deferredReason: null, statuses: statements.map(() => VALID_STATUS) };
+  }
+  const errsByIdx = new Map<number, string>();
+  for (const err of result.errors) {
+    const where = err.line > 0 ? ` (line ${err.line}, col ${err.col})` : "";
+    errsByIdx.set(err.statementIndex, `${err.message}${where}`);
+  }
+  return {
+    deferredReason: null,
+    statuses: statements.map((_, idx): PerStatementStatus => {
+      const msg = errsByIdx.get(idx);
+      return msg ? { validity: "invalid", message: msg } : VALID_STATUS;
+    }),
+  };
+}
+
+function matchesStarterStatements({
+  starterStatements,
+  statements,
+}: {
+  starterStatements: readonly string[] | undefined;
+  statements: string[];
+}): boolean {
+  if (!starterStatements || starterStatements.length === 0) return false;
+  if (starterStatements.length !== statements.length) return false;
+  return starterStatements.every((line, i) => line === (statements[i] ?? ""));
+}
+
 export function OttlEditor({
   organizationId,
   sourceType: _sourceType,
@@ -117,29 +162,9 @@ export function OttlEditor({
           statements: next,
         });
         setValidationError(null);
-        if (result.status === "deferred") {
-          // The request succeeded and the answer was "nothing checked these".
-          // Green is a claim about the statements; there is no claim to make,
-          // so every dot stays neutral and the note says why.
-          setDeferredReason(result.reason);
-          setValidationStatus(next.map(() => UNKNOWN_STATUS));
-        } else if (result.status === "valid") {
-          setDeferredReason(null);
-          setValidationStatus(next.map(() => VALID_STATUS));
-        } else {
-          setDeferredReason(null);
-          const errsByIdx = new Map<number, string>();
-          for (const err of result.errors) {
-            const where = err.line > 0 ? ` (line ${err.line}, col ${err.col})` : "";
-            errsByIdx.set(err.statementIndex, `${err.message}${where}`);
-          }
-          setValidationStatus(
-            next.map((_, idx): PerStatementStatus => {
-              const msg = errsByIdx.get(idx);
-              return msg ? { validity: "invalid", message: msg } : VALID_STATUS;
-            }),
-          );
-        }
+        const read = readValidation({ result, statements: next });
+        setDeferredReason(read.deferredReason);
+        setValidationStatus(read.statuses);
       } catch (err) {
         // The check didn't run — the gateway is unreachable, or the request
         // failed on the way there. Don't block save, but don't claim a
@@ -188,14 +213,10 @@ export function OttlEditor({
 
   const hasStarter = (starterStatements ?? []).length > 0;
   const isEmpty = statements.length === 0;
-  const matchesStarter = useMemo(() => {
-    if (!starterStatements || starterStatements.length === 0) return false;
-    if (starterStatements.length !== statements.length) return false;
-    for (let i = 0; i < starterStatements.length; i++) {
-      if ((starterStatements[i] ?? "") !== (statements[i] ?? "")) return false;
-    }
-    return true;
-  }, [starterStatements, statements]);
+  const matchesStarter = useMemo(
+    () => matchesStarterStatements({ starterStatements, statements }),
+    [starterStatements, statements],
+  );
 
   if (!enabled) return null;
 

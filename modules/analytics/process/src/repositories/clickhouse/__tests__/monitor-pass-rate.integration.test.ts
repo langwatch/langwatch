@@ -12,6 +12,7 @@ import {
   type AnalyticsSeries,
   type AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
+import { fromDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -136,9 +137,9 @@ function read({
       timeScale,
       timeZone: "UTC",
     },
-    startDate: START_DATE,
-    endDate: END_DATE,
-    previousPeriodStartDate: PREVIOUS_START_DATE,
+    startDate: fromDate(START_DATE),
+    endDate: fromDate(END_DATE),
+    previousPeriodStartDate: fromDate(PREVIOUS_START_DATE),
     adjustedTimeScale: timeScale,
     maxResultRows: undefined,
   });

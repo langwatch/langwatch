@@ -9,10 +9,28 @@ const read = (environment: Record<string, string | undefined>) =>
 describe("auth server configuration", () => {
   describe("given the passkey switch is written the way the deployment reads it", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
-    it("turns passkeys on for the literal on and off when unset", () => {
+    it("reads passkeys and two-step enrollment through the auth schema", () => {
       expect(read({ PASSKEYS_ENABLED: "on" }).passkeysEnabled).toBe(true);
-      expect(read({}).passkeysEnabled).toBe(false);
       expect(read({ MFA_ENROLLMENT_OPEN: "on" }).mfaEnrollmentOpen).toBe(true);
+    });
+  });
+
+  describe("given an installation that has not turned passkeys off", () => {
+    /** @scenario "A passkey is offered on every deployment, not on some of them" */
+    it("offers passkeys, whether or not two-step enrollment is open", () => {
+      expect(read({}).passkeysEnabled).toBe(true);
+      expect(read({ MFA_ENROLLMENT_OPEN: "on" }).passkeysEnabled).toBe(true);
+      expect(read({ PASSKEYS_ENABLED: "on" }).passkeysEnabled).toBe(true);
+    });
+  });
+
+  describe("given an operator who turned passkeys off", () => {
+    /** @scenario "An operator can turn passkeys off for the whole deployment" */
+    it("offers no passkey anywhere the switch reaches", () => {
+      expect(read({ PASSKEYS_ENABLED: "off" }).passkeysEnabled).toBe(false);
+      expect(read({ PASSKEYS_ENABLED: "off", MFA_ENROLLMENT_OPEN: "on" }).passkeysEnabled).toBe(
+        false,
+      );
     });
   });
 

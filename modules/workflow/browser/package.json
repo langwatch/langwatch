@@ -28,11 +28,6 @@
       "types": "./dist/run-via-api-tabs.d.ts",
       "default": "./src/run-via-api-tabs.ts"
     },
-    "./redacted-field": {
-      "langwatch-declaration-source": "./src/redacted-field.ts",
-      "types": "./dist/redacted-field.d.ts",
-      "default": "./src/redacted-field.ts"
-    },
     "./surfaces/deja-view-link": {
       "langwatch-declaration-source": "./src/behavior/use-deja-view-link.ts",
       "types": "./dist/behavior/use-deja-view-link.d.ts",

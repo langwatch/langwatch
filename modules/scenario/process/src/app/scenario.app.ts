@@ -48,6 +48,7 @@ import {
   type RunParameterValues,
   type RunTarget,
   type Scenario,
+  type ScenarioLookup,
   type ScenarioAuthorLabel,
   type ScenarioCaller,
   type ScenarioCreateInput,
@@ -100,6 +101,12 @@ import {
   type ScenarioRunScheduled,
   type SimulationRunData,
   type SimulationScenarioRunInput,
+  type SimulationUpdateWatchInput,
+  type SimulationBatchSummaryRest,
+  type SimulationRunListInput,
+  type SimulationRunListResponse,
+  type SimulationRunLookupInput,
+  type SimulationRunRestResponse,
   type SimulationScenarioSetRunsInput,
   type ScenarioUsageCount,
   type SimulationService,
@@ -132,6 +139,14 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
+import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
+import {
+  DuplicatedCancellationConnection,
+  RedisScenarioCancellationPublisherChannel,
+  RedisScenarioCancellationSubscriberChannel,
+  type CancellationPublisherClient,
+  type CancellationSubscriberClient,
+} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
@@ -149,7 +164,10 @@ import { RunConfigurationsService } from "../services/run-configurations.service
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
-import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
+import {
+  ScenarioExecutorService,
+  type ScenarioChildBundle,
+} from "../services/scenario-executor.service.ts";
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
@@ -164,6 +182,7 @@ import {
   SimulationProcessingService,
   type SimulationPipelineSetup,
 } from "../services/simulation-processing.service.ts";
+import { SimulationRunViewService } from "../services/simulation-run-view.service.ts";
 import { SimulationUpdateStreamService } from "../services/simulation-update-stream.service.ts";
 import { VoiceSessionService } from "../services/voice-session.service.ts";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
@@ -195,6 +214,8 @@ export interface ScenarioAppDependencies {
   connectedTargets: ConnectedTargetService;
   /** The platform's own links, in the interface the project's release flag names. */
   platformLinks: ScenarioPlatformLinkService;
+  /** The runs and batches a simulation produced, as the run drawer and the public API read them. */
+  runViews: SimulationRunViewService;
   /** "Talk to it": browser voice sessions and their recordings. */
   voiceSessions: VoiceSessionService;
 }
@@ -257,6 +278,10 @@ export type ScenarioReadOnlyClickHouse = Readonly<{
   }): Promise<{ rows: Row[] }>;
 }>;
 
+/** The process's Redis as scenario reaches it: fan-out publishes and a duplicable subscriber. */
+export type ScenarioRedis = ScenarioEventBroadcastPublisher &
+  CancellationPublisherClient & { duplicate(): CancellationSubscriberClient };
+
 type ScenarioProcessMembers = Readonly<{
   clickhouse: ScenarioReadOnlyClickHouse;
   encryption: Readonly<{ encrypt(plaintext: string): string; decrypt(ciphertext: string): string }>;
@@ -267,8 +292,11 @@ type ScenarioProcessMembers = Readonly<{
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
   idempotency: Readonly<{ claim(key: string, ttlSeconds: number): Promise<boolean> }>;
-  redis: ScenarioEventBroadcastPublisher;
+  /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
+  redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
+  /** The compiled scenario child, as the app that ships it answers (a deployment fact). */
+  scenarioChildBundle: ScenarioChildBundle;
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
   isSaas: boolean;
@@ -297,6 +325,7 @@ export class ScenarioApp implements ScenarioApi {
     "idempotency",
     "redis",
     "publicBaseUrl",
+    "scenarioChildBundle",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
     "isSaas",
@@ -360,7 +389,24 @@ export class ScenarioApp implements ScenarioApi {
       nlpServiceUrl: setup.members.nlpServiceUrl ?? "",
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
     };
-    const broadcast = scenarioEventBroadcastChannels.live.create(setup.members.redis);
+    const { redis } = setup.members;
+    const broadcast = redis
+      ? scenarioEventBroadcastChannels.live.create(redis)
+      : scenarioEventBroadcastChannels.memory.create();
+    const memoryCancellations = MemoryScenarioCancellationChannel.create();
+    const cancellations = redis
+      ? RedisScenarioCancellationPublisherChannel.create(redis)
+      : memoryCancellations;
+    const cancellationSubscriptions = redis
+      ? RedisScenarioCancellationSubscriberChannel.create(
+          DuplicatedCancellationConnection.over(redis),
+        )
+      : memoryCancellations;
+    const platformLinks = ScenarioPlatformLinkService.create({
+      featureFlags: setup.dependencies.featureFlags,
+      projects: setup.dependencies.projects,
+      publicBaseUrl: setup.members.publicBaseUrl,
+    });
 
     return new ScenarioApp({
       agentTesting: AgentTestService.create({
@@ -400,7 +446,7 @@ export class ScenarioApp implements ScenarioApi {
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),
       scenarioTabs,
       users: setup.dependencies.users,
-      updates: SimulationUpdateStreamService.create(peers.presence),
+      updates: SimulationUpdateStreamService.create({ emitters: peers.presence, scenarioTabs }),
       resultAtoms: ResultAtomsService.create(repositories.resultAtoms, repositories.scenarios),
       runConfigurations: RunConfigurationsService.create(
         repositories.runConfigurations,
@@ -424,11 +470,8 @@ export class ScenarioApp implements ScenarioApi {
         entitlement: setup.dependencies.plans,
         projects: setup.dependencies.projects,
       }),
-      platformLinks: ScenarioPlatformLinkService.create({
-        featureFlags: setup.dependencies.featureFlags,
-        projects: setup.dependencies.projects,
-        publicBaseUrl: setup.members.publicBaseUrl,
-      }),
+      platformLinks,
+      runViews: SimulationRunViewService.create({ simulations, platformLinks }),
       voiceSessions: VoiceSessionService.compose({
         peers: setup.dependencies,
         scenarios,
@@ -445,7 +488,7 @@ export class ScenarioApp implements ScenarioApi {
       simulationCommands,
       simulationProcessing: SimulationProcessingService.create({
         runs: setup.repositories.simulationRunProcessing,
-        cancellations: setup.repositories.cancellations,
+        cancellations,
         traces: setup.dependencies.traces,
         retention: setup.dependencies.retention,
         commands: simulationCommands,
@@ -481,10 +524,11 @@ export class ScenarioApp implements ScenarioApi {
           scenarios,
           simulations,
           secretCipher,
-          cancellations: setup.repositories.cancellations,
-          cancellationSubscriptions: setup.repositories.cancellationSubscriptions,
+          cancellations,
+          cancellationSubscriptions,
           config: setup.config,
           host: {
+            scenarioChildBundle: setup.members.scenarioChildBundle,
             nlpServiceUrl: setup.members.nlpServiceUrl,
             isSaas: setup.members.isSaas,
             nodeEnvironment: setup.members.nodeEnvironment,
@@ -681,8 +725,8 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /** One scenario, archived ones included. */
-  tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.#dependencies.scenarios.tryGetByIdIncludingArchived(input);
+  readByIdIncludingArchived(input: ScenarioIdInput): Promise<ScenarioLookup> {
+    return this.#dependencies.scenarios.readByIdIncludingArchived(input);
   }
 
   /**
@@ -1017,6 +1061,25 @@ export class ScenarioApp implements ScenarioApi {
     return this.#dependencies.simulations.findScenarioRunData(input);
   }
 
+  getRunState(input: SimulationScenarioRunInput): Promise<SimulationRunData> {
+    return this.#dependencies.runViews.getRunState(input);
+  }
+
+  listSimulationRuns(input: SimulationRunListInput): Promise<SimulationRunListResponse> {
+    return this.#dependencies.runViews.listRuns(input);
+  }
+
+  getSimulationRun(input: SimulationRunLookupInput): Promise<SimulationRunRestResponse> {
+    return this.#dependencies.runViews.getRun(input);
+  }
+
+  getBatchSummary(input: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<SimulationBatchSummaryRest> {
+    return this.#dependencies.runViews.getBatchSummary(input);
+  }
+
   /** How many batch runs one suite has, for its pagination. */
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number> {
     return this.#dependencies.simulations.getBatchRunCountForScenarioSet(input);
@@ -1059,6 +1122,10 @@ export class ScenarioApp implements ScenarioApi {
     signal?: AbortSignal;
   }): AsyncIterable<SimulationStreamFrame> {
     return this.#dependencies.updates.watch(input);
+  }
+
+  watchSimulationUpdates(input: SimulationUpdateWatchInput): AsyncIterable<SimulationStreamFrame> {
+    return this.#dependencies.updates.watchForTab(input);
   }
 
   /**

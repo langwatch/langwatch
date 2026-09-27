@@ -295,6 +295,128 @@ export type GatewayLicenseTokenResolution =
     }
   | { ok: false; code: GatewayLicenseTokenRefusal };
 
+/** The claims a virtual-key JWT carries. */
+export type GatewayJwtClaimsInput = {
+  vk_id: string;
+  project_id: string | null;
+  team_id: string | null;
+  org_id: string;
+  principal_id: string | null;
+  revision: string;
+  notAfter?: Instant | null;
+  /** The hosted services of the license a CONNECT key runs under; absent otherwise. */
+  connect_services?: string[];
+};
+
+export type GatewaySignedJwt = { jwt: string; expiresAt: number };
+
+export type GatewayCodexRefreshInput = { providerRowId: string };
+
+/** The changes after `since`, and the revision they reach. */
+export type GatewayChangeFeed = {
+  currentRevision: bigint;
+  events: {
+    kind: string;
+    virtualKeyId: string | null;
+    budgetId: string | null;
+    modelProviderId: string | null;
+    projectId: string | null;
+    revision: bigint;
+  }[];
+};
+
+export type GatewayGuardrailCheckInput = {
+  projectId: string;
+  guardrailIds: string[];
+  direction: "request" | "response" | "stream_chunk";
+  content?: {
+    messages?: unknown;
+    output?: unknown;
+    chunk?: unknown;
+    tools?: unknown;
+    mcps?: unknown;
+  };
+};
+
+export type GatewayGuardrailCheckResult =
+  | { status: "unavailable" }
+  | {
+      status: "evaluated";
+      verdict: {
+        decision: "allow" | "block" | "modify";
+        reason: string | null;
+        modified_content: Record<string, unknown> | null;
+        policies_triggered: string[];
+      };
+    };
+
+export type GatewayBucketSpendInput = { budgetId: string; endUserId: string };
+
+export type GatewayBucketSpendResult =
+  | { status: "not_found" }
+  | { status: "available"; spentMicroUsd: number; bucketScopeId: string | null };
+
+export type GatewayRealtimeReservation = {
+  sessionId: string;
+  projectId: string;
+  organizationId: string;
+  virtualKeyId: string;
+  modelProviderId: string;
+  vendor: string;
+  agentId?: string;
+  model: string;
+  traceId?: string;
+  requestedModel?: string;
+};
+
+export type GatewayRealtimeReservationResult =
+  | { ok: true }
+  | { ok: false; reason: "session_limit"; open: number; limit: number }
+  | { ok: false; reason: "unavailable" };
+
+export type GatewayRealtimeCorrelation = {
+  sessionId: string;
+  projectId: string;
+  vendorConversationId: string;
+};
+
+export type GatewayRealtimeRelease = {
+  sessionId: string;
+  projectId: string;
+  status: "FAILED" | "EXPIRED";
+  reason: string;
+};
+
+/** Whether a session update landed, found nothing, or had no session store to land in. */
+export type GatewayRealtimeSessionUpdate = "applied" | "not_found" | "unavailable";
+
+export type GatewayRealtimeUsageReport = {
+  sessionId: string;
+  projectId: string;
+  virtualKeyId: string;
+  usage: SpendUsage;
+};
+
+export type GatewayRealtimeUsageOutcome = "already_closed" | "closed" | "not_found" | "unavailable";
+
+/** Spend of one request type across tenants, in an optional epoch-millisecond window. */
+export type GatewaySpendByRequestTypeQuery = {
+  tenantIds: readonly string[];
+  requestType: string;
+  fromMs?: number;
+  toMs?: number;
+};
+
+/** One page of a project's spend-event ledger, newest first. */
+export type GatewaySpendEventsPageQuery = {
+  projectId: string;
+  fromMs: number;
+  toMs: number;
+  filters?: SpendFilters;
+  cursor?: { occurredAtMs: number; gatewayRequestId: string };
+  limit?: number;
+};
+
 export interface GatewayInternalProtocol {
   findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
   /** Resolves an `lwl_` token by the facts licensing wrote onto its managed key. */
@@ -303,104 +425,29 @@ export interface GatewayInternalProtocol {
     instanceId: string | undefined;
   }): Promise<GatewayLicenseTokenResolution>;
   findTraceDestination(projectId: string): Promise<{ id: string; teamId: string } | null>;
-  signJwt(input: {
-    vk_id: string;
-    project_id: string | null;
-    team_id: string | null;
-    org_id: string;
-    principal_id: string | null;
-    revision: string;
-    notAfter?: Instant | null;
-    /** The hosted services of the license a CONNECT key runs under; absent otherwise. */
-    connect_services?: string[];
-  }): { jwt: string; expiresAt: number };
+  signJwt(input: GatewayJwtClaimsInput): GatewaySignedJwt;
   touchVirtualKeyUsage(id: string): Promise<void>;
-  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult>;
+  refreshCodex(input: GatewayCodexRefreshInput): Promise<GatewayInternalCodexRefreshResult>;
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null>;
   configVersionToken(input: VirtualKeyWithScopes): Promise<string>;
   materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown>;
-  listChanges(
-    organizationId: string,
-    since: bigint,
-    limit: number,
-  ): Promise<{
-    currentRevision: bigint;
-    events: {
-      kind: string;
-      virtualKeyId: string | null;
-      budgetId: string | null;
-      modelProviderId: string | null;
-      projectId: string | null;
-      revision: bigint;
-    }[];
-  }>;
+  listChanges(organizationId: string, since: bigint, limit: number): Promise<GatewayChangeFeed>;
   currentRevision(organizationId: string): Promise<bigint>;
-  checkGuardrails(input: {
-    projectId: string;
-    guardrailIds: string[];
-    direction: "request" | "response" | "stream_chunk";
-    content?: {
-      messages?: unknown;
-      output?: unknown;
-      chunk?: unknown;
-      tools?: unknown;
-      mcps?: unknown;
-    };
-  }): Promise<
-    | { status: "unavailable" }
-    | {
-        status: "evaluated";
-        verdict: {
-          decision: "allow" | "block" | "modify";
-          reason: string | null;
-          modified_content: Record<string, unknown> | null;
-          policies_triggered: string[];
-        };
-      }
-  >;
-  budgetBucketSpend(input: {
-    budgetId: string;
-    endUserId: string;
-  }): Promise<
-    | { status: "not_found" }
-    | { status: "available"; spentMicroUsd: number; bucketScopeId: string | null }
-  >;
+  checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult>;
+  budgetBucketSpend(input: GatewayBucketSpendInput): Promise<GatewayBucketSpendResult>;
   submitSpendCommands(
     records: GatewayInternalSpendCommandRecord[],
   ): Promise<GatewayInternalSpendSubmission>;
-  reserveRealtimeSession(input: {
-    sessionId: string;
-    projectId: string;
-    organizationId: string;
-    virtualKeyId: string;
-    modelProviderId: string;
-    vendor: string;
-    agentId?: string;
-    model: string;
-    traceId?: string;
-    requestedModel?: string;
-  }): Promise<
-    | { ok: true }
-    | { ok: false; reason: "session_limit"; open: number; limit: number }
-    | { ok: false; reason: "unavailable" }
-  >;
-  correlateRealtimeSession(input: {
-    sessionId: string;
-    projectId: string;
-    vendorConversationId: string;
-  }): Promise<"applied" | "not_found" | "unavailable">;
-  releaseRealtimeSession(input: {
-    sessionId: string;
-    projectId: string;
-    status: "FAILED" | "EXPIRED";
-    reason: string;
-  }): Promise<"applied" | "not_found" | "unavailable">;
-  reportRealtimeSessionUsage(input: {
-    sessionId: string;
-    projectId: string;
-    virtualKeyId: string;
-    usage: SpendUsage;
-  }): Promise<"already_closed" | "closed" | "not_found" | "unavailable">;
+  reserveRealtimeSession(
+    input: GatewayRealtimeReservation,
+  ): Promise<GatewayRealtimeReservationResult>;
+  correlateRealtimeSession(
+    input: GatewayRealtimeCorrelation,
+  ): Promise<GatewayRealtimeSessionUpdate>;
+  releaseRealtimeSession(input: GatewayRealtimeRelease): Promise<GatewayRealtimeSessionUpdate>;
+  reportRealtimeSessionUsage(
+    input: GatewayRealtimeUsageReport,
+  ): Promise<GatewayRealtimeUsageOutcome>;
 }
 
 /**
@@ -523,6 +570,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
     id: string;
     organizationId: string;
   }): Promise<GatewayCacheRuleResource | null>;
+  /** The organization's cache rule; throws the handled 404 when it holds none by that id. */
+  getCacheRule(input: { id: string; organizationId: string }): Promise<GatewayCacheRuleResource>;
   createCacheRule(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   updateCacheRule(input: UpdateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
   archiveCacheRule(input: ArchiveGatewayCacheRuleInput): Promise<GatewayCacheRuleResource>;
@@ -743,6 +792,12 @@ export interface GatewayApi extends GatewayInternalProtocol {
     virtualKeyIds: readonly string[];
     window: GatewayUsageWindow;
   }): Promise<Map<string, { spentUsd: string; requests: number }>>;
+  /** One key's spend over the window, zero when it spent none; refused without a spend source. */
+  getVirtualKeySpend(input: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: GatewayUsageWindow;
+  }): Promise<{ spentUsd: string; requests: number }>;
   /** The budget each named key carries of its own, with this period's spend. */
   loadDirectBudgetsForKeys(input: {
     organizationId: string;
@@ -768,26 +823,14 @@ export interface GatewayApi extends GatewayInternalProtocol {
    * whole ledger or the window given. Confirmed rows only, and 0 where this
    * deployment has no spend source: an absent ledger was never written to.
    */
-  sumSpendNanoUsdByRequestType(input: {
-    tenantIds: readonly string[];
-    requestType: string;
-    fromMs?: number;
-    toMs?: number;
-  }): Promise<number>;
+  sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number>;
 
   /**
    * One page of the spend-event ledger for a project, newest first, with
-   * virtual-key names resolved. Answers null with no ClickHouse spend
-   * source, so a door renders disabled rather than an empty page.
+   * virtual-key names resolved. With no ClickHouse spend source the page is
+   * empty and `clickHouseDisabled`, so a door renders disabled rather than zero.
    */
-  listSpendEventsPage(input: {
-    projectId: string;
-    fromMs: number;
-    toMs: number;
-    filters?: SpendFilters;
-    cursor?: { occurredAtMs: number; gatewayRequestId: string };
-    limit?: number;
-  }): Promise<GatewaySpendEventPage | null>;
+  listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage>;
   /**
    * The metered lane per UTC day across these tenants' ledgers, inclusive days,
    * oldest first; none for no tenants or no ledger. Main's governance

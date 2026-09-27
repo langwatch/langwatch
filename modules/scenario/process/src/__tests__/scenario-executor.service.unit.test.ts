@@ -8,7 +8,7 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
-import { MemoryCancellationChannelRepository } from "../repositories/memory/memory.cancellation-channel.repository.ts";
+import { MemoryScenarioCancellationChannel } from "../channels/memory/memory.scenario-cancellation.channel.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
 import type { ScenarioService } from "../services/scenario.service.ts";
@@ -19,7 +19,7 @@ import {
 } from "./support/scenario-app-setup.fixture.ts";
 
 function harness({ langwatchEndpoint }: { langwatchEndpoint: string | undefined }) {
-  const channel = MemoryCancellationChannelRepository.create();
+  const channel = MemoryScenarioCancellationChannel.create();
   const owned: string[] = [];
   const executor = ScenarioExecutorService.create({
     peers: {

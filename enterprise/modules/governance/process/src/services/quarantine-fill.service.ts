@@ -12,7 +12,7 @@ import type {
   GovernanceDiagnosticsSink,
   QuarantineTenantResolver,
 } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 
 export class QuarantineFillEvaluatorService {
   private readonly tenant: QuarantineTenantResolver;
@@ -46,7 +46,7 @@ export class QuarantineFillEvaluatorService {
     return new QuarantineFillEvaluatorService({
       tenant: options.tenant,
       traces: options.traces,
-      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
       now: options.now ?? Date.now,
     });
   }

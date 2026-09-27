@@ -177,6 +177,7 @@ describe("SCIM user parity", () => {
     ).rejects.toMatchObject({ response: { status: "409" } });
   });
 
+  /** @scenario "A directory adopts a member who already had an account" */
   it("adds an existing user to a different organization", async () => {
     const existing = user();
     const { repo, service } = harness({ existingUser: existing, membership: null });

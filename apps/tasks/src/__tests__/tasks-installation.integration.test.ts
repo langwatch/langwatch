@@ -27,6 +27,7 @@ import {
   systemClock,
   type ProcessMembers,
 } from "@langwatch/process-stores";
+import { scenarioChildBundle } from "@langwatch/scenario-child";
 import {
   refuseDoubleClaims,
   SecretsChain,
@@ -116,6 +117,7 @@ async function bootTasks() {
         content: void 0,
         gatewayInternalProtocol: {},
         connectJudge: null,
+        scenarioChildBundle,
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

@@ -22,7 +22,7 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 const ENTRYPOINTS = [
   "apps/api/src/main.ts",
   "apps/worker/src/main.ts",
-  "packages/scenario-child/src/scenario-child.entrypoint.ts",
+  "apps/scenario-child/src/main.ts",
   "apps/tasks/src/main.ts",
   "apps/server/src/cli.ts",
 ];

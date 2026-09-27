@@ -69,7 +69,11 @@ import {
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
-import { analyticsApi, type AnalyticsFilterOption } from "../../../behavior/analytics-api.ts";
+import {
+  analyticsApi,
+  type AnalyticsApiMap,
+  type AnalyticsFilterOption,
+} from "../../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
 import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
@@ -134,12 +138,38 @@ export interface CustomGraphFormData {
     operator: "gt" | "lt" | "gte" | "lte" | "eq";
     timePeriod: number;
     type: "CRITICAL" | "WARNING" | "INFO";
-    action: "SEND_EMAIL" | "SEND_SLACK_MESSAGE";
+    /** The form offers email and Slack; a stored alert may carry any trigger action. */
+    action: NonNullable<StoredGraphDetail["alert"]>["action"];
     actionParams?: {
       members?: string[];
       slackWebhook?: string;
     };
     triggerId?: string;
+  };
+}
+
+type FormAlert = NonNullable<CustomGraphFormData["alert"]>;
+type StoredGraphDetail = AnalyticsApiMap["graphs"]["getById"]["query"]["output"];
+
+const ALERT_OPERATORS: readonly FormAlert["operator"][] = ["gt", "lt", "gte", "lte", "eq"];
+
+function isAlertOperator(value: string): value is FormAlert["operator"] {
+  return ALERT_OPERATORS.some((operator) => operator === value);
+}
+
+/** A stored alert as the form edits it; one without a severity or a known operator is left out. */
+function formAlertOf(stored: StoredGraphDetail["alert"]): FormAlert | undefined {
+  if (!stored || stored.type == null || !isAlertOperator(stored.operator)) return undefined;
+  return {
+    enabled: stored.enabled,
+    seriesName: stored.seriesName,
+    threshold: stored.threshold,
+    operator: stored.operator,
+    timePeriod: stored.timePeriod,
+    type: stored.type,
+    action: stored.action,
+    actionParams: stored.actionParams,
+    triggerId: stored.triggerId,
   };
 }
 
@@ -1556,11 +1586,7 @@ export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMod
   const graph = stored.data?.graph;
   if (!graph) return null;
 
-  const rawAlert = stored.data?.alert;
-  const alert: CustomGraphFormData["alert"] | undefined =
-    rawAlert != null && rawAlert.type != null
-      ? (rawAlert as unknown as CustomGraphFormData["alert"])
-      : void 0;
+  const alert = formAlertOf(stored.data?.alert);
 
   return (
     <AnalyticsCustomGraphContent

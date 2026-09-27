@@ -1,4 +1,4 @@
-import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { Box, chakra, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { VersionBadge } from "@langwatch/prompt-browser-kit";
 import { useState, type MouseEvent } from "react";
 import { LuX } from "react-icons/lu";
@@ -77,8 +77,13 @@ export function PromptBrowserTab({
         )}
       </HStack>
       {showsCloseButton && (
-        <Box
-          role="button"
+        <chakra.button
+          type="button"
+          display="flex"
+          background="transparent"
+          border="none"
+          padding={0}
+          cursor="pointer"
           aria-label={`Close ${name}`}
           borderRadius="3px"
           transition="all 0.1s ease-in-out"
@@ -90,7 +95,7 @@ export function PromptBrowserTab({
           marginRight={-1}
         >
           <LuX width="18px" />
-        </Box>
+        </chakra.button>
       )}
     </HStack>
   );

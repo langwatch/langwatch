@@ -11,13 +11,19 @@ import type { HandledErrorShape } from "@langwatch/error-presentation/read-handl
 import { describe, expect, it } from "vitest";
 
 import {
+  SsoActivationArrivalsUndecidedError,
+  SsoActivationBreakGlassMissingError,
+  SsoActivationDomainUnprovedError,
+  SsoActivationTestSignInMissingError,
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
   SsoConnectionOperatorActRequiredError,
   SsoConnectionStringEditRetiredError,
   SsoConnectionTeardownStrandsUsersError,
+  SsoLicenseRequiredError,
   SsoSamlNotSelfServeError,
+  SsoSelfServeUnavailableError,
 } from "../identity.errors.ts";
 
 /** Every refusal reachable from the onboarding surfaces, constructed the way
@@ -27,6 +33,12 @@ const REFUSALS = [
   new SsoConnectionInvalidTransitionError("detail"),
   new SsoConnectionDomainTakenError("detail"),
   new SsoConnectionActivationBlockedError("detail"),
+  new SsoActivationDomainUnprovedError("detail"),
+  new SsoActivationTestSignInMissingError("detail"),
+  new SsoActivationBreakGlassMissingError("detail"),
+  new SsoActivationArrivalsUndecidedError("detail"),
+  new SsoLicenseRequiredError("detail"),
+  new SsoSelfServeUnavailableError("detail"),
   new SsoConnectionTeardownStrandsUsersError("detail"),
   new SsoConnectionOperatorActRequiredError("detail"),
   new SsoConnectionStringEditRetiredError("detail"),

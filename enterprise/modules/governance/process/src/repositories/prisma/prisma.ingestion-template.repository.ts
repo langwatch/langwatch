@@ -33,7 +33,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     return new PrismaIngestionTemplateRepository(database);
   }
 
-  async listUserVisible(organizationId: string): Promise<IngestionTemplate[]> {
+  async findUserVisible(organizationId: string): Promise<IngestionTemplate[]> {
     const rows = await this.prisma.ingestionTemplate.findMany({
       where: {
         archivedAt: null,
@@ -45,7 +45,7 @@ export class PrismaIngestionTemplateRepository extends IngestionTemplateReposito
     return rows.map(toIngestionTemplate);
   }
 
-  async listAdminVisible(organizationId: string): Promise<IngestionTemplate[]> {
+  async findAdminVisible(organizationId: string): Promise<IngestionTemplate[]> {
     const rows = await this.prisma.ingestionTemplate.findMany({
       where: {
         archivedAt: null,

@@ -275,6 +275,8 @@ describe("InviteService resilience", () => {
     });
 
     describe("when the extend runs", () => {
+      /** @scenario "Extending is not how a leaked link is dealt with" */
+      /** @scenario "Extending an invitation moves the deadline and leaves the link alone" */
       it("keeps the code and mails nothing, only pushing the expiry out", async () => {
         mockPrisma.organizationInvite.updateMany.mockResolvedValue({
           count: 1,
@@ -298,6 +300,7 @@ describe("InviteService resilience", () => {
         );
       });
 
+      /** @scenario "Two administrators extending at once extend it once" */
       it("loses quietly when the invite stopped being pending under it", async () => {
         mockPrisma.organizationInvite.updateMany.mockResolvedValue({
           count: 0,
@@ -311,21 +314,25 @@ describe("InviteService resilience", () => {
         ).rejects.toBeInstanceOf(InviteNotFoundError);
       });
 
-      it("refuses to extend a revoked invitation", async () => {
-        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
-          ...makePendingInvite(),
-          status: "REVOKED",
-          organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
-        });
+      /** @scenario "Only an invitation still waiting can be extended" */
+      it.each(["REVOKED", "ACCEPTED"] as const)(
+        "refuses to extend an invitation that is %s",
+        async (status) => {
+          mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+            ...makePendingInvite(),
+            status,
+            organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
+          });
 
-        await expect(
-          service.extendInvite({
-            organizationId: "org-1",
-            inviteId: "inv-race-1",
-          }),
-        ).rejects.toBeInstanceOf(InviteNotFoundError);
-        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
-      });
+          await expect(
+            service.extendInvite({
+              organizationId: "org-1",
+              inviteId: "inv-race-1",
+            }),
+          ).rejects.toBeInstanceOf(InviteNotFoundError);
+          expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+        },
+      );
     });
   });
 

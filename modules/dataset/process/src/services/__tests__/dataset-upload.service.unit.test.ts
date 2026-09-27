@@ -312,6 +312,7 @@ describe("DatasetUploadService", () => {
     });
 
     describe("when the uploaded file describes different columns", () => {
+      /** @scenario "Upload fails when file columns do not match dataset columns" */
       it("refuses the upload as a column mismatch", async () => {
         const row = datasetRow({
           slug: "strict",
@@ -325,12 +326,18 @@ describe("DatasetUploadService", () => {
             filename: "other.csv",
             content: "question,answer\nwhat,that\n",
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "column_mismatch" });
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "column_mismatch",
+          code: "validation_error",
+          httpStatus: 422,
+        });
         expect(inlineRecords).toHaveLength(0);
       });
     });
 
     describe("when the file carries no data rows", () => {
+      /** @scenario "Upload an empty file returns 422" */
       it("refuses it as empty before any dataset is read", async () => {
         const { adapter } = harness({ row: datasetRow() });
 
@@ -340,11 +347,17 @@ describe("DatasetUploadService", () => {
             filename: "feedback.csv",
             content: "input,output\n",
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "empty_file" });
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "empty_file",
+          code: "validation_error",
+          httpStatus: 422,
+        });
       });
     });
 
     describe("when the file is larger than the family accepts", () => {
+      /** @scenario "Upload exceeding file size limit is rejected" */
       it("refuses it on the bytes the content carries, not the size the client stated", async () => {
         const { adapter } = harness({ row: datasetRow() });
 
@@ -359,7 +372,11 @@ describe("DatasetUploadService", () => {
             bytes: bytesOf("x".repeat(MAX_FILE_SIZE_BYTES + 1)),
             fileSize: 0,
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "file_too_large" });
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "file_too_large",
+          httpStatus: 400,
+        });
       });
 
       it("accepts a file whose client-stated size overshoots the measured one", async () => {
@@ -380,6 +397,7 @@ describe("DatasetUploadService", () => {
     });
 
     describe("when the file carries more rows than the family accepts", () => {
+      /** @scenario "Upload exceeding row limit is rejected" */
       it("refuses it on the parsed row count", async () => {
         const { adapter } = harness({ row: datasetRow() });
         const rows = Array.from({ length: MAX_ROWS_LIMIT + 1 }, (_, i) => `${i},row ${i}`).join(
@@ -394,11 +412,16 @@ describe("DatasetUploadService", () => {
             bytes: bytesOf(`input,output\n${rows}\n`),
             fileSize: 0,
           }),
-        ).rejects.toMatchObject({ name: "UploadValidationError", kind: "row_limit_exceeded" });
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "row_limit_exceeded",
+          httpStatus: 400,
+        });
       });
     });
 
     describe("when the dataset the path names does not exist", () => {
+      /** @scenario "Upload to a non-existent dataset returns 404" */
       it("refuses rather than creating one on the way past", async () => {
         const { adapter } = harness({ row: null });
 
@@ -408,7 +431,11 @@ describe("DatasetUploadService", () => {
             filename: "feedback.csv",
             content: "input\nhello\n",
           }),
-        ).rejects.toMatchObject({ name: "DatasetNotFoundError" });
+        ).rejects.toMatchObject({
+          name: "DatasetNotFoundError",
+          code: "dataset_not_found",
+          httpStatus: 404,
+        });
       });
     });
   });
@@ -529,12 +556,49 @@ describe("DatasetUploadService", () => {
     });
 
     describe("when the file has an extension the family cannot read", () => {
+      /** @scenario "Upload with unsupported file format is rejected" */
       it("refuses it as an unsupported format", async () => {
         const { adapter } = harness();
 
         await expect(
           create(adapter, { name: "Sheet", filename: "book.xlsx", content: "anything" }),
-        ).rejects.toThrow(/Unsupported file format/);
+        ).rejects.toMatchObject({
+          name: "UploadValidationError",
+          kind: "unsupported_format",
+          httpStatus: 422,
+        });
+      });
+
+      /** @scenario "Upload with unsupported file format is rejected" */
+      it("refuses an unsupported format for an existing dataset too", async () => {
+        const { adapter } = harness({ row: datasetRow() });
+
+        await expect(
+          upload(adapter, {
+            slugOrId: "user-feedback",
+            filename: "book.xlsx",
+            content: "anything",
+          }),
+        ).rejects.toMatchObject({ kind: "unsupported_format", httpStatus: 422 });
+      });
+    });
+
+    describe("when the new dataset's file carries more rows than the family accepts", () => {
+      /** @scenario "Create + upload rejects file exceeding row limit" */
+      it("refuses it on the parsed row count and creates nothing", async () => {
+        const { adapter, created } = harness();
+        const rows = Array.from({ length: MAX_ROWS_LIMIT + 1 }, (_, i) => `${i},row ${i}`).join(
+          "\n",
+        );
+
+        await expect(
+          create(adapter, {
+            name: "Too Big",
+            filename: "big.csv",
+            content: `input,output\n${rows}\n`,
+          }),
+        ).rejects.toMatchObject({ kind: "row_limit_exceeded", httpStatus: 400 });
+        expect(created).toHaveLength(0);
       });
     });
   });

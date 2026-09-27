@@ -5,7 +5,6 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * plane's error envelope. Unsupplied members throw, naming what was asked.
  */
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
-import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -14,12 +13,13 @@ import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
 } from "../../../rules/gateway-internal-identity.rules.ts";
+import { GatewayInternalDoorService } from "../../../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../../../services/gateway-internal-identity.service.ts";
 import {
   GatewayInternalProtocolService,
   type GatewayInternalProtocolMembers,
 } from "../../../services/gateway-internal-protocol.service.ts";
-import { gatewayInternalRest } from "../../gateway-internal.rest.ts";
+import { type GatewayInternalDoorApi, gatewayInternalRest } from "../../gateway-internal.rest.ts";
 
 /**
  * Sequential-hex HMAC fixture, not a credential; allowlisted by path in
@@ -70,29 +70,21 @@ export function mountGatewayInternalRest(
 ) {
   const secret = options.secret ?? GATEWAY_INTERNAL_TEST_SECRET;
   const protocol = GatewayInternalProtocolService.create(suppliedMembers(members));
-  const app = createApiFixture<GatewayApi>(
+  const door = GatewayInternalDoorService.create({ protocol });
+  const app = createApiFixture<GatewayInternalDoorApi>(
     {
-      findVirtualKeyBySecret: (secret) => protocol.findVirtualKeyBySecret(secret),
-      resolveLicenseToken: (input) => protocol.resolveLicenseToken(input),
-      findTraceDestination: (projectId) => protocol.findTraceDestination(projectId),
-      signJwt: (input) => protocol.signJwt(input),
-      touchVirtualKeyUsage: (id) => protocol.touchVirtualKeyUsage(id),
-      refreshCodex: (input) => protocol.refreshCodex(input),
-      findVirtualKeyForConfig: (id) => protocol.findVirtualKeyForConfig(id),
-      configVersionToken: (input) => protocol.configVersionToken(input),
-      materialiseConfig: (input) => protocol.materialiseConfig(input),
-      listChanges: (organizationId, since, limit) =>
-        protocol.listChanges(organizationId, since, limit),
-      currentRevision: (organizationId) => protocol.currentRevision(organizationId),
-      checkGuardrails: (input) => protocol.checkGuardrails(input),
-      budgetBucketSpend: (input) => protocol.budgetBucketSpend(input),
-      submitSpendCommands: (records) => protocol.submitSpendCommands(records),
-      reserveRealtimeSession: (input) => protocol.reserveRealtimeSession(input),
-      correlateRealtimeSession: (input) => protocol.correlateRealtimeSession(input),
-      releaseRealtimeSession: (input) => protocol.releaseRealtimeSession(input),
-      reportRealtimeSessionUsage: (input) => protocol.reportRealtimeSessionUsage(input),
+      answerInternalResolveKey: (input) => door.answerResolveKey(input),
+      answerInternalCodexRefresh: (input) => door.answerCodexRefresh(input),
+      answerInternalConfig: (input) => door.answerConfig(input),
+      answerInternalChanges: (input) => door.answerChanges(input),
+      answerInternalGuardrailCheck: (input) => door.answerGuardrailCheck(input),
+      answerInternalBudgetBucketSpend: (input) => door.answerBudgetBucketSpend(input),
+      answerInternalSpendCommands: (input) => door.answerSpendCommands(input),
+      answerInternalReserveRealtimeSession: (input) => door.answerReserveRealtimeSession(input),
+      answerInternalPatchRealtimeSession: (input) => door.answerPatchRealtimeSession(input),
+      answerInternalReportRealtimeUsage: (input) => door.answerReportRealtimeUsage(input),
     },
-    "GatewayApi",
+    "GatewayInternalDoorApi",
   );
   const runtime = createRestRuntime({
     identity: GatewayInternalIdentityService.create({ secret }),

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
+import { VoiceConcurrencyGateService } from "../services/voice-concurrency-gate.service.ts";
 
-describe("VoiceConcurrencyGate", () => {
+describe("VoiceConcurrencyGateService", () => {
   describe("given a per-project concurrency gate", () => {
     describe("when the cap is 2", () => {
       it("admits up to the cap per project, then blocks", () => {
-        const gate = new VoiceConcurrencyGate({ max: 2 });
+        const gate = VoiceConcurrencyGateService.create({ max: 2 });
         const project = "proj-1";
 
         expect(gate.canAcquire(project)).toBe(true);
@@ -19,7 +19,7 @@ describe("VoiceConcurrencyGate", () => {
       });
 
       it("admits another once a slot is released", () => {
-        const gate = new VoiceConcurrencyGate({ max: 2 });
+        const gate = VoiceConcurrencyGateService.create({ max: 2 });
         const project = "proj-1";
         gate.acquire(project);
         gate.acquire(project);
@@ -33,7 +33,7 @@ describe("VoiceConcurrencyGate", () => {
 
     describe("when two projects run concurrently", () => {
       it("caps each project independently", () => {
-        const gate = new VoiceConcurrencyGate({ max: 2 });
+        const gate = VoiceConcurrencyGateService.create({ max: 2 });
         gate.acquire("a");
         gate.acquire("a");
 
@@ -45,7 +45,7 @@ describe("VoiceConcurrencyGate", () => {
 
     describe("when released below zero", () => {
       it("clamps at zero rather than going negative", () => {
-        const gate = new VoiceConcurrencyGate({ max: 2 });
+        const gate = VoiceConcurrencyGateService.create({ max: 2 });
         gate.release("a");
         expect(gate.activeCount("a")).toBe(0);
       });

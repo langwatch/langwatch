@@ -148,7 +148,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyReposito
                 OR: keysetAfter([
                   {
                     name: "createdAt",
-                    value: toDate(args.cursor.createdAt),
+                    value: args.cursor.createdAt,
                     direction: "desc",
                   },
                   { name: "id", value: args.cursor.id, direction: "desc" },

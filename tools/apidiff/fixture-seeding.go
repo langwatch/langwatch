@@ -28,6 +28,9 @@ var fixtureSymbols = map[string]string{
 	"traceid":    fixtureTraceID,
 	"workflowid": fixtureWorkflowID,
 	"versionid":  fixtureWorkflowVersionID,
+	// The workflow version, qualified by its family, so a prompt version
+	// captured later never answers a workflow route's {versionId}.
+	"workflows/versionid": fixtureWorkflowVersionID,
 }
 
 // seedFixtures files the fixture ids and ingests the fixture trace on both
@@ -43,6 +46,9 @@ func (engine *probeEngine) seedFixtures() {
 		engine.symbolsB.file(bucket, fixtureSymbols[bucket])
 	}
 	engine.ingestFixtureTrace()
+	engine.ingestCodingAgentLog()
+	engine.mintCLISession(engine.options.A, engine.credsA)
+	engine.mintCLISession(engine.options.B, engine.credsB)
 }
 
 func (engine *probeEngine) ingestFixtureTrace() {

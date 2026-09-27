@@ -10,13 +10,12 @@ const getTwilioCredential = vi.fn();
 const findElevenLabsProviderForProject = vi.fn();
 const getElevenLabsApiCredential = vi.fn();
 
-import { PHONE_NO_CREDENTIAL_MESSAGE } from "@langwatch/scenario-contract/voice-runtime";
-
+import { PHONE_NO_CREDENTIAL_MESSAGE } from "../channels/http/http.phone-voice-transport.channel.ts";
+import { createSerializedVoiceAgentAdapter } from "../channels/voice-transport.channels.ts";
 import {
   resolveVoiceTarget,
   type VoiceTransportCredentialReader,
 } from "../rules/voice-target.rules.ts";
-import { createSerializedVoiceAgentAdapter } from "../voice-agent.adapter.ts";
 
 beforeEach(() => vi.clearAllMocks());
 

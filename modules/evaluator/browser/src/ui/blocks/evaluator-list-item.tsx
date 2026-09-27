@@ -1,4 +1,4 @@
-import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -65,17 +65,8 @@ export function EvaluatorListItem({
 
   return (
     <Box
-      role="button"
-      tabIndex={0}
       cursor="pointer"
       onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick();
-        }
-      }}
       padding={4}
       borderRadius="md"
       border="1px solid"
@@ -88,6 +79,14 @@ export function EvaluatorListItem({
       data-testid={`evaluator-card-${evaluator.id}`}
       position="relative"
     >
+      <chakra.button
+        type="button"
+        aria-label={evaluator.name}
+        position="absolute"
+        inset={0}
+        borderRadius="md"
+        cursor="pointer"
+      />
       <HStack gap={3} align="start">
         <Box color="green.fg" paddingTop={1}>
           <EvaluatorKindIcon kind={evaluator.type} />
@@ -112,6 +111,8 @@ export function EvaluatorListItem({
               variant="ghost"
               size="xs"
               aria-label="Actions"
+              position="relative"
+              zIndex={1}
               onClick={(event) => event.stopPropagation()}
               data-testid={`evaluator-menu-${evaluator.id}`}
             >

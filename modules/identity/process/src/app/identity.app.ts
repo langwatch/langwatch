@@ -603,6 +603,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
           reads: setup.repositories.ssoConnections,
           activity: setup.repositories.ssoMigrationEvidence,
           credentials: setup.repositories.ssoCredentials,
+          breakGlass,
           registrations: SsoIdpRegistrationService.create({
             // The same fence the published-proof reads go through: an issuer
             // is a string an administrator typed.

@@ -6,7 +6,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type { DiscoveredPersonRepository } from "../repositories/discovered-person.repository.ts";
 import type { IdentityMatchRepository } from "../repositories/identity-match.repository.ts";
-import { extraString, provenUserId } from "../rules/directory-department.rules.ts";
+import { deriveProvenUserId, extraString } from "../rules/directory-department.rules.ts";
 import { DIRECTORY_REPORT_ACTION } from "../rules/microsoft-graph-directory.rules.ts";
 import type { DepartmentService } from "./department.service.ts";
 import type { IdentityMatchService } from "./identity-match.service.ts";
@@ -63,12 +63,12 @@ export class DirectoryDepartmentSyncService {
     const desired = new Map<string, string>();
     for (const row of rows) {
       const department = extraString(row, "department").trim();
-      const userId = provenUserId({
+      const userId = deriveProvenUserId({
         row,
         accounts,
         openLinkUserId: openLinkByActor.get(row.actor) ?? null,
       });
-      if (userId !== null) desired.set(userId, department);
+      if (userId !== undefined) desired.set(userId, department);
     }
     if (desired.size === 0) return { assigned: 0 };
 

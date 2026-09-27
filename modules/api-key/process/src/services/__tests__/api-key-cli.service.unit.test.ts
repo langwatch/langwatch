@@ -205,6 +205,7 @@ describe("given a CLI login key mint", () => {
   });
 
   describe("when the user logs in again from the same device", () => {
+    /** @scenario A re-login names rotation as the cause of the login key it replaces */
     it("revokes the previous key with cause rotation, not a person's own decision", async () => {
       const { service, revoke } = serviceWith({
         findForUser: () => Promise.resolve([OLD_KEY]),

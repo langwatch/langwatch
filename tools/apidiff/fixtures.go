@@ -40,6 +40,13 @@ const (
 	// insert the same row, not a second one.
 	fixtureDoomedUserEmail = "apidiff-user-doomed@apidiff.invalid"
 
+	// The dashboard-widget project: release_custom_chart_playground is
+	// targeted at it alone through the flag store, because the flag turns the
+	// saved-chart routes off in whichever project it reaches.
+	fixtureWidgetProjectID = "apidiff-project-widgets"
+	WidgetProjectKey       = "sk-lw-apidiff-project-widgets-key"
+	customChartFlag        = "release_custom_chart_playground"
+
 	// The fixture workflow (fixture-seeding.go): no REST route creates one.
 	fixtureWorkflowID        = "apidiff-workflow"
 	fixtureWorkflowVersionID = "apidiff-workflow-version"
@@ -47,9 +54,18 @@ const (
 
 // forcedFeatureFlags are switched on for both instances, so the routes they
 // gate are compared rather than refused alike. release_custom_chart_playground
-// is left off: it turns the saved-chart routes off (the two are mutually
-// exclusive per project), and those carry more of the surface.
-var forcedFeatureFlags = "release_lwql_workbench,release_instant_evals,release_langy_enabled"
+// is not forced: it turns the saved-chart routes off in the project it
+// reaches, so a flag-store rule targets it at the widget project alone.
+var forcedFeatureFlags = "release_lwql_workbench,release_instant_evals,release_langy_enabled,release_langy_api_key_turns_enabled"
+
+// widgetFlagSQL targets the custom-chart playground at the widget project
+// through the flag store both layouts read (identical FeatureFlag columns).
+func widgetFlagSQL() string {
+	return `INSERT INTO "FeatureFlag" ("key", "enabled", "rules") VALUES
+  ('` + customChartFlag + `', false, '[{"match":{"projectId":"` + fixtureWidgetProjectID + `"},"enabled":true}]')
+ON CONFLICT ("key") DO NOTHING;
+`
+}
 
 // provisioningSQL inserts the permission-probe fixtures: organization 2 with
 // its team and project C, project B in the seeded organization, and the two
@@ -73,7 +89,8 @@ ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "Project" ("id", "name", "slug", "apiKey", "teamId", "language", "framework") VALUES
   ('` + fixtureProjectBID + `', 'apidiff project B', 'apidiff-project-b', '` + ProjectKeyB + `', '` + seededTeamID + `', 'typescript', 'apidiff'),
   ('` + fixtureProjectCID + `', 'apidiff project C', 'apidiff-project-c', '` + ProjectKeyC + `', '` + fixtureTeam2ID + `', 'typescript', 'apidiff'),
-  ('` + fixtureDoomedProjectID + `', 'apidiff doomed project', 'apidiff-project-doomed', '` + fixtureDoomedProjectKey + `', '` + seededTeamID + `', 'typescript', 'apidiff')
+  ('` + fixtureDoomedProjectID + `', 'apidiff doomed project', 'apidiff-project-doomed', '` + fixtureDoomedProjectKey + `', '` + seededTeamID + `', 'typescript', 'apidiff'),
+  ('` + fixtureWidgetProjectID + `', 'apidiff widget project', 'apidiff-project-widgets', '` + WidgetProjectKey + `', '` + seededTeamID + `', 'typescript', 'apidiff')
 ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "User" ("id", "name", "email") VALUES
   ('` + fixtureDoomedUserID + `', 'apidiff doomed user', '` + fixtureDoomedUserEmail + `')
@@ -81,5 +98,5 @@ ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "OrganizationUser" ("userId", "organizationId", "role") VALUES
   ('` + fixtureDoomedUserID + `', '` + seededOrganizationID + `', 'MEMBER')
 ON CONFLICT ("userId", "organizationId") DO NOTHING;
-` + fixtureWorkflowSQL()
+` + widgetFlagSQL() + fixtureWorkflowSQL()
 }

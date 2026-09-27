@@ -3,16 +3,14 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import {
-  ScenarioRunStatus,
-  type VoiceSessionInfrastructure,
-  type WholeCallAudioInfrastructure,
-} from "@langwatch/scenario-contract";
-import type { VoiceTransportRunner } from "@langwatch/scenario-contract/voice-runtime";
+import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryVoiceRecordingChannel } from "../../channels/memory/memory.voice-recording.channel.ts";
+import { type VoiceTransportRunner } from "../../channels/voice-transport.channel.ts";
+import type { VoiceSessionInfrastructure } from "../voice-call.service.ts";
 import { VoiceSessionService } from "../voice-session.service.ts";
+import type { WholeCallAudioInfrastructure } from "../whole-call-audio.service.ts";
 
 const AUDIO_URL = "https://api.elevenlabs.io/v1/convai/conversations/conv_1/audio";
 const TWILIO_WAV_URL = "https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE1.wav";

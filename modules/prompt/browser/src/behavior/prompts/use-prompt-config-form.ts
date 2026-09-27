@@ -1,6 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { salvageValidData } from "@langwatch/design-system/zod-salvage";
-import { useModelLimits } from "@langwatch/model-provider-browser/model-limits";
 import {
   formSchema,
   formSchemaForSave,
@@ -15,6 +14,7 @@ import {
   buildDefaultFormValues,
   inputsAndOutputsToDemostrationColumns,
 } from "../../prompt-form.ts";
+import { useModelLimits } from "../use-model-limits.ts";
 
 interface UsePromptConfigFormProps {
   configId?: string;

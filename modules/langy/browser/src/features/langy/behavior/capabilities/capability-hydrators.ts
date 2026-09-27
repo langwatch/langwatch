@@ -23,8 +23,20 @@ type TraceRowPayload = {
   totalCost?: number;
 };
 
-/** The tRPC utils proxy (`api.useUtils()`), for imperative `.fetch` calls. */
-export type CapabilityTrpcUtils = ReturnType<typeof api.useUtils>;
+type ApiUtils = ReturnType<typeof api.useUtils>;
+
+/** The imperative `.fetch` reads the hydrators make off `api.useUtils()`. */
+export type CapabilityTrpcUtils = {
+  traces: {
+    header: Pick<ApiUtils["traces"]["header"], "fetch">;
+    list: Pick<ApiUtils["traces"]["list"], "fetch">;
+  };
+  dataset: { getAll: Pick<ApiUtils["dataset"]["getAll"], "fetch"> };
+  prompts: {
+    getAllPromptsForProject: Pick<ApiUtils["prompts"]["getAllPromptsForProject"], "fetch">;
+  };
+  experiments: { getAllByProjectId: Pick<ApiUtils["experiments"]["getAllByProjectId"], "fetch"> };
+};
 
 /** One hydrated row, in the shared vocabulary every card draws. */
 export interface CapabilityHydratedRow {

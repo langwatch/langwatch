@@ -40,89 +40,64 @@ const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 export function stripCommentsAndStrings(query: string): string {
   let out = "";
   let i = 0;
-  const n = query.length;
-  while (i < n) {
-    const c = query[i];
-    const next = query[i + 1];
-
-    if (c === "/" && next === "*") {
-      let depth = 1;
-      i += 2;
-      while (i < n && depth > 0) {
-        if (query[i] === "/" && query[i + 1] === "*") {
-          depth++;
-          i += 2;
-        } else if (query[i] === "*" && query[i + 1] === "/") {
-          depth--;
-          i += 2;
-        } else {
-          i++;
-        }
-      }
-      out += " ";
-      continue;
-    }
-
-    if (c === "-" && next === "-") {
-      i += 2;
-      while (i < n && query[i] !== "\n") i++;
-      out += " ";
-      continue;
-    }
-
-    if (c === "#" && (i === 0 || /\s/.test(query[i - 1] ?? ""))) {
-      i++;
-      while (i < n && query[i] !== "\n") i++;
-      out += " ";
-      continue;
-    }
-
-    if (c === "'") {
-      i++;
-      while (i < n) {
-        if (query[i] === "\\" && i + 1 < n) {
-          i += 2;
-          continue;
-        }
-        if (query[i] === "'" && query[i + 1] === "'") {
-          i += 2;
-          continue;
-        }
-        if (query[i] === "'") {
-          i++;
-          break;
-        }
-        i++;
-      }
-      out += "''";
-      continue;
-    }
-
-    if (c === '"') {
-      i++;
-      while (i < n) {
-        if (query[i] === "\\" && i + 1 < n) {
-          i += 2;
-          continue;
-        }
-        if (query[i] === '"' && query[i + 1] === '"') {
-          i += 2;
-          continue;
-        }
-        if (query[i] === '"') {
-          i++;
-          break;
-        }
-        i++;
-      }
-      out += '""';
-      continue;
-    }
-
-    out += c;
-    i++;
+  while (i < query.length) {
+    const scanned = scanAt(query, i);
+    out += scanned.replacement;
+    i = scanned.end;
   }
   return out;
+}
+
+/** What one lexer step at `start` consumes: where it ends and what stands in for it. */
+type Scanned = Readonly<{ end: number; replacement: string }>;
+
+/** A comment reads as one space, a string as its empty quotes, anything else as itself. */
+function scanAt(query: string, start: number): Scanned {
+  const c = query[start] ?? "";
+  const next = query[start + 1];
+  if (c === "/" && next === "*") return { end: skipBlockComment(query, start), replacement: " " };
+  if (c === "-" && next === "-") return { end: skipToLineEnd(query, start + 2), replacement: " " };
+  if (c === "#" && (start === 0 || /\s/.test(query[start - 1] ?? ""))) {
+    return { end: skipToLineEnd(query, start + 1), replacement: " " };
+  }
+  if (c === "'" || c === '"') return { end: skipQuoted(query, start, c), replacement: c + c };
+  return { end: start + 1, replacement: c };
+}
+
+/** Past a block comment opening at `start`, nested ones included. */
+function skipBlockComment(query: string, start: number): number {
+  let depth = 1;
+  let i = start + 2;
+  while (i < query.length && depth > 0) {
+    const pair = query.slice(i, i + 2);
+    if (pair === "/*") depth++;
+    if (pair === "*/") depth--;
+    i += pair === "/*" || pair === "*/" ? 2 : 1;
+  }
+  return i;
+}
+
+/** The newline ending a line comment, left for the caller to keep. */
+function skipToLineEnd(query: string, start: number): number {
+  const newline = query.indexOf("\n", start);
+  return newline === -1 ? query.length : newline;
+}
+
+/** Past a quoted run opening at `start`, honouring backslash and doubled-quote escapes. */
+function skipQuoted(query: string, start: number, quote: string): number {
+  let i = start + 1;
+  while (i < query.length) {
+    if (query[i] === "\\" && i + 1 < query.length) {
+      i += 2;
+    } else if (query[i] !== quote) {
+      i++;
+    } else if (query[i + 1] === quote) {
+      i += 2;
+    } else {
+      return i + 1;
+    }
+  }
+  return i;
 }
 
 export function buildExplainQuery(query: string, type: OpsExplainType = "PLAN"): OpsExplainBuild {

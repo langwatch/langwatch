@@ -9,7 +9,8 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { GovernanceIngestRateLimiter } from "./governance-ingest-rate-limit.service.ts";
+import type { GovernanceIngestRateLimiter } from "../app/governance.members.ts";
+import { extractClientIp } from "../rules/governance-ingest-rate-limit.rules.ts";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -65,7 +66,7 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
 
     if (!limiter) return null;
 
-    const ip = GovernanceIngestRateLimiter.extractClientIp(headers);
+    const ip = extractClientIp(headers);
     const decision = await limiter.check({ ip });
 
     if (decision.allowed) return null;

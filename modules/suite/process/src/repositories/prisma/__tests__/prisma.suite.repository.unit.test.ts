@@ -216,3 +216,48 @@ describe("PrismaSuiteRepository.findOrCreatePlanByName", () => {
     });
   });
 });
+
+describe("PrismaSuiteRepository.create", () => {
+  describe("when the stored row carries the fields and evaluators columns", () => {
+    /** @scenario "A stored run plan reads back although its row carries fields and evaluators" */
+    it("answers the run plan", async () => {
+      const stored = {
+        id: "suite_1",
+        projectId: "project_1",
+        name: "Checkout",
+        slug: "checkout",
+        kind: "run_plan",
+        description: null,
+        scenarioIds: ["scenario_1"],
+        scope: null,
+        targets: [{ type: "http", referenceId: "agent_1" }],
+        repeatCount: 1,
+        labels: [],
+        simulatorModel: null,
+        judgeModel: null,
+        fields: null,
+        evaluators: null,
+        archivedAt: null,
+        createdAt: new Date("2026-09-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-09-01T00:00:00.000Z"),
+      };
+      const database = prismaDouble({
+        simulationSuite: { create: vi.fn().mockResolvedValue(stored) },
+      });
+
+      const suite = await PrismaSuiteRepository.create(database).create({
+        id: "suite_1",
+        projectId: "project_1",
+        name: "Checkout",
+        slug: "checkout",
+        scenarioIds: ["scenario_1"],
+        targets: [{ type: "http", referenceId: "agent_1" }],
+        repeatCount: 1,
+        labels: [],
+      });
+
+      expect(suite).toMatchObject({ id: "suite_1", slug: "checkout", kind: "run_plan" });
+      expect(suite).not.toHaveProperty("evaluators");
+    });
+  });
+});

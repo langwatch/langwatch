@@ -90,17 +90,82 @@ describe("the daily rollup and the currency a day was billed in", () => {
 describe("the restatement marker", () => {
   describe("when one pull revises two items in the same cell", () => {
     /** @scenario "One pull revising several items preserves the previous whole-cell total" */
-    it("names the whole cell's total before that pull", () => {
+    it.each([false, true])(
+      "names the whole cell's total before that pull, with reversed delivery %s",
+      (reverse) => {
+        const { fold } = rollupFold();
+        const revisions = [
+          observed({ restatementKey: "a", costNanoMinor: 150, observedAtMs: T2 }),
+          observed({ restatementKey: "b", costNanoMinor: 250, observedAtMs: T2 }),
+        ];
+
+        const state = fold([
+          observed({ restatementKey: "a", costNanoMinor: 100, observedAtMs: T1 }),
+          observed({ restatementKey: "b", costNanoMinor: 200, observedAtMs: T1 }),
+          ...(reverse ? revisions.reverse() : revisions),
+        ]);
+
+        expect(state).toMatchObject({ previousAmountNanoUsd: 300, revisedAt: T2 });
+      },
+    );
+  });
+
+  describe("given a settled day is pulled again and nothing moved", () => {
+    it("still says it was revised, and still names the same prior figure", () => {
       const { fold } = rollupFold();
+      const confirmingPull = T2 + HOUR_MS;
 
       const state = fold([
         observed({ restatementKey: "a", costNanoMinor: 100, observedAtMs: T1 }),
-        observed({ restatementKey: "b", costNanoMinor: 200, observedAtMs: T1 }),
-        observed({ restatementKey: "a", costNanoMinor: 150, observedAtMs: T2 }),
-        observed({ restatementKey: "b", costNanoMinor: 250, observedAtMs: T2 }),
+        observed({ restatementKey: "a", costNanoMinor: 90, observedAtMs: T2 }),
+        observed({ restatementKey: "a", costNanoMinor: 90, observedAtMs: confirmingPull }),
       ]);
 
-      expect(state).toMatchObject({ previousAmountNanoUsd: 300, revisedAt: T2 });
+      expect(state).toMatchObject({
+        revisedAt: T2,
+        previousAmountNanoUsd: 100,
+        lastObservedAt: confirmingPull,
+      });
+    });
+  });
+
+  describe("given two different items in the cell are each restated", () => {
+    const restatedAAt = T1 + HOUR_MS;
+    const restatedBAt = T1 + 2 * HOUR_MS;
+    const opening = () => [
+      observed({ restatementKey: "bucket-a", costNanoMinor: 100, observedAtMs: T1 }),
+      observed({ restatementKey: "bucket-b", costNanoMinor: 200, observedAtMs: T1 }),
+    ];
+    const restatementOfA = () =>
+      observed({ restatementKey: "bucket-a", costNanoMinor: 150, observedAtMs: restatedAAt });
+    const restatementOfB = () =>
+      observed({ restatementKey: "bucket-b", costNanoMinor: 300, observedAtMs: restatedBAt });
+    const both = () => {
+      const { fold } = rollupFold();
+      return {
+        inOrder: fold([...opening(), restatementOfA(), restatementOfB()]),
+        reversed: rollupFold().fold([...opening(), restatementOfB(), restatementOfA()]),
+      };
+    };
+
+    it("reports the newest correction, whichever order the two arrive in", () => {
+      const { inOrder, reversed } = both();
+      expect(inOrder.revisedAt).toBe(restatedBAt);
+      expect(reversed.revisedAt).toBe(restatedBAt);
+    });
+
+    it("names the same prior figure, whichever order the two arrive in", () => {
+      const { inOrder, reversed } = both();
+      expect(inOrder.previousAmountNanoUsd).toBe(150 + 200);
+      expect(reversed.previousAmountNanoUsd).toBe(150 + 200);
+    });
+
+    it("agrees on the total and the count either way", () => {
+      const { inOrder, reversed } = both();
+      expect(governanceCostRollupTotals(inOrder).amountNanoUsd).toBe(150 + 300);
+      expect(governanceCostRollupTotals(reversed).amountNanoUsd).toBe(150 + 300);
+      expect(inOrder.revisionCount).toBe(2);
+      expect(reversed.revisionCount).toBe(2);
     });
   });
 

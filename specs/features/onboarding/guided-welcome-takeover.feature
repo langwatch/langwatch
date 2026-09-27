@@ -197,7 +197,7 @@ Feature: Guided welcome flow and takeover screens
   Scenario: Azure, Bedrock and Custom take credentials and a typed model name
     When I select Azure
     Then the connect panel asks for the credentials and a chat model
-    And the hint reads "Type it exactly as deployed: Azure has no model list we can read for you."
+    And the hint reads "Type it exactly as deployed: Azure OpenAI has no model list we can read for you."
     When I select Bedrock
     Then the hint names Bedrock
     When I select Custom

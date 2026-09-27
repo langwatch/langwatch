@@ -1,4 +1,4 @@
-import type * as ioredisModule from "ioredis";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAnomalyRateTrackerRepository } from "../../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
@@ -8,7 +8,7 @@ import { OpsMetricsCollectorService } from "../ops-metrics-collector.service.ts"
 import { OpsMetricsTestAdapter } from "./ops-metrics.fixture.ts";
 
 function createMockRedis() {
-  return {
+  return redisDouble({
     pipeline: vi.fn().mockReturnValue({
       exec: vi.fn().mockResolvedValue([]),
       get: vi.fn(),
@@ -21,12 +21,12 @@ function createMockRedis() {
     info: vi.fn().mockResolvedValue(""),
     smembers: vi.fn().mockResolvedValue([]),
     zrange: vi.fn().mockResolvedValue([]),
-  } as unknown as ioredisModule.default;
+  });
 }
 
 /**
- * Drive the private reconcile through the public discovery path, then read the
- * dashboard the way the UI does.
+ * Drive the reconcile through the collector's own start, then read the
+ * dashboard the way the UI does once the published drift has been read back.
  */
 const runReconcile = async (ops: OpsMetricsTestAdapter) => {
   const collector = OpsMetricsCollectorService.create({
@@ -34,10 +34,13 @@ const runReconcile = async (ops: OpsMetricsTestAdapter) => {
     ops,
     rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
   });
-  await collector.discoverQueues();
-  // Access via bracket notation to avoid exposing a test-only public API.
-  await (collector as unknown as { reconcilePending(): Promise<void> }).reconcilePending();
-  return collector.getDashboardData().pendingDrift;
+  await collector.start();
+  try {
+    await vi.waitFor(() => expect(ops.getDriftReads()).toBeGreaterThan(0));
+    return collector.getDashboardData().pendingDrift;
+  } finally {
+    await collector.stop();
+  }
 };
 
 describe("OpsMetricsCollectorService", () => {

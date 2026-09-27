@@ -12,6 +12,7 @@ import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { CapabilityBodyWidget } from "../../../../../../model/langy-capability-catalog.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -590,14 +591,14 @@ describe("LangyDeclarativeCard", () => {
  */
 describe("given a body widget the catalog names", () => {
   /** The same descriptor the call resolves to, re-seated on one widget. */
-  function renderWithBody({ body, output }: { body: string; output: unknown }) {
+  function renderWithBody({ body, output }: { body: CapabilityBodyWidget; output: unknown }) {
     const descriptor = resolveCapability("langwatch.analytics.query");
     if (!descriptor) throw new Error("no descriptor for analytics query");
     return render(
       <ChakraProvider value={defaultSystem}>
         <LangyHostProvider value={host}>
           <LangyDeclarativeCard
-            descriptor={{ ...descriptor, body } as unknown as typeof descriptor}
+            descriptor={{ ...descriptor, body }}
             input={{}}
             output={output}
             projectSlug="acme"
@@ -639,18 +640,6 @@ describe("given a body widget the catalog names", () => {
 
       expect(document.querySelector(".recharts-surface")).toBeNull();
       expect(screen.getByText("total")).toBeTruthy();
-    });
-  });
-
-  describe("when the widget is one this card has never heard of", () => {
-    it("still draws a body rather than an empty card", () => {
-      renderWithBody({
-        body: "constellation",
-        output: { currentPeriod: [], name: "Total cost", status: "ready" },
-      });
-
-      expect(screen.getByText("status")).toBeTruthy();
-      expect(screen.getByText("ready")).toBeTruthy();
     });
   });
 

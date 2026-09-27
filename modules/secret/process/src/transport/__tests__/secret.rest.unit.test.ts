@@ -1,17 +1,23 @@
 import type { Actor } from "@langwatch/actor";
 import { createErrorHandler } from "@langwatch/api";
+import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
+import type { AuthzApi, AuthzListTeamMemberBindingsInput } from "@langwatch/authz-contract";
 import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createSecretTestApp } from "../../app/__tests__/secret.fixture.ts";
+import {
+  createSecretTestApp,
+  teamWithMembers,
+  type SecretTestPeers,
+} from "../../app/__tests__/secret.fixture.ts";
 import { SECRET_REST_VERSION, secretRest } from "../secret.rest.ts";
 
 const PROJECT = "project-1";
 const USER: Actor = { type: "user", id: "user-1" };
 
-function mount(options: { project?: string; actor?: Actor | null } = {}) {
-  const app = createSecretTestApp();
+function mount(options: { project?: string; actor?: Actor | null; peers?: SecretTestPeers } = {}) {
+  const app = createSecretTestApp({ peers: options.peers });
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({
@@ -117,16 +123,47 @@ describe("the secret REST family", () => {
     });
   });
 
-  describe("when the credential is bound to no user", () => {
-    /** @scenario "Writes use the authenticated user actor" */
-    it("refuses a write", async () => {
-      const response = await create(mount({ actor: null }), {
-        projectId: PROJECT,
-        name: "OPENAI_API_KEY",
-        value: "sk-live",
+  describe("when a legacy project key, bound to no user, writes", () => {
+    /** @scenario "A key bound to no user writes as the first member of the project's team" */
+    it("creates and replaces the secret, asking the project's team for its members", async () => {
+      const team = teamWithMembers(["user-first", "user-second"]);
+      const asked: AuthzListTeamMemberBindingsInput[] = [];
+      const permissions = createApiFixture<AuthzApi>({
+        listTeamMemberBindings: async (input) => {
+          asked.push(input);
+
+          return team.permissions.listTeamMemberBindings(input);
+        },
+      });
+      const app = mount({ actor: null, peers: { projects: team.projects, permissions } });
+
+      const created = await create(app, { name: "OPENAI_API_KEY", value: "sk-live" });
+      const { id } = secretPublicSchema.parse(await created.json());
+      const replaced = await app.request(`/api/secrets/${id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ value: "sk-rotated" }),
       });
 
-      expect(response.status).toBe(401);
+      expect([created.status, replaced.status]).toEqual([201, 200]);
+      expect(asked).toEqual([
+        { organizationId: "organization-1", teamIds: ["team-1"] },
+        { organizationId: "organization-1", teamIds: ["team-1"] },
+      ]);
+    });
+
+    /** @scenario "A key bound to no user is refused when the project's team has no member" */
+    it("refuses the write by code when the team has no member to attribute it to", async () => {
+      const app = mount({ actor: null, peers: teamWithMembers([]) });
+
+      const response = await create(app, { name: "OPENAI_API_KEY", value: "sk-live" });
+      const listed = await app.request("/api/secrets");
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        code: "authenticated_actor_required",
+      });
+      await expect(listed.json()).resolves.toEqual([]);
     });
   });
 

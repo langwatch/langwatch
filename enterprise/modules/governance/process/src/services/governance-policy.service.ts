@@ -6,9 +6,9 @@ import type {
 import { z } from "zod";
 
 import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 const UNASSIGNED_DEPARTMENT = "unassigned";
 const codingAssistantConfigSchema = z.looseObject({
@@ -70,7 +70,7 @@ export class PostgresGovernancePolicyService {
         );
       });
     } catch (error) {
-      const diagnostics = this.options.diagnostics ?? new NullGovernanceDiagnosticsAdapter();
+      const diagnostics = this.options.diagnostics ?? silentGovernanceDiagnostics;
       diagnostics.warn("failed to resolve bundled-plan policy; defaulting to non-billable", {
         error,
         organizationId: input.organizationId,

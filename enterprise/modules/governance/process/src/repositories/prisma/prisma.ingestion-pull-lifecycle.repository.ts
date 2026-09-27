@@ -2,9 +2,23 @@ import { fromDate } from "@langwatch/time";
 
 import {
   IngestionPullLifecycleRepository,
-  type IngestionPullLifecycleDatabase,
   type IngestionPullLifecycleSource,
 } from "../ingestion-pull-lifecycle.repository.ts";
+
+export type IngestionPullLifecycleDatabase = {
+  ingestionSource: {
+    findMany(input: {
+      where: {
+        OR: ({ pullSchedule: { not: null } } | { id: { in: string[] } })[];
+      };
+    }): Promise<
+      (Omit<IngestionPullLifecycleSource, "updatedAt" | "archivedAt"> & {
+        updatedAt: Date;
+        archivedAt: Date | null;
+      })[]
+    >;
+  };
+};
 
 export class PrismaIngestionPullLifecycleRepository extends IngestionPullLifecycleRepository {
   private constructor(private readonly database: IngestionPullLifecycleDatabase) {

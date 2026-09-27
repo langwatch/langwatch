@@ -15,6 +15,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
+// Trace lends the thread; a synchronous stand-in keeps this suite on the drawer's layout.
+vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
+}));
+
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
 const mockGetBatchRunData = vi.hoisted(() => vi.fn());

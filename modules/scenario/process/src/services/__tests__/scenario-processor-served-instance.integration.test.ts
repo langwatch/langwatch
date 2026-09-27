@@ -10,9 +10,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const childScript = vi.hoisted(() => ({ current: "" }));
 vi.mock("../child-process-spawn.service.ts", () => ({
   ChildProcessSpawnService: {
-    resolve: () => ({
-      command: process.execPath,
-      args: ["-e", childScript.current],
+    create: () => ({
+      resolve: () => ({
+        command: process.execPath,
+        args: ["-e", childScript.current],
+      }),
     }),
   },
 }));
@@ -21,7 +23,7 @@ import type {
   CancellationSubscriber,
   ScenarioProcessorServiceMetrics,
 } from "../../app/scenario.app.ts";
-import { NodeScenarioChildProcessAdapter } from "../node-scenario-child-process.service.ts";
+import { NodeScenarioChildService } from "../node-scenario-child.service.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";
@@ -84,7 +86,7 @@ function buildProcessor() {
     execution,
     pool,
     cancellations: new SilentCancellations(),
-    childProcesses: NodeScenarioChildProcessAdapter.create({
+    childProcesses: NodeScenarioChildService.create({
       pool,
       config: {
         packageRoot: process.cwd(),

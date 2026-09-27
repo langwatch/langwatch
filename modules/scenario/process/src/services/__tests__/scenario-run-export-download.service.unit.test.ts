@@ -6,6 +6,7 @@ import { gunzipSync } from "node:zlib";
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { KSUID_RESOURCES, parse } from "@langwatch/ksuid";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   ScenarioRunStatus,
@@ -74,6 +75,7 @@ describe("ScenarioRunExportDownloadService", () => {
 
     expect(csv).toContain("run_scenario_run_id");
     expect(csv).toContain("run_1");
+    expect(parse(download.exportId).resource).toBe(KSUID_RESOURCES.EXPORT);
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user_1",

@@ -5,9 +5,11 @@
  * what it holds, and a filter honoured or refused — and an `externalId` term
  * resolves only against the connection that asserted it.
  */
+import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
@@ -202,6 +204,7 @@ describe("reading the directory back", () => {
     const people = Array.from({ length: 250 }, (_, index) => person(index));
 
     /** @scenario "A page reports how many resources it actually carries" */
+    /** @scenario "The last page reports how many people it actually carries" */
     it("reports the short last page at its real size", async () => {
       const page = await serviceOver(directory({ people })).listUsers({
         organizationId: ORGANIZATION,
@@ -214,6 +217,7 @@ describe("reading the directory back", () => {
     });
 
     /** @scenario "A page reports how many resources it actually carries" */
+    /** @scenario "A full page reports the whole page" */
     it("reports a full page as full", async () => {
       const page = await serviceOver(directory({ people })).listUsers({
         organizationId: ORGANIZATION,
@@ -298,5 +302,81 @@ describe("reading the directory back", () => {
       expect(page.Resources).toEqual([]);
       expect(lookups).toEqual([]);
     });
+  });
+
+  describe("when the directory grows between two pages", () => {
+    /** @scenario "A directory that grows mid-walk repeats somebody rather than losing them" */
+    it("repeats at worst, and still shows everybody who was already there", async () => {
+      const people = Array.from({ length: 150 }, (_, index) => person(index));
+      const presentAtStart = people.map(({ id }) => id);
+      const scim = serviceOver(directory({ people }));
+
+      const first = await scim.listUsers({
+        organizationId: ORGANIZATION,
+        startIndex: 1,
+        count: 100,
+      });
+      people.push({ id: "user-0050a", email: "joiner@acme.com" });
+      const second = await scim.listUsers({
+        organizationId: ORGANIZATION,
+        startIndex: 101,
+        count: 100,
+      });
+
+      const seen = [...first.Resources, ...second.Resources].map((resource) => resource.id);
+      expect(presentAtStart.filter((id) => !seen.includes(id))).toEqual([]);
+    });
+  });
+
+  describe("when a filter names something the directory can match on", () => {
+    /** @scenario "A filter matching nobody is an empty page rather than a refusal" */
+    it("answers an address nobody holds with an empty page", async () => {
+      const people = Array.from({ length: 20 }, (_, index) => person(index));
+
+      const page = await serviceOver(directory({ people })).listUsers({
+        organizationId: ORGANIZATION,
+        filter: 'userName eq "nobody@acme.com"',
+      });
+
+      expect(page.Resources).toEqual([]);
+      expect(page.totalResults).toBe(0);
+    });
+  });
+
+  describe("when a filter names something the directory cannot match on", () => {
+    /** @scenario "A refused filter says which filter was refused and nothing else" */
+    it("names the attribute it could not honour and nobody in the organization", async () => {
+      const people = Array.from({ length: 20 }, (_, index) => person(index));
+
+      const refusal = await serviceOver(directory({ people }))
+        .listUsers({ organizationId: ORGANIZATION, filter: 'department eq "Platform"' })
+        .catch((error: unknown) => error);
+
+      if (!(refusal instanceof ScimProtocolError)) throw new Error("expected a refusal");
+      expect(refusal.response.detail).toContain("department");
+      expect(refusal.response.detail).not.toContain("Platform");
+      expect(refusal.response.detail).not.toContain("@acme.com");
+    });
+  });
+
+  describe("when the organization scope is missing", () => {
+    /** @scenario "Missing organization scope never widens a SCIM query" */
+    it.each(["", "   "])(
+      "refuses scope %j before the directory is read at all",
+      async (organizationId) => {
+        const repository = directory({ people: [person(1)] });
+        const scim = serviceOver(repository);
+
+        await expect(scim.listUsers({ organizationId })).rejects.toBeInstanceOf(ZodError);
+        await expect(scim.getUser({ id: "user-0001", organizationId })).rejects.toBeInstanceOf(
+          ZodError,
+        );
+        await expect(scim.deleteUser({ id: "user-0001", organizationId })).rejects.toBeInstanceOf(
+          ZodError,
+        );
+        expect(repository.findOrganizationUsers).not.toHaveBeenCalled();
+        expect(repository.findMembership).not.toHaveBeenCalled();
+      },
+    );
   });
 });

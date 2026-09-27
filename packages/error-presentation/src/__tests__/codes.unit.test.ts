@@ -255,8 +255,6 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
  */
 const RAISED_IN_AN_UNSCANNABLE_SHAPE = new Set<string>([
   "budget_not_found",
-  "invalid_cursor",
-  "spend_source_unavailable",
   "suite_evaluator_mappings_missing",
 ]);
 

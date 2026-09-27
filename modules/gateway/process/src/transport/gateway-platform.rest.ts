@@ -4,12 +4,12 @@ import {
   canonicalConflictResponses,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  RequestValidationError,
   resolver,
 } from "@langwatch/api/rest";
 import {
   type gatewayBudgetWireSchema,
   GatewayApi,
-  GatewayWindow,
   toStoredEnum,
   toWireEnum,
   gatewayVirtualKeyDtoSchema,
@@ -20,7 +20,6 @@ import {
   gatewayPageQuerySchema,
   gatewayVirtualKeyListQuerySchema,
   gatewayBudgetListQuerySchema,
-  gatewayBudgetScopeTypeSchema,
   gatewayResetBudgetQuerySchema,
   gatewayVkSpendWindowSchema,
   gatewayCreateVirtualKeySchema,
@@ -48,11 +47,15 @@ import {
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import { decodePageCursor, buildNextPageCursor } from "../rules/gateway-wire-pagination.rules.ts";
+import { resolveVirtualKeySpendWindow } from "../rules/gateway-spend-window.rules.ts";
+import {
+  buildNextPageCursor,
+  decodeCacheRuleCursor,
+  decodeCreatedAtIdCursor,
+} from "../rules/gateway-wire-pagination.rules.ts";
 import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 
 const budgetDtos = GatewayBudgetDtoService.create();
-const MAX_EPOCH_MS = 8_640_000_000_000_000;
 
 /**
  * The 410 the four retired provider-binding addresses publish. Spread per
@@ -88,22 +91,6 @@ function actorUserIdOf(actor: GatewayCaller): string {
     return caller.id;
   }
   throw new Error("gateway platform route resolved no actor id");
-}
-
-function parseCursorInstant(part: unknown): Instant | null {
-  const epochMs = Number(part);
-  if (!Number.isFinite(epochMs) || Math.abs(epochMs) > MAX_EPOCH_MS) return null;
-  return Temporal.Instant.fromEpochMilliseconds(epochMs);
-}
-
-function decodeCreatedAtIdCursor(
-  encoded: string | undefined,
-): { createdAt: Instant; id: string } | null | undefined {
-  if (encoded === undefined) return undefined;
-  const parts = decodePageCursor(encoded, 2);
-  if (!parts) return null;
-  const createdAt = parseCursorInstant(parts[0]);
-  return createdAt ? { createdAt, id: String(parts[1]) } : null;
 }
 
 /**
@@ -201,7 +188,14 @@ function parseBudgetWire(
     onBreach: budget.on_breach && toStoredEnum(budget.on_breach),
     name: budget.name,
   });
-  if (!parsed.success) throw new Error(`validation_error: ${parsed.error.message}`);
+  if (!parsed.success) {
+    throw new RequestValidationError({
+      target: "json",
+      violations: [
+        { field: "budget.limit_usd", type: "invalid_amount", message: parsed.error.message },
+      ],
+    });
+  }
   return parsed.data;
 }
 
@@ -228,12 +222,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const cursor = decodeCreatedAtIdCursor(input.cursor);
-    if (cursor === null) throw new Error("invalid_cursor");
     const rows = await app.getVirtualKeyPage({
       organizationId,
       limit: input.limit,
-      cursor: cursor ?? null,
+      cursor: input.cursor === undefined ? null : decodeCreatedAtIdCursor(input.cursor),
       externalId: input.external_id,
     });
     const visible = app.visibleToProjectCredential({
@@ -341,33 +333,25 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const now = nowInstant();
-    const fromDate =
-      input.from !== undefined
-        ? Temporal.Instant.fromEpochMilliseconds(input.from)
-        : GatewayWindow.startOfCurrentMonthUTC(now);
-    const toDate = input.to !== undefined ? Temporal.Instant.fromEpochMilliseconds(input.to) : now;
-    if (fromDate.epochMilliseconds >= toDate.epochMilliseconds) {
-      throw new Error("`from` must be before `to`");
-    }
+    const { fromDate, toDate } = resolveVirtualKeySpendWindow({
+      from: input.from,
+      to: input.to,
+      now: nowInstant(),
+    });
     const vk = await app.getVisibleVirtualKeyForProjectCredential({
       project: { id: scope.id },
       id: input.id,
       organizationId,
     });
-    if (!app.isSpendSourceAvailable()) {
-      throw new Error("spend_source_unavailable");
-    }
-    const spend = await app.spendByVirtualKey({
+    const spend = await app.getVirtualKeySpend({
       organizationId,
-      virtualKeyIds: [vk.id],
+      virtualKeyId: vk.id,
       window: { fromDate, toDate },
     });
-    const row = spend.get(vk.id);
     return {
       virtual_key_id: vk.id,
-      spent_usd: row?.spentUsd ?? "0",
-      requests: row?.requests ?? 0,
+      spent_usd: spend.spentUsd,
+      requests: spend.requests,
       window: { from: fromDate.epochMilliseconds, to: toDate.epochMilliseconds },
     };
   })
@@ -536,20 +520,11 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const cursor = decodeCreatedAtIdCursor(input.cursor);
-    if (cursor === null) throw new Error("invalid_cursor");
-    const scopeTypes =
-      input.scope_type !== undefined
-        ? gatewayBudgetScopeTypeSchema
-            .array()
-            .min(1)
-            .parse(input.scope_type.split(",").map((s) => s.trim()))
-        : undefined;
     const { budgets, spendAvailable } = await app.listBudgetPageWithHealth({
       organizationId,
       limit: input.limit,
-      cursor: cursor ?? null,
-      scopeTypes: scopeTypes?.map((t) => toStoredEnum(t)),
+      cursor: input.cursor === undefined ? null : decodeCreatedAtIdCursor(input.cursor),
+      scopeTypes: input.scope_type?.map((t) => toStoredEnum(t)),
       externalId: input.external_id,
     });
     const memberCounts = await app.groupMemberCounts(budgets);
@@ -737,16 +712,11 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const parts = input.cursor !== undefined ? decodePageCursor(input.cursor, 3) : undefined;
-    if (input.cursor !== undefined && !parts) throw new Error("invalid_cursor");
-    const priority = parts ? Number(parts[0]) : undefined;
-    const createdAt = parts ? parseCursorInstant(parts[1]) : undefined;
-    if (parts && (priority === undefined || Number.isNaN(priority) || !createdAt)) {
-      throw new Error("invalid_cursor");
-    }
-    const cursor =
-      parts && createdAt ? { priority: priority as number, createdAt, id: String(parts[2]) } : null;
-    const rows = await app.listCacheRulePage({ organizationId, limit: input.limit, cursor });
+    const rows = await app.listCacheRulePage({
+      organizationId,
+      limit: input.limit,
+      cursor: input.cursor === undefined ? null : decodeCacheRuleCursor(input.cursor),
+    });
     return {
       data: rows.map(toCacheRuleDto),
       next_cursor: buildNextPageCursor(rows, input.limit, (r) => [
@@ -768,8 +738,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const row = await app.findCacheRule({ id: input.id, organizationId });
-    if (!row) throw new Error(`cache rule ${input.id} not found`);
+    const row = await app.getCacheRule({ id: input.id, organizationId });
     return { cache_rule: toCacheRuleDto(row) };
   })
 

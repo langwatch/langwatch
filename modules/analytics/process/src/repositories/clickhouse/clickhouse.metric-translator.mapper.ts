@@ -3,8 +3,6 @@
  * expressions.
  */
 
-import { randomUUID } from "node:crypto";
-
 import type {
   AggregationTypes,
   PercentileAggregationTypes,
@@ -130,14 +128,12 @@ export function nonBilledCostExpression(ts: string): string {
   return `coalesce(${ts}.NonBilledCost, if(${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${ts}.TotalCost, 0), 0)`;
 }
 
-/**
- * Generate a unique parameter name for metrics using random suffix.
- * Uses 'm_' prefix to avoid collisions with filter params.
- */
+let metricParamSequence = 0;
+
+/** A parameter name unique in this process; the `m_` prefix keeps it clear of filter params. */
 function genMetricParamName(prefix: string): string {
-  // Use first 8 chars of random UUID for uniqueness without excessive length
-  const suffix = randomUUID().slice(0, 8);
-  return `m_${prefix}_${suffix}`;
+  metricParamSequence += 1;
+  return `m_${prefix}_${metricParamSequence.toString(36)}`;
 }
 
 /**

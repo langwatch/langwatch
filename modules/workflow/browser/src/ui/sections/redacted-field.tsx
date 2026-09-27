@@ -7,7 +7,7 @@ import { Lock } from "react-feather";
 import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
 
-interface RedactedFieldProps {
+export interface RedactedFieldProps {
   field: "input" | "output";
   children: React.ReactNode;
   loadingComponent?: React.ReactNode;

@@ -4,7 +4,8 @@
  * dispose on unmount. Assistance is the schema response only, nothing live.
  */
 
-import type { Monaco, OnMount } from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
+import type * as MonacoApi from "monaco-editor";
 import type { editor, languages } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -15,6 +16,8 @@ import {
   lwqlCompletionItems,
   lwqlHoverFor,
 } from "../model/lwql-schema-model.ts";
+
+type Monaco = typeof MonacoApi;
 
 type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 

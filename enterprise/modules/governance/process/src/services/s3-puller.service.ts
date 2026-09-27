@@ -38,7 +38,7 @@ import type {
   GovernanceObjectStore,
   IngestionPullDiagnosticsSink,
 } from "../app/governance.members.ts";
-import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
+import { silentIngestionPullDiagnostics } from "../app/governance.members.ts";
 
 const MAX_FILES_PER_RUN = 100;
 const MAX_BYTES_PER_FILE = 50 * 1024 * 1024; // 50 MB safety cap
@@ -126,7 +126,7 @@ export class S3PollingPullerService implements PullerAdapter<S3PollingConfig> {
   private constructor(
     readonly id: string,
     private readonly objects: GovernanceObjectStore,
-    private readonly diagnostics: IngestionPullDiagnosticsSink = new NullIngestionPullDiagnosticsAdapter(),
+    private readonly diagnostics: IngestionPullDiagnosticsSink = silentIngestionPullDiagnostics,
   ) {}
 
   static create(options: {

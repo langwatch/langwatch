@@ -4,7 +4,7 @@ import {
   anomalyRuleSchema,
   createAnomalyRuleInputSchema,
   safeParseDestinationConfig,
-  validateThresholdConfig,
+  assertThresholdConfig,
 } from "../anomaly-rule.ts";
 import { departmentSchema } from "../department.ts";
 import { isGovernanceOriginTrace } from "../governance-attributes.ts";
@@ -28,8 +28,8 @@ describe("governance backend contract", () => {
   });
 
   it("keeps preview rule types explicit and rejects unknown types", () => {
-    expect(validateThresholdConfig({ ruleType: "rate_limit", config: {} })).toBeNull();
-    expect(() => validateThresholdConfig({ ruleType: "typo", config: {} })).toThrow(
+    expect(() => assertThresholdConfig({ ruleType: "rate_limit", config: {} })).not.toThrow();
+    expect(() => assertThresholdConfig({ ruleType: "typo", config: {} })).toThrow(
       'Unsupported ruleType "typo"',
     );
   });

@@ -37,7 +37,7 @@ export const adminRest = defineRestRouter(OpsApi)
   .withAccess(publicRoute({ reason: STAFF_RESOLVED_IN_HANDLER }))
   .withOutput(adminImpersonationStartedSchema)
   .withMiddleware(adminActor, adminAuthSession, adminAuditRequest)
-  .handle(({ app, input }, actor, session, req) =>
+  .handle(({ app, input }, ...[actor, session, req]) =>
     app.startAdminImpersonation({ ...input, actor, session, req }),
   )
 
@@ -46,7 +46,9 @@ export const adminRest = defineRestRouter(OpsApi)
   .withAccess(publicRoute({ reason: STAFF_RESOLVED_IN_HANDLER }))
   .withOutput(adminImpersonationStoppedSchema)
   .withMiddleware(adminActor, adminAuthSession, adminAuditRequest)
-  .handle(({ app }, actor, session, req) => app.stopAdminImpersonation({ actor, session, req }))
+  .handle(({ app }, ...[actor, session, req]) =>
+    app.stopAdminImpersonation({ actor, session, req }),
+  )
 
   .post("/api/admin/:resource", "runAdminOperation")
   .withParams(adminResourceParamsSchema)

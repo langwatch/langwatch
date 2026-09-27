@@ -136,6 +136,75 @@ describe("a percentage rule", () => {
       expect(deriveRuleOutcome(rules, { bucketingId: "user_1" })).toBeNull();
     });
   });
+
+  const GUIDED = "experiment_onboarding_langy_guided";
+  const rollout = (percentage: number): FeatureFlagRules => [
+    { match: { percentageRollout: percentage }, enabled: true },
+  ];
+  const readFor = (rules: FeatureFlagRules, bucketingId: string | undefined, flagKey = GUIDED) =>
+    deriveRuleOutcome(rules, { organizationId: "organization_1", bucketingId }, flagKey);
+
+  describe("when a fifty percent rule is read for the same user many times", () => {
+    /** @scenario "a percentage rollout rule assigns a user the same variant on every read" */
+    it("resolves to the same value on every read", () => {
+      const first = readFor(rollout(50), "user_sticky");
+      for (let i = 0; i < 100; i++) {
+        expect(readFor(rollout(50), "user_sticky")).toBe(first);
+      }
+    });
+  });
+
+  describe("when a fifty percent rule is read for ten thousand distinct users", () => {
+    /** @scenario "a percentage rollout rule splits users roughly evenly" */
+    it("enables close to half of them", () => {
+      let enabled = 0;
+      for (let i = 0; i < 10_000; i++) {
+        if (readFor(rollout(50), `user_${i}`) === true) enabled += 1;
+      }
+      expect(enabled / 10_000).toBeGreaterThan(0.47);
+      expect(enabled / 10_000).toBeLessThan(0.53);
+    });
+  });
+
+  describe("when the rule is read with no user to bucket", () => {
+    /** @scenario "a percentage rollout rule never matches a read without a user" */
+    it("matches nothing, so the read falls through to the row-level default", () => {
+      expect(readFor(rollout(50), undefined)).toBeNull();
+      expect(readFor(rollout(50), "")).toBeNull();
+      expect(readFor(rollout(100), undefined)).toBeNull();
+    });
+  });
+
+  describe("when the rollout is zero percent", () => {
+    /** @scenario "a zero percent rollout matches no user" */
+    it("matches no user", () => {
+      for (let i = 0; i < 1_000; i++) {
+        expect(readFor(rollout(0), `user_${i}`)).toBeNull();
+      }
+    });
+  });
+
+  describe("when the rollout is a hundred percent", () => {
+    /** @scenario "a hundred percent rollout matches every user" */
+    it("matches every user", () => {
+      for (let i = 0; i < 1_000; i++) {
+        expect(readFor(rollout(100), `user_${i}`)).toBe(true);
+      }
+    });
+  });
+
+  describe("when two flags with fifty percent rules are read for many users", () => {
+    /** @scenario "the same user lands in different buckets for different flags" */
+    it("does not put every user in the same half of both experiments", () => {
+      let differing = 0;
+      for (let i = 0; i < 1_000; i++) {
+        const a = readFor(rollout(50), `user_${i}`, "experiment_a");
+        const b = readFor(rollout(50), `user_${i}`, "experiment_b");
+        if (a !== b) differing += 1;
+      }
+      expect(differing).toBeGreaterThan(300);
+    });
+  });
 });
 
 describe("parseRules", () => {

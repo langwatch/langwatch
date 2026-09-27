@@ -51,13 +51,13 @@ export function GovernanceSummarySparkline({
   return (
     <Box width={`${width}px`} height={`${height}px`} color={color}>
       <svg
-        role="img"
         aria-label={label}
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
         height="100%"
         data-testid="governance-summary-sparkline"
       >
+        <title>{label}</title>
         <polyline
           points={polyline}
           fill="none"

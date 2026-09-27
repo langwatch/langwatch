@@ -1,4 +1,4 @@
-import { ClickHouseLangWatchQLExecutorAdapter } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 /**
  * Process composition binds the restricted LangWatchQL identity to its service.
  */
@@ -28,7 +28,7 @@ export function createLangWatchQLService(
   const { connection, ...overrides } = options;
 
   return LangWatchQLService.create({
-    executor: connection ? ClickHouseLangWatchQLExecutorAdapter.create({ connection }) : null,
+    executor: connection ? ClickHouseLangWatchQLExecutorRepository.create({ connection }) : null,
     database: connection?.database ?? DEFAULT_LWQL_DATABASE,
     ...overrides,
   });

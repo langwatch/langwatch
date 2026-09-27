@@ -46,12 +46,12 @@ export class BlobStoreService {
     });
   }
 
-  async tryGetBlobById(params: {
+  async findBlobsById(params: {
     queueName: string;
     projectId: string;
     hash: string;
-  }): Promise<OpsBlobSummary | null> {
-    return this.repo.tryFindById(params);
+  }): Promise<OpsBlobSummary[]> {
+    return this.repo.findById(params);
   }
 
   async getStats(): Promise<OpsBlobStoreStats> {

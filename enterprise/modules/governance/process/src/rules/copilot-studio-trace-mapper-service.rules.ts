@@ -414,7 +414,7 @@ function toolSpansOf(params: {
   });
 }
 
-export function tryToTraceRequest({
+export function toTraceRequest({
   events,
   origin,
 }: {
@@ -441,5 +441,5 @@ const CopilotStudioTraceMapperService = {
   toolSpan,
   conversationSpans,
   toolSpansOf,
-  tryToTraceRequest,
+  toTraceRequest,
 };

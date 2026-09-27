@@ -13,9 +13,9 @@ const JOB_TYPE = "scenario";
  * The processor's own counts, on the two instruments every other job in the fleet already reports
  * to.
  */
-export class OtelScenarioProcessorMetricsAdapter implements ScenarioProcessorServiceMetrics {
-  static create(): OtelScenarioProcessorMetricsAdapter {
-    return new OtelScenarioProcessorMetricsAdapter();
+export class ScenarioProcessorMetricsService implements ScenarioProcessorServiceMetrics {
+  static create(): ScenarioProcessorMetricsService {
+    return new ScenarioProcessorMetricsService();
   }
 
   private readonly jobs: CounterHandle = counter({

@@ -10,7 +10,7 @@ import type { Context, ErrorHandler, Next } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import {
@@ -650,6 +650,7 @@ function countingHandler(body: unknown) {
 
 describe("the Idempotency-Key receipt ledger", () => {
   describe("given a request that carries no key", () => {
+    /** @scenario A create sent without an idempotency key is unchanged */
     it("runs the handler and stores nothing", async () => {
       const receipts = new FakeReceiptStore();
       const create = countingHandler({ id: "budget_1" });
@@ -869,6 +870,95 @@ describe("the Idempotency-Key receipt ledger", () => {
     it("releases the claim once the tolerance is past", () => {
       expect(isClaimAbandoned({ heartbeatAt: lastBeat(TAKEOVER_AFTER_MS + 1), now })).toBe(true);
       expect(isClaimAbandoned({ heartbeatAt: lastBeat(10 * 60_000), now })).toBe(true);
+    });
+  });
+});
+
+describe("the Idempotency-Key receipt ledger over time", () => {
+  const call = {
+    operation: "gateway.v1.budgets.create",
+    scopeId: SCOPE,
+    key: KEY,
+    validatedBody: { limit: 10 },
+  };
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given an original that is still running five minutes later", () => {
+    /** @scenario A slow original that is still reporting alive keeps its claim */
+    it("refuses the retry as in_progress because the original kept beating", async () => {
+      vi.useFakeTimers({ now: new Date("2026-08-05T12:00:00.000Z") });
+      const receipts = new FakeReceiptStore();
+      const ledger = ledgerOver(receipts);
+      let releaseOriginal: (() => void) | undefined;
+      const held = new Promise<void>((resolve) => {
+        releaseOriginal = resolve;
+      });
+
+      const original = ledger.run({
+        ...call,
+        handler: async () => {
+          await held;
+          return Response.json({ id: "budget_1" }, { status: 201 });
+        },
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+
+      const retry = countingHandler({ id: "budget_2" });
+      const refusal = await refusalFrom(ledger.run({ ...call, handler: retry.handler }));
+      releaseOriginal?.();
+      await original;
+
+      expect(refusal.code).toBe("idempotency_error");
+      expect(refusal.meta?.reason).toBe("in_progress");
+      expect(retry.runs).toBe(0);
+    });
+  });
+
+  describe("given a receipt whose lifetime has elapsed", () => {
+    /** @scenario An expired receipt lets the key be used again */
+    it("runs the create again as a first use and replaces the lapsed receipt", async () => {
+      vi.useFakeTimers({ now: new Date("2026-08-05T12:00:00.000Z") });
+      const receipts = new FakeReceiptStore();
+      const ledger = ledgerOver(receipts);
+      await ledger.run({ ...call, handler: countingHandler({ id: "budget_1" }).handler });
+
+      vi.setSystemTime(Date.now() + RECEIPT_TTL_MS + 1_000);
+      const retry = countingHandler({ id: "budget_2" });
+      const outcome = await ledger.run({ ...call, handler: retry.handler });
+
+      expect(outcome).toMatchObject({ isReplayed: false, status: 201 });
+      expect(retry.runs).toBe(1);
+      expect(receipts.size).toBe(1);
+    });
+  });
+
+  describe("given a receipt written under a secret that has since rotated", () => {
+    /** @scenario A receipt that no longer decrypts lets the key be used again */
+    it("runs the create again as a first use and replaces the unreadable receipt", async () => {
+      const receipts = new FakeReceiptStore();
+      await ledgerOver(receipts).run({
+        ...call,
+        handler: countingHandler({ id: "budget_1" }).handler,
+      });
+
+      const rotated = IdempotencyLedger.create({
+        receipts,
+        cipher: {
+          encrypt: (value) => `rotated:${value}`,
+          decrypt: () => {
+            throw new Error("bad decrypt");
+          },
+        },
+      });
+      const retry = countingHandler({ id: "budget_2" });
+      const outcome = await rotated.run({ ...call, handler: retry.handler });
+
+      expect(outcome).toMatchObject({ isReplayed: false, status: 201 });
+      expect(retry.runs).toBe(1);
+      expect(receipts.size).toBe(1);
     });
   });
 });

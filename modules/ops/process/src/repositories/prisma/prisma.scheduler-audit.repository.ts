@@ -60,7 +60,7 @@ export class PrismaSchedulerAuditRepository extends SchedulerAuditRepository {
     action: SchedulerControlAction;
     scheduleId: string;
     projectId: string;
-    slot: Date | null;
+    slot: string | null;
   }): Promise<void> {
     await this.auditLog.record({
       userId: entry.actorUserId,
@@ -68,7 +68,7 @@ export class PrismaSchedulerAuditRepository extends SchedulerAuditRepository {
       action: entry.action,
       targetKind: "scheduled_job",
       targetId: entry.scheduleId,
-      metadata: { slot: entry.slot?.toISOString() ?? null },
+      metadata: { slot: entry.slot },
     });
   }
 

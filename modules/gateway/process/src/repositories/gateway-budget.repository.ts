@@ -146,12 +146,12 @@ export abstract class GatewayBudgetRepository {
   abstract resolveApplicableBudgets(
     input: GatewayBudgetResolutionTarget,
   ): Promise<GatewayResolvedBudget[]>;
-  abstract resolveScopeTargets(
-    budgets: { scopeType: string; scopeId: string }[],
-    organizationId: string | null,
-    projects: ProjectIdentity[],
-    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
-  ): Promise<Map<string, GatewayBudgetScopeTarget>>;
+  abstract resolveScopeTargets(input: {
+    budgets: { scopeType: string; scopeId: string }[];
+    organizationId: string | null;
+    projects: ProjectIdentity[];
+    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[];
+  }): Promise<Map<string, GatewayBudgetScopeTarget>>;
   /**
    * The attributed-user budget templates an end user's caps read from, and
    * the bucket boundaries for when each period started. Two reads, not one

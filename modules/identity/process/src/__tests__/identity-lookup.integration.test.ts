@@ -312,6 +312,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
   });
 
   describe("when olive ends sessions", () => {
+    /** @scenario "Sessions can be ended for a person or for one of their sign-in methods" */
     it("ends one method's sessions for an id, and every session for null", async () => {
       const service = repairingService();
 
@@ -331,6 +332,7 @@ describe("identity lookup, the repairs and the panels main's surface serves", ()
   });
 
   describe("when olive extends an invitation", () => {
+    /** @scenario "Extending an invitation moves its expiry and says by how much" */
     it("answers the new expiry and records the act against the invitation", async () => {
       const answer = await repairingService().extendLookupInvitation({
         organizationId: "org_acme",

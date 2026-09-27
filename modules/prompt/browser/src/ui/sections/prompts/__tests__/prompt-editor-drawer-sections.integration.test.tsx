@@ -36,7 +36,7 @@ vi.mock("@langwatch/browser-host/upgrade-modal-store", () => ({
   },
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", () => ({
+vi.mock("../../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({
     modelMetadata: {
       "openai/gpt-5-mini": {
@@ -49,17 +49,18 @@ vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", ()
   }),
 }));
 
-vi.mock("@langwatch/workflow-browser/studio-scope", () => ({
-  useOrganizationTeamProject: () => ({
-    project: { id: "project-1", slug: "demo", name: "Demo" },
-    organization: { id: "organization-1" },
-    team: { id: "team-1" },
+vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
+  usePromptProject: () => ({
+    project: { id: "project-1", slug: "demo", apiKey: "" },
     projectId: "project-1",
-    modelProviders: {},
-    isResolved: true,
-    isLoading: false,
-    isRefetching: false,
+    organizationId: "organization-1",
+    teamId: "team-1",
+    hasPermission: () => true,
   }),
+}));
+
+vi.mock("../../../../behavior/use-model-limits.ts", () => ({
+  useModelLimits: () => ({ limits: null }),
 }));
 
 vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({

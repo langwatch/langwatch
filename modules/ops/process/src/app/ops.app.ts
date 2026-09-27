@@ -29,7 +29,7 @@ import {
 } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch/identity-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
@@ -215,6 +215,9 @@ import {
   type StreamDashboardInput,
   type OpsSignUpHealthInput,
   type SignUpHealth,
+  type OpsDoorAnswer,
+  opsExplainRequestSchema,
+  submitBugReportSchema,
 } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
@@ -233,6 +236,13 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
+import {
+  extractBearerSecret,
+  parseJsonDocument,
+  toCallerKey,
+  toDoorStatus,
+  toExplainDoorAnswer,
+} from "#rules/ops-door.rules";
 import { BugReportInboxService } from "#services/bug-report-inbox.service";
 import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
@@ -417,12 +427,15 @@ export type OpsReplayRunner = {
  * The operations capability as the process composes it: the portable service
  * plus the explorers, the replay runner and the optional snapshot collector.
  */
-export type OpsCapability = OpsService & {
+export type OpsCapability = OpsService;
+
+/** What the capability carries beside the operations: the explorers, replay and snapshot reader. */
+export type OpsExplorers = Readonly<{
   eventExplorer: OpsEventExplorer;
   managerExplorer: OpsProcessExplorer;
   replay: OpsReplayRunner;
   snapshots: OpsSnapshotService | null;
-};
+}>;
 
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
@@ -1346,6 +1359,29 @@ export class OpsApp implements OpsApi {
     return outcome;
   }
 
+  /** The operator door's whole answer: the secret, the body, then the EXPLAIN. */
+  async explainClickHouseRequest(input: {
+    body: string;
+    authorization: string | null;
+  }): Promise<OpsDoorAnswer> {
+    this.authorizeOperatorSecret({ presented: extractBearerSecret(input.authorization) });
+
+    const posted = parseJsonDocument(input.body);
+    if (posted === undefined || posted === null) {
+      return { status: 400, body: { message: "request body must be JSON" } };
+    }
+
+    const parsed = opsExplainRequestSchema.safeParse(posted);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
+      const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
+
+      return { status: 400, body: { message: `${path}${issue?.message ?? "invalid body"}` } };
+    }
+
+    return toExplainDoorAnswer(await this.explainClickHouseQuery(parsed.data));
+  }
+
   // -- the process's own readings --------------------------------------------
 
   listPipelineRegistrations(): OpsPipelineRegistrations {
@@ -1558,6 +1594,41 @@ export class OpsApp implements OpsApi {
       projectIdHint: input.projectIdHint,
       apiKeys: this.#dependencies.apiKeys,
     });
+  }
+
+  /** The intake door's whole answer, in the bodies released CLI and MCP builds read. */
+  async receiveBugReport(input: {
+    body: string;
+    forwardedFor: string | null;
+    credential: Readonly<{ token: string; projectId: string | null }> | null;
+  }): Promise<OpsDoorAnswer> {
+    const posted = parseJsonDocument(input.body);
+    if (posted === undefined || posted === null) {
+      return { status: 400, body: { error: "Invalid body, expecting JSON" } };
+    }
+
+    const parsed = submitBugReportSchema.safeParse(posted);
+    if (!parsed.success) {
+      return { status: 400, body: { error: "Invalid report", details: parsed.error.flatten() } };
+    }
+
+    try {
+      const { id } = await this.submitBugReport({
+        report: parsed.data,
+        callerKey: toCallerKey(input.forwardedFor),
+        apiToken: input.credential?.token,
+        projectIdHint: input.credential?.projectId ?? null,
+      });
+
+      return { status: 201, body: { id } };
+    } catch (error) {
+      if (!HandledError.isHandled(error)) throw error;
+
+      return {
+        status: toDoorStatus(error.httpStatus),
+        body: { error: error.message, code: error.code },
+      };
+    }
   }
 
   /**
@@ -1780,11 +1851,17 @@ export interface OpsProcessManagerMetadata {
   hasWake: boolean;
 }
 
+/** One fold's init and apply, typed over the state it folds. */
+export interface OpsDejaViewFold<State> {
+  init(): State;
+  apply(state: State, event: { type: string }): State;
+}
+
 export interface OpsDejaViewProjection {
   projectionName: string;
   eventTypes: readonly string[];
-  init: () => unknown;
-  apply: (state: unknown, event: { type: string }) => unknown;
+  /** Hands the fold to `use` under its own state type, which never leaves the call. */
+  replay<R>(use: <State>(fold: OpsDejaViewFold<State>) => R): R;
 }
 
 /**
@@ -1815,19 +1892,6 @@ export interface OpsEventingIntrospection {
    * their `init`/`apply` so the explorer can rebuild state without a store.
    */
   dejaViewProjections(): OpsDejaViewProjection[];
-}
-
-export interface OpsSnapshotRedis {
-  eval(script: string, numberOfKeys: number, ...args: string[]): Promise<unknown>;
-  set(
-    key: string,
-    value: string,
-    expiryMode: "EX",
-    expirySeconds: number,
-    condition: "NX",
-  ): Promise<unknown>;
-  tryGet(key: string): Promise<string | null>;
-  incr(key: string): Promise<number>;
 }
 
 /**

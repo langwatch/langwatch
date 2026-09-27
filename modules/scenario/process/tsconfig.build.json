@@ -12,7 +12,6 @@
     "./src/index.ts",
     "./src/services/scenario-failure-handler.service.ts",
     "src/repositories/clickhouse/simulation-clickhouse.repository.ts",
-    "src/repositories/clickhouse/clickhouse.simulation-eventing.repository.ts",
     "src/eventing/simulation-processing-producer.pipeline.ts",
     "./src/tasks/stalled-runs-backfill.task.ts"
   ],

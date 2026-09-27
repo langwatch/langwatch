@@ -42,6 +42,7 @@ export class OpsMetricsPublicationService {
   private latestDetail: DetailSnapshot | null = null;
 
   private readonly ops: OpsQueueMetricsSourceRepository;
+  readonly #view = OpsDashboardViewService.create();
   private readonly sampling: OpsMetricsSamplingService;
   private readonly window: OpsMetricsWindowService;
   private readonly writerId: string;
@@ -89,7 +90,7 @@ export class OpsMetricsPublicationService {
 
   /** This writer's own view of the dashboard, which is also what it publishes. */
   dashboardData(): DashboardData {
-    return OpsDashboardViewService.build({
+    return this.#view.build({
       window: this.window,
       latestDetail: this.latestDetail,
       writerId: this.writerId,
@@ -224,7 +225,7 @@ export class OpsMetricsPublicationService {
           included: parked.tenants.length,
           total: parked.total,
         },
-        pipelineTree: OpsDashboardViewService.buildPipelineTree({
+        pipelineTree: this.#view.buildPipelineTree({
           queues,
           seedKeys: treeSeedKeys,
         }),

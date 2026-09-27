@@ -58,7 +58,7 @@ export class OpsExplainClickHouseRepository extends OpsExplainRepository {
 }
 
 /** Process-owned lazy client for the dedicated read-only ops account. */
-export class OpsClickHouseRuntime {
+export class OpsClickHouseRuntime implements OpsExplainClients {
   static create(options: { url?: string; buildTime: boolean }): OpsClickHouseRuntime {
     return new OpsClickHouseRuntime(options.url, options.buildTime);
   }
@@ -72,16 +72,20 @@ export class OpsClickHouseRuntime {
     private readonly buildTime: boolean,
   ) {}
 
-  resolveClient(): ClickHouseClient | null {
+  findClient(): OpsExplainClientResolution | null {
     const configured = !this.closed && !this.buildTime && (this.url?.trim() ?? "") !== "";
     if (!configured || this.url === undefined) return null;
+    return { client: this.openClient(this.url), usingFallback: false };
+  }
+
+  private openClient(url: string): ClickHouseClient {
     if (this.client !== undefined) return this.client;
 
-    const parsed = findOpsConnection(this.url);
+    const parsed = findOpsConnection(url);
     // No client-side `clickhouse_settings` here: the readonly profile forbids
     // session-setting changes; its server-side profile enforces the limits.
     this.client = createClient({
-      url: parsed?.url ?? this.url,
+      url: parsed?.url ?? url,
       username: parsed?.username || undefined,
       password: parsed?.password || undefined,
       database: parsed?.database,

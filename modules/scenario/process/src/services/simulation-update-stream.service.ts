@@ -1,18 +1,61 @@
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   simulationStreamFrameSchema,
+  startScenarioTabPresence,
+  type ScenarioTabRegistry,
   type SimulationStreamFrame,
+  type SimulationUpdateWatchInput,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 type TenantEmitters = Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
 
 /** A project's `simulation_updated` frames, relayed from the process's tenant fan-out. */
 export class SimulationUpdateStreamService {
-  static create(emitters: TenantEmitters): SimulationUpdateStreamService {
-    return new SimulationUpdateStreamService(emitters);
+  static create(input: {
+    emitters: TenantEmitters;
+    scenarioTabs: ScenarioTabRegistry;
+  }): SimulationUpdateStreamService {
+    return new SimulationUpdateStreamService(input.emitters, input.scenarioTabs);
   }
 
-  private constructor(private readonly emitters: TenantEmitters) {}
+  private constructor(
+    private readonly emitters: TenantEmitters,
+    private readonly scenarioTabs: ScenarioTabRegistry,
+  ) {}
+
+  /** One tab's stream: registered as present while it lives, its parked navigate first. */
+  async *watchForTab({
+    projectId,
+    tabKey,
+    tabId,
+    signal,
+  }: SimulationUpdateWatchInput): AsyncGenerator<SimulationStreamFrame> {
+    const presence =
+      tabKey && tabId
+        ? await startScenarioTabPresence({
+            registration: { projectId, tabKey, tabId },
+            registry: this.scenarioTabs,
+          })
+        : null;
+
+    if (presence?.parkedNavigate) {
+      // The same envelope the broadcast path emits, so the client parses one shape.
+      yield {
+        event: JSON.stringify(presence.parkedNavigate),
+        timestamp: nowInstant().epochMilliseconds,
+      };
+    }
+
+    try {
+      yield* this.watch({ projectId, signal });
+    } catch (error) {
+      // A disconnect aborts the wait, which is the normal end of a stream, not a stream error.
+      if (!(error instanceof Error) || error.name !== "AbortError") throw error;
+    } finally {
+      await presence?.stop();
+    }
+  }
 
   async *watch({
     projectId,

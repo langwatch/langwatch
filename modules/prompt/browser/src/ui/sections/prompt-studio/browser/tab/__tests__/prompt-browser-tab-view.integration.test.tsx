@@ -8,6 +8,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { getDisplayHandle } from "../../../../../../prompt-reference.ts";
 import { TabIdProvider } from "../../../studio-internals.ts";
 import { PromptBrowserTab } from "../prompt-browser-tab-view.tsx";
 import { usePromptBrowserTabController } from "../use-prompt-browser-tab-controller.ts";
@@ -18,14 +19,14 @@ vi.mock("../use-prompt-browser-tab-controller.ts", () => ({
 
 const controllerOf = vi.mocked(usePromptBrowserTabController);
 
-function givenTabTitled(title: string) {
+function givenTabTitled(title: string, savedTitle: string | null = title) {
   controllerOf.mockReturnValue({
     tab: {
       id: "tab-1",
       data: {
         chat: { initialMessagesFromSpanData: [] },
         form: { currentValues: {} },
-        meta: { title },
+        meta: { title: savedTitle },
         variableValues: {},
       },
     },
@@ -83,15 +84,7 @@ describe("PromptBrowserTab", () => {
 
   describe("given the prompt has never been saved", () => {
     it("falls back to a placeholder title", () => {
-      controllerOf.mockReturnValue({
-        tab: { id: "tab-1", data: { meta: { title: null } } },
-        hasUnsavedChanges: false,
-        handleClose: vi.fn(),
-        latestVersion: undefined,
-        isOutdated: false,
-        handleUpgrade: vi.fn(),
-        showVersionBadge: false,
-      } as unknown as ReturnType<typeof usePromptBrowserTabController>);
+      givenTabTitled(getDisplayHandle(null), null);
       renderTab();
 
       expect(screen.getByText("New Prompt")).toBeInTheDocument();

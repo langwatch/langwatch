@@ -12,7 +12,7 @@ export const useModelProviderKeys = ({
   const { modelProviders } = useOrganizationTeamProject();
 
   const modelProvidersWithoutCustomKeys = Object.values(modelProviders ?? {}).filter(
-    (modelProvider: any) => !modelProvider.enabled && !modelProvider.customKeys,
+    (modelProvider) => !modelProvider.enabled && !modelProvider.customKeys,
   );
 
   const nodesWithLLMParameter = workflow.nodes.filter((node) =>
@@ -43,7 +43,7 @@ export const useModelProviderKeys = ({
   const uniqueNodeProviders = Array.from(nodeProviders);
 
   const nodeProvidersWithoutCustomKeys = uniqueNodeProviders.filter((provider) =>
-    modelProvidersWithoutCustomKeys.some((p: any) => p.provider === provider),
+    modelProvidersWithoutCustomKeys.some((p) => p.provider === provider),
   );
 
   const hasProvidersWithoutCustomKeys = nodeProvidersWithoutCustomKeys.length > 0;

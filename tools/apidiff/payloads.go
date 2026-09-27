@@ -3,7 +3,9 @@ package apidiff
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // Fixed values for synthesized payloads: deterministic across runs so a diff
@@ -265,33 +267,68 @@ func NewSymbolTable() *SymbolTable {
 // Returns the captured IDs.
 func (table *SymbolTable) Capture(operationPath string, body any) []string {
 	captured := make([]string, 0)
-	table.captureValue(resourceParamName(operationPath, ""), body, &captured)
+	scope := captureScope{resourceParam: resourceParamName(operationPath, ""), family: resourceFamily(operationPath)}
+	table.captureValue(scope, body, &captured)
 	return captured
 }
 
-func (table *SymbolTable) captureValue(resourceParam string, value any, captured *[]string) {
+// captureScope is what one capture files ids under: the resource a bare id
+// belongs to, and the family a resource-scoped key is qualified by.
+type captureScope struct {
+	resourceParam string
+	family        string
+}
+
+func (table *SymbolTable) captureValue(scope captureScope, value any, captured *[]string) {
 	switch typed := value.(type) {
 	case map[string]any:
-		table.captureObject(resourceParam, typed, captured)
+		table.captureObject(scope, typed, captured)
 	case []any:
 		for _, element := range typed {
-			table.captureValue(resourceParam, element, captured)
+			table.captureValue(scope, element, captured)
 		}
 	}
 }
 
-func (table *SymbolTable) captureObject(resourceParam string, object map[string]any, captured *[]string) {
+func (table *SymbolTable) captureObject(scope captureScope, object map[string]any, captured *[]string) {
 	for _, key := range sortedKeys(object) {
 		child := object[key]
 		if text, ok := child.(string); ok && isIDKey(key) && text != "" {
-			table.file(normalizeParamName(key), text)
-			if bareIDKey(key) && resourceParam != "" {
-				table.file(resourceParam, text)
-			}
+			table.fileCaptured(scope, key, text)
 			*captured = append(*captured, text)
 		}
-		table.captureValue(resourceParam, child, captured)
+		table.captureValue(scope, child, captured)
 	}
+}
+
+// fileCaptured files one captured id under every bucket it can answer.
+func (table *SymbolTable) fileCaptured(scope captureScope, key, id string) {
+	bucket := normalizeParamName(key)
+	table.file(bucket, id)
+	if resourceScopedKeys[bucket] && scope.family != "" {
+		table.file(scope.family+"/"+bucket, id)
+	}
+	if bareIDKey(key) && scope.resourceParam != "" {
+		table.file(scope.resourceParam, id)
+	}
+}
+
+// resourceScopedKeys are id keys several resource families mint under one
+// name: a prompt version and a workflow version are both a "versionId". Each
+// is also filed under its family ("prompts/versionid"), and a lookup from a
+// family's own path reads that bucket first.
+var resourceScopedKeys = map[string]bool{"versionid": true}
+
+// resourceFamily is a path's first literal segment after /api and any
+// version mount: /api/v1/workflows/{id}/versions → "workflows".
+func resourceFamily(operationPath string) string {
+	for _, segment := range strings.Split(strings.Trim(operationPath, "/"), "/") {
+		if segment == "" || segment == "api" || segment == "v1" || strings.HasPrefix(segment, "{") || isVersionSegment(segment) {
+			continue
+		}
+		return segment
+	}
+	return ""
 }
 
 func (table *SymbolTable) file(bucket, id string) {
@@ -329,6 +366,11 @@ func (table *SymbolTable) Lookup(paramName, operationPath string) (string, bool)
 // lookupBuckets names the buckets a parameter may resolve from, in order.
 func lookupBuckets(paramName, operationPath string) []string {
 	normalized := normalizeParamName(paramName)
+	if resourceScopedKeys[normalized] {
+		if family := resourceFamily(operationPath); family != "" {
+			return []string{family + "/" + normalized, normalized}
+		}
+	}
 	if !bareIDKey(paramName) {
 		return []string{normalized}
 	}
@@ -439,8 +481,9 @@ var SeededConstants = map[string]string{
 	// and PUT /api/prompts/{id}/tags/{tag} name a caller-chosen tag; PUT/GET/DELETE
 	// /api/agent-cache/{name} names a caller-chosen cache entry; the "repository"
 	// query param on GET /api/coding-agent/pull-request-usage names an owner/repo
-	// slug; "from"/"to" bound a time window in epoch milliseconds (2026-01-01
-	// and a day later) on every route that takes one.
+	// slug; "from"/"to" bound a time window in epoch milliseconds around the
+	// run (yesterday to tomorrow, UTC days), so everything the run's fixtures
+	// record falls inside every ranged read.
 	"provider":   "openai",
 	"tag":        "apidiff-tag",
 	"name":       "APIDIFF_AGENT_CACHE_ENTRY",
@@ -469,10 +512,14 @@ var SeededConstants = map[string]string{
 	"audience": "datasets:view",
 }
 
-const (
-	synthFromMillis = "1767225600000"
-	synthToMillis   = "1767312000000"
-)
+var synthFromMillis, synthToMillis = runWindow(time.Now())
+
+// runWindow is the ranged-read window: from the start of the day before the
+// run to the end of the day after it, identical on both sides.
+func runWindow(now time.Time) (from, to string) {
+	day := now.UTC().Truncate(24 * time.Hour)
+	return strconv.FormatInt(day.Add(-24*time.Hour).UnixMilli(), 10), strconv.FormatInt(day.Add(48*time.Hour).UnixMilli(), 10)
+}
 
 // ResolveParam picks a value for a path or required query parameter: spec
 // examples/defaults first, then seeded constants matched by name, then the

@@ -48,97 +48,10 @@ export function EvaluatorApiUsageDialog({
   const evaluatorType = config?.evaluatorType ?? "";
   const evaluatorDef = evaluatorType ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes] : null;
 
-  // Build data fields for experiment mode (Python)
-  const buildPythonExperimentDataFields = (): string => {
-    const allFields = [
-      ...(evaluatorDef?.requiredFields ?? []),
-      ...(evaluatorDef?.optionalFields ?? []),
-    ];
-
-    if (allFields.length === 0) {
-      return `            "input": row["input"],
-            "output": output,`;
-    }
-
-    return allFields
-      .map((field) => {
-        if (field === "output") return `            "${field}": output,`;
-        if (field === "input") return `            "${field}": row["input"],`;
-        if (field === "contexts") return `            "${field}": row["contexts"],`;
-        if (field === "expected_output") return `            "${field}": row["expected_output"],`;
-        if (field === "expected_contexts")
-          return `            "${field}": row["expected_contexts"],`;
-        if (field === "conversation") return `            "${field}": row["conversation"],`;
-        return `            "${field}": "",`;
-      })
-      .join("\n");
-  };
-
-  // Build data fields for online mode (Python)
-  const buildPythonOnlineDataFields = (): string => {
-    const allFields = [
-      ...(evaluatorDef?.requiredFields ?? []),
-      ...(evaluatorDef?.optionalFields ?? []),
-    ];
-
-    if (allFields.length === 0) {
-      return `            "input": "",
-            "output": "",`;
-    }
-
-    return allFields.map((field) => `            "${field}": "",`).join("\n");
-  };
-
-  // Build data fields for experiment mode (TypeScript)
-  const buildTypeScriptExperimentDataFields = (): string => {
-    const allFields = [
-      ...(evaluatorDef?.requiredFields ?? []),
-      ...(evaluatorDef?.optionalFields ?? []),
-    ];
-
-    if (allFields.length === 0) {
-      return `        input: item.input,
-        output: output,`;
-    }
-
-    return allFields
-      .map((field) => {
-        if (field === "input") return `        input: item.input,`;
-        if (field === "output") return `        output: output,`;
-        return `        ${field}: item.${field},`;
-      })
-      .join("\n");
-  };
-
-  // Build data fields for online mode (TypeScript)
-  const buildTypeScriptOnlineDataFields = (): string => {
-    const allFields = [
-      ...(evaluatorDef?.requiredFields ?? []),
-      ...(evaluatorDef?.optionalFields ?? []),
-    ];
-
-    if (allFields.length === 0) {
-      return `      input: "", // your input value
-      output: "", // your output value`;
-    }
-
-    return allFields.map((field) => `      ${field}: "", // your ${field} value`).join("\n");
-  };
-
-  // Build data fields for cURL
-  const buildCurlDataFields = (): string => {
-    const allFields = [
-      ...(evaluatorDef?.requiredFields ?? []),
-      ...(evaluatorDef?.optionalFields ?? []),
-    ];
-
-    if (allFields.length === 0) {
-      return `"input": "input content",
-    "output": "output content"`;
-    }
-
-    return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
-  };
+  const allFields = [
+    ...(evaluatorDef?.requiredFields ?? []),
+    ...(evaluatorDef?.optionalFields ?? []),
+  ];
 
   // ============================================================================
   // Experiment Mode Code Snippets
@@ -158,7 +71,7 @@ for index, row in experiment.loop(df.iterrows()):
         "evaluators/${evaluatorSlug}",
         index=index,
         data={
-${buildPythonExperimentDataFields()}
+${buildPythonExperimentDataFields(allFields)}
         },
         settings={}
     )`;
@@ -182,7 +95,7 @@ await experiment.run(
     await experiment.evaluate("evaluators/${evaluatorSlug}", {
       index,
       data: {
-${buildTypeScriptExperimentDataFields()}
+${buildTypeScriptExperimentDataFields(allFields)}
       },
     });
   },
@@ -202,7 +115,7 @@ def my_llm_step():
         "evaluators/${evaluatorSlug}",
         name="${evaluatorName}",
         data={
-${buildPythonOnlineDataFields()}
+${buildPythonOnlineDataFields(allFields)}
         },
         settings={},
     )
@@ -219,7 +132,7 @@ async function myLLMStep(input: string): Promise<string> {
   const result = await langwatch.evaluations.evaluate("evaluators/${evaluatorSlug}", {
     name: "${evaluatorName}",
     data: {
-${buildTypeScriptOnlineDataFields()}
+${buildTypeScriptOnlineDataFields(allFields)}
     },
     settings: {},
   });
@@ -239,7 +152,7 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/evaluators/${evaluatorSlug}
 {
   "name": "${evaluatorName}",
   "data": {
-    ${buildCurlDataFields()}
+    ${buildCurlDataFields(allFields)}
   },
   "settings": {}
 }
@@ -390,4 +303,70 @@ EOF
       </Dialog.Content>
     </Dialog.Root>
   );
+}
+
+// Build data fields for experiment mode (Python)
+function buildPythonExperimentDataFields(allFields: readonly string[]): string {
+  if (allFields.length === 0) {
+    return `            "input": row["input"],
+          "output": output,`;
+  }
+
+  return allFields
+    .map((field) => {
+      if (field === "output") return `            "${field}": output,`;
+      if (field === "input") return `            "${field}": row["input"],`;
+      if (field === "contexts") return `            "${field}": row["contexts"],`;
+      if (field === "expected_output") return `            "${field}": row["expected_output"],`;
+      if (field === "expected_contexts") return `            "${field}": row["expected_contexts"],`;
+      if (field === "conversation") return `            "${field}": row["conversation"],`;
+      return `            "${field}": "",`;
+    })
+    .join("\n");
+}
+
+// Build data fields for online mode (Python)
+function buildPythonOnlineDataFields(allFields: readonly string[]): string {
+  if (allFields.length === 0) {
+    return `            "input": "",
+          "output": "",`;
+  }
+
+  return allFields.map((field) => `            "${field}": "",`).join("\n");
+}
+
+// Build data fields for experiment mode (TypeScript)
+function buildTypeScriptExperimentDataFields(allFields: readonly string[]): string {
+  if (allFields.length === 0) {
+    return `        input: item.input,
+      output: output,`;
+  }
+
+  return allFields
+    .map((field) => {
+      if (field === "input") return `        input: item.input,`;
+      if (field === "output") return `        output: output,`;
+      return `        ${field}: item.${field},`;
+    })
+    .join("\n");
+}
+
+// Build data fields for online mode (TypeScript)
+function buildTypeScriptOnlineDataFields(allFields: readonly string[]): string {
+  if (allFields.length === 0) {
+    return `      input: "", // your input value
+    output: "", // your output value`;
+  }
+
+  return allFields.map((field) => `      ${field}: "", // your ${field} value`).join("\n");
+}
+
+// Build data fields for cURL
+function buildCurlDataFields(allFields: readonly string[]): string {
+  if (allFields.length === 0) {
+    return `"input": "input content",
+  "output": "output content"`;
+  }
+
+  return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
 }

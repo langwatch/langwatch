@@ -171,6 +171,7 @@ describe("setting a first password", () => {
    * a minted password would outlive the impersonation on those accounts.
    */
   describe("given an operator browsing as somebody", () => {
+    /** @scenario "An impersonating operator cannot set or change a password" */
     it("refuses outright, sets no password and ends no session", async () => {
       const auth = createUserTestAuth();
       const account = passwordlessAccount();

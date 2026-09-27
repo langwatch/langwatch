@@ -5,7 +5,7 @@ import {
   type ExecutionJobData,
   ScenarioExecutionPoolService,
 } from "../services/scenario-execution-pool.service.ts";
-import { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
+import { VoiceConcurrencyGateService } from "../services/voice-concurrency-gate.service.ts";
 
 function poolRunning(
   execute: ScenarioExecutionRunner["execute"],
@@ -13,7 +13,7 @@ function poolRunning(
 ): ScenarioExecutionPoolService {
   const pool = ScenarioExecutionPoolService.create({
     concurrency: 10,
-    voiceGate: new VoiceConcurrencyGate({ max }),
+    voiceGate: VoiceConcurrencyGateService.create({ max }),
   });
   pool.connect({ execute, skipCancelled: () => undefined });
   return pool;

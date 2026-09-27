@@ -4,7 +4,7 @@
  * that rendered a bogus model string.
  * @see specs/model-providers/no-models-empty-state.feature
  */
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
 
 import { modelProviderIcons } from "./model-provider-icons.tsx";
@@ -26,30 +26,16 @@ const SETTINGS_HREF = "/settings/model-providers";
 export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Props) {
   const featureSuffix = forFeatureLabel ? ` for ${forFeatureLabel}` : "";
 
-  // Whole-row click navigates to settings in a new tab. The inner button
-  // still gets its own hover treatment for visual feedback, but it is
-  // not an anchor (nested anchors are invalid HTML); the wrapper Box
-  // owns the navigation.
-  const openSettings = () => {
-    window.open(SETTINGS_HREF, "_blank", "noopener,noreferrer");
-  };
-
   return (
-    <Box
-      // Whole row is clickable. Rendered as a div (not an <a>) because
-      // Chakra's global anchor styles in this app fragment the rounded
-      // border (showed up as detached corner brackets - #4073 round 4).
-      // a11y is preserved via role=link + tabIndex + keyboard handler.
-      role="link"
-      tabIndex={0}
+    <chakra.a
+      // Whole row is the link; `display="block"` and no underline keep the
+      // app's global anchor styles off the rounded border (#4073 round 4).
+      href={SETTINGS_HREF}
+      target="_blank"
+      rel="noopener noreferrer"
       aria-label={`Set up models${featureSuffix}, opens settings in a new tab`}
-      onClick={openSettings}
-      onKeyDown={(e: React.KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openSettings();
-        }
-      }}
+      display="block"
+      textDecoration="none"
       width={size === "full" ? "100%" : "auto"}
       borderWidth="1px"
       borderColor="border"
@@ -59,7 +45,7 @@ export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Prop
       paddingY={2}
       cursor="pointer"
       transition="background 0.15s, border-color 0.15s"
-      _hover={{ bg: "bg.subtle", borderColor: "border.emphasized" }}
+      _hover={{ bg: "bg.subtle", borderColor: "border.emphasized", textDecoration: "none" }}
       _focusVisible={{
         outline: "2px solid",
         outlineColor: "border.emphasized",
@@ -97,7 +83,7 @@ export function NoModelsConfiguredCallout({ size = "md", forFeatureLabel }: Prop
           </HStack>
         </Button>
       </HStack>
-    </Box>
+    </chakra.a>
   );
 }
 

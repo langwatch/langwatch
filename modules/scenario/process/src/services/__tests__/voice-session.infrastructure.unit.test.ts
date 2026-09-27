@@ -1,20 +1,21 @@
-import { ScenarioNotFoundError, ScenarioRunStatus } from "@langwatch/scenario-contract";
 /**
  * Infrastructure composition for "Talk to it" route over in-memory fakes.
  * Verifies infrastructure translates service results to promised shapes.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import {
-  type VoiceTransport,
-  type VoiceTransportRunner,
+  ScenarioNotFoundError,
+  ScenarioRunStatus,
   VoiceAgentRowNotFoundError,
-} from "@langwatch/scenario-contract/voice-runtime";
+  type VoiceTransport,
+} from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { type VoiceTransportRunner } from "../../channels/voice-transport.channel.ts";
 import {
-  createVoiceSessionInfrastructureFromServices as composeVoiceSessionInfrastructure,
+  VoiceSessionInfrastructureService,
   type VoiceSessionServices,
-} from "../voice-session.infrastructure.ts";
+} from "../voice-session-infrastructure.service.ts";
 
 /** The agent row the fakes hand back, loose about the fields this file does
  *  not read so the test does not restate the whole Agent shape. */
@@ -45,8 +46,8 @@ function createVoiceSessionInfrastructureFromServices(
   over: Pick<VoiceSessionServices, "agentService" | "scenarioService"> &
     Partial<VoiceSessionServices>,
 ) {
-  return composeVoiceSessionInfrastructure({
-    elevenLabsCredentials: { resolveForProject: vi.fn(async () => null) },
+  return VoiceSessionInfrastructureService.create({
+    elevenLabsCredentials: { readForProject: vi.fn(async () => ({ found: false as const })) },
     simulations: {
       findScenarioRunData: (input) => findScenarioRunData(input),
     },
@@ -55,7 +56,7 @@ function createVoiceSessionInfrastructureFromServices(
     signSessionToken: vi.fn(() => "signed-token"),
     registry: fakeRegistry(),
     ...over,
-  });
+  }).infrastructure;
 }
 
 function fakeAgentService(over: {
@@ -421,7 +422,10 @@ describe("Feature: voice-session infrastructure composition", () => {
           agentService: fakeAgentService({}),
           scenarioService: fakeScenarioService({}),
           elevenLabsCredentials: {
-            resolveForProject: vi.fn(async () => ({ apiKey: "k", baseUrl: "https://el" })),
+            readForProject: vi.fn(async () => ({
+              found: true as const,
+              credential: { apiKey: "k", baseUrl: "https://el" },
+            })),
           },
         });
 

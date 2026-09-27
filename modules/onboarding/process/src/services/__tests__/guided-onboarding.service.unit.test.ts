@@ -1,5 +1,4 @@
 /**
- * @scenario "an unknown path is refused before any organization call"
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
@@ -44,6 +43,7 @@ function createOrganizations(seed: Readonly<Record<string, GuidedOnboardingRecor
 }
 
 describe("GuidedOnboardingService path guards", () => {
+  /** @scenario "an unknown path is refused before any organization call" */
   it("refuses an unknown path on completePath before touching the organization", async () => {
     const service = createService();
 
@@ -52,6 +52,7 @@ describe("GuidedOnboardingService path guards", () => {
     ).rejects.toThrow(GuidedOnboardingPathUnknownError);
   });
 
+  /** @scenario "an unknown path is refused before any organization call" */
   it("refuses an unknown path on beginPath before touching the organization", async () => {
     const service = createService();
 

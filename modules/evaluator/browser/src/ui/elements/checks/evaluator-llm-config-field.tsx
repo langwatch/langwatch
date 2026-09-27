@@ -46,11 +46,11 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
 
   // Construct LLMConfig object from watched values
   const llmConfig: LLMConfig = useMemo(() => {
-    const config: Partial<LLMConfig> = {};
+    const config: Partial<Record<(typeof LLM_CONFIG_KEYS)[number], string | number>> = {};
     LLM_CONFIG_KEYS.forEach((key, index) => {
       const val = watchedValues[index];
       if (val !== undefined) {
-        (config as any)[key] = val;
+        config[key] = val;
       }
     });
     config.model = (config.model as string) ?? "";

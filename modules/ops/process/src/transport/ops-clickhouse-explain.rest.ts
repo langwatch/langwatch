@@ -3,13 +3,8 @@
  * its own 401; the application retains wrapping and auditing.
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  jsonResponse,
-  MANAGEMENT_API_VERSION,
-  type RestRawResult,
-} from "@langwatch/api/rest";
-import { OpsApi, opsExplainRequestSchema, type OpsExplainAnswer } from "@langwatch/ops-contract";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { OpsApi, opsExplainRequestSchema } from "@langwatch/ops-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 
@@ -55,62 +50,17 @@ export const opsClickHouseExplainRest = defineRestRouter(OpsApi)
         "this door, because operator is not an RBAC grain",
     }),
   )
-  .withRawResponse({ produces: "application/json" })
-  .handle(async ({ app, request, raw }): Promise<RestRawResult> => {
-    app.authorizeOperatorSecret({ presented: findPresentedSecret(request) });
+  .withResponse("protocol", { produces: "application/json", because: OPERATOR_ANSWERS })
+  .handle(async ({ app, request, raw, response }) => {
+    const answer = await app.explainClickHouseRequest({
+      body: raw,
+      authorization: request.headers.get("authorization"),
+    });
 
-    const posted = parsedJson(raw);
-
-    if (posted === null) return jsonResponse({ message: "request body must be JSON" }, 400);
-
-    const parsed = opsExplainRequestSchema.safeParse(posted);
-
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const path = issue?.path?.length ? `${issue.path.join(".")}: ` : "";
-
-      return jsonResponse({ message: `${path}${issue?.message ?? "invalid body"}` }, 400);
-    }
-
-    return answerFor(await app.explainClickHouseQuery(parsed.data));
+    return response.write({
+      status: answer.status,
+      mediaType: "application/json",
+      body: JSON.stringify(answer.body),
+    });
   })
   .build();
-
-/** The bearer token the caller presented, or nothing. */
-function findPresentedSecret(request: Request): string | null {
-  const header = request.headers.get("authorization");
-  const bearer = header ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null;
-
-  return bearer?.[1]?.trim() ?? null;
-}
-
-/** The posted document, or null where the body was not JSON. */
-function parsedJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
-/** One answer, in the exact body the operator tool already parses. */
-function answerFor(answer: OpsExplainAnswer): RestRawResult {
-  switch (answer.status) {
-    case "ok":
-      return jsonResponse({ type: answer.type, rows: answer.rows }, 200);
-    case "refused":
-      return jsonResponse({ message: answer.reason }, 400);
-    case "not_configured_in_production":
-      return jsonResponse(
-        {
-          message:
-            "ClickHouse ops user is not configured on this instance (CLICKHOUSE_OPS_URL unset in production).",
-        },
-        503,
-      );
-    case "unavailable":
-      return jsonResponse({ message: "ClickHouse is not configured on this instance" }, 503);
-    case "failed":
-      return jsonResponse({ message: "ClickHouse refused the EXPLAIN" }, 502);
-  }
-}

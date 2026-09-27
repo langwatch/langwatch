@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { CAPABILITY_HYDRATORS } from "../capability-hydrators.ts";
+import { CAPABILITY_HYDRATORS, type CapabilityTrpcUtils } from "../capability-hydrators.ts";
 
 describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
   describe("given a list of trace ids to hydrate for the capability card", () => {
@@ -15,11 +15,13 @@ describe("CAPABILITY_HYDRATORS.trace.byIds", () => {
           totalCost: null,
           output: null,
         });
-        const utils = {
-          traces: { header: { fetch: fetchMock } },
-        } as unknown as Parameters<
-          NonNullable<(typeof CAPABILITY_HYDRATORS)["trace"]["byIds"]>
-        >[0]["utils"];
+        const unused = vi.fn();
+        const utils: CapabilityTrpcUtils = {
+          traces: { header: { fetch: fetchMock }, list: { fetch: unused } },
+          dataset: { getAll: { fetch: unused } },
+          prompts: { getAllPromptsForProject: { fetch: unused } },
+          experiments: { getAllByProjectId: { fetch: unused } },
+        };
 
         await CAPABILITY_HYDRATORS.trace!.byIds!({
           utils,

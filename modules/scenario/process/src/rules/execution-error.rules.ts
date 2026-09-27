@@ -1,6 +1,6 @@
 /**
- * Formats NLP engine failures from HttpSerializedCodeAgentChannel: distinguishes user-code from infra,
- * omits endpoints, strips noise, caps length.
+ * Formats NLP engine failures from HttpSerializedCodeAgentChannel: distinguishes user code
+ * from infra, omits endpoints, strips noise, caps length.
  */
 
 import { goErrorEnvelopeSchema } from "./scenario-generate-nlpgo-error.rules.ts";
@@ -388,7 +388,13 @@ function describeInnerCause(cause: unknown): string {
   if (typeof code === "string" && code.length > 0) {
     return `\n  cause: ${code}`;
   }
-  return `\n  cause: ${redactInternalAddresses(String(inner))}`;
+  return `\n  cause: ${redactInternalAddresses(describeCauseValue(inner))}`;
+}
+
+function describeCauseValue(inner: unknown): string {
+  if (inner instanceof Error) return inner.toString();
+  if (typeof inner === "string") return inner;
+  return JSON.stringify(inner) ?? "";
 }
 
 function indent(text: string, prefix: string): string {

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
-import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
+import { AnthropicAdminPullerService } from "../anthropic-admin-puller.service.ts";
 
 const options = { cursor: null, credentials: { token: "admin-key" } };
 const usageConfig = {
@@ -92,8 +92,8 @@ class FakeHttp implements GovernanceHttpClient {
   }
 }
 
-function puller(http: FakeHttp): AnthropicAdminPullerAdapter {
-  return AnthropicAdminPullerAdapter.create(http);
+function puller(http: FakeHttp): AnthropicAdminPullerService {
+  return AnthropicAdminPullerService.create(http);
 }
 
 const hintSchema = z.object({

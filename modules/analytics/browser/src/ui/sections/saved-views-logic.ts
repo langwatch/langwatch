@@ -57,7 +57,9 @@ export const DEFAULT_VIEWS: DefaultView[] = [
  * order-insensitive matching, undefined/null/empty arrays count as
  * absent, and nested objects sort their arrays recursively.
  */
-export function normalizeFilterValue(value: FilterParam | undefined): FilterParam | undefined {
+export function normalizeFilterValue(
+  value: FilterParam | null | undefined,
+): FilterParam | undefined {
   if (value === undefined || value === null) return undefined;
 
   if (Array.isArray(value)) {

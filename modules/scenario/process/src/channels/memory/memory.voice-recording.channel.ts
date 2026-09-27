@@ -1,4 +1,4 @@
-import { VoiceRecordingUnavailableError } from "@langwatch/scenario-contract/voice-runtime";
+import { VoiceRecordingUnavailableError } from "@langwatch/scenario-contract";
 
 import type { VoiceRecordingChannel } from "../voice-recording.channel.ts";
 

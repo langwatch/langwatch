@@ -11,9 +11,9 @@ import type {
   AnomalySpendReader,
   AnomalySpendSourceFilter,
 } from "../app/governance.members.ts";
+import { silentGovernanceDiagnostics } from "../app/governance.members.ts";
 import type { SpendSpikeAnomalyRepository } from "../repositories/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 const BASELINE_WINDOWS = 6;
 
@@ -56,7 +56,7 @@ export class SpendSpikeAnomalyEvaluatorService {
       repository: options.repository,
       spend: options.spend,
       dispatcher: options.dispatcher,
-      diagnostics: options.diagnostics ?? new NullGovernanceDiagnosticsAdapter(),
+      diagnostics: options.diagnostics ?? silentGovernanceDiagnostics,
     });
   }
 

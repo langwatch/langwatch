@@ -40,18 +40,28 @@ import type {
   AnomalySpendReader,
 } from "./app/governance.members.ts";
 import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
-import { governanceEventsEventing } from "./eventing/governance-events.pipeline.ts";
+import {
+  GovernanceEventsAdapter,
+  type GovernanceEventsPipelineDeps,
+  governanceEventsEventing,
+} from "./eventing/governance-events.pipeline.ts";
 import { ingestionPullReconcileEventing } from "./eventing/ingestion-pull-reconcile.pipeline.ts";
-import { ingestionPullEventing } from "./eventing/ingestion-pull.pipeline.ts";
+import {
+  IngestionPullEventingAdapter,
+  ingestionPullEventing,
+} from "./eventing/ingestion-pull.pipeline.ts";
 import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
 import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
-import { pulledUsageEventing } from "./eventing/pulled-usage.pipeline.ts";
+import {
+  PulledUsageEventingAdapter,
+  pulledUsageEventing,
+} from "./eventing/pulled-usage.pipeline.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
-import type { IngestionPullLifecycleDatabase } from "./repositories/ingestion-pull-lifecycle.repository.ts";
 import {
   PrismaDepartmentRepository,
   type DepartmentDatabase,
 } from "./repositories/prisma/prisma.department.repository.ts";
+import type { IngestionPullLifecycleDatabase } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
 import { PrismaIngestionPullLifecycleRepository } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
 import {
   PrismaIngestionPullRunProjectionRepository,
@@ -72,15 +82,9 @@ import {
   type DepartmentProjects,
   DepartmentService,
 } from "./services/department.service.ts";
-import {
-  GovernanceEventsAdapter,
-  type GovernanceEventsPipelineDeps,
-} from "./services/governance-events.service.ts";
 import { GovernanceSignalService } from "./services/governance-signal.service.ts";
-import { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
-import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import { activityMonitorTrpcTransport } from "./transport/activity-monitor.trpc.ts";
 import { aiToolsTrpcTransport } from "./transport/ai-tools.trpc.ts";

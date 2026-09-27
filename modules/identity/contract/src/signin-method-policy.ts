@@ -66,7 +66,7 @@ export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
    * the endpoint behind it does not have.
    */
   static deploymentOffersPasskeys(passkeysEnabled: string | undefined): boolean {
-    return passkeysEnabled === "on";
+    return passkeysEnabled !== "off";
   }
 
   /**

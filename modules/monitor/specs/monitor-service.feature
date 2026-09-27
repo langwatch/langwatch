@@ -51,3 +51,9 @@ Feature: Monitor service boundary
     When a caller toggles or deletes it
     Then the write is refused as monitor_not_found rather than as a server fault
     And every stored backend answers the same refusal
+
+  @unit
+  Scenario: A monitor's platform link is built on the process's public base URL
+    Given a process whose deployment named a public base URL
+    When the monitor app builds a monitor's platform link
+    Then the link starts with that base URL, the project slug and the monitor path

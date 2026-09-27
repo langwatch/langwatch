@@ -44,23 +44,23 @@ import {
 import { GovernanceEventDeliveryIntent } from "../../eventing/governance-event-delivery.intent.ts";
 import { GovernanceEventDeliveryProcess } from "../../eventing/governance-event-delivery.process.ts";
 import {
+  RecordBudgetCrossingCommand,
+  RecordVkLifecycleCommand,
+} from "../../eventing/governance-events.pipeline.ts";
+import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusEventingProjection,
 } from "../../eventing/ingestion-pull-run-status-eventing.projection.ts";
+import { IngestionPullEventingAdapter } from "../../eventing/ingestion-pull.pipeline.ts";
 import {
   INGESTION_PULL_PROCESS_NAME,
   type IngestionPullProcessState,
   IngestionPullProcess,
 } from "../../eventing/ingestion-pull.process.ts";
 import { PulledUsageLedgerIntent } from "../../eventing/pulled-usage-ledger.intent.ts";
-import {
-  RecordBudgetCrossingCommand,
-  RecordVkLifecycleCommand,
-} from "../governance-events.service.ts";
-import { IngestionPullEventingAdapter } from "../ingestion-pull-eventing.service.ts";
+import { PulledUsageEventingAdapter } from "../../eventing/pulled-usage.pipeline.ts";
 import { IngestionPullListingService } from "../ingestion-pull-listing.service.ts";
 import { IngestionPullService } from "../ingestion-pull.service.ts";
-import { PulledUsageEventingAdapter } from "../pulled-usage-eventing.service.ts";
 
 class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {

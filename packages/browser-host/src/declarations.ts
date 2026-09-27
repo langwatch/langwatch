@@ -6,6 +6,7 @@
 
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import type { TimeInput } from "@langwatch/time";
+import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type { ComponentType, ReactNode } from "react";
 
 /** A component a module declares, loaded the first time something draws it. */
@@ -19,6 +20,9 @@ export type UiAuthenticationOverviewCardProps = {
   /** `organization:manage`: groups and member provenance are its reads. */
   canReadMembership: boolean;
 };
+
+/** What a landing hero hands project's lent inline command palette. */
+export type UiHeroAskFieldProps = { placeholder: string };
 
 /** What agent's test panel hands scenario's lent parameter line: the agent's own parameters. */
 export type UiParameterLineFieldProps = {
@@ -86,6 +90,47 @@ export type UiModelDisplayProps = {
   fontSize?: string;
 };
 
+/**
+ * Playback coordination for one audio part, as the host's sequential player
+ * hands it out. The thread never starts a clip; it passes these to the media.
+ */
+export type UiConversationAudioPlayback = {
+  ref: (element: HTMLAudioElement | null) => void;
+  onPlay: () => void;
+  onEnded: () => void;
+};
+
+/** Draws one media part; the host owns stored-object probing and playback. */
+export type UiRenderMediaPart = (input: {
+  part: Extract<DisplayPart, { kind: "media" }>["part"];
+  projectId: string;
+  audioPlayback?: UiConversationAudioPlayback;
+}) => ReactNode;
+
+/** What a screen hands trace's conversation renderer: parts flattened by the trace kit. */
+export type UiConversationThreadProps = {
+  parts: DisplayPart[];
+  /** `compact` is a grid-cell preview: smaller type, no turn separators. */
+  variant?: "compact" | "regular";
+  /** `scenario` swaps the sides so the agent under test reads as the subject. */
+  roleMode?: ConversationRoleMode;
+  labels?: { user?: string; assistant?: string };
+  /** Owns the stored objects behind any media parts. */
+  projectId: string;
+  renderPartActions?: (part: DisplayPart) => ReactNode;
+  shouldAutoScroll?: boolean;
+  /** Draws a reply that parses as JSON as a value tree, not markdown. */
+  shouldRenderStructuredOutput?: boolean;
+  panel?: { contentMaxWidth: string };
+  /** A reply was asked for and has not begun arriving. */
+  hasPendingReply?: boolean;
+  /** Numbers turns from the start and offers trace affordances as traces land. */
+  live?: boolean;
+  renderMediaPart: UiRenderMediaPart;
+  renderTurnSeparator?: (input: { index: number; traceId?: string; live: boolean }) => ReactNode;
+  audioPlaybackFor?: (part: DisplayPart) => UiConversationAudioPlayback | undefined;
+};
+
 /** What a screen hands trace's eye-icon peek at one trace. */
 export type UiTraceIdPeekProps = {
   traceId: string;
@@ -123,6 +168,23 @@ export type UiRenderInputOutputProps = {
   shouldCollapse?: (field: { type: string }) => boolean;
   /** Show the entry count beside each object and array. */
   displayObjectSize?: boolean;
+};
+
+/** What a screen hands workflow's clamped text that expands into a dialog. */
+export type UiHoverableBigTextProps = {
+  children: ReactNode;
+  lineClamp?: number;
+  expandedVersion?: string;
+  expandable?: boolean;
+};
+
+/** What a screen hands workflow's marker for a trace field the reader may not see. */
+export type UiRedactedFieldProps = {
+  field: "input" | "output";
+  children: ReactNode;
+  loadingComponent?: ReactNode;
+  redacted?: boolean;
+  visibleTo?: string | null;
 };
 
 /** What an empty state hands trace's "Setup via Agent" menu. */
@@ -184,12 +246,16 @@ export type UiDeclaredCapabilities = {
   authenticationOverviewCard: UiDeclaredComponent<UiAuthenticationOverviewCardProps> & {
     readonly section?: "sign-in" | "provisioning";
   };
+  conversationThread: UiDeclaredComponent<UiConversationThreadProps>;
+  heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
+  hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
   joinOffer: UiDeclaredComponent<UiJoinOfferProps>;
   licenseBillingSection: UiDeclaredComponent<UiLicenseBillingSectionProps>;
   modelDisplay: UiDeclaredComponent<UiModelDisplayProps>;
   modelSelector: UiDeclaredComponent<UiModelSelectorProps>;
   parameterLineField: UiDeclaredComponent<UiParameterLineFieldProps>;
   passkeys: UiDeclaredOperations<UiPasskeyCeremonies>;
+  redactedField: UiDeclaredComponent<UiRedactedFieldProps>;
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;

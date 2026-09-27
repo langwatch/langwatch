@@ -7,12 +7,17 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
-import type { RunParameterValues, ScenarioApi } from "@langwatch/scenario-contract";
-import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
 import {
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-process";
+  withNote,
+  type RunParameterValues,
+  type SimulationQueueRun,
+} from "@langwatch/scenario-contract";
+import {
+  getSuiteSetId,
+  hasParameterOverrides,
+  targetKeyOf,
+  type SuiteTarget,
+} from "@langwatch/suite-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -108,51 +113,45 @@ async function runBatch(params: {
   /** When the runs of this batch started, epoch ms. */
   runAt: number;
 }): Promise<void> {
-  const queued: QueueSimulationRunCommandData[] = [];
-  // The run's values for a scenario, with the target's own overrides merged
-  // over them — what the real resolver does with the values it is handed.
-  const scenarios = createApiFixture<ScenarioApi>({
-    resolveRunParametersForScenarios: async ({ scenarios: configs, values }) =>
-      configs.map((config) => ({
-        scenarioId: config.id,
-        parameters: { ...params.parametersByScenarioId?.get(config.id), ...values },
-        secretParameters: {},
-        scenarioVersion: 1,
-      })),
-  });
-
-  const service = SuiteExecutionService.create({
-    commands: {
-      startSuiteRun: async () => {},
-      queueSimulationRun: async (data) => {
-        queued.push(data);
-      },
-    },
-    scenarios,
-  });
-
-  await service.execute({
-    suiteId: params.suiteId,
-    projectId: tenantId,
-    activeScenarioIds: params.scenarioIds,
-    scenarioNames: new Map(params.scenarioIds.map((id) => [id, `Scenario ${id}`])),
-    scenarioVersions: new Map(params.scenarioIds.map((id) => [id, 1])),
-    scenarioConfigs: params.scenarioIds.map((id) => ({
-      id,
-      name: `Scenario ${id}`,
-      version: 1,
-      situation: "A customer asks for a refund",
-      criteria: [],
-      parameters: {},
-    })),
-    activeTargets: params.targets ?? [DEFAULT_TARGET],
-    repeatCount: params.repeatCount ?? 1,
-    skippedArchived: { scenarios: [], targets: [] },
-    idempotencyKey: `idem-${nanoid()}`,
-    simulatorModel: params.simulatorModel ?? null,
-    judgeModel: params.judgeModel ?? null,
-    ...(params.note !== undefined ? { note: params.note } : {}),
-  });
+  // One run per scenario, per target, per repeat, carrying the metadata the suite stamps: the
+  // run's values with the target's own overrides merged over them.
+  const batchRunId = `batch-${nanoid()}`;
+  const targets = params.targets ?? [DEFAULT_TARGET];
+  const queued: SimulationQueueRun[] = params.scenarioIds.flatMap((scenarioId) =>
+    targets.flatMap((target) =>
+      Array.from({ length: params.repeatCount ?? 1 }, () => {
+        const parameters = {
+          ...params.parametersByScenarioId?.get(scenarioId),
+          ...target.runParameters,
+        };
+        return {
+          tenantId,
+          scenarioRunId: `scenariorun-${nanoid()}`,
+          scenarioId,
+          batchRunId,
+          scenarioSetId: getSuiteSetId(params.suiteId),
+          name: `Scenario ${scenarioId}`,
+          metadata: {
+            langwatch: {
+              targetReferenceId: target.referenceId,
+              targetType: target.type,
+              targetKey: targetKeyOf(target),
+              ...(hasParameterOverrides(target.runParameters)
+                ? { targetParameters: target.runParameters }
+                : {}),
+              scenarioVersion: 1,
+              ...(params.simulatorModel ? { simulatorModel: params.simulatorModel } : {}),
+              ...(params.judgeModel ? { judgeModel: params.judgeModel } : {}),
+            },
+            ...withNote(params.note),
+            ...(Object.keys(parameters).length > 0 ? { parameters } : {}),
+          },
+          target: { type: target.type, referenceId: target.referenceId },
+          occurredAt: params.runAt,
+        };
+      }),
+    ),
+  );
 
   for (const command of queued) {
     await recordQueuedRun({ command, runAt: params.runAt });
@@ -172,7 +171,7 @@ async function recordQueuedRun({
   command,
   runAt,
 }: {
-  command: QueueSimulationRunCommandData;
+  command: SimulationQueueRun;
   runAt: number;
 }): Promise<void> {
   const events = new QueueRunCommand().handle({

@@ -17,6 +17,8 @@ import {
   FakeMonitorReplication,
 } from "./monitor.fixture.ts";
 
+const PUBLIC_BASE_URL = "https://app.langwatch.example";
+
 function process(role: "api" | "worker") {
   return createApp({ role })
     .withModules([withMemoryRepositories(monitorServer)])
@@ -26,6 +28,7 @@ function process(role: "api" | "worker") {
       replication: new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),
       generateId: () => `monitor_${Math.random().toString(36).slice(2, 10)}`,
     })
+    .withMember("publicBaseUrl", PUBLIC_BASE_URL)
     .provide({
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
       evaluator: createApiFixture<EvaluatorApi>(),
@@ -60,6 +63,21 @@ describe("monitor app installation", () => {
       await expect(app.getById({ id: monitor.id, projectId: "project-1" })).resolves.toMatchObject({
         name: "Hallucination",
       });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "A monitor's platform link is built on the process's public base URL" */
+  it("links a monitor on the public base URL the process supplies", async () => {
+    const runtime = await process("api").boot();
+
+    try {
+      expect(
+        runtime
+          .service(MonitorApi)
+          .platformUrl({ projectSlug: "acme", path: "/online-evaluations" }),
+      ).toBe(`${PUBLIC_BASE_URL}/acme/online-evaluations`);
     } finally {
       await runtime.stop();
     }

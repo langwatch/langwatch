@@ -12,7 +12,7 @@ import { type ClickHouseCriteriaColumns, columnsToCriteria } from "./simulation-
 import {
   type ClickHouseEvaluationColumns,
   columnsToEvaluations,
-} from "./simulation-evaluations.columns.ts";
+} from "../../rules/simulation-evaluation-columns.rules.ts";
 
 /**
  * Timestamp columns arrive as Unix milliseconds via toUnixTimestamp64Milli().

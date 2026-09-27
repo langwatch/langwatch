@@ -35,12 +35,12 @@ export const SampleDataToggle: React.FC<{
 };
 
 /**
- * Banner shown when samples are active; role="status" honesty affordance
+ * Banner shown when samples are active; an `output` (role status) honesty affordance
  * claiming that nothing on screen is real.
  */
 export const SampleDataBanner: React.FC<{ children?: ReactNode }> = ({ children }) => (
   <Flex
-    role="status"
+    as="output"
     align="center"
     gap={2}
     paddingX={3.5}

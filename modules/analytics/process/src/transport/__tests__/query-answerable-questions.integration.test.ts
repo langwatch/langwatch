@@ -22,7 +22,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
+import { ClickHouseLangWatchQLExecutorRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 import { LWQL_EXAMPLE_DATABASE } from "../../rules/langwatch-ql-examples.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import { buildQueryReference } from "../../rules/query-reference.rules.ts";
@@ -659,7 +659,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
 
   const shippedService = () =>
     LangWatchQLService.create({
-      executor: ClickHouseLangWatchQLExecutorAdapter.create({
+      executor: ClickHouseLangWatchQLExecutorRepository.create({
         connection: {
           ...harness.restrictedConnection(),
           database,
@@ -1306,7 +1306,7 @@ describe("given the /api/v1/query REST door and a seed with known answers", () =
       // for: the claim is about the relationship between the result and the
       // instant, and a wall clock would make it true only once.
       service = LangWatchQLService.create({
-        executor: ClickHouseLangWatchQLExecutorAdapter.create({
+        executor: ClickHouseLangWatchQLExecutorRepository.create({
           connection: {
             ...harness.restrictedConnection(),
             database,

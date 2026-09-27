@@ -41,6 +41,11 @@ export function scenarioExecutorPeers() {
 
 /** The process facts a child is started with, as a test process answers them. */
 export const scenarioHostMembers = {
+  scenarioChildBundle: {
+    packageRoot: "/app/apps/scenario-child",
+    sourcePath: "/app/apps/scenario-child/src/main.ts",
+    sourceRoots: ["/app/apps/scenario-child/src"],
+  },
   nlpServiceUrl: void 0,
   nlpCodeBlockTimeoutSeconds: void 0,
   isSaas: false,

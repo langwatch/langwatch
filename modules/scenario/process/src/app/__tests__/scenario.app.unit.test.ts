@@ -34,7 +34,6 @@ import {
   scenarioHostMembers,
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
-import type { ScenarioEventBroadcastPublisher } from "../../channels/redis/redis.scenario-event-broadcast.channel.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
@@ -75,7 +74,7 @@ async function harness() {
     // missing property, which is the loud failure we want.
     members: {
       ...scenarioHostMembers,
-      redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
+      redis: null,
       publicBaseUrl: "https://langwatch.test",
       clickhouse: createApiFixture<ScenarioReadOnlyClickHouse>(),
       simulations: simulations as SimulationService,
@@ -367,7 +366,7 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         secrets: scenarioTestSecrets,
         members: {
           ...scenarioHostMembers,
-          redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
+          redis: null,
           publicBaseUrl: undefined,
           // No ClickHouse either: the refusal is what a deployment that
           // composed neither the member nor the store it derives from owes.
@@ -414,7 +413,7 @@ describe("given a process that supplies no simulations member but does read Clic
       secrets: scenarioTestSecrets,
       members: {
         ...scenarioHostMembers,
-        redis: createApiFixture<ScenarioEventBroadcastPublisher>(),
+        redis: null,
         publicBaseUrl: undefined,
         clickhouse: {
           query: <Row>(input: { tenantId: string }) => {

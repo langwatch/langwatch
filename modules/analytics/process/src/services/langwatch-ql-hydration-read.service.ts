@@ -33,25 +33,31 @@ export const LWQL_HYDRATION_READ_CHUNK = {
 export const LWQL_TRACES_PER_THREAD_CEILING = 1_000;
 
 /** What hydration needs from the Trace peer, and nothing more. */
+/** Traces named by id, read with their spans. */
+export type LangWatchQLTraceReadInput = {
+  projectId: string;
+  traceIds: readonly string[];
+  protections: LangWatchQLProtections;
+};
+
+/** The named threads' traces, read with their spans. */
+export type LangWatchQLThreadTraceReadInput = {
+  projectId: string;
+  threadKeys: readonly string[];
+  protections: LangWatchQLProtections;
+  /** The most traces the read may answer with, sized by the threads asked for. */
+  maxTraces: number;
+};
+
 export interface LangWatchQLTraceSource {
   /** Traces named by id, with their spans. Order is not promised. */
-  readTraces(input: {
-    projectId: string;
-    traceIds: readonly string[];
-    protections: LangWatchQLProtections;
-  }): Promise<readonly Trace[]>;
+  readTraces(input: LangWatchQLTraceReadInput): Promise<readonly Trace[]>;
   /**
    * Every trace of the named threads, with their spans. The thread key is the
    * conversation id after the fold, which the read maps back onto the trace's
    * own `metadata.thread_id`.
    */
-  readThreadTraces(input: {
-    projectId: string;
-    threadKeys: readonly string[];
-    protections: LangWatchQLProtections;
-    /** The most traces the read may answer with, sized by the threads asked for. */
-    maxTraces: number;
-  }): Promise<readonly Trace[]>;
+  readThreadTraces(input: LangWatchQLThreadTraceReadInput): Promise<readonly Trace[]>;
 }
 
 /** Everything the reads brought back, indexed the way the compute reads it. */

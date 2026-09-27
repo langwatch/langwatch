@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
+}

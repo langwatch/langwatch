@@ -200,8 +200,8 @@ export class ScenarioWorkflowHydratorService {
       description: "",
       state: { execution: { status: "idle" } },
       ...dsl,
-      spec_version: String(dsl.spec_version ?? "1.5"),
-      version: String(dsl.version ?? "1.0"),
+      spec_version: versionText(dsl.spec_version, "1.5"),
+      version: versionText(dsl.version, "1.0"),
       nodes,
     });
     if (!parsed.success) {
@@ -222,4 +222,10 @@ export class ScenarioWorkflowHydratorService {
 
     return { inputs, outputs };
   }
+}
+
+function versionText(value: unknown, fallback: string): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toString();
+  return fallback;
 }

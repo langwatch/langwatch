@@ -90,7 +90,7 @@ describe("ChildProcessSpawnService.resolve", () => {
 
       /** @scenario 'Processor spawns child process using the pre-compiled bundle in production' */
       it("invokes node with the path to the compiled bundle", () => {
-        const result = ChildProcessSpawnService.resolve(spawnOptions("production"));
+        const result = ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(result.command).toBe("node");
         expect(result.args).toEqual([
@@ -99,14 +99,14 @@ describe("ChildProcessSpawnService.resolve", () => {
       });
 
       it("does not invoke pnpm exec tsx", () => {
-        const result = ChildProcessSpawnService.resolve(spawnOptions("production"));
+        const result = ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(result.command).not.toBe("pnpm");
         expect(result.args).not.toContain("tsx");
       });
 
       it("logs the bundle path at info level", () => {
-        ChildProcessSpawnService.resolve(spawnOptions("production"));
+        ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -124,7 +124,7 @@ describe("ChildProcessSpawnService.resolve", () => {
 
       /** @scenario "Processor falls back to tsx with loud logging when bundle is missing in production" */
       it("falls back to tsx instead of crashing", () => {
-        const result = ChildProcessSpawnService.resolve(spawnOptions("production"));
+        const result = ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(result.command).toBe("pnpm");
         expect(result.args[0]).toBe("exec");
@@ -132,7 +132,7 @@ describe("ChildProcessSpawnService.resolve", () => {
       });
 
       it("logs an error with the missing bundle path", () => {
-        ChildProcessSpawnService.resolve(spawnOptions("production"));
+        ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -145,7 +145,7 @@ describe("ChildProcessSpawnService.resolve", () => {
       });
 
       it("logs a remediation hint in the error message", () => {
-        ChildProcessSpawnService.resolve(spawnOptions("production"));
+        ChildProcessSpawnService.create().resolve(spawnOptions("production"));
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.any(Object),
@@ -186,7 +186,7 @@ describe("ChildProcessSpawnService.resolve", () => {
     it("invokes node with the bundle when it is newer than every child source", () => {
       givenMtimes({ bundleMtimeMs: 2000, sourceMtimeMs: 1000 });
 
-      const result = ChildProcessSpawnService.resolve(spawnOptions("development"));
+      const result = ChildProcessSpawnService.create().resolve(spawnOptions("development"));
 
       expect(result.command).toBe("node");
       expect(result.args).toEqual([BUNDLE]);
@@ -197,20 +197,22 @@ describe("ChildProcessSpawnService.resolve", () => {
       // never silently runs the previously built code.
       givenMtimes({ bundleMtimeMs: 1000, sourceMtimeMs: 2000 });
 
-      expect(ChildProcessSpawnService.resolve(spawnOptions("development")).command).toBe("pnpm");
+      expect(ChildProcessSpawnService.create().resolve(spawnOptions("development")).command).toBe(
+        "pnpm",
+      );
     });
 
     /** @scenario 'Processor spawns child process using tsx in development' */
     it("invokes pnpm exec tsx with the TypeScript source file", () => {
       givenMtimes({ sourceMtimeMs: 1000 });
-      const result = ChildProcessSpawnService.resolve(spawnOptions("development"));
+      const result = ChildProcessSpawnService.create().resolve(spawnOptions("development"));
 
       expect(result.command).toBe("pnpm");
       expect(result.args).toEqual(["exec", "tsx", SOURCE_PATH]);
     });
 
     it("logs the environment at debug level", () => {
-      ChildProcessSpawnService.resolve(spawnOptions("development"));
+      ChildProcessSpawnService.create().resolve(spawnOptions("development"));
 
       expect(mockLogger.debug).toHaveBeenCalledWith(
         expect.objectContaining({ nodeEnv: "development" }),
@@ -221,7 +223,7 @@ describe("ChildProcessSpawnService.resolve", () => {
 
   describe("when NODE_ENV is test", () => {
     it("falls back to development mode (tsx)", () => {
-      const result = ChildProcessSpawnService.resolve(spawnOptions("test"));
+      const result = ChildProcessSpawnService.create().resolve(spawnOptions("test"));
 
       expect(result.command).toBe("pnpm");
       expect(result.args[0]).toBe("exec");
@@ -231,7 +233,7 @@ describe("ChildProcessSpawnService.resolve", () => {
 
   describe("when NODE_ENV is undefined", () => {
     it("falls back to development mode (tsx)", () => {
-      const result = ChildProcessSpawnService.resolve(spawnOptions(undefined));
+      const result = ChildProcessSpawnService.create().resolve(spawnOptions(undefined));
 
       expect(result.command).toBe("pnpm");
       expect(result.args[0]).toBe("exec");

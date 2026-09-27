@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { HStack, Spinner, Text } from "@chakra-ui/react";
+import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Boxes } from "lucide-react";
 
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
-import type { AiToolEntry } from "../../ai-tools/model/ai-tool-tile.ts";
 import { asRegisteredTools, buildRegisteredToolCards } from "./registered-tools";
 import { SAMPLE_TOOL_CARDS } from "./sample-tool-cards";
 import type { ToolCard } from "./tool-cards";

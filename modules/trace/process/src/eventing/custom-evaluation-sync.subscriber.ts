@@ -57,7 +57,7 @@ function deterministicEvaluationId({
   return `eval_md5_${hash}`;
 }
 
-function readEvaluationPayload(event: OtlpSpanEvent): string | undefined {
+function extractEvaluationPayload(event: OtlpSpanEvent): string | undefined {
   if (event.name !== EVAL_EVENT_NAME) return undefined;
   const jsonAttr = event.attributes.find((attr) => attr.key === "json_encoded_event");
   return jsonAttr?.value && "stringValue" in jsonAttr.value
@@ -115,14 +115,14 @@ async function reportEvaluations({
 }): Promise<Error[]> {
   const errors: Error[] = [];
   for (const evaluation of evaluations) {
-    const failure = await reportOneEvaluation({
+    const report = await reportOneEvaluation({
       deps,
       tenantId,
       traceId,
       evaluation,
       occurredAt,
     });
-    if (failure) errors.push(failure);
+    if (report.outcome === "failed") errors.push(report.error);
   }
   return errors;
 }
@@ -178,6 +178,8 @@ function buildReportPayload({
  * the failure instead of throwing so the caller can attempt the rest of the
  * span's evaluations first.
  */
+type EvaluationReport = { outcome: "reported" } | { outcome: "failed"; error: Error };
+
 async function reportOneEvaluation({
   deps,
   tenantId,
@@ -190,7 +192,7 @@ async function reportOneEvaluation({
   traceId: string;
   evaluation: SdkEvaluation;
   occurredAt: number;
-}): Promise<Error | undefined> {
+}): Promise<EvaluationReport> {
   const payload = buildReportPayload({
     tenantId,
     traceId,
@@ -201,7 +203,7 @@ async function reportOneEvaluation({
 
   try {
     await deps.reportEvaluation(payload);
-    return undefined;
+    return { outcome: "reported" };
   } catch (error) {
     logger.error(
       {
@@ -213,7 +215,7 @@ async function reportOneEvaluation({
       },
       "Failed to sync custom evaluation",
     );
-    return error instanceof Error ? error : new Error(String(error));
+    return { outcome: "failed", error: error instanceof Error ? error : new Error(String(error)) };
   }
 }
 
@@ -229,7 +231,7 @@ export function customEvaluationSyncDedupId(event: TraceProcessingEvent): string
 export function extractEvaluationsFromSpan(span: OtlpSpan): SdkEvaluation[] {
   const evaluations: SdkEvaluation[] = [];
   for (const event of span.events ?? []) {
-    const jsonPayload = readEvaluationPayload(event);
+    const jsonPayload = extractEvaluationPayload(event);
     if (typeof jsonPayload !== "string") continue;
     const evaluation = parseEvaluation(jsonPayload);
     if (evaluation) evaluations.push(evaluation);

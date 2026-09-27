@@ -4,6 +4,7 @@ import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-proces
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
+import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -49,6 +50,7 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
     .withMember("content", () => void 0)
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
+    .withMember("scenarioChildBundle", () => scenarioChildBundle)
     .withMember("monitor", () => void 0)
     .withPipelines((pipelines) => pipelines.consume())
     .boot();

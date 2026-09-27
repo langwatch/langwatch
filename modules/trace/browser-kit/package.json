@@ -23,6 +23,8 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "liqe": "catalog:",

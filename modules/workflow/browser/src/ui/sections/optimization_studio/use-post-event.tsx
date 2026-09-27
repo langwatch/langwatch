@@ -180,247 +180,225 @@ export const usePostEvent = () => {
         })
         .catch(onError);
     },
-    [handleServerMessage, project, setEvaluationState],
+    [handleServerMessage, project, setEvaluationState, setComponentExecutionState],
   );
 
   return { postEvent, isLoading, socketStatus };
 };
+
+type AlertOnComponent = ({
+  componentId,
+  execution_state,
+}: {
+  componentId: string;
+  execution_state: BaseComponent["execution_state"];
+}) => void;
 
 export const useHandleServerMessage = ({
   workflowStore,
   alertOnComponent,
 }: {
   workflowStore: WorkflowStore;
-  alertOnComponent: ({
-    componentId,
-    execution_state,
-  }: {
-    componentId: string;
-    execution_state: BaseComponent["execution_state"];
-  }) => void;
-}) => {
-  const {
-    setSocketStatus,
-    getWorkflow,
-    setComponentExecutionState,
-    setWorkflowExecutionState,
-    setEvaluationState,
-    setOptimizationState,
-    checkIfUnreachableErrorMessage,
-    stopWorkflowIfRunning,
-    setOpenResultsPanelRequest,
-  } = workflowStore;
-
-  /**
-   * Reports a failed run (ADR-045); a deliberate STOP keeps the local
-   * `info` explainer instead of "we've been notified".
-   */
-  const alertOnError = useCallback(
-    ({
-      failure,
-      fallbackTitle,
-    }: {
-      failure: CodedExecutionFailure | undefined;
-      fallbackTitle?: string;
-    }) => {
-      const explanation = explainExecutionStateError({
-        state: failure,
-        fallbackTitle,
-      });
-      const wasStopped = isDeliberateStop(failure);
-
-      // Keyed by what the toast actually SAYS, so a repeating failure updates
-      // one toast instead of stacking a wall of them. A code the registry
-      // knows keys on the code instead, so it never collapses onto an
-      // unrelated failure.
-      const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
-        explanation.isRegistered ? failure?.error_type : explanation.title
-      }`;
-
-      if (wasStopped) {
-        toaster.create({
-          id: dedupeId,
-          title: "Stopped",
-          // Only registered copy has anything to add here; the generic
-          // "we've been notified" would be wrong for a deliberate stop.
-          description: explanation.isRegistered ? explanation.description || undefined : undefined,
-          type: "info",
-          duration: 3000,
-        });
-      } else {
-        toaster.create({
-          id: dedupeId,
-          error: reportableExecutionFailure(failure),
-          title: explanation.title,
-          type: "error",
-          duration: 5000,
-        });
-      }
-    },
-    [],
+  alertOnComponent: AlertOnComponent;
+}) =>
+  useCallback(
+    (message: StudioServerEvent) =>
+      applyServerMessage({ message, workflowStore, alertOnComponent }),
+    [workflowStore, alertOnComponent],
   );
 
-  return useCallback(
-    (message: StudioServerEvent) => {
-      switch (message.type) {
-        case "is_alive_response":
-          if (pythonDisconnectedTimeout) {
-            clearTimeout(pythonDisconnectedTimeout);
-            pythonDisconnectedTimeout = null;
-          }
-          logger.debug("python is alive, setting status to connected");
-          setSocketStatus("connected");
-          break;
-        case "component_state_change":
-          logger.debug(
-            {
-              componentId: message.payload.component_id,
-              status: message.payload.execution_state?.status,
-            },
-            "component_state_change received",
-          );
-          setComponentExecutionState(message.payload.component_id, message.payload.execution_state);
+/**
+ * Reports a failed run (ADR-045); a deliberate STOP keeps the local
+ * `info` explainer instead of "we've been notified".
+ */
+function alertOnError({
+  failure,
+  fallbackTitle,
+}: {
+  failure: CodedExecutionFailure | undefined;
+  fallbackTitle?: string;
+}) {
+  const explanation = explainExecutionStateError({ state: failure, fallbackTitle });
+  const wasStopped = isDeliberateStop(failure);
 
-          if (message.payload.execution_state?.status === "error") {
-            checkIfUnreachableErrorMessage(message.payload.execution_state.error);
-            alertOnComponent({
-              componentId: message.payload.component_id,
-              execution_state: message.payload.execution_state,
-            });
-          }
+  // Keyed by what the toast SAYS, so a repeating failure updates one toast;
+  // a registered code keys on the code so it never collapses onto another.
+  const dedupeId = `studio-${wasStopped ? "stopped" : "error"}-${
+    explanation.isRegistered ? failure?.error_type : explanation.title
+  }`;
 
-          break;
-        case "execution_state_change":
-          logger.debug(
-            { status: message.payload.execution_state?.status },
-            "execution_state_change received",
-          );
-          // The event type allows the state to be absent; there is nothing to
-          // apply when it is, and the store reads `status` off what it is given.
-          if (message.payload.execution_state) {
-            setWorkflowExecutionState(message.payload.execution_state);
-          }
+  if (wasStopped) {
+    toaster.create({
+      id: dedupeId,
+      title: "Stopped",
+      // Only registered copy has anything to add to a deliberate stop.
+      description: explanation.isRegistered ? explanation.description || undefined : undefined,
+      type: "info",
+      duration: 3000,
+    });
+    return;
+  }
+  toaster.create({
+    id: dedupeId,
+    error: reportableExecutionFailure(failure),
+    title: explanation.title,
+    type: "error",
+    duration: 5000,
+  });
+}
 
-          // Auto-select the target node and expand properties when a
-          // "Run workflow until here" execution succeeds, so the user
-          // can see the results without clicking manually.
-          if (message.payload.execution_state?.status === "success") {
-            const untilNodeId = getWorkflow().state.execution?.until_node_id;
-            if (untilNodeId) {
-              workflowStore.setSelectedNode(untilNodeId);
-              workflowStore.setPropertiesExpanded(true);
-            }
-          }
-
-          if (message.payload.execution_state?.status === "error") {
-            // Surface the node that actually failed (e.g. an LLM with no
-            // messages) instead of the run target, whose stale output would
-            // otherwise hide the error. Fall back to the target when no
-            // single node carries the error.
-            const failedNode = getWorkflow().nodes.find(
-              (node) => node.data.execution_state?.status === "error",
-            );
-            const focusNodeId = failedNode?.id ?? getWorkflow().state.execution?.until_node_id;
-            if (focusNodeId) {
-              workflowStore.setSelectedNode(focusNodeId);
-              workflowStore.setPropertiesExpanded(true);
-            }
-            alertOnError({
-              failure: message.payload.execution_state,
-              fallbackTitle: "This run didn't finish",
-            });
-            // The whole coded failure, not just its message: every node still
-            // running is about to be marked failed by the SAME failure, and
-            // handing them a bare string left them uncoded, so the properties
-            // panel fell back to raw engine text for a failure we could name.
-            stopWorkflowIfRunning(message.payload.execution_state);
-          }
-          break;
-        case "evaluation_state_change":
-        case "evaluation_run_change": {
-          const evaluationState =
-            message.type === "evaluation_state_change"
-              ? message.payload.evaluation_state
-              : message.payload.evaluation_run;
-          logger.debug(
-            {
-              status: evaluationState?.status,
-              progress: evaluationState?.progress,
-            },
-            `${message.type} received`,
-          );
-          const currentEvaluationState = getWorkflow().state.evaluation;
-          setEvaluationState(evaluationState);
-          if (evaluationState?.status === "error") {
-            alertOnError({
-              failure: evaluationState,
-              fallbackTitle: "This run didn't finish",
-            });
-            if (currentEvaluationState?.status !== "waiting") {
-              setTimeout(() => {
-                setOpenResultsPanelRequest("evaluations");
-              }, 500);
-            }
-          }
-          break;
-        }
-        case "optimization_state_change":
-          const currentOptimizationState = getWorkflow().state.optimization;
-          setOptimizationState(message.payload.optimization_state);
-          if (message.payload.optimization_state?.status === "error") {
-            alertOnError({
-              failure: message.payload.optimization_state,
-              fallbackTitle: "This run didn't finish",
-            });
-            if (currentOptimizationState?.status !== "waiting") {
-              setTimeout(() => {
-                setOpenResultsPanelRequest("optimizations");
-              }, 500);
-            }
-          }
-          break;
-        case "error":
-          logger.error({ message: message.payload.message }, "error event received from server");
-          checkIfUnreachableErrorMessage(message.payload.message);
-          stopWorkflowIfRunning({ error: message.payload.message });
-          // The stream's `error` frame carries no code (see StudioServerEvent),
-          // so this presents as the generic unknown state — the message rides
-          // along only so a deliberate stop still reads as "Stopped", and so
-          // the "runtime is unreachable" check above can read it. It is never
-          // shown.
-          alertOnError({
-            failure: { error: message.payload.message },
-            fallbackTitle: "This run didn't finish",
-          });
-          break;
-        case "debug":
-          break;
-        case "done":
-          logger.debug("stream completed (done event received)");
-          break;
-        default:
-          toaster.create({
-            title: "Unknown message type on client",
-            //@ts-expect-error: exhaustive switch; message is never in default
-            description: message.type,
-            type: "warning",
-            duration: 5000,
-          });
-          break;
-      }
-    },
-    [
-      alertOnComponent,
-      alertOnError,
-      checkIfUnreachableErrorMessage,
-      getWorkflow,
-      setComponentExecutionState,
-      setEvaluationState,
-      setOpenResultsPanelRequest,
-      setOptimizationState,
-      setSocketStatus,
-      setWorkflowExecutionState,
-      stopWorkflowIfRunning,
-    ],
-  );
+type ServerMessageContext<Type extends StudioServerEvent["type"]> = {
+  message: Extract<StudioServerEvent, { type: Type }>;
+  workflowStore: WorkflowStore;
+  alertOnComponent: AlertOnComponent;
 };
+
+function applyServerMessage({
+  message,
+  workflowStore,
+  alertOnComponent,
+}: ServerMessageContext<StudioServerEvent["type"]>) {
+  switch (message.type) {
+    case "is_alive_response":
+      markPythonAlive(workflowStore);
+      break;
+    case "component_state_change":
+      applyComponentStateChange({ message, workflowStore, alertOnComponent });
+      break;
+    case "execution_state_change":
+      applyExecutionStateChange({ message, workflowStore, alertOnComponent });
+      break;
+    case "evaluation_state_change":
+    case "evaluation_run_change":
+      applyEvaluationChange({ message, workflowStore, alertOnComponent });
+      break;
+    case "optimization_state_change":
+      applyOptimizationChange({ message, workflowStore, alertOnComponent });
+      break;
+    case "error":
+      applyServerError({ message, workflowStore, alertOnComponent });
+      break;
+    case "debug":
+      break;
+    case "done":
+      logger.debug("stream completed (done event received)");
+      break;
+    default:
+      toaster.create({
+        title: "Unknown message type on client",
+        //@ts-expect-error: exhaustive switch; message is never in default
+        description: message.type,
+        type: "warning",
+        duration: 5000,
+      });
+      break;
+  }
+}
+
+function markPythonAlive(workflowStore: WorkflowStore) {
+  if (pythonDisconnectedTimeout) {
+    clearTimeout(pythonDisconnectedTimeout);
+    pythonDisconnectedTimeout = null;
+  }
+  logger.debug("python is alive, setting status to connected");
+  workflowStore.setSocketStatus("connected");
+}
+
+function applyComponentStateChange({
+  message,
+  workflowStore,
+  alertOnComponent,
+}: ServerMessageContext<"component_state_change">) {
+  const { component_id: componentId, execution_state } = message.payload;
+  logger.debug({ componentId, status: execution_state?.status }, "component_state_change received");
+  workflowStore.setComponentExecutionState(componentId, execution_state);
+  if (execution_state?.status !== "error") return;
+  workflowStore.checkIfUnreachableErrorMessage(execution_state.error);
+  alertOnComponent({ componentId, execution_state });
+}
+
+function focusNode(workflowStore: WorkflowStore, nodeId: string | undefined) {
+  if (!nodeId) return;
+  workflowStore.setSelectedNode(nodeId);
+  workflowStore.setPropertiesExpanded(true);
+}
+
+function applyExecutionStateChange({
+  message,
+  workflowStore,
+}: ServerMessageContext<"execution_state_change">) {
+  const executionState = message.payload.execution_state;
+  logger.debug({ status: executionState?.status }, "execution_state_change received");
+  // The event allows the state to be absent; there is nothing to apply then.
+  if (executionState) workflowStore.setWorkflowExecutionState(executionState);
+
+  // A successful "Run workflow until here" selects its target so the result shows.
+  if (executionState?.status === "success") {
+    focusNode(workflowStore, workflowStore.getWorkflow().state.execution?.until_node_id);
+  }
+  if (executionState?.status !== "error") return;
+
+  // Surface the node that actually failed, falling back to the run target.
+  const workflow = workflowStore.getWorkflow();
+  const failedNode = workflow.nodes.find((node) => node.data.execution_state?.status === "error");
+  focusNode(workflowStore, failedNode?.id ?? workflow.state.execution?.until_node_id);
+  alertOnError({ failure: executionState, fallbackTitle: "This run didn't finish" });
+  // The whole coded failure, so every node still running is marked with a named code.
+  workflowStore.stopWorkflowIfRunning(executionState);
+}
+
+function openResultsPanelLater(
+  workflowStore: WorkflowStore,
+  panel: Parameters<WorkflowStore["setOpenResultsPanelRequest"]>[0],
+) {
+  setTimeout(() => {
+    workflowStore.setOpenResultsPanelRequest(panel);
+  }, 500);
+}
+
+function applyEvaluationChange({
+  message,
+  workflowStore,
+}: ServerMessageContext<"evaluation_state_change" | "evaluation_run_change">) {
+  const evaluationState =
+    message.type === "evaluation_state_change"
+      ? message.payload.evaluation_state
+      : message.payload.evaluation_run;
+  logger.debug(
+    { status: evaluationState?.status, progress: evaluationState?.progress },
+    `${message.type} received`,
+  );
+  const currentEvaluationState = workflowStore.getWorkflow().state.evaluation;
+  workflowStore.setEvaluationState(evaluationState);
+  if (evaluationState?.status !== "error") return;
+  alertOnError({ failure: evaluationState, fallbackTitle: "This run didn't finish" });
+  if (currentEvaluationState?.status !== "waiting") {
+    openResultsPanelLater(workflowStore, "evaluations");
+  }
+}
+
+function applyOptimizationChange({
+  message,
+  workflowStore,
+}: ServerMessageContext<"optimization_state_change">) {
+  const currentOptimizationState = workflowStore.getWorkflow().state.optimization;
+  const optimizationState = message.payload.optimization_state;
+  workflowStore.setOptimizationState(optimizationState);
+  if (optimizationState?.status !== "error") return;
+  alertOnError({ failure: optimizationState, fallbackTitle: "This run didn't finish" });
+  if (currentOptimizationState?.status !== "waiting") {
+    openResultsPanelLater(workflowStore, "optimizations");
+  }
+}
+
+function applyServerError({ message, workflowStore }: ServerMessageContext<"error">) {
+  logger.error({ message: message.payload.message }, "error event received from server");
+  workflowStore.checkIfUnreachableErrorMessage(message.payload.message);
+  workflowStore.stopWorkflowIfRunning({ error: message.payload.message });
+  // The `error` frame carries no code, so it presents as the generic unknown
+  // state; the message rides along only so a deliberate stop reads "Stopped".
+  alertOnError({
+    failure: { error: message.payload.message },
+    fallbackTitle: "This run didn't finish",
+  });
+}

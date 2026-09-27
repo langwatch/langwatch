@@ -237,7 +237,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
       fetchStub.mockResolvedValueOnce(r503());
       await expect(
         runIngestionPull({ sourceId: "src-error", cursor: "starting-cursor" }),
-      ).rejects.toThrow();
+      ).rejects.toThrow("Ingestion pull adapter reported 1 error(s)");
 
       expect(ocsfInsert).not.toHaveBeenCalled();
       expect(sourceUpdate).not.toHaveBeenCalled();

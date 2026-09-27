@@ -4,7 +4,6 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 
-import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
@@ -17,8 +16,9 @@ import type {
   PulledUsageEntitlements,
   PulledUsageRateInput,
 } from "../../app/governance.members.ts";
+import { silentIngestionPullDiagnostics } from "../../app/governance.members.ts";
+import { NO_SUPPRESSION } from "../../rules/erasure-suppression.rules.ts";
 import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
-import { NullIngestionPullDiagnosticsAdapter } from "../../services/ingestion-pull-diagnostics.service.ts";
 import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
@@ -151,17 +151,19 @@ export type WorkerTestDoubles = {
   };
   insertEvent: (input: GovernanceOcsfEventInput) => Promise<void>;
   usageEnabled: (organizationId: string) => Promise<boolean>;
-  ensureProject: () => Promise<{ id: string }>;
+  ensureProject: (input: { organizationId: string; kind: string }) => Promise<{ id: string }>;
+  discovery?: { recordFromPulledEvents(): Promise<{ discovered: number }> };
+  identityMatch?: { runFor(input: { organizationId: string }): Promise<void> };
 };
 
 export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWorkerService {
   const registry = PullerRegistryService.create();
   registry.register(doubles.adapter);
   const pricing = PulledUsagePricingService.create(new TestRate());
-  const diagnostics = new NullIngestionPullDiagnosticsAdapter();
+  const diagnostics = silentIngestionPullDiagnostics;
   const projects = new CompleteTestProjectService();
-  projects.ensureInternal = async () => {
-    const project = await doubles.ensureProject();
+  projects.ensureInternal = async (input) => {
+    const project = await doubles.ensureProject(input);
     return {
       id: project.id,
       name: "test",
@@ -189,8 +191,8 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
     usageEntitlement: new TestEntitlement(doubles.usageEnabled),
     usageRecords: PulledUsageRecordService.create(pricing),
     suppression: { loadForProvider: async () => NO_SUPPRESSION },
-    discovery: { recordFromPulledEvents: async () => ({ discovered: 0 }) },
-    identityMatch: { runFor: async () => undefined },
+    discovery: doubles.discovery ?? { recordFromPulledEvents: async () => ({ discovered: 0 }) },
+    identityMatch: doubles.identityMatch ?? { runFor: async () => undefined },
     unpricedWindows: {
       getUnpricedUsageWindow: async () => ({ since: null, through: null }),
       updateUnpricedUsageWindow: async () => undefined,

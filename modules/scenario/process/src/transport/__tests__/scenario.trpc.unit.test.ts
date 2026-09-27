@@ -4,6 +4,7 @@
  * refuses queueing. See simulation-runner.feature and related suite features.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   getOnPlatformSetId,
   ScenarioNotFoundError,
@@ -48,12 +49,40 @@ function runnableApp(overrides: Partial<ScenarioApi> = {}) {
       }),
       prefetchExecution: async () => ({
         success: true as const,
-        data: { scenario: { id: SCENARIO_ID, name: "Login flow" } },
+        telemetry: { endpoint: "https://app.langwatch.test", apiKey: "project-key" },
+        data: {
+          context: {
+            projectId: PROJECT_ID,
+            scenarioId: SCENARIO_ID,
+            setId: "set-1",
+            batchRunId: "batch-1",
+          },
+          scenario: {
+            id: SCENARIO_ID,
+            name: "Login flow",
+            situation: "Signs in",
+            criteria: [],
+            labels: [],
+          },
+          parameters: {},
+          adapterData: {
+            type: "http" as const,
+            agentId: "agent-1",
+            url: "https://example.com",
+            method: "POST",
+            headers: [],
+            secrets: {},
+          },
+          simulatorModelParams: { model: "openai/gpt-5-mini", api_key: "key" },
+          judgeModelParams: { model: "openai/gpt-5", api_key: "key" },
+          nlpServiceUrl: "http://nlp",
+          target: { type: "http" as const, referenceId: "agent-1" },
+        },
         resolvedModels: { simulatorModel: "openai/gpt-5-mini", judgeModel: "openai/gpt-5" },
       }),
       queueSimulationRun,
       ...overrides,
-    } as unknown as Partial<ScenarioApi>,
+    } satisfies Partial<ScenarioApi>,
   };
 }
 
@@ -270,7 +299,11 @@ describe("the scenarios tRPC transport", () => {
 
   describe("given a run state that names nothing", () => {
     it("answers not found rather than an empty run", async () => {
-      const { caller } = harness({ findScenarioRunData: async () => null });
+      const { caller } = harness({
+        getRunState: async ({ scenarioRunId }) => {
+          throw new NotFoundError("not_found", "Scenario run", scenarioRunId);
+        },
+      });
 
       await expect(
         caller.getRunState({ projectId: PROJECT_ID, scenarioRunId: "scenariorun_1" }),

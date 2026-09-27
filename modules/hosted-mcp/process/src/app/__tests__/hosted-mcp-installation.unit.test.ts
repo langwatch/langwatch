@@ -5,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * The hosted MCP feature, booted over its store members and peers alone.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -24,6 +25,7 @@ function process() {
     .provide({
       project: createApiFixture<ProjectApi>(),
       authz: createApiFixture<AuthzApi>(),
+      governance: createApiFixture<GovernanceRestApi>(),
     });
 }
 

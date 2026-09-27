@@ -4,22 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { browserTranscriptToCallRecord, scenarioRunIdForConversation } from "../call-record.ts";
-
-describe("scenarioRunIdForConversation", () => {
-  describe("given two attempts with the same conversation id and one with a different id", () => {
-    /** @scenario "The idempotency key is derived from the conversation id" */
-    it("derives the same run id for the same conversation and a different one otherwise", () => {
-      const a1 = scenarioRunIdForConversation("conv_abc");
-      const a2 = scenarioRunIdForConversation("conv_abc");
-      const b = scenarioRunIdForConversation("conv_xyz");
-
-      expect(a1).toBe(a2);
-      expect(a1).not.toBe(b);
-      expect(a1.startsWith("voicecall_")).toBe(true);
-    });
-  });
-});
+import { browserTranscriptToCallRecord } from "../call-record.ts";
 
 describe("browserTranscriptToCallRecord", () => {
   describe("when the provider record is not available", () => {

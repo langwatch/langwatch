@@ -53,7 +53,7 @@ export {
 } from "@langwatch/analytics-contract";
 export type {
   LangWatchQLConnection,
-  LangWatchQLExecutor,
+  LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "./repositories/langwatch-ql-executor.repository.ts";
 

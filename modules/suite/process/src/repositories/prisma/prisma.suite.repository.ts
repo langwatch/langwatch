@@ -15,6 +15,7 @@ import {
   type SuiteScope,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
+import { z } from "zod";
 
 import { SuiteRepository } from "../suite.repository.ts";
 
@@ -26,9 +27,11 @@ import { SuiteRepository } from "../suite.repository.ts";
 const PLAN_NAME_TXN_TIMEOUT_MS = 15_000;
 const PLAN_NAME_TXN_MAX_WAIT_MS = 10_000;
 
+/** A stored row also holds `fields` and `evaluators`, which a Suite does not carry. */
+const storedSuiteSchema = z.object(suiteSchema.shape);
+
 function mapSuite(row: unknown): Suite {
-  const parsed = suiteSchema.parse(row);
-  return parsed;
+  return storedSuiteSchema.parse(row);
 }
 
 function nextAvailableSlug(baseSlug: string, existingSlugs: string[]): string {

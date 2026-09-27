@@ -5,12 +5,6 @@
  */
 import { AnalyticsApi, analyticsTrpc } from "@langwatch/analytics-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { ValidationError } from "@langwatch/handled-error";
-
-import {
-  filterFieldRequiresKey,
-  filterFieldRequiresSubkey,
-} from "../rules/analytics-filter-catalogue.rules.ts";
 
 export const analyticsTrpcTransport = defineTrpcRouter(AnalyticsApi, analyticsTrpc)
   .procedure("getTimeseries")
@@ -19,32 +13,7 @@ export const analyticsTrpcTransport = defineTrpcRouter(AnalyticsApi, analyticsTr
 
   .procedure("dataForFilter")
   .withPermission("analytics:view")
-  .handle(async ({ app, input }) => {
-    const { field, key, subkey } = input;
-
-    if (filterFieldRequiresKey(field) && !key) {
-      throw new ValidationError(`Field ${field} requires a key to be defined`);
-    }
-
-    if (filterFieldRequiresSubkey(field) && !subkey) {
-      throw new ValidationError(`Field ${field} requires a subkey to be defined`);
-    }
-
-    // The narrowing rule — a field's own selection must not narrow the values
-    // offered for it — belongs to the application, so both doors agree.
-    const options = await app.filterOptions({
-      projectId: input.projectId,
-      field,
-      ...(input.query === undefined ? {} : { query: input.query }),
-      ...(key === undefined ? {} : { key }),
-      ...(subkey === undefined ? {} : { subkey }),
-      startDate: input.startDate,
-      endDate: input.endDate,
-      ...(input.filters === undefined ? {} : { filters: input.filters }),
-    });
-
-    return { options };
-  })
+  .handle(async ({ app, input }) => ({ options: await app.filterOptions(input) }))
 
   .procedure("topUsedDocuments")
   .withPermission("cost:view")

@@ -62,428 +62,297 @@ async function prefetchWithFixture({
 
 const prefetchScenarioData = prefetchWithFixture;
 
-describe("prefetchWithFixture", () => {
-  const defaultContext: ExecutionContext = {
-    projectId: "proj_123",
-    scenarioId: "scen_123",
-    setId: "set_123",
-    batchRunId: "batch_123",
+const defaultContext: ExecutionContext = {
+  projectId: "proj_123",
+  scenarioId: "scen_123",
+  setId: "set_123",
+  batchRunId: "batch_123",
+};
+
+const defaultScenario = {
+  id: "scen_123",
+  name: "Test Scenario",
+  situation: "User asks a question",
+  criteria: ["Must respond politely"],
+  labels: [],
+};
+
+const defaultProject = {
+  apiKey: "test-api-key",
+  team: { organizationId: "organization_1" },
+};
+
+const defaultModelParams: LiteLLMParams = {
+  api_key: "test-key",
+  model: "openai/gpt-4",
+};
+
+const defaultModelParamsResult = {
+  success: true as const,
+  params: defaultModelParams,
+};
+
+function createMockDeps(overrides: Partial<ScenarioPrefetchFixture> = {}): ScenarioPrefetchFixture {
+  const scenarioFetcher: ScenarioFetcher = {
+    getById: vi.fn().mockResolvedValue(defaultScenario),
   };
 
-  const defaultScenario = {
-    id: "scen_123",
-    name: "Test Scenario",
-    situation: "User asks a question",
-    criteria: ["Must respond politely"],
-    labels: [],
+  const suiteConfigFetcher: SuiteConfigFetcher = {
+    getBySetId: vi.fn().mockResolvedValue(null),
   };
 
-  const defaultProject = {
-    apiKey: "test-api-key",
-    team: { organizationId: "organization_1" },
+  const promptFetcher: PromptFetcher = {
+    findByIdOrHandle: vi.fn().mockResolvedValue(null),
   };
 
-  const defaultModelParams: LiteLLMParams = {
-    api_key: "test-key",
-    model: "openai/gpt-4",
+  const agentFetcher: AgentFetcher = {
+    findById: vi.fn().mockResolvedValue(null),
   };
 
-  const defaultModelParamsResult = {
-    success: true as const,
-    params: defaultModelParams,
+  const workflowVersionFetcher: WorkflowVersionFetcher = {
+    getLatestDsl: vi.fn().mockResolvedValue(null),
   };
 
-  function createMockDeps(
-    overrides: Partial<ScenarioPrefetchFixture> = {},
-  ): ScenarioPrefetchFixture {
-    const scenarioFetcher: ScenarioFetcher = {
-      getById: vi.fn().mockResolvedValue(defaultScenario),
+  const projectFetcher: ProjectFetcher = {
+    findUnique: vi.fn().mockResolvedValue(defaultProject),
+  };
+
+  const modelParamsProvider: ModelParamsProvider = {
+    prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
+  };
+
+  const projectSecretsFetcher: ProjectSecretsFetcher = {
+    getSecrets: vi.fn().mockResolvedValue({}),
+  };
+
+  const traceWaitBudgetResolver: TraceWaitBudgetResolver = {
+    resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(30_000),
+  };
+
+  const modelResolver = {
+    // Distinguish every feature key so simulator/judge/agent-under-test
+    // selection can be asserted independently. "scenarios.generator" gets
+    // its own value so a resolver call against the wrong key (#6634) is
+    // observable rather than silently matching agent-under-test.
+    resolve: vi.fn().mockImplementation(async (featureKey: string) => {
+      const modelByFeatureKey: Record<string, string> = {
+        "scenarios.user_simulator": "openai/sim-default",
+        "scenarios.judge": "openai/judge-default",
+        "scenarios.agent_under_test": "anthropic/claude-3-sonnet",
+        "scenarios.generator": "anthropic/wrong-key-generator",
+      };
+      const model = modelByFeatureKey[featureKey];
+      if (!model) throw new Error(`unexpected feature key resolved: "${featureKey}"`);
+      return model;
+    }),
+  };
+
+  const voiceTargets: VoiceTargetReader = {
+    getVoiceTarget: async ({ agentId }: { projectId: string; agentId: string }) => {
+      const provider = await findElevenLabsProviderForProject();
+      const credential = provider
+        ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
+        : null;
+      const providers = await getProjectModelProviders();
+      const openai = providers.openai;
+      const openaiKey: unknown = openai?.enabled
+        ? prepareEnvKeys(openai).OPENAI_API_KEY
+        : undefined;
+      const callerEnv: Record<string, string> = {};
+      if (typeof openaiKey === "string") {
+        callerEnv.OPENAI_API_KEY = openaiKey;
+      }
+      return {
+        type: "voice" as const,
+        agentId,
+        voiceTarget: {
+          transport: "elevenlabs_convai" as const,
+          agentId: "el_agent",
+          credential: credential ? { kind: "elevenlabs" as const, ...credential } : null,
+        },
+        callerEnv,
+        maxCallSeconds: 300,
+      };
+    },
+  };
+
+  return {
+    scenarioFetcher,
+    suiteConfigFetcher,
+    promptFetcher,
+    agentFetcher,
+    workflowVersionFetcher,
+    projectFetcher,
+    modelParamsProvider,
+    modelResolver,
+    projectSecretsFetcher,
+    traceWaitBudgetResolver,
+    voiceTargets,
+    ...overrides,
+  };
+}
+
+describe("prefetchWithFixture, given child environment readiness", () => {
+  const promptTarget: TargetConfig = {
+    type: "prompt",
+    referenceId: "prompt_123",
+  };
+
+  describe("when the scenario and project resolve", () => {
+    /** @scenario "A worker prepares a run through canonical services" */
+    it("announces the labels and api key the child environment needs", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+        },
+      });
+      const observeChildEnvironment = vi.fn();
+
+      await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
+        observeChildEnvironment,
+      });
+
+      expect(observeChildEnvironment).toHaveBeenCalledTimes(1);
+      expect(observeChildEnvironment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          labels: ["smoke"],
+          telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
+        }),
+      );
+    });
+  });
+
+  describe("when the run is already doomed", () => {
+    // No child may be started for a run that is about to fail, so the
+    // signal has to stay silent rather than fire optimistically.
+    it("stays silent when the scenario does not exist", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: { getById: vi.fn().mockResolvedValue(null) },
+      });
+      const observeChildEnvironment = vi.fn();
+
+      await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
+        observeChildEnvironment,
+      });
+
+      expect(observeChildEnvironment).not.toHaveBeenCalled();
+    });
+
+    it("stays silent when the project has no api key", async () => {
+      const deps = createMockDeps({
+        projectFetcher: {
+          findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+        },
+      });
+      const observeChildEnvironment = vi.fn();
+
+      await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
+        observeChildEnvironment,
+      });
+
+      expect(observeChildEnvironment).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("prefetchWithFixture, when selecting a model", () => {
+  describe("given a prompt with a specific model configured", () => {
+    const promptWithModel = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: "openai/gpt-4",
+      temperature: 0.7,
+      maxTokens: 1000,
     };
 
-    const suiteConfigFetcher: SuiteConfigFetcher = {
-      getBySetId: vi.fn().mockResolvedValue(null),
-    };
-
-    const promptFetcher: PromptFetcher = {
-      findByIdOrHandle: vi.fn().mockResolvedValue(null),
-    };
-
-    const agentFetcher: AgentFetcher = {
-      findById: vi.fn().mockResolvedValue(null),
-    };
-
-    const workflowVersionFetcher: WorkflowVersionFetcher = {
-      getLatestDsl: vi.fn().mockResolvedValue(null),
-    };
-
-    const projectFetcher: ProjectFetcher = {
-      findUnique: vi.fn().mockResolvedValue(defaultProject),
-    };
-
-    const modelParamsProvider: ModelParamsProvider = {
-      prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
-    };
-
-    const projectSecretsFetcher: ProjectSecretsFetcher = {
-      getSecrets: vi.fn().mockResolvedValue({}),
-    };
-
-    const traceWaitBudgetResolver: TraceWaitBudgetResolver = {
-      resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(30_000),
-    };
-
-    const modelResolver = {
-      // Distinguish every feature key so simulator/judge/agent-under-test
-      // selection can be asserted independently. "scenarios.generator" gets
-      // its own value so a resolver call against the wrong key (#6634) is
-      // observable rather than silently matching agent-under-test.
-      resolve: vi.fn().mockImplementation(async (featureKey: string) => {
-        const modelByFeatureKey: Record<string, string> = {
-          "scenarios.user_simulator": "openai/sim-default",
-          "scenarios.judge": "openai/judge-default",
-          "scenarios.agent_under_test": "anthropic/claude-3-sonnet",
-          "scenarios.generator": "anthropic/wrong-key-generator",
+    describe("when prefetching scenario data", () => {
+      it("uses the prompt's configured model", async () => {
+        const mockModelParamsProvider: ModelParamsProvider = {
+          prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
         };
-        const model = modelByFeatureKey[featureKey];
-        if (!model) throw new Error(`unexpected feature key resolved: "${featureKey}"`);
-        return model;
-      }),
-    };
 
-    const voiceTargets: VoiceTargetReader = {
-      getVoiceTarget: async ({ agentId }: { projectId: string; agentId: string }) => {
-        const provider = await findElevenLabsProviderForProject();
-        const credential = provider
-          ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
-          : null;
-        const providers = await getProjectModelProviders();
-        const openai = providers.openai;
-        const openaiKey: unknown = openai?.enabled
-          ? prepareEnvKeys(openai).OPENAI_API_KEY
-          : undefined;
-        const callerEnv: Record<string, string> = {};
-        if (typeof openaiKey === "string") {
-          callerEnv.OPENAI_API_KEY = openaiKey;
-        }
-        return {
-          type: "voice" as const,
-          agentId,
-          voiceTarget: {
-            transport: "elevenlabs_convai" as const,
-            agentId: "el_agent",
-            credential: credential ? { kind: "elevenlabs" as const, ...credential } : null,
-          },
-          callerEnv,
-          maxCallSeconds: 300,
-        };
-      },
-    };
-
-    return {
-      scenarioFetcher,
-      suiteConfigFetcher,
-      promptFetcher,
-      agentFetcher,
-      workflowVersionFetcher,
-      projectFetcher,
-      modelParamsProvider,
-      modelResolver,
-      projectSecretsFetcher,
-      traceWaitBudgetResolver,
-      voiceTargets,
-      ...overrides,
-    };
-  }
-
-  describe("given child environment readiness", () => {
-    const promptTarget: TargetConfig = {
-      type: "prompt",
-      referenceId: "prompt_123",
-    };
-
-    describe("when the scenario and project resolve", () => {
-      /** @scenario "A worker prepares a run through canonical services" */
-      it("announces the labels and api key the child environment needs", async () => {
         const deps = createMockDeps({
-          scenarioFetcher: {
-            getById: vi.fn().mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+          },
+          modelParamsProvider: mockModelParamsProvider,
+        });
+
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+
+        await prefetchWithFixture({ context: defaultContext, target, deps });
+
+        expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith("proj_123", "openai/gpt-4");
+      });
+
+      /** @scenario "A prompt with its own model never consults the agent-under-test default" */
+      it("never calls the agent-under-test resolver", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
           },
         });
-        const observeChildEnvironment = vi.fn();
 
         await prefetchWithFixture({
           context: defaultContext,
-          target: promptTarget,
+          target: {
+            type: "prompt",
+            referenceId: "prompt_123",
+          },
           deps,
-          observeChildEnvironment,
         });
 
-        expect(observeChildEnvironment).toHaveBeenCalledTimes(1);
-        expect(observeChildEnvironment).toHaveBeenCalledWith(
-          expect.objectContaining({
-            labels: ["smoke"],
-            telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
-          }),
+        expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+          "scenarios.agent_under_test",
+          expect.anything(),
         );
       });
     });
+  });
 
-    describe("when the run is already doomed", () => {
-      // No child may be started for a run that is about to fail, so the
-      // signal has to stay silent rather than fire optimistically.
-      it("stays silent when the scenario does not exist", async () => {
-        const deps = createMockDeps({
-          scenarioFetcher: { getById: vi.fn().mockResolvedValue(null) },
-        });
-        const observeChildEnvironment = vi.fn();
-
-        await prefetchWithFixture({
-          context: defaultContext,
-          target: promptTarget,
-          deps,
-          observeChildEnvironment,
-        });
-
-        expect(observeChildEnvironment).not.toHaveBeenCalled();
+  describe("given a prompt target preparing a run", () => {
+    /** @scenario "A worker prepares a run through canonical services" */
+    it("prepares model params exactly three times — agent, simulator, and judge", async () => {
+      const deps = createMockDeps({
+        promptFetcher: {
+          findByIdOrHandle: vi.fn().mockResolvedValue({
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          }),
+        },
       });
 
-      it("stays silent when the project has no api key", async () => {
-        const deps = createMockDeps({
-          projectFetcher: {
-            findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
-          },
-        });
-        const observeChildEnvironment = vi.fn();
-
-        await prefetchWithFixture({
-          context: defaultContext,
-          target: promptTarget,
-          deps,
-          observeChildEnvironment,
-        });
-
-        expect(observeChildEnvironment).not.toHaveBeenCalled();
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps,
       });
+
+      expect(result.success).toBe(true);
+      expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
     });
   });
 
-  describe("when selecting a model", () => {
-    describe("given a prompt with a specific model configured", () => {
-      const promptWithModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [],
-        model: "openai/gpt-4",
-        temperature: 0.7,
-        maxTokens: 1000,
-      };
-
-      describe("when prefetching scenario data", () => {
-        it("uses the prompt's configured model", async () => {
-          const mockModelParamsProvider: ModelParamsProvider = {
-            prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
-          };
-
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-            modelParamsProvider: mockModelParamsProvider,
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-
-          await prefetchWithFixture({ context: defaultContext, target, deps });
-
-          expect(mockModelParamsProvider.prepare).toHaveBeenCalledWith("proj_123", "openai/gpt-4");
-        });
-
-        /** @scenario "A prompt with its own model never consults the agent-under-test default" */
-        it("never calls the agent-under-test resolver", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-          });
-
-          await prefetchWithFixture({
-            context: defaultContext,
-            target: {
-              type: "prompt",
-              referenceId: "prompt_123",
-            },
-            deps,
-          });
-
-          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
-            "scenarios.agent_under_test",
-            expect.anything(),
-          );
-        });
-      });
-    });
-
-    describe("given a prompt target preparing a run", () => {
-      /** @scenario "A worker prepares a run through canonical services" */
-      it("prepares model params exactly three times — agent, simulator, and judge", async () => {
-        const deps = createMockDeps({
-          promptFetcher: {
-            findByIdOrHandle: vi.fn().mockResolvedValue({
-              id: "prompt_123",
-              prompt: "You are helpful",
-              messages: [],
-              model: "openai/gpt-4",
-            }),
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: { type: "prompt", referenceId: "prompt_123" },
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(3);
-      });
-    });
-
-    describe("given a workflow, code, or HTTP target", () => {
-      const httpAgent = {
-        id: "agent_http",
-        type: "http" as const,
-        name: "Test HTTP Agent",
-        projectId: "proj_123",
-        config: {
-          url: "https://api.example.com/chat",
-          method: "POST",
-          headers: [],
-        },
-        workflowId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        archivedAt: null,
-      };
-      const codeAgent = {
-        id: "agent_code",
-        type: "code" as const,
-        name: "Test Code Agent",
-        projectId: "proj_123",
-        config: {
-          parameters: [
-            {
-              identifier: "code",
-              type: "code",
-              value: "def execute(input):\n    return input",
-            },
-          ],
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-        },
-        workflowId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        archivedAt: null,
-      };
-      const workflowAgent = {
-        id: "agent_workflow",
-        type: "workflow" as const,
-        name: "Test Workflow Agent",
-        projectId: "proj_123",
-        config: { workflow_id: "wf_123" },
-        workflowId: "wf_123",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        archivedAt: null,
-      };
-      const emptyWorkflowDsl = {
-        workflowId: "wf_123",
-        dsl: { spec_version: "1.5", nodes: [], edges: [] },
-      };
-
-      const cases: {
-        label: "http" | "code" | "workflow";
-        target: TargetConfig;
-        agent: typeof httpAgent | typeof codeAgent | typeof workflowAgent;
-      }[] = [
-        {
-          label: "http",
-          target: { type: "http", referenceId: "agent_http" },
-          agent: httpAgent,
-        },
-        {
-          label: "code",
-          target: { type: "code", referenceId: "agent_code" },
-          agent: codeAgent,
-        },
-        {
-          label: "workflow",
-          target: { type: "workflow", referenceId: "agent_workflow" },
-          agent: workflowAgent,
-        },
-      ];
-
-      describe.each(cases)("when the target is $label", ({ target, agent }) => {
-        function depsFor(): ScenarioPrefetchFixture {
-          return createMockDeps({
-            agentFetcher: { findById: vi.fn().mockResolvedValue(agent) },
-            workflowVersionFetcher: {
-              getLatestDsl: vi.fn().mockResolvedValue(emptyWorkflowDsl),
-            },
-          });
-        }
-
-        /** @scenario "A workflow target resolves no adapter-role model" */
-        /** @scenario "A code target resolves no adapter-role model" */
-        /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */
-        it("never calls the agent-under-test resolver", async () => {
-          const deps = depsFor();
-
-          await prefetchWithFixture({ context: defaultContext, target, deps });
-
-          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
-            "scenarios.agent_under_test",
-            expect.anything(),
-          );
-          expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
-            "scenarios.generator",
-            expect.anything(),
-          );
-        });
-
-        /** @scenario "The user-simulator and judge always resolve their own models" */
-        it("prepares model params exactly twice — simulator and judge only", async () => {
-          const deps = depsFor();
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);
-          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
-            "proj_123",
-            "openai/sim-default",
-          );
-          expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
-            "proj_123",
-            "openai/judge-default",
-          );
-        });
-      });
-    });
-  });
-
-  describe("when selecting the user-simulator and judge model", () => {
+  describe("given a workflow, code, or HTTP target", () => {
     const httpAgent = {
       id: "agent_http",
       type: "http" as const,
-      name: "HTTP Agent",
+      name: "Test HTTP Agent",
       projectId: "proj_123",
       config: {
         url: "https://api.example.com/chat",
@@ -495,871 +364,199 @@ describe("prefetchWithFixture", () => {
       updatedAt: new Date(),
       archivedAt: null,
     };
-    const httpTarget: TargetConfig = {
-      type: "http",
-      referenceId: "agent_http",
-    };
-
-    // Echoes the requested model back as params so the resolved simulator /
-    // judge model is observable on result.data.{simulator,judge}ModelParams.
-    const echoingProvider = (): ModelParamsProvider => ({
-      prepare: vi.fn().mockImplementation(async (_projectId: string, model: string) => ({
-        success: true as const,
-        params: { api_key: "k", model },
-      })),
-    });
-
-    describe("given a scenario with no simulator or judge override", () => {
-      describe("when prefetching the run data", () => {
-        /**
-         * @scenario "Defaults resolve to the smart Default model when the scenario has no override"
-         */
-        it("resolves the simulator and judge from their DEFAULT-role feature keys", async () => {
-          const deps = createMockDeps({
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: echoingProvider(),
-          });
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: httpTarget,
-            deps,
-          });
-
-          expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
-            "scenarios.user_simulator",
-            "proj_123",
-          );
-          expect(deps.modelResolver.resolve).toHaveBeenCalledWith("scenarios.judge", "proj_123");
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
-        });
-      });
-    });
-
-    describe("given a scenario with a simulator model override", () => {
-      describe("when prefetching the run data", () => {
-        /** @scenario "A scenario-level simulator override is used for the user-simulator" */
-        it("uses the override for the simulator and the default for the judge", async () => {
-          const deps = createMockDeps({
-            scenarioFetcher: {
-              getById: vi.fn().mockResolvedValue({
-                ...defaultScenario,
-                simulatorModel: "anthropic/sim-override",
-                judgeModel: null,
-              }),
-            },
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: echoingProvider(),
-          });
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: httpTarget,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
-          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
-        });
-      });
-    });
-
-    describe("given a scenario with a judge model override", () => {
-      describe("when prefetching the run data", () => {
-        /** @scenario "A scenario-level judge override is used for the judge" */
-        it("uses the override for the judge and the default for the simulator", async () => {
-          const deps = createMockDeps({
-            scenarioFetcher: {
-              getById: vi.fn().mockResolvedValue({
-                ...defaultScenario,
-                simulatorModel: null,
-                judgeModel: "anthropic/judge-override",
-              }),
-            },
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: echoingProvider(),
-          });
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: httpTarget,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
-          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-        });
-      });
-    });
-
-    describe("given a run plan that sets a simulator model", () => {
-      describe("when prefetching a scenario in that plan with no override", () => {
-        /** @scenario "A run plan simulator model overrides the scenario default at run time" */
-        it("uses the run plan's simulator model over the scenario default", async () => {
-          const deps = createMockDeps({
-            suiteConfigFetcher: {
-              getBySetId: vi.fn().mockResolvedValue({
-                simulatorModel: "groq/plan-sim",
-                judgeModel: null,
-              }),
-            },
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: echoingProvider(),
-          });
-
-          const result = await prefetchWithFixture({
-            context: {
-              ...defaultContext,
-              setId: "__internal__suite_1__suite",
-            },
-            target: httpTarget,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
-          // Plan leaves judge unset -> falls through to the default judge.
-          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
-        });
-      });
-    });
-
-    describe("given a model override that is a latest alias", () => {
-      // The alias is stored verbatim, so the prefetcher is the boundary
-      // that must expand it before litellm params are prepared: providers
-      // do not understand "latest" as a model id. The expected concrete
-      // model comes from the same registry resolution the picker shows.
-      const concreteFor = (alias: string) => {
-        const concrete = findAliasTarget(alias)[0];
-        if (concrete === undefined || concrete === alias) {
-          throw new Error(`"${alias}" does not resolve to a concrete model`);
-        }
-        return concrete;
-      };
-
-      /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
-      it("expands a scenario simulator alias before preparing params", async () => {
-        const deps = createMockDeps({
-          scenarioFetcher: {
-            getById: vi.fn().mockResolvedValue({
-              ...defaultScenario,
-              simulatorModel: "openai/latest",
-              judgeModel: null,
-            }),
-          },
-          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-          modelParamsProvider: echoingProvider(),
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: httpTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest"));
-      });
-
-      /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
-      it("expands a scenario judge alias before preparing params", async () => {
-        const deps = createMockDeps({
-          scenarioFetcher: {
-            getById: vi.fn().mockResolvedValue({
-              ...defaultScenario,
-              simulatorModel: null,
-              judgeModel: "anthropic/latest-mini",
-            }),
-          },
-          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-          modelParamsProvider: echoingProvider(),
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: httpTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        expect(result.data.judgeModelParams?.model).toBe(concreteFor("anthropic/latest-mini"));
-      });
-
-      /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
-      it("expands a run plan simulator alias before preparing params", async () => {
-        const deps = createMockDeps({
-          suiteConfigFetcher: {
-            getBySetId: vi.fn().mockResolvedValue({
-              simulatorModel: "openai/latest-mini",
-              judgeModel: null,
-            }),
-          },
-          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-          modelParamsProvider: echoingProvider(),
-        });
-
-        const result = await prefetchWithFixture({
-          // The plan is only read for a set id that names one.
-          context: { ...defaultContext, setId: "__internal__suite_1__suite" },
-          target: httpTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest-mini"));
-      });
-
-      /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
-      it("expands a run plan judge alias before preparing params", async () => {
-        const deps = createMockDeps({
-          suiteConfigFetcher: {
-            getBySetId: vi.fn().mockResolvedValue({
-              simulatorModel: null,
-              judgeModel: "gemini/latest",
-            }),
-          },
-          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-          modelParamsProvider: echoingProvider(),
-        });
-
-        const result = await prefetchWithFixture({
-          // The plan is only read for a set id that names one.
-          context: { ...defaultContext, setId: "__internal__suite_1__suite" },
-          target: httpTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        expect(result.data.judgeModelParams?.model).toBe(concreteFor("gemini/latest"));
-      });
-    });
-
-    describe("given a run plan with no model override", () => {
-      describe("when prefetching a scenario in that plan with no override", () => {
-        /** @scenario "A run plan with no model override falls back to the scenario or project default" */
-        it("falls back to the default simulator and judge models", async () => {
-          const deps = createMockDeps({
-            suiteConfigFetcher: {
-              getBySetId: vi.fn().mockResolvedValue({
-                simulatorModel: null,
-                judgeModel: null,
-              }),
-            },
-            agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
-            modelParamsProvider: echoingProvider(),
-          });
-
-          const result = await prefetchWithFixture({
-            context: {
-              ...defaultContext,
-              setId: "__internal__suite_1__suite",
-            },
-            target: httpTarget,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
-        });
-      });
-    });
-  });
-
-  describe("when handling errors", () => {
-    describe("given scenario does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure with scenario not found error", async () => {
-          const deps = createMockDeps({
-            scenarioFetcher: {
-              getById: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe("Scenario scen_123 not found");
-        });
-      });
-    });
-
-    describe("given project does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure with project not found error", async () => {
-          const deps = createMockDeps({
-            projectFetcher: {
-              findUnique: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe("Project proj_123 not found");
-        });
-      });
-    });
-
-    describe("given prompt does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure with prompt not found error", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe("Prompt prompt_123 not found");
-        });
-      });
-    });
-
-    describe("given HTTP agent does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure with agent not found error", async () => {
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "http",
-            referenceId: "agent_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe("HTTP agent agent_123 not found");
-        });
-      });
-    });
-
-    describe("given the connected agent does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("names the missing target as a connected agent", async () => {
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "connected",
-            referenceId: "agent_connected",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe("Connected agent agent_connected not found");
-        });
-      });
-    });
-
-    describe("given code agent does not exist", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure with code agent not found error", async () => {
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(null),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "code",
-            referenceId: "agent_456",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toContain("Code agent");
-          expect(result.error).toContain("not found");
-        });
-      });
-    });
-
-    describe("given code agent has wrong type", () => {
-      describe("when prefetching scenario data", () => {
-        it("returns failure when agent type mismatch", async () => {
-          const httpAgent = {
-            id: "agent_456",
-            type: "http" as const,
-            name: "HTTP Agent",
-            projectId: "proj_123",
-            config: {
-              url: "https://api.example.com",
-              method: "POST",
-              headers: [],
-            },
-            workflowId: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            archivedAt: null,
-          };
-
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(httpAgent),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "code",
-            referenceId: "agent_456",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toContain("Code agent");
-          expect(result.error).toContain("not found");
-        });
-      });
-    });
-
-    describe("given model params preparation fails", () => {
-      const promptWithModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [],
-        model: "openai/gpt-4",
-      };
-
-      describe("when prefetching scenario data", () => {
-        /** @scenario "Prefetcher logs model params failure with reason" */
-        it("returns failure with model params error", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-            modelParamsProvider: {
-              prepare: vi.fn().mockResolvedValue({
-                success: false,
-                reason: "provider_not_enabled",
-                message: "Provider 'openai' is not enabled for this project",
-              }),
-            },
-            disabledProviders: new Set(["openai"]),
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) {
-            throw new Error("prefetch should have failed");
-          }
-          expect(result.error).toBe(
-            "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
-          );
-          expect(result.reason).toBe("provider_not_enabled");
-        });
-      });
-    });
-
-    describe("given model resolution throws", () => {
-      const promptWithAModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [],
-        model: "openai/gpt-4",
-      };
-
-      const depsWhoseResolverThrows = (error: unknown) =>
-        createMockDeps({
-          promptFetcher: {
-            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithAModel),
-          },
-          modelResolver: {
-            resolve: vi.fn().mockRejectedValue(error),
-          },
-        });
-
-      describe("when the error is one LangWatch wrote for the customer", () => {
-        /** @scenario "Technical detail stops at the trace id" */
-        it("keeps its message, and names the reason", async () => {
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: { type: "prompt", referenceId: "prompt_123" },
-            deps: depsWhoseResolverThrows(
-              new ModelNotConfiguredError(
-                "scenarios.agent_under_test",
-                "DEFAULT",
-                "Agent under test",
-                "project_123",
-              ),
-            ),
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) return;
-          expect(result.reason).toBe("model_not_configured");
-          expect(result.error).not.toBe("The models this run needs could not be resolved");
-        });
-      });
-
-      describe("when the error is an internal one", () => {
-        /** @scenario "Technical detail stops at the trace id" */
-        it("never puts its message in the reason the customer reads", async () => {
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: { type: "prompt", referenceId: "prompt_123" },
-            deps: depsWhoseResolverThrows(new Error("connect ECONNREFUSED 10.0.0.4:5432")),
-          });
-
-          expect(result.success).toBe(false);
-          if (result.success) return;
-          expect(result.error).toBe("The models this run needs could not be resolved");
-          expect(result.reason).toBeUndefined();
-        });
-      });
-    });
-  });
-
-  describe("when prefetching a code agent", () => {
-    describe("given a code agent exists with Python code and inputs/outputs", () => {
-      const codeAgent = {
-        id: "agent_456",
-        type: "code" as const,
-        name: "Classifier",
-        projectId: "proj_123",
-        config: {
-          parameters: [
-            {
-              identifier: "code",
-              type: "code",
-              value: 'def execute(input):\n    return "classified"',
-            },
-          ],
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-        },
-        workflowId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        archivedAt: null,
-      };
-
-      describe("when prefetching scenario data", () => {
-        it("fetches the agent and serializes code, inputs, and outputs", async () => {
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(codeAgent),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "code",
-            referenceId: "agent_456",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.adapterData).toMatchObject({
-            type: "code",
-            agentId: "agent_456",
-            code: 'def execute(input):\n    return "classified"',
-            inputs: [{ identifier: "input", type: "str" }],
-            outputs: [{ identifier: "output", type: "str" }],
-          });
-        });
-
-        // Superseded by the describe.each("given a workflow, code, or HTTP
-        // target") block above (AC2 / AC-N8): agent-under-test is never
-        // called, and model params are prepared exactly twice.
-
-        it("includes decrypted project secrets on the prefetched adapter data", async () => {
-          const projectSecretsFetcher: ProjectSecretsFetcher = {
-            getSecrets: vi.fn().mockResolvedValue({
-              WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
-              OTHER_SECRET: "val2",
-            }),
-          };
-          const deps = createMockDeps({
-            agentFetcher: {
-              findById: vi.fn().mockResolvedValue(codeAgent),
-            },
-            projectSecretsFetcher,
-          });
-
-          const target: TargetConfig = {
-            type: "code",
-            referenceId: "agent_456",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith("proj_123");
-          expect(result.success).toBe(true);
-          // Assert explicitly before narrowing so a type drift fails loudly
-          // instead of silently skipping the toEqual below.
-          if (!result.success) throw new Error("prefetch should have succeeded");
-          expect(result.data.adapterData.type).toBe("code");
-          if (result.data.adapterData.type !== "code") return;
-          expect(result.data.adapterData.secrets).toEqual({
-            WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
-            OTHER_SECRET: "val2",
-          });
-        });
-      });
-    });
-  });
-
-  describe("when the prefetch succeeds", () => {
-    describe("given all dependencies return valid data", () => {
-      const promptWithModel = {
-        id: "prompt_123",
-        prompt: "You are helpful",
-        messages: [
-          { role: "user", content: "Hello" },
-          { role: "assistant", content: "Hi there!" },
-        ],
-        model: "openai/gpt-4",
-        temperature: 0.7,
-        maxTokens: 1000,
-      };
-
-      describe("when prefetching scenario data", () => {
-        /** @scenario "Return success with LiteLLM params on valid configuration" */
-        it("returns success with complete data", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-          });
-
-          const target: TargetConfig = {
-            type: "prompt",
-            referenceId: "prompt_123",
-          };
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          if (!result.success) {
-            throw new Error("prefetch should have succeeded");
-          }
-          expect(result.data.context).toEqual(defaultContext);
-          expect(result.data.scenario).toEqual(defaultScenario);
-          expect(result.data.adapterData).toMatchObject({
-            type: "prompt",
-            promptId: "prompt_123",
-            systemPrompt: "You are helpful",
-          });
-          expect(result.data.modelParams).toEqual(defaultModelParams);
-          expect(result.data.target).toEqual({
-            type: "prompt",
-            referenceId: "prompt_123",
-          });
-          expect(result.telemetry).toEqual({
-            endpoint: "http://app:5560",
-            apiKey: "test-api-key",
-          });
-        });
-      });
-    });
-  });
-
-  describe("when the target is a workflow agent", () => {
-    const workflowAgent = {
-      id: "agent_wf",
-      type: "workflow" as const,
-      name: "Greeter",
-      workflowId: "wf_1",
+    const codeAgent = {
+      id: "agent_code",
+      type: "code" as const,
+      name: "Test Code Agent",
+      projectId: "proj_123",
       config: {
-        name: "Greeter",
-        isCustom: true,
-        workflow_id: "wf_1",
-        scenarioMappings: {
-          query: {
-            type: "source",
-            sourceId: "scenario",
-            path: ["input"],
+        parameters: [
+          {
+            identifier: "code",
+            type: "code",
+            value: "def execute(input):\n    return input",
           },
-        },
-        scenarioOutputField: "answer",
+        ],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
       },
+      workflowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const workflowAgent = {
+      id: "agent_workflow",
+      type: "workflow" as const,
+      name: "Test Workflow Agent",
+      projectId: "proj_123",
+      config: { workflow_id: "wf_123" },
+      workflowId: "wf_123",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+    const emptyWorkflowDsl = {
+      workflowId: "wf_123",
+      dsl: { spec_version: "1.5", nodes: [], edges: [] },
     };
 
-    const workflowDsl = {
-      workflow_id: "wf_1",
-      spec_version: "1.5",
-      version: "1.0",
-      name: "Scenario workflow",
-      icon: "",
-      description: "",
-      state: { execution: { status: "idle" } },
-      nodes: [
-        {
-          id: "entry",
-          type: "entry",
-          position: { x: 0, y: 0 },
-          data: {
-            name: "Entry",
-            outputs: [{ identifier: "query", type: "str" }],
-          },
-        },
-        {
-          id: "end",
-          type: "end",
-          position: { x: 0, y: 0 },
-          data: {
-            name: "End",
-            inputs: [
-              { identifier: "answer", type: "str" },
-              { identifier: "trace", type: "str" },
-            ],
-          },
-        },
-      ],
-      edges: [
-        {
-          id: "entry-greeter",
-          source: "entry",
-          sourceHandle: "outputs.query",
-          target: "greeter",
-          targetHandle: "inputs.query",
-        },
-      ],
-    };
+    const cases: {
+      label: "http" | "code" | "workflow";
+      target: TargetConfig;
+      agent: typeof httpAgent | typeof codeAgent | typeof workflowAgent;
+    }[] = [
+      {
+        label: "http",
+        target: { type: "http", referenceId: "agent_http" },
+        agent: httpAgent,
+      },
+      {
+        label: "code",
+        target: { type: "code", referenceId: "agent_code" },
+        agent: codeAgent,
+      },
+      {
+        label: "workflow",
+        target: { type: "workflow", referenceId: "agent_workflow" },
+        agent: workflowAgent,
+      },
+    ];
 
-    const workflowTarget: TargetConfig = {
-      type: "workflow",
-      referenceId: "agent_wf",
-    };
-
-    describe("when the agent and workflow have a latest version", () => {
-      it("returns WorkflowAgentData with inputs, outputs, mappings and workflow DSL", async () => {
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
+    describe.each(cases)("when the target is $label", ({ target, agent }) => {
+      function depsFor(): ScenarioPrefetchFixture {
+        return createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(agent) },
           workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: workflowDsl,
-            }),
+            getLatestDsl: vi.fn().mockResolvedValue(emptyWorkflowDsl),
           },
+        });
+      }
+
+      /** @scenario "A workflow target resolves no adapter-role model" */
+      /** @scenario "A code target resolves no adapter-role model" */
+      /** @scenario "An HTTP target resolves no adapter-role model and consumes no project key" */
+      it("never calls the agent-under-test resolver", async () => {
+        const deps = depsFor();
+
+        await prefetchWithFixture({ context: defaultContext, target, deps });
+
+        expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+          "scenarios.agent_under_test",
+          expect.anything(),
+        );
+        expect(deps.modelResolver.resolve).not.toHaveBeenCalledWith(
+          "scenarios.generator",
+          expect.anything(),
+        );
+      });
+
+      /** @scenario "The user-simulator and judge always resolve their own models" */
+      it("prepares model params exactly twice — simulator and judge only", async () => {
+        const deps = depsFor();
+
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        expect(deps.modelParamsProvider.prepare).toHaveBeenCalledTimes(2);
+        expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
+          "proj_123",
+          "openai/sim-default",
+        );
+        expect(deps.modelParamsProvider.prepare).toHaveBeenCalledWith(
+          "proj_123",
+          "openai/judge-default",
+        );
+      });
+    });
+  });
+});
+
+describe("prefetchWithFixture, when selecting the user-simulator and judge model", () => {
+  const httpAgent = {
+    id: "agent_http",
+    type: "http" as const,
+    name: "HTTP Agent",
+    projectId: "proj_123",
+    config: {
+      url: "https://api.example.com/chat",
+      method: "POST",
+      headers: [],
+    },
+    workflowId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    archivedAt: null,
+  };
+  const httpTarget: TargetConfig = {
+    type: "http",
+    referenceId: "agent_http",
+  };
+
+  // Echoes the requested model back as params so the resolved simulator /
+  // judge model is observable on result.data.{simulator,judge}ModelParams.
+  const echoingProvider = (): ModelParamsProvider => ({
+    prepare: vi.fn().mockImplementation(async (_projectId: string, model: string) => ({
+      success: true as const,
+      params: { api_key: "k", model },
+    })),
+  });
+
+  describe("given a scenario with no simulator or judge override", () => {
+    describe("when prefetching the run data", () => {
+      /**
+       * @scenario "Defaults resolve to the smart Default model when the scenario has no override"
+       */
+      it("resolves the simulator and judge from their DEFAULT-role feature keys", async () => {
+        const deps = createMockDeps({
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
         });
 
         const result = await prefetchWithFixture({
           context: defaultContext,
-          target: workflowTarget,
+          target: httpTarget,
+          deps,
+        });
+
+        expect(deps.modelResolver.resolve).toHaveBeenCalledWith(
+          "scenarios.user_simulator",
+          "proj_123",
+        );
+        expect(deps.modelResolver.resolve).toHaveBeenCalledWith("scenarios.judge", "proj_123");
+        expect(result.success).toBe(true);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
+        }
+        expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+        expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+      });
+    });
+  });
+
+  describe("given a scenario with a simulator model override", () => {
+    describe("when prefetching the run data", () => {
+      /** @scenario "A scenario-level simulator override is used for the user-simulator" */
+      it("uses the override for the simulator and the default for the judge", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: "anthropic/sim-override",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target: httpTarget,
           deps,
         });
 
@@ -1367,179 +564,31 @@ describe("prefetchWithFixture", () => {
         if (!result.success) {
           throw new Error("prefetch should have succeeded");
         }
-        expect(result.data.adapterData.type).toBe("workflow");
-        if (result.data.adapterData.type !== "workflow") {
-          throw new Error("expected a workflow adapter");
-        }
-        expect(result.data.adapterData.agentId).toBe("agent_wf");
-        expect(result.data.adapterData.workflowId).toBe("wf_1");
-        expect(result.data.adapterData.inputs).toEqual([{ identifier: "query", type: "str" }]);
-        expect(result.data.adapterData.outputs).toEqual([
-          { identifier: "answer", type: "str" },
-          { identifier: "trace", type: "str" },
-        ]);
-        expect(result.data.adapterData.scenarioMappings).toEqual({
-          query: {
-            type: "source",
-            sourceId: "scenario",
-            path: ["input"],
-          },
-        });
-        expect(result.data.adapterData.scenarioOutputField).toBe("answer");
-        expect(result.data.adapterData.workflow).toEqual(workflowDsl);
+        expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
+        expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
       });
     });
+  });
 
-    describe("when the workflow has no saved version", () => {
-      it("returns a friendly 'Workflow agent not found' error", async () => {
+  describe("given a scenario with a judge model override", () => {
+    describe("when prefetching the run data", () => {
+      /** @scenario "A scenario-level judge override is used for the judge" */
+      it("uses the override for the judge and the default for the simulator", async () => {
         const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue({
+              ...defaultScenario,
+              simulatorModel: null,
+              judgeModel: "anthropic/judge-override",
+            }),
           },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue(null),
-          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
         });
 
         const result = await prefetchWithFixture({
           context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(false);
-        if (result.success) {
-          throw new Error("prefetch should have failed");
-        }
-        expect(result.error).toBe("Workflow agent agent_wf not found");
-      });
-    });
-
-    describe("when the agent has no workflowId", () => {
-      it("returns 'Workflow agent not found' without touching the version fetcher", async () => {
-        const getLatestDsl = vi.fn();
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue({
-              ...workflowAgent,
-              workflowId: null,
-              config: { ...workflowAgent.config, workflow_id: undefined },
-            }),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl,
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(false);
-        if (result.success) {
-          throw new Error("prefetch should have failed");
-        }
-        expect(result.error).toBe("Workflow agent agent_wf not found");
-        expect(getLatestDsl).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the DSL has a blank-template signature node with an undefined llm parameter value", () => {
-      // Regression test for issue #3160:
-      // Fresh workflow agents store value: undefined for the llm parameter in the
-      // blank template DSL. The scenario execution path must hydrate litellm_params
-      // onto each llm-type parameter before sending the DSL to the NLP service,
-      // otherwise litellm raises AuthenticationError: Incorrect API key provided: dummy.
-      const blankTemplateDsl = {
-        workflow_id: "wf_1",
-        nodes: [
-          {
-            id: "entry",
-            type: "entry",
-            data: {
-              name: "Entry",
-              outputs: [{ identifier: "question", type: "str" }],
-            },
-          },
-          {
-            id: "llm_call",
-            type: "signature",
-            data: {
-              name: "LLM Call",
-              parameters: [
-                {
-                  identifier: "llm",
-                  type: "llm",
-                  // value is undefined — this is the blank-template default
-                  value: undefined,
-                },
-                {
-                  identifier: "instructions",
-                  type: "str",
-                  value: undefined,
-                },
-              ],
-              inputs: [{ identifier: "question", type: "str" }],
-              outputs: [{ identifier: "answer", type: "str" }],
-            },
-          },
-          {
-            id: "end",
-            type: "end",
-            data: {
-              name: "End",
-              inputs: [{ identifier: "output", type: "str" }],
-            },
-          },
-        ],
-        edges: [
-          {
-            id: "e0-1",
-            source: "entry",
-            sourceHandle: "outputs.question",
-            target: "llm_call",
-            targetHandle: "inputs.question",
-          },
-          {
-            id: "e1-2",
-            source: "llm_call",
-            sourceHandle: "outputs.answer",
-            target: "end",
-            targetHandle: "inputs.output",
-          },
-        ],
-      };
-
-      /** @scenario "Per-node workflow model credentials are untouched by the platform-key fix" */
-      it("hydrates the llm parameter value with litellm_params from the project's model providers", async () => {
-        const hydratedApiKey = "sk-real-project-key-abc123";
-
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: blankTemplateDsl,
-            }),
-          },
-          modelParamsProvider: {
-            prepare: vi.fn().mockResolvedValue({
-              success: true as const,
-              params: {
-                model: "openai/gpt-5-mini",
-                api_key: hydratedApiKey,
-              },
-            }),
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
+          target: httpTarget,
           deps,
         });
 
@@ -1547,80 +596,451 @@ describe("prefetchWithFixture", () => {
         if (!result.success) {
           throw new Error("prefetch should have succeeded");
         }
-        if (result.data.adapterData.type !== "workflow") {
-          throw new Error("expected a workflow adapter");
-        }
-        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
-          | Record<string, unknown>
-          | undefined;
-
-        expect(signatureNode).toBeDefined();
-
-        const data = signatureNode?.data as Record<string, unknown> | undefined;
-        const parameters = data?.parameters as Record<string, unknown>[] | undefined;
-        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-
-        expect(llmParam).toBeDefined();
-
-        // The value must be hydrated — not undefined and not using the dummy key
-        const value = llmParam?.value as Record<string, unknown> | undefined;
-        expect(value).toBeDefined();
-        expect(value?.litellm_params).toBeDefined();
-
-        const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
-        expect(litellmParams?.api_key).toBeDefined();
-        expect(litellmParams?.api_key).not.toBe("dummy");
-        expect(litellmParams?.api_key).toBe(hydratedApiKey);
+        expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
+        expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
       });
     });
+  });
 
-    describe("when the DSL has a blank-template signature node and the model provider lookup fails", () => {
-      // Test A: provider lookup fails → prefetch returns structured failure, not silent pass
-      it("returns a structured failure with the provider reason, not a silent pass with dummy api_key", async () => {
+  describe("given a run plan that sets a simulator model", () => {
+    describe("when prefetching a scenario in that plan with no override", () => {
+      /** @scenario "A run plan simulator model overrides the scenario default at run time" */
+      it("uses the run plan's simulator model over the scenario default", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: "groq/plan-sim",
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchWithFixture({
+          context: {
+            ...defaultContext,
+            setId: "__internal__suite_1__suite",
+          },
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
+        }
+        expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
+        // Plan leaves judge unset -> falls through to the default judge.
+        expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+      });
+    });
+  });
+
+  describe("given a model override that is a latest alias", () => {
+    // The alias is stored verbatim, so the prefetcher is the boundary
+    // that must expand it before litellm params are prepared: providers
+    // do not understand "latest" as a model id. The expected concrete
+    // model comes from the same registry resolution the picker shows.
+    const concreteFor = (alias: string) => {
+      const concrete = findAliasTarget(alias)[0];
+      if (concrete === undefined || concrete === alias) {
+        throw new Error(`"${alias}" does not resolve to a concrete model`);
+      }
+      return concrete;
+    };
+
+    /** @scenario "A latest alias on the scenario simulator model expands to a concrete model at run time" */
+    it("expands a scenario simulator alias before preparing params", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({
+            ...defaultScenario,
+            simulatorModel: "openai/latest",
+            judgeModel: null,
+          }),
+        },
+        agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+        modelParamsProvider: echoingProvider(),
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: httpTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest"));
+    });
+
+    /** @scenario "A latest alias on the scenario judge model expands to a concrete model at run time" */
+    it("expands a scenario judge alias before preparing params", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({
+            ...defaultScenario,
+            simulatorModel: null,
+            judgeModel: "anthropic/latest-mini",
+          }),
+        },
+        agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+        modelParamsProvider: echoingProvider(),
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: httpTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      expect(result.data.judgeModelParams?.model).toBe(concreteFor("anthropic/latest-mini"));
+    });
+
+    /** @scenario "A latest alias on the run plan simulator model expands to a concrete model at run time" */
+    it("expands a run plan simulator alias before preparing params", async () => {
+      const deps = createMockDeps({
+        suiteConfigFetcher: {
+          getBySetId: vi.fn().mockResolvedValue({
+            simulatorModel: "openai/latest-mini",
+            judgeModel: null,
+          }),
+        },
+        agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+        modelParamsProvider: echoingProvider(),
+      });
+
+      const result = await prefetchWithFixture({
+        // The plan is only read for a set id that names one.
+        context: { ...defaultContext, setId: "__internal__suite_1__suite" },
+        target: httpTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest-mini"));
+    });
+
+    /** @scenario "A latest alias on the run plan judge model expands to a concrete model at run time" */
+    it("expands a run plan judge alias before preparing params", async () => {
+      const deps = createMockDeps({
+        suiteConfigFetcher: {
+          getBySetId: vi.fn().mockResolvedValue({
+            simulatorModel: null,
+            judgeModel: "gemini/latest",
+          }),
+        },
+        agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+        modelParamsProvider: echoingProvider(),
+      });
+
+      const result = await prefetchWithFixture({
+        // The plan is only read for a set id that names one.
+        context: { ...defaultContext, setId: "__internal__suite_1__suite" },
+        target: httpTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      expect(result.data.judgeModelParams?.model).toBe(concreteFor("gemini/latest"));
+    });
+  });
+
+  describe("given a run plan with no model override", () => {
+    describe("when prefetching a scenario in that plan with no override", () => {
+      /** @scenario "A run plan with no model override falls back to the scenario or project default" */
+      it("falls back to the default simulator and judge models", async () => {
+        const deps = createMockDeps({
+          suiteConfigFetcher: {
+            getBySetId: vi.fn().mockResolvedValue({
+              simulatorModel: null,
+              judgeModel: null,
+            }),
+          },
+          agentFetcher: { findById: vi.fn().mockResolvedValue(httpAgent) },
+          modelParamsProvider: echoingProvider(),
+        });
+
+        const result = await prefetchWithFixture({
+          context: {
+            ...defaultContext,
+            setId: "__internal__suite_1__suite",
+          },
+          target: httpTarget,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
+        }
+        expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+        expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+      });
+    });
+  });
+});
+
+describe("prefetchWithFixture, when handling errors", () => {
+  describe("given scenario does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure with scenario not found error", async () => {
+        const deps = createMockDeps({
+          scenarioFetcher: {
+            getById: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toBe("Scenario scen_123 not found");
+      });
+    });
+  });
+
+  describe("given project does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure with project not found error", async () => {
+        const deps = createMockDeps({
+          projectFetcher: {
+            findUnique: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toBe("Project proj_123 not found");
+      });
+    });
+  });
+
+  describe("given prompt does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure with prompt not found error", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toBe("Prompt prompt_123 not found");
+      });
+    });
+  });
+
+  describe("given HTTP agent does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure with agent not found error", async () => {
         const deps = createMockDeps({
           agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
+            findById: vi.fn().mockResolvedValue(null),
           },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: {
-                workflow_id: "wf_1",
-                nodes: [
-                  {
-                    id: "llm_call",
-                    type: "signature",
-                    data: {
-                      name: "LLM Call",
-                      parameters: [
-                        {
-                          identifier: "llm",
-                          type: "llm",
-                          value: undefined,
-                        },
-                      ],
-                    },
-                  },
-                ],
-                edges: [],
-              },
-            }),
+        });
+
+        const target: TargetConfig = {
+          type: "http",
+          referenceId: "agent_123",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toBe("HTTP agent agent_123 not found");
+      });
+    });
+  });
+
+  describe("given the connected agent does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("names the missing target as a connected agent", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "connected",
+          referenceId: "agent_connected",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toBe("Connected agent agent_connected not found");
+      });
+    });
+  });
+
+  describe("given code agent does not exist", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure with code agent not found error", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(null),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "code",
+          referenceId: "agent_456",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toContain("Code agent");
+        expect(result.error).toContain("not found");
+      });
+    });
+  });
+
+  describe("given code agent has wrong type", () => {
+    describe("when prefetching scenario data", () => {
+      it("returns failure when agent type mismatch", async () => {
+        const httpAgent = {
+          id: "agent_456",
+          type: "http" as const,
+          name: "HTTP Agent",
+          projectId: "proj_123",
+          config: {
+            url: "https://api.example.com",
+            method: "POST",
+            headers: [],
+          },
+          workflowId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          archivedAt: null,
+        };
+
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(httpAgent),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "code",
+          referenceId: "agent_456",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
+        }
+        expect(result.error).toContain("Code agent");
+        expect(result.error).toContain("not found");
+      });
+    });
+  });
+
+  describe("given model params preparation fails", () => {
+    const promptWithModel = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: "openai/gpt-4",
+    };
+
+    describe("when prefetching scenario data", () => {
+      /** @scenario "Prefetcher logs model params failure with reason" */
+      it("returns failure with model params error", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
           },
           modelParamsProvider: {
             prepare: vi.fn().mockResolvedValue({
-              success: false as const,
+              success: false,
               reason: "provider_not_enabled",
-              message:
-                "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
+              message: "Provider 'openai' is not enabled for this project",
             }),
           },
           disabledProviders: new Set(["openai"]),
         });
 
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
         const result = await prefetchWithFixture({
           context: defaultContext,
-          target: workflowTarget,
+          target,
           deps,
         });
 
@@ -1628,20 +1048,910 @@ describe("prefetchWithFixture", () => {
         if (result.success) {
           throw new Error("prefetch should have failed");
         }
+        expect(result.error).toBe(
+          "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
+        );
         expect(result.reason).toBe("provider_not_enabled");
-        expect(result.error).toContain("not enabled");
+      });
+    });
+  });
+
+  describe("given model resolution throws", () => {
+    const promptWithAModel = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [],
+      model: "openai/gpt-4",
+    };
+
+    const depsWhoseResolverThrows = (error: unknown) =>
+      createMockDeps({
+        promptFetcher: {
+          findByIdOrHandle: vi.fn().mockResolvedValue(promptWithAModel),
+        },
+        modelResolver: {
+          resolve: vi.fn().mockRejectedValue(error),
+        },
+      });
+
+    describe("when the error is one LangWatch wrote for the customer", () => {
+      /** @scenario "Technical detail stops at the trace id" */
+      it("keeps its message, and names the reason", async () => {
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target: { type: "prompt", referenceId: "prompt_123" },
+          deps: depsWhoseResolverThrows(
+            new ModelNotConfiguredError(
+              "scenarios.agent_under_test",
+              "DEFAULT",
+              "Agent under test",
+              "project_123",
+            ),
+          ),
+        });
+
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.reason).toBe("model_not_configured");
+        expect(result.error).not.toBe("The models this run needs could not be resolved");
       });
     });
 
-    describe("when a workflow node's llm parameter is pinned to a codex model", () => {
-      // Issue #6634, AC7(b): the platform-key fix for workflow.api_key must
-      // not touch per-node credentials — a node that was ALREADY correctly
-      // refused for using a restricted model outside its allowed surface
-      // must still be refused, and the refusal must name that node's
-      // model, not a generic failure.
-      const CODEX_NODE_MODEL = "openai_codex/gpt-5.6-terra";
+    describe("when the error is an internal one", () => {
+      /** @scenario "Technical detail stops at the trace id" */
+      it("never puts its message in the reason the customer reads", async () => {
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target: { type: "prompt", referenceId: "prompt_123" },
+          deps: depsWhoseResolverThrows(new Error("connect ECONNREFUSED 10.0.0.4:5432")),
+        });
 
-      const codexNodeDsl = {
+        expect(result.success).toBe(false);
+        if (result.success) return;
+        expect(result.error).toBe("The models this run needs could not be resolved");
+        expect(result.reason).toBeUndefined();
+      });
+    });
+  });
+});
+
+describe("prefetchWithFixture, when prefetching a code agent", () => {
+  describe("given a code agent exists with Python code and inputs/outputs", () => {
+    const codeAgent = {
+      id: "agent_456",
+      type: "code" as const,
+      name: "Classifier",
+      projectId: "proj_123",
+      config: {
+        parameters: [
+          {
+            identifier: "code",
+            type: "code",
+            value: 'def execute(input):\n    return "classified"',
+          },
+        ],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      },
+      workflowId: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+    };
+
+    describe("when prefetching scenario data", () => {
+      it("fetches the agent and serializes code, inputs, and outputs", async () => {
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(codeAgent),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "code",
+          referenceId: "agent_456",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
+        }
+        expect(result.data.adapterData).toMatchObject({
+          type: "code",
+          agentId: "agent_456",
+          code: 'def execute(input):\n    return "classified"',
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        });
+      });
+
+      // Superseded by the describe.each("given a workflow, code, or HTTP
+      // target") block above (AC2 / AC-N8): agent-under-test is never
+      // called, and model params are prepared exactly twice.
+
+      it("includes decrypted project secrets on the prefetched adapter data", async () => {
+        const projectSecretsFetcher: ProjectSecretsFetcher = {
+          getSecrets: vi.fn().mockResolvedValue({
+            WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
+            OTHER_SECRET: "val2",
+          }),
+        };
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(codeAgent),
+          },
+          projectSecretsFetcher,
+        });
+
+        const target: TargetConfig = {
+          type: "code",
+          referenceId: "agent_456",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith("proj_123");
+        expect(result.success).toBe(true);
+        // Assert explicitly before narrowing so a type drift fails loudly
+        // instead of silently skipping the toEqual below.
+        if (!result.success) throw new Error("prefetch should have succeeded");
+        expect(result.data.adapterData.type).toBe("code");
+        if (result.data.adapterData.type !== "code") return;
+        expect(result.data.adapterData.secrets).toEqual({
+          WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
+          OTHER_SECRET: "val2",
+        });
+      });
+    });
+  });
+});
+
+describe("prefetchWithFixture, when the prefetch succeeds", () => {
+  describe("given all dependencies return valid data", () => {
+    const promptWithModel = {
+      id: "prompt_123",
+      prompt: "You are helpful",
+      messages: [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi there!" },
+      ],
+      model: "openai/gpt-4",
+      temperature: 0.7,
+      maxTokens: 1000,
+    };
+
+    describe("when prefetching scenario data", () => {
+      /** @scenario "Return success with LiteLLM params on valid configuration" */
+      it("returns success with complete data", async () => {
+        const deps = createMockDeps({
+          promptFetcher: {
+            findByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+          },
+        });
+
+        const target: TargetConfig = {
+          type: "prompt",
+          referenceId: "prompt_123",
+        };
+        const result = await prefetchWithFixture({
+          context: defaultContext,
+          target,
+          deps,
+        });
+
+        expect(result.success).toBe(true);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
+        }
+        expect(result.data.context).toEqual(defaultContext);
+        expect(result.data.scenario).toEqual(defaultScenario);
+        expect(result.data.adapterData).toMatchObject({
+          type: "prompt",
+          promptId: "prompt_123",
+          systemPrompt: "You are helpful",
+        });
+        expect(result.data.modelParams).toEqual(defaultModelParams);
+        expect(result.data.target).toEqual({
+          type: "prompt",
+          referenceId: "prompt_123",
+        });
+        expect(result.telemetry).toEqual({
+          endpoint: "http://app:5560",
+          apiKey: "test-api-key",
+        });
+      });
+    });
+  });
+});
+
+const workflowAgent = {
+  id: "agent_wf",
+  type: "workflow" as const,
+  name: "Greeter",
+  workflowId: "wf_1",
+  config: {
+    name: "Greeter",
+    isCustom: true,
+    workflow_id: "wf_1",
+    scenarioMappings: {
+      query: {
+        type: "source",
+        sourceId: "scenario",
+        path: ["input"],
+      },
+    },
+    scenarioOutputField: "answer",
+  },
+};
+
+const workflowDsl = {
+  workflow_id: "wf_1",
+  spec_version: "1.5",
+  version: "1.0",
+  name: "Scenario workflow",
+  icon: "",
+  description: "",
+  state: { execution: { status: "idle" } },
+  nodes: [
+    {
+      id: "entry",
+      type: "entry",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "Entry",
+        outputs: [{ identifier: "query", type: "str" }],
+      },
+    },
+    {
+      id: "end",
+      type: "end",
+      position: { x: 0, y: 0 },
+      data: {
+        name: "End",
+        inputs: [
+          { identifier: "answer", type: "str" },
+          { identifier: "trace", type: "str" },
+        ],
+      },
+    },
+  ],
+  edges: [
+    {
+      id: "entry-greeter",
+      source: "entry",
+      sourceHandle: "outputs.query",
+      target: "greeter",
+      targetHandle: "inputs.query",
+    },
+  ],
+};
+
+const workflowTarget: TargetConfig = {
+  type: "workflow",
+  referenceId: "agent_wf",
+};
+
+describe("prefetchWithFixture, when the target is a workflow agent", () => {
+  describe("when the agent and workflow have a latest version", () => {
+    it("returns WorkflowAgentData with inputs, outputs, mappings and workflow DSL", async () => {
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: workflowDsl,
+          }),
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      expect(result.data.adapterData.type).toBe("workflow");
+      if (result.data.adapterData.type !== "workflow") {
+        throw new Error("expected a workflow adapter");
+      }
+      expect(result.data.adapterData.agentId).toBe("agent_wf");
+      expect(result.data.adapterData.workflowId).toBe("wf_1");
+      expect(result.data.adapterData.inputs).toEqual([{ identifier: "query", type: "str" }]);
+      expect(result.data.adapterData.outputs).toEqual([
+        { identifier: "answer", type: "str" },
+        { identifier: "trace", type: "str" },
+      ]);
+      expect(result.data.adapterData.scenarioMappings).toEqual({
+        query: {
+          type: "source",
+          sourceId: "scenario",
+          path: ["input"],
+        },
+      });
+      expect(result.data.adapterData.scenarioOutputField).toBe("answer");
+      expect(result.data.adapterData.workflow).toEqual(workflowDsl);
+    });
+  });
+
+  describe("when the workflow has no saved version", () => {
+    it("returns a friendly 'Workflow agent not found' error", async () => {
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue(null),
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("prefetch should have failed");
+      }
+      expect(result.error).toBe("Workflow agent agent_wf not found");
+    });
+  });
+
+  describe("when the agent has no workflowId", () => {
+    it("returns 'Workflow agent not found' without touching the version fetcher", async () => {
+      const getLatestDsl = vi.fn();
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            ...workflowAgent,
+            workflowId: null,
+            config: { ...workflowAgent.config, workflow_id: undefined },
+          }),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl,
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("prefetch should have failed");
+      }
+      expect(result.error).toBe("Workflow agent agent_wf not found");
+      expect(getLatestDsl).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the DSL has a blank-template signature node with an undefined llm parameter value", () => {
+    // Regression test for issue #3160:
+    // Fresh workflow agents store value: undefined for the llm parameter in the
+    // blank template DSL. The scenario execution path must hydrate litellm_params
+    // onto each llm-type parameter before sending the DSL to the NLP service,
+    // otherwise litellm raises AuthenticationError: Incorrect API key provided: dummy.
+    const blankTemplateDsl = {
+      workflow_id: "wf_1",
+      nodes: [
+        {
+          id: "entry",
+          type: "entry",
+          data: {
+            name: "Entry",
+            outputs: [{ identifier: "question", type: "str" }],
+          },
+        },
+        {
+          id: "llm_call",
+          type: "signature",
+          data: {
+            name: "LLM Call",
+            parameters: [
+              {
+                identifier: "llm",
+                type: "llm",
+                // value is undefined — this is the blank-template default
+                value: undefined,
+              },
+              {
+                identifier: "instructions",
+                type: "str",
+                value: undefined,
+              },
+            ],
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [{ identifier: "answer", type: "str" }],
+          },
+        },
+        {
+          id: "end",
+          type: "end",
+          data: {
+            name: "End",
+            inputs: [{ identifier: "output", type: "str" }],
+          },
+        },
+      ],
+      edges: [
+        {
+          id: "e0-1",
+          source: "entry",
+          sourceHandle: "outputs.question",
+          target: "llm_call",
+          targetHandle: "inputs.question",
+        },
+        {
+          id: "e1-2",
+          source: "llm_call",
+          sourceHandle: "outputs.answer",
+          target: "end",
+          targetHandle: "inputs.output",
+        },
+      ],
+    };
+
+    /** @scenario "Per-node workflow model credentials are untouched by the platform-key fix" */
+    it("hydrates the llm parameter value with litellm_params from the project's model providers", async () => {
+      const hydratedApiKey = "sk-real-project-key-abc123";
+
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: blankTemplateDsl,
+          }),
+        },
+        modelParamsProvider: {
+          prepare: vi.fn().mockResolvedValue({
+            success: true as const,
+            params: {
+              model: "openai/gpt-5-mini",
+              api_key: hydratedApiKey,
+            },
+          }),
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      if (result.data.adapterData.type !== "workflow") {
+        throw new Error("expected a workflow adapter");
+      }
+      const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
+      const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+        | Record<string, unknown>
+        | undefined;
+
+      expect(signatureNode).toBeDefined();
+
+      const data = signatureNode?.data as Record<string, unknown> | undefined;
+      const parameters = data?.parameters as Record<string, unknown>[] | undefined;
+      const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+
+      expect(llmParam).toBeDefined();
+
+      // The value must be hydrated — not undefined and not using the dummy key
+      const value = llmParam?.value as Record<string, unknown> | undefined;
+      expect(value).toBeDefined();
+      expect(value?.litellm_params).toBeDefined();
+
+      const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
+      expect(litellmParams?.api_key).toBeDefined();
+      expect(litellmParams?.api_key).not.toBe("dummy");
+      expect(litellmParams?.api_key).toBe(hydratedApiKey);
+    });
+  });
+
+  describe("when the DSL has a blank-template signature node and the model provider lookup fails", () => {
+    // Test A: provider lookup fails → prefetch returns structured failure, not silent pass
+    it("returns a structured failure with the provider reason, not a silent pass with dummy api_key", async () => {
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: {
+              workflow_id: "wf_1",
+              nodes: [
+                {
+                  id: "llm_call",
+                  type: "signature",
+                  data: {
+                    name: "LLM Call",
+                    parameters: [
+                      {
+                        identifier: "llm",
+                        type: "llm",
+                        value: undefined,
+                      },
+                    ],
+                  },
+                },
+              ],
+              edges: [],
+            },
+          }),
+        },
+        modelParamsProvider: {
+          prepare: vi.fn().mockResolvedValue({
+            success: false as const,
+            reason: "provider_not_enabled",
+            message:
+              "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
+          }),
+        },
+        disabledProviders: new Set(["openai"]),
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("prefetch should have failed");
+      }
+      expect(result.reason).toBe("provider_not_enabled");
+      expect(result.error).toContain("not enabled");
+    });
+  });
+
+  describe("when a workflow node's llm parameter is pinned to a codex model", () => {
+    // Issue #6634, AC7(b): the platform-key fix for workflow.api_key must
+    // not touch per-node credentials — a node that was ALREADY correctly
+    // refused for using a restricted model outside its allowed surface
+    // must still be refused, and the refusal must name that node's
+    // model, not a generic failure.
+    const CODEX_NODE_MODEL = "openai_codex/gpt-5.6-terra";
+
+    const codexNodeDsl = {
+      workflow_id: "wf_1",
+      nodes: [
+        {
+          id: "llm_call",
+          type: "signature",
+          data: {
+            name: "LLM Call",
+            parameters: [
+              {
+                identifier: "llm",
+                type: "llm",
+                value: { model: CODEX_NODE_MODEL },
+              },
+            ],
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    /**
+     * Refuses exactly the codex model, building the refusal from the model
+     * asked about — a blanket-failure stub stays green even with the codex pin
+     * removed, since its hard-coded message names a model nothing pinned.
+     */
+    const modelAwarePrepare = vi.fn(
+      async (_projectId: string, model: string): Promise<ModelParamsResult> =>
+        model === CODEX_NODE_MODEL
+          ? {
+              success: false,
+              reason: "preparation_error",
+              message: `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
+            }
+          : {
+              success: true,
+              params: { api_key: "sk-usable", model },
+            },
+    );
+
+    /** @scenario "A workflow node still pinned to a restricted model correctly fails" */
+    it("returns a structured failure naming the codex model, not a silent pass", async () => {
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: codexNodeDsl,
+          }),
+        },
+        modelParamsProvider: { prepare: modelAwarePrepare },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(modelAwarePrepare).toHaveBeenCalledWith(defaultContext.projectId, CODEX_NODE_MODEL);
+      expect(result.success).toBe(false);
+      if (result.success) {
+        throw new Error("prefetch should have failed");
+      }
+      expect(result.reason).toBe("preparation_error");
+      expect(result.error).toContain(CODEX_NODE_MODEL);
+    });
+  });
+});
+
+describe("prefetchWithFixture, when the target is a workflow agent with several nodes", () => {
+  describe("when the DSL has two signature nodes with different llm models", () => {
+    // Test B: multi-model dedup — prepare called once per unique model
+    it("calls prepare exactly twice for two nodes with different models", async () => {
+      const prepareFn = vi.fn().mockResolvedValue({
+        success: true as const,
+        params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
+      });
+
+      const multiModelDsl = {
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_a",
+            type: "signature",
+            data: {
+              name: "LLM A",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: { model: "openai/gpt-5-mini" },
+                },
+              ],
+            },
+          },
+          {
+            id: "llm_b",
+            type: "signature",
+            data: {
+              name: "LLM B",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: { model: "azure/gpt-5-mini" },
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: multiModelDsl,
+          }),
+        },
+        modelParamsProvider: {
+          prepare: prepareFn,
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      // Two distinct models → prepare called exactly twice (once for LLM provider model params)
+      // Note: prefetchWithFixture also calls prepare for the scenario-level model params
+      // so we check the workflow-level prepare calls via the models passed
+      const workflowModels = prepareFn.mock.calls
+        .map((call) => call[1] as string)
+        .filter((m) => m === "openai/gpt-5-mini" || m === "azure/gpt-5-mini");
+      expect(workflowModels).toHaveLength(2);
+      expect(workflowModels).toContain("openai/gpt-5-mini");
+      expect(workflowModels).toContain("azure/gpt-5-mini");
+
+      // Verify result is successful (both models resolved)
+      expect(result.success).toBe(true);
+    });
+
+    it("calls prepare only once for two nodes sharing the same model", async () => {
+      const prepareFn = vi.fn().mockResolvedValue({
+        success: true as const,
+        params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
+      });
+
+      const sameModelDsl = {
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "llm_a",
+            type: "signature",
+            data: {
+              name: "LLM A",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: { model: "openai/gpt-5-mini" },
+                },
+              ],
+            },
+          },
+          {
+            id: "llm_b",
+            type: "signature",
+            data: {
+              name: "LLM B",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: { model: "openai/gpt-5-mini" },
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: sameModelDsl,
+          }),
+        },
+        modelParamsProvider: {
+          prepare: prepareFn,
+        },
+      });
+
+      await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
+      const workflowModelCalls = prepareFn.mock.calls
+        .map((call) => call[1] as string)
+        .filter((m) => m === "openai/gpt-5-mini");
+      expect(workflowModelCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the DSL has no default_llm and the signature node has no value.model", () => {
+    // Test C: falls back to DEFAULT_MODEL when both default_llm and param.value.model are absent
+    it("calls prepare with DEFAULT_MODEL and hydrates litellm_params onto the param", async () => {
+      const hydratedApiKey = "sk-default-model-key";
+
+      const prepareFn = vi.fn().mockResolvedValue({
+        success: true as const,
+        params: { model: DEFAULT_MODEL, api_key: hydratedApiKey },
+      });
+
+      const noDefaultLlmDsl = {
+        workflow_id: "wf_1",
+        // default_llm absent (undefined)
+        nodes: [
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  value: undefined, // no model set
+                },
+              ],
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: noDefaultLlmDsl,
+          }),
+        },
+        modelParamsProvider: {
+          prepare: prepareFn,
+        },
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      // prepare must be called with DEFAULT_MODEL for the workflow node
+      const workflowModelCall = prepareFn.mock.calls.find(
+        (call) => (call[1] as string) === DEFAULT_MODEL,
+      );
+      expect(workflowModelCall).toBeDefined();
+
+      // litellm_params must be hydrated on the node
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      if (result.data.adapterData.type !== "workflow") {
+        throw new Error("expected a workflow adapter");
+      }
+      const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
+      const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+        | Record<string, unknown>
+        | undefined;
+      const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+        | Record<string, unknown>[]
+        | undefined;
+      const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+      const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
+        | Record<string, unknown>
+        | undefined;
+      expect(litellmParams?.api_key).toBe(hydratedApiKey);
+    });
+  });
+
+  describe("when the llm parameter value is a partial object without a top-level model key", () => {
+    // Regression: existingValue like { temperature: 0.7 } (no `model` field) must still
+    // produce an emitted value with the model resolved during Workflow preparation.
+    // Downstream NLP reads value.model directly; missing it causes runtime failure.
+    it("guarantees a top-level model key in the emitted llm value", async () => {
+      const prepareFn = vi.fn().mockResolvedValue({
+        success: true as const,
+        params: { model: DEFAULT_MODEL, api_key: "sk-partial" },
+      });
+
+      const partialValueDsl = {
         workflow_id: "wf_1",
         nodes: [
           {
@@ -1653,7 +1963,7 @@ describe("prefetchWithFixture", () => {
                 {
                   identifier: "llm",
                   type: "llm",
-                  value: { model: CODEX_NODE_MODEL },
+                  value: { temperature: 0.7 },
                 },
               ],
             },
@@ -1662,416 +1972,89 @@ describe("prefetchWithFixture", () => {
         edges: [],
       };
 
-      /**
-       * Refuses exactly the codex model, building the refusal from the model
-       * asked about — a blanket-failure stub stays green even with the codex pin
-       * removed, since its hard-coded message names a model nothing pinned.
-       */
-      const modelAwarePrepare = vi.fn(
-        async (_projectId: string, model: string): Promise<ModelParamsResult> =>
-          model === CODEX_NODE_MODEL
-            ? {
-                success: false,
-                reason: "preparation_error",
-                message: `"${model}" serves the coding-assistant surfaces only and cannot run workflows, evaluations or the playground.`,
-              }
-            : {
-                success: true,
-                params: { api_key: "sk-usable", model },
-              },
-      );
-
-      /** @scenario "A workflow node still pinned to a restricted model correctly fails" */
-      it("returns a structured failure naming the codex model, not a silent pass", async () => {
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: codexNodeDsl,
-            }),
-          },
-          modelParamsProvider: { prepare: modelAwarePrepare },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        expect(modelAwarePrepare).toHaveBeenCalledWith(defaultContext.projectId, CODEX_NODE_MODEL);
-        expect(result.success).toBe(false);
-        if (result.success) {
-          throw new Error("prefetch should have failed");
-        }
-        expect(result.reason).toBe("preparation_error");
-        expect(result.error).toContain(CODEX_NODE_MODEL);
-      });
-    });
-
-    describe("when the DSL has two signature nodes with different llm models", () => {
-      // Test B: multi-model dedup — prepare called once per unique model
-      it("calls prepare exactly twice for two nodes with different models", async () => {
-        const prepareFn = vi.fn().mockResolvedValue({
-          success: true as const,
-          params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
-        });
-
-        const multiModelDsl = {
-          workflow_id: "wf_1",
-          nodes: [
-            {
-              id: "llm_a",
-              type: "signature",
-              data: {
-                name: "LLM A",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: { model: "openai/gpt-5-mini" },
-                  },
-                ],
-              },
-            },
-            {
-              id: "llm_b",
-              type: "signature",
-              data: {
-                name: "LLM B",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: { model: "azure/gpt-5-mini" },
-                  },
-                ],
-              },
-            },
-          ],
-          edges: [],
-        };
-
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: multiModelDsl,
-            }),
-          },
-          modelParamsProvider: {
-            prepare: prepareFn,
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        // Two distinct models → prepare called exactly twice (once for LLM provider model params)
-        // Note: prefetchWithFixture also calls prepare for the scenario-level model params
-        // so we check the workflow-level prepare calls via the models passed
-        const workflowModels = prepareFn.mock.calls
-          .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-5-mini" || m === "azure/gpt-5-mini");
-        expect(workflowModels).toHaveLength(2);
-        expect(workflowModels).toContain("openai/gpt-5-mini");
-        expect(workflowModels).toContain("azure/gpt-5-mini");
-
-        // Verify result is successful (both models resolved)
-        expect(result.success).toBe(true);
-      });
-
-      it("calls prepare only once for two nodes sharing the same model", async () => {
-        const prepareFn = vi.fn().mockResolvedValue({
-          success: true as const,
-          params: { model: "openai/gpt-5-mini", api_key: "sk-key-a" },
-        });
-
-        const sameModelDsl = {
-          workflow_id: "wf_1",
-          nodes: [
-            {
-              id: "llm_a",
-              type: "signature",
-              data: {
-                name: "LLM A",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: { model: "openai/gpt-5-mini" },
-                  },
-                ],
-              },
-            },
-            {
-              id: "llm_b",
-              type: "signature",
-              data: {
-                name: "LLM B",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: { model: "openai/gpt-5-mini" },
-                  },
-                ],
-              },
-            },
-          ],
-          edges: [],
-        };
-
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: sameModelDsl,
-            }),
-          },
-          modelParamsProvider: {
-            prepare: prepareFn,
-          },
-        });
-
-        await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
-        const workflowModelCalls = prepareFn.mock.calls
-          .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-5-mini");
-        expect(workflowModelCalls).toHaveLength(1);
-      });
-    });
-
-    describe("when the DSL has no default_llm and the signature node has no value.model", () => {
-      // Test C: falls back to DEFAULT_MODEL when both default_llm and param.value.model are absent
-      it("calls prepare with DEFAULT_MODEL and hydrates litellm_params onto the param", async () => {
-        const hydratedApiKey = "sk-default-model-key";
-
-        const prepareFn = vi.fn().mockResolvedValue({
-          success: true as const,
-          params: { model: DEFAULT_MODEL, api_key: hydratedApiKey },
-        });
-
-        const noDefaultLlmDsl = {
-          workflow_id: "wf_1",
-          // default_llm absent (undefined)
-          nodes: [
-            {
-              id: "llm_call",
-              type: "signature",
-              data: {
-                name: "LLM Call",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: undefined, // no model set
-                  },
-                ],
-              },
-            },
-          ],
-          edges: [],
-        };
-
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: noDefaultLlmDsl,
-            }),
-          },
-          modelParamsProvider: {
-            prepare: prepareFn,
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        // prepare must be called with DEFAULT_MODEL for the workflow node
-        const workflowModelCall = prepareFn.mock.calls.find(
-          (call) => (call[1] as string) === DEFAULT_MODEL,
-        );
-        expect(workflowModelCall).toBeDefined();
-
-        // litellm_params must be hydrated on the node
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        if (result.data.adapterData.type !== "workflow") {
-          throw new Error("expected a workflow adapter");
-        }
-        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
-          | Record<string, unknown>
-          | undefined;
-        const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-          | Record<string, unknown>[]
-          | undefined;
-        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-        const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
-          | Record<string, unknown>
-          | undefined;
-        expect(litellmParams?.api_key).toBe(hydratedApiKey);
-      });
-    });
-
-    describe("when the llm parameter value is a partial object without a top-level model key", () => {
-      // Regression: existingValue like { temperature: 0.7 } (no `model` field) must still
-      // produce an emitted value with the model resolved during Workflow preparation.
-      // Downstream NLP reads value.model directly; missing it causes runtime failure.
-      it("guarantees a top-level model key in the emitted llm value", async () => {
-        const prepareFn = vi.fn().mockResolvedValue({
-          success: true as const,
-          params: { model: DEFAULT_MODEL, api_key: "sk-partial" },
-        });
-
-        const partialValueDsl = {
-          workflow_id: "wf_1",
-          nodes: [
-            {
-              id: "llm_call",
-              type: "signature",
-              data: {
-                name: "LLM Call",
-                parameters: [
-                  {
-                    identifier: "llm",
-                    type: "llm",
-                    value: { temperature: 0.7 },
-                  },
-                ],
-              },
-            },
-          ],
-          edges: [],
-        };
-
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: partialValueDsl,
-            }),
-          },
-          modelParamsProvider: {
-            prepare: prepareFn,
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: workflowTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) {
-          throw new Error("prefetch should have succeeded");
-        }
-        if (result.data.adapterData.type !== "workflow") {
-          throw new Error("expected a workflow adapter");
-        }
-        const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
-        const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
-          | Record<string, unknown>
-          | undefined;
-        const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-          | Record<string, unknown>[]
-          | undefined;
-        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-        const value = llmParam?.value as Record<string, unknown> | undefined;
-
-        expect(value?.model).toBe(DEFAULT_MODEL);
-        expect(value?.temperature).toBe(0.7);
-      });
-    });
-
-    describe("when spec-version gates the legacy default fallback", () => {
-      // Nodes own their model since spec_version 1.5: a modelless llm param
-      // on a modern DSL is stale state that must NOT be silently substituted
-      // with DEFAULT_MODEL — it stays unhydrated so the engine raises its
-      // typed llm_model_not_set error. The comparison is component-wise, so
-      // a hypothetical "1.10" is newer than "1.5", not parseFloat's 1.1.
-      const modellessDsl = (spec_version: string) => ({
-        spec_version,
-        workflow_id: "wf_1",
-        nodes: [
-          {
-            id: "llm_call",
-            type: "signature",
-            data: {
-              name: "LLM Call",
-              parameters: [{ identifier: "llm", type: "llm", value: undefined }],
-            },
-          },
-        ],
-        edges: [],
-      });
-
-      const setupFor = (dsl: Record<string, unknown>) => {
-        const prepareFn = vi.fn().mockResolvedValue(defaultModelParamsResult);
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({ workflowId: "wf_1", dsl }),
-          },
-          modelParamsProvider: { prepare: prepareFn },
-        });
-        return { deps, prepareFn };
-      };
-
-      it.each(["1.5", "1.10"])(
-        "does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param",
-        async (specVersion) => {
-          const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
-
-          const result = await prefetchWithFixture({
-            context: defaultContext,
-            target: workflowTarget,
-            deps,
-          });
-
-          expect(result.success).toBe(true);
-          expect(prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL)).toBe(
-            false,
-          );
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
         },
-      );
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({
+            workflowId: "wf_1",
+            dsl: partialValueDsl,
+          }),
+        },
+        modelParamsProvider: {
+          prepare: prepareFn,
+        },
+      });
 
-      it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
-        const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("prefetch should have succeeded");
+      }
+      if (result.data.adapterData.type !== "workflow") {
+        throw new Error("expected a workflow adapter");
+      }
+      const nodes = result.data.adapterData.workflow.nodes as Record<string, unknown>[];
+      const signatureNode = nodes.find((n) => (n as { type?: unknown }).type === "signature") as
+        | Record<string, unknown>
+        | undefined;
+      const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+        | Record<string, unknown>[]
+        | undefined;
+      const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+      const value = llmParam?.value as Record<string, unknown> | undefined;
+
+      expect(value?.model).toBe(DEFAULT_MODEL);
+      expect(value?.temperature).toBe(0.7);
+    });
+  });
+
+  describe("when spec-version gates the legacy default fallback", () => {
+    // Nodes own their model since spec_version 1.5: a modelless llm param
+    // on a modern DSL is stale state that must NOT be silently substituted
+    // with DEFAULT_MODEL — it stays unhydrated so the engine raises its
+    // typed llm_model_not_set error. The comparison is component-wise, so
+    // a hypothetical "1.10" is newer than "1.5", not parseFloat's 1.1.
+    const modellessDsl = (spec_version: string) => ({
+      spec_version,
+      workflow_id: "wf_1",
+      nodes: [
+        {
+          id: "llm_call",
+          type: "signature",
+          data: {
+            name: "LLM Call",
+            parameters: [{ identifier: "llm", type: "llm", value: undefined }],
+          },
+        },
+      ],
+      edges: [],
+    });
+
+    const setupFor = (dsl: Record<string, unknown>) => {
+      const prepareFn = vi.fn().mockResolvedValue(defaultModelParamsResult);
+      const deps = createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue(workflowAgent),
+        },
+        workflowVersionFetcher: {
+          getLatestDsl: vi.fn().mockResolvedValue({ workflowId: "wf_1", dsl }),
+        },
+        modelParamsProvider: { prepare: prepareFn },
+      });
+      return { deps, prepareFn };
+    };
+
+    it.each(["1.5", "1.10"])(
+      "does not inject DEFAULT_MODEL on a %s DSL with a modelless llm param",
+      async (specVersion) => {
+        const { deps, prepareFn } = setupFor(modellessDsl(specVersion));
 
         const result = await prefetchWithFixture({
           context: defaultContext,
@@ -2081,160 +2064,327 @@ describe("prefetchWithFixture", () => {
 
         expect(result.success).toBe(true);
         expect(prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL)).toBe(
-          true,
+          false,
         );
+      },
+    );
+
+    it("still falls back to DEFAULT_MODEL on a 1.4 DSL", async () => {
+      const { deps, prepareFn } = setupFor(modellessDsl("1.4"));
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: workflowTarget,
+        deps,
       });
+
+      expect(result.success).toBe(true);
+      expect(prepareFn.mock.calls.some((call) => (call[1] as string) === DEFAULT_MODEL)).toBe(true);
     });
   });
+});
 
-  describe("given a run that resolved parameter values", () => {
-    const promptTarget: TargetConfig = {
-      type: "prompt",
-      referenceId: "prompt_123",
+describe("prefetchWithFixture, given a run that resolved parameter values", () => {
+  const promptTarget: TargetConfig = {
+    type: "prompt",
+    referenceId: "prompt_123",
+  };
+
+  function depsForScenario(scenario: Record<string, unknown>) {
+    return createMockDeps({
+      scenarioFetcher: { getById: vi.fn().mockResolvedValue(scenario) },
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+  }
+
+  describe("given a scenario whose text reads a parameter", () => {
+    const parameterisedScenario = {
+      ...defaultScenario,
+      situation: "A {{ params.account_tier }} customer asks for a refund",
+      criteria: ["Offers the {{ params.account_tier }} refund window"],
+      parameters: [
+        { name: "account_tier", defaultValue: "gold" },
+        { name: "region", defaultValue: "eu-central" },
+      ],
     };
 
-    function depsForScenario(scenario: Record<string, unknown>) {
-      return createMockDeps({
-        scenarioFetcher: { getById: vi.fn().mockResolvedValue(scenario) },
-        promptFetcher: {
-          findByIdOrHandle: vi.fn().mockResolvedValue({
-            id: "prompt_123",
-            prompt: "You are helpful",
-            messages: [],
-            model: "openai/gpt-4",
-          }),
+    /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
+    it("hands on a situation and criteria already rendered against the run's values", async () => {
+      const deps = depsForScenario(parameterisedScenario);
+
+      const result = await prefetchWithFixture({
+        context: {
+          ...defaultContext,
+          parameters: { account_tier: "platinum" },
         },
-      });
-    }
-
-    describe("given a scenario whose text reads a parameter", () => {
-      const parameterisedScenario = {
-        ...defaultScenario,
-        situation: "A {{ params.account_tier }} customer asks for a refund",
-        criteria: ["Offers the {{ params.account_tier }} refund window"],
-        parameters: [
-          { name: "account_tier", defaultValue: "gold" },
-          { name: "region", defaultValue: "eu-central" },
-        ],
-      };
-
-      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
-      it("hands on a situation and criteria already rendered against the run's values", async () => {
-        const deps = depsForScenario(parameterisedScenario);
-
-        const result = await prefetchWithFixture({
-          context: {
-            ...defaultContext,
-            parameters: { account_tier: "platinum" },
-          },
-          target: promptTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.scenario.situation).toBe("A platinum customer asks for a refund");
-        expect(result.data.scenario.criteria).toEqual(["Offers the platinum refund window"]);
+        target: promptTarget,
+        deps,
       });
 
-      /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
-      it("carries the resolved values on the job", async () => {
-        const deps = depsForScenario(parameterisedScenario);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.scenario.situation).toBe("A platinum customer asks for a refund");
+      expect(result.data.scenario.criteria).toEqual(["Offers the platinum refund window"]);
+    });
 
-        const result = await prefetchWithFixture({
-          context: {
-            ...defaultContext,
-            parameters: { account_tier: "platinum" },
-          },
-          target: promptTarget,
-          deps,
-        });
+    /** @scenario "Situation and criteria render params references before the simulated user and judge see them" */
+    it("carries the resolved values on the job", async () => {
+      const deps = depsForScenario(parameterisedScenario);
 
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.parameters).toEqual({
-          account_tier: "platinum",
-          region: "eu-central",
-        });
+      const result = await prefetchWithFixture({
+        context: {
+          ...defaultContext,
+          parameters: { account_tier: "platinum" },
+        },
+        target: promptTarget,
+        deps,
       });
 
-      it("falls back to the declared defaults when the job carries no values", async () => {
-        const deps = depsForScenario(parameterisedScenario);
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: promptTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.parameters).toEqual({
-          account_tier: "gold",
-          region: "eu-central",
-        });
-        expect(result.data.scenario.situation).toBe("A gold customer asks for a refund");
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.parameters).toEqual({
+        account_tier: "platinum",
+        region: "eu-central",
       });
     });
 
-    describe("given a scenario that declares none", () => {
-      /** @scenario "A scenario without parameters renders byte-identical to its stored text" */
-      it("hands its text on byte-identical", async () => {
-        const situation = "The customer writes {{ and {% in their message";
-        const deps = depsForScenario({
-          ...defaultScenario,
-          situation,
-          criteria: ["Repeats {% verbatim"],
-        });
+    it("falls back to the declared defaults when the job carries no values", async () => {
+      const deps = depsForScenario(parameterisedScenario);
 
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: promptTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.scenario.situation).toBe(situation);
-        expect(result.data.scenario.criteria).toEqual(["Repeats {% verbatim"]);
-        expect(result.data.parameters).toEqual({});
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
       });
-    });
 
-    describe("given the scenario changed under a queued run", () => {
-      it("fails loudly rather than running against an unrendered reference", async () => {
-        const deps = depsForScenario({
-          ...defaultScenario,
-          situation: "A {{ params.account_tier }} customer asks for a refund",
-          parameters: [{ name: "account_tier" }],
-        });
-
-        await expect(
-          prefetchWithFixture({
-            context: defaultContext,
-            target: promptTarget,
-            deps,
-          }),
-        ).rejects.toThrow(/could not be rendered/);
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.parameters).toEqual({
+        account_tier: "gold",
+        region: "eu-central",
       });
+      expect(result.data.scenario.situation).toBe("A gold customer asks for a refund");
     });
   });
 
-  describe("given an http target and a project holding secrets", () => {
-    /** @scenario "The http prefetch loads project secrets for the run" */
-    it("loads the project's secrets so the target can reference them", async () => {
-      const deps = createMockDeps({
-        agentFetcher: {
-          findById: vi.fn().mockResolvedValue({
-            id: "agent_http",
-            type: "http",
-            config: { url: "https://api.test/chat", method: "POST" },
-          }),
-        },
-        projectSecretsFetcher: {
-          getSecrets: vi.fn().mockResolvedValue({ AGENT_TOKEN: "tok-123" }),
-        },
+  describe("given a scenario that declares none", () => {
+    /** @scenario "A scenario without parameters renders byte-identical to its stored text" */
+    it("hands its text on byte-identical", async () => {
+      const situation = "The customer writes {{ and {% in their message";
+      const deps = depsForScenario({
+        ...defaultScenario,
+        situation,
+        criteria: ["Repeats {% verbatim"],
       });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: promptTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.scenario.situation).toBe(situation);
+      expect(result.data.scenario.criteria).toEqual(["Repeats {% verbatim"]);
+      expect(result.data.parameters).toEqual({});
+    });
+  });
+
+  describe("given the scenario changed under a queued run", () => {
+    it("fails loudly rather than running against an unrendered reference", async () => {
+      const deps = depsForScenario({
+        ...defaultScenario,
+        situation: "A {{ params.account_tier }} customer asks for a refund",
+        parameters: [{ name: "account_tier" }],
+      });
+
+      await expect(
+        prefetchWithFixture({
+          context: defaultContext,
+          target: promptTarget,
+          deps,
+        }),
+      ).rejects.toThrow(/could not be rendered/);
+    });
+  });
+});
+
+describe("prefetchWithFixture, given an http target and a project holding secrets", () => {
+  /** @scenario "The http prefetch loads project secrets for the run" */
+  it("loads the project's secrets so the target can reference them", async () => {
+    const deps = createMockDeps({
+      agentFetcher: {
+        findById: vi.fn().mockResolvedValue({
+          id: "agent_http",
+          type: "http",
+          config: { url: "https://api.test/chat", method: "POST" },
+        }),
+      },
+      projectSecretsFetcher: {
+        getSecrets: vi.fn().mockResolvedValue({ AGENT_TOKEN: "tok-123" }),
+      },
+    });
+
+    const result = await prefetchWithFixture({
+      context: defaultContext,
+      target: { type: "http", referenceId: "agent_http" },
+      deps,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.adapterData).toMatchObject({
+      type: "http",
+      secrets: { AGENT_TOKEN: "tok-123" },
+    });
+  });
+});
+
+describe("prefetchWithFixture, given a run carrying secret parameter values", () => {
+  const httpDepsWithProjectSecrets = (secrets: Record<string, string>) =>
+    createMockDeps({
+      agentFetcher: {
+        findById: vi.fn().mockResolvedValue({
+          id: "agent_http",
+          type: "http",
+          config: { url: "https://api.test/chat", method: "POST" },
+        }),
+      },
+      projectSecretsFetcher: {
+        getSecrets: vi.fn().mockResolvedValue(secrets),
+      },
+    });
+
+  /** @scenario "A secret value reaches targets through the secrets namespace" */
+  it("delivers the run's secrets alongside the project's", async () => {
+    const deps = httpDepsWithProjectSecrets({ PROJECT_TOKEN: "project-1" });
+
+    const result = await prefetchWithFixture({
+      context: {
+        ...defaultContext,
+        secretParameters: encryptTestRunSecrets({
+          api_token: "tok-live-1",
+        }),
+      },
+      target: { type: "http", referenceId: "agent_http" },
+      deps,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.adapterData).toMatchObject({
+      secrets: { PROJECT_TOKEN: "project-1", api_token: "tok-live-1" },
+    });
+  });
+
+  /** @scenario "A run value overrides a project secret with the same name for that run" */
+  it("lets the run's value win over the project's for that name", async () => {
+    const deps = httpDepsWithProjectSecrets({ API_TOKEN: "project-value" });
+
+    const result = await prefetchWithFixture({
+      context: {
+        ...defaultContext,
+        secretParameters: encryptTestRunSecrets({
+          API_TOKEN: "run-value",
+        }),
+      },
+      target: { type: "http", referenceId: "agent_http" },
+      deps,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.adapterData).toMatchObject({
+      secrets: { API_TOKEN: "run-value" },
+    });
+  });
+
+  it("fails the run when the values can no longer be decrypted", async () => {
+    const deps = httpDepsWithProjectSecrets({});
+
+    const result = await prefetchWithFixture({
+      context: {
+        ...defaultContext,
+        secretParameters: { api_token: "not-a-ciphertext" },
+      },
+      target: { type: "http", referenceId: "agent_http" },
+      deps,
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error).toContain("api_token");
+  });
+
+  /** @scenario "A secret value is never written to the simulation runs store" */
+  it("keeps the secret out of the values the child reads as params", async () => {
+    const deps = createMockDeps({
+      scenarioFetcher: {
+        getById: vi.fn().mockResolvedValue({
+          ...defaultScenario,
+          parameters: [
+            { name: "api_token", secret: true },
+            { name: "region", defaultValue: "eu-central" },
+          ],
+        }),
+      },
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+    });
+
+    const result = await prefetchWithFixture({
+      context: {
+        ...defaultContext,
+        // A build that queued the run before the split could still put the
+        // value here, so the prefetch drops it rather than trusting it.
+        parameters: { api_token: "tok-live-1" },
+        secretParameters: encryptTestRunSecrets({
+          api_token: "tok-live-1",
+        }),
+      },
+      target: { type: "prompt", referenceId: "prompt_123" },
+      deps,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.parameters).toEqual({ region: "eu-central" });
+  });
+});
+
+describe("prefetchWithFixture, when the prefetcher sizes the trace wait budget", () => {
+  const httpDeps = (budgetMs: number) =>
+    createMockDeps({
+      agentFetcher: {
+        findById: vi.fn().mockResolvedValue({
+          id: "agent_http",
+          type: "http",
+          config: { url: "https://api.test/chat", method: "POST" },
+        }),
+      },
+      traceWaitBudgetResolver: {
+        resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(budgetMs),
+      },
+    });
+
+  describe("given an http target", () => {
+    /** @scenario "The prefetcher computes the wait budget only for http targets" */
+    it("puts the project's resolved budget on the job data", async () => {
+      const deps = httpDeps(45_000);
 
       const result = await prefetchWithFixture({
         context: defaultContext,
@@ -2244,101 +2394,16 @@ describe("prefetchWithFixture", () => {
 
       expect(result.success).toBe(true);
       if (!result.success) return;
-      expect(result.data.adapterData).toMatchObject({
-        type: "http",
-        secrets: { AGENT_TOKEN: "tok-123" },
+      expect(result.data.traceWaitTimeoutMs).toBe(45_000);
+      expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).toHaveBeenCalledWith({
+        projectId: "proj_123",
       });
     });
   });
 
-  describe("given a run carrying secret parameter values", () => {
-    const httpDepsWithProjectSecrets = (secrets: Record<string, string>) =>
-      createMockDeps({
-        agentFetcher: {
-          findById: vi.fn().mockResolvedValue({
-            id: "agent_http",
-            type: "http",
-            config: { url: "https://api.test/chat", method: "POST" },
-          }),
-        },
-        projectSecretsFetcher: {
-          getSecrets: vi.fn().mockResolvedValue(secrets),
-        },
-      });
-
-    /** @scenario "A secret value reaches targets through the secrets namespace" */
-    it("delivers the run's secrets alongside the project's", async () => {
-      const deps = httpDepsWithProjectSecrets({ PROJECT_TOKEN: "project-1" });
-
-      const result = await prefetchWithFixture({
-        context: {
-          ...defaultContext,
-          secretParameters: encryptTestRunSecrets({
-            api_token: "tok-live-1",
-          }),
-        },
-        target: { type: "http", referenceId: "agent_http" },
-        deps,
-      });
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.data.adapterData).toMatchObject({
-        secrets: { PROJECT_TOKEN: "project-1", api_token: "tok-live-1" },
-      });
-    });
-
-    /** @scenario "A run value overrides a project secret with the same name for that run" */
-    it("lets the run's value win over the project's for that name", async () => {
-      const deps = httpDepsWithProjectSecrets({ API_TOKEN: "project-value" });
-
-      const result = await prefetchWithFixture({
-        context: {
-          ...defaultContext,
-          secretParameters: encryptTestRunSecrets({
-            API_TOKEN: "run-value",
-          }),
-        },
-        target: { type: "http", referenceId: "agent_http" },
-        deps,
-      });
-
-      expect(result.success).toBe(true);
-      if (!result.success) return;
-      expect(result.data.adapterData).toMatchObject({
-        secrets: { API_TOKEN: "run-value" },
-      });
-    });
-
-    it("fails the run when the values can no longer be decrypted", async () => {
-      const deps = httpDepsWithProjectSecrets({});
-
-      const result = await prefetchWithFixture({
-        context: {
-          ...defaultContext,
-          secretParameters: { api_token: "not-a-ciphertext" },
-        },
-        target: { type: "http", referenceId: "agent_http" },
-        deps,
-      });
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error).toContain("api_token");
-    });
-
-    /** @scenario "A secret value is never written to the simulation runs store" */
-    it("keeps the secret out of the values the child reads as params", async () => {
+  describe("given a prompt target", () => {
+    it("computes no budget and carries none on the job data", async () => {
       const deps = createMockDeps({
-        scenarioFetcher: {
-          getById: vi.fn().mockResolvedValue({
-            ...defaultScenario,
-            parameters: [
-              { name: "api_token", secret: true },
-              { name: "region", defaultValue: "eu-central" },
-            ],
-          }),
-        },
         promptFetcher: {
           findByIdOrHandle: vi.fn().mockResolvedValue({
             id: "prompt_123",
@@ -2350,274 +2415,205 @@ describe("prefetchWithFixture", () => {
       });
 
       const result = await prefetchWithFixture({
-        context: {
-          ...defaultContext,
-          // A build that queued the run before the split could still put the
-          // value here, so the prefetch drops it rather than trusting it.
-          parameters: { api_token: "tok-live-1" },
-          secretParameters: encryptTestRunSecrets({
-            api_token: "tok-live-1",
-          }),
-        },
+        context: defaultContext,
         target: { type: "prompt", referenceId: "prompt_123" },
         deps,
       });
 
       expect(result.success).toBe(true);
       if (!result.success) return;
-      expect(result.data.parameters).toEqual({ region: "eu-central" });
+      expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+      expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
     });
   });
 
-  describe("when the prefetcher sizes the trace wait budget", () => {
-    const httpDeps = (budgetMs: number) =>
-      createMockDeps({
+  describe("given a code target", () => {
+    it("computes no budget", async () => {
+      const deps = createMockDeps({
         agentFetcher: {
           findById: vi.fn().mockResolvedValue({
-            id: "agent_http",
-            type: "http",
-            config: { url: "https://api.test/chat", method: "POST" },
+            id: "agent_code",
+            type: "code",
+            config: {
+              parameters: [{ identifier: "code", type: "code", value: "def f(): pass" }],
+            },
           }),
         },
-        traceWaitBudgetResolver: {
-          resolveTraceWaitTimeoutMs: vi.fn().mockResolvedValue(budgetMs),
+      });
+
+      const result = await prefetchWithFixture({
+        context: defaultContext,
+        target: { type: "code", referenceId: "agent_code" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.traceWaitTimeoutMs).toBeUndefined();
+      expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("prefetchWithFixture, when the target is a voice agent", () => {
+  const voiceAgent = {
+    id: "agent_voice",
+    type: "voice" as const,
+    name: "Support line",
+    projectId: "proj_123",
+    config: { transport: "elevenlabs_convai", agentId: "el_agent" },
+    workflowId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    archivedAt: null,
+  };
+  const voiceTarget: TargetConfig = {
+    type: "voice",
+    referenceId: "agent_voice",
+  };
+
+  beforeEach(() => {
+    findElevenLabsProviderForProject.mockReset().mockResolvedValue(null);
+    getElevenLabsApiCredential.mockReset().mockResolvedValue(null);
+    getProjectModelProviders.mockReset().mockResolvedValue({});
+    prepareEnvKeys.mockReset().mockReturnValue({});
+  });
+
+  describe("given the project has an enabled ElevenLabs provider", () => {
+    /** @scenario "A voice target resolves its ElevenLabs credential from the project provider" */
+    it("carries the resolved credential on the prepared voice target", async () => {
+      findElevenLabsProviderForProject.mockResolvedValueOnce({
+        id: "prov_1",
+      });
+      getElevenLabsApiCredential.mockResolvedValueOnce({
+        apiKey: "sk-el",
+        baseUrl: "https://api.elevenlabs.io",
+      });
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+      });
+
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        type: "voice",
+        voiceTarget: {
+          transport: "elevenlabs_convai",
+          agentId: "el_agent",
+          credential: {
+            apiKey: "sk-el",
+            baseUrl: "https://api.elevenlabs.io",
+          },
         },
-      });
-
-    describe("given an http target", () => {
-      /** @scenario "The prefetcher computes the wait budget only for http targets" */
-      it("puts the project's resolved budget on the job data", async () => {
-        const deps = httpDeps(45_000);
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: { type: "http", referenceId: "agent_http" },
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.traceWaitTimeoutMs).toBe(45_000);
-        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).toHaveBeenCalledWith({
-          projectId: "proj_123",
-        });
-      });
-    });
-
-    describe("given a prompt target", () => {
-      it("computes no budget and carries none on the job data", async () => {
-        const deps = createMockDeps({
-          promptFetcher: {
-            findByIdOrHandle: vi.fn().mockResolvedValue({
-              id: "prompt_123",
-              prompt: "You are helpful",
-              messages: [],
-              model: "openai/gpt-4",
-            }),
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: { type: "prompt", referenceId: "prompt_123" },
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
-        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("given a code target", () => {
-      it("computes no budget", async () => {
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue({
-              id: "agent_code",
-              type: "code",
-              config: {
-                parameters: [{ identifier: "code", type: "code", value: "def f(): pass" }],
-              },
-            }),
-          },
-        });
-
-        const result = await prefetchWithFixture({
-          context: defaultContext,
-          target: { type: "code", referenceId: "agent_code" },
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.traceWaitTimeoutMs).toBeUndefined();
-        expect(deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs).not.toHaveBeenCalled();
       });
     });
   });
 
-  describe("when the target is a voice agent", () => {
-    const voiceAgent = {
-      id: "agent_voice",
-      type: "voice" as const,
-      name: "Support line",
-      projectId: "proj_123",
-      config: { transport: "elevenlabs_convai", agentId: "el_agent" },
-      workflowId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      archivedAt: null,
-    };
-    const voiceTarget: TargetConfig = {
-      type: "voice",
-      referenceId: "agent_voice",
-    };
+  describe("given the project has no ElevenLabs provider", () => {
+    /** @scenario "A voice target with no ElevenLabs provider resolves a null credential" */
+    it("prepares the run with a null credential", async () => {
+      findElevenLabsProviderForProject.mockResolvedValueOnce(null);
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+      });
 
-    beforeEach(() => {
-      findElevenLabsProviderForProject.mockReset().mockResolvedValue(null);
-      getElevenLabsApiCredential.mockReset().mockResolvedValue(null);
-      getProjectModelProviders.mockReset().mockResolvedValue({});
-      prepareEnvKeys.mockReset().mockReturnValue({});
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        type: "voice",
+        voiceTarget: { credential: null },
+      });
+      expect(getElevenLabsApiCredential).not.toHaveBeenCalled();
     });
+  });
 
-    describe("given the project has an enabled ElevenLabs provider", () => {
-      /** @scenario "A voice target resolves its ElevenLabs credential from the project provider" */
-      it("carries the resolved credential on the prepared voice target", async () => {
-        findElevenLabsProviderForProject.mockResolvedValueOnce({
-          id: "prov_1",
-        });
-        getElevenLabsApiCredential.mockResolvedValueOnce({
-          apiKey: "sk-el",
-          baseUrl: "https://api.elevenlabs.io",
-        });
-        const deps = createMockDeps({
-          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
-        });
-
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: voiceTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.adapterData).toMatchObject({
-          type: "voice",
-          voiceTarget: {
-            transport: "elevenlabs_convai",
-            agentId: "el_agent",
-            credential: {
-              apiKey: "sk-el",
-              baseUrl: "https://api.elevenlabs.io",
+  describe("given the scenario has a caller voice", () => {
+    /** @scenario "A voice target carries the scenario caller voice to the child" */
+    it("carries the scenario's caller voice onto the prepared data", async () => {
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({
+            ...defaultScenario,
+            callerVoice: {
+              voiceModel: "openai/tts-1",
+              interruptProbability: 0.3,
+              effects: "phone_line",
             },
-          },
-        });
+          }),
+        },
+      });
+
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.callerVoice).toMatchObject({
+        interruptProbability: 0.3,
+        effects: "phone_line",
       });
     });
+  });
 
-    describe("given the project has no ElevenLabs provider", () => {
-      /** @scenario "A voice target with no ElevenLabs provider resolves a null credential" */
-      it("prepares the run with a null credential", async () => {
-        findElevenLabsProviderForProject.mockResolvedValueOnce(null);
-        const deps = createMockDeps({
-          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
-        });
+  describe("given the project has an enabled OpenAI provider", () => {
+    /** @scenario A voice target carries the caller OpenAI key to the child */
+    it("carries the project's OpenAI key as caller env", async () => {
+      getProjectModelProviders.mockResolvedValueOnce({
+        openai: { provider: "openai", enabled: true },
+      });
+      prepareEnvKeys.mockReturnValueOnce({ OPENAI_API_KEY: "sk-openai" });
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
+      });
 
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: voiceTarget,
-          deps,
-        });
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
+      });
 
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.adapterData).toMatchObject({
-          type: "voice",
-          voiceTarget: { credential: null },
-        });
-        expect(getElevenLabsApiCredential).not.toHaveBeenCalled();
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        type: "voice",
+        callerEnv: { OPENAI_API_KEY: "sk-openai" },
       });
     });
+  });
 
-    describe("given the scenario has a caller voice", () => {
-      /** @scenario "A voice target carries the scenario caller voice to the child" */
-      it("carries the scenario's caller voice onto the prepared data", async () => {
-        const deps = createMockDeps({
-          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
-          scenarioFetcher: {
-            getById: vi.fn().mockResolvedValue({
-              ...defaultScenario,
-              callerVoice: {
-                voiceModel: "openai/tts-1",
-                interruptProbability: 0.3,
-                effects: "phone_line",
-              },
-            }),
-          },
-        });
-
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: voiceTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.callerVoice).toMatchObject({
-          interruptProbability: 0.3,
-          effects: "phone_line",
-        });
+  describe("given the project has no OpenAI provider", () => {
+    it("carries an empty caller env", async () => {
+      const deps = createMockDeps({
+        agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
       });
-    });
 
-    describe("given the project has an enabled OpenAI provider", () => {
-      /** @scenario A voice target carries the caller OpenAI key to the child */
-      it("carries the project's OpenAI key as caller env", async () => {
-        getProjectModelProviders.mockResolvedValueOnce({
-          openai: { provider: "openai", enabled: true },
-        });
-        prepareEnvKeys.mockReturnValueOnce({ OPENAI_API_KEY: "sk-openai" });
-        const deps = createMockDeps({
-          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
-        });
-
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: voiceTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.adapterData).toMatchObject({
-          type: "voice",
-          callerEnv: { OPENAI_API_KEY: "sk-openai" },
-        });
+      const result = await prefetchScenarioData({
+        context: defaultContext,
+        target: voiceTarget,
+        deps,
       });
-    });
 
-    describe("given the project has no OpenAI provider", () => {
-      it("carries an empty caller env", async () => {
-        const deps = createMockDeps({
-          agentFetcher: { findById: vi.fn().mockResolvedValue(voiceAgent) },
-        });
-
-        const result = await prefetchScenarioData({
-          context: defaultContext,
-          target: voiceTarget,
-          deps,
-        });
-
-        expect(result.success).toBe(true);
-        if (!result.success) return;
-        expect(result.data.adapterData).toMatchObject({
-          type: "voice",
-          callerEnv: {},
-        });
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        type: "voice",
+        callerEnv: {},
       });
     });
   });

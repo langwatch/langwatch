@@ -152,7 +152,8 @@ func TestCuratedCreateSendsEachSideItsOwnPrerequisites(t *testing.T) {
 
 func TestCuratedCreateIDOutranksALaterListCapture(t *testing.T) {
 	symbols := NewSymbolTable()
-	pinCreated(symbols, "/api/model-defaults", SideResult{Status: 200, Body: `{"id":"model_default_created"}`})
+	var create *curatedCreate
+	create.pin(symbols, "/api/model-defaults", SideResult{Status: 200, Body: `{"id":"model_default_created"}`})
 	captureSucceeded(symbols, "/api/model-defaults", SideResult{Status: 200, Body: `{"configs":[{"id":"local-dev-organization"}]}`})
 	if got, _ := symbols.Lookup("id", "/api/model-defaults/{id}"); got != "model_default_created" {
 		t.Fatalf("id = %q, want the curated create's own id", got)
@@ -160,10 +161,10 @@ func TestCuratedCreateIDOutranksALaterListCapture(t *testing.T) {
 }
 
 func TestUnresolvableReasonNamesWhyNothingMintsIt(t *testing.T) {
-	if got := unresolvableReason("turnId", "/api/internal/langy/turn/{turnId}/result"); !strings.Contains(got, "langy agent service") {
+	if got := unresolvableReason("turnId", "/api/internal/langy/turn/{turnId}/result"); !strings.Contains(got, "stub agent manager") {
 		t.Fatalf("reason = %q", got)
 	}
-	if got := unresolvableReason("id", "/api/webhooks/v1/events/{id}"); !strings.Contains(got, "AI gateway") {
+	if got := unresolvableReason("id", "/api/webhooks/v1/events/{id}"); !strings.Contains(got, "fixture gateway spend") {
 		t.Fatalf("reason = %q", got)
 	}
 	if got := unresolvableReason("fooId", "/api/foo/{fooId}"); !strings.Contains(got, "no earlier create") {

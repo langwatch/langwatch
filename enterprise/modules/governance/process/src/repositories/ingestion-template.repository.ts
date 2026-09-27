@@ -14,8 +14,8 @@ export type IngestionTemplateMutationResult =
   | { status: "not_found" };
 
 export abstract class IngestionTemplateRepository {
-  abstract listUserVisible(organizationId: string): Promise<IngestionTemplate[]>;
-  abstract listAdminVisible(organizationId: string): Promise<IngestionTemplate[]>;
+  abstract findUserVisible(organizationId: string): Promise<IngestionTemplate[]>;
+  abstract findAdminVisible(organizationId: string): Promise<IngestionTemplate[]>;
   abstract findVisible(input: {
     id: string;
     organizationId: string;

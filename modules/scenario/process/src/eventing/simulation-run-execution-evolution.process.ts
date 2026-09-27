@@ -69,10 +69,10 @@ export const handleRunQueued: EventHandler<
   // execute intent by messageKey anyway, but re-stamping state and wakes is
   // pure churn.
   if (state.scenarioRunId !== "" || state.phase === "terminal") {
-    return { state, nextWakeAt: SimulationRunExecutionEvolution.currentWake(state) };
+    return { state, nextWakeAt: computeWake(state) };
   }
 
-  const refMs = SimulationRunExecutionEvolution.schedulingRef(ctx);
+  const refMs = schedulingRef(ctx);
   const base: SimulationRunExecutionProcessState = {
     projectId: ctx.projectId,
     scenarioRunId: ctx.key,
@@ -96,7 +96,7 @@ export const handleRunQueued: EventHandler<
     return {
       state: { ...base, phase: "cancelling" },
       nextWakeAt: ctx.now + CANCEL_GRACE_MS,
-      intents: [SimulationRunExecutionEvolution.finishCancelledIntent(ctx)],
+      intents: [finishCancelledIntent(ctx)],
     };
   }
 
@@ -110,7 +110,7 @@ export const handleRunQueued: EventHandler<
     view.scenarioSetId === null ||
     view.target === null
   ) {
-    return SimulationRunExecutionEvolution.finishUnexecutable({
+    return finishUnexecutable({
       ctx,
       base,
       error: "queued event carries no execution target",
@@ -121,9 +121,9 @@ export const handleRunQueued: EventHandler<
   // target that authenticates with this credential, so executing it without
   // one, or with the project value of the same name, reports a result about
   // the credential rather than about the scenario.
-  const missingSecrets = SimulationRunExecutionEvolution.declaredSecretsWithoutCiphertext(view);
+  const missingSecrets = declaredSecretsWithoutCiphertext(view);
   if (missingSecrets.length > 0) {
-    return SimulationRunExecutionEvolution.finishUnexecutable({
+    return finishUnexecutable({
       ctx,
       base,
       error: `queued event carries no value for secret parameters: ${missingSecrets.join(", ")}`,
@@ -162,9 +162,9 @@ export const handleRunActivity: EventHandler<
     // The child is being torn down, or the run is over and only its
     // evaluators are outstanding; activity no longer resets anything, but the
     // grace or deadline wake must survive.
-    return { state, nextWakeAt: SimulationRunExecutionEvolution.currentWake(state) };
+    return { state, nextWakeAt: computeWake(state) };
   }
-  const refMs = SimulationRunExecutionEvolution.schedulingRef(ctx);
+  const refMs = schedulingRef(ctx);
   return {
     state: { ...state, phase: "running", lastActivityAtMs: refMs },
     nextWakeAt: refMs + STALL_THRESHOLD_MS,
@@ -194,9 +194,9 @@ export const handleCancelRequested: EventHandler<
                 scenarioRunId: ctx.key,
                 projectId: ctx.projectId,
               }),
-              SimulationRunExecutionEvolution.finishCancelledIntent(ctx),
+              finishCancelledIntent(ctx),
             ]
-          : [SimulationRunExecutionEvolution.finishCancelledIntent(ctx)],
+          : [finishCancelledIntent(ctx)],
       };
     }
     case "running":
@@ -219,7 +219,7 @@ export const handleCancelRequested: EventHandler<
       };
     default:
       // terminal / cancelling: no-op, keep the existing wake.
-      return { state, nextWakeAt: SimulationRunExecutionEvolution.currentWake(state) };
+      return { state, nextWakeAt: computeWake(state) };
   }
 };
 
@@ -246,7 +246,7 @@ export const handleRunFinished: EventHandler<
   // A run finishes exactly once: a redelivered finished event must not re-arm
   // a deadline the evaluated event already cleared, nor push one back.
   if (state.phase === "terminal" || state.phase === "evaluating") {
-    return { state, nextWakeAt: SimulationRunExecutionEvolution.currentWake(state) };
+    return { state, nextWakeAt: computeWake(state) };
   }
 
   const view = simulationRunProcessEventViewSchema.parse(payload);
@@ -262,7 +262,7 @@ export const handleRunFinished: EventHandler<
     return { state: { ...state, phase: "terminal" }, nextWakeAt: null };
   }
 
-  const refMs = SimulationRunExecutionEvolution.schedulingRef(ctx);
+  const refMs = schedulingRef(ctx);
   return {
     state: {
       ...state,
@@ -298,7 +298,7 @@ export const handleRunEvaluated: EventHandler<
       nextWakeAt: null,
     };
   }
-  return { state: recorded, nextWakeAt: SimulationRunExecutionEvolution.currentWake(state) };
+  return { state: recorded, nextWakeAt: computeWake(state) };
 };
 
 export const simulationRunExecutionWake: WakeHandler<
@@ -324,14 +324,14 @@ export const simulationRunExecutionWake: WakeHandler<
       return {
         state: { ...state, phase: "terminal" },
         nextWakeAt: null,
-        intents: [SimulationRunExecutionEvolution.finishCancelledIntent(ctx)],
+        intents: [finishCancelledIntent(ctx)],
       };
     }
     return { state, nextWakeAt: requestedAtMs + CANCEL_GRACE_MS };
   }
 
   if (state.phase === "evaluating") {
-    return SimulationRunExecutionEvolution.wakeEvaluating(state, ctx);
+    return wakeEvaluating(state, ctx);
   }
 
   // queued | running
@@ -355,177 +355,169 @@ export const simulationRunExecutionWake: WakeHandler<
 };
 
 /**
- * Simulation run execution evolution: how it moves and when given up on.
- * Members public: handlers registered by process builder from outside.
+ * Re-derive the wake a no-op must keep. The runtime maps an omitted
+ * `nextWakeAt` to null (it CLEARS the wake), so "leave the wake alone" has
+ * to be stated explicitly.
  */
-export class SimulationRunExecutionEvolution {
-  /**
-   * Re-derive the wake a no-op must keep. The runtime maps an omitted
-   * `nextWakeAt` to null (it CLEARS the wake), so "leave the wake alone" has
-   * to be stated explicitly.
-   */
-  static currentWake(state: SimulationRunExecutionProcessState): number | null {
-    switch (state.phase) {
-      case "terminal":
-        return null;
-      case "cancelling":
-        return state.cancelRequestedAtMs === null
-          ? null
-          : state.cancelRequestedAtMs + CANCEL_GRACE_MS;
-      case "evaluating":
-        return state.finishedAtMs === null ? null : state.finishedAtMs + EVALUATION_DEADLINE_MS;
-      default:
-        return state.lastActivityAtMs + STALL_THRESHOLD_MS;
-    }
+function computeWake(state: SimulationRunExecutionProcessState): number | null {
+  switch (state.phase) {
+    case "terminal":
+      return null;
+    case "cancelling":
+      return state.cancelRequestedAtMs === null
+        ? null
+        : state.cancelRequestedAtMs + CANCEL_GRACE_MS;
+    case "evaluating":
+      return state.finishedAtMs === null ? null : state.finishedAtMs + EVALUATION_DEADLINE_MS;
+    default:
+      return state.lastActivityAtMs + STALL_THRESHOLD_MS;
   }
+}
 
-  static finishCancelledIntent(ctx: Ctx): ProcessIntent {
-    return ctx.intents.finish(finishCancelledKey(ctx.key), {
-      scenarioRunId: ctx.key,
-      projectId: ctx.projectId,
-      status: ScenarioRunStatus.CANCELLED,
-    });
-  }
+function finishCancelledIntent(ctx: Ctx): ProcessIntent {
+  return ctx.intents.finish(finishCancelledKey(ctx.key), {
+    scenarioRunId: ctx.key,
+    projectId: ctx.projectId,
+    status: ScenarioRunStatus.CANCELLED,
+  });
+}
 
-  /**
-   * Clamp the scheduling reference to the present. `ctx.at` is business time,
-   * so a backed-up subscriber's event can already be past its stall deadline;
-   * scheduling from it would stall the run the moment the wake worker looks.
-   */
-  static schedulingRef(ctx: Ctx): number {
-    return Math.max(ctx.at, ctx.now);
-  }
+/**
+ * Clamp the scheduling reference to the present. `ctx.at` is business time,
+ * so a backed-up subscriber's event can already be past its stall deadline;
+ * scheduling from it would stall the run the moment the wake worker looks.
+ */
+function schedulingRef(ctx: Ctx): number {
+  return Math.max(ctx.at, ctx.now);
+}
 
-  /**
-   * The declared secret names the queued event has no usable ciphertext for:
-   * missing when the ciphertext record has no entry, or an empty one. An
-   * event declaring nothing secret returns nothing, same as before secrets.
-   */
-  static declaredSecretsWithoutCiphertext(view: SimulationRunProcessEventView): string[] {
-    if (view.secretParameterNames === null) return [];
-    const ciphertext = view.secretParameters ?? {};
-    return view.secretParameterNames.filter((name) => (ciphertext[name] ?? "").length === 0);
-  }
+/**
+ * The declared secret names the queued event has no usable ciphertext for:
+ * missing when the ciphertext record has no entry, or an empty one. An
+ * event declaring nothing secret returns nothing, same as before secrets.
+ */
+function declaredSecretsWithoutCiphertext(view: SimulationRunProcessEventView): string[] {
+  if (view.secretParameterNames === null) return [];
+  const ciphertext = view.secretParameters ?? {};
+  return view.secretParameterNames.filter((name) => (ciphertext[name] ?? "").length === 0);
+}
 
-  /** Finishes the run ERROR without submitting it, and clears every wake. */
-  static finishUnexecutable({
-    ctx,
-    base,
-    error,
-  }: {
-    ctx: Ctx;
-    base: SimulationRunExecutionProcessState;
-    error: string;
-  }): ProcessEvolution<SimulationRunExecutionProcessState> {
-    return {
-      state: { ...base, phase: "terminal" as const },
-      nextWakeAt: null,
-      intents: [
-        ctx.intents.finish(finishUnexecutableKey(ctx.key), {
-          scenarioRunId: ctx.key,
-          projectId: ctx.projectId,
-          status: ScenarioRunStatus.ERROR,
-          error,
-        }),
-      ],
-    };
-  }
+/** Finishes the run ERROR without submitting it, and clears every wake. */
+function finishUnexecutable({
+  ctx,
+  base,
+  error,
+}: {
+  ctx: Ctx;
+  base: SimulationRunExecutionProcessState;
+  error: string;
+}): ProcessEvolution<SimulationRunExecutionProcessState> {
+  return {
+    state: { ...base, phase: "terminal" as const },
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.finish(finishUnexecutableKey(ctx.key), {
+        scenarioRunId: ctx.key,
+        projectId: ctx.projectId,
+        status: ScenarioRunStatus.ERROR,
+        error,
+      }),
+    ],
+  };
+}
 
-  /**
-   * The wake of a run waiting on its evaluators. Past the deadline with no
-   * evaluated event, the job was lost outright, so one errored result per
-   * evaluator hands the decision to the gate: required fails, optional leaves it.
-   */
-  static wakeEvaluating(
-    state: SimulationRunExecutionProcessState,
-    ctx: Parameters<
-      WakeHandler<SimulationRunExecutionProcessState, SimulationRunExecutionIntents>
-    >[1],
-  ): ProcessEvolution<SimulationRunExecutionProcessState> {
-    const finishedAtMs = state.finishedAtMs ?? ctx.now;
-    if (ctx.now - finishedAtMs < EVALUATION_DEADLINE_MS) {
-      return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
-    }
-    return {
-      state: { ...state, phase: "terminal" as const, pendingEvaluators: null },
-      nextWakeAt: null,
-      intents: [
-        ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
-          scenarioRunId: ctx.key,
-          projectId: ctx.projectId,
-          evaluators: state.pendingEvaluators ?? [],
-          details: EVALUATION_LOST_DETAILS,
-        }),
-      ],
-    };
+/**
+ * The wake of a run waiting on its evaluators. Past the deadline with no
+ * evaluated event, the job was lost outright, so one errored result per
+ * evaluator hands the decision to the gate: required fails, optional leaves it.
+ */
+function wakeEvaluating(
+  state: SimulationRunExecutionProcessState,
+  ctx: Parameters<
+    WakeHandler<SimulationRunExecutionProcessState, SimulationRunExecutionIntents>
+  >[1],
+): ProcessEvolution<SimulationRunExecutionProcessState> {
+  const finishedAtMs = state.finishedAtMs ?? ctx.now;
+  if (ctx.now - finishedAtMs < EVALUATION_DEADLINE_MS) {
+    return { state, nextWakeAt: finishedAtMs + EVALUATION_DEADLINE_MS };
   }
+  return {
+    state: { ...state, phase: "terminal" as const, pendingEvaluators: null },
+    nextWakeAt: null,
+    intents: [
+      ctx.intents.record_evaluations(recordEvaluationsLostKey(ctx.key), {
+        scenarioRunId: ctx.key,
+        projectId: ctx.projectId,
+        evaluators: state.pendingEvaluators ?? [],
+        details: EVALUATION_LOST_DETAILS,
+      }),
+    ],
+  };
+}
 
-  /**
-   * The evaluators a finished event says the run is graded with, narrowed to
-   * ids and required flags. Null when absent or unreadable: the fold and the
-   * job share a schema, so what the process can't watch isn't queued for it.
-   */
-  static pendingEvaluatorsOf(data: Record<string, unknown>): PendingEvaluator[] | null {
-    const parsedEvaluators = unknownRecordSchema.safeParse(data.evaluators);
-    if (!parsedEvaluators.success) return null;
-    const parsed = pendingEvaluatorsSchema.safeParse(parsedEvaluators.data.attachments);
-    return parsed.success ? parsed.data : null;
-  }
+/**
+ * The evaluators a finished event says the run is graded with, narrowed to
+ * ids and required flags. Null when absent or unreadable: the fold and the
+ * job share a schema, so what the process can't watch isn't queued for it.
+ */
+function extractPendingEvaluators(data: Record<string, unknown>): PendingEvaluator[] | undefined {
+  const parsedEvaluators = unknownRecordSchema.safeParse(data.evaluators);
+  if (!parsedEvaluators.success) return undefined;
+  const parsed = pendingEvaluatorsSchema.safeParse(parsedEvaluators.data.attachments);
+  return parsed.success ? parsed.data : undefined;
+}
 
-  static buildSimulationRunEventView(
-    event: SimulationRunPayloadEvent,
-  ): SimulationRunProcessEventView {
-    const parsedData = unknownRecordSchema.safeParse(event.data);
-    const data = parsedData.success ? parsedData.data : {};
-    const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
-    // Validated rather than cast. A cast lets any non-null object through as a
-    // target, and the schema parse on the way back in then THROWS on it — so a
-    // malformed target becomes a redelivering handler instead of a run that
-    // fails once, clearly. Normalising to null instead hands handleRunQueued the
-    // case it already has an answer for: finish the run as unexecutable.
-    const parsedTarget = simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
-    const target = parsedTarget.success ? parsedTarget.data : null;
-    // The queued event is the only place the run's resolved parameter values
-    // cross into execution: an unreadable shape is dropped rather than failing
-    // the run, since a run without parameters is the behaviour every run had
-    // before them.
-    const parsedMetadata = unknownRecordSchema.safeParse(data.metadata);
-    const metadata = parsedMetadata.success ? parsedMetadata.data : {};
-    const parsedParameters = runParameterValuesSchema.safeParse(metadata.parameters);
-    const parameters =
-      parsedParameters.success && Object.keys(parsedParameters.data).length > 0
-        ? parsedParameters.data
-        : null;
-    // Encrypted, and kept encrypted: this view is persisted verbatim into inbox
-    // and outbox rows. It rides beside the metadata rather than inside it, so an
-    // event written by a build that did not have it simply has nothing here.
-    const parsedSecretParameters = runSecretCiphertextSchema.safeParse(data.secretParameters);
-    const secretParameters =
-      parsedSecretParameters.success && Object.keys(parsedSecretParameters.data).length > 0
-        ? parsedSecretParameters.data
-        : null;
-    // The names ride the metadata in clear. They say what the ciphertext beside
-    // them has to cover, so a queued event whose secret values were lost or
-    // written by another CREDENTIALS_SECRET is caught before the run starts.
-    const parsedSecretNames = secretParameterNamesSchema.safeParse(metadata.secretParameterNames);
-    const secretParameterNames =
-      parsedSecretNames.success && parsedSecretNames.data.length > 0
-        ? parsedSecretNames.data
-        : null;
-    return {
-      eventType: event.type,
-      occurredAt: event.occurredAt,
-      status: str(data.status),
-      scenarioId: str(data.scenarioId),
-      batchRunId: str(data.batchRunId),
-      scenarioSetId: str(data.scenarioSetId),
-      name: str(data.name),
-      target,
-      parameters,
-      secretParameters,
-      secretParameterNames,
-      evaluators: SimulationRunExecutionEvolution.pendingEvaluatorsOf(data),
-      hasOwnEvaluations: unknownRecordSchema.safeParse(data.results).data?.evaluations != null,
-    };
-  }
+export function buildSimulationRunEventView(
+  event: SimulationRunPayloadEvent,
+): SimulationRunProcessEventView {
+  const parsedData = unknownRecordSchema.safeParse(event.data);
+  const data = parsedData.success ? parsedData.data : {};
+  const str = (value: unknown): string | null => (typeof value === "string" ? value : null);
+  // Validated rather than cast. A cast lets any non-null object through as a
+  // target, and the schema parse on the way back in then THROWS on it — so a
+  // malformed target becomes a redelivering handler instead of a run that
+  // fails once, clearly. Normalising to null instead hands handleRunQueued the
+  // case it already has an answer for: finish the run as unexecutable.
+  const parsedTarget = simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
+  const target = parsedTarget.success ? parsedTarget.data : null;
+  // The queued event is the only place the run's resolved parameter values
+  // cross into execution: an unreadable shape is dropped rather than failing
+  // the run, since a run without parameters is the behaviour every run had
+  // before them.
+  const parsedMetadata = unknownRecordSchema.safeParse(data.metadata);
+  const metadata = parsedMetadata.success ? parsedMetadata.data : {};
+  const parsedParameters = runParameterValuesSchema.safeParse(metadata.parameters);
+  const parameters =
+    parsedParameters.success && Object.keys(parsedParameters.data).length > 0
+      ? parsedParameters.data
+      : null;
+  // Encrypted, and kept encrypted: this view is persisted verbatim into inbox
+  // and outbox rows. It rides beside the metadata rather than inside it, so an
+  // event written by a build that did not have it simply has nothing here.
+  const parsedSecretParameters = runSecretCiphertextSchema.safeParse(data.secretParameters);
+  const secretParameters =
+    parsedSecretParameters.success && Object.keys(parsedSecretParameters.data).length > 0
+      ? parsedSecretParameters.data
+      : null;
+  // The names ride the metadata in clear. They say what the ciphertext beside
+  // them has to cover, so a queued event whose secret values were lost or
+  // written by another CREDENTIALS_SECRET is caught before the run starts.
+  const parsedSecretNames = secretParameterNamesSchema.safeParse(metadata.secretParameterNames);
+  const secretParameterNames =
+    parsedSecretNames.success && parsedSecretNames.data.length > 0 ? parsedSecretNames.data : null;
+  return {
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    status: str(data.status),
+    scenarioId: str(data.scenarioId),
+    batchRunId: str(data.batchRunId),
+    scenarioSetId: str(data.scenarioSetId),
+    name: str(data.name),
+    target,
+    parameters,
+    secretParameters,
+    secretParameterNames,
+    evaluators: extractPendingEvaluators(data) ?? null,
+    hasOwnEvaluations: unknownRecordSchema.safeParse(data.results).data?.evaluations != null,
+  };
 }
