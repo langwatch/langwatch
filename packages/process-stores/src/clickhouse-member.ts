@@ -1,6 +1,6 @@
 /** One ClickHouse client that routes itself. Modules never resolve endpoints
  * because every statement carries tenantId filtering, enforced by this driver. */
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
 import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
@@ -32,11 +32,16 @@ class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseCl
       ...(this.config.requestTimeoutMs === undefined
         ? {}
         : { request_timeout: this.config.requestTimeoutMs }),
-      ...(this.config.settings === undefined
-        ? {}
-        : { clickhouse_settings: this.config.settings as Record<string, never> }),
+      clickhouse_settings: vendorClickHouseSettings(this.config.settings),
     });
   }
+}
+
+/** JS Dates travel as ISO strings, which ClickHouse parses only best-effort, as main always set. */
+export function vendorClickHouseSettings(
+  settings: ClickHouseConfig["settings"],
+): ClickHouseSettings {
+  return { date_time_input_format: "best_effort", ...settings };
 }
 
 /**
