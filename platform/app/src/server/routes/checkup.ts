@@ -221,7 +221,11 @@ secured.access(runAuth).post(
       body = parsed.data;
     }
 
-    const result = await checkupFor({ prisma, organizationId }).explicit({
+    const result = await checkupFor({
+      prisma,
+      organizationId,
+      actorUserId: auth.userId,
+    }).explicit({
       ...(body.checks ? { checks: body.checks } : {}),
       ...(body.scenarioRunPlanId
         ? { scenarioRunPlanId: body.scenarioRunPlanId }

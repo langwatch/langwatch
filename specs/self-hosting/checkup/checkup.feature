@@ -152,6 +152,49 @@ Feature: The checkup page of a self-hosted install
     Then the scenarios row reads not checked
     And the row says which input it needs
 
+  @unit
+  Scenario: A gateway that reaches this app by its in-cluster address passes the control plane check
+    Given the app's public address is "http://localhost:5560"
+    And the app is also reached in the cluster at "http://langwatch-app:5560"
+    And the gateway reports its control plane as "http://langwatch-app:5560"
+    When the explicit gateway control plane check runs
+    Then the gateway control plane row reads pass
+
+  @unit
+  Scenario: A gateway that reports another install as its control plane fails the check
+    Given the gateway reports its control plane as "http://other-app:5560"
+    And "http://other-app:5560" is none of the addresses this app is reached at
+    When the explicit gateway control plane check runs
+    Then the gateway control plane row reads fail with code "checkup_gateway_control_plane_mismatch"
+
+  @unit
+  Scenario: The Langy canary asks the same access question the Langy panel asks
+    Given Langy is open to everyone in this install
+    And the Langy API key surface is switched off
+    When the explicit Langy canary runs as the administrator who asked for it
+    Then one Langy turn is sent as that administrator
+    And the Langy row reads pass
+
+  @unit
+  Scenario: The Langy canary is not checked for someone Langy is not open to
+    Given Langy is not open to the administrator who asked for the checkup
+    When the explicit Langy canary runs
+    Then no Langy turn is sent
+    And the Langy row reads not checked
+
+  @unit
+  Scenario: The model provider test reads the provider's stored key
+    Given an OpenAI provider whose key is stored encrypted
+    When the checkup reads the organization's providers
+    Then the provider test is given the decrypted key
+
+  @unit
+  Scenario: A provider that cannot be tested says why
+    Given the only configured provider stores no key
+    When the explicit model provider check runs
+    Then the model provider row reads not checked
+    And the row says the provider has no key stored
+
   # ============================================================================
   # What we send
   # ============================================================================

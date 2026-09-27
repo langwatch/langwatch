@@ -91,7 +91,10 @@ export async function authenticateProject(c: {
     };
   }
 
-  return { project: resolved.project, authToken };
+  // The key's owner, for a caller that acts as a person; a legacy project
+  // key belongs to no one.
+  const userId = resolved.type === "apiKey" ? resolved.userId : null;
+  return { project: resolved.project, authToken, userId };
 }
 
 // ── GET /collector ───────────────────────────────────────────────────
