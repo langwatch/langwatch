@@ -22,7 +22,11 @@ async function createPerson() {
     avatarStorage,
     credentialIssuer: "credential",
   });
-  const created = await users.createPasskeyUser({ email: "ada@acme.com", issuer: "credential" });
+  const created = await users.createPasskeyUser({
+    email: "ada@acme.com",
+    issuer: "credential",
+    emailVerified: true,
+  });
 
   return { service, id: created.id };
 }
