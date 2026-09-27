@@ -1,6 +1,10 @@
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  type ClickHouseClient,
+  ClickHouseLogLevel,
+  createClient,
+} from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
 
@@ -112,8 +116,13 @@ export class MigrationError extends Error {
 async function withClient<T>(
   url: string,
   fn: (client: ClickHouseClient) => Promise<T>,
+  { quiet = false }: { quiet?: boolean } = {},
 ): Promise<T> {
-  const client = createClient({ url });
+  const client = createClient({
+    url,
+    // A quiet client leaves reporting to the caller, which logs its own line.
+    ...(quiet ? { log: { level: ClickHouseLogLevel.OFF } } : {}),
+  });
   try {
     return await fn(client);
   } finally {
@@ -215,24 +224,205 @@ function checkGooseBinary(): void {
   }
 }
 
+/** How long a migration run waits for ClickHouse to accept connections by default. */
+export const DEFAULT_CLICKHOUSE_WAIT_SECONDS = 180;
+
+const WAIT_RETRY_INTERVAL_MS = 2_000;
+const WAIT_LOG_INTERVAL_MS = 10_000;
+
+/**
+ * Error codes that mean the server is not reachable yet, as opposed to a
+ * server that answered and refused. A chart-managed ClickHouse takes about a
+ * minute to boot on a fresh install, and until then its Service has no ready
+ * endpoint, so the app and workers see these while it starts.
+ */
+const CONNECTION_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ECONNABORTED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EPIPE",
+]);
+
+/** True when the error says the server could not be reached at all. */
+export function isConnectionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === "string" && CONNECTION_ERROR_CODES.has(code)) {
+    return true;
+  }
+  // @clickhouse/client reports its own request timeout as a plain Error.
+  if (/timeout error/i.test(error.message)) return true;
+  // A host that resolves to several addresses fails with one error per address.
+  if (error instanceof AggregateError) {
+    return error.errors.some(isConnectionError);
+  }
+  if (error.cause !== undefined && error.cause !== error) {
+    return isConnectionError(error.cause);
+  }
+  return false;
+}
+
+/**
+ * A one-line reason for a failed check. An AggregateError from a refused
+ * dual-stack connect has an empty message, so its inner errors speak for it.
+ */
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  if (error.message) return error.message;
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.map(describeError).join("; ");
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : error.name;
+}
+
+/** Reads `CLICKHOUSE_MIGRATE_WAIT_SECONDS`; `0` turns the wait off. */
+export function readClickHouseWaitSeconds(
+  raw: string | undefined = process.env.CLICKHOUSE_MIGRATE_WAIT_SECONDS,
+): number {
+  if (raw === undefined || raw.trim() === "") {
+    return DEFAULT_CLICKHOUSE_WAIT_SECONDS;
+  }
+  const seconds = Number(raw);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    throw new MigrationError(
+      `Invalid CLICKHOUSE_MIGRATE_WAIT_SECONDS: "${raw}". Must be a number of seconds, 0 or more.`,
+      "preflight",
+    );
+  }
+  return seconds;
+}
+
+/** The URL with its credentials removed, safe to log. */
+export function redactUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    return parsed.toString();
+  } catch {
+    return "<invalid url>";
+  }
+}
+
+export interface WaitForClickHouseDeps {
+  /** One health check. Resolves on success, rejects with the failure. */
+  ping: () => Promise<void>;
+  /** Where the wait is going, without credentials. */
+  displayUrl: string;
+  waitSeconds: number;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+  log?: (message: string) => void;
+}
+
+/**
+ * Pings until ClickHouse answers or `waitSeconds` pass. Only a failure to
+ * connect is retried: a server that answers with an error, such as refused
+ * credentials, fails on the first attempt.
+ */
+export async function waitForClickHouseReady({
+  ping,
+  displayUrl,
+  waitSeconds,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now = Date.now,
+  log = (message) => logger.info(message),
+}: WaitForClickHouseDeps): Promise<void> {
+  const startedAt = now();
+  const deadline = startedAt + waitSeconds * 1000;
+  let lastLogAt: number | undefined;
+
+  for (;;) {
+    try {
+      await ping();
+      return;
+    } catch (error) {
+      const reason = describeError(error);
+      const cause = error instanceof Error ? error : undefined;
+      if (!isConnectionError(error)) {
+        throw new MigrationError(
+          `ClickHouse at ${displayUrl} failed the connection check: ${reason}`,
+          "preflight",
+          cause,
+        );
+      }
+      const current = now();
+      if (current >= deadline) {
+        const waited =
+          waitSeconds > 0
+            ? ` after waiting ${waitSeconds}s (CLICKHOUSE_MIGRATE_WAIT_SECONDS)`
+            : "";
+        throw new MigrationError(
+          `Cannot connect to ClickHouse at ${displayUrl}${waited}: ${reason}`,
+          "preflight",
+          cause,
+        );
+      }
+      if (
+        lastLogAt === undefined ||
+        current - lastLogAt >= WAIT_LOG_INTERVAL_MS
+      ) {
+        const elapsed = Math.round((current - startedAt) / 1000);
+        log(
+          `Waiting for ClickHouse at ${displayUrl} to accept connections (${elapsed}s of ${waitSeconds}s): ${reason}`,
+        );
+        lastLogAt = current;
+      }
+      await sleep(Math.min(WAIT_RETRY_INTERVAL_MS, deadline - current));
+    }
+  }
+}
+
+/**
+ * Waits for the server behind `config` to accept connections. The ping runs a
+ * SELECT so the server also checks the credentials, which its bare `/ping`
+ * endpoint does not. `ping()` reports failure in its result rather than by
+ * throwing, so the result is turned back into a rejection here.
+ */
+async function waitForServer(config: ClickHouseConfig): Promise<void> {
+  const waitSeconds = readClickHouseWaitSeconds();
+  await withClient(
+    config.serverUrl,
+    (client) =>
+      waitForClickHouseReady({
+        displayUrl: redactUrl(config.serverUrl),
+        waitSeconds,
+        ping: async () => {
+          const result = await client.ping({ select: true });
+          if (!result.success) throw result.error;
+        },
+      }),
+    { quiet: true },
+  );
+  logger.debug("ClickHouse connectivity check passed");
+}
+
+/**
+ * Waits for the ClickHouse named by `connectionUrl` (default `CLICKHOUSE_URL`)
+ * to accept connections. Does nothing when no URL is configured, the same as
+ * {@link runMigrations}.
+ */
+export async function waitForClickHouse(
+  options: Pick<GooseOptions, "connectionUrl" | "database"> = {},
+): Promise<void> {
+  const url = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
+  if (!url) return;
+  await waitForServer(parseConnectionUrl(url, options.database));
+}
+
 async function preflight(config: ClickHouseConfig): Promise<void> {
   logger.info("Running pre-flight checks...");
 
   // Check goose binary exists
   checkGooseBinary();
 
-  try {
-    await withClient(config.serverUrl, async (client) => {
-      await client.ping();
-      logger.debug("ClickHouse connectivity check passed");
-    });
-  } catch (error) {
-    throw new MigrationError(
-      `Cannot connect to ClickHouse at ${config.serverUrl}: ${error instanceof Error ? error.message : String(error)}`,
-      "preflight",
-      error instanceof Error ? error : undefined,
-    );
-  }
+  await waitForServer(config);
 
   logger.info("Pre-flight checks passed");
 }
