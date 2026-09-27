@@ -13,7 +13,11 @@ import {
   createRestRuntime,
   type IdempotentRunner,
 } from "@langwatch/api/rest";
-import { type GatewayApi, type GatewayVirtualKeySnakeDto } from "@langwatch/gateway-contract";
+import {
+  type GatewayApi,
+  type GatewayVirtualKeySnakeDto,
+  virtualKeyBudgetInputSchema,
+} from "@langwatch/gateway-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -251,6 +255,135 @@ describe("the gateway platform family's public wire", () => {
       expect(answer.status).toBe(410);
       expect(answer.body).toMatchObject({ type: "gone", code: "gateway_provider_bindings_gone" });
       expect(answer.body.message).toContain("/api/gateway/v1/model-providers");
+    });
+  });
+
+  describe("given a cursor this surface never minted", () => {
+    /** @scenario A cursor this surface did not issue is refused */
+    it("answers 400 invalid_cursor on every paged list, reading nothing", async () => {
+      const reads = {
+        getVirtualKeyPage: vi.fn(),
+        listBudgetPageWithHealth: vi.fn(),
+        listCacheRulePage: vi.fn(),
+      };
+      const call = mount(reads);
+      const forged = Buffer.from("not-a-keyset", "utf8").toString("base64url");
+      const answers = await Promise.all(
+        ["/virtual-keys", "/budgets", "/cache-rules"].map((path) =>
+          call("GET", `${path}?cursor=${forged}`),
+        ),
+      );
+
+      expect(answers.map((a) => [a.status, a.body.code])).toEqual([
+        [400, "invalid_cursor"],
+        [400, "invalid_cursor"],
+        [400, "invalid_cursor"],
+      ]);
+      expect(Object.values(reads).some((read) => read.mock.calls.length > 0)).toBe(false);
+    });
+
+    /** @scenario The page size is capped */
+    it("answers the framework's 422 for a page past the cap", async () => {
+      const answer = await mount()("GET", "/virtual-keys?limit=500");
+
+      expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
+    });
+  });
+
+  describe("given a budget list filter", () => {
+    /** @scenario An invalid scope_type filter is refused */
+    it("answers 422 for a scope type the rows never carry, reading nothing", async () => {
+      const listBudgetPageWithHealth = vi.fn();
+      const answer = await mount({ listBudgetPageWithHealth })("GET", "/budgets?scope_type=BANANA");
+
+      expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
+      expect(JSON.stringify(answer.body.meta)).toContain("scope_type");
+      expect(listBudgetPageWithHealth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a key budget the shared schema refuses", () => {
+    const creates = {
+      authorizeVirtualKeyCreate: async () => {},
+      parseVirtualKeyBudget: (input: unknown) => virtualKeyBudgetInputSchema.safeParse(input),
+    };
+
+    /** @scenario A malformed cap is refused with the shared validation */
+    it("answers 422 naming limit_usd, minting nothing", async () => {
+      const createVirtualKey = vi.fn();
+      const call = mount({ ...creates, createVirtualKey });
+      const garbled = await call("POST", "/virtual-keys", {
+        body: { name: "k", budget: { limit_usd: "10abs", window: "month" } },
+      });
+      const unwritable = await call("POST", "/virtual-keys", {
+        body: { name: "k", budget: { limit_usd: 1e-7, window: "month" } },
+      });
+
+      for (const answer of [garbled, unwritable]) {
+        expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
+        expect(answer.body.meta?.target).toBe("json");
+        expect(JSON.stringify(answer.body.meta)).toContain("limit_usd");
+      }
+      expect(createVirtualKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a key spend read", () => {
+    const visibleKey = {
+      getVisibleVirtualKeyForProjectCredential: async () => virtualKeyRow(),
+      isSpendSourceAvailable: () => true,
+      spendByVirtualKey: async () => new Map(),
+    };
+
+    /** @scenario The spend read validates its window */
+    it("answers the framework's 422 validation_error when from is not before to", async () => {
+      const spendByVirtualKey = vi.fn();
+      const answer = await mount({ ...visibleKey, spendByVirtualKey })(
+        "GET",
+        "/virtual-keys/vk_1/spend?from=1760000000000&to=1750000000000",
+      );
+
+      expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
+      expect(JSON.stringify(answer.body.meta)).toContain("from");
+      expect(spendByVirtualKey).not.toHaveBeenCalled();
+    });
+
+    /** @scenario The spend window is epoch milliseconds, like every spend endpoint */
+    it("echoes an epoch window and refuses the ISO form with 422", async () => {
+      const call = mount(visibleKey);
+      const epoch = await call(
+        "GET",
+        "/virtual-keys/vk_1/spend?from=1750000000000&to=1760000000000",
+      );
+      const iso = await call("GET", "/virtual-keys/vk_1/spend?from=2026-01-01T00:00:00Z");
+
+      expect(epoch.status).toBe(200);
+      expect(epoch.body.window).toEqual({ from: 1750000000000, to: 1760000000000 });
+      expect([iso.status, iso.body.code]).toEqual([422, "validation_error"]);
+    });
+
+    /** @scenario A fresh key reports zero spend for the current month */
+    it("answers 412 spend_source_unavailable rather than a zero it cannot vouch for", async () => {
+      const spendByVirtualKey = vi.fn();
+      const answer = await mount({
+        ...visibleKey,
+        isSpendSourceAvailable: () => false,
+        spendByVirtualKey,
+      })("GET", "/virtual-keys/vk_1/spend");
+
+      expect([answer.status, answer.body.code]).toEqual([412, "spend_source_unavailable"]);
+      expect(spendByVirtualKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a cache rule the organization does not hold", () => {
+    it("answers 404 rather than an internal failure", async () => {
+      const answer = await mount({ findCacheRule: async () => null })(
+        "GET",
+        "/cache-rules/cr_missing",
+      );
+
+      expect([answer.status, answer.body.code]).toEqual([404, "gateway_cache_rule_not_found"]);
     });
   });
 

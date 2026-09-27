@@ -1,3 +1,10 @@
+import {
+  GATEWAY_MAX_EPOCH_MS,
+  GatewayInvalidCursorError,
+  type GatewayCacheRuleCursor,
+} from "@langwatch/gateway-contract";
+import { Temporal, type Instant } from "@langwatch/time";
+
 /**
  * Cursor pagination for Postgres-backed REST lists, matching the ClickHouse
  * /spend-events contract. Keyset is on VALUES, not Prisma's row cursor, so
@@ -67,4 +74,29 @@ export function buildNextPageCursor<T>(
 ): string | null {
   const last = rows[rows.length - 1];
   return rows.length === limit && last ? encodePageCursor(keyOf(last)) : null;
+}
+
+function cursorInstant(part: string): Instant {
+  const epochMs = Number(part);
+  if (!Number.isFinite(epochMs) || Math.abs(epochMs) > GATEWAY_MAX_EPOCH_MS) {
+    throw new GatewayInvalidCursorError();
+  }
+  return Temporal.Instant.fromEpochMilliseconds(epochMs);
+}
+
+/** The `(createdAt, id)` keyset a list minted, refused when this surface never issued it. */
+export function decodeCreatedAtIdCursor(encoded: string): { createdAt: Instant; id: string } {
+  const [createdAt, id] = decodePageCursor(encoded, 2) ?? [];
+  if (createdAt === undefined || id === undefined) throw new GatewayInvalidCursorError();
+  return { createdAt: cursorInstant(createdAt), id };
+}
+
+/** The `(priority, createdAt, id)` keyset the cache-rule list minted, refused otherwise. */
+export function decodeCacheRuleCursor(encoded: string): GatewayCacheRuleCursor {
+  const [priority, createdAt, id] = decodePageCursor(encoded, 3) ?? [];
+  if (priority === undefined || createdAt === undefined || id === undefined) {
+    throw new GatewayInvalidCursorError();
+  }
+  if (Number.isNaN(Number(priority))) throw new GatewayInvalidCursorError();
+  return { priority: Number(priority), createdAt: cursorInstant(createdAt), id };
 }

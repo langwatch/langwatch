@@ -185,6 +185,8 @@ export const gatewayBudgetListQuerySchema = z.object({
   ...gatewayPageQuerySchema.shape,
   scope_type: z
     .string()
+    .transform((raw) => raw.split(",").map((part) => part.trim()))
+    .pipe(z.array(gatewayBudgetScopeTypeSchema).min(1))
     .optional()
     .describe("Comma-separated subset of the scope types, lowercase."),
   external_id: gatewayExternalIdFilterSchema,

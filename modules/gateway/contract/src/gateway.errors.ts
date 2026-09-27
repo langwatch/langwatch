@@ -140,7 +140,7 @@ export class GatewayBudgetNotFoundError extends HandledError {
   }
 }
 
-/** A voice provider has no usable API key stored; the scenario voice session refuses with it too. */
+/** A voice provider has no usable API key; the scenario voice session refuses with it too. */
 export class GatewayVoiceKeyMissingError extends HandledError {
   declare readonly code: "voice_key_missing";
 
@@ -407,5 +407,47 @@ export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
       { meta: { window }, httpStatus: 400, fault: "customer" },
     );
     this.name = "GatewayBudgetCycleAnchorInvalidError";
+  }
+}
+
+/** A page cursor this surface never issued; restarting the walk would re-serve every row. */
+export class GatewayInvalidCursorError extends HandledError {
+  declare readonly code: "invalid_cursor";
+
+  constructor() {
+    super("invalid_cursor", "`cursor` is not a cursor this endpoint issued.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { field: "cursor" },
+    });
+    this.name = "GatewayInvalidCursorError";
+  }
+}
+
+/** A spend window whose start is not before its end. */
+export class GatewaySpendWindowInvertedError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super("validation_error", "`from` must be before `to`", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { fieldErrors: { from: ["must be before `to`"] } },
+    });
+    this.name = "GatewaySpendWindowInvertedError";
+  }
+}
+
+/** This deployment has no spend source; a confident $0.00 would read as a zero-spend key. */
+export class GatewaySpendSourceUnavailableError extends HandledError {
+  declare readonly code: "spend_source_unavailable";
+
+  constructor() {
+    super(
+      "spend_source_unavailable",
+      "This deployment has no spend source to read key spend from.",
+      { httpStatus: 412, fault: "platform" },
+    );
+    this.name = "GatewaySpendSourceUnavailableError";
   }
 }
