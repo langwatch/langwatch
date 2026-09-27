@@ -4,6 +4,7 @@
  * door's own. @see specs/auth/auth-rest-family-mounted.feature
  */
 import { publicRoute } from "@langwatch/api/access";
+import { ClientAddress } from "@langwatch/api/policy";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
@@ -282,12 +283,40 @@ async function betterAuthHandshake({
   });
 
   const betterAuth = await app.betterAuth();
+  // Better Auth counts the caller the platform resolved, never one a header claims.
+  const stated = requestStatingCaller({ request, caller: ClientAddress.resolvedFor(request) });
 
   if (bornFinalized) {
-    return app.runWithIdentityBirth(() => betterAuth.handler(request));
+    return app.runWithIdentityBirth(() => betterAuth.handler(stated));
   }
 
-  return betterAuth.handler(request);
+  return betterAuth.handler(stated);
+}
+
+/**
+ * The same request, stating the caller the platform resolved on the one header Better Auth
+ * reads, or none when unresolved: a shared bucket is coarse, a caller-chosen one is none.
+ * Rebuilt from parts because the Node adapter's lazy request refuses to be copied.
+ */
+function requestStatingCaller({
+  request,
+  caller,
+}: {
+  request: Request;
+  caller: string | undefined;
+}): Request {
+  const headers = new Headers(request.headers);
+  if (caller) headers.set("x-forwarded-for", caller);
+  else headers.delete("x-forwarded-for");
+  const body = request.method === "GET" || request.method === "HEAD" ? null : request.body;
+
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    body,
+    ...(body ? { duplex: "half" as const } : {}),
+    signal: request.signal,
+  });
 }
 
 /** One `Set-Cookie` per session cookie, in both spellings, all expired. */

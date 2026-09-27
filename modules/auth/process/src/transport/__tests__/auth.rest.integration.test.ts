@@ -3,6 +3,7 @@
  * The `/api/auth` family over the real declaration and REST runtime.
  * @see specs/auth/auth-rest-family-mounted.feature
  */
+import { ClientAddress } from "@langwatch/api/policy";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { describe, expect, it, vi } from "vitest";
 
@@ -204,6 +205,43 @@ describe("given the /api/auth family mounted on a process's own doors", () => {
       const response = await world.app.request("/api/auth/logout");
 
       expect(response.headers.get("location")).toBe("https://idp.test/logout");
+    });
+  });
+
+  describe("when a sign-in call arrives claiming a forwarded address of its own", () => {
+    const signIn = () =>
+      new Request(`${BASE_URL}/api/auth/sign-in/email`, {
+        method: "POST",
+        headers: {
+          origin: BASE_URL,
+          "content-type": "application/json",
+          "x-forwarded-for": "203.0.113.8",
+        },
+        body: JSON.stringify({ email: "sam@acme.com", password: "hunter2" }),
+      });
+    const handedOn = (world: ReturnType<typeof authWorld>) => world.handler.mock.calls[0]![0];
+
+    /** @scenario "Better Auth counts the same caller the platform counts" */
+    it("hands Better Auth the caller the platform resolved, over the one it claimed", async () => {
+      const world = authWorld();
+      const request = signIn();
+      ClientAddress.classifyByAddress().handle({ request, socketAddress: "198.51.100.11" });
+
+      await world.app.request(request);
+
+      const stated = handedOn(world);
+      expect(stated.headers.get("x-forwarded-for")).toBe("198.51.100.11");
+      await expect(stated.text()).resolves.toBe(
+        JSON.stringify({ email: "sam@acme.com", password: "hunter2" }),
+      );
+    });
+
+    it("strips the claim when no caller could be resolved, so it cannot pick a bucket", async () => {
+      const world = authWorld();
+
+      await world.app.request(signIn());
+
+      expect(handedOn(world).headers.get("x-forwarded-for")).toBeNull();
     });
   });
 
