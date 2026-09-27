@@ -95,6 +95,15 @@ const RETIRED_LEGACY_AGENTS =
 const RETIRED_LEGACY_SECRET_SINGULAR =
   "Retired surface, intentionally undocumented: superseded by /api/secrets (see the Secrets family below); this singular-named alias is the same family under its original path.";
 
+const UNDOCUMENTED_APP_INTERNAL =
+  "Not part of the public API: the LangWatch app, its operators or a vendor webhook call this route, not API key holders.";
+
+const UNDOCUMENTED_STORED_OBJECTS =
+  "Not yet documented in the API reference: the stored object upload routes back signed-URL attachments and have no reference pages yet.";
+
+const UNDOCUMENTED_LANGY_CONVERSATIONS =
+  "Not yet documented in the API reference: the Langy conversation routes have no reference pages yet.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -160,7 +169,24 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
+    UNDOCUMENTED_DASHBOARD_WIDGETS,  "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
+  "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
+  "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
+  "/api/cron/old_lambdas_cleanup": UNDOCUMENTED_APP_INTERNAL,
+  "/api/elevenlabs/webhook/{modelProviderId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/track_event": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/admin/impersonate": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/admin/{resource}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/bug-reports": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/ops/clickhouse/explain": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/platform-health": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/platform-health/{check}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/playground": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/unsubscribe": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/langy/conversations": UNDOCUMENTED_LANGY_CONVERSATIONS,
+  "/api/v1/langy/conversations/{conversationId}/messages": UNDOCUMENTED_LANGY_CONVERSATIONS,
+  "/api/v1/stored-objects/{id}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/{uploadToken}/confirmation": UNDOCUMENTED_STORED_OBJECTS,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -633,11 +659,15 @@ function bareTwinOf(apiPath: string): string | null {
   return `/api${apiPath.slice("/api/v1".length)}`;
 }
 
+/** Skip reasons that retire only the bare path, never its live `/api/v1` successor. */
+const BARE_ONLY_SKIP_REASONS = new Set([RETIRED_LEGACY_AGENTS]);
+
 /** Whether `apiPath`, or its `/api/v1` bare twin, is named in SKIP_PATHS. */
 function isSkipped(apiPath: string): boolean {
   if (Object.hasOwn(SKIP_PATHS, apiPath)) return true;
   const bare = bareTwinOf(apiPath);
-  return bare !== null && Object.hasOwn(SKIP_PATHS, bare);
+  if (bare === null || !Object.hasOwn(SKIP_PATHS, bare)) return false;
+  return !BARE_ONLY_SKIP_REASONS.has(SKIP_PATHS[bare]!);
 }
 
 /**
