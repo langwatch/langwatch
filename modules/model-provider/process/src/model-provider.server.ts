@@ -199,8 +199,6 @@ export type ModelProviderRuntimeInput = Readonly<{
   egress?: ModelProviderEgressPolicy;
   /** The managed provider rows, when a deployment has an Enterprise service answering them. */
   managedGateway?: ModelProviderManagedGateway;
-  /** The random half of a minted identifier, in the format this process mints ids in. */
-  idSuffix: () => string;
 }>;
 
 /**
@@ -222,7 +220,7 @@ export function createModelProviderRuntime(input: ModelProviderRuntimeInput): Mo
         egress: SsrfModelProviderEgressService.create({ policy: input.egress }),
       })
     : UnavailableModelProviderCredentialProbeService.create();
-  const ids = PrefixedModelProviderIdService.create({ suffix: input.idSuffix });
+  const ids = PrefixedModelProviderIdService.create();
   const technical = {
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({

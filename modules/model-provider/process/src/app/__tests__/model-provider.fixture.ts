@@ -112,7 +112,7 @@ export function createModelProviderTestInfrastructure(
       executionProxyBaseUrl: UNREACHABLE_EXECUTION_PROXY,
     }),
     connectionPing: modelProviderConnectionPingChannels.memory.create(),
-    ids: PrefixedModelProviderIdService.create({ suffix: () => "test" }),
+    ids: PrefixedModelProviderIdService.create(),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
       limiter: { consume: async () => ({ allowed: true, resetAt: 0 }) },

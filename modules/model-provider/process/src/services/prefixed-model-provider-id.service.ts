@@ -1,26 +1,28 @@
+import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+
 import { ModelProviderIdService } from "../app/model-provider.members.ts";
 
 /**
- * The three id prefixes Model Provider's rows are read back by. They belong
- * to the feature, not the writing process: an operator reading
- * `model_default_…` in a log knows the table; the process supplies only the random half.
+ * New ids are KSUIDs under their resource prefix: main's `provider_…` and `mdcfg_…`, and
+ * `modelcost_…` (Alex, 2026-09-27). Ids minted before keep their format and stay accepted
+ * (ARCHITECTURE.md §3.2, Ids).
  */
-const PREFIXES = {
-  provider: "model_provider",
-  default: "model_default",
-  cost: "model_cost",
+const KSUID_RESOURCE = {
+  provider: KSUID_RESOURCES.MODEL_PROVIDER,
+  default: KSUID_RESOURCES.MODEL_DEFAULT_CONFIG,
+  cost: "modelcost",
 } as const;
 
 export class PrefixedModelProviderIdService extends ModelProviderIdService {
-  static create(input: { suffix: () => string }): PrefixedModelProviderIdService {
-    return new PrefixedModelProviderIdService(input.suffix);
+  static create(): PrefixedModelProviderIdService {
+    return new PrefixedModelProviderIdService();
   }
 
-  private constructor(private readonly suffix: () => string) {
+  private constructor() {
     super();
   }
 
   generate(input: { type: "provider" | "default" | "cost" }): string {
-    return `${PREFIXES[input.type]}_${this.suffix()}`;
+    return generate(KSUID_RESOURCE[input.type]).toString();
   }
 }

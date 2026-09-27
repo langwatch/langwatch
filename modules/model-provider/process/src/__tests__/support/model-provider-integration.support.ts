@@ -233,9 +233,7 @@ export function buildModelProvider(overrides: {
   } as ModelProvider;
 }
 
-export const idService = PrefixedModelProviderIdService.create({
-  suffix: () => randomBytes(6).toString("hex"),
-});
+export const idService = PrefixedModelProviderIdService.create();
 
 /** No-op collaborators the write path calls but these suites never exercise. */
 export const noopConnectionRateLimiter = { assertAvailable: async () => {} };
