@@ -2,7 +2,6 @@ from typing import Optional, Union, cast
 from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
-    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -12,11 +11,11 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from langevals_core.image_support import build_content_parts, ContentPart
+from langevals_core.token_budget import fit_judge_content
 from pydantic import BaseModel, Field
 import litellm
 from litellm.types.utils import ModelResponse
 from litellm.cost_calculator import completion_cost
-from litellm.utils import encode
 import dspy
 
 
@@ -85,25 +84,24 @@ class CustomLLMCategoryEvaluator(
 
         task_with_categories = f"{self.settings.prompt}{categories_text}"
 
-        content: Union[str, list[ContentPart]] = build_content_parts(
+        system_prompt = self.settings.prompt + ". Always output a valid json for the function call"
+        fitted = fit_judge_content(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            reserved_texts=[system_prompt, task_with_categories],
             input=entry.input,
             output=entry.output,
             contexts=entry.contexts,
+        )
+        if isinstance(fitted, EvaluationResultSkipped):
+            return fitted
+
+        content: Union[str, list[ContentPart]] = build_content_parts(
+            input=fitted.input,
+            output=fitted.output,
+            contexts=fitted.contexts,
             task=task_with_categories,
         )
-
-        # Token counting uses the plain-text version for estimation
-        content_text = content if isinstance(content, str) else " ".join(
-            p["text"] for p in content if p.get("type") == "text"  # type: ignore
-        )
-        total_tokens = len(
-            encode(model=self.settings.model, text=f"{self.settings.prompt} {content_text}")
-        )
-        max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
-        if total_tokens > max_tokens:
-            return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"
-            )
 
         cost = None
         response = litellm.completion(
@@ -112,8 +110,7 @@ class CustomLLMCategoryEvaluator(
             messages=[
                 {
                     "role": "system",
-                    "content": self.settings.prompt
-                    + ". Always output a valid json for the function call",
+                    "content": system_prompt,
                 },
                 {
                     "role": "user",
@@ -161,6 +158,6 @@ class CustomLLMCategoryEvaluator(
 
         return CustomLLMCategoryResult(
             label=arguments["label"],
-            details=arguments["reasoning"],
+            details=fitted.with_note(arguments["reasoning"]),
             cost=Money(amount=cost, currency="USD") if cost else None,
         )

@@ -32,7 +32,7 @@ def test_custom_llm_boolean_evaluator():
     assert result.cost.amount > 0
 
 
-def test_custom_llm_boolean_evaluator_skips_if_context_is_too_large():
+def test_custom_llm_boolean_evaluator_cuts_the_middle_if_context_is_too_large():
     entry = CustomLLMBooleanEntry(
         input="What is the capital of France?",
         output="The capital of France is Paris.",
@@ -48,9 +48,9 @@ def test_custom_llm_boolean_evaluator_skips_if_context_is_too_large():
 
     result = evaluator.evaluate(entry)
 
-    assert result.status == "skipped"
+    assert result.status == "processed"
     assert result.details
-    assert "Total tokens exceed the maximum of 2048" in result.details
+    assert "omitted from the middle of the content to fit the maximum of 2048 tokens" in result.details
 
 
 @pytest.mark.skipif(not os.environ.get("ATLA_API_KEY"), reason="ATLA_API_KEY not set")

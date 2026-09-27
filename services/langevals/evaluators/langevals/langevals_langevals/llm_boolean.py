@@ -1,7 +1,6 @@
 from typing import Literal, Optional, cast
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
-    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -12,6 +11,7 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from langevals_core.image_support import build_content_parts
+from langevals_core.token_budget import fit_judge_content
 from langevals_core.tool_calls import (
     JudgeAnswerError,
     read_boolean,
@@ -115,27 +115,26 @@ class CustomLLMBooleanEvaluator(
         if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
-        content = build_content_parts(
+        fitted = fit_judge_content(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            reserved_texts=[judge_system_prompt(self.settings.prompt), self.settings.prompt],
             input=entry.input,
             output=entry.output,
             contexts=entry.contexts,
+        )
+        if isinstance(fitted, EvaluationResultSkipped):
+            return fitted
+
+        content = build_content_parts(
+            input=fitted.input,
+            output=fitted.output,
+            contexts=fitted.contexts,
             task=self.settings.prompt,
         )
-
-        # Token counting uses the plain-text version for estimation
         content_text = content if isinstance(content, str) else " ".join(
             p["text"] for p in content if p.get("type") == "text"  # type: ignore
         )
-        total_tokens = len(
-            litellm.encode(  # type: ignore
-                model=self.settings.model, text=f"{self.settings.prompt} {content_text}"
-            )
-        )
-        max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
-        if total_tokens > max_tokens:
-            return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"
-            )
 
         cost = None
 
@@ -190,6 +189,6 @@ class CustomLLMBooleanEvaluator(
         return CustomLLMBooleanResult(
             score=1 if arguments["passed"] else 0,
             passed=arguments["passed"],
-            details=arguments["reasoning"],
+            details=fitted.with_note(arguments["reasoning"]),
             cost=Money(amount=cost, currency="USD") if cost else None,
         )
