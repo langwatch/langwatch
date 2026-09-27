@@ -893,6 +893,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     name: string;
     slug: string;
     apiKey: string;
+    lwqlKey?: string;
     teamId: string;
     isPersonal: boolean;
     ownerUserId: string | null;
@@ -905,7 +906,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       name: project.name,
       slug: project.slug,
       apiKey: project.apiKey,
-      lwqlKey: "",
+      lwqlKey: project.lwqlKey ?? "",
       teamId: project.teamId,
       language: "",
       framework: "",

@@ -158,14 +158,7 @@ async function fold(
     tenantId: createTenantId(ORG),
   };
   let state: SsoConnectionFoldState = {
-    ...(
-      projection as unknown as {
-        initState: () => Omit<
-          SsoConnectionFoldState,
-          "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
-        >;
-      }
-    ).initState(),
+    ...projection.init(),
     CreatedAt: T0,
     UpdatedAt: T0,
     LastEventOccurredAt: 0,

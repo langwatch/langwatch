@@ -6,40 +6,80 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see specs/api-keys/project-key-read-access.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { FullyLoadedOrganization } from "@langwatch/organization-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryOrganizationMembershipRepository } from "../../repositories/memory/memory.organization-membership.repository.ts";
+import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { OrganizationVisibilityService } from "../organization-visibility.service.ts";
 
 const BASE_API_KEY = "test-base-key";
 const STORED_LWQL_KEY = "test-lwql-key";
 const CALLER = { id: "user-1" };
 
-/** One organization, loaded, with the two stored keys on its only project. */
-function organizationPayload(): FullyLoadedOrganization[] {
-  return [
-    {
-      id: "org-1",
-      name: "Base Key Org",
-      members: [{ userId: "user-1", organizationId: "org-1", role: "MEMBER" }],
-      teams: [
-        {
-          id: "team-1",
-          members: [{ userId: "user-1", teamId: "team-1", role: "MEMBER" }],
-          projects: [
-            {
-              id: "project-1",
-              apiKey: BASE_API_KEY,
-              lwqlKey: STORED_LWQL_KEY,
-              s3AccessKeyId: null,
-              s3SecretAccessKey: null,
-              s3Endpoint: null,
-            },
-          ],
-        },
-      ],
-    },
-  ] as unknown as FullyLoadedOrganization[];
+const T0 = Temporal.Instant.fromEpochMilliseconds(0);
+
+/** One organization with the two stored keys on its only project, in the memory twin. */
+function seededMembership(): MemoryOrganizationMembershipRepository {
+  const memory = MemoryOrganizationDatabase.create();
+  memory.organizations.set("org-1", {
+    id: "org-1",
+    name: "Base Key Org",
+    slug: "base-key-org",
+    supportContact: null,
+    presenceEnabled: false,
+    traceSharingEnabled: false,
+    primaryIntent: null,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    stripeCustomerId: null,
+    createdAt: T0,
+    updatedAt: T0,
+  });
+  memory.organizationUsers.push({
+    userId: CALLER.id,
+    organizationId: "org-1",
+    role: "MEMBER",
+    disabledAt: null,
+    createdAt: T0,
+    updatedAt: T0,
+  });
+  memory.teams.set("team-1", {
+    id: "team-1",
+    name: "Team",
+    slug: "team",
+    organizationId: "org-1",
+    isPersonal: false,
+    ownerUserId: null,
+    archivedAt: null,
+    createdAt: T0,
+    updatedAt: T0,
+  });
+  memory.teamUsers.push({
+    teamId: "team-1",
+    userId: CALLER.id,
+    role: "MEMBER",
+    customRoleId: null,
+    createdAt: T0,
+    updatedAt: T0,
+  });
+  memory.projects.set("project-1", {
+    id: "project-1",
+    name: "Project",
+    slug: "project",
+    apiKey: BASE_API_KEY,
+    lwqlKey: STORED_LWQL_KEY,
+    teamId: "team-1",
+    isPersonal: false,
+    ownerUserId: null,
+    organizationId: "org-1",
+    archivedAt: null,
+    createdAt: T0,
+    personalFeatures: null,
+  });
+  return MemoryOrganizationMembershipRepository.create({ memory });
 }
 
 /**
@@ -56,11 +96,12 @@ function testPermissions(granted: readonly string[]): AuthzApi {
 }
 
 function visibility(granted: readonly string[]) {
+  const membership = seededMembership();
   return OrganizationVisibilityService.create({
     reader: {
-      getAllForUser: vi.fn(async () => organizationPayload()),
-      findOrganizationWithMembers: vi.fn(async () => null),
-      findMemberById: vi.fn(async () => null),
+      getAllForUser: (input) => membership.findAllForUser(input),
+      findOrganizationWithMembers: (input) => membership.findOrganizationWithMembers(input),
+      findMemberById: (input) => membership.findMemberById(input),
     },
     permissions: testPermissions(granted),
     secrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },

@@ -5,7 +5,7 @@ import {
   IdentityUnsupportedStorageQueryError,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 import type { BetterAuthOptions } from "better-auth";
 import type {
   AdapterFactory,
@@ -302,7 +302,10 @@ class IdentityStorageRouting {
 
   private readonly secretsOf = (row: Row): IdentityAccountSecrets =>
     Object.fromEntries(
-      SECRET_FIELDS.filter((field) => field in row).map((field) => [field, row[field] ?? null]),
+      SECRET_FIELDS.filter((field) => field in row).map((field) => [
+        field,
+        toSecretValue(row[field]),
+      ]),
     );
 
   /**
@@ -677,7 +680,7 @@ class IdentityStorageRouting {
       const userId = canonical.userId;
       if (typeof userId === "string" && (await this.routesToIdentity({ userId }))) {
         const written = await this.createOnIdentityBranch(canonical);
-        if (written) return this.toStorageKeys(model, { ...written }) as never;
+        if (written) return this.toStorageKeys(model, toBetterAuthAccount(written)) as never;
       }
     }
     const row = await this.deps.legacy.create<Row, Row>({
@@ -704,7 +707,7 @@ class IdentityStorageRouting {
       });
       if (rows !== null) {
         const row = rows[0];
-        return row ? (this.toStorageKeys(model, { ...row }) as never) : null;
+        return row ? (this.toStorageKeys(model, toBetterAuthAccount(row)) as never) : null;
       }
       const translated = await this.legacyAccountWhere(model, where);
       if (translated === null) return null;
@@ -745,7 +748,9 @@ class IdentityStorageRouting {
         // branch's. The legacy engine has always served sorts and offsets,
         // and a fleet nobody has enrolled must keep getting that answer.
         refuseOrderedAccountRead({ sorted: sortBy !== undefined, offset });
-        return rows.slice(0, limit).map((row) => this.toStorageKeys(model, { ...row })) as never;
+        return rows
+          .slice(0, limit)
+          .map((row) => this.toStorageKeys(model, toBetterAuthAccount(row))) as never;
       }
       // A findMany with no `where` asks for every account row, and there
       // is nothing in "everything" to translate.
@@ -801,7 +806,7 @@ class IdentityStorageRouting {
       secrets: this.secretsOfUpdate("update", this.toCanonicalKeys(model, update), [first]),
     });
     const [fresh] = await this.deps.accounts.findByAccountIds({ accountIds: [first.id] });
-    return fresh === undefined ? null : this.toStorageKeys(model, { ...fresh });
+    return fresh === undefined ? null : this.toStorageKeys(model, toBetterAuthAccount(fresh));
   };
 
   private readonly updateUserRow = async ({
@@ -991,6 +996,22 @@ class IdentityStorageRouting {
     await this.deps.accounts.deleteCredentials({ accountIds });
     await this.deps.accounts.deleteBridgeAccounts({ accountIds });
     return rows.length;
+  };
+}
+
+/** better-auth's own value for a secret it wrote: an expiry arrives as a `Date`. */
+function toSecretValue(value: unknown): unknown {
+  return value instanceof Date ? fromDate(value) : (value ?? null);
+}
+
+/** An identity row as better-auth reads it: every moment back to the `Date` it expects. */
+function toBetterAuthAccount(row: IdentityAccountRow): Row {
+  return {
+    ...row,
+    accessTokenExpiresAt: row.accessTokenExpiresAt ? toDate(row.accessTokenExpiresAt) : null,
+    refreshTokenExpiresAt: row.refreshTokenExpiresAt ? toDate(row.refreshTokenExpiresAt) : null,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
   };
 }
 
