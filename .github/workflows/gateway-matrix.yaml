@@ -119,6 +119,8 @@ jobs:
        !(startsWith(github.head_ref, 'dependabot/') &&
          github.event.pull_request.user.login == 'dependabot[bot]'))
     env:
+      # The tasks and api config parses refuse a missing NODE_ENV.
+      NODE_ENV: "test"
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560
       # Provider creds — set as repo/org secrets, NOT committed.
@@ -216,6 +218,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm run task prisma-migrate
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api refuses to boot without a 32-byte hex encryption key.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Start control plane (background)
         working-directory: apps/api
