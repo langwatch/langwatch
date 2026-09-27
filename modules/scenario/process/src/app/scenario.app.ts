@@ -164,7 +164,10 @@ import { RunConfigurationsService } from "../services/run-configurations.service
 import { ScenarioEventService } from "../services/scenario-event.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../services/scenario-execution-prefetcher.service.ts";
-import { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
+import {
+  ScenarioExecutorService,
+  type ScenarioChildBundle,
+} from "../services/scenario-executor.service.ts";
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
@@ -292,6 +295,8 @@ type ScenarioProcessMembers = Readonly<{
   /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
   redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
+  /** The compiled scenario child, as the app that ships it answers (a deployment fact). */
+  scenarioChildBundle: ScenarioChildBundle;
   nlpServiceUrl: string | undefined;
   nlpCodeBlockTimeoutSeconds: string | undefined;
   isSaas: boolean;
@@ -320,6 +325,7 @@ export class ScenarioApp implements ScenarioApi {
     "idempotency",
     "redis",
     "publicBaseUrl",
+    "scenarioChildBundle",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
     "isSaas",
@@ -522,6 +528,7 @@ export class ScenarioApp implements ScenarioApi {
           cancellationSubscriptions,
           config: setup.config,
           host: {
+            scenarioChildBundle: setup.members.scenarioChildBundle,
             nlpServiceUrl: setup.members.nlpServiceUrl,
             isSaas: setup.members.isSaas,
             nodeEnvironment: setup.members.nodeEnvironment,

@@ -131,6 +131,7 @@
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/role-process": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-child": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secret-process": "workspace:*",

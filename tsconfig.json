@@ -571,7 +571,7 @@
       "path": "modules/scenario/browser/tsconfig.json"
     },
     {
-      "path": "packages/scenario-child/tsconfig.json"
+      "path": "apps/scenario-child/tsconfig.json"
     },
     {
       "path": "modules/scenario/contract/tsconfig.json"

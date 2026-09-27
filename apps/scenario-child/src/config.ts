@@ -24,3 +24,6 @@ export function readScenarioChildEnvironment({
     rejectUnauthorized: source.NODE_TLS_REJECT_UNAUTHORIZED !== "0",
   };
 }
+
+/** The environment the parent stated for this child: the one place the program reads it. */
+export const scenarioChildEnvironmentSource: EnvironmentSource = process.env;

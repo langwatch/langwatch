@@ -21,10 +21,11 @@ import {
 
 import {
   readScenarioChildEnvironment,
+  scenarioChildEnvironmentSource,
   type ScenarioChildEnvironment,
-} from "./scenario-child.environment.ts";
+} from "./config.ts";
 
-const source = process.env;
+const source = scenarioChildEnvironmentSource;
 const environment = readScenarioChildEnvironment({
   source,
   egressPolicyKey: SCENARIO_EGRESS_POLICY_ENV,

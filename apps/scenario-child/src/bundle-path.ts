@@ -10,10 +10,13 @@ const packageRoot = path.join(import.meta.dirname, "..");
 
 export const scenarioChildPackageRoot = packageRoot;
 
-export const scenarioChildSourcePath = path.join(
-  packageRoot,
-  "src",
-  "scenario-child.entrypoint.ts",
-);
+export const scenarioChildSourcePath = path.join(packageRoot, "src", "main.ts");
 
 export const scenarioChildSourceRoots = [path.join(packageRoot, "src")];
+
+/** The three together, as the processes that run scenarios hand them to the scenario module. */
+export const scenarioChildBundle = {
+  packageRoot: scenarioChildPackageRoot,
+  sourcePath: scenarioChildSourcePath,
+  sourceRoots: scenarioChildSourceRoots,
+};

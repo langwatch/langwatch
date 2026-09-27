@@ -7,6 +7,7 @@ import { serverModules as processModules } from "@langwatch/installed-server-mod
 import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/observability";
 import { processConfig, Server } from "@langwatch/process-server";
 import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
+import { scenarioChildBundle } from "@langwatch/scenario-child";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { Task, TaskCatalogue } from "@langwatch/task";
 
@@ -101,6 +102,7 @@ export async function runModuleTask({
       .withMember("content", () => void 0)
       .withMember("gatewayInternalProtocol", () => ({}))
       .withMember("connectJudge", () => null)
+      .withMember("scenarioChildBundle", () => scenarioChildBundle)
       .withMember("monitor", () => void 0)
       .withPipelines((pipelines) => pipelines.produce())
       .boot();

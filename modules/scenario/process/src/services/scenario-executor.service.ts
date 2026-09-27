@@ -4,11 +4,6 @@ import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import {
-  scenarioChildPackageRoot,
-  scenarioChildSourcePath,
-  scenarioChildSourceRoots,
-} from "@langwatch/scenario-child";
 import type { ScenarioServerConfig, SimulationService } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
@@ -47,8 +42,16 @@ export type ScenarioExecutorPeers = Readonly<{
   modelProviders: ModelProviderApi;
 }>;
 
+/** Where the compiled child sits and the sources a spawn checks it against. */
+export type ScenarioChildBundle = Readonly<{
+  packageRoot: string;
+  sourcePath: string;
+  sourceRoots: readonly string[];
+}>;
+
 /** The process facts a child is started with, read as members. */
 export type ScenarioExecutorHost = Readonly<{
+  scenarioChildBundle: ScenarioChildBundle;
   nlpServiceUrl: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
@@ -150,9 +153,9 @@ export class ScenarioExecutorService {
   #childConfig(): ScenarioChildProcessConfig {
     const { config, host } = this.input;
     return {
-      packageRoot: scenarioChildPackageRoot,
-      sourcePath: scenarioChildSourcePath,
-      sourceRoots: scenarioChildSourceRoots,
+      packageRoot: host.scenarioChildBundle.packageRoot,
+      sourcePath: host.scenarioChildBundle.sourcePath,
+      sourceRoots: [...host.scenarioChildBundle.sourceRoots],
       nodeEnv: host.nodeEnvironment,
       isSaas: host.isSaas,
       voicePublicBaseUrl: config.voicePublicBaseUrl,

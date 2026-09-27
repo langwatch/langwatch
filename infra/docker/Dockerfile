@@ -103,7 +103,7 @@ COPY apps/tasks ./apps/tasks
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
 # of its own and runs from source through tsx; apps/worker declares none either
-# now — the pre-compiled scenario child is its own package, @langwatch/scenario-child,
+# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child,
 # reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
 # process per simulation, so it is spawned as `node` on that bundle rather than
 # `pnpm exec tsx` on a TypeScript tree (tsx is a devDependency and the --prod
@@ -207,9 +207,9 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/enterprise ./enterprise
 # The worker executable runs from source through tsx, the way apps/api does. The
-# child it spawns is built into packages/scenario-child/dist, which the whole-tree
-# packages copy above already carries.
+# child it spawns is its own app, built into apps/scenario-child/dist.
 COPY --from=builder /app/apps/worker ./apps/worker
+COPY --from=builder /app/apps/scenario-child ./apps/scenario-child
 # The task runner. Runs from source through tsx, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks
 # Same: run from source through tsx. The boot command below runs both schema

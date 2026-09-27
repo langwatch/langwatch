@@ -144,7 +144,7 @@ const ENTRIES = [
     // Spawned per scenario run by `child-process-spawn.adapter.ts`, as a fresh
     // process every time.
     name: "scenario-child-process",
-    entry: "src/scenario-child.entrypoint.ts",
+    entry: "src/main.ts",
   },
 ];
 

@@ -6,6 +6,7 @@ import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-proces
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
+import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 import { apiHealthRoute } from "./api-health-route.ts";
 
@@ -54,6 +55,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withMember("content", () => void 0)
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
+    .withMember("scenarioChildBundle", () => scenarioChildBundle)
     .withMember("monitor", () => void 0)
     .exposeTransports((transports) =>
       transports

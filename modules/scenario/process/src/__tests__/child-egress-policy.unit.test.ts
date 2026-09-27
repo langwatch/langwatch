@@ -14,8 +14,8 @@ import {
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/apps/worker",
-  sourcePath: "/app/packages/scenario-child/src/scenario-child.entrypoint.ts",
-  sourceRoots: ["/app/packages/scenario-child/src"],
+  sourcePath: "/app/apps/scenario-child/src/main.ts",
+  sourceRoots: ["/app/apps/scenario-child/src"],
   nodeEnv: "production",
   isSaas: false,
   egress: { blockLocal: true, allowedHosts: ["agents.internal"] },
