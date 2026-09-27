@@ -61,7 +61,6 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
 import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { AzureSafetyCredentialsService } from "../services/azure-safety-credentials.service.ts";
-import { DirectEvaluationExecutionReceiptService } from "../services/direct.evaluation-execution-receipt.service.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
@@ -71,6 +70,8 @@ import { EvaluationCommandDispatcherService } from "../services/evaluation-comma
 import { EvaluationCostService } from "../services/evaluation-cost.service.ts";
 import { EvaluationEventingService } from "../services/evaluation-eventing.service.ts";
 import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
+import { EvaluationExecutionMetricsService } from "../services/evaluation-execution-metrics.service.ts";
+import { EvaluationExecutionReceiptService } from "../services/evaluation-execution-receipt.service.ts";
 import { EvaluationExecutionService } from "../services/evaluation-execution.service.ts";
 import { EvaluationFilterMatchingService } from "../services/evaluation-filter-matching.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../services/evaluation-inputs-offload-switch.service.ts";
@@ -96,7 +97,6 @@ import { EvaluatorModelEnvService } from "../services/evaluator-model-env.servic
 import { LangevalsClusteringService } from "../services/langevals-clustering.service.ts";
 import { LangevalsEvaluatorService } from "../services/langevals-evaluator.service.ts";
 import { LangevalsPiiDetectionService } from "../services/langevals-pii-detection.service.ts";
-import { OtelEvaluationExecutionMetricsService } from "../services/otel.evaluation-execution-metrics.service.ts";
 import { WorkflowEvaluationService } from "../services/workflow-evaluation.service.ts";
 import type {
   EvaluationExecution,
@@ -365,7 +365,7 @@ export class EvaluationApp implements EvaluationApiContract {
           }),
         })
       : NullLangevalsChannel.create();
-    const telemetry = OtelEvaluationExecutionMetricsService.create();
+    const telemetry = EvaluationExecutionMetricsService.create();
     const azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     const inputs = EvaluationInputsOffloadService.create({
       storage: repositories.inputs,
@@ -429,7 +429,7 @@ export class EvaluationApp implements EvaluationApiContract {
           inputs,
           flags: dependencies.featureFlags,
         }),
-        executionReceipt: DirectEvaluationExecutionReceiptService.create({
+        executionReceipt: EvaluationExecutionReceiptService.create({
           execution,
           costs: EvaluationCostService.create({ repository: repositories.costs }),
         }),

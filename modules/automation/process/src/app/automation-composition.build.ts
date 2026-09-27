@@ -7,7 +7,6 @@ import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   ApiAutomationUnavailableError,
-  type AutomationAction,
   type AutomationPersistCapBreach,
   type DatasetActionParams,
   type GraphTriggerEvaluationReason,
@@ -80,10 +79,8 @@ import { AutomationSettlementDispatchService } from "../services/trigger-settlem
 import type {
   AutomationAuditSink,
   AutomationInfrastructure,
-  AutomationProviderSecrets,
   AutomationSlackDirectory,
   AutomationTraceFilterCompiler,
-  AutomationWebhookStoredParams,
 } from "./automation.app.ts";
 import {
   AutomationDatasetMapper,
@@ -157,7 +154,7 @@ export function buildAutomationInfrastructure(
     runaway: new UncontainedApiAutomationRunaway(members.logger),
     testFire: new UndeliverableApiTestFire(),
     persistCaps: input.repositories.persistCaps,
-    providers: new AutomationProviderSecretsAdapter(providers),
+    providers,
     slackChannels: new UnavailableAutomationSlackDirectory(),
     traceFilters: new UnwiredAutomationTraceFilterCompiler(),
     limits: input.repositories.callCounter,
@@ -407,42 +404,6 @@ class UndeliverableApiTestFire extends AutomationTestFire {
 
   sendWebhook(): Promise<{ status: number }> {
     return Promise.reject(new ApiAutomationUnavailableError("send a test webhook"));
-  }
-}
-
-/**
- * {@link AutomationProviderSecrets} over the registry, renaming its
- * `findDecryptedSlackBotToken` to the authoring surface's `findSlackBotToken` —
- * the same read, under the name the two callers agree on.
- */
-class AutomationProviderSecretsAdapter implements AutomationProviderSecrets {
-  constructor(private readonly registry: AutomationProviderRegistryService) {}
-
-  actionParamsSchemaFor(action: AutomationAction) {
-    return this.registry.actionParamsSchemaFor(action);
-  }
-
-  persistActionParamsFor(
-    action: AutomationAction,
-    args: Readonly<{ incoming: Record<string, unknown>; loadExisting: () => Promise<unknown> }>,
-  ) {
-    return this.registry.persistActionParamsFor(action, args);
-  }
-
-  redactActionParamsFor(action: AutomationAction, params: unknown) {
-    return this.registry.redactActionParamsFor(action, params);
-  }
-
-  findSlackBotToken(actionParams: unknown): string | null {
-    return this.registry.findDecryptedSlackBotToken(actionParams);
-  }
-
-  decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string> {
-    return this.registry.decryptWebhookHeaders(stored);
-  }
-
-  decryptWebhookSigningSecrets(stored: AutomationWebhookStoredParams): readonly string[] {
-    return this.registry.decryptWebhookSigningSecrets(stored);
   }
 }
 
@@ -871,6 +832,13 @@ export function createAutomationReportDispatcher(input: {
   baseHost: string;
 }): ReportDispatcher {
   const { repositories } = input;
+  const charts = ReportChartService.create({
+    findCustomGraph: ({ projectId, customGraphId }) =>
+      repositories.customGraphs.findById({ customGraphId, projectId }),
+    loadDashboardGraphs: ({ projectId, dashboardId }) =>
+      repositories.customGraphs.findAllByDashboardId({ dashboardId, projectId }),
+    getTimeseries: (timeseries) => input.analytics.getTimeseries(timeseries),
+  });
   const deps: ReportDispatchDeps = {
     findTrigger: ({ projectId, triggerId }) =>
       repositories.triggers.findById({ triggerId, projectId }),
@@ -879,20 +847,7 @@ export function createAutomationReportDispatcher(input: {
     slackProvider: AutomationSlackSecretsService.create(input.crypto),
     filterSuppressedRecipients: (recipients) => input.suppression.filterSuppressed(recipients),
     listReportTraces: createReportTraceList({ traces: input.traces, baseHost: input.baseHost }),
-    loadReportCharts: ({ projectId, source, from, to }) =>
-      ReportChartService.loadReportCharts({
-        deps: {
-          findCustomGraph: ({ projectId: project, customGraphId }) =>
-            repositories.customGraphs.findById({ customGraphId, projectId: project }),
-          loadDashboardGraphs: ({ projectId: project, dashboardId }) =>
-            repositories.customGraphs.findAllByDashboardId({ dashboardId, projectId: project }),
-          getTimeseries: (timeseries) => input.analytics.getTimeseries(timeseries),
-        },
-        source,
-        projectId,
-        from,
-        to,
-      }),
+    loadReportCharts: (chartInput) => charts.loadReportCharts(chartInput),
     recordFire: async ({ projectId, triggerId, firedAt }) => {
       await repositories.history.create({
         projectId,
@@ -906,11 +861,13 @@ export function createAutomationReportDispatcher(input: {
     baseHost: input.baseHost,
   };
 
+  const reports = ReportDispatchService.create(deps);
   return {
     dispatch: ({ projectId, triggerId, slot }) =>
-      ReportDispatchService.dispatchScheduledReport({
-        deps,
-        fire: { projectId, triggerId, slot: Temporal.Instant.fromEpochMilliseconds(slot) },
+      reports.dispatchScheduledReport({
+        projectId,
+        triggerId,
+        slot: Temporal.Instant.fromEpochMilliseconds(slot),
       }),
   };
 }

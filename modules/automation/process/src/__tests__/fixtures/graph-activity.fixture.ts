@@ -1,10 +1,12 @@
-import type { AutomationClock,AutomationProjectDirectory } from "../app/automation.members.ts";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { AutomationClock,AutomationProjectDirectory } from "../../app/automation.members.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {
   AutomationDispatchError,
   AutomationLogger,
-} from "../app/automation.members.ts";
-import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+} from "../../app/automation.members.ts";
+import { AutomationNotificationDelivery } from "../../channels/automation-notification-delivery.channel.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 
 // Strict Prisma double for graph-alert vertical; fails on queries it should not
@@ -148,19 +150,16 @@ export const customGraphRow = {
 };
 
 /** One recorded timeseries answer, above any threshold the fixtures set. */
-export class BreachingAnalytics {
-  calls = 0;
-
-  async getTimeseries(): Promise<unknown> {
-    this.calls += 1;
-    return {
+export function breachingAnalytics(): AnalyticsService {
+  return createApiFixture<AnalyticsService>({
+    getTimeseries: async () => ({
       previousPeriod: [],
       currentPeriod: [
         { date: "2026-09-02", "0/metadata.trace_id/cardinality": 42 },
         { date: "2026-09-02", "0/metadata.trace_id/cardinality": 43 },
       ],
-    };
-  }
+    }),
+  });
 }
 
 export class OneProject implements AutomationProjectDirectory {

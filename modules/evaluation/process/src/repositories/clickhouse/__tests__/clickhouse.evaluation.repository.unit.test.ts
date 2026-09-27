@@ -7,7 +7,7 @@ import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseInsert,
   EvaluationClickHouseQuery,
-} from "../evaluation-clickhouse-client.ts";
+} from "../clickhouse.evaluation-session.store.ts";
 import { ClickHouseEvaluationRepository } from "../evaluation.repository.ts";
 
 const run: EvaluationRunData = {

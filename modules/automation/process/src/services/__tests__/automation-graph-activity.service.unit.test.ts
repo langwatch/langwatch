@@ -1,9 +1,8 @@
-import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { createProcessMembers } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
 import {
-  BreachingAnalytics,
+  breachingAnalytics,
   createGraphActivityPrismaDouble,
   FrozenClock,
   graphTriggerRow,
@@ -11,7 +10,7 @@ import {
   RecordingDelivery,
   SilentLogger,
   TestDispatchErrors,
-} from "../../fixtures/graph-activity.fixture.ts";
+} from "../../__tests__/fixtures/graph-activity.fixture.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
 import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
@@ -74,7 +73,7 @@ function compose(
     }),
     clock,
     projects: new OneProject(),
-    analytics: new BreachingAnalytics() as unknown as AnalyticsService,
+    analytics: breachingAnalytics(),
     delivery,
     webhooks: AutomationWebhookSecretsService.create(secrets),
     slackTokens: AutomationSlackBotTokenDecryptorService.create(

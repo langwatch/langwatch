@@ -8,9 +8,12 @@ import {
   isNoDataPredicate,
 } from "@langwatch/automation-contract";
 
-import type { GraphAlertDispatchResult } from "../app/automation.members.ts";
-import { TriggerEvaluatorService } from "./trigger-evaluator.service.ts";
-import type { GraphEvaluationPlan, GraphSeriesEvaluation } from "./trigger-evaluator.service.ts";
+import type {
+  GraphAlertDispatchResult,
+  GraphEvaluationPlan,
+  GraphSeriesEvaluation,
+} from "../app/automation.members.ts";
+import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
 
 /**
  * Identity for one firing, derived from the trigger, the graph and the fire it
@@ -48,7 +51,7 @@ export class GraphTriggerAlertDeliveryService {
   ): Promise<GraphTriggerEvaluationResult> {
     const project = await plan.request.deps.projects.findById(plan.request.projectId);
     if (!project) {
-      return TriggerEvaluatorService.skippedGraphEvaluation({
+      return skippedGraphEvaluation({
         ...plan.request,
         detail: "project not found",
       });

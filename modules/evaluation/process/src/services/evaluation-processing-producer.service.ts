@@ -12,6 +12,7 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import {
   EvaluationProcessingService,
   type EvaluationAutomationReactions,
+  type EvaluationProcessingPipeline,
 } from "./evaluation-processing.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */
@@ -74,16 +75,14 @@ function producerOnlyAutomations(processName: string): EvaluationAutomationReact
  * reached it rather than reporting an anonymous failure.
  */
 export class EvaluationProcessingProducerService {
-  private constructor() {}
-
-  static create(): EvaluationProcessingProducerService {
-    return new EvaluationProcessingProducerService();
+  static create(input: { processName: string }): EvaluationProcessingProducerService {
+    return new EvaluationProcessingProducerService(input.processName);
   }
 
-  static createPipeline(input: {
-    processName: string;
-  }): ReturnType<EvaluationProcessingService["build"]> {
-    const { processName } = input;
+  private constructor(private readonly processName: string) {}
+
+  build(): EvaluationProcessingPipeline {
+    const { processName } = this;
 
     return EvaluationProcessingService.createPipeline({
       evalRunStore: new ProducerOnlyFoldStore<EvaluationRunData>(processName, "evaluation run"),

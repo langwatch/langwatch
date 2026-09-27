@@ -180,7 +180,7 @@ export function createCanonicalAutomationApp(): {
       ),
       persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
       redactActionParamsFor: vi.fn((_action, params) => params),
-      findSlackBotToken: vi.fn(() => null),
+      findDecryptedSlackBotToken: vi.fn(() => null),
       decryptWebhookHeaders: vi.fn(() => ({})),
       decryptWebhookSigningSecrets: vi.fn(() => []),
     },

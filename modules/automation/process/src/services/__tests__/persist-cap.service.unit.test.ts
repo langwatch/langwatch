@@ -7,7 +7,7 @@ const planMock = vi.hoisted(() => ({
 }));
 import { Temporal } from "@langwatch/time";
 
-import { SettlementProjectService } from "../../fixtures/settlement.fixtures.ts";
+import { SettlementProjectService } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
 

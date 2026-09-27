@@ -5,7 +5,7 @@ import {
   automationProcessDefinition,
   InertIntentRetention,
   InertScheduledIntents,
-} from "../../fixtures/pipeline-test-harness.ts";
+} from "../../__tests__/fixtures/pipeline-test-harness.ts";
 import { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "../graph-alert-sweep.process.ts";
 
 describe("graph alert sweep process", () => {

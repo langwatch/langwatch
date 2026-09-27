@@ -4,8 +4,8 @@ import { frozenAt, recordingMail } from "@langwatch/test-harness";
 import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { settlementTrigger } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import type { GraphAlertDispatchInput } from "../../channels/automation-graph-alert.channel.ts";
-import { settlementTrigger } from "../../fixtures/settlement.fixtures.ts";
 import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
 import { MemoryAutomationRepositories } from "../../repositories/memory/memory.automation.repositories.ts";
 import { AutomationNotificationDeliveryService } from "../../services/automation-notification-delivery.service.ts";

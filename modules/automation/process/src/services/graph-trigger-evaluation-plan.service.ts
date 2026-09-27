@@ -2,7 +2,6 @@ import { parseSeriesIndex } from "@langwatch/automation-contract";
 import type { GraphTriggerEvaluationResult, Trigger } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
-import { TriggerEvaluatorService } from "./trigger-evaluator.service.ts";
 import type {
   GraphActionParams,
   GraphEvaluationPlan,
@@ -10,7 +9,8 @@ import type {
   GraphSeries,
   StoredGraphConfig,
   TimeseriesInputType,
-} from "./trigger-evaluator.service.ts";
+} from "../app/automation.members.ts";
+import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
 
 export class GraphTriggerEvaluationPlanService {
   private constructor() {}
@@ -151,6 +151,6 @@ export class GraphTriggerEvaluationPlanService {
   }
 
   private skip(request: GraphEvaluationRequest, detail: string): GraphTriggerEvaluationResult {
-    return TriggerEvaluatorService.skippedGraphEvaluation({ ...request, detail });
+    return skippedGraphEvaluation({ ...request, detail });
   }
 }

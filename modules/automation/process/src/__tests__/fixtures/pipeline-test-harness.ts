@@ -5,16 +5,16 @@ import type {
 } from "@langwatch/automation-contract";
 import type { ProcessManagerDefinition } from "@langwatch/eventing";
 
-import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../app/automation.members.ts";
+import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../../app/automation.members.ts";
 import {
   type AutomationsPipelineDeps,
   createAutomationsPipeline,
-} from "../eventing/automation.pipeline.ts";
+} from "../../eventing/automation.pipeline.ts";
 import type {
   ReportDispatcher,
   ReportRunSettlement,
-} from "../eventing/report-schedule.intent.ts";
-import { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
+} from "../../eventing/report-schedule.intent.ts";
+import { AutomationIntentRetentionRepository } from "../../repositories/automation-intent-retention.repository.ts";
 
 class InertSettlementExecutor extends AutomationSettlementExecutor {
   async notifyDigest(): Promise<void> {}

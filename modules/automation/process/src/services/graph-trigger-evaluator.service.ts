@@ -3,10 +3,10 @@ import type {
   GraphTriggerEvaluationResult,
 } from "@langwatch/automation-contract";
 
+import type { GraphTriggerEvaluationDeps } from "../app/automation.members.ts";
 import { GraphTriggerEvaluationPlanService } from "./graph-trigger-evaluation-plan.service.ts";
 import { GraphTriggerIncidentService } from "./graph-trigger-incident.service.ts";
 import { GraphTriggerSeriesEvaluationService } from "./graph-trigger-series-evaluation.service.ts";
-import type { GraphTriggerEvaluationDeps } from "./trigger-evaluator.service.ts";
 
 /** Public private-automation evaluator that composes focused graph collaborators. */
 export class GraphTriggerEvaluatorService {

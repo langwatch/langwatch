@@ -10,7 +10,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createAnalyticsComparisonWindow } from "@langwatch/analytics-process";
 import {
-  MonitorPerformanceAdapter,
+  createMonitorPerformanceReads,
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-process";
 import { nanoid } from "nanoid";
@@ -37,9 +37,10 @@ const endMs = Date.now();
 const currentStartMs = endMs - 7 * DAY_MS;
 // Derived through the same service the monitors surface uses, so the window
 // the trend is measured against is the one the page would have asked for.
-const previousStartMs = createAnalyticsComparisonWindow()
-  .currentVsPrevious({ startDate: currentStartMs, endDate: endMs })
-  .previousPeriodStartDate.epochMilliseconds;
+const previousStartMs = createAnalyticsComparisonWindow().currentVsPrevious({
+  startDate: currentStartMs,
+  endDate: endMs,
+}).previousPeriodStartDate.epochMilliseconds;
 
 let clickHouse: ClickHouseClient;
 let queryCount = 0;
@@ -68,7 +69,7 @@ const monitors = () => [
 ];
 
 const readTablePerformance = (resolve: EvaluationClickHouseResolver) =>
-  MonitorPerformanceAdapter.create({ resolveClickHouse: resolve }).getMonitorPerformance({
+  createMonitorPerformanceReads({ resolveClickHouse: resolve }).getMonitorPerformance({
     tenantId,
     monitors: monitors(),
     previousStartMs,
@@ -145,7 +146,7 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   }, 60_000);
 
   it("returns an explicit no-data result for a monitor without runs", async () => {
-    const performance = await MonitorPerformanceAdapter.create({
+    const performance = await createMonitorPerformanceReads({
       resolveClickHouse: plainResolver(),
     }).getMonitorPerformance({
       tenantId,

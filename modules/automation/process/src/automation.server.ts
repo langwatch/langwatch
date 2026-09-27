@@ -23,8 +23,6 @@ import { automationRepositories } from "./repositories/automation-repositories.r
 import type { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
 import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
-import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
-import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import {
   PrismaCustomGraphRepository,
   type CustomGraphDatabase,
@@ -47,6 +45,7 @@ import { AutomationEvaluationSubscriberService } from "./services/automation-eva
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
 import { type AutomationSecretCrypto } from "./services/automation-slack-secrets.service.ts";
+import { AutomationTraceTriggerCatalogueService } from "./services/automation-trace-trigger-catalogue.service.ts";
 import { AutomationEmailCapService } from "./services/email-cap.service.ts";
 import {
   TriggerNoReplyService,
@@ -228,8 +227,11 @@ export function createAutomationCustomGraphs(database: CustomGraphDatabase): Cus
 
 /** The trace triggers an ingested trace is matched against. */
 export function createAutomationTraceTriggerCatalogue(input: {
-  prisma: AutomationTraceTriggerCatalogueDatabase;
+  prisma: TriggerDatabase;
   clock: AutomationClock;
 }): AutomationTraceTriggerCatalogueRepository {
-  return PrismaAutomationTraceTriggerCatalogueRepository.create(input);
+  return AutomationTraceTriggerCatalogueService.create({
+    triggers: PrismaTriggerRepository.create(input.prisma, input.clock),
+    clock: input.clock,
+  });
 }

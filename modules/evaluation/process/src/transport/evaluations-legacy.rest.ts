@@ -424,13 +424,13 @@ async function recordBatch({
   try {
     await app.logBatchEvaluation({ projectId, params });
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (error instanceof Error && "issues" in error && Array.isArray(error.issues)) {
       logger.error(
         { error, runId: params.run_id, projectId },
         "failed to validate data for batch evaluation",
       );
 
-      return answer({ error: fromZodError(error).message }, 400);
+      return answer({ error: sentenceFor(error) }, 400);
     }
 
     if (HandledError.isHandled(error)) {
@@ -618,17 +618,11 @@ async function handleEvaluatorCall({
   const isLegacyPairwiseDispatch = saved.checkType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
   const checkType = resolveDispatchEvaluatorType(saved.checkType) ?? saved.checkType;
 
-  let evaluatorDefinition: NonNullable<typeof saved.workflowDefinition> | EvaluatorIncludingCustom;
-  try {
-    evaluatorDefinition =
-      saved.workflowDefinition ??
-      (await getEvaluatorIncludingCustom(app, projectId, checkType as EvaluatorTypes));
-  } catch (error) {
-    if (error instanceof HandledError && error.code === "evaluator_not_found") {
-      return answer({ error: `Evaluator not found: ${checkType}` }, 404);
-    }
-    throw error;
-  }
+  const definition = saved.workflowDefinition
+    ? { evaluatorDefinition: saved.workflowDefinition }
+    : await resolveEvaluatorDefinition({ app, projectId, checkType });
+  if ("refusal" in definition) return definition.refusal;
+  const { evaluatorDefinition } = definition;
 
   let params: EvaluationRESTParams;
 
@@ -645,7 +639,7 @@ async function handleEvaluatorCall({
 
   if (disabled) return disabled;
 
-  if (body.settings?.trace_id) params.trace_id = body.settings.trace_id;
+  applySettingsTraceId({ params, body });
 
   const merged = await mergeEvaluatorSettings({
     app,
@@ -684,7 +678,7 @@ async function handleEvaluatorCall({
     projectId,
     checkType,
     data,
-    settings: merged.settings,
+    settings: merged.settings ?? {},
     params,
     saved,
     monitor,
@@ -786,7 +780,7 @@ async function mergeEvaluatorSettings({
   monitor: EvaluationMonitorSummary | null;
   isLegacyPairwiseDispatch: boolean;
   evaluatorDefinition: ResolvedEvaluatorDefinition;
-}): Promise<{ settings: any } | { refusal: LegacyAnswer }> {
+}): Promise<{ settings: Record<string, unknown> | undefined } | { refusal: LegacyAnswer }> {
   const evaluatorSettingSchema = checkType.startsWith("custom/")
     ? undefined
     : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
@@ -1052,17 +1046,58 @@ function publishedResult({
   return { ...result, ...(isGuardrail ? { passed: result.passed ?? true } : {}) };
 }
 
+async function resolveEvaluatorDefinition({
+  app,
+  projectId,
+  checkType,
+}: {
+  app: EvaluationApi;
+  projectId: string;
+  checkType: string;
+}): Promise<{ evaluatorDefinition: EvaluatorIncludingCustom } | { refusal: LegacyAnswer }> {
+  try {
+    return {
+      evaluatorDefinition: await getEvaluatorIncludingCustom(
+        app,
+        projectId,
+        checkType as EvaluatorTypes,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof HandledError && error.code === "evaluator_not_found") {
+      return { refusal: answer({ error: `Evaluator not found: ${checkType}` }, 404) };
+    }
+    throw error;
+  }
+}
+
 // ============ Shared helpers ============
 
 /** The document, or nothing where the body was not a JSON object. */
-function parseJson(raw: string): Record<string, any> | null {
+function parseJson(raw: string): Record<string, unknown> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
 
-    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, any>) : null;
+    return isJsonObject(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** A `settings.trace_id` in the raw body names the trace the evaluation is attributed to. */
+function applySettingsTraceId({
+  params,
+  body,
+}: {
+  params: EvaluationRESTParams;
+  body: Record<string, unknown>;
+}): void {
+  const traceId = isJsonObject(body.settings) ? body.settings.trace_id : undefined;
+  if (typeof traceId === "string" && traceId) params.trace_id = traceId;
 }
 
 /** A refusal's sentence, whichever kind of failure produced it. */

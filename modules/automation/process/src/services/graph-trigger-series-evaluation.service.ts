@@ -1,16 +1,14 @@
 import { aggregateSeriesValues, extractSeriesPoints } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
 
-import {
-  GRAPH_TRIGGER_MAX_RESULT_ROWS,
-  TriggerEvaluatorService,
-} from "./trigger-evaluator.service.ts";
+import { GRAPH_TRIGGER_MAX_RESULT_ROWS } from "../app/automation.members.ts";
 import type {
   GraphEvaluationPlan,
   GraphSeries,
   GraphSeriesEvaluation,
   TimeseriesResult,
-} from "./trigger-evaluator.service.ts";
+} from "../app/automation.members.ts";
+import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
 
 /** ClickHouse's "too many rows or bytes", however the client spelled it. */
 function isTimeseriesResultTooLarge(error: unknown): boolean {
@@ -81,7 +79,7 @@ export class GraphTriggerSeriesEvaluationService {
         "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
       );
 
-      return TriggerEvaluatorService.skippedGraphEvaluation({
+      return skippedGraphEvaluation({
         ...plan.request,
         detail: "timeseries result exceeds the row ceiling",
       });

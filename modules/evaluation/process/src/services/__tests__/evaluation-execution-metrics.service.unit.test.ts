@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   EVALUATION_DURATION_METRIC_NAME,
   EVALUATION_STATUS_METRIC_NAME,
-  OtelEvaluationExecutionMetricsService,
-} from "../otel.evaluation-execution-metrics.service.ts";
+  EvaluationExecutionMetricsService,
+} from "../evaluation-execution-metrics.service.ts";
 
 /**
  * Spec: modules/evaluation/specs/evaluation-service.feature. Names and label
@@ -26,7 +26,7 @@ describe("given the evaluator process series pushed over OTLP", () => {
 
   /** @scenario "An evaluator run reports its duration and its outcome" */
   it("observes the run's duration under the evaluator that produced it", () => {
-    const adapter = OtelEvaluationExecutionMetricsService.create();
+    const adapter = EvaluationExecutionMetricsService.create();
 
     adapter.record({ evaluatorType: "ragas/bleu_score", status: "processed", durationMs: 42 });
     adapter.record({ evaluatorType: "ragas/bleu_score", status: "processed", durationMs: 7 });
@@ -46,7 +46,7 @@ describe("given the evaluator process series pushed over OTLP", () => {
 
   /** @scenario "An evaluator run reports its duration and its outcome" */
   it("counts each outcome separately, so an all-error hour cannot read as load", () => {
-    const adapter = OtelEvaluationExecutionMetricsService.create();
+    const adapter = EvaluationExecutionMetricsService.create();
 
     adapter.record({ evaluatorType: "ragas/bleu_score", status: "error", durationMs: 1 });
     adapter.record({ evaluatorType: "ragas/bleu_score", status: "error", durationMs: 1 });

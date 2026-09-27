@@ -8,7 +8,7 @@
       "@langwatch/automation-process": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts", "./src/testing.ts"],
+  "files": ["./src/index.ts", "./src/__tests__/testing.ts", "./src/__tests__/fixtures/graph-activity.fixture.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

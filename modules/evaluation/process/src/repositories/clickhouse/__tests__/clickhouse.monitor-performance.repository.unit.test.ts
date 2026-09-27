@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseQuery,
-} from "../evaluation-clickhouse-client.ts";
+} from "../clickhouse.evaluation-session.store.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../monitor-performance.repository.ts";
 
 describe("ClickHouseMonitorPerformanceRepository", () => {

@@ -201,13 +201,12 @@ function chartReader({
   getTimeseries?: (input: AnalyticsTimeseriesInput) => Promise<AnalyticsTimeseriesResult>;
 }): ReportDispatchDeps["loadReportCharts"] {
   return ({ projectId, source, from, to }): Promise<ReportChart[]> =>
-    ReportChartService.loadReportCharts({
-      deps: {
-        findCustomGraph: async () => graphs[0] ?? null,
-        loadDashboardGraphs: async () => graphs,
-        getTimeseries:
-          getTimeseries ?? (async () => timeseries ?? { previousPeriod: [], currentPeriod: [] }),
-      },
+    ReportChartService.create({
+      findCustomGraph: async () => graphs[0] ?? null,
+      loadDashboardGraphs: async () => graphs,
+      getTimeseries:
+        getTimeseries ?? (async () => timeseries ?? { previousPeriod: [], currentPeriod: [] }),
+    }).loadReportCharts({
       source,
       projectId,
       from,
@@ -231,10 +230,9 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         filterQuery: "status:error",
       });
 
-      await ReportDispatchService.dispatchScheduledReport({
-        deps: makeDeps({ trigger, mail, listReportTraces }),
-        fire: FIRE,
-      });
+      await ReportDispatchService.create(
+        makeDeps({ trigger, mail, listReportTraces }),
+      ).dispatchScheduledReport(FIRE);
 
       expect(listReportTraces).toHaveBeenCalledWith({
         projectId: PROJECT.id,
@@ -270,10 +268,9 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         filterQuery: null,
       });
 
-      await ReportDispatchService.dispatchScheduledReport({
-        deps: makeDeps({ trigger, mail, listReportTraces }),
-        fire: FIRE,
-      });
+      await ReportDispatchService.create(
+        makeDeps({ trigger, mail, listReportTraces }),
+      ).dispatchScheduledReport(FIRE);
 
       expect(listReportTraces).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -301,14 +298,13 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         source: { kind: "customGraph", customGraphId: "graph-1" },
       });
 
-      await ReportDispatchService.dispatchScheduledReport({
-        deps: makeDeps({
+      await ReportDispatchService.create(
+        makeDeps({
           trigger,
           mail,
           loadReportCharts: chartReader({ graphs: [graphRow()], getTimeseries }),
         }),
-        fire: FIRE,
-      });
+      ).dispatchScheduledReport(FIRE);
 
       expect(getTimeseries).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -333,8 +329,8 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         source: { kind: "dashboard", dashboardId: "dashboard-1" },
       });
 
-      await ReportDispatchService.dispatchScheduledReport({
-        deps: makeDeps({
+      await ReportDispatchService.create(
+        makeDeps({
           trigger,
           mail,
           loadReportCharts: chartReader({
@@ -349,8 +345,7 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
             },
           }),
         }),
-        fire: FIRE,
-      });
+      ).dispatchScheduledReport(FIRE);
 
       // One rendered chart per panel, in the dashboard's own order.
       const html = mail.emails[0]?.html ?? "";
@@ -378,7 +373,7 @@ describe("ReportDispatchService.dispatchScheduledReport", () => {
         }),
       });
 
-      await ReportDispatchService.dispatchScheduledReport({ deps, fire: FIRE });
+      await ReportDispatchService.create(deps).dispatchScheduledReport(FIRE);
 
       expect(mail.emails).toHaveLength(1);
       expect(mail.emails[0]?.html).toContain("Nothing to show for this period");
@@ -449,10 +444,9 @@ describe("the composed trace-query report", () => {
         filterQuery: "status:error",
       });
 
-      await ReportDispatchService.dispatchScheduledReport({
-        deps: makeDeps({ trigger, mail, listReportTraces }),
-        fire: FIRE,
-      });
+      await ReportDispatchService.create(
+        makeDeps({ trigger, mail, listReportTraces }),
+      ).dispatchScheduledReport(FIRE);
 
       expect(readTraceList).toHaveBeenCalledWith({
         tenantId: PROJECT.id,

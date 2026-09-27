@@ -7,7 +7,7 @@ import {
   type MonitorPerformanceBucket,
   type MonitorPerformanceBucketQuery,
 } from "../monitor-performance.repository.ts";
-import type { EvaluationClickHouseResolver } from "./evaluation-clickhouse-client.ts";
+import type { EvaluationClickHouseResolver } from "./clickhouse.evaluation-session.store.ts";
 
 /** A moment as a ClickHouse statement carries it. The client serialises this into
  *  `DateTime64(3)`; an instant serialises to `{}`, so the conversion is here. */

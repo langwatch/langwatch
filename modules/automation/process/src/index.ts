@@ -68,7 +68,6 @@ export type {
   AutomationsPipelineDeps,
   TriggerMatchRecordedEvent,
 } from "./eventing/automation.pipeline.ts";
-export { TriggerSettlement } from "./eventing/trigger-settlement.process.ts";
 export { createGraphTriggerActivityHandler } from "./eventing/graph-trigger-activity.subscriber.ts";
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
@@ -181,7 +180,6 @@ export {
   type AutomationGraphActivityDatabase,
 } from "./app/automation-graph-composition.build.ts";
 export { AutomationTraceTriggerCatalogueRepository } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
-export { type AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
 export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
 export { UnsubscribeTokenService } from "./services/unsubscribe-token.service.ts";

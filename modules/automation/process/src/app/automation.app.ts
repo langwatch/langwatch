@@ -162,7 +162,7 @@ export interface AutomationProviderSecrets {
   /** Stored params with every secret stripped, for a row on its way out. */
   redactActionParamsFor(action: AutomationAction, params: unknown): unknown;
   /** The stored Slack bot token in the clear, or nothing when none is stored. */
-  findSlackBotToken(actionParams: unknown): string | null;
+  findDecryptedSlackBotToken(actionParams: unknown): string | null;
   /** The stored webhook header values in the clear, by header name. */
   decryptWebhookHeaders(stored: AutomationWebhookStoredParams): Record<string, string>;
   /** The stored webhook signing secrets in the clear, newest first. */

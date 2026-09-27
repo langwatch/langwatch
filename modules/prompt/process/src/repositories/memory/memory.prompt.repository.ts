@@ -26,6 +26,7 @@ import {
   type LlmConfigWithLatestVersion,
   type PromptConfigRow,
 } from "../prompt.repository.ts";
+import { MemoryLlmConfigVersionsRepository } from "./memory.prompt-version.repository.ts";
 import {
   type MemoryPromptState,
   clone,
@@ -36,8 +37,7 @@ import {
   schemaVersionOf,
   storedHandle,
   visibleConfig,
-} from "./memory-prompt.state.ts";
-import { MemoryLlmConfigVersionsRepository } from "./memory.prompt-version.repository.ts";
+} from "./memory.prompt.store.ts";
 
 export class MemoryLlmConfigRepository extends LlmConfigRepository {
   readonly versions: MemoryLlmConfigVersionsRepository;

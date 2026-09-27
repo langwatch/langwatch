@@ -12,6 +12,7 @@ import { InMemoryProcessStore } from "@langwatch/eventing";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { createAutomationTestRuntime } from "../../__tests__/testing.ts";
 import type { AutomationClock } from "../../app/automation.members.ts";
 import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
 import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
@@ -23,7 +24,6 @@ import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
 import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository.ts";
 import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
-import { createAutomationTestRuntime } from "../../testing.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationService } from "../automation.service.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";

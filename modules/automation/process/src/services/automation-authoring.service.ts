@@ -840,7 +840,7 @@ export class AutomationAuthoringService {
       projectId: args.projectId,
     });
 
-    return this.collaborators.providers.findSlackBotToken(saved?.actionParams ?? {});
+    return this.collaborators.providers.findDecryptedSlackBotToken(saved?.actionParams ?? {});
   }
 }
 

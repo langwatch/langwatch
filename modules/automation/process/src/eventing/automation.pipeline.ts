@@ -13,6 +13,13 @@ import type {
   AutomationSettlementExecutor,
 } from "../app/automation.members.ts";
 import type { AutomationIntentRetentionRepository } from "../repositories/automation-intent-retention.repository.ts";
+import {
+  addPending,
+  digestBatchKey,
+  drainDue,
+  pagePersistMatches,
+  settleWindowBucket,
+} from "../rules/trigger-settlement.rules.ts";
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -53,11 +60,7 @@ import {
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./trigger-settlement.intent.ts";
-import {
-  INITIAL_SETTLEMENT_STATE,
-  type SettlementState,
-  TriggerSettlement,
-} from "./trigger-settlement.process.ts";
+import { INITIAL_SETTLEMENT_STATE, type SettlementState } from "./trigger-settlement.process.ts";
 import { runWebhookDeliveryPrune } from "./webhook-delivery-prune.intent.ts";
 import {
   pruneSchema,
@@ -75,7 +78,7 @@ export const RecordTriggerMatchCommand = defineCommand({
   aggregateId: ({ triggerId }) => triggerId,
   groupKey: ({ triggerId }) => triggerId,
   idempotencyKey: ({ triggerId, traceId, occurredAt, traceDebounceMs }) =>
-    `${triggerId}:${traceId}:${TriggerSettlement.settleWindowBucket({ occurredAt, traceDebounceMs })}`,
+    `${triggerId}:${traceId}:${settleWindowBucket({ occurredAt, traceDebounceMs })}`,
   spanAttributes: ({ triggerId, traceId, actionClass }) => ({
     "automation.trigger.id": triggerId,
     "automation.trace.id": traceId,
@@ -143,7 +146,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           (payload, context) => deps.settlement.logOverflow(payload, context),
         )
         .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => {
-          const { state: nextState, flushed } = TriggerSettlement.addPending(state, data, ctx.at);
+          const { state: nextState, flushed, nextBoundary } = addPending(state, data, ctx.at);
           const flushedPersist = flushed.filter(({ match }) => match.actionClass === "persist");
           const flushedNotify = flushed.filter(({ match }) => match.actionClass !== "persist");
           return {
@@ -153,7 +156,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
             intents:
               flushed.length > 0
                 ? [
-                    ...TriggerSettlement.pagePersistMatches({
+                    ...pagePersistMatches({
                       matches: flushedPersist.map(({ traceId, match }) => ({
                         traceId,
                         settleWindowBucket: match.settleWindowBucket,
@@ -166,7 +169,7 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                     ),
                     ...flushedNotify.map(({ traceId, match }) =>
                       ctx.intents.notifyDigest(
-                        `digest:${match.dispatchDueAt}:${TriggerSettlement.digestBatchKey([traceId])}`,
+                        `digest:${match.dispatchDueAt}:${digestBatchKey([traceId])}`,
                         {
                           triggerId: ctx.key,
                           traceIds: [traceId],
@@ -183,17 +186,17 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
                     }),
                   ]
                 : undefined,
-            nextWakeAt: TriggerSettlement.findNextBoundary(nextState),
+            nextWakeAt: nextBoundary,
           };
         })
         .onWake((state, ctx) => {
-          const due = TriggerSettlement.drainDue(state, ctx.at);
+          const due = drainDue(state, ctx.at);
           return {
             state: due.state,
             intents: [
               ...due.boundaries.map((boundary) =>
                 ctx.intents.notifyDigest(
-                  `digest:${boundary.key}:${TriggerSettlement.digestBatchKey(boundary.traceIds)}`,
+                  `digest:${boundary.key}:${digestBatchKey(boundary.traceIds)}`,
                   {
                     triggerId: ctx.key,
                     traceIds: boundary.traceIds,

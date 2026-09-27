@@ -2,7 +2,7 @@ import type {
   AutomationGraphNotifier,
   AutomationRunawayNotice,
   AutomationRunawaySignals,
-} from "./index.ts";
+} from "../index.ts";
 import {
   AutomationDispatchError,
   AutomationEmailCapService,
@@ -11,7 +11,7 @@ import {
   AutomationRunawayRepository,
   AutomationSlackBotTokenDecryptor,
   AutomationTestFire,
-} from "./index.ts";
+} from "../index.ts";
 
 /**
  * The graph-alert vertical's fixtures, so a composition root can prove its own
@@ -19,7 +19,7 @@ import {
  * inventing a second stand-in that agrees with nothing.
  */
 export {
-  BreachingAnalytics,
+  breachingAnalytics,
   createGraphActivityPrismaDouble,
   customGraphRow,
   FrozenClock,
@@ -30,7 +30,7 @@ export {
   SilentLogger,
   TestDispatchErrors,
 } from "./fixtures/graph-activity.fixture.ts";
-import { MemoryAutomationEmailCapRepository } from "./repositories/memory/memory.automation-email-cap.repository.ts";
+import { MemoryAutomationEmailCapRepository } from "../repositories/memory/memory.automation-email-cap.repository.ts";
 
 class TestNotifier implements AutomationGraphNotifier {
   async dispatch() {
