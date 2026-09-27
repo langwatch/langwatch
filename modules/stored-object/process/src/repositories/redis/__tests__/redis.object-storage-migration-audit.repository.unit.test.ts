@@ -22,7 +22,7 @@ const logger = {
 function emptyAuditRedis() {
   return {
     disconnect: connection.disconnect,
-    get: vi.fn(async () => null),
+    mget: vi.fn(async () => [null]),
     hvals: vi.fn(async () => []),
     scard: vi.fn(async () => 0),
     scan: vi.fn(async (): Promise<[string, string[]]> => ["0", []]),

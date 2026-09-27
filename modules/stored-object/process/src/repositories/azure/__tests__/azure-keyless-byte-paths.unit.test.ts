@@ -19,23 +19,24 @@ vi.mock("@azure/identity", () => ({
   },
 }));
 
-import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
 import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
   type AzureInjectedIdentity,
-  AzureBlobCredentialsAdapter,
+  AzureBlobCredentialsService,
 } from "#services/azure-blob-credentials.service";
-const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
-import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
-const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;
+const azureCredentials = AzureBlobCredentialsService.create();
+const resolveAzureCredentials: AzureBlobCredentialsService["resolve"] = (input) =>
+  azureCredentials.resolve(input);
+import { resetAzureTokenCacheForTests } from "#repositories/azure/azure.blob-token.store";
 import {
   StoredObjectAzureDestination,
-  StoredObjectDestinationPolicyAdapter,
+  StoredObjectDestinationPolicyService,
   StoredObjectProjectS3Config,
   type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
-import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
+import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 const PROJECT_ID = "proj-1";
 const HISTORICAL_URI = `azure-blob://lwacct/written-long-ago/${PROJECT_ID}/abc123`;
@@ -100,8 +101,8 @@ class ResolvedAzureDestination extends StoredObjectAzureDestination {
 function policyFor(
   config: AzureBlobCredentialsConfig,
   identity: AzureInjectedIdentity,
-): StoredObjectDestinationPolicyAdapter {
-  return StoredObjectDestinationPolicyAdapter.create({
+): StoredObjectDestinationPolicyService {
+  return StoredObjectDestinationPolicyService.create({
     selection: {
       backend: "azure",
       localFilesystemRoot: "/var/lib/langwatch/objects",
@@ -134,12 +135,12 @@ const dispatchedElsewhere = {
 function registryFor(
   config: AzureBlobCredentialsConfig,
   identity: AzureInjectedIdentity = {},
-): StoredObjectStorageRegistryAdapter {
-  return StoredObjectStorageRegistryAdapter.create({
+): StoredObjectStorageRegistryService {
+  return StoredObjectStorageRegistryService.create({
     s3: dispatchedElsewhere,
     file: dispatchedElsewhere,
     "azure-blob": () =>
-      AzureBlobStoredObjectDriverAdapter.create(
+      AzureStoredObjectBlobRepository.create(
         resolveAzureCredentials({ config, purpose: "read", identity }),
       ),
   });

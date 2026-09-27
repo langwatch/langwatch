@@ -30,13 +30,13 @@ const RECORD_KSUID_RESOURCE = "record";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
-import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 import {
   DATASET_SEARCH_MAX_BYTES,
   DATASET_SEARCH_MAX_ROWS,
   matchesDatasetSearch,
   measureRowsBytes,
-} from "./dataset-search.ts";
+} from "../rules/dataset-search.rules.ts";
+import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentService implements DatasetContent {

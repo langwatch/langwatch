@@ -3,18 +3,18 @@ import { describe, expect, it } from "vitest";
 
 import { ClickHouseImportStoredObjectMigration } from "../migrations/clickhouse-import.stored-object.migration.ts";
 import { MemoryStoredObjectRecordRepository } from "../repositories/memory/memory.stored-object-record.repository.ts";
-import { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
-import { StoredObjectLegacySource } from "../repositories/stored-object-legacy-source.repository.ts";
-import { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
-import { StoredObjectProjectSource } from "../repositories/stored-object-project-source.repository.ts";
+import { StoredObjectLegacyLocationRepository } from "../repositories/stored-object-legacy-location.repository.ts";
+import { StoredObjectLegacySourceRepository } from "../repositories/stored-object-legacy-source.repository.ts";
+import { StoredObjectLegacyWriterDrainRepository } from "../repositories/stored-object-legacy-writer-drain.repository.ts";
+import { StoredObjectProjectSourceRepository } from "../repositories/stored-object-project-source.repository.ts";
 
-class OneProject extends StoredObjectProjectSource {
+class OneProject extends StoredObjectProjectSourceRepository {
   async findForOrganization() {
     return [{ id: "project_1" }];
   }
 }
 
-class OneLegacyObject extends StoredObjectLegacySource {
+class OneLegacyObject extends StoredObjectLegacySourceRepository {
   async findPage(input: { afterId?: string }) {
     if (input.afterId) return [];
     return [
@@ -35,7 +35,7 @@ class OneLegacyObject extends StoredObjectLegacySource {
   }
 }
 
-class LegacyLocations extends StoredObjectLegacyLocation {
+class LegacyLocations extends StoredObjectLegacyLocationRepository {
   parse() {
     return {
       provider: "s3",
@@ -45,7 +45,7 @@ class LegacyLocations extends StoredObjectLegacyLocation {
   }
 }
 
-class ProvedDrain extends StoredObjectLegacyWriterDrain {
+class ProvedDrain extends StoredObjectLegacyWriterDrainRepository {
   async get() {
     return {
       valid: true as const,
@@ -55,7 +55,7 @@ class ProvedDrain extends StoredObjectLegacyWriterDrain {
   }
 }
 
-class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrain {
+class DrainBecomesValidAfterFirstScan extends StoredObjectLegacyWriterDrainRepository {
   private calls = 0;
   async get() {
     this.calls += 1;

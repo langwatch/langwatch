@@ -35,13 +35,13 @@ vi.mock("@azure/identity", () => ({
   },
 }));
 
-import type { TokenModeCredentials } from "../azure-blob-token-provider.service.ts";
+import type { TokenModeCredentials } from "../azure.blob-token.store.ts";
 import {
   AzureTokenExchangeError,
-  AzureBlobTokenProviderAdapter,
-} from "../azure-blob-token-provider.service.ts";
-const { getAzureBlobToken, invalidateAzureBlobToken, resetAzureTokenCacheForTests } =
-  AzureBlobTokenProviderAdapter;
+  getAzureBlobToken,
+  invalidateAzureBlobToken,
+  resetAzureTokenCacheForTests,
+} from "../azure.blob-token.store.ts";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -141,7 +141,7 @@ describe("getAzureBlobToken", () => {
 
       // Two "different driver instances" translate to two independent calls
       // with equal (but not identical object-identity) credential values —
-      // exactly what two AzureBlobStoredObjectDriverAdapter instances built from the
+      // exactly what two AzureStoredObjectBlobRepository instances built from the
       // same resolveAzureCredentials() output would pass.
       const shared = { tenantId: "tenant-shared", clientId: "client-shared" };
       const credentialsA = workloadCredentials({ ...shared });

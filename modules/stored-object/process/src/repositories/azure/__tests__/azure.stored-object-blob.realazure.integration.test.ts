@@ -10,8 +10,8 @@ import {
 } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
+import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;
 const ACCOUNT_KEY = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_KEY;
@@ -35,7 +35,7 @@ const describeTokenAzure = hasTokenModeAzure ? describe : describe.skip;
 const RUN_ID = crypto.randomBytes(6).toString("hex");
 const PROJECT = `test-realazure-${RUN_ID}`;
 
-let driver: AzureBlobStoredObjectDriverAdapter;
+let driver: AzureStoredObjectBlobRepository;
 const writtenUris: string[] = [];
 const tokenUris: string[] = [];
 
@@ -51,7 +51,7 @@ function uriFor(bytes: Buffer): string {
 }
 
 function tokenDriver() {
-  return AzureBlobStoredObjectDriverAdapter.create({
+  return AzureStoredObjectBlobRepository.create({
     mode: "azureCli",
     accountName: TOKEN_MODE_ACCOUNT!,
     identity: {},
@@ -71,7 +71,7 @@ function tokenUriFor(bytes: Buffer): string {
 
 beforeAll(() => {
   if (!hasRealAzure) return;
-  driver = AzureBlobStoredObjectDriverAdapter.create({
+  driver = AzureStoredObjectBlobRepository.create({
     mode: "sharedKey",
     accountName: ACCOUNT_NAME!,
     accountKey: ACCOUNT_KEY!,
@@ -91,7 +91,7 @@ afterAll(async () => {
 });
 
 describeRealAzure(
-  "AzureBlobStoredObjectDriverAdapter against real Azure Blob Storage (host-style addressing)",
+  "AzureStoredObjectBlobRepository against real Azure Blob Storage (host-style addressing)",
   () => {
     describe("given a host-style production endpoint", () => {
       it("signs the request correctly for the single-account canonicalised resource form", async () => {
@@ -152,9 +152,9 @@ describeRealAzure(
         const uri = uriFor(bytes);
         await driver.put(uri, bytes, "text/plain");
 
-        const registry = StoredObjectStorageRegistryAdapter.create({
+        const registry = StoredObjectStorageRegistryService.create({
           // s3/file are mandatory on the registry but unused here — any
-          // StoredObjectStorageDriver satisfies the type; azure-blob does the
+          // StoredObjectBlobRepository satisfies the type; azure-blob does the
           // real work.
           s3: driver,
           file: driver,
@@ -171,7 +171,7 @@ describeRealAzure(
 );
 
 describeTokenAzure(
-  "AzureBlobStoredObjectDriverAdapter against real Azure Blob using an Entra identity",
+  "AzureStoredObjectBlobRepository against real Azure Blob using an Entra identity",
   () => {
     describe("given an account that refuses shared-key authentication", () => {
       /** @scenario "Blobs round-trip against a real storage account with shared-key access disabled" */

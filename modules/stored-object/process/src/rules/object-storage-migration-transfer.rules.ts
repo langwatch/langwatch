@@ -16,7 +16,7 @@ import type {
   MigrationDataset,
   MigrationPageRequest,
 } from "#repositories/object-storage-migration-inventory.repository";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 
 import type {
   MigrationProvider,
@@ -70,7 +70,7 @@ export async function copyVerified({
   expectedSha256?: string;
   mediaType: string;
 }): Promise<"copied" | "repaired" | "skippedVerified"> {
-  // The ONLY full copy held in memory: `StoredObjectStorageDriver.put` takes a Buffer,
+  // The ONLY full copy held in memory: `StoredObjectBlobRepository.put` takes a Buffer,
   // so the source bytes must be resident to write them. Every digest below
   // hashes its stream chunk-by-chunk instead of buffering a second (or
   // third) copy alongside — peak residency is one object, not two or three.
@@ -101,7 +101,7 @@ export async function copyVerified({
 }
 
 export async function assertUriDigest(
-  driver: StoredObjectStorageDriver,
+  driver: StoredObjectBlobRepository,
   uri: string,
   expectedSha256: string,
 ): Promise<void> {
@@ -149,7 +149,7 @@ export function createMigrationStorageEndpoint({
   container,
 }: {
   provider: MigrationProvider;
-  driver: StoredObjectStorageDriver;
+  driver: StoredObjectBlobRepository;
   bucket?: string;
   accountName?: string;
   container?: string;

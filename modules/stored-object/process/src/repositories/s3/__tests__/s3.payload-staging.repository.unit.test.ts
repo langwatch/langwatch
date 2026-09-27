@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   PayloadStagingS3TargetRepository,
-  S3PayloadStagingAdapter,
+  S3PayloadStagingRepository,
 } from "#repositories/s3/s3.payload-staging.repository";
-import { AbsentPayloadStagingAdapter } from "#services/absent-payload-staging.service";
+import { AbsentPayloadStagingService } from "#services/absent-payload-staging.service";
 
 function s3(): { client: S3Client; sent: unknown[] } {
   const client = new S3Client({
@@ -29,12 +29,12 @@ function targets(client: S3Client): PayloadStagingS3TargetRepository {
   })();
 }
 
-describe("S3PayloadStagingAdapter", () => {
+describe("S3PayloadStagingRepository", () => {
   describe("given a project with a staging bucket", () => {
     describe("when a payload is staged", () => {
       it("uploads it under the caller's prefix and hands back a presigned GET url", async () => {
         const { client, sent } = s3();
-        const adapter = S3PayloadStagingAdapter.create({
+        const adapter = S3PayloadStagingRepository.create({
           targets: targets(client),
           uniqueSuffix: () => "fixed",
         });
@@ -57,7 +57,7 @@ describe("S3PayloadStagingAdapter", () => {
 
       it("deletes the object when the caller discards it", async () => {
         const { client, sent } = s3();
-        const adapter = S3PayloadStagingAdapter.create({
+        const adapter = S3PayloadStagingRepository.create({
           targets: targets(client),
           uniqueSuffix: () => "fixed",
         });
@@ -76,11 +76,11 @@ describe("S3PayloadStagingAdapter", () => {
   });
 });
 
-describe("AbsentPayloadStagingAdapter", () => {
+describe("AbsentPayloadStagingService", () => {
   describe("given a deployment that composed no object storage", () => {
     describe("when a payload needs staging", () => {
       it("refuses by name rather than posting it inline", () => {
-        expect(() => AbsentPayloadStagingAdapter.create().stage()).toThrow(
+        expect(() => AbsentPayloadStagingService.create().stage()).toThrow(
           PayloadStagingUnavailableError,
         );
       });

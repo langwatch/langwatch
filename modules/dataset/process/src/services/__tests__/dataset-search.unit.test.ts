@@ -5,7 +5,7 @@ import {
   matchesDatasetSearch,
   measureRowsBytes,
   normalizeDatasetSearch,
-} from "../dataset-search.ts";
+} from "../../rules/dataset-search.rules.ts";
 
 describe("normalizeDatasetSearch()", () => {
   it("treats a blank search as no search at all", () => {

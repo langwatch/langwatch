@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   StoredObjectAzureDestination,
-  StoredObjectDestinationPolicyAdapter,
+  StoredObjectDestinationPolicyService,
   StoredObjectProjectS3Config,
   type StoredObjectProjectBucket,
 } from "../services/stored-object-destination-policy.service.ts";
-import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
+import { StoredObjectStorageRegistryService } from "../services/stored-object-storage-registry.service.ts";
 
 class ProjectConfig extends StoredObjectProjectS3Config {
   constructor(private readonly bucket: string | null) {
@@ -30,7 +30,7 @@ class AzureDestination extends StoredObjectAzureDestination {
 describe("Stored Object storage members", () => {
   it("keeps BYOC first and does not resolve inactive Azure configuration", async () => {
     const azure = new AzureDestination();
-    const policy = StoredObjectDestinationPolicyAdapter.create({
+    const policy = StoredObjectDestinationPolicyService.create({
       selection: {
         backend: "azure",
         localFilesystemRoot: "/objects",
@@ -56,7 +56,7 @@ describe("Stored Object storage members", () => {
       delete: async () => undefined,
       exists: async () => false,
     };
-    const registry = StoredObjectStorageRegistryAdapter.create({
+    const registry = StoredObjectStorageRegistryService.create({
       s3: driver,
       file: driver,
       "azure-blob": () => {

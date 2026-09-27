@@ -1,7 +1,7 @@
 import type { StoredObjectStorageAddress } from "#app/stored-object.members";
 
 /** Parses a legacy storage URI back into an address the new store recognises. */
-export abstract class StoredObjectLegacyLocation {
+export abstract class StoredObjectLegacyLocationRepository {
   abstract parse(input: {
     projectId: string;
     storageUri: string;

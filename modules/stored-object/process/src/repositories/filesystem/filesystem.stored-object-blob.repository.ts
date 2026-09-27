@@ -14,7 +14,7 @@ import {
   ObjectNotFoundError,
 } from "@langwatch/stored-object-contract";
 
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 
 const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
 
@@ -45,7 +45,7 @@ function parseFileUri(uri: string): string {
  *
  * See class-level JSDoc for single-replica constraints and atomicity guarantees.
  */
-export class StoredObjectBlobFilesystemRepository implements StoredObjectStorageDriver {
+export class StoredObjectBlobFilesystemRepository implements StoredObjectBlobRepository {
   static create(): StoredObjectBlobFilesystemRepository {
     return new StoredObjectBlobFilesystemRepository();
   }

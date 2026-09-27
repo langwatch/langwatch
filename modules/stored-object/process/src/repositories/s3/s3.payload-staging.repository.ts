@@ -9,7 +9,10 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import { PayloadStaging, type StagedPayload } from "#repositories/payload-staging.repository";
+import {
+  PayloadStagingRepository,
+  type StagedPayload,
+} from "#repositories/payload-staging.repository";
 
 /** Which bucket, on which connection, one project's staged bodies belong in. */
 export type PayloadStagingS3Target = Readonly<{ bucket: string; client: S3Client }>;
@@ -18,14 +21,14 @@ export abstract class PayloadStagingS3TargetRepository {
   abstract resolve(projectId: string): Promise<PayloadStagingS3Target>;
 }
 
-export class S3PayloadStagingAdapter extends PayloadStaging {
+export class S3PayloadStagingRepository extends PayloadStagingRepository {
   static create(options: {
     targets: PayloadStagingS3TargetRepository;
     logger?: Pick<Logger, "debug" | "warn">;
     /** Injected so the object name is deterministic under test. */
     uniqueSuffix?: () => string;
-  }): S3PayloadStagingAdapter {
-    return new S3PayloadStagingAdapter(
+  }): S3PayloadStagingRepository {
+    return new S3PayloadStagingRepository(
       options.targets,
       options.logger,
       options.uniqueSuffix ?? defaultUniqueSuffix,

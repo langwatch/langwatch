@@ -6,9 +6,9 @@ import { type Instant, Temporal, fromDate, nowInstant, toDate } from "@langwatch
 
 import type {
   MigrationDataset,
-  ObjectStorageMigrationInventory,
+  ObjectStorageMigrationInventoryRepository,
 } from "#repositories/object-storage-migration-inventory.repository";
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 
 import {
@@ -37,7 +37,7 @@ export type QueueMigrationBlocker = {
 export type MigrationStorageEndpoint = {
   provider: MigrationProvider;
   scheme: "s3" | "azure-blob";
-  driver: StoredObjectStorageDriver;
+  driver: StoredObjectBlobRepository;
   storedObjectUri(projectId: string, sha256: string): string;
   datasetChunkUri(projectId: string, datasetId: string, index: number): string;
 };
@@ -86,7 +86,7 @@ export class MigrationBlockedError extends Error {
 export type ObjectStorageMigrationDeps = {
   source: MigrationStorageEndpoint;
   destination: MigrationStorageEndpoint;
-  inventory: ObjectStorageMigrationInventory;
+  inventory: ObjectStorageMigrationInventoryRepository;
   /**
    * Must append a newer stored_objects version. It must never ALTER UPDATE or
    * delete the prior version.

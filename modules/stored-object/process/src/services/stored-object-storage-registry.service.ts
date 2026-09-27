@@ -7,8 +7,8 @@ import {
 } from "@langwatch/stored-object-contract";
 
 import type {
-  StoredObjectStorageDriver,
-  StoredObjectStorageDriverFactory,
+  StoredObjectBlobRepository,
+  StoredObjectBlobRepositoryFactory,
 } from "#repositories/stored-object-blob.repository";
 
 import { StoredObjectStorageRepository } from "../repositories/stored-object-storage.repository.ts";
@@ -16,19 +16,19 @@ import { StoredObjectStorageRepository } from "../repositories/stored-object-sto
 /**
  * Provider-neutral scheme dispatch owned by Stored Objects.
  */
-export class StoredObjectStorageRegistryAdapter extends StoredObjectStorageRepository {
+export class StoredObjectStorageRegistryService extends StoredObjectStorageRepository {
   static create(input: {
-    s3: StoredObjectStorageDriver;
-    file: StoredObjectStorageDriver;
-    "azure-blob"?: StoredObjectStorageDriver | StoredObjectStorageDriverFactory;
-  }): StoredObjectStorageRegistryAdapter {
-    return new StoredObjectStorageRegistryAdapter(input);
+    s3: StoredObjectBlobRepository;
+    file: StoredObjectBlobRepository;
+    "azure-blob"?: StoredObjectBlobRepository | StoredObjectBlobRepositoryFactory;
+  }): StoredObjectStorageRegistryService {
+    return new StoredObjectStorageRegistryService(input);
   }
 
   private constructor(input: {
-    s3: StoredObjectStorageDriver;
-    file: StoredObjectStorageDriver;
-    "azure-blob"?: StoredObjectStorageDriver | StoredObjectStorageDriverFactory;
+    s3: StoredObjectBlobRepository;
+    file: StoredObjectBlobRepository;
+    "azure-blob"?: StoredObjectBlobRepository | StoredObjectBlobRepositoryFactory;
   }) {
     super();
     this.drivers = { s3: input.s3, file: input.file };
@@ -40,9 +40,9 @@ export class StoredObjectStorageRegistryAdapter extends StoredObjectStorageRepos
     }
   }
 
-  private readonly drivers: Partial<Record<StoredObjectStorageScheme, StoredObjectStorageDriver>>;
+  private readonly drivers: Partial<Record<StoredObjectStorageScheme, StoredObjectBlobRepository>>;
   private readonly factories: Partial<
-    Record<StoredObjectStorageScheme, StoredObjectStorageDriverFactory>
+    Record<StoredObjectStorageScheme, StoredObjectBlobRepositoryFactory>
   > = {};
 
   // Arrow instance properties, not prototype methods: the base class declares
@@ -66,7 +66,7 @@ export class StoredObjectStorageRegistryAdapter extends StoredObjectStorageRepos
     return this.driverFor(uri).exists(uri);
   };
 
-  private driverFor(uri: string): StoredObjectStorageDriver {
+  private driverFor(uri: string): StoredObjectBlobRepository {
     const scheme = getStoredObjectStorageScheme(uri);
     let driver = this.drivers[scheme];
     const factory = this.factories[scheme];

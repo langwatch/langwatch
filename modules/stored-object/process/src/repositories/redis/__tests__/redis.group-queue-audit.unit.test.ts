@@ -4,9 +4,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  GroupQueueObjectStorageMigrationAdapter,
+  MigrationCutoverAuditRedisRepository,
   type QueueAuditRedis,
-} from "../group-queue.object-storage-migration.service.ts";
+} from "../redis.object-storage-migration-audit.repository.ts";
 
 class AuditRedis implements QueueAuditRedis {
   readonly sets = new Map<string, string[]>();
@@ -21,8 +21,8 @@ class AuditRedis implements QueueAuditRedis {
     return this.sets.get(key) ?? [];
   }
 
-  async get(key: string): Promise<string | null> {
-    return this.strings.get(key) ?? null;
+  async mget(...keys: string[]): Promise<(string | null)[]> {
+    return keys.map((key) => this.strings.get(key) ?? null);
   }
 
   async zcard(key: string): Promise<number> {
@@ -59,12 +59,11 @@ class AuditCluster extends AuditRedis {
     return (await Promise.all(this.masters.map((master) => master.smembers(key)))).flat();
   }
 
-  override async get(key: string): Promise<string | null> {
-    for (const master of this.masters) {
-      const value = await master.get(key);
-      if (value != null) return value;
-    }
-    return null;
+  override async mget(...keys: string[]): Promise<(string | null)[]> {
+    const perMaster = await Promise.all(this.masters.map((master) => master.mget(...keys)));
+    return keys.map(
+      (_, index) => perMaster.map((values) => values[index]).find((value) => value != null) ?? null,
+    );
   }
 
   override async zcard(key: string): Promise<number> {
@@ -104,7 +103,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
       `GQ2|${Buffer.byteLength(header)}|${header}`,
     ]);
 
-    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis, nowMs: 100 });
+    const blockers = await MigrationCutoverAuditRedisRepository.auditQueues({ redis, nowMs: 100 });
 
     expect(blockers).toEqual([
       { queueName: "events", kind: "pending", count: 3 },
@@ -128,7 +127,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
       `GQ2|${Buffer.byteLength(header)}|${header}`,
     ]);
 
-    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis });
+    const blockers = await MigrationCutoverAuditRedisRepository.auditQueues({ redis });
 
     expect(blockers).toEqual([
       {
@@ -147,7 +146,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
     redis.keys.add("blocked-only:gq:blocked");
     redis.sets.set("blocked-only:gq:blocked", ["tenant/group"]);
 
-    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({ redis });
+    const blockers = await MigrationCutoverAuditRedisRepository.auditQueues({ redis });
 
     expect(blockers).toEqual([
       { queueName: "blocked-only", kind: "blocked", count: 1 },
@@ -162,7 +161,7 @@ describe("auditGroupQueuesForStorageMigration", () => {
     secondMaster.sets.set("other-shard:gq:blocked", ["tenant/group"]);
     const cluster = new AuditCluster([firstMaster, secondMaster]);
 
-    const blockers = await GroupQueueObjectStorageMigrationAdapter.audit({
+    const blockers = await MigrationCutoverAuditRedisRepository.auditQueues({
       redis: cluster,
       scanNodes: [firstMaster, secondMaster],
     });

@@ -14,9 +14,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 
-import { S3UriRules } from "#rules/s3-uri.rules";
-const { parseS3Uri } = S3UriRules;
-import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
+import { parseS3Uri } from "#rules/s3-uri.rules";
 
 import type {
   StoredObjectS3Target,
@@ -36,7 +35,7 @@ export type StoredObjectS3ClientPolicy = Readonly<{
 }>;
 
 /** Storage driver for S3-compatible object storage, scoped to one project. */
-export class StoredObjectBlobS3Repository implements StoredObjectStorageDriver {
+export class StoredObjectBlobS3Repository implements StoredObjectBlobRepository {
   static create(options: {
     projectId: string;
     targets: StoredObjectS3TargetResolver;

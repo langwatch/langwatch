@@ -10,15 +10,15 @@ import { TieredBlobStore } from "@langwatch/group-queue/operational";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import {
   StoredObjectAzureDestination,
-  StoredObjectDestinationPolicyAdapter,
+  StoredObjectDestinationPolicyService,
   StoredObjectProjectS3Config,
   type StoredObjectProjectBucket,
 } from "#services/stored-object-destination-policy.service";
-import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
+import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
 import { StoredObjectsService } from "#services/stored-objects.service";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
@@ -59,8 +59,8 @@ function installBlobAccount(): Map<string, Buffer> {
   return blobs;
 }
 
-function azureDriver(): AzureBlobStoredObjectDriverAdapter {
-  return AzureBlobStoredObjectDriverAdapter.create({
+function azureDriver(): AzureStoredObjectBlobRepository {
+  return AzureStoredObjectBlobRepository.create({
     mode: "sharedKey",
     accountName: ACCOUNT,
     accountKey: Buffer.from("account-key").toString("base64"),
@@ -68,7 +68,7 @@ function azureDriver(): AzureBlobStoredObjectDriverAdapter {
 }
 
 /** Only the Azure arm can serve a request: an S3 or file dispatch is a failure. */
-function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
+function azureOnlyRegistry(): StoredObjectStorageRegistryService {
   const driver = azureDriver();
   const refuse = {
     get: async () => {
@@ -84,7 +84,7 @@ function azureOnlyRegistry(): StoredObjectStorageRegistryAdapter {
       throw new Error("no S3 or filesystem provider exists on this install");
     },
   };
-  return StoredObjectStorageRegistryAdapter.create({
+  return StoredObjectStorageRegistryService.create({
     s3: refuse,
     file: refuse,
     "azure-blob": driver,
@@ -104,8 +104,8 @@ class ConfiguredAzure extends StoredObjectAzureDestination {
 }
 
 /** The one deployment both cases run on: azure selected, no S3 anywhere. */
-function azureOnlyPolicy(): StoredObjectDestinationPolicyAdapter {
-  return StoredObjectDestinationPolicyAdapter.create({
+function azureOnlyPolicy(): StoredObjectDestinationPolicyService {
+  return StoredObjectDestinationPolicyService.create({
     selection: {
       backend: "azure",
       localFilesystemRoot: "/var/lib/langwatch/objects",

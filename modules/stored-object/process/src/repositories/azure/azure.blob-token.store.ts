@@ -10,7 +10,10 @@ import {
 } from "@azure/identity";
 import { nowInstant } from "@langwatch/time";
 
-import type { AzureCredentials, AzureTokenAuthMode } from "./azure-blob-credentials.service.ts";
+import type {
+  AzureCredentials,
+  AzureTokenAuthMode,
+} from "#services/azure-blob-credentials.service";
 
 export type TokenModeCredentials = Extract<AzureCredentials, { mode: AzureTokenAuthMode }>;
 
@@ -153,7 +156,7 @@ function startExchange(key: string, credentials: TokenModeCredentials): CacheEnt
  * Cold-cache callers share one exchange because insertion occurs synchronously
  * before the first `await`.
  */
-async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<string> {
+export async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<string> {
   const key = cacheKey(credentials);
   let entry = tokenCache.get(key);
 
@@ -174,23 +177,11 @@ async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<str
  * 401 so the retry acquires a fresh token instead of replaying the one that
  * was just rejected.
  */
-function invalidateAzureBlobToken(credentials: TokenModeCredentials): void {
+export function invalidateAzureBlobToken(credentials: TokenModeCredentials): void {
   tokenCache.delete(cacheKey(credentials));
 }
 
 /** Test-only: clears every cached token so suites don't leak state across tests. */
-function resetAzureTokenCacheForTests(): void {
+export function resetAzureTokenCacheForTests(): void {
   tokenCache.clear();
-}
-
-export class AzureBlobTokenProviderAdapter {
-  private constructor() {}
-
-  static create(): AzureBlobTokenProviderAdapter {
-    return new AzureBlobTokenProviderAdapter();
-  }
-
-  static getAzureBlobToken = getAzureBlobToken;
-  static invalidateAzureBlobToken = invalidateAzureBlobToken;
-  static resetAzureTokenCacheForTests = resetAzureTokenCacheForTests;
 }

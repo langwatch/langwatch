@@ -258,15 +258,17 @@ function assertRequiredVariablesPresent({
  * Transport guards every token-mode credential must pass: no plaintext for bearer
  * tokens, sovereign endpoints must name authority host.
  */
+type AzureTransportSafetyInput = {
+  endpointBaseUrl: string | undefined;
+  authorityHost: string | undefined;
+  allowInsecureTokenEndpointForTests?: boolean | undefined;
+};
+
 function assertTokenModeTransportSafety({
   endpointBaseUrl,
   authorityHost,
   allowInsecureTokenEndpointForTests = false,
-}: {
-  endpointBaseUrl: string | undefined;
-  authorityHost: string | undefined;
-  allowInsecureTokenEndpointForTests?: boolean | undefined;
-}): void {
+}: AzureTransportSafetyInput): void {
   assertHttpsEndpoint(endpointBaseUrl, allowInsecureTokenEndpointForTests);
   assertSovereignAuthority({ endpointBaseUrl, authorityHost });
 }
@@ -275,17 +277,19 @@ function assertTokenModeTransportSafety({
  * Resolves Azure Blob credentials for whichever auth mode is configured, or
  * throws `AzureBackendMisconfiguredError` naming exactly what's wrong.
  */
-function resolveAzureCredentials({
-  config,
-  purpose = "write",
-  identity = {},
-}: {
+type ResolveAzureCredentialsInput = {
   /** The `AZURE_BLOB_*` block, as the process's environment reader read it. */
   config: AzureBlobCredentialsConfig;
   purpose?: "read" | "write";
   /** The platform-injected federated identity, as the composition root read it. */
   identity?: AzureInjectedIdentity;
-}): AzureCredentials {
+};
+
+function resolveAzureCredentials({
+  config,
+  purpose = "write",
+  identity = {},
+}: ResolveAzureCredentialsInput): AzureCredentials {
   // Pinned rather than inferred, which is what makes the exhaustiveness check
   // at the bottom of this function real: against a widened string it would
   // silently pass.
@@ -353,13 +357,19 @@ function resolveAzureCredentials({
   }
 }
 
-export class AzureBlobCredentialsAdapter {
-  private constructor() {}
-
-  static create(): AzureBlobCredentialsAdapter {
-    return new AzureBlobCredentialsAdapter();
+/** Validates a deployment's Azure Blob settings and resolves the credentials it signs with. */
+export class AzureBlobCredentialsService {
+  static create(): AzureBlobCredentialsService {
+    return new AzureBlobCredentialsService();
   }
 
-  static assertTokenModeTransportSafety = assertTokenModeTransportSafety;
-  static resolveAzureCredentials = resolveAzureCredentials;
+  private constructor() {}
+
+  resolve(input: ResolveAzureCredentialsInput): AzureCredentials {
+    return resolveAzureCredentials(input);
+  }
+
+  assertTokenModeTransportSafety(input: AzureTransportSafetyInput): void {
+    assertTokenModeTransportSafety(input);
+  }
 }

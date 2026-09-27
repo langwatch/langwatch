@@ -26,12 +26,12 @@ export abstract class StoredObjectProjectS3Config {
 }
 
 /** Pure BYOC-first destination policy; environment parsing stays at roots. */
-export class StoredObjectDestinationPolicyAdapter extends StoredObjectProjectDestinationResolver {
+export class StoredObjectDestinationPolicyService extends StoredObjectProjectDestinationResolver {
   static create(options: {
     selection: StoredObjectStorageSelection;
     projects: StoredObjectProjectS3Config;
-  }): StoredObjectDestinationPolicyAdapter {
-    return new StoredObjectDestinationPolicyAdapter(options.selection, options.projects);
+  }): StoredObjectDestinationPolicyService {
+    return new StoredObjectDestinationPolicyService(options.selection, options.projects);
   }
 
   private constructor(

@@ -9,16 +9,16 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryStoredObjectBlobRepository } from "../memory/memory.stored-object-blob.repository.ts";
 import { MemoryStoredObjectBlobStore } from "../memory/memory.stored-object-blob.store.ts";
-import type { StoredObjectStorageDriver } from "../stored-object-blob.repository.ts";
+import type { StoredObjectBlobRepository } from "../stored-object-blob.repository.ts";
 
-const backends: readonly { name: string; create: () => StoredObjectStorageDriver }[] = [
+const backends: readonly { name: string; create: () => StoredObjectBlobRepository }[] = [
   { name: "memory", create: () => MemoryStoredObjectBlobRepository.create() },
 ];
 
 const URI = "s3://bucket/project_acme/so_aaaaaaaa";
 const BYTES = Buffer.from("the payload");
 
-async function readAll(repository: StoredObjectStorageDriver, uri: string): Promise<Buffer> {
+async function readAll(repository: StoredObjectBlobRepository, uri: string): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for await (const chunk of await repository.get(uri)) {
     chunks.push(Buffer.from(chunk as Buffer));
