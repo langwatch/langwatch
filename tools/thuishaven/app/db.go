@@ -38,8 +38,8 @@ type seedPreset struct {
 }
 
 // seedPresets is the registry of variants, shared by `db seed` and `db reset`.
-// Every entry is env switches that prisma/seed.ts reads for itself — see
-// packages/prisma-client/prisma/seed.ts, which is the whole seed now.
+// Every entry is env switches the storage-seed task reads for itself — see
+// apps/tasks/src/storage-seed/storage-seed.ts, which is the whole seed now.
 var seedPresets = map[string]seedPreset{
 	"demo":            {env: []string{"HAVEN_SEED_PRESET=demo"}, summary: "past onboarding, with the demo prompt, HTTP agent and dataset"},
 	"onboarding":      {env: []string{"HAVEN_SEED_FIRST_MESSAGE=0"}, summary: "a fresh onboarding journey (first-trace flag cleared)"},

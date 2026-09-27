@@ -6,8 +6,8 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
-    // The local-dev / CI fixture. It reads the repository-root .env itself, so
-    // it needs no dotenv preload here.
-    seed: "pnpm --filter @langwatch/storage-seed run seed",
+    // The local-dev / CI fixture: the tasks runner's storage-seed task, which
+    // loads the repository-root .env itself.
+    seed: "pnpm --filter @langwatch/tasks task storage-seed",
   },
 });

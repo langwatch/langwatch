@@ -279,9 +279,9 @@ only add or refresh, never discard — and `haven db reset` is the destructive
 sibling that starts from a fresh, migrated database. Both take a preset:
 `demo` marks the project past onboarding and adds the demo prompt, HTTP agent
 and dataset, `onboarding` / `post-onboarding` flip the first-trace flag, and
-`bare` seeds the identity alone. Every preset is switches that
-`packages/prisma-client/prisma/seed.ts` reads for itself, so none of them
-needs a running stack.
+`bare` seeds the identity alone. Every preset is switches that the
+`storage-seed` task (`apps/tasks/src/storage-seed/storage-seed.ts`) reads for
+itself, so none of them needs a running stack.
 
 `traces` and `mass` are RETIRED and refused by name. Both existed only to run
 ingest scripts through the live stack's collector — `seed:sample-traces`,
@@ -517,7 +517,7 @@ The monolith layout is `origin/main`, and it exists here so `apidiff` and
   seeds idempotently. Nothing about the local dev identity is ever randomly
   generated — the same admin login, org/team/project/user IDs, and API
   tokens exist on every worktree and every machine. See the doc comment at
-  the top of `packages/prisma-client/prisma/seed.ts` for the exact values (admin email +
+  the top of `apps/tasks/src/storage-seed/storage-seed.ts` for the exact values (admin email +
   password, ingestion key `sk-lw-local-development-key` (override
   `LANGWATCH_LOCAL_API_KEY`), a private full-access personal access token,
   and a public ingestion-only token).

@@ -4,26 +4,18 @@
  * API tokens — plaintext identical everywhere, only the bcrypt hash differs.
  */
 
-import fs from "fs";
-import { fileURLToPath } from "url";
+import { createHmac } from "node:crypto";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { hashApiKeySecret } from "@langwatch/api-key-process";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
-import {
-  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-  resolveSeedLicense,
-} from "@langwatch/enterprise-licensing-process/seeding";
-import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-process/testing";
 import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";
-import { runScript, writeScriptWarning } from "@langwatch/observability";
-import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
-import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { aesEncryption, type Encryption } from "@langwatch/process-stores";
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { AesGcmSecretEncryptionService } from "@langwatch/secret-process";
 import { hash as hashPassword } from "bcrypt";
-import { parse as parseDotenv } from "dotenv";
 
+import type { TaskInput } from "../config.ts";
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
 import {
   adminGrantBindings,
@@ -38,13 +30,13 @@ import {
   resolveSeedEmailDomain,
   seedEmailAddress,
 } from "./seed-identity.ts";
+import {
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  resolveSeedLicense,
+  TEST_SUITE_ENTERPRISE_LICENSE_KEY,
+} from "./seed-license.ts";
 
-/** The lane name haven runs this under, and what its structured lines carry. */
-const SEED_LANE = "seed";
-
-const prisma = new PrismaClient({
-  adapter: PrismaDriverAdapterService.create().createOwnedAdapter(process.env.DATABASE_URL ?? ""),
-});
+const logger = createLogger("langwatch:tasks:storage-seed");
 
 const ORG_ID = "local-dev-organization";
 const ORG_SLUG = "local-dev-org";
@@ -60,13 +52,6 @@ const PROJECT_NAME = "Local Dev Project";
 
 const ADMIN_USER_ID = "local-dev-admin-user";
 const ADMIN_LOCAL_PART = "admin";
-// SEED_EMAIL_DOMAIN is a purely opt-in per-stack override (see
-// seed-identity.ts); unset, every seeded address stays on the one stable
-// global domain.
-const ADMIN_EMAIL = seedEmailAddress({
-  localPart: ADMIN_LOCAL_PART,
-  domainOverride: resolveSeedEmailDomain({ environment: process.env }),
-});
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
 
@@ -91,37 +76,47 @@ const MODEL_DEFAULT_CONFIG_ID = "local-dev-model-default-config";
 const DEFAULT_PROMPT_TAG = "production";
 const DEFAULT_PROMPT_TAG_ID = "local-dev-prompt-tag-production";
 
-async function main() {
-  // Both pepper keys are optional in development. Absent, the seed says which
-  // ones it looked for, once, and goes on to seed everything that does not
+/** The idempotent local-dev / CI seed: fixed ids and tokens, written straight to the database. */
+export async function storageSeed({ connections, environment }: TaskInput): Promise<void> {
+  const database = connections.database;
+  if (!database) throw new Error("This task needs DATABASE_URL");
+  const prisma = database.client;
+
+  // SEED_EMAIL_DOMAIN is a purely opt-in per-stack override (see seed-identity.ts); unset,
+  // every seeded address stays on the one stable global domain.
+  const adminEmail = seedEmailAddress({
+    localPart: ADMIN_LOCAL_PART,
+    domainOverride: resolveSeedEmailDomain({ environment }),
+  });
+
+  // Absent, the seed names the pepper it looked for, once, and seeds everything that does not
   // need one — never a stack trace, and never a failed `haven up`.
-  const { pepper: apiKeyPepper, absent } = await resolveApiKeyPepper({ source: process.env });
+  const { pepper: apiKeyPepper, absent } = await resolveApiKeyPepper({ source: environment });
   if (apiKeyPepper === undefined) {
-    writeScriptWarning({
-      name: SEED_LANE,
-      msg: "no API-key pepper is configured — seeding the local identity without its access tokens",
-      fields: { absent },
-    });
+    logger.warn(
+      { absent },
+      "no API-key pepper is configured — seeding the local identity without its access tokens",
+    );
   }
   // Prefer the haven-injected local credential (HAVEN_SEED_LANGWATCH_API_KEY); the
   // platform never carries LANGWATCH_API_KEY anymore, but keep it as a fallback for
   // non-haven flows that still pass one explicitly.
   const apiKey =
-    process.env.HAVEN_SEED_LANGWATCH_API_KEY ??
-    process.env.LANGWATCH_API_KEY ??
+    environment.HAVEN_SEED_LANGWATCH_API_KEY ??
+    environment.LANGWATCH_API_KEY ??
     DEFAULT_INGESTION_KEY;
   // Redact — in non-haven flows apiKey may be a real credential, and logs get shipped.
-  console.log(`🌱 Seeding static local dev identity (ingestion key: ${apiKey.slice(0, 8)}…)`);
+  logger.info({ ingestionKey: `${apiKey.slice(0, 8)}…` }, "seeding the static local dev identity");
 
   // HAVEN_SEED_PRESET=demo seeds the project as already past onboarding, so
   // the UI opens on the real product instead of the "waiting for your first
   // message" journey (`haven seed --preset demo` sets this and ingests sample
   // traces). HAVEN_SEED_FIRST_MESSAGE=1|0 overrides the flag independently.
-  const firstMessageOverride = process.env.HAVEN_SEED_FIRST_MESSAGE;
+  const firstMessageOverride = environment.HAVEN_SEED_FIRST_MESSAGE;
   const hasFirstMessageOverride = firstMessageOverride !== undefined;
   const isPastOnboarding = hasFirstMessageOverride
     ? firstMessageOverride === "1" || firstMessageOverride === "true"
-    : process.env.HAVEN_SEED_PRESET === "demo";
+    : environment.HAVEN_SEED_PRESET === "demo";
 
   // The license must verify against the key this app boots with, otherwise
   // every settings page reports it as invalid. `resolveSeedLicense` keeps a
@@ -210,7 +205,7 @@ async function main() {
   const user = await prisma.user.upsert(
     buildAdminUserUpsertArgs({
       adminUserId: ADMIN_USER_ID,
-      email: ADMIN_EMAIL,
+      email: adminEmail,
       name: ADMIN_NAME,
     }),
   );
@@ -271,6 +266,7 @@ async function main() {
   // login — it just cannot write a hash the applications would verify.
   if (apiKeyPepper !== undefined) {
     await seedAccessTokens({
+      prisma,
       apiKeyPepper,
       organizationId: organization.id,
       projectId: project.id,
@@ -303,6 +299,7 @@ async function main() {
         scopeType: "ORGANIZATION",
         scopeId: organization.id,
       },
+      configId: defaultConfig.id,
     },
     create: {
       configId: defaultConfig.id,
@@ -315,10 +312,15 @@ async function main() {
   // Provider credentials are stored AES-GCM-encrypted under the same pepper,
   // so they are skipped for the same reason the access tokens are.
   if (apiKeyPepper !== undefined) {
-    await seedModelProvidersFromEnv(organization.id, apiKeyPepper);
+    await seedModelProvidersFromEnv({
+      prisma,
+      environment,
+      organizationId: organization.id,
+      encryption: aesEncryption(new Uint8Array(Buffer.from(apiKeyPepper, "hex"))),
+    });
   }
 
-  if (process.env.HAVEN_SEED_PRESET === "demo") {
+  if (environment.HAVEN_SEED_PRESET === "demo") {
     await seedDemoPlatform({
       prisma,
       projectId: project.id,
@@ -327,19 +329,22 @@ async function main() {
     });
   }
 
-  console.log(`✅ Organization: ${organization.id} (${organization.slug})`);
-  console.log(`✅ Team:         ${team.id} (${team.slug})`);
-  console.log(`✅ Project:      ${project.id} (${project.slug})`);
-  console.log(`✅ Admin login:  ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-  // Only echo the key in full when it's the non-secret default; otherwise redact
-  // (same rationale as the seeding log above — real credentials must not hit shipped logs).
+  // Only the non-secret default ingestion key is shown in full; anything else is redacted.
   const displayApiKey =
     project.apiKey === DEFAULT_INGESTION_KEY ? project.apiKey : `${project.apiKey.slice(0, 8)}…`;
-  console.log(`✅ Ingestion key:        ${displayApiKey}`);
-  if (apiKeyPepper !== undefined) {
-    console.log(`✅ Private access token: ${PRIVATE_ACCESS_TOKEN}`);
-    console.log(`✅ Public access token:  ${PUBLIC_ACCESS_TOKEN}`);
-  }
+  logger.info(
+    {
+      organization: `${organization.id} (${organization.slug})`,
+      team: `${team.id} (${team.slug})`,
+      project: `${project.id} (${project.slug})`,
+      adminLogin: `${adminEmail} / ${ADMIN_PASSWORD}`,
+      ingestionKey: displayApiKey,
+      ...(apiKeyPepper !== undefined
+        ? { privateAccessToken: PRIVATE_ACCESS_TOKEN, publicAccessToken: PUBLIC_ACCESS_TOKEN }
+        : {}),
+    },
+    "seeded the static local dev identity",
+  );
 }
 
 /**
@@ -347,11 +352,13 @@ async function main() {
  * because they are the one part of the seed a checkout with no pepper skips.
  */
 async function seedAccessTokens({
+  prisma,
   apiKeyPepper,
   organizationId,
   projectId,
   userId,
 }: {
+  prisma: PrismaClient;
   apiKeyPepper: string;
   organizationId: string;
   projectId: string;
@@ -364,16 +371,16 @@ async function seedAccessTokens({
     where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Private Access Token",
-      description: "Static local-dev personal access token seeded by @langwatch/storage-seed",
+      description: "Static local-dev personal access token seeded by the storage-seed task",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
-      hashedSecret: hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret({ secret: PRIVATE_TOKEN_SECRET, pepper: apiKeyPepper }),
       permissionMode: "all",
       userId: userId,
       createdByUserId: userId,
       organizationId: organizationId,
     },
     update: {
-      hashedSecret: hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret({ secret: PRIVATE_TOKEN_SECRET, pepper: apiKeyPepper }),
       userId: userId,
       organizationId: organizationId,
       revokedAt: null,
@@ -423,14 +430,14 @@ async function seedAccessTokens({
     create: {
       name: "Local Dev Public Ingestion Token",
       description:
-        "Static local-dev ingestion-only token (traces:create) seeded by @langwatch/storage-seed",
+        "Static local-dev ingestion-only token (traces:create) seeded by the storage-seed task",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
-      hashedSecret: hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret({ secret: PUBLIC_TOKEN_SECRET, pepper: apiKeyPepper }),
       permissionMode: "restricted",
       organizationId: organizationId,
     },
     update: {
-      hashedSecret: hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
+      hashedSecret: hashApiKeySecret({ secret: PUBLIC_TOKEN_SECRET, pepper: apiKeyPepper }),
       organizationId: organizationId,
       revokedAt: null,
     },
@@ -456,31 +463,9 @@ async function seedAccessTokens({
 
 const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 
-/**
- * The at-rest format for ModelProvider.customKeys: AES-256-GCM under the
- * deployment's own 32-byte hex pepper, written `iv:ciphertext:authTag` —
- * `@langwatch/secret-process` owns the format; the key comes from the boot seam.
- */
-function encryptCredentials(value: string, key: string): string {
-  return AesGcmSecretEncryptionService.create({ key }).encrypt(value);
-}
-
-// loadSeedEnv merges dotenv layers with process env winning over the
-// repository-root .env, resolving the path from this file rather than
-// process.cwd(): the seed runs as a prisma `migrations.seed` command, a
-// package script, and via haven from the repo root — all three read the same file.
-function loadSeedEnv(): Record<string, string> {
-  const merged: Record<string, string> = {};
-  const rootEnv = fileURLToPath(new URL("../../../.env", import.meta.url));
-  // An absent file is fine: the process environment may already carry
-  // everything. A file that is present and unreadable is not, and throws.
-  if (fs.existsSync(rootEnv)) {
-    Object.assign(merged, parseDotenv(fs.readFileSync(rootEnv)));
-  }
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v !== undefined) merged[k] = v;
-  }
-  return merged;
+/** The api-key module's at-rest hash: HMAC-SHA256 of the secret under the pepper, in hex. */
+function hashApiKeySecret({ secret, pepper }: { secret: string; pepper: string }): string {
+  return createHmac("sha256", pepper).update(secret).digest("hex");
 }
 
 type ModelProviderDefinition = (typeof modelProviders)[keyof typeof modelProviders];
@@ -520,35 +505,38 @@ function missingProviderKeys({
 }
 
 async function seedModelProviderFromEnv({
+  prisma,
   provider,
   def,
   envMap,
   organizationId,
-  pepper,
+  encryption,
 }: {
+  prisma: PrismaClient;
   provider: string;
   def: ModelProviderDefinition;
-  envMap: Record<string, string>;
+  envMap: Readonly<Record<string, string | undefined>>;
   organizationId: string;
-  pepper: string;
+  encryption: Encryption;
 }): Promise<void> {
   const names = providerKeyNames(def);
   const keys: Record<string, string> = {};
   for (const name of names) {
-    if (name && envMap[name]) keys[name] = envMap[name];
+    const value = name ? envMap[name] : undefined;
+    if (name && value) keys[name] = value;
   }
   const missing = missingProviderKeys({ provider, def, names, keys });
   const parsed = def.keysSchema.safeParse(keys);
   if (!parsed.success || missing.length > 0) {
-    const missingText = missing.length > 0 ? ` (missing ${missing.join(", ")})` : "";
-    console.log(
-      `⏭️  Model provider ${provider}: ${def.apiKey} is set but the key set is incomplete${missingText} — skipped`,
+    logger.info(
+      { provider, apiKey: def.apiKey, missing },
+      "model provider skipped: its API key is set but the key set is incomplete",
     );
     return;
   }
 
   const id = MODEL_PROVIDER_ID_PREFIX + provider;
-  const customKeys = encryptCredentials(JSON.stringify(keys), pepper);
+  const customKeys = encryption.encrypt(JSON.stringify(keys));
   const row = await prisma.modelProvider.upsert({
     where: { id },
     create: {
@@ -568,6 +556,7 @@ async function seedModelProviderFromEnv({
         scopeType: "ORGANIZATION",
         scopeId: organizationId,
       },
+      modelProviderId: row.id,
     },
     create: {
       modelProviderId: row.id,
@@ -576,31 +565,36 @@ async function seedModelProviderFromEnv({
     },
     update: {},
   });
-  console.log(`✅ Model provider: ${provider} (keys from environment)`);
+  logger.info({ provider }, "model provider seeded from the environment");
 }
 
-async function seedModelProvidersFromEnv(organizationId: string, pepper: string) {
-  const flag = process.env.HAVEN_SEED_MODEL_PROVIDERS;
+async function seedModelProvidersFromEnv({
+  prisma,
+  environment,
+  organizationId,
+  encryption,
+}: {
+  prisma: PrismaClient;
+  environment: Readonly<Record<string, string | undefined>>;
+  organizationId: string;
+  encryption: Encryption;
+}) {
+  const flag = environment.HAVEN_SEED_MODEL_PROVIDERS;
   if (flag === "0" || flag === "false") {
-    console.log("⏭️  Model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
+    logger.info("model providers: seeding disabled (HAVEN_SEED_MODEL_PROVIDERS=0)");
     return;
   }
-  const envMap = loadSeedEnv();
   for (const [provider, def] of Object.entries(modelProviders)) {
     // "custom" has no inferable identity from the environment; skip it.
     if (provider === "custom") continue;
-    if (!envMap[def.apiKey]) continue;
-    await seedModelProviderFromEnv({ provider, def, envMap, organizationId, pepper });
+    if (!environment[def.apiKey]) continue;
+    await seedModelProviderFromEnv({
+      prisma,
+      provider,
+      def,
+      envMap: environment,
+      organizationId,
+      encryption,
+    });
   }
 }
-
-await runScript({
-  name: SEED_LANE,
-  main: async () => {
-    try {
-      await main();
-    } finally {
-      await prisma.$disconnect();
-    }
-  },
-});

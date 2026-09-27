@@ -22,6 +22,7 @@ import {
   type TasksConfig,
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
+import { storageSeed } from "./storage-seed/storage-seed.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
 import { lwqlRenderAccessConfig } from "./lwql-render-access-config.ts";
 import { prismaMigrate } from "./prisma-migrate.ts";
@@ -34,6 +35,7 @@ const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
   ["lwql-render-access-config", lwqlRenderAccessConfig],
   ["system-migrations-pass", systemMigrationsPass],
   ["clear-stale-pending-sso-setup", clearStalePendingSsoSetup],
+  ["storage-seed", storageSeed],
 ]);
 
 /** Tasks that never touch the migration database, so never wait on its advisory lock. */

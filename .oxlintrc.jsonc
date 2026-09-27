@@ -171,13 +171,9 @@
       "rules": { "node/no-process-env": "off" },
     },
     {
-      // Substrate that boots below the config layer: the logger, the migration
-      // runner and the seed tool run before any composed config exists.
-      "files": [
-        "packages/observability/**",
-        "packages/clickhouse-migrations/src/**",
-        "packages/storage-seed/**",
-      ],
+      // Substrate that boots below the config layer: the logger and the
+      // migration runner run before any composed config exists.
+      "files": ["packages/observability/**", "packages/clickhouse-migrations/src/**"],
       "rules": { "node/no-process-env": "off" },
     },
     {

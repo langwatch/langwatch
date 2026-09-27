@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability";
 import { ExperimentType, type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
@@ -106,7 +107,7 @@ export async function seedDemoPlatform({
   });
 
   await prisma.llmPromptConfigVersion.upsert({
-    where: { configId_version: { configId: prompt.id, version: 1 } },
+    where: { configId_version: { configId: prompt.id, version: 1 }, projectId },
     create: {
       id: DEMO_PLATFORM_IDS.promptVersion,
       configId: prompt.id,
@@ -219,6 +220,7 @@ export async function seedDemoPlatform({
         projectId,
         slug: "demo-support-regression",
       },
+      projectId,
     },
     create: {
       id: DEMO_PLATFORM_IDS.suite,
@@ -246,6 +248,7 @@ export async function seedDemoPlatform({
         projectId,
         slug: "demo-support-regression",
       },
+      projectId,
     },
     create: {
       id: DEMO_PLATFORM_IDS.dataset,
@@ -270,7 +273,7 @@ export async function seedDemoPlatform({
 
   for (const [index, entry] of DATASET_ROWS.entries()) {
     await prisma.datasetRecord.upsert({
-      where: { id: `demo-dataset-record-${index + 1}` },
+      where: { id: `demo-dataset-record-${index + 1}`, projectId },
       create: {
         id: `demo-dataset-record-${index + 1}`,
         datasetId: dataset.id,
@@ -287,6 +290,7 @@ export async function seedDemoPlatform({
         projectId,
         slug: "demo-support-quality",
       },
+      projectId,
     },
     create: {
       id: DEMO_PLATFORM_IDS.experiment,
@@ -352,7 +356,16 @@ export async function seedDemoPlatform({
     update: { archivedAt: null },
   });
 
-  console.log(
-    `✅ Demo platform: 3 agents, 1 prompt, 2 evaluators, ${scenarios.length} scenarios, 1 suite, ${DATASET_ROWS.length} dataset rows, experiment ${experiment.slug}`,
+  createLogger("langwatch:tasks:storage-seed").info(
+    {
+      agents: 3,
+      prompts: 1,
+      evaluators: 2,
+      scenarios: scenarios.length,
+      suites: 1,
+      datasetRows: DATASET_ROWS.length,
+      experiment: experiment.slug,
+    },
+    "seeded the demo platform",
   );
 }

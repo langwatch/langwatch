@@ -1,22 +1,23 @@
 import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 
-import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY, resolveSeedLicense } from "../seeding.ts";
-import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
-import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
+import {
+  isSignedFor,
+  LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
+  resolveSeedLicense,
+  TEST_SUITE_ENTERPRISE_LICENSE_KEY as TEST_SUITE_LICENSE_KEY,
+} from "../seed-license.ts";
 
-const cryptography = NodeLicenseCryptographyService.create();
-
-function isSignedFor({
-  licenseKey,
-  publicKey,
-}: {
-  licenseKey: string;
-  publicKey: string;
-}): boolean {
-  const parsed = cryptography.parseLicenseKey(licenseKey);
-  return parsed !== null && cryptography.verifySignature(parsed, publicKey);
-}
+/** The public half of the licensing test suite's key pair, which signs TEST_SUITE_LICENSE_KEY. */
+const TEST_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApmJ61eRR1wxrapjipSmN
+IqYMJPmbonA1d6XV51kdnVs/MdNrrdoWIal6TDt2lHvbAbrEalqR7h+vQzBBZ4St
+ZPqBzTIHQwu3Wjlj7Fj7IeVUiJnRg60W+u9DmYXUeFBlZFMHxV3nNVqedwDcFpV/
+IrAMmSe3QeTqBztcDMBxu5luA4DMU5Hi6kp4qcHDoCCiEH4a6ZZkPdNC+xpFdW41
+75BwdKBKnyOZrUvyPaKrxInra7z+9YQKiggRciQvCNxc76Ef4DLGkTIf36Cvm7XL
+m0gqlJm89dYcRBaDVGFTnb98BM7SrAIg117yjuuw5o/RmSlKq9/Klkz0QsXYF9Zj
+iQIDAQAB
+-----END PUBLIC KEY-----`;
 
 const SEED_CANDIDATES = [LOCAL_DEV_ENTERPRISE_LICENSE_KEY, TEST_SUITE_LICENSE_KEY] as const;
 

@@ -12,7 +12,13 @@
       "path": "../../modules/analytics/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/api-key/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/auth/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/process/tsconfig.build.json"
@@ -30,6 +36,9 @@
       "path": "../../modules/data-privacy/process/tsconfig.build.json"
     },
     {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -40,6 +49,9 @@
     },
     {
       "path": "../../modules/identity/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../packages/observability/tsconfig.build.json"
@@ -54,7 +66,13 @@
       "path": "../../packages/process-server/tsconfig.build.json"
     },
     {
+      "path": "../../packages/process-stores/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/role/contract/tsconfig.build.json"
     },
     {
       "path": "../../packages/secrets/tsconfig.build.json"
@@ -75,13 +93,16 @@
       "path": "../../packages/kernel/tsconfig.build.json"
     },
     {
-      "path": "../../packages/process-stores/tsconfig.build.json"
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
     },
     {
       "path": "../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../packages/vitest-config/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }
