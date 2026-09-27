@@ -1,3 +1,6 @@
+import { createServer, type Server } from "node:http";
+
+import { RawHttpHost } from "@langwatch/api";
 import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
@@ -9,7 +12,7 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hostedMcpServer } from "../../hosted-mcp.server.ts";
 
@@ -44,5 +47,59 @@ describe("hosted MCP app installation", () => {
     } finally {
       await runtime.stop();
     }
+  });
+});
+
+describe("hosted MCP door installation", () => {
+  const doors = RawHttpHost.create();
+  let stopRuntime: () => Promise<void> = () => Promise.resolve();
+  let server: Server;
+  let origin = "";
+
+  beforeAll(async () => {
+    const runtime = await process()
+      .expose(() => ({
+        hosts: { rest: { mount: () => undefined }, rawhttp: doors },
+        serve: () => undefined,
+      }))
+      .boot();
+    stopRuntime = () => runtime.stop();
+    server = createServer(
+      doors.ahead((_request, response) => {
+        response.writeHead(404, { "Content-Type": "text/plain" }).end("routes");
+      }),
+    );
+    await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
+    const address = server.address();
+    if (address === null || typeof address === "string") throw new Error("no port bound");
+    origin = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await doors.close();
+    await new Promise<void>((stopped) => server.close(() => stopped()));
+    await stopRuntime();
+  });
+
+  /** @scenario "The hosted MCP door mounts on the api process and its health path answers" */
+  it("answers the health path through the mounted door", async () => {
+    const response = await fetch(`${origin}/mcp/health`);
+
+    expect({ status: response.status, body: await response.json() }).toEqual({
+      status: 200,
+      body: { status: "ok" },
+    });
+  });
+
+  /** @scenario "An unpublished metadata suffix answers main's JSON 404" */
+  it("answers an unpublished metadata suffix with a JSON 404", async () => {
+    const response = await fetch(`${origin}/.well-known/oauth-protected-resource/elsewhere`);
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+  });
+
+  it("leaves every path it does not claim to the routes", async () => {
+    expect(await (await fetch(`${origin}/api/mcp/authorize`)).text()).toBe("routes");
   });
 });

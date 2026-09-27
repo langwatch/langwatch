@@ -1086,6 +1086,11 @@ never thinks about resolution at all. The per-module resolver adapters
   door: a path pattern and a handler given the request, the raw socket and `head`, hosted on its own
   port by the role that owns the children. A public address the role resolves at boot is a supplied
   member (`{ url } | { unavailable }`), never a module writing `process.env` (Alex, 2026-09-27).
+- A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
+  declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
+  everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
+  close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
+  `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
 - **A route's documentation lives on the route, in its own `.withDocs()`

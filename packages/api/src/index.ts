@@ -36,6 +36,13 @@ export {
   RawSocketProtocol,
   type RawSocketUpgrade,
 } from "./raw-socket.ts";
+export {
+  RawHttpHost,
+  RawHttpProtocol,
+  type RawHttpDoor,
+  type RawHttpExchange,
+  type RawHttpListener,
+} from "./raw-http.ts";
 
 export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
 

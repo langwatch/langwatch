@@ -410,3 +410,66 @@ describe("given a feature whose server declares a raw-socket door", () => {
     });
   });
 });
+
+/** One declared raw HTTP door, standing in for a `RawHttpProtocol`. */
+const endpointDoor = {
+  protocol: "rawhttp",
+  router: () => ({ paths: ["/mcp"] }),
+} as const;
+
+describe("given a feature whose server declares a raw HTTP door", () => {
+  const server = defineServerModule("dataset")
+    .withApp(CatalogueApp)
+    .withTransports(catalogueRest, endpointDoor);
+
+  describe("when the api process opened its raw HTTP host", () => {
+    /** @scenario "A declared raw HTTP door mounts on the api process, bound to its module's application" */
+    it("mounts the door on it, bound to the feature's own app", async () => {
+      const doors: { declaration: object; app: unknown }[] = [];
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({
+          rest: recordingRestHost(),
+          rawhttp: { mount: (declaration, app) => doors.push({ declaration, app: app() }) },
+        })
+        .withModules([server])
+        .boot();
+
+      expect(doors).toHaveLength(1);
+      expect(doors[0]?.declaration).toEqual({ paths: ["/mcp"] });
+      const app = doors[0]?.app;
+      if (!readsCatalogue(app)) throw new Error("the door was bound to no catalogue app");
+      expect(app.read()).toBe("one dataset");
+    });
+  });
+
+  describe("when the api process opened no raw HTTP host", () => {
+    /** @scenario "An api process without a raw HTTP host refuses a declared door by name" */
+    it("refuses boot naming the feature and the protocol", async () => {
+      const booting = createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest: recordingRestHost() })
+        .withModules([server])
+        .boot();
+
+      await expect(booting).rejects.toMatchObject({
+        name: "MissingTransportHostError",
+        feature: "dataset",
+        protocol: "raw HTTP",
+      });
+    });
+  });
+
+  describe("when the worker boots the same feature", () => {
+    /** @scenario "The worker never mounts a raw HTTP door" */
+    it("opens no door", async () => {
+      const doors: object[] = [];
+
+      await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withTransports({ rawhttp: { mount: (declaration) => doors.push(declaration) } })
+        .withModules([server])
+        .boot();
+
+      expect(doors).toHaveLength(0);
+    });
+  });
+});
