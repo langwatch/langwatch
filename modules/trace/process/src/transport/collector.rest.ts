@@ -36,14 +36,11 @@ import {
   resolveTraceId,
   type CollectorBody,
   type CollectorErrorReport,
+  type CollectorIngestInput,
+  type CollectorIngestOutcome,
   type CollectorMetadata,
   type CollectorRejection,
 } from "#rules/trace-collector-body.rules";
-import {
-  TraceCollectorDispatchService,
-  type CollectorEvaluationReport,
-  type CollectorSpanIngest,
-} from "#services/trace-collector-dispatch.service";
 
 const logger = createLogger("langwatch.collector");
 
@@ -85,19 +82,8 @@ export type CollectorApp = Readonly<{
    * the operations-only proxy throws on a name it doesn't serve.
    */
   collectorUsageLimit: CollectorUsageLimit;
-  /** Where a normalized span goes. Required: it is the whole of this door. */
-  ingestSpan: CollectorSpanIngest;
-  /**
-   * Where a custom SDK evaluation goes. Answers that the evaluation was refused
-   * where the process registered no evaluation pipeline.
-   */
-  reportEvaluation: CollectorEvaluationReport;
-  /**
-   * The evaluator-id slug rule, for an evaluation naming none. Supplied by
-   * the process because the rule is EVALUATION's — a feature server package
-   * may not reach into another feature's server package.
-   */
-  deriveEvaluatorId: (name: string) => string;
+  /** Dispatches a validated body's spans and evaluations; the whole of this door. */
+  collectorIngest: (input: CollectorIngestInput) => Promise<CollectorIngestOutcome>;
   collectorReportError: CollectorErrorReport;
 }>;
 
@@ -232,11 +218,6 @@ function prepareCollectorBody(
   return { spans, traceId, metadata };
 }
 
-/**
- * Total ingestion failure (e.g. Redis/group-queue outage): no fallback
- * stack, so a 200 would mean permanent trace loss. Return 500 so clients
- * retry; releaseOnFailure makes that safe. Partial success stays 2xx.
- */
 async function ingestCollectorBody(input: {
   project: CollectorProject;
   app: CollectorApp;
@@ -244,59 +225,39 @@ async function ingestCollectorBody(input: {
   prepared: PreparedCollectorBody;
 }): Promise<CollectorAnswer> {
   const { project, app, params, prepared } = input;
-  const { spans, traceId, metadata } = prepared;
 
-  const dispatch = TraceCollectorDispatchService.create({
-    ingestSpan: app.ingestSpan,
-    deriveEvaluatorId: app.deriveEvaluatorId,
-    reportEvaluation: app.reportEvaluation,
-  });
-
-  const { freshSpans, droppedOldSpans, droppedUnstorableSpans } = dispatch.partitionFreshSpans(
-    spans,
-    {
-      projectId: project.id,
-      traceId,
-    },
-  );
-
-  const spanOutcome = await dispatch.dispatchSpans(freshSpans, {
+  const outcome = await app.collectorIngest({
     projectId: project.id,
-    traceId,
-    droppedOldSpans,
-    droppedUnstorableSpans,
-    metadata,
+    traceId: prepared.traceId,
+    spans: prepared.spans,
+    metadata: prepared.metadata,
     expectedOutput: params.expected_output,
+    evaluations: params.evaluations ?? [],
   });
 
-  if (freshSpans.length > 0 && spanOutcome.dispatchFailures === freshSpans.length) {
+  if (outcome.kind === "failed") {
     return answer(
       {
-        message: `Failed to ingest all ${spanOutcome.dispatchFailures} spans, please retry`,
+        message: `Failed to ingest all ${outcome.spans.dispatchFailures} spans, please retry`,
         partialSuccess: {
-          rejectedSpans: spanOutcome.rejectedSpans,
-          errorMessage: spanOutcome.rejectionErrors.join("; "),
+          rejectedSpans: outcome.spans.rejectedSpans,
+          errorMessage: outcome.spans.rejectionErrors.join("; "),
         },
       },
       500,
     );
   }
 
-  const evaluations = params.evaluations ?? [];
-  const evaluationOutcome =
-    evaluations.length > 0
-      ? await dispatch.dispatchEvaluations(evaluations, { projectId: project.id, traceId })
-      : { rejectedEvaluations: 0, evaluationErrors: [] };
-
   return answer(
     {
       message: "Trace received successfully.",
       partialSuccess: {
-        rejectedSpans: spanOutcome.rejectedSpans,
-        rejectedEvaluations: evaluationOutcome.rejectedEvaluations,
-        errorMessage: [...spanOutcome.rejectionErrors, ...evaluationOutcome.evaluationErrors].join(
-          "; ",
-        ),
+        rejectedSpans: outcome.spans.rejectedSpans,
+        rejectedEvaluations: outcome.evaluations.rejectedEvaluations,
+        errorMessage: [
+          ...outcome.spans.rejectionErrors,
+          ...outcome.evaluations.evaluationErrors,
+        ].join("; "),
       },
     },
     200,

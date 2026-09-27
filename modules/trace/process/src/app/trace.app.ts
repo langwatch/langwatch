@@ -263,6 +263,10 @@ import {
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
 import type * as traceContractModule from "@langwatch/trace-contract";
 
+import type {
+  CollectorIngestInput,
+  CollectorIngestOutcome,
+} from "../rules/trace-collector-body.rules.ts";
 import {
   traceDerivedAttrPrefixes,
   traceReadMapperPorts,
@@ -276,10 +280,11 @@ import {
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
-import type {
-  CollectorEvaluationReportInput,
-  CollectorSpanIngestInput,
-  CollectorSpanIngestResult,
+import {
+  TraceCollectorDispatchService,
+  type CollectorEvaluationReportInput,
+  type CollectorSpanIngestInput,
+  type CollectorSpanIngestResult,
 } from "../services/trace-collector-dispatch.service.ts";
 import { TraceExportProgressService } from "../services/trace-export-progress.service.ts";
 import { TraceFacetValuesService } from "../services/trace-facet-values.service.ts";
@@ -2767,6 +2772,15 @@ export class TraceApp implements TraceApi, CollectorApp {
   /** The evaluator-id slug rule, as EVALUATION's own module spells it. */
   deriveEvaluatorId(name: string): string {
     return this.#dependencies.evaluations.deriveEvaluatorId(name);
+  }
+
+  /** One validated collector body, fanned out to the span and evaluation pipelines. */
+  collectorIngest(input: CollectorIngestInput): Promise<CollectorIngestOutcome> {
+    return TraceCollectorDispatchService.create({
+      ingestSpan: (span) => this.ingestSpan(span),
+      reportEvaluation: (evaluation) => this.reportEvaluation(evaluation),
+      deriveEvaluatorId: (name) => this.deriveEvaluatorId(name),
+    }).ingest(input);
   }
 
   /** A failure the door answered but did not raise, kept off the customer's body. */

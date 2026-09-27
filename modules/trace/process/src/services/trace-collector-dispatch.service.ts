@@ -7,11 +7,17 @@ import { nowInstant } from "@langwatch/time";
 import {
   DEFAULT_PII_REDACTION_LEVEL,
   SPAN_MAX_PAST_MS,
-  type CollectorRESTParamsValidator,
   type Span,
 } from "@langwatch/trace-contract";
 
-import type { CollectorMetadata } from "#rules/trace-collector-body.rules";
+import type {
+  CollectorEvaluation,
+  CollectorIngestInput,
+  CollectorIngestOutcome,
+  CollectorMetadata,
+  EvaluationDispatchOutcome,
+  SpanDispatchOutcome,
+} from "#rules/trace-collector-body.rules";
 import { TraceCollectorSpanService } from "#services/trace-collector-span.service";
 
 import { isStorableSpanTimeMs } from "../rules/storable-span-time.rules.ts";
@@ -121,13 +127,6 @@ function ingestionFailureDetails(
   return details;
 }
 
-/** What the span fan-out rejected, in the vocabulary `partialSuccess` answers with. */
-export type SpanDispatchOutcome = Readonly<{
-  rejectedSpans: number;
-  dispatchFailures: number;
-  rejectionErrors: string[];
-}>;
-
 async function fanOutSpans(
   freshSpans: Span[],
   input: Readonly<{
@@ -219,14 +218,6 @@ async function dispatchSpans(
     };
   }
 }
-
-/** What the evaluation fan-out rejected. */
-export type EvaluationDispatchOutcome = Readonly<{
-  rejectedEvaluations: number;
-  evaluationErrors: string[];
-}>;
-
-export type CollectorEvaluation = NonNullable<CollectorRESTParamsValidator["evaluations"]>[number];
 
 async function reportOneEvaluation(
   evaluation: CollectorEvaluation,
@@ -372,6 +363,38 @@ export class TraceCollectorDispatchService {
     }>,
   ): Promise<SpanDispatchOutcome> {
     return dispatchSpans(freshSpans, { ...input, ingestSpan: this.members.ingestSpan });
+  }
+
+  /**
+   * Total ingestion failure (e.g. Redis/group-queue outage) has no fallback stack, so a 200
+   * would mean permanent trace loss: the door answers 500 so clients retry. Partial success
+   * stays 2xx.
+   */
+  async ingest(input: CollectorIngestInput): Promise<CollectorIngestOutcome> {
+    const { projectId, traceId } = input;
+    const { freshSpans, droppedOldSpans, droppedUnstorableSpans } = this.partitionFreshSpans(
+      input.spans,
+      { projectId, traceId },
+    );
+
+    const spans = await this.dispatchSpans(freshSpans, {
+      projectId,
+      traceId,
+      droppedOldSpans,
+      droppedUnstorableSpans,
+      metadata: input.metadata,
+      expectedOutput: input.expectedOutput,
+    });
+    if (freshSpans.length > 0 && spans.dispatchFailures === freshSpans.length) {
+      return { kind: "failed", spans };
+    }
+
+    const evaluations =
+      input.evaluations.length > 0
+        ? await this.dispatchEvaluations(input.evaluations, { projectId, traceId })
+        : { rejectedEvaluations: 0, evaluationErrors: [] };
+
+    return { kind: "received", spans, evaluations };
   }
 
   /**

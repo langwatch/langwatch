@@ -178,3 +178,9 @@ export class EventingTracePipelineAdapter {
     return buildTracePipeline(this.options);
   }
 }
+
+/** The exact definition Trace's builder produces, commands and projections
+ * included. Type-preserves the commands (recordSpan as itself, not as union). */
+export type TraceProcessingPipelineDefinition = ReturnType<
+  ReturnType<EventingTracePipelineAdapter["build"]>["build"]
+>;

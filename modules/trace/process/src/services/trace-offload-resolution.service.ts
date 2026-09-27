@@ -1,4 +1,4 @@
-import type { Logger as PinoLogger } from "@langwatch/observability";
+import { createLogger, type Logger as PinoLogger } from "@langwatch/observability";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
@@ -9,9 +9,13 @@ import type { TraceIOExtractionService } from "#services/trace-io-extraction.ser
  * event_log and leans projections, so the fold holds preview IO; the read path resolves the
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
+import type { ResolveTraceSpansFn } from "../repositories/trace-legacy-read.repository.ts";
 import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
+import type { BlobResolutionDeps } from "./trace-legacy-read.service.ts";
+
+const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
 export type WarnLogger = Pick<PinoLogger, "warn" | "error">;
@@ -46,6 +50,18 @@ export class TraceOffloadResolutionService {
   }
 
   private constructor() {}
+
+  /** The per-trace resolver a legacy read calls, bound to one blob store. */
+  resolverFor(deps: BlobResolutionDeps): ResolveTraceSpansFn {
+    return (projectId, normalizedSpans) =>
+      this.resolveOffloadedTraces({
+        projectId,
+        normalizedSpans,
+        blobStore: deps.blobStore,
+        ioExtractionService: deps.ioExtractionService,
+        logger: offloadResolutionLogger,
+      });
+  }
 
   /**
    * Resolves offloaded event refs for one trace's normalized spans, replacing spanAttributes with

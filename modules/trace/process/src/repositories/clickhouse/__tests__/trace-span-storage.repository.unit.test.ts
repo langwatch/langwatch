@@ -1,7 +1,9 @@
-import { SecurityError } from "@langwatch/eventing";
+import { createTenantId, SecurityError } from "@langwatch/eventing";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { createTestSpan } from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
+import { SpanStorageStore } from "../../../eventing/span-storage.store.ts";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
@@ -336,9 +338,13 @@ describe("TraceSpanStorageClickHouseRepository", () => {
      * @scenario "A span without a retention of its own is stamped with the deployment's"
      */
     it("stamps the fallback on a span that declares none", async () => {
-      const { clickhouse, repo } = repository(49);
+      const { clickhouse, repo } = repository(7);
+      const store = SpanStorageStore.create({ storage: repo, defaultRetentionDays: () => 49 });
 
-      await repo.insertSpan({ ...span(), retentionDays: undefined as unknown as number });
+      await store.append(createTestSpan({}), {
+        aggregateId: "trace-1",
+        tenantId: createTenantId("project-1"),
+      });
 
       expect(clickhouse.rows()[0]?._retention_days).toBe(49);
     });

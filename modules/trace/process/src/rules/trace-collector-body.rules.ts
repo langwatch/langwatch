@@ -212,6 +212,40 @@ export type CollectorMetadata = Readonly<{
   customMetadata: CustomMetadata;
 }>;
 
+/** What the span fan-out rejected, in the vocabulary `partialSuccess` answers with. */
+export type SpanDispatchOutcome = Readonly<{
+  rejectedSpans: number;
+  dispatchFailures: number;
+  rejectionErrors: string[];
+}>;
+
+/** What the evaluation fan-out rejected. */
+export type EvaluationDispatchOutcome = Readonly<{
+  rejectedEvaluations: number;
+  evaluationErrors: string[];
+}>;
+
+export type CollectorEvaluation = NonNullable<CollectorRESTParamsValidator["evaluations"]>[number];
+
+/** One validated collector body: its spans, the trace they share, and its evaluations. */
+export type CollectorIngestInput = Readonly<{
+  projectId: string;
+  traceId: string;
+  spans: Span[];
+  metadata: CollectorMetadata;
+  expectedOutput: string | null | undefined;
+  evaluations: CollectorEvaluation[];
+}>;
+
+/** Every span failed to dispatch, or the body was received with what it rejected. */
+export type CollectorIngestOutcome =
+  | Readonly<{ kind: "failed"; spans: SpanDispatchOutcome }>
+  | Readonly<{
+      kind: "received";
+      spans: SpanDispatchOutcome;
+      evaluations: EvaluationDispatchOutcome;
+    }>;
+
 function splitMetadata(metadata: Record<string, unknown>): CollectorMetadata {
   const reservedTraceMetadata = Object.fromEntries(
     Object.entries(reservedTraceMetadataSchema.parse(metadata)).filter(
