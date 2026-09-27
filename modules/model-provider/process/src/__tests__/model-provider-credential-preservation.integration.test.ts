@@ -1,3 +1,4 @@
+import { MASKED_KEY_PLACEHOLDER } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * Real-Postgres coverage for the credential a customer never retyped.
@@ -75,6 +76,36 @@ describe.skipIf(!DB_URL)(
     afterAll(async () => {
       await cleanupTenancyFixture(prisma, fixture);
       await prisma.$disconnect();
+    });
+
+    describe("given an azure provider saved with a key, an endpoint and a header", () => {
+      describe("when the save answers with the stored provider", () => {
+        /** @scenario Saving a provider answers with its credentials masked */
+        it("masks the key and the header value and keeps the endpoint", async () => {
+          const plaintextKey = `sk-answer-${ns}`;
+          const headerSecret = `header-${ns}`;
+          const saved = await command.upsert({
+            projectId: fixture.projectId,
+            actorId: fixture.adminUserId,
+            provider: "azure",
+            enabled: true,
+            customKeys: {
+              AZURE_OPENAI_API_KEY: plaintextKey,
+              AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+            },
+            extraHeaders: [{ key: "x-acme", value: headerSecret }],
+            scopes: [{ scopeType: "PROJECT", scopeId: fixture.projectId }],
+          } as never);
+
+          expect(saved.customKeys).toEqual({
+            AZURE_OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            AZURE_OPENAI_ENDPOINT: "https://acme.openai.azure.com",
+          });
+          expect(saved.extraHeaders).toEqual([{ key: "x-acme", value: MASKED_KEY_PLACEHOLDER }]);
+          expect(JSON.stringify(saved)).not.toContain(plaintextKey);
+          expect(JSON.stringify(saved)).not.toContain(headerSecret);
+        });
+      });
     });
 
     describe("given an azure provider with stored credentials", () => {

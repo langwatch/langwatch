@@ -93,7 +93,16 @@ export class ModelProviderCommandService {
     await this.seedOnboardingDefaults(existing, saved);
     await this.saveProjectDefault(parsed);
 
-    return saved;
+    return this.withMaskedCredentials(saved);
+  }
+
+  /** A write answers what a read answers: the caller already holds what it sent. */
+  private withMaskedCredentials(provider: ModelProvider): ModelProvider {
+    return {
+      ...provider,
+      customKeys: this.options.credentialPolicy.toMaskedKeys(provider.customKeys),
+      extraHeaders: this.options.credentialPolicy.maskHeaders(provider.extraHeaders),
+    };
   }
 
   /** The project key's legacy shape: the provider string names the one row it already holds. */

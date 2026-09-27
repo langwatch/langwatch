@@ -2143,7 +2143,8 @@ describe("ModelProviderService", () => {
         enabled: true,
         customKeys: { apiKey: "replacement" },
       }),
-    ).resolves.toMatchObject({ customKeys: { apiKey: "replacement" } });
+    ).resolves.toBeDefined();
+    expect(providers.rows[0]?.customKeys).toEqual({ apiKey: "replacement" });
   });
 
   it("keeps an omitted secret while accepting a replacement endpoint", async () => {
