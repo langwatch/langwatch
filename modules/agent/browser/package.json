@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/agent.web.ts",
       "types": "./dist/agent.web.d.ts",
       "default": "./src/agent.web.ts"
-    },
-    "./agent-http-editor": {
-      "langwatch-declaration-source": "./src/agent-http-editor.ts",
-      "types": "./dist/agent-http-editor.d.ts",
-      "default": "./src/agent-http-editor.ts"
     }
   },
   "scripts": {
