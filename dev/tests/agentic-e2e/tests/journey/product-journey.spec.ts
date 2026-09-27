@@ -2,6 +2,8 @@
  * The browser product journey.
  * Spec: specs/e2e/browser-product-journey.feature
  */
+import { closeDb, findUserIdByEmail } from "../front-door/db";
+import { whenIOpenTheConfirmationLinkFor } from "../front-door/steps";
 import { expect, test, type BrowserContext, type Locator, type Page } from "../test.ts";
 import { ECHO_AGENT_REPLY } from "./echo-agent";
 import { NO_MODEL_PROVIDER_KEY as NO_KEY } from "./journey.constants";
@@ -56,30 +58,29 @@ test.describe("browser product journey", () => {
 
   test.afterAll(async () => {
     await context?.close();
+    await closeDb();
   });
 
   // @scenario "Sign-up refuses a password confirmation that does not match"
   test("refuses a sign-up whose password confirmation does not match", async () => {
-    await openSignUp();
+    const email = `mismatch-${RUN}@example.test`;
+    await reachTheSignUpCredentialForm(email);
 
-    await page.getByLabel("Name").fill(ACCOUNT.name);
-    await page.getByLabel("Email").fill(`mismatch-${RUN}@example.test`);
     await page.getByLabel("Password", { exact: true }).fill(ACCOUNT.password);
-    await page.getByLabel("Confirm Password").fill(`${ACCOUNT.password}-other`);
-    await page.getByRole("button", { name: /^sign up$/i }).click();
+    await page.getByLabel("Confirm password", { exact: true }).fill(`${ACCOUNT.password}-other`);
+    await page.getByRole("button", { name: "Create account", exact: true }).click();
 
-    await expect(page.getByText(/passwords don't match/i)).toBeVisible();
+    await expect(page.getByText("The two passwords are not the same")).toBeVisible();
     await expect(page).toHaveURL(/\/auth\/signup/);
+    expect(await findUserIdByEmail(email)).toBeNull();
   });
 
   // @scenario "Signing up creates the account and signs me in"
   test("signs up a fresh account through the real form", async () => {
-    await openSignUp();
-    await page.getByLabel("Name").fill(ACCOUNT.name);
-    await page.getByLabel("Email").fill(ACCOUNT.email);
+    await reachTheSignUpCredentialForm(ACCOUNT.email);
     await page.getByLabel("Password", { exact: true }).fill(ACCOUNT.password);
-    await page.getByLabel("Confirm Password").fill(ACCOUNT.password);
-    await page.getByRole("button", { name: /^sign up$/i }).click();
+    await page.getByLabel("Confirm password", { exact: true }).fill(ACCOUNT.password);
+    await page.getByRole("button", { name: "Create account", exact: true }).click();
 
     // Registration is one slow call on a loaded machine, and the sign-in it
     // performs can land after the form has settled back; the account exists
@@ -130,8 +131,18 @@ test.describe("browser product journey", () => {
       const chosen = (await intent.isVisible().catch(() => false))
         ? intent
         : page.getByRole("radio").first();
-      if (await chosen.isVisible().catch(() => false)) {
-        await chosen.click().catch(() => undefined);
+      // Each option is a card over a visually hidden input, so the card is what
+      // a person clicks.
+      const unchosen =
+        (await chosen.count()) > 0 &&
+        !(await chosen.isChecked({ timeout: 2000 }).catch(() => true));
+      if (unchosen) {
+        await page
+          .locator("label")
+          .filter({ has: chosen })
+          .first()
+          .click({ timeout: 5000 })
+          .catch(() => undefined);
       }
 
       const forward = page.getByRole("button", { name: /^(next|finish)$/i }).first();
@@ -587,13 +598,26 @@ async function visit(path: string): Promise<void> {
  */
 async function openSignUp(): Promise<void> {
   await visit("/auth/signup");
-  const heading = page.getByRole("heading", { name: /^sign up$/i });
+  const heading = page.getByRole("heading", { name: "Create your LangWatch account" });
   try {
     await heading.waitFor({ state: "visible", timeout: 45000 });
   } catch {
     await page.reload({ waitUntil: "domcontentloaded" });
     await heading.waitFor({ state: "visible", timeout: 90000 });
   }
+}
+
+/**
+ * Sign-up asks for the address first and collects a credential only once the
+ * emailed link is opened; the link's token is read from Postgres.
+ */
+async function reachTheSignUpCredentialForm(email: string): Promise<void> {
+  await openSignUp();
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByTestId("verification-sent")).toBeVisible({ timeout: 30000 });
+  await whenIOpenTheConfirmationLinkFor(page, email);
+  await expect(page.getByTestId("signup-identifier")).toContainText(email, { timeout: 60000 });
 }
 
 /**
@@ -607,7 +631,7 @@ async function recoverSession(): Promise<boolean> {
 
   // The bounce can land while the lane that serves the form is still coming
   // back, which paints an empty sign-in page; one reload is enough once it has.
-  const email = page.getByLabel("Email");
+  const email = page.getByLabel("Email", { exact: true });
   try {
     await email.waitFor({ state: "visible", timeout: 30000 });
   } catch {
@@ -616,9 +640,14 @@ async function recoverSession(): Promise<boolean> {
   }
   if (!(await email.isVisible().catch(() => false))) return false;
 
+  // Sign-in is address first: the password step appears once the address is routed.
   await email.fill(ACCOUNT.email);
-  await page.getByLabel("Password", { exact: true }).fill(ACCOUNT.password);
-  await page.getByRole("button", { name: /^sign in$/i }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  const password = page.getByLabel("Password", { exact: true });
+  await password.waitFor({ state: "visible", timeout: 30000 }).catch(() => undefined);
+  if (!(await password.isVisible().catch(() => false))) return false;
+  await password.fill(ACCOUNT.password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await page
     .waitForURL((url) => !url.pathname.startsWith("/auth/"), { timeout: 90000 })
     .catch(() => undefined);

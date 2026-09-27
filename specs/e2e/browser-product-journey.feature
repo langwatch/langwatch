@@ -18,8 +18,8 @@ Feature: Browser product journey
   @e2e
   Scenario: Signing up creates the account and signs me in
     Given I am on the sign-up page
-    When I give my name, my email address and a password twice
-    And I submit the form
+    When I give my email address and open the confirmation link it sends
+    And I choose a password twice and submit
     Then I am signed in and no longer on an authentication page
 
   @e2e
@@ -88,6 +88,7 @@ Feature: Browser product journey
   @e2e
   Scenario: Sign-up refuses a password confirmation that does not match
     Given I am on the sign-up page
+    And I have confirmed my email address through the link it sends
     When I type two different passwords and submit
     Then the form tells me the passwords do not match
     And no account is created
