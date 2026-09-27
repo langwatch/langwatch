@@ -3,13 +3,13 @@
  * Conversation renderer output: flattenMessages → ConversationThread drawing.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { type FlattenableMessage, flattenMessages } from "@langwatch/trace-browser-kit";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ConversationThread } from "../conversation-thread.tsx";
-import { type FlattenableMessage, flattenMessages } from "@langwatch/trace-browser-kit";
 
 const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
 

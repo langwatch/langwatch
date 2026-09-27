@@ -1,14 +1,11 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { collectMediaParts, type MediaPartData } from "@langwatch/trace-browser-kit";
 import { isPythonRepr, parsePythonInsideJson } from "@langwatch/trace-contract";
 import type { CollapsedFieldProps } from "@microlink/react-json-view";
 import React, { lazy, Suspense } from "react";
 
-import {
-  collectMediaParts,
-  type MediaPartData,
-} from "@langwatch/trace-browser-kit";
 import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output.tsx";
 import { CopyIcon } from "../../elements/icons/copy.tsx";
 import { showErrorToast } from "../errors/index.ts";

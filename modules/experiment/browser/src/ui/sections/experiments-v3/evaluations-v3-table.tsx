@@ -42,6 +42,7 @@ import {
   isCellInExecution,
   toComparisonConfig,
 } from "@langwatch/experiment-contract";
+import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import { nowInstant } from "@langwatch/time";
 
 import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
@@ -63,7 +64,6 @@ import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
 } from "../../../model/experiments-v3/http-agent-utils.ts";
-import { evaluatorHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
 import {

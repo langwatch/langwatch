@@ -1,4 +1,5 @@
 import { Box, VStack } from "@chakra-ui/react";
+import { groupIntoTurns } from "@langwatch/trace-browser-kit";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 
 import type {
@@ -6,7 +7,6 @@ import type {
   ConversationRoleMode,
   DisplayPart,
 } from "./conversation.types.ts";
-import { groupIntoTurns } from "@langwatch/trace-browser-kit";
 import {
   ErrorPart,
   ImagePart,

@@ -1,4 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { mediaRefToMediaData } from "@langwatch/trace-browser-kit";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { RESERVED_INPUT_MEDIA_REFS, RESERVED_OUTPUT_MEDIA_REFS } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo, useRef } from "react";
@@ -7,7 +8,6 @@ import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import { mediaRefToMediaData } from "@langwatch/trace-browser-kit";
 import {
   mediaRefBelongsToSide,
   parseMediaRefs,

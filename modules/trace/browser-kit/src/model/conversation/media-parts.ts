@@ -10,7 +10,6 @@ import {
   type MediaPartRole,
   type TraceMediaRef,
 } from "@langwatch/trace-contract";
-
 import {
   parseBase64DataUri,
   type ContentPartVisitor,
@@ -19,7 +18,6 @@ import {
 import type { MediaPartData } from "@langwatch/trace-contract/conversation";
 
 import { containsMediaMarkers } from "./media-markers.ts";
-
 
 /**
  * Shared recursion ceiling for media walks — identical on the render-side collector

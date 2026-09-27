@@ -2,9 +2,8 @@
  * Compact trace-level media references.
  */
 
-import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
-
 import { type CollectedMediaPart, collectAnnotatedMediaParts } from "@langwatch/trace-browser-kit";
+import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
 
 /** Which summary strip a ref belongs on. */
 export type TraceMediaSide = "input" | "output";
