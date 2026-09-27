@@ -128,7 +128,7 @@ describe("LangWatchQLHydrationService.hydrate", () => {
 });
 
 describe("LangWatchQLHydrationService.hydrateTexts", () => {
-  it("restricts the caller's own statement to the traces asked about", async () => {
+  it("reads the caller's own statement as a page pass over the traces asked about", async () => {
     const { execute, service } = hydrationService();
 
     await service.hydrateTexts({
@@ -140,11 +140,9 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
     });
 
     const [input] = execute.mock.calls[0] ?? [];
-    expect(input?.sql).toContain("lwql_hydration_trace_ids");
-    expect(input?.parameters).toEqual({
-      since: "yesterday",
-      lwql_hydration_trace_ids: ["trace-a"],
-    });
+    expect(input?.sql).toBe("SELECT TraceId FROM analytics.traces");
+    expect(input?.parameters).toEqual({ since: "yesterday" });
+    expect(input?.pass).toEqual({ kind: "page", traceIds: ["trace-a"] });
   });
 
   it("answers the text an eval would judge rather than a verdict, calling no judge", async () => {

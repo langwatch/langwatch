@@ -1,30 +1,24 @@
 /**
- * The reads a run performs, each a wrapper around the caller's own statement,
- * run through Analytics as the project's restricted identity. A result cut
+ * The reads a run performs, each a pass Analytics wraps around the caller's own
+ * statement after re-validating it, run as the project's restricted identity. A result cut
  * short is an error here, never a shorter answer.
  * @see specs/instant-evals/instant-eval-pipeline.feature
  */
 
-import type {
-  LangWatchQLCaller,
-  LangWatchQLColumn,
-  LangWatchQLPassInput,
-  LangWatchQLProtections,
-  LangWatchQLQueryResult,
+import {
+  isLangWatchQLPassKeyColumn,
+  type LangWatchQLCaller,
+  type LangWatchQLColumn,
+  type LangWatchQLPass,
+  type LangWatchQLPassInput,
+  type LangWatchQLProtections,
+  type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
 import { Temporal } from "@langwatch/time";
 
 import {
-  INSTANT_EVAL_AFTER_PARAMETER,
-  INSTANT_EVAL_AFTER_SPAN_PARAMETER,
-  INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER,
   INSTANT_EVAL_TRACE_COLUMN,
-  instantEvalCountSql,
-  instantEvalKeyPassSql,
-  instantEvalPagesBySpan,
-  instantEvalProbeSql,
   instantEvalSampleBuckets,
-  instantEvalSampleKeysSql,
 } from "../rules/instant-eval-composition.rules.ts";
 import {
   instantEvalRowText,
@@ -100,11 +94,7 @@ export class InstantEvalRowSourceService {
 
   /** What the statement projects, without reading a row or judging anything. */
   async probe(input: InstantEvalPassInput): Promise<readonly LangWatchQLColumn[]> {
-    const execution = await this.#run({
-      ...input,
-      sql: instantEvalProbeSql(input.sql),
-      maxRows: 1,
-    });
+    const execution = await this.#run({ ...input, pass: { kind: "probe" }, maxRows: 1 });
 
     return execution.columns;
   }
@@ -117,9 +107,9 @@ export class InstantEvalRowSourceService {
   async count(input: InstantEvalPassInput & { limit: number }): Promise<number> {
     const execution = await this.#run({
       ...input,
-      sql: instantEvalCountSql({ sql: input.sql, limit: input.limit }),
+      pass: { kind: "count", limit: input.limit },
       maxRows: 1,
-      pass: "count",
+      name: "count",
     });
     const total = execution.rows[0]?.total;
     if (typeof total === "number") return total;
@@ -142,26 +132,16 @@ export class InstantEvalRowSourceService {
     // One row past the page, which is how "there is more" is learned without a
     // second count over the same statement.
     const probeLimit = input.limit + 1;
-    const bySpan = instantEvalPagesBySpan(input.keyColumns);
     const execution = await this.#run({
       ...input,
-      sql: instantEvalKeyPassSql({
-        sql: input.sql,
-        keyColumns: input.keyColumns,
+      pass: {
+        kind: "keys",
+        keyColumns: input.keyColumns.filter(isLangWatchQLPassKeyColumn),
         limit: probeLimit,
-        hasCursor: input.after !== undefined,
-      }),
-      parameters: {
-        ...input.parameters,
-        ...(input.after === undefined
-          ? {}
-          : {
-              [INSTANT_EVAL_AFTER_PARAMETER]: input.after.traceId,
-              ...(bySpan ? { [INSTANT_EVAL_AFTER_SPAN_PARAMETER]: input.after.spanId ?? "" } : {}),
-            }),
+        ...(input.after === undefined ? {} : { after: input.after }),
       },
       maxRows: probeLimit,
-      pass: "key",
+      name: "key",
     });
 
     return {
@@ -185,17 +165,11 @@ export class InstantEvalRowSourceService {
   ): Promise<readonly InstantEvalRowKey[]> {
     const execution = await this.#run({
       ...input,
-      sql: instantEvalSampleKeysSql({
-        sql: input.sql,
-        keyColumns: input.keyColumns,
+      pass: {
+        kind: "sample",
+        keyColumns: input.keyColumns.filter(isLangWatchQLPassKeyColumn),
         limit: input.limit,
-      }),
-      parameters: {
-        ...input.parameters,
-        [INSTANT_EVAL_SAMPLE_BUCKET_PARAMETER]: instantEvalSampleBuckets({
-          total: input.total,
-          limit: input.limit,
-        }),
+        buckets: instantEvalSampleBuckets({ total: input.total, limit: input.limit }),
       },
       maxRows: input.limit,
     });
@@ -205,26 +179,31 @@ export class InstantEvalRowSourceService {
 
   /**
    * Runs one pass as the caller and refuses a result that outgrew its bound.
-   * `pass` names the read in the refusal; a pass that cannot outgrow its own
+   * `name` names the read in the refusal; a pass that cannot outgrow its own
    * SQL bound passes none.
    */
   async #run({
     caller,
+    protections,
     sql,
     parameters,
-    maxRows,
     pass,
+    maxRows,
+    name,
   }: InstantEvalPassInput & {
+    pass: LangWatchQLPass;
     maxRows: number;
-    pass?: string;
+    name?: string;
   }): Promise<LangWatchQLQueryResult> {
     const execution = await this.analytics.executeLangWatchQLPass({
       project: caller,
+      protections,
       sql,
       ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
+      pass,
     });
     const isTruncated = execution.rows.length > maxRows;
-    if (isTruncated && pass !== undefined) throw new InstantEvalResultTruncatedError(pass);
+    if (isTruncated && name !== undefined) throw new InstantEvalResultTruncatedError(name);
 
     return execution;
   }

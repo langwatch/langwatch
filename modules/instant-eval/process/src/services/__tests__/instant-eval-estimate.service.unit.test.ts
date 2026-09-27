@@ -44,9 +44,10 @@ class ScriptedRunner implements InstantEvalStatementRunner {
   constructor(private readonly total: number) {}
 
   async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
-    const rows = input.sql.startsWith("SELECT count()")
-      ? [{ total: this.total }]
-      : [...Array(Math.min(this.total, 50)).keys()].map((index) => ({ TraceId: `t${index}` }));
+    const rows =
+      input.pass.kind === "count"
+        ? [{ total: this.total }]
+        : [...Array(Math.min(this.total, 50)).keys()].map((index) => ({ TraceId: `t${index}` }));
 
     return {
       columns: [{ name: "TraceId", type: "String" }],

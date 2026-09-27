@@ -301,13 +301,26 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     Then exactly one spend record is reported for the run
     And it carries our cost, the customer price and the tokens
 
-  # apidiff parity with main: a run's passes wrap the accepted statement in a
-  # subquery, where the policy refuses an app function. Main ran them on the
-  # restricted identity without a second policy walk, and so does this.
+  # Every pass re-validates the caller's statement with the full policy, then
+  # runs it inside a wrapper Analytics composes from the pass's kind (probe,
+  # count, keys, sample, page). A caller names a kind and never sends wrapper SQL.
   @unit
   Scenario: A statement calling eval at the top level runs its passes
     Given a statement that calls eval in its top-level projection
-    And the policy accepted it for the run
-    When a pass wraps it in a subquery and runs
-    Then the pass reaches the database as the caller's restricted identity
-    And it is not refused for the eval call's position
+    And the project may call eval functions
+    When each pass kind runs it
+    Then the statement is re-validated and accepted
+    And the pass reaches the database inside its wrapper as the caller's restricted identity
+
+  @unit
+  Scenario: A pass re-validates its statement with the full policy
+    Given a statement the query policy refuses
+    When a pass is asked to run it
+    Then the pass is refused with the policy's own code
+    And nothing reaches the database
+
+  @unit
+  Scenario: A pass cannot carry SQL of its own
+    Given a pass naming wrapper SQL, an unknown kind or an unlisted key column
+    When it is asked to run
+    Then it is refused before anything reaches the database

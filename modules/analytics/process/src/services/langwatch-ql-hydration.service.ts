@@ -12,7 +12,6 @@ import {
   type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
-  LWQL_HYDRATION_TRACE_IDS_PARAMETER,
 } from "@langwatch/analytics-contract";
 
 import {
@@ -26,7 +25,6 @@ import {
   collectLangWatchQLKeys,
   langWatchQLExtractionPlan,
 } from "../rules/langwatch-ql-hydration-plan.rules.ts";
-import { langWatchQLTraceRestrictedSql } from "../rules/langwatch-ql-hydration-sql.rules.ts";
 import type { LangWatchQLHydrationComputeService } from "./langwatch-ql-hydration-compute.service.ts";
 import {
   type LangWatchQLHydrationReadService,
@@ -145,8 +143,10 @@ export class LangWatchQLHydrationService {
     if (traceIds.length === 0) return [];
     const execution = await this.runner.executeLangWatchQLPass({
       project,
-      sql: langWatchQLTraceRestrictedSql(sql),
-      parameters: { ...parameters, [LWQL_HYDRATION_TRACE_IDS_PARAMETER]: [...traceIds] },
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+      pass: { kind: "page", traceIds },
     });
     const hydrated = await this.hydrate({
       projectIds: [project.id],

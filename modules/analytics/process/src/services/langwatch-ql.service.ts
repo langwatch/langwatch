@@ -9,7 +9,9 @@ import {
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
+  langWatchQLPassSchema,
   type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLEvalGate,
   type LangWatchQLPassInput,
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
@@ -23,6 +25,7 @@ import type {
   LangWatchQLExecutorRepository,
   LangWatchQLResultLimits,
 } from "../repositories/langwatch-ql-executor.repository.ts";
+import { langWatchQLPassSql } from "../rules/langwatch-ql-pass-sql.rules.ts";
 import { appendDefaultRowLimit } from "../rules/langwatch-ql-row-limit.rules.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LWQL_VIEW_CATALOG } from "../rules/lwql-view-catalog.rules.ts";
@@ -351,15 +354,32 @@ export class LangWatchQLService {
   }
 
   /**
-   * Runs a wrapper composed around a statement `validate` already accepted, with no second
-   * policy walk: the wrapper holds that statement in a subquery, where an app function is
-   * refused. Main's instant-eval passes ran exactly so, as the caller's restricted identity.
+   * Re-validates the statement with the full policy, then runs it inside the fixed wrapper its
+   * pass names as the caller's restricted identity. Only the statement is walked: the wrapper
+   * holds it in a subquery, where the policy would refuse a top-level app function.
    */
   async executePass({
     project,
+    protections,
     sql,
     parameters,
-  }: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
+    pass,
+    isInstantEvalsEnabled,
+  }: LangWatchQLPassInput & LangWatchQLEvalGate): Promise<LangWatchQLQueryResult> {
+    const wrapper = langWatchQLPassSchema.parse(pass);
+    const validation = this.validate({
+      projectId: project.id,
+      protections,
+      sql,
+      ...(parameters ? { parameters } : {}),
+      isInstantEvalsEnabled: isInstantEvalsEnabled === true,
+    });
+    resolveRunGranularityOrRefuseUnfilled({
+      declared: validation.parameters,
+      ...(parameters ? { parameters } : {}),
+      awaitingTimeWindow: validation.awaitingTimeWindow,
+    });
+
     const { executor } = this.deps;
     if (!executor) {
       logger.error(
@@ -370,9 +390,11 @@ export class LangWatchQLService {
       throw new LangWatchQLUnavailableError();
     }
 
+    const composed = langWatchQLPassSql({ sql, pass: wrapper });
+    const executionParameters = { ...validation.boundParameters, ...composed.parameters };
     const execution = await executor.execute({
-      sql,
-      ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
+      sql: composed.sql,
+      ...(Object.keys(executionParameters).length > 0 ? { parameters: executionParameters } : {}),
       tenantCapability: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
     });
 
