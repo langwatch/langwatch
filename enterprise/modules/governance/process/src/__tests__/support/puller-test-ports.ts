@@ -151,7 +151,7 @@ export type WorkerTestDoubles = {
   };
   insertEvent: (input: GovernanceOcsfEventInput) => Promise<void>;
   usageEnabled: (organizationId: string) => Promise<boolean>;
-  ensureProject: () => Promise<{ id: string }>;
+  ensureProject: (input: { organizationId: string; kind: string }) => Promise<{ id: string }>;
   discovery?: { recordFromPulledEvents(): Promise<{ discovered: number }> };
   identityMatch?: { runFor(input: { organizationId: string }): Promise<void> };
 };
@@ -162,8 +162,8 @@ export function createWorkerService(doubles: WorkerTestDoubles): IngestionPullWo
   const pricing = PulledUsagePricingService.create(new TestRate());
   const diagnostics = silentIngestionPullDiagnostics;
   const projects = new CompleteTestProjectService();
-  projects.ensureInternal = async () => {
-    const project = await doubles.ensureProject();
+  projects.ensureInternal = async (input) => {
+    const project = await doubles.ensureProject(input);
     return {
       id: project.id,
       name: "test",

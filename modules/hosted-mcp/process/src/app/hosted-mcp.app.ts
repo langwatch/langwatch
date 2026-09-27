@@ -1,10 +1,12 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi, type HostedMcpApiContract } from "@langwatch/hosted-mcp-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant.service.ts";
+import { GovernanceMcpSessionToolsService } from "../services/governance-mcp-session-tools.service.ts";
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
@@ -31,6 +33,8 @@ type HostedMcpDependenciesMap = Readonly<{
   projects: typeof ProjectApi;
   /** Re-checks the grant an OAuth bearer was minted from. */
   authorization: typeof AuthzApi;
+  /** Installs governance's tools on each session (Alex, 2026-09-27). */
+  governance: typeof GovernanceRestApi;
 }>;
 
 type HostedMcpSetup = FeatureSetup<HostedMcpDependenciesMap, HostedMcpInfrastructure, undefined>;
@@ -41,6 +45,7 @@ export class HostedMcpApp implements HostedMcpApiContract {
   static readonly dependencies: HostedMcpDependenciesMap = {
     projects: ProjectApi,
     authorization: AuthzApi,
+    governance: GovernanceRestApi,
   };
   static readonly reads = ["redis", "encryption", "publicBaseUrl"] as const;
 
@@ -65,6 +70,9 @@ export class HostedMcpApp implements HostedMcpApiContract {
       cipher: members.encryption,
       address: HeaderMcpClientAddressService.create(),
       baseHost: members.publicBaseUrl,
+      sessionTools: GovernanceMcpSessionToolsService.create({
+        governance: dependencies.governance,
+      }),
     });
   }
 

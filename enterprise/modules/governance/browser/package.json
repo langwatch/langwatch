@@ -42,7 +42,6 @@
     "@langwatch/model-provider-browser-kit": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/navigation-browser": "workspace:*",
-    "@langwatch/project-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-kernel": "workspace:*",
     "@langwatch/user-browser": "workspace:*",

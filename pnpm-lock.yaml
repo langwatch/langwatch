@@ -2504,9 +2504,6 @@ importers:
       '@langwatch/navigation-browser':
         specifier: workspace:*
         version: link:../../../../modules/navigation/browser
-      '@langwatch/project-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/project/browser
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -8315,6 +8312,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/governance/contract
       '@langwatch/hosted-mcp-contract':
         specifier: workspace:*
         version: link:../contract
@@ -13323,6 +13323,12 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -13402,6 +13408,9 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
+      '@langwatch/prompt-contract':
+        specifier: workspace:*
+        version: link:../../prompt/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -14705,6 +14714,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../modules/trace/contract
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)

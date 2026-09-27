@@ -721,6 +721,7 @@ export interface GovernanceClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    clickhouse_settings?: Record<string, number>;
   }): Promise<GovernanceClickHouseResult>;
 }
 

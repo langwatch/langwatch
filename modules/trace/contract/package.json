@@ -38,6 +38,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",
     "liqe": "catalog:",

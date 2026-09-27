@@ -7,6 +7,7 @@ import { RestHost } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
+import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { serverModules } from "@langwatch/installed-server-modules";
 import { ModuleApiToken } from "@langwatch/kernel";
@@ -337,6 +338,38 @@ describe("the api process installation", () => {
           limit: 10,
         }),
       ).resolves.toHaveLength(1);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("installs the governance tools on a hosted MCP session", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const registered: string[] = [];
+      runtime.service(GovernanceRestApi).registerMcpTools({
+        server: {
+          tool: (name) => {
+            registered.push(name);
+            return undefined;
+          },
+        },
+        apiKey: "sk-lw-session",
+        callerUserId: undefined,
+      });
+
+      expect(registered).toEqual([
+        "governance_ingestion_templates_list",
+        "governance_ingestion_templates_admin_list",
+        "governance_ingestion_templates_get",
+        "governance_ingestion_templates_create",
+        "governance_ingestion_templates_update_ottl_rules",
+        "governance_ingestion_templates_clone_from_platform",
+        "governance_ingestion_templates_archive",
+        "governance_ingestion_keys_list",
+        "governance_ingestion_keys_mint",
+      ]);
     } finally {
       await runtime.stop();
     }

@@ -328,6 +328,9 @@ type PulledEventRow = {
   rawPayload: string;
 };
 
+/** A spend read's ceiling on threads and runtime (#8072 step 3, as on main). */
+const GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS = { max_threads: 2, max_execution_time: 45 };
+
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
@@ -428,16 +431,19 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
       `,
       query_params: {
+        windowEnd: now,
         tenantId: govProjectId,
         thisStart: thisWindowStart,
         prevStart: previousWindowStart,
@@ -446,6 +452,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         userKey: ATTR_USER_ID,
       },
       format: "JSONEachRow",
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
     });
     const rows = (await result.json()) as {
       thisSpend: number | string | null;
@@ -537,6 +544,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           FROM trace_summaries ts
           WHERE ts.TenantId = {tenantId:String}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             AND ts.Attributes[{originKey:String}] = {originValue:String}
             AND ts.Attributes[{userKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
@@ -544,6 +552,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
             )
         )
@@ -552,6 +561,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       query_params: {
+        windowEnd: now,
         tenantId: govProjectId,
         windowStart: now - windowMs,
         originKey: ATTR_ORIGIN_KIND,
@@ -561,6 +571,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         offset,
       },
       format: "JSONEachRow",
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
     });
     const rows = (await result.json()) as {
       actor: string;
@@ -638,21 +649,25 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         FROM trace_summaries ts
         WHERE ts.TenantId IN ({tenantIds:Array(String)})
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId IN ({tenantIds:Array(String)})
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
         GROUP BY projectId, actor
       `,
       query_params: {
+        windowEnd: now,
         tenantIds,
         windowStart,
         userKey: ATTR_USER_ID,
       },
       format: "JSONEachRow",
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
     });
     const rows = (await result.json()) as {
       projectId: string;
@@ -849,6 +864,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           FROM trace_summaries ts
           WHERE ts.TenantId = {tenantId:String}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+            AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             AND ts.Attributes[{originKey:String}] = {originValue:String}
             AND ts.Attributes[{sourceKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
@@ -856,12 +872,14 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+                AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
             )
         )
         GROUP BY sourceId
       `,
       query_params: {
+        windowEnd: now,
         tenantId: govProjectId,
         thisStart: now - windowMs,
         prevStart: previousWindowStart,
@@ -870,6 +888,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         sourceKey: ATTR_INGESTION_SOURCE_ID,
       },
       format: "JSONEachRow",
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
     });
 
     const sourceRows = (await result.json()) as {
@@ -1029,18 +1048,21 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
             GROUP BY TenantId, TraceId
           )
         GROUP BY bucketMs, groupKey
         ORDER BY bucketMs ASC
       `,
       query_params: {
+        windowEnd: now,
         tenantId: govProjectId,
         windowStart,
         originKey: ATTR_ORIGIN_KIND,
@@ -1049,6 +1071,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         userKey: ATTR_USER_ID,
       },
       format: "JSONEachRow",
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
     });
     const rows = (await result.json()) as {
       bucketMs: string;
@@ -1516,7 +1539,9 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(ts.OccurredAt >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(OccurredAt)))
+           FROM trace_summaries
+           WHERE TenantId = {tenantId:String} AND Attributes[{originKey:String}] = {originValue:String} AND Attributes[{sourceKey:String}] = {sourceId:String}) AS lastMs
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({since30d:UInt64})
@@ -1555,7 +1580,9 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(lr.TimeUnixMs >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(lr.TimeUnixMs))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(TimeUnixMs)))
+           FROM stored_log_records
+           WHERE TenantId = {tenantId:String} AND Attributes[{originKey:String}] = {originValue:String} AND Attributes[{sourceKey:String}] = {sourceId:String}) AS lastMs
         FROM stored_log_records lr
         WHERE lr.TenantId = {tenantId:String}
           AND lr.TimeUnixMs >= fromUnixTimestamp64Milli({since30d:UInt64})
@@ -1587,7 +1614,9 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
           countIf(EventTime >= fromUnixTimestamp64Milli({since24h:UInt64})) AS c24,
           countIf(EventTime >= fromUnixTimestamp64Milli({since7d:UInt64})) AS c7,
           count() AS c30,
-          toString(toUnixTimestamp64Milli(max(EventTime))) AS lastMs
+          (SELECT toString(toUnixTimestamp64Milli(max(EventTime)))
+           FROM governance_ocsf_events
+           WHERE TenantId = {tenantId:String} AND startsWith(TraceId, 'pull:') AND SourceId = {sourceId:String}) AS lastMs
         FROM governance_ocsf_events
         WHERE TenantId = {tenantId:String}
           AND startsWith(TraceId, 'pull:')

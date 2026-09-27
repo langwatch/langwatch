@@ -22,10 +22,6 @@
       "langwatch-declaration-source": "./src/project-settings.ts",
       "types": "./dist/project-settings.d.ts",
       "default": "./src/project-settings.ts"
-    },
-    "./surfaces/hero-ask-field": {
-      "types": "./dist/ui/sections/home/components/hero-ask-field.d.ts",
-      "default": "./src/ui/sections/home/components/hero-ask-field.tsx"
     }
   },
   "scripts": {
