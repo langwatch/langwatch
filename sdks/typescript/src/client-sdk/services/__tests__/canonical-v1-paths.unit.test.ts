@@ -56,7 +56,7 @@ function bareFamilyPaths(files: string[]): string[] {
       // — is mounted once and keeps the address it has.
       const segments = (match[2] ?? "").split("/").filter(Boolean);
       if (segments.some((segment) => VERSION_SEGMENT.test(segment))) continue;
-      const withPlaceholders = match[0]!.replace(/\$\{[^}]*\}/g, "x");
+      const withPlaceholders = match[0].replace(/\$\{[^}]*\}/g, "x");
       if (BARE_ONLY.some((bare) => bare.test(withPlaceholders))) continue;
       const line = source.slice(0, match.index).split("\n").length;
       offenders.push(`${file.slice(SDK_SRC.length + 1)}:${line} ${match[0]}`);

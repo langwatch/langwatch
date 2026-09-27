@@ -154,6 +154,6 @@ describe("renderBudgetExceeded", () => {
 
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
-    expect(out).not.toMatch(/\[/);
+    expect(out).not.toContain("\u001b[");
   });
 });

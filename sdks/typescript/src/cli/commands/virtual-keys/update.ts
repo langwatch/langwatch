@@ -1,4 +1,4 @@
-import type * as NodeFs from "node:fs";
+import { readFileSync } from "node:fs";
 
 import chalk from "chalk";
 
@@ -43,9 +43,6 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
     }
   }
   if (options.configFile) {
-    // Lazy-require so the import stays local to the --config-file path
-    // (the CLI is an entrypoint shared with scripts that may not need fs).
-    const { readFileSync } = require("node:fs") as typeof NodeFs;
     const raw = readFileSync(options.configFile, "utf8");
     try {
       return JSON.parse(raw) as Record<string, unknown>;

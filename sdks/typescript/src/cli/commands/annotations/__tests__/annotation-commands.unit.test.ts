@@ -8,7 +8,7 @@ import {
 import { setOutputFormat } from "../../../utils/errorOutput";
 
 vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     AnnotationsApiService: vi.fn(),

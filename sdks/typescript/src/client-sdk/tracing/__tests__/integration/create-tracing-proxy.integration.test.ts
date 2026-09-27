@@ -122,6 +122,7 @@ describe("createTracingProxy Integration Tests", () => {
       const proxy = createTracingProxy(target, tracer);
 
       // These should not trigger tracing
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       proxy.toString();
       proxy.valueOf();
 
@@ -440,9 +441,10 @@ describe("createTracingProxy Integration Tests", () => {
 
   describe("when filtering methods", () => {
     it("does not trace getters", async () => {
+      const getterValue = "getter value";
       class TestClass {
         get getterProperty() {
-          return "getter value";
+          return getterValue;
         }
 
         publicMethod() {

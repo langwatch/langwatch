@@ -41,7 +41,7 @@ afterAll(() => {
 });
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     AgentsApiService: vi.fn(),
