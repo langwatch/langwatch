@@ -20,14 +20,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
-    },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
-    },
-    "./seeding": {
-      "types": "./dist/seeding.d.ts",
-      "default": "./src/seeding.ts"
     }
   },
   "scripts": {

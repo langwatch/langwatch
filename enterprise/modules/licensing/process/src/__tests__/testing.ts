@@ -15,8 +15,8 @@ import { ResourceScope } from "@langwatch/kernel";
 import { planQuantities } from "@langwatch/plans";
 import { ScopedSecrets } from "@langwatch/secrets";
 
-import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
-import { type LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
+import { LicensingApp, type LicensingInfrastructure } from "../app/licensing.app.ts";
+import { type LicenseStorage, type StoredLicense } from "../app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /** Connect off, so no suite composing this app can make an outbound call. */

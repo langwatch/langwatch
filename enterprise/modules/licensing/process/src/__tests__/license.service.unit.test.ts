@@ -18,7 +18,7 @@ import {
   TEST_PRIVATE_KEY,
   TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
-} from "../testing.ts";
+} from "./testing.ts";
 
 /** A freshly minted key, bound to one organization or to none. */
 function mintLicenseKey(

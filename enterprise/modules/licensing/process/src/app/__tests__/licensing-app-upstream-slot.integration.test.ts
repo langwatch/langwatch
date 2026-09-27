@@ -10,11 +10,11 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, describe, expect, it } from "vitest";
 
+import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
 import {
   createLicensingTestConnection,
   TEST_DATABASE_URL,
 } from "../../repositories/prisma/__tests__/support/licensing-database.fixture.ts";
-import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../testing.ts";
 import { LicensingApp } from "../licensing.app.ts";
 
 const RUN = `slot-${crypto.randomUUID().slice(0, 8)}`;

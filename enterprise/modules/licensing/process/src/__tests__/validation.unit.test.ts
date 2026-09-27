@@ -15,7 +15,7 @@ import {
   MALFORMED_BASE64,
   TAMPERED_LICENSE_KEY,
   VALID_LICENSE_KEY,
-} from "../testing.ts";
+} from "./testing.ts";
 
 const cryptography = NodeLicenseCryptographyService.create();
 const isExpired = cryptography.isExpired.bind(cryptography);

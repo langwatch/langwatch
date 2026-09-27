@@ -4,10 +4,10 @@ import { ResourceScope } from "@langwatch/kernel";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
+import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";
 import { LicensingApp } from "../../app/licensing.app.ts";
 import type { OrganizationLicenseReads } from "../../app/licensing.members.ts";
 import { MemoryOrganizationLicenseRepository } from "../../repositories/memory/memory.organization-license.repository.ts";
-import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../testing.ts";
 import { LicensingInfrastructureService } from "../licensing-infrastructure.service.ts";
 
 const LICENSED_ORGANIZATION_ID = "org_paid";

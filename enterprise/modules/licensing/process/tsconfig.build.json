@@ -8,7 +8,7 @@
       "@langwatch/enterprise-licensing-process": ["./src/index.ts"]
     }
   },
-  "files": ["./src/index.ts", "./src/testing.ts"],
+  "files": ["./src/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

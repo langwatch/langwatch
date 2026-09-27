@@ -9,7 +9,10 @@ import type { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../../../fixtures/license-keys.fixture.ts";
+import {
+  TEST_PRIVATE_KEY,
+  TEST_PUBLIC_KEY,
+} from "../../../__tests__/fixtures/license-keys.fixture.ts";
 import { LicenseGenerationService } from "../../../services/license-generation.service.ts";
 import { LicenseRegistryService } from "../../../services/license-registry.service.ts";
 import { NodeLicenseCryptographyService } from "../../../services/node-license-cryptography.service.ts";

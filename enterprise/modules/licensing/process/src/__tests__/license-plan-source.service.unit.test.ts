@@ -13,7 +13,7 @@ import {
   EXPIRED_ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_PUBLIC_KEY,
-} from "../testing.ts";
+} from "./testing.ts";
 
 /**
  * Spec: enterprise/modules/licensing/specs/licensing.feature

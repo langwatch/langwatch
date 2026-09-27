@@ -69,7 +69,7 @@ regexes = [
 ]
 
 # The self-hosted license fixtures are base64 payloads signed with the TEST
-# keypair that sits beside them in `fixtures/license-keys.fixture.ts`, checked in
+# keypair that sits beside them in `__tests__/fixtures/license-keys.fixture.ts`, checked in
 # on purpose: license validation is signature verification, so a test that does not
 # carry a real signature verifies nothing. The keypair signs nothing outside
 # this suite, and the production verifier reads its key from
@@ -96,7 +96,7 @@ paths = ['''enterprise/modules/licensing/process/src/testing\.ts''']
 [[allowlists]]
 description = "Test RSA keypair the license fixtures are signed with; verifies nothing in production"
 targetRules = ["private-key"]
-paths = ['''enterprise/modules/licensing/process/src/fixtures/license-keys\.fixture\.ts''']
+paths = ['''enterprise/modules/licensing/process/src/__tests__/fixtures/license-keys\.fixture\.ts''']
 
 # The offline license compatibility fixture (ADR-139): one license minted with
 # the licensing code of main before connected self-hosted landed, so a test can
