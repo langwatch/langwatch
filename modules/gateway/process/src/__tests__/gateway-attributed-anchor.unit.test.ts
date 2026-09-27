@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import { GatewayScopeOrgMismatchError } from "../index.ts";
 
 /**

@@ -8,8 +8,9 @@ import { createLogger } from "@langwatch/observability";
  */
 import { type Instant, nowInstant } from "@langwatch/time";
 
-import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
+import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import type { VirtualKeyDirectBudgetRepository } from "../repositories/gateway-virtual-key-direct-budget.repository.ts";
+import { budgetSpendTargetsFor } from "../rules/gateway-budget-spend-targets.rules.ts";
 
 const logger = createLogger("langwatch:gateway:virtual-key-direct-budget");
 

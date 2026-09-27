@@ -9,7 +9,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 
 const REACHED_TRANSACTION = "REACHED_TRANSACTION";
 

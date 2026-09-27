@@ -21,11 +21,11 @@ import type {
   GatewaySpendConfirmation,
   GatewaySpendRating,
 } from "../app/gateway.members.ts";
-import { EMPTY_SPEND_USAGE } from "../eventing/gateway-spend-commands.process.ts";
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
+import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
 
 const logger = createLogger("langwatch:gateway:realtime-session");
 

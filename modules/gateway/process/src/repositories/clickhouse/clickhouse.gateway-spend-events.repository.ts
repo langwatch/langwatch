@@ -7,6 +7,9 @@ import {
   type SpendEventRow,
   type SpendEventStatus,
   type SpendFilters,
+  SPEND_STATUS_IN_FLIGHT,
+  type SpendBucket,
+  type SpendGroupByKey,
 } from "@langwatch/gateway-contract";
 /**
  * Gateway spend: the per-request billing record, one row per REQUEST at its
@@ -18,34 +21,25 @@ import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
-import {
-  EMPTY_SPEND_USAGE,
-  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-} from "../../eventing/gateway-spend-commands.process.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 import {
   GatewaySpendEventsRepository,
-  type SpendBucket,
   type SpendEventsPageCursor,
-  type SpendGroupByKey,
   type SpendSummaryRow,
 } from "../../repositories/gateway-spend-events.repository.ts";
+import * as spendCursors from "../../rules/gateway-spend-cursor.rules.ts";
+import * as spendFilters from "../../rules/gateway-spend-filters.rules.ts";
+import * as spendGrouping from "../../rules/gateway-spend-grouping.rules.ts";
 import {
-  GatewaySpendCursorAdapter,
-  type GatewaySpendEventsCursor,
-} from "../../rules/gateway-spend-cursor.rules.ts";
-import {
-  GatewaySpendFiltersAdapter,
-  SPEND_STATUS_IN_FLIGHT,
-} from "../../rules/gateway-spend-filters.rules.ts";
-import { GatewaySpendGroupingAdapter } from "../../rules/gateway-spend-grouping.rules.ts";
+  EMPTY_SPEND_USAGE,
+  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
+} from "../../rules/gateway-spend-projection.rules.ts";
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
     ? String(value)
     : "";
 
-const spendCursors = GatewaySpendCursorAdapter.create();
 const NANO_PER_USD = 1_000_000_000;
 const usageRowsSchema = z.array(
   z.object({ Total: z.string(), SpendNanoUsd: z.string(), FirstMs: z.string() }),
@@ -75,9 +69,6 @@ interface SummaryDimension {
   alias: string;
   expression: string;
 }
-
-const spendFilters = GatewaySpendFiltersAdapter.create();
-const spendGrouping = GatewaySpendGroupingAdapter.create();
 
 const CHARGED_STATUSES = "('confirmed', 'failed')";
 const METERED_READ_MAX_EXECUTION_SECONDS = 20;
@@ -763,7 +754,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     toMs,
     filters,
   }: {
-    decoded: GatewaySpendEventsCursor | null;
+    decoded: spendCursors.GatewaySpendEventsCursor | null;
     fromMs?: number;
     toMs?: number;
     filters: SpendFilters;

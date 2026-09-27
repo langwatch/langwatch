@@ -13,9 +13,12 @@ export const gatewayRealtimeSessionReconcileSchema = z.object({
   scheduledFor: z.number().int(),
 });
 
-export interface GatewayRealtimeSessionReconcileState {
-  lastReconcileAt: number | null;
-}
+export const gatewayRealtimeSessionReconcileStateSchema = z.object({
+  lastReconcileAt: z.number().nullable(),
+});
+export type GatewayRealtimeSessionReconcileState = z.infer<
+  typeof gatewayRealtimeSessionReconcileStateSchema
+>;
 
 export const GATEWAY_REALTIME_SESSION_RECONCILE_INITIAL_STATE: GatewayRealtimeSessionReconcileState =
   { lastReconcileAt: null };

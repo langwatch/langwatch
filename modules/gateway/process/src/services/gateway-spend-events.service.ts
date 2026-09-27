@@ -1,15 +1,15 @@
 import type {
   GatewaySpendDay,
   GatewayUsageCount,
+  SpendBucket,
   SpendEventRow,
   SpendFilters,
+  SpendGroupByKey,
 } from "@langwatch/gateway-contract";
 
 import type {
   GatewaySpendEventsRepository,
-  SpendBucket,
   SpendEventsPageCursor,
-  SpendGroupByKey,
   SpendSummaryRow,
 } from "../repositories/gateway-spend-events.repository.ts";
 

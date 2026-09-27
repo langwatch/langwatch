@@ -4,8 +4,8 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import { type GatewayBudgetSpend, type LedgerEventRow } from "../app/gateway.members.ts";
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 
 function mockChRepoWithEvents(
   events: (Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">)[],

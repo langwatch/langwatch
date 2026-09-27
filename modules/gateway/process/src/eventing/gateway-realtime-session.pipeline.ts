@@ -16,7 +16,7 @@ import {
   GATEWAY_REALTIME_SESSION_RECONCILE_INITIAL_STATE,
   GATEWAY_REALTIME_SESSION_RECONCILE_INTERVAL_MS,
   GATEWAY_REALTIME_SESSION_RECONCILE_PROCESS_NAME,
-  type GatewayRealtimeSessionReconcileState,
+  gatewayRealtimeSessionReconcileStateSchema,
   gatewayRealtimeSessionReconcileSchema,
   gatewayRealtimeSessionReconcileWake,
 } from "./gateway-realtime-session-reconcile.process.ts";
@@ -45,7 +45,8 @@ export function buildGatewayRealtimeSessionMaintenancePipeline(
     .withEvents([])
     .withProcessManager(GATEWAY_REALTIME_SESSION_RECONCILE_PROCESS_NAME, (pm) =>
       pm
-        .state<GatewayRealtimeSessionReconcileState>(
+        .state(
+          gatewayRealtimeSessionReconcileStateSchema,
           GATEWAY_REALTIME_SESSION_RECONCILE_INITIAL_STATE,
         )
         .schedule({ everyMs: GATEWAY_REALTIME_SESSION_RECONCILE_INTERVAL_MS })

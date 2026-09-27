@@ -1,13 +1,11 @@
-import {
-  FixedGatewaySettlementPolicyService,
-  GatewaySpendGroupingAdapter,
-} from "@langwatch/gateway-process";
+import { isIanaTimeZone } from "@langwatch/gateway-contract";
+import { FixedGatewaySettlementPolicyService } from "@langwatch/gateway-process";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
 
-const spendGrouping = GatewaySpendGroupingAdapter.create();
+import * as spendGrouping from "../rules/gateway-spend-grouping.rules.ts";
 
 const NOW = 1_800_000_000_000;
 /**
@@ -161,7 +159,7 @@ describe("given a spend rollup grouping", () => {
   describe("when a time zone is named", () => {
     it("accepts the named zones the store can load", () => {
       for (const zone of ["UTC", "Europe/Amsterdam", "Etc/GMT+5", "Zulu"]) {
-        expect(spendGrouping.isIanaTimeZone(zone), zone).toBe(true);
+        expect(isIanaTimeZone(zone), zone).toBe(true);
       }
     });
 
@@ -173,13 +171,13 @@ describe("given a spend rollup grouping", () => {
       // from a place they cannot see.
       for (const offset of ["+05:00", "+0500", "-08:00", "+05"]) {
         expect(() => new Intl.DateTimeFormat("en-US", { timeZone: offset }), offset).not.toThrow();
-        expect(spendGrouping.isIanaTimeZone(offset), offset).toBe(false);
+        expect(isIanaTimeZone(offset), offset).toBe(false);
       }
     });
 
     it("still refuses a name no zone database has", () => {
-      expect(spendGrouping.isIanaTimeZone("Nowhere/Special")).toBe(false);
-      expect(spendGrouping.isIanaTimeZone("")).toBe(false);
+      expect(isIanaTimeZone("Nowhere/Special")).toBe(false);
+      expect(isIanaTimeZone("")).toBe(false);
     });
   });
 });

@@ -24,6 +24,7 @@ export * from "./gateway.responses.ts";
 export * from "./gateway-platform.schemas.ts";
 export * from "./gateway.config.ts";
 export * from "./gateway-spend.schemas.ts";
+export * from "./gateway-spend-rest.schemas.ts";
 export * from "./gateway.spend-rating.ts";
 export * from "./gateway-internal.schemas.ts";
 export * from "./gateway-spend-event.trpc.ts";

@@ -1,14 +1,12 @@
 import {
-  type FoldProjectionStore,
   AbstractFoldProjection,
   type FoldEventHandlers,
+  type FoldProjectionStore,
 } from "@langwatch/eventing";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 
-import {
-  GATEWAY_SPEND_PIPELINE_NAME,
-  GATEWAY_SPEND_PROJECTION_VERSION_LATEST,
-} from "./gateway-spend-commands.process.ts";
+import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../rules/gateway-spend-projection.rules.ts";
+import { GATEWAY_SPEND_PIPELINE_NAME } from "./gateway-spend-commands.process.ts";
 import {
   type GatewaySpendAdmittedEvent,
   type GatewaySpendConfirmedEvent,

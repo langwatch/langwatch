@@ -10,7 +10,8 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/testing.ts",
+    "./src/__tests__/testing.ts",
+    "./src/__tests__/support/postgres.virtual-key.ts",
     "./src/services/gateway-realtime-session-reconciliation.service.ts",
     "./src/repositories/prisma/prisma.gateway-change-event.repository.ts",
     "./src/repositories/prisma/prisma.gateway-audit.repository.ts",
@@ -18,7 +19,7 @@
     "./src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
     "./src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts",
     "./src/repositories/prisma/prisma.gateway-key-budget.repository.ts",
-    "./src/app/postgres.gateway-transaction.ts",
+    "./src/repositories/prisma/prisma.gateway-transaction.repository.ts",
     "./src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts",
     "./src/repositories/prisma/prisma.gateway-realtime-session.repository.ts",
     "./src/repositories/prisma/prisma.virtual-key-authorization.repository.ts",

@@ -10,7 +10,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 
 describe("computeBudgetPeriodFloorMs on an anchored budget", () => {
   const anchor = Temporal.Instant.from("2026-06-17T09:00:00.000Z");

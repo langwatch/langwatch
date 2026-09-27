@@ -16,8 +16,8 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
 import type { BudgetDebitRow } from "../app/gateway.members.ts";
-import { PrismaGatewayAdapter } from "../app/prisma.gateway.composition.ts";
 import {
   createTestClickHouseClient,
   testClickHouseUrl,

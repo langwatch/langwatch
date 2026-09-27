@@ -13,7 +13,6 @@ import {
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
-import { GatewaySpendStore } from "../../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -21,6 +20,7 @@ import {
   GATEWAY_SPEND_EVENT_VERSION_LATEST,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
 } from "../gateway-spend-commands.process.ts";
+import { GatewaySpendStore } from "../gateway-spend.pipeline.ts";
 import { GatewaySpendFoldProjection } from "../gateway-spend.projection.ts";
 
 const chUrl = testClickHouseUrl();

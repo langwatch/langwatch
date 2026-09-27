@@ -1,26 +1,13 @@
 import type {
   GatewaySpendDay,
+  SpendBucket,
+  SpendGroupByKey,
   GatewayUsageCount,
   SpendEventRow,
   SpendFilters,
 } from "@langwatch/gateway-contract";
 
 import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
-
-export const SPEND_GROUP_BY_KEYS = [
-  "virtual_key",
-  "end_user",
-  "project",
-  "model",
-  "provider",
-  "principal",
-  "request_type",
-] as const;
-
-export type SpendGroupByKey = (typeof SPEND_GROUP_BY_KEYS)[number];
-
-export const SPEND_BUCKETS = ["none", "hour", "day"] as const;
-export type SpendBucket = (typeof SPEND_BUCKETS)[number];
 
 export interface SpendEventsPageCursor {
   occurredAtMs: number;

@@ -47,15 +47,13 @@ import {
 import { nowInstant, Temporal } from "@langwatch/time";
 import { z } from "zod";
 
+import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import { resolveVirtualKeySpendWindow } from "../rules/gateway-spend-window.rules.ts";
 import {
   buildNextPageCursor,
   decodeCacheRuleCursor,
   decodeCreatedAtIdCursor,
 } from "../rules/gateway-wire-pagination.rules.ts";
-import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
-
-const budgetDtos = GatewayBudgetDtoService.create();
 
 /**
  * The 410 the four retired provider-binding addresses publish. Spread per

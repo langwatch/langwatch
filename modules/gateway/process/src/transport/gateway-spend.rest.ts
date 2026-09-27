@@ -1,49 +1,36 @@
 import {
+  canonicalBaseResponses,
   defineRestMiddleware,
   defineRestRouter,
-  BadRequestError,
-  canonicalBaseResponses,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
-  gatewaySpendEventEnvelopeSchema,
-  USD_DISPLAY_STRING_FORMAT,
-  type GatewaySpendEnvelope,
-  type GatewaySpendEventEnvelope,
+  gatewayEndUserSpendParamsSchema,
+  gatewayEndUserSpendQuerySchema,
+  gatewayEndUserSpendResponseSchema,
+  type GatewayEndUserSpendQuery,
+  type GatewayEndUserSpendResponse,
+  gatewaySpendEventsPageSchema,
+  gatewaySpendEventsQuerySchema,
+  type GatewaySpendEventsPage,
+  type GatewaySpendEventsQuery,
+  gatewaySpendReplayBodySchema,
+  gatewaySpendReplayResponseSchema,
+  type GatewaySpendReplayBody,
+  type GatewaySpendReplayResponse,
+  gatewaySpendSummariesPageSchema,
+  gatewaySpendSummariesQuerySchema,
+  type GatewaySpendSummariesPage,
+  type GatewaySpendSummariesQuery,
 } from "@langwatch/gateway-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
-import { generate } from "@langwatch/ksuid";
-import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
-import {
-  SPEND_BUCKETS,
-  SPEND_GROUP_BY_KEYS,
-  type SpendGroupByKey,
-} from "../repositories/gateway-spend-events.repository.ts";
-import { GatewaySpendCursorAdapter } from "../rules/gateway-spend-cursor.rules.ts";
-import {
-  GatewaySpendFiltersAdapter,
-  SPEND_SUMMARY_STATUS_DESCRIPTION,
-  spendFilterQueryShape,
-  spendSummaryStatusFilter,
-} from "../rules/gateway-spend-filters.rules.ts";
-import {
-  GatewaySpendGroupingAdapter,
-  MAX_GROUP_BY_KEYS,
-} from "../rules/gateway-spend-grouping.rules.ts";
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
  * Billing reconciliation REST on `/api/gateway/v1`, shared with the
  * virtual-key surface — each route owns its whole path, no wildcard claimed.
  */
-import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
-import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
-
-const spendCursors = GatewaySpendCursorAdapter.create();
-const spendFilters = GatewaySpendFiltersAdapter.create();
-const spendGrouping = GatewaySpendGroupingAdapter.create();
 
 /** Pinned as constants: the 13-month window and dedup guidance are load-bearing for consumers. */
 export const SPEND_EVENTS_PULL_DESCRIPTION =
@@ -55,108 +42,23 @@ export const SPEND_SUMMARIES_DESCRIPTION =
 export const END_USER_SPEND_DESCRIPTION =
   "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.";
 
-/** One row of the spend ledger, as the events reader hands it over. */
-type SpendLedgerRow = Awaited<
-  ReturnType<GatewaySpendEventsService["walkSpendEvents"]>
->["rows"][number];
+/** What the four reconciliation routes reach: each route's parsed request in, its page out. */
+export interface GatewaySpendDoorApi {
+  answerSpendSummaries(
+    input: Readonly<{ organizationId: string; query: GatewaySpendSummariesQuery }>,
+  ): Promise<GatewaySpendSummariesPage>;
+  answerSpendEvents(
+    input: Readonly<{ organizationId: string; query: GatewaySpendEventsQuery }>,
+  ): Promise<GatewaySpendEventsPage>;
+  answerEndUserSpend(
+    input: Readonly<{ organizationId: string; query: GatewayEndUserSpendQuery }>,
+  ): Promise<GatewayEndUserSpendResponse>;
+  answerSpendReplay(
+    input: Readonly<{ organizationId: string; body: GatewaySpendReplayBody }>,
+  ): Promise<GatewaySpendReplayResponse>;
+}
 
-/** A deliverable endpoint, reduced to what a replay reads off it. */
-export type GatewaySpendWebhookEndpoint = {
-  id: string;
-  enabledEvents: readonly string[];
-};
-
-/** The endpoint registry a replay names its destination in. */
-export type GatewaySpendWebhookEndpoints = {
-  findDeliverable(input: {
-    organizationId: string;
-    endpointId: string;
-  }): Promise<GatewaySpendWebhookEndpoint | null>;
-};
-
-/** The emitted-envelope log a replay walks, one page at a time. */
-export type GatewaySpendWebhookEvents = {
-  getEmittedEvents(input: {
-    organizationId: string;
-    fromMs: number;
-    toMs: number;
-    cursor: string | null;
-    limit: number;
-  }): Promise<{ events: GatewaySpendEnvelope[]; nextCursor: string | null }>;
-};
-
-/** The live delivery path a replay appends to. */
-export type GatewaySpendWebhookDelivery = {
-  appendReplayToEndpointStream(input: {
-    organizationId: string;
-    endpoint: GatewaySpendWebhookEndpoint;
-    envelope: GatewaySpendEnvelope;
-    replayId: string;
-  }): Promise<void>;
-};
-
-/** Postgres filters a spend read narrows by, before they resolve to ClickHouse ids. */
-export type GatewaySpendScopeQuery = {
-  organizationId: string;
-  projectIds?: string[];
-  teamIds?: string[];
-  externalIds?: string[];
-};
-
-/** The tenants and keys a spend read covers; a no-match is empty, never "unfiltered". */
-export type GatewaySpendScope = { tenantIds: string[]; virtualKeyIds?: string[] };
-
-/**
- * The whole of what the four reconciliation routes ask the application for.
- * The webhook half stays structural (not importing `WebhookApi`) so the type
- * states what a route reads, not the whole platform surface it doesn't use.
- */
-export type GatewaySpendApp = Readonly<{
-  /**
-   * The ledger reads. Refused on a deployment without ClickHouse, where there
-   * are no figures to report at all, rather than answering with a confident zero.
-   */
-  getSpendEvents(): GatewaySpendEventsService;
-  /** The budget ledger the per-end-user caps are read against. */
-  getBudgetSpend(): GatewayBudgetSpend;
-
-  /** The endpoint registry a replay names its destination in. */
-  webhookEndpoints(): GatewaySpendWebhookEndpoints;
-  /** The emitted-envelope log a replay walks. */
-  webhookEvents(): GatewaySpendWebhookEvents;
-  /** The live delivery path a replay appends to. */
-  webhookDelivery(): GatewaySpendWebhookDelivery;
-
-  /**
-   * One spend row rendered as the canonical billing envelope. The wire format
-   * is the webhook platform's, and the pull and the push must answer the same
-   * bytes, so the mapping arrives rather than being restated here.
-   */
-  spendEventEnvelope(row: SpendLedgerRow): GatewaySpendEventEnvelope;
-
-  /** Selector grammar is the webhook platform's; a second reading here could disagree with push. */
-  endpointAcceptsEvent(input: { enabledEvents: readonly string[]; eventType: string }): boolean;
-
-  /**
-   * How long after a request an outcome may still arrive, which is what makes
-   * a recent grouping unstable under a page walk.
-   */
-  settlementPolicy(): GatewaySettlementPolicy;
-
-  /** Resolves Postgres filters to CH ids. A no-match resolves to EMPTY, never "unfiltered". */
-  resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope>;
-
-  /** Every attributed-user budget that applies to one end user, with spend. */
-  endUserCaps(input: {
-    organizationId: string;
-    endUserId: string;
-    tenantIds: string[];
-    virtualKeyId?: string;
-    budgetRepository: GatewayBudgetSpend;
-  }): Promise<GatewayEndUserCap[]>;
-}>;
-
-export const GatewaySpendApi = moduleApi<GatewaySpendApp>()("gateway");
+export const GatewaySpendApi = moduleApi<GatewaySpendDoorApi>()("gateway");
 
 /**
  * Whether the credential's organization holds the plan billing events is
@@ -168,358 +70,7 @@ export const gatewaySpendBillingPlanGate = defineRestMiddleware(
   z.object({}),
 );
 
-/** Milliseconds, not seconds: a seconds epoch silently lands in 1970 and reads empty. */
-const epochMs = z.coerce.number().int().positive().max(Number.MAX_SAFE_INTEGER).meta({
-  description:
-    "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error.",
-  example: 1782864000000,
-});
-
-const spendEventsQuerySchema = z
-  .object({
-    // The reconciliation pull is a RANGED read by contract: without bounds
-    // the walk sorts the whole 13-month table under FINAL on every page.
-    from: epochMs,
-    to: epochMs,
-    cursor: z.string().max(500).optional(),
-    limit: z.coerce.number().int().positive().max(200).optional().default(50),
-    ...spendFilterQueryShape,
-  })
-  .refine((q) => q.from <= q.to, {
-    message: "from must be less than or equal to to",
-  });
-
-const END_USER_WINDOWS = {
-  day: 24 * 60 * 60 * 1000,
-  week: 7 * 24 * 60 * 60 * 1000,
-  month: 30 * 24 * 60 * 60 * 1000,
-} as const;
-
-const endUserSpendQuerySchema = z.object({
-  window: z.enum(["day", "week", "month"]).optional().default("month"),
-  from: z.coerce.number().int().positive().optional(),
-  to: z.coerce.number().int().positive().optional(),
-  virtual_key_id: z.string().min(1).max(100).optional(),
-});
-
-const endUserSpendParamsSchema = z.object({ id: z.string().min(1) });
-
-// ── Response DTO schemas ───────────────────────────────────────────────
-// These mirror the shapes the handlers below return. Without them the
-// generated spec documents these routes with `responses: {}`, so a caller
-// reading the spec learns the route exists and nothing about what it answers.
-
-const usageSchema = z.object({
-  input_tokens: z.number().int(),
-  output_tokens: z.number().int(),
-  cache_read_input_tokens: z.number().int(),
-  cache_creation_input_tokens: z.number().int(),
-  reasoning_tokens: z.number().int(),
-});
-
-/**
- * `usageSchema` plus image quantities, for this repository's own rollups
- * (spend-summaries, end-user spend). /spend-events stays on the base schema
- * since the shared webhook envelope builder doesn't carry these fields yet.
- */
-const usageWithImagesSchema = z.object({
-  ...usageSchema.shape,
-  // Always present, 0 on a request/rollup that used no images. The object
-  // already carries the cache and reasoning counts as 0 when unused, so an
-  // optional field would put two conventions in one payload; reconciliation
-  // consumers sum these fields, and a missing one turns a sum into NaN where
-  // a 0 does not.
-  input_image_tokens: z
-    .number()
-    .int()
-    .describe(
-      "Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it.",
-    ),
-  output_image_tokens: z
-    .number()
-    .int()
-    .describe(
-      "Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic.",
-    ),
-  image_count: z
-    .number()
-    .int()
-    .describe(
-      "Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum.",
-    ),
-});
-
-/** Money is published twice: a display string and the canonical integer. */
-const costSchema = z.object({
-  total_usd: z
-    .string()
-    .describe(`Display value. ${USD_DISPLAY_STRING_FORMAT} Use nano_usd for arithmetic.`),
-  nano_usd: z
-    .number()
-    .int()
-    .describe(
-      "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against.",
-    ),
-});
-
-/** Null when the walk is exhausted. A full page does NOT imply more. */
-const nextCursorSchema = z.string().nullable();
-
-const spendSummaryRowSchema = z.object({
-  /** The first grouping dimension's value, unchanged from when a rollup could
-   *  only be grouped one way. Read `group` to tell two dimensions apart. */
-  key: z.string(),
-  /** Every grouping dimension by name, e.g. `{ "model": "gpt-5-mini" }`. */
-  group: z.record(z.string(), z.string()),
-  /** Start of the time bucket in the requested timezone, null when unbucketed. */
-  bucket_start: z.string().nullable(),
-  event_count: z.number().int(),
-  settled_count: z.number().int(),
-  usage: usageWithImagesSchema,
-  cost: costSchema,
-});
-
-const endUserCapSchema = z.object({
-  budget_id: z.string(),
-  anchor_id: z.string(),
-  window: z.string(),
-  on_breach: z.enum(["block", "warn"]),
-  limit_usd: z.string().describe(`The cap for this end user. ${USD_DISPLAY_STRING_FORMAT}`),
-  spent_usd: z.string().describe(`Spend against that cap. ${USD_DISPLAY_STRING_FORMAT}`),
-  period_started_at: z.string(),
-});
-
-const endUserSpendSchema = z.object({
-  end_user_id: z.string(),
-  window: z.string(),
-  from: z.string(),
-  to: z.string(),
-  cost: costSchema,
-  request_count: z.number().int(),
-  usage: usageWithImagesSchema,
-  caps: z.array(endUserCapSchema),
-});
-
-const replayResultSchema = z.object({
-  endpoint_id: z.string(),
-  replay_id: z.string(),
-  replayed: z.number().int(),
-  window: z.object({ from: z.string(), to: z.string() }),
-});
-
-/** The refusals every route here documents; the 200 comes from its output. */
 const spendResponses = canonicalBaseResponses;
-
-/** Validated in the transform, not an array schema, so a refusal names group_by, not group_by.0. */
-const groupBySchema = z
-  .string()
-  .transform((raw, ctx): SpendGroupByKey[] => {
-    const keys = raw.split(",").map((part) => part.trim());
-    const refuse = (message: string): typeof z.NEVER => {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message });
-      return z.NEVER;
-    };
-    const unknown = keys.filter((key) => !SPEND_GROUP_BY_KEYS.includes(key as SpendGroupByKey));
-    if (unknown.length > 0) {
-      return refuse(`group_by must name one or two of ${SPEND_GROUP_BY_KEYS.join(", ")}`);
-    }
-    if (keys.length > MAX_GROUP_BY_KEYS) {
-      return refuse(`group_by takes at most ${MAX_GROUP_BY_KEYS} dimensions`);
-    }
-    if (new Set(keys).size !== keys.length) {
-      return refuse("group_by cannot repeat a dimension");
-    }
-    return keys as SpendGroupByKey[];
-  })
-  .meta({
-    description: `One or two dimensions, comma separated: ${SPEND_GROUP_BY_KEYS.join(", ")}. A dimension may not repeat. Each row's \`key\` is the first dimension's value and \`group\` names them all, so two rows may share a key.`,
-    example: "model,end_user",
-  });
-
-/** What a query string may say for yes and for no. Compared case-folded. */
-const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
-const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
-
-/**
- * z.coerce.boolean() is JS Boolean(): every non-empty string is true, so allow_unstable=false
- * would turn the guard OFF. Case is folded since the caller's HTTP library picks it, not them.
- */
-const queryBoolean = z
-  .string()
-  .optional()
-  .default("false")
-  .transform((raw, ctx): boolean | typeof z.NEVER => {
-    const spelling = raw.toLowerCase();
-    if (QUERY_BOOLEAN_TRUE.includes(spelling)) return true;
-    if (QUERY_BOOLEAN_FALSE.includes(spelling)) return false;
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: `must be one of ${[...QUERY_BOOLEAN_TRUE, ...QUERY_BOOLEAN_FALSE.filter(Boolean)].join(", ")}`,
-    });
-    return z.NEVER;
-  })
-  .meta({
-    description: [
-      `${QUERY_BOOLEAN_TRUE.join(", ")} for yes;`,
-      `${QUERY_BOOLEAN_FALSE.filter(Boolean).join(", ")} or omitted for no.`,
-      "Case does not matter, so a Python True is accepted as sent.",
-    ].join(" "),
-    example: "true",
-  });
-
-const spendSummariesQuerySchema = z
-  .object({
-    group_by: groupBySchema,
-    bucket: z.enum(SPEND_BUCKETS).optional().default("none"),
-    // An IANA zone, because a day boundary is the caller's local midnight and
-    // re-bucketing UTC days afterwards cannot recover the requests that fell
-    // on the other side of it. Checked here so an unknown zone is a 400 that
-    // names the parameter rather than a ClickHouse error the caller cannot act
-    // on.
-    timezone: z
-      .string()
-      .min(1)
-      .max(64)
-      .refine((zone) => spendGrouping.isIanaTimeZone(zone), {
-        message: "timezone must be an IANA zone name, e.g. Europe/Amsterdam",
-      })
-      .optional()
-      .default("UTC"),
-    allow_unstable: queryBoolean,
-    from: epochMs,
-    to: epochMs,
-    cursor: z.string().max(500).optional(),
-    limit: z.coerce.number().int().positive().max(1000).optional().default(500),
-    ...spendFilterQueryShape,
-    // The one filter this read narrows further than /spend-events does. A
-    // rollup excludes in-flight rows from every sum, so accepting `admitted`
-    // would answer a real question with a confident zero. The refusal names
-    // the parameter, so a caller can act on it, and the events read still
-    // serves those envelopes.
-    status: spendSummaryStatusFilter
-      .optional()
-      .meta({ description: SPEND_SUMMARY_STATUS_DESCRIPTION }),
-  })
-  // An inverted window is an empty window, so a caller who swapped the two
-  // reads a confident zero and reconciles against it. /spend-events has
-  // refused this since it shipped; this surface answered instead.
-  .refine((q) => q.from <= q.to, {
-    message: "from must be less than or equal to to",
-  });
-
-const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const REPLAY_MAX_ENVELOPES = 10_000;
-const REPLAY_PAGE_SIZE = 200;
-/** Salts the batch and inbox-source ids a replay writes; never read back by kind. */
-const REPLAY_KSUID_RESOURCE = "replay";
-
-/** Refuses as soon as the cap is passed, BEFORE any envelope is queued: no partial ships. */
-async function assertReplayWindowWithinCap({
-  events,
-  endpoint,
-  accepts,
-  organizationId,
-  fromMs,
-  toMs,
-}: {
-  events: GatewaySpendWebhookEvents;
-  endpoint: GatewaySpendWebhookEndpoint;
-  accepts: GatewaySpendApp["endpointAcceptsEvent"];
-  organizationId: string;
-  fromMs: number;
-  toMs: number;
-}): Promise<void> {
-  let matching = 0;
-  let cursor: string | null = null;
-  do {
-    const page = await events.getEmittedEvents({
-      organizationId,
-      fromMs,
-      toMs,
-      cursor,
-      limit: REPLAY_PAGE_SIZE,
-    });
-    for (const envelope of page.events) {
-      if (!accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type })) {
-        continue;
-      }
-      matching++;
-      if (matching > REPLAY_MAX_ENVELOPES) {
-        throw new BadRequestError(
-          `the window holds more than ${REPLAY_MAX_ENVELOPES} envelopes; narrow it`,
-        );
-      }
-    }
-    cursor = page.nextCursor;
-  } while (cursor);
-}
-
-const replayBodySchema = z
-  .object({
-    from: z.number().int().positive().safe(),
-    to: z.number().int().positive().safe(),
-    endpoint_id: z.string().min(1).max(200),
-  })
-  .refine((b) => b.from <= b.to, {
-    message: "from must be less than or equal to to",
-  })
-  .refine((b) => b.to - b.from <= REPLAY_MAX_WINDOW_MS, {
-    message: "the replay window is capped at 7 days per call",
-  });
-
-/**
- * Appends every matching envelope in the window to the endpoint's live
- * delivery stream, and answers how many shipped.
- */
-async function appendWindowToEndpointStream({
-  events,
-  endpoint,
-  delivery,
-  accepts,
-  organizationId,
-  fromMs,
-  toMs,
-  replayId,
-}: {
-  events: GatewaySpendWebhookEvents;
-  endpoint: GatewaySpendWebhookEndpoint;
-  delivery: GatewaySpendWebhookDelivery;
-  accepts: GatewaySpendApp["endpointAcceptsEvent"];
-  organizationId: string;
-  fromMs: number;
-  toMs: number;
-  replayId: string;
-}): Promise<number> {
-  let replayed = 0;
-  let cursor: string | null = null;
-  do {
-    const page = await events.getEmittedEvents({
-      organizationId,
-      fromMs,
-      toMs,
-      cursor,
-      limit: REPLAY_PAGE_SIZE,
-    });
-    const matching = page.events.filter((envelope) =>
-      accepts({ enabledEvents: endpoint.enabledEvents, eventType: envelope.type }),
-    );
-    // The preflight cleared this window, but folds landing between the two
-    // passes can still grow it. Ship up to the cap and stop there rather
-    // than error out: the response reports what actually went out.
-    const shippable = matching.slice(0, REPLAY_MAX_ENVELOPES - replayed);
-    for (const envelope of shippable) {
-      await delivery.appendReplayToEndpointStream({
-        organizationId,
-        endpoint,
-        envelope,
-        replayId,
-      });
-      replayed++;
-    }
-    cursor = shippable.length < matching.length ? null : page.nextCursor;
-  } while (cursor);
-  return replayed;
-}
 
 const REPLAY_DESCRIPTION =
   "Re-delivers the window's spend envelopes to ONE endpoint through the " +
@@ -542,14 +93,9 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
   .withAddressing("literal", { v1Twin: false })
 
   .get("/api/gateway/v1/spend-summaries", "listGatewaySpendSummaries")
-  .withQuery(spendSummariesQuerySchema)
+  .withQuery(gatewaySpendSummariesQuerySchema)
   .withPermission("gatewaySpend:view")
-  .withOutput(
-    z.object({
-      data: z.array(spendSummaryRowSchema),
-      next_cursor: nextCursorSchema,
-    }),
-  )
+  .withOutput(gatewaySpendSummariesPageSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
     tags: ["Gateway Spend"],
@@ -557,85 +103,14 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     description: SPEND_SUMMARIES_DESCRIPTION,
     responses: spendResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    // Same contract as /spend-events: a garbled cursor is refused rather
-    // than silently restarting from the first key. A cursor decoding but
-    // naming a different dimension count is refused too — a different walk
-    // shape, and continuing would re-serve page one under a fresh cursor
-    // with nothing saying the walk reset.
-    if (input.cursor !== undefined) {
-      const parts = spendCursors.decodeSpendSummariesCursor(input.cursor);
-      const dimensionCount = input.group_by.length + (input.bucket === "none" ? 0 : 1);
-      if (parts === null) {
-        throw new BadRequestError("Invalid cursor.");
-      }
-      if (parts.length !== dimensionCount) {
-        throw new BadRequestError(
-          "This cursor belongs to a walk over a different grouping. Start a new walk without a cursor.",
-        );
-      }
-    }
-    spendGrouping.assertGroupingIsWalkable({
-      keys: input.group_by,
-      bucket: input.bucket,
-      toMs: input.to,
-      nowMs: nowInstant().epochMilliseconds,
-      allowUnstable: input.allow_unstable,
-      settlementPolicy: app.settlementPolicy(),
-    });
-    const resolved = await app.resolveSpendScope({
-      organizationId: scope.id,
-      projectIds: input.project_id,
-      teamIds: input.team_id,
-      externalIds: input.external_id,
-    });
-    const page = await app.getSpendEvents().getSpendSummaries({
-      tenantIds: resolved.tenantIds,
-      groupBy: input.group_by,
-      bucket: input.bucket,
-      timezone: input.timezone,
-      fromMs: input.from,
-      toMs: input.to,
-      cursor: input.cursor ?? null,
-      limit: input.limit,
-      filters: spendFilters.spendFiltersFromQuery({
-        query: input,
-        overrides: { virtualKeyIds: resolved.virtualKeyIds },
-      }),
-    });
-
-    return {
-      data: page.rows.map((r) => ({
-        key: r.key,
-        group: r.group,
-        bucket_start: r.bucketStart,
-        event_count: r.eventCount,
-        settled_count: r.settledCount,
-        usage: {
-          input_tokens: r.tokensInput,
-          output_tokens: r.tokensOutput,
-          cache_read_input_tokens: r.tokensCacheRead,
-          cache_creation_input_tokens: r.tokensCacheWrite,
-          reasoning_tokens: r.tokensReasoning,
-          input_image_tokens: r.tokensInputImage,
-          output_image_tokens: r.tokensOutputImage,
-          image_count: r.imageCount,
-        },
-        cost: { total_usd: r.costUsd, nano_usd: r.costNanoUsd },
-      })),
-      next_cursor: page.nextCursor,
-    };
-  })
+  .handle(({ app, input, scope }) =>
+    app.answerSpendSummaries({ organizationId: scope.id, query: input }),
+  )
 
   .get("/api/gateway/v1/spend-events", "listGatewaySpendEvents")
-  .withQuery(spendEventsQuerySchema)
+  .withQuery(gatewaySpendEventsQuerySchema)
   .withPermission("gatewaySpend:view")
-  .withOutput(
-    z.object({
-      data: z.array(gatewaySpendEventEnvelopeSchema),
-      next_cursor: nextCursorSchema,
-    }),
-  )
+  .withOutput(gatewaySpendEventsPageSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
     tags: ["Gateway Spend"],
@@ -643,41 +118,15 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     description: SPEND_EVENTS_PULL_DESCRIPTION,
     responses: spendResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    // A present-but-garbled cursor is a caller bug: refusing beats
-    // silently restarting the walk, which would re-serve the whole range.
-    if (input.cursor !== undefined && !spendCursors.decodeSpendEventsCursor(input.cursor)) {
-      throw new BadRequestError("Invalid cursor.");
-    }
-    const resolved = await app.resolveSpendScope({
-      organizationId: scope.id,
-      projectIds: input.project_id,
-      teamIds: input.team_id,
-      externalIds: input.external_id,
-    });
-    const page = await app.getSpendEvents().walkSpendEvents({
-      tenantIds: resolved.tenantIds,
-      fromMs: input.from,
-      toMs: input.to,
-      cursor: input.cursor ?? null,
-      limit: input.limit,
-      filters: spendFilters.spendFiltersFromQuery({
-        query: input,
-        overrides: { virtualKeyIds: resolved.virtualKeyIds },
-      }),
-    });
-
-    return {
-      data: page.rows.map((row) => app.spendEventEnvelope(row)),
-      next_cursor: page.nextCursor,
-    };
-  })
+  .handle(({ app, input, scope }) =>
+    app.answerSpendEvents({ organizationId: scope.id, query: input }),
+  )
 
   .get("/api/gateway/v1/end-users/:id/spend", "getGatewayEndUserSpend")
-  .withParams(endUserSpendParamsSchema)
-  .withQuery(endUserSpendQuerySchema)
+  .withParams(gatewayEndUserSpendParamsSchema)
+  .withQuery(gatewayEndUserSpendQuerySchema)
   .withPermission("gatewaySpend:view")
-  .withOutput(z.object({ data: endUserSpendSchema }))
+  .withOutput(gatewayEndUserSpendResponseSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
     tags: ["Gateway Spend"],
@@ -685,59 +134,14 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     description: END_USER_SPEND_DESCRIPTION,
     responses: spendResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    const endUserId = input.id;
-    const now = nowInstant().epochMilliseconds;
-    const fromMs = input.from ?? now - END_USER_WINDOWS[input.window];
-    const toMs = input.to ?? now;
-    const { tenantIds } = await app.resolveSpendScope({ organizationId: scope.id });
-    const rollup = await app.getSpendEvents().getEndUserSpend({
-      tenantIds,
-      endUserId,
-      fromMs,
-      toMs,
-      virtualKeyId: input.virtual_key_id,
-    });
-    const budgetRepository = app.getBudgetSpend();
-    const caps = await app.endUserCaps({
-      budgetRepository,
-      organizationId: scope.id,
-      endUserId,
-      tenantIds,
-      virtualKeyId: input.virtual_key_id,
-    });
-
-    return {
-      data: {
-        end_user_id: endUserId,
-        window: input.window,
-        from: Temporal.Instant.fromEpochMilliseconds(fromMs).toString({
-          smallestUnit: "millisecond",
-        }),
-        to: Temporal.Instant.fromEpochMilliseconds(toMs).toString({
-          smallestUnit: "millisecond",
-        }),
-        cost: { total_usd: rollup.spendUsd, nano_usd: rollup.spendNanoUsd },
-        request_count: rollup.requestCount,
-        usage: {
-          input_tokens: rollup.tokensInput,
-          output_tokens: rollup.tokensOutput,
-          cache_read_input_tokens: rollup.tokensCacheRead,
-          cache_creation_input_tokens: rollup.tokensCacheWrite,
-          reasoning_tokens: rollup.tokensReasoning,
-          input_image_tokens: rollup.tokensInputImage,
-          output_image_tokens: rollup.tokensOutputImage,
-          image_count: rollup.imageCount,
-        },
-        caps,
-      },
-    };
-  })
+  .handle(({ app, input, scope }) =>
+    app.answerEndUserSpend({ organizationId: scope.id, query: input }),
+  )
 
   .post("/api/gateway/v1/spend-events/replay", "replayGatewaySpendEvents")
-  .withInput(replayBodySchema)
+  .withInput(gatewaySpendReplayBodySchema)
   .withPermission("gatewaySpend:manage")
-  .withOutput(z.object({ data: replayResultSchema }))
+  .withOutput(gatewaySpendReplayResponseSchema)
   .withMiddleware(gatewaySpendBillingPlanGate)
   .withDocs({
     tags: ["Gateway Spend"],
@@ -745,57 +149,8 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     description: REPLAY_DESCRIPTION,
     responses: spendResponses,
   })
-  .handle(async ({ app, input, scope }) => {
-    const endpoint = await app.webhookEndpoints().findDeliverable({
-      organizationId: scope.id,
-      endpointId: input.endpoint_id,
-    });
-    if (!endpoint) {
-      throw new BadRequestError("unknown or inactive endpoint for this organization");
-    }
-
-    const events = app.webhookEvents();
-    const delivery = app.webhookDelivery();
-
-    // One replay identity per call: it salts batch ids and inbox source
-    // ids so redelivered envelopes cannot collide with their historical
-    // batches; the ENVELOPE ids stay untouched.
-    await assertReplayWindowWithinCap({
-      events,
-      endpoint,
-      accepts: app.endpointAcceptsEvent,
-      organizationId: scope.id,
-      fromMs: input.from,
-      toMs: input.to,
-    });
-
-    const replayId = generate(REPLAY_KSUID_RESOURCE).toString();
-    const replayed = await appendWindowToEndpointStream({
-      events,
-      endpoint,
-      delivery,
-      accepts: app.endpointAcceptsEvent,
-      organizationId: scope.id,
-      fromMs: input.from,
-      toMs: input.to,
-      replayId,
-    });
-
-    return {
-      data: {
-        endpoint_id: endpoint.id,
-        replay_id: replayId,
-        replayed,
-        window: {
-          from: Temporal.Instant.fromEpochMilliseconds(input.from).toString({
-            smallestUnit: "millisecond",
-          }),
-          to: Temporal.Instant.fromEpochMilliseconds(input.to).toString({
-            smallestUnit: "millisecond",
-          }),
-        },
-      },
-    };
-  })
+  .handle(({ app, input, scope }) =>
+    app.answerSpendReplay({ organizationId: scope.id, body: input }),
+  )
 
   .build();
