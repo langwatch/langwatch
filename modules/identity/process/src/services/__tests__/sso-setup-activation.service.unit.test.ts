@@ -8,9 +8,11 @@ import {
   emptySsoConnection,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
+  type SsoDomainVerification,
 } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { StubBreakGlassBindings } from "../../__tests__/support/in-memory-connections.ts";
 import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
 import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { SsoConnectionReadRepository } from "../../repositories/sso-connection.repository.ts";
@@ -24,10 +26,24 @@ const ORGANIZATION_ID = "org_acme";
 const CONNECTION_ID = "local_ssoc_0005NmMMMX8uk3JfupN0JsNdW368m";
 const ACTOR = { userId: "user_ana" };
 
+const DOMAIN_PROOF: SsoDomainVerification = {
+  domain: "acme.com",
+  method: "dns-txt",
+  actorId: null,
+  verifiedAtMs: 1_690_000_000_000,
+  proofState: "VERIFIED",
+  firstAbsentAtMs: null,
+  graceEndsAtMs: null,
+  tokenHash: "sha256:proof",
+};
+
 const connection = (over: Partial<SsoConnectionState> = {}): SsoConnectionState => ({
   ...emptySsoConnection({ connectionId: CONNECTION_ID }),
   organizationId: ORGANIZATION_ID,
   state: "VERIFIED",
+  source: "self-serve",
+  verifiedDomains: ["acme.com"],
+  domainVerifications: [DOMAIN_PROOF],
   ...over,
 });
 
@@ -53,6 +69,7 @@ class OneConnection extends SsoConnectionReadRepository {
 function serviceOver({
   row = connection(),
   signIns = [] as { userId: string; providerAccountId: string | null; atMs: number }[],
+  wayBackIn = true,
 } = {}) {
   const store = MemoryIdentityStore.create();
   for (const signIn of signIns) {
@@ -70,6 +87,7 @@ function serviceOver({
     reads: new OneConnection(row),
     activity: identityRepositoriesOverMemory(store).ssoMigrationEvidence,
     credentials: createApiFixture<SsoCredentialRepository>({}),
+    breakGlass: new StubBreakGlassBindings(wayBackIn),
     registrations: createApiFixture<SsoIdpRegistrationService>({}),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => 1_700_000_000_000,
@@ -96,11 +114,12 @@ describe("taking a connection live", () => {
     );
   });
 
+  /** @scenario "Going live without a test sign-in says so by name" */
   it("refuses a connection nobody has signed in through", async () => {
     const { service, activateConnection } = serviceOver();
 
     await expect(activate(service)).rejects.toMatchObject({
-      code: "sso_connection_activation_blocked",
+      code: "sso_activation_test_sign_in_missing",
     });
     expect(activateConnection).not.toHaveBeenCalled();
   });
@@ -111,8 +130,34 @@ describe("taking a connection live", () => {
     });
 
     await expect(activate(service)).rejects.toMatchObject({
-      code: "sso_connection_activation_blocked",
+      code: "sso_activation_test_sign_in_missing",
     });
+  });
+
+  /** @scenario "Going live without a proved domain says so by name" */
+  it("refuses a connection that has proved no domain, before asking anything else", async () => {
+    const { service, activateConnection } = serviceOver({
+      row: connection({ verifiedDomains: [], domainVerifications: [] }),
+      wayBackIn: false,
+    });
+
+    await expect(activate(service)).rejects.toMatchObject({
+      code: "sso_activation_domain_unproved",
+    });
+    expect(activateConnection).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Going live without a way back in says so by name" */
+  it("refuses when nobody can get in without the identity provider", async () => {
+    const { service, activateConnection } = serviceOver({
+      signIns: [{ userId: "user_ana", providerAccountId: "okta|ana", atMs: 1_699_000_000_000 }],
+      wayBackIn: false,
+    });
+
+    await expect(activate(service)).rejects.toMatchObject({
+      code: "sso_activation_break_glass_missing",
+    });
+    expect(activateConnection).not.toHaveBeenCalled();
   });
 
   it("keeps the account a completed activation already recorded", async () => {

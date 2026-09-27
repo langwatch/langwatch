@@ -2904,6 +2904,21 @@ const presentations = {
     describe: () =>
       "Another single sign-on connection has already proved ownership of this domain. Contact support to resolve the claim.",
   },
+  sso_activation_domain_unproved: {
+    title: "Prove a domain first",
+    describe: () =>
+      "Nobody can be sent to your identity provider until a domain is proved to be yours. Claim the domain and publish the record we give you.",
+  },
+  sso_activation_test_sign_in_missing: {
+    title: "Sign in through it once first",
+    describe: () =>
+      "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
+  },
+  sso_activation_break_glass_missing: {
+    title: "Name someone who can still get in",
+    describe: () =>
+      "Before single sign-on decides who gets in, one person needs to be able to sign in with a password in case the identity provider stops working. Grant a way back in, then try again.",
+  },
   sso_connection_activation_blocked: {
     title: "This connection isn't ready to go live",
     describe: () =>

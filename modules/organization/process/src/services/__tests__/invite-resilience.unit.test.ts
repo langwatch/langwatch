@@ -314,21 +314,24 @@ describe("InviteService resilience", () => {
       });
 
       /** @scenario "Only an invitation still waiting can be extended" */
-      it("refuses to extend a revoked invitation", async () => {
-        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
-          ...makePendingInvite(),
-          status: "REVOKED",
-          organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
-        });
+      it.each(["REVOKED", "ACCEPTED"] as const)(
+        "refuses to extend an invitation that is %s",
+        async (status) => {
+          mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+            ...makePendingInvite(),
+            status,
+            organization: { id: "org-1", name: "Acme", ...ROW_TIMESTAMPS },
+          });
 
-        await expect(
-          service.extendInvite({
-            organizationId: "org-1",
-            inviteId: "inv-race-1",
-          }),
-        ).rejects.toBeInstanceOf(InviteNotFoundError);
-        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
-      });
+          await expect(
+            service.extendInvite({
+              organizationId: "org-1",
+              inviteId: "inv-race-1",
+            }),
+          ).rejects.toBeInstanceOf(InviteNotFoundError);
+          expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+        },
+      );
     });
   });
 

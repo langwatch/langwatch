@@ -102,6 +102,7 @@ beforeEach(() => {
     reads: connections,
     activity: identityRepositoriesOverMemory(MemoryIdentityStore.create()).ssoMigrationEvidence,
     credentials: vault,
+    breakGlass: new StubBreakGlassBindings(true),
     registrations: SsoIdpRegistrationService.create({ discovery: reachableDiscovery }),
     finalization: createApiFixture<SsoMigrationFinalizationService>({}),
     now: () => T0,

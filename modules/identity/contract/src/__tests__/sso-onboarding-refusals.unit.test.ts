@@ -11,6 +11,9 @@ import type { HandledErrorShape } from "@langwatch/error-presentation/read-handl
 import { describe, expect, it } from "vitest";
 
 import {
+  SsoActivationBreakGlassMissingError,
+  SsoActivationDomainUnprovedError,
+  SsoActivationTestSignInMissingError,
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
@@ -27,6 +30,9 @@ const REFUSALS = [
   new SsoConnectionInvalidTransitionError("detail"),
   new SsoConnectionDomainTakenError("detail"),
   new SsoConnectionActivationBlockedError("detail"),
+  new SsoActivationDomainUnprovedError("detail"),
+  new SsoActivationTestSignInMissingError("detail"),
+  new SsoActivationBreakGlassMissingError("detail"),
   new SsoConnectionTeardownStrandsUsersError("detail"),
   new SsoConnectionOperatorActRequiredError("detail"),
   new SsoConnectionStringEditRetiredError("detail"),

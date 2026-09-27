@@ -234,7 +234,7 @@ Feature: The platform operator identity lookup - the end of database surgery
     Then a fresh invitation goes out and the previous one stops working
     And the resend is recorded with "olive" on it
 
-  @unit
+  @integration
   Scenario: Extending an invitation moves its expiry and says by how much
     Given an invitation expires tomorrow
     When "olive" extends it
