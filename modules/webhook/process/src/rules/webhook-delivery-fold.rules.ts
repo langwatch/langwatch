@@ -21,6 +21,7 @@ import {
   type SettleSpendCommandData,
   type DeliverInstance,
   type WebhookDeliveryState,
+  type WebhookProcessState,
 } from "./webhook-delivery-contract.rules.ts";
 import {
   attributedColumns,
@@ -84,12 +85,12 @@ export function payloadToRow(payload: DeliverPayload): WebhookSpendEventRow {
 }
 
 /** An `endpoint:<id>` instance holds the coalescing buffer, not the delivery state. */
-function isEndpointStreamState(state: object): state is EndpointStreamState {
+export function isEndpointStreamState(state: WebhookProcessState): state is EndpointStreamState {
   return "pending" in state && Array.isArray(state.pending);
 }
 
 export function deriveEndpointFlushTarget(
-  state: WebhookDeliveryState,
+  state: WebhookProcessState,
   key: string,
 ): { endpointId: string; organizationId: string } | null {
   if (!isEndpointStreamKey(key) || !isEndpointStreamState(state)) {

@@ -409,6 +409,13 @@ Feature: Webhook endpoints, signed outbound event delivery
       When the coalescing deadline passes
       Then the wake flushes them as one batch
 
+    @unit
+    Scenario: The delivery process manager flushes an endpoint stream on its wake
+      Given an active endpoint with a coalescing delay
+      And a confirmed spend step buffered in the endpoint's stream
+      When the stream's wake fires
+      Then the buffered envelope is delivered to the endpoint once
+
     @integration
     Scenario: Under backpressure batches grow toward the size cap
       Given an endpoint capped at one in-flight send with a slow receiver
