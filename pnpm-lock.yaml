@@ -1004,6 +1004,9 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../packages/api-fixture
+      '@langwatch/clickhouse-migrations':
+        specifier: workspace:*
+        version: link:../../packages/clickhouse-migrations
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
