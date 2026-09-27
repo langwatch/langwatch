@@ -604,9 +604,6 @@
       "path": "modules/share/process/tsconfig.json"
     },
     {
-      "path": "packages/storage-seed/tsconfig.json"
-    },
-    {
       "path": "modules/stored-object/contract/tsconfig.json"
     },
     {
