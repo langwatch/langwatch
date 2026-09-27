@@ -4,8 +4,10 @@
  * trace spans) so service stays testable against fake reader.
  */
 
-import type { SimulationService, WholeCallAudioInfrastructure } from "@langwatch/scenario-contract";
+import type { SimulationService } from "@langwatch/scenario-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
+
+import type { WholeCallAudioInfrastructure } from "./whole-call-audio.service.ts";
 
 /** What resolving a call's audio reaches outside itself. */
 export interface WholeCallAudioCollaborators {

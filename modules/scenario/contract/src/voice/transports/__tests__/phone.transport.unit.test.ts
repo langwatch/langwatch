@@ -16,6 +16,7 @@ import {
   type PhoneTransportEnvironment,
   derivePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
+  type PhoneAgentAdapter,
   type TwilioAdapterLike,
   type TwilioAgentFactory,
   VoicePhoneTransportUnavailableError,
@@ -45,9 +46,6 @@ const TWILIO_CREDENTIAL: VoiceTransportCredential = {
 /** The E.164 destination under test, dialled as the a-leg. */
 const TARGET = "+14155559999";
 
-/** The connect() a runner exposes on the SDK adapter it returns. */
-type Connectable = { connect: () => Promise<void> };
-
 /**
  * The vendor SDK's own `placeCall` argument shape: `shouldRecord` swapped for the SDK's published
  * `record`, mirroring the (unexported) `SdkTwilioAdapter` translation in phone.transport.ts.
@@ -57,7 +55,7 @@ type SdkPlaceCallArgs = Omit<Parameters<TwilioAdapterLike["placeCall"]>[0], "sho
   record?: boolean;
 };
 
-interface FakeAdapter extends TwilioAdapterLike {
+interface FakeAdapter extends PhoneAgentAdapter {
   readonly placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][];
   readonly disconnectCount: () => number;
 }
@@ -68,6 +66,8 @@ function fakeAdapter(
   const placeCallArgs: Parameters<TwilioAdapterLike["placeCall"]>[0][] = [];
   let disconnects = 0;
   return {
+    role: AgentRole.AGENT,
+    call: vi.fn(async () => ""),
     placeCallArgs,
     disconnectCount: () => disconnects,
     connect: vi.fn(async () => {
@@ -110,7 +110,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await (built as unknown as Connectable).connect();
+        await built.connect();
 
         expect(factoryOptions[0]?.accountSid).toBe("AC123");
         expect(factoryOptions[0]?.authToken).toBe("tok-secret");
@@ -147,7 +147,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 600,
         });
-        await (built as unknown as Connectable).connect();
+        await built.connect();
         expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(
           TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
         );
@@ -162,7 +162,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 90,
         });
-        await (built as unknown as Connectable).connect();
+        await built.connect();
         expect(adapter.placeCallArgs[0]?.maxCallDurationSeconds).toBe(90);
       });
     });
@@ -193,9 +193,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await expect((built as unknown as Connectable).connect()).rejects.toThrow(
-          PHONE_CONNECT_REJECTED_PREFIX,
-        );
+        await expect(built.connect()).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
         expect(adapter.disconnectCount()).toBe(1);
       });
     });
@@ -211,9 +209,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await expect((built as unknown as Connectable).connect()).rejects.toThrow(
-          PHONE_CONNECT_REJECTED_PREFIX,
-        );
+        await expect(built.connect()).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
         expect(adapter.placeCallArgs).toHaveLength(0);
         expect(adapter.disconnectCount()).toBe(1);
       });
@@ -538,7 +534,7 @@ describe("phoneTransport", () => {
           maxCallSeconds: 120,
         });
 
-        expect((built as unknown as { role: AgentRole }).role).toBe(AgentRole.AGENT);
+        expect(built.role).toBe(AgentRole.AGENT);
       });
 
       /**
@@ -562,7 +558,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await (built as unknown as Connectable).connect();
+        await built.connect();
 
         expect(placeCall).toHaveBeenCalledTimes(1);
         const call = placeCall.mock.calls[0]?.[0];
@@ -594,7 +590,7 @@ describe("phoneTransport", () => {
           credential: TWILIO_CREDENTIAL,
           maxCallSeconds: 120,
         });
-        await (built as unknown as Connectable).connect();
+        await built.connect();
         expect(connect).toHaveBeenCalledTimes(1);
 
         await transport.endCall(built);

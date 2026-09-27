@@ -6,13 +6,8 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { SimulationQueueRun } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
-import {
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -35,58 +30,32 @@ const target: SuiteTarget = {
 let client: ClickHouseClient | undefined;
 let repository: SimulationClickHouseRepository;
 
-/** The command the execution service queues for that target: metadata included. */
-async function queueRunAgainstTarget(): Promise<QueueSimulationRunCommandData> {
-  const queued: QueueSimulationRunCommandData[] = [];
-  const service = SuiteExecutionService.create({
-    commands: {
-      startSuiteRun: async () => {},
-      queueSimulationRun: async (data) => {
-        queued.push(data);
+/** The queued run as the suite sends it for that target: metadata included. */
+function queueRunAgainstTarget(): SimulationQueueRun {
+  return {
+    tenantId,
+    scenarioRunId: `scenariorun-${nanoid()}`,
+    scenarioId,
+    batchRunId: `batch-${nanoid()}`,
+    scenarioSetId: `suiteset-${nanoid()}`,
+    name: "Refund flow",
+    metadata: {
+      langwatch: {
+        targetReferenceId: target.referenceId,
+        targetType: target.type,
+        targetKey: targetKeyOf(target),
+        targetParameters: target.runParameters,
+        scenarioVersion: 1,
       },
+      parameters: { model: "gpt-5-mini", region: "eu-central" },
     },
-    scenarios: createApiFixture<ScenarioApi>({
-      resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
-        scenarios.map((scenario) => ({
-          scenarioId: scenario.id,
-          parameters: { model: "gpt-5-mini", region: "eu-central" },
-          secretParameters: {},
-          scenarioVersion: 1,
-        })),
-    }),
-  });
-
-  await service.execute({
-    suiteId: `suite-${nanoid()}`,
-    projectId: tenantId,
-    activeScenarioIds: [scenarioId],
-    scenarioNames: new Map([[scenarioId, "Refund flow"]]),
-    scenarioVersions: new Map([[scenarioId, 1]]),
-    scenarioConfigs: [
-      {
-        id: scenarioId,
-        name: "Refund flow",
-        version: 1,
-        situation: "A customer asks for a refund",
-        criteria: [],
-        parameters: {},
-      },
-    ],
-    activeTargets: [target],
-    repeatCount: 1,
-    skippedArchived: { scenarios: [], targets: [] },
-    idempotencyKey: `idem-${nanoid()}`,
-    simulatorModel: null,
-    judgeModel: null,
-  });
-
-  const command = queued[0];
-  if (!command) throw new Error("the execution service queued no run");
-  return command;
+    target: { type: target.type, referenceId: target.referenceId },
+    occurredAt: Date.now(),
+  };
 }
 
 /** Stores the queued run the way the fold projection lands it. */
-async function storeRun(command: QueueSimulationRunCommandData): Promise<void> {
+async function storeRun(command: SimulationQueueRun): Promise<void> {
   if (!client) throw new Error("ClickHouse integration environment is unavailable");
   const startedAt = new Date(Date.now() - 5_000);
   await client.insert({
@@ -154,7 +123,7 @@ describe.skipIf(databaseUrl === null)(
     describe("when the run is stored and read back", () => {
       /** @scenario The target key and its parameters read back off the stored run */
       it("reads the target key and the override back under the reserved langwatch namespace", async () => {
-        const command = await queueRunAgainstTarget();
+        const command = queueRunAgainstTarget();
         await storeRun(command);
 
         const run = await repository.findScenarioRunData({

@@ -33,15 +33,18 @@ export interface VoiceSessionConnect {
   signedUrl: string;
 }
 
+/** What a transport builds the pool child's agent adapter from. */
+export interface VoiceAgentAdapterRequest {
+  agentId: string;
+  credential: VoiceTransportCredential;
+  maxCallSeconds: number;
+}
+
 export interface VoiceTransportRunner {
   // Guard before browser-driven mint/record. Phone throws; doesn't gate headless dial.
   assertAvailable?(): void;
   /** Build the SDK agent adapter the pool child drives for this transport. */
-  createAgentAdapter(input: {
-    agentId: string;
-    credential: VoiceTransportCredential;
-    maxCallSeconds: number;
-  }): AgentAdapter;
+  createAgentAdapter(input: VoiceAgentAdapterRequest): AgentAdapter;
   /**
    * Ask the provider for a short-lived signed URL the browser opens the call
    * with. The key stays here; only the signed URL travels back.

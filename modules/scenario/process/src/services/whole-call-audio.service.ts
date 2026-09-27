@@ -1,7 +1,7 @@
 // Resolve the handle the whole-call audio player streams a run's recording by.
 // Reads run's traces, scans spans for vendor handle (Twilio or ElevenLabs); unavailable if missing.
 
-import { VoiceRecordingUnavailableError } from "./voice-session.service.ts";
+import { VoiceRecordingUnavailableError } from "@langwatch/scenario-contract/voice-runtime";
 
 /** The span attribute a phone run stamps its Twilio call SID on. */
 export const TWILIO_CALL_SID_ATTR = "voice.twilio.call_sid";
@@ -48,32 +48,30 @@ function extractAttributesHandle(
   return null;
 }
 
-/**
- * The whole-call audio handle for a run, read from the run's own trace spans.
- * Throws `VoiceRecordingUnavailableError` when no span names one.
- */
-export async function getWholeCallAudio({
-  projectId,
-  scenarioRunId,
-  infrastructure,
-}: {
-  projectId: string;
-  scenarioRunId: string;
-  infrastructure: WholeCallAudioInfrastructure;
-}): Promise<WholeCallAudioHandle> {
-  const traceIds = await infrastructure.loadRunTraceIds({
+/** The whole-call audio handle a run's own trace spans name. */
+export class WholeCallAudioService {
+  static create(infrastructure: WholeCallAudioInfrastructure): WholeCallAudioService {
+    return new WholeCallAudioService(infrastructure);
+  }
+
+  private constructor(private readonly infrastructure: WholeCallAudioInfrastructure) {}
+
+  /** Scans the run's traces in order; throws `VoiceRecordingUnavailableError` when none has one. */
+  async getHandle({
     projectId,
     scenarioRunId,
-  });
-  for (const traceId of traceIds) {
-    const spans = await infrastructure.readSpanAttributes({
-      projectId,
-      traceId,
-    });
-    for (const attributes of spans) {
-      const handle = extractAttributesHandle(attributes);
-      if (handle) return handle;
+  }: {
+    projectId: string;
+    scenarioRunId: string;
+  }): Promise<WholeCallAudioHandle> {
+    const traceIds = await this.infrastructure.loadRunTraceIds({ projectId, scenarioRunId });
+    for (const traceId of traceIds) {
+      const spans = await this.infrastructure.readSpanAttributes({ projectId, traceId });
+      for (const attributes of spans) {
+        const handle = extractAttributesHandle(attributes);
+        if (handle) return handle;
+      }
     }
+    throw new VoiceRecordingUnavailableError();
   }
-  throw new VoiceRecordingUnavailableError();
 }

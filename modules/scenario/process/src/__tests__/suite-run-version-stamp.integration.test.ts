@@ -1,11 +1,11 @@
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-version-on-runs.feature
- * A queued run records the version read at queue time; a later edit never moves it.
+ * The version a suite stamps on each queued run is the one the run-config read answers at
+ * queue time (suite's own stamping: suite-execution-run-stamp.unit.test.ts).
  */
 import { randomUUID } from "node:crypto";
 
-import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -16,25 +16,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  projectWithTeamSchema,
-  type ProjectApi,
-  type ProjectWithTeam,
-} from "@langwatch/project-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import {
-  type SimulationService,
-  type Scenario,
-  type ScenarioApi,
-} from "@langwatch/scenario-contract";
-import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
-import {
-  type SuiteRunCommands,
-  PostgresSuiteRepositories,
-  SuiteApp,
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-process";
+import type { Scenario, SimulationService } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -47,10 +29,6 @@ import type {
 } from "../app/scenario.app.ts";
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
-
-type SuiteEvaluatorApi = Parameters<
-  typeof SuiteApp.createForTesting
->[0]["dependencies"]["evaluators"];
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -86,67 +64,6 @@ class TestSecretCipher implements ScenarioSecretCipher {
   }
 }
 
-/** Records the durable commands the execution service would have appended. */
-class CapturingCommands implements SuiteRunCommands {
-  readonly queued: QueueSimulationRunCommandData[] = [];
-
-  async startSuiteRun(_data: StartSuiteRunCommandData): Promise<void> {}
-
-  async queueSimulationRun(data: QueueSimulationRunCommandData): Promise<void> {
-    this.queued.push(data);
-  }
-}
-
-/** Targets are opaque JSON on the suite row, so nothing here needs a real FK. */
-type FakeAgent = { id: string; name: string; type: "http" };
-
-function fakeAgentApi(agents: Map<string, FakeAgent>): AgentApi {
-  return createApiFixture<AgentApi>({
-    getReferenceStates: async ({ ids }: { ids: string[] }) =>
-      ids.flatMap((id) => {
-        const agent = agents.get(id);
-        return agent ? [{ id, archivedAt: null, type: agent.type, name: agent.name }] : [];
-      }),
-    getNamesByIds: async ({ ids }: { ids: string[] }) =>
-      ids.flatMap((id) => {
-        const agent = agents.get(id);
-        return agent ? [{ id, name: agent.name }] : [];
-      }),
-    getConnectedByNameAndEnvironment: async () => [],
-    ownersOf: async () => new Map(),
-  });
-}
-
-function fakePromptApi(): PromptApi {
-  return createApiFixture<PromptApi>({
-    getExistingIds: async () => [],
-    getNamesByIds: async () => [],
-  });
-}
-
-/**
- * The scenario capability the suite application reads through, served by this
- * test's own Prisma-backed scenario service so the versions are the stored ones.
- */
-function scenarioApiOver(service: ScenarioService): ScenarioApi {
-  return createApiFixture<ScenarioApi>({
-    list: (input) => service.list(input),
-    listTestSuites: (input) => service.listTestSuites(input),
-    findTestSuite: (input) => service.findTestSuite(input),
-    createTestSuite: (input) => service.createTestSuite(input),
-    updateTestSuite: (input) => service.updateTestSuite(input),
-    renameTestSuite: (input) => service.renameTestSuite(input),
-    archiveTestSuite: (input) => service.archiveTestSuite(input),
-    getTestSuiteRunDefinition: (input) => service.getTestSuiteRunDefinition(input),
-    getReferenceStates: (input) => service.getReferenceStates(input),
-    getRunConfigs: (input) => service.getRunConfigs(input),
-    getModelChoices: (input) => service.getModelChoices(input),
-    getNamesByIds: (input) => service.getNamesByIds(input),
-    resolveRunParameters: (input) => service.resolveRunParameters(input),
-    resolveRunParametersForScenarios: (input) => service.resolveRunParametersForScenarios(input),
-  });
-}
-
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
   ? PrismaConnectionService.create({
@@ -166,11 +83,7 @@ const namespace = `suite-version-stamp-${randomUUID()}`;
 let organizationId = "";
 let teamId = "";
 let projectId = "";
-let project: ProjectWithTeam | null = null;
 let scenarios: ScenarioService;
-let suites: SuiteApi;
-let commands: CapturingCommands;
-let agents: Map<string, FakeAgent>;
 
 async function createCaseAtVersion(name: string, version: number): Promise<Scenario> {
   const scenario = await scenarios.create({
@@ -191,21 +104,7 @@ async function createCaseAtVersion(name: string, version: number): Promise<Scena
   return scenario;
 }
 
-function createHttpAgent(): FakeAgent {
-  const agent: FakeAgent = {
-    id: `agent_${randomUUID()}`,
-    name: `Agent ${randomUUID().slice(0, 8)}`,
-    type: "http",
-  };
-  agents.set(agent.id, agent);
-  return agent;
-}
-
-function stampOf(command: QueueSimulationRunCommandData) {
-  return (command.metadata as { langwatch?: Record<string, unknown> }).langwatch;
-}
-
-describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
+describe.skipIf(!databaseUrl)("the version a suite run reads for its stamp", () => {
   beforeAll(async () => {
     const db = database();
     const organization = await db.organization.create({
@@ -225,10 +124,8 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
         language: "typescript",
         framework: "other",
       },
-      include: { team: true },
     });
     projectId = created.id;
-    project = projectWithTeamSchema.parse(created);
   });
 
   beforeEach(async () => {
@@ -238,9 +135,6 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       ["scenario", { projectId }],
       ["simulationSuite", { projectId }],
     ]);
-
-    agents = new Map();
-    commands = new CapturingCommands();
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
       simulations: createApiFixture<SimulationService>(),
@@ -248,25 +142,6 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),
       secretCipher: new TestSecretCipher(),
-    });
-    const scenarioApi = scenarioApiOver(scenarios);
-    suites = SuiteApp.createForTesting({
-      repositories: PostgresSuiteRepositories.create({ prisma: db }),
-      dependencies: {
-        scenarios: scenarioApi,
-        agents: fakeAgentApi(agents),
-        prompts: fakePromptApi(),
-        evaluators: createApiFixture<SuiteEvaluatorApi>({}),
-        projects: createApiFixture<ProjectApi>({
-          findWithTeam: async (id: string) => (id === projectId ? project : null),
-        }),
-      },
-      infrastructure: {
-        execution: SuiteExecutionService.create({
-          commands,
-          scenarios: scenarioApi,
-        }),
-      },
     });
   });
 
@@ -288,68 +163,26 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
   });
 
   /** @scenario "A test suite run records the version of every scenario it ran" */
-  it("records each case's own stored version on its queued run", async () => {
+  it("answers each case's own stored version in the run configs a suite queues from", async () => {
     const atThree = await createCaseAtVersion("Refund", 3);
     const atSeven = await createCaseAtVersion("Checkout", 7);
-    const agent = createHttpAgent();
-    const suite = await suites.create({
-      projectId,
-      name: "Nightly",
-      scenarioIds: [atThree.id, atSeven.id],
-      targets: [{ type: "http", referenceId: agent.id }],
-      repeatCount: 1,
-      labels: [],
-    });
 
-    await suites.run({
-      id: suite.id,
-      projectId,
-      idempotencyKey: `run-${randomUUID().slice(0, 8)}`,
-    });
+    const configs = await scenarios.getRunConfigs({ ids: [atThree.id, atSeven.id], projectId });
 
-    const stampsByScenarioId = new Map(
-      commands.queued.map((command) => [command.scenarioId, stampOf(command)]),
-    );
-    expect(stampsByScenarioId.get(atThree.id)).toMatchObject({
-      targetReferenceId: agent.id,
-      targetType: "http",
-      scenarioVersion: 3,
-    });
-    expect(stampsByScenarioId.get(atSeven.id)).toMatchObject({
-      targetReferenceId: agent.id,
-      targetType: "http",
-      scenarioVersion: 7,
-    });
+    const versions = new Map(configs.map((config) => [config.id, config.version]));
+    expect(versions.get(atThree.id)).toBe(3);
+    expect(versions.get(atSeven.id)).toBe(7);
   });
 
   /** @scenario "Editing a scenario after a run leaves the run unchanged" */
-  it("keeps the queued stamp at the version read at queue time after a later edit", async () => {
+  it("keeps the version read at queue time after a later edit moves the stored one", async () => {
     const scenario = await createCaseAtVersion("Refund", 5);
-    const agent = createHttpAgent();
-    const suite = await suites.create({
-      projectId,
-      name: "Nightly",
-      scenarioIds: [scenario.id],
-      targets: [{ type: "http", referenceId: agent.id }],
-      repeatCount: 1,
-      labels: [],
-    });
+    const [queuedFrom] = await scenarios.getRunConfigs({ ids: [scenario.id], projectId });
 
-    await suites.run({
-      id: suite.id,
-      projectId,
-      idempotencyKey: `run-${randomUUID().slice(0, 8)}`,
-    });
+    await scenarios.update({ id: scenario.id, projectId, situation: "Edited after the run" });
 
-    await scenarios.update({
-      id: scenario.id,
-      projectId,
-      situation: "Edited after the run",
-    });
     const stored = await scenarios.getById({ id: scenario.id, projectId });
-    expect(stored?.version).toBe(6);
-
-    // The queued command still carries the version read when it was queued.
-    expect(stampOf(commands.queued[0]!)).toMatchObject({ scenarioVersion: 5 });
+    expect(stored.version).toBe(6);
+    expect(queuedFrom?.version).toBe(5);
   });
 });

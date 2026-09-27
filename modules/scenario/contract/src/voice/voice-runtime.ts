@@ -23,7 +23,4 @@ export {
   VoiceRecordingUnavailableError,
   VoiceSessionInvalidError,
 } from "./voice-session.service.ts";
-export { getTwilioRecordingWavUrl, twilioBasicAuthHeader } from "./twilio-recording.service.ts";
-export { getWholeCallAudio } from "./whole-call-audio.service.ts";
-export { proxyAudioStream } from "./audio-proxy-stream.ts";
 export { voiceCallMaxSeconds } from "./voice-limits.ts";

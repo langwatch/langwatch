@@ -19,16 +19,13 @@ import type {
   VoiceSessionMintResult,
   VoiceSessionTokenPayload,
   SimulationService,
-  WholeCallAudioInfrastructure,
 } from "@langwatch/scenario-contract";
 import {
   authorizeRecordingPlayback,
   createVoiceTransportRegistry,
   voiceCallMaxSeconds,
   finishVoiceSession,
-  getWholeCallAudio,
   mintVoiceSession,
-  twilioBasicAuthHeader,
   VoiceAgentsGateDisabledError,
   VoiceRecordingKeyMissingError,
   VoiceSessionInvalidError,
@@ -36,6 +33,7 @@ import {
 import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { VoiceRecordingChannel } from "../channels/voice-recording.channel.ts";
+import { twilioBasicAuthHeader } from "../rules/twilio-auth.rules.ts";
 import { voicePermissionsFor } from "../rules/voice-permissions.rules.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 import { createVoiceCallTraceRecorder } from "./voice-call-trace-writer.ts";
@@ -43,6 +41,10 @@ import { createVoiceCallRunWriter } from "./voice-run-writer.ts";
 import { signVoiceSessionToken, verifyVoiceSessionToken } from "./voice-session-token.ts";
 import { createVoiceSessionInfrastructureFromServices } from "./voice-session.infrastructure.ts";
 import { createWholeCallAudioInfrastructure } from "./whole-call-audio.infrastructure.ts";
+import {
+  WholeCallAudioService,
+  type WholeCallAudioInfrastructure,
+} from "./whole-call-audio.service.ts";
 
 const logger = createLogger("langwatch:voice:session-service");
 
@@ -238,10 +240,9 @@ export class VoiceSessionService {
       projectId: input.projectId,
       permissions: ["scenarios:view"],
     });
-    const handle = await getWholeCallAudio({
+    const handle = await WholeCallAudioService.create(this.options.wholeCallAudio).getHandle({
       projectId: input.projectId,
       scenarioRunId: input.scenarioRunId,
-      infrastructure: this.options.wholeCallAudio,
     });
     this.#auditRecordingAccess({ ...input, transport: handle.kind });
 

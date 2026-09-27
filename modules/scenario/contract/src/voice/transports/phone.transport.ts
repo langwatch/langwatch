@@ -8,6 +8,7 @@ import type { AgentAdapter } from "@langwatch/scenario";
 import { AgentRole, voice as scenarioVoice } from "@langwatch/scenario";
 
 import type {
+  VoiceAgentAdapterRequest,
   VoiceTransportCredential,
   VoiceTransportRunner,
 } from "../voice-transport.registry.ts";
@@ -77,6 +78,14 @@ export interface TwilioAdapterLike {
   }): Promise<void>;
 }
 
+/** The SDK's own adapter as the runner drives it: an agent adapter that places the call. */
+export type PhoneAgentAdapter = AgentAdapter & TwilioAdapterLike;
+
+/** The phone runner, whose adapter keeps its call controls visible to the caller. */
+export type PhoneTransportRunner = Omit<VoiceTransportRunner, "createAgentAdapter"> & {
+  createAgentAdapter(input: VoiceAgentAdapterRequest): PhoneAgentAdapter;
+};
+
 /** Builds the SDK adapter; injectable so a test drives a fake instead of Twilio. */
 export type TwilioAgentFactory = (options: {
   accountSid: string;
@@ -89,7 +98,7 @@ export type TwilioAgentFactory = (options: {
   allowedCallees: readonly string[];
   /** The target under test is the agent; the synthetic caller is the user. */
   role: AgentRole;
-}) => TwilioAdapterLike;
+}) => PhoneAgentAdapter;
 
 /** SDK's own adapter instance, not a wrapper: role validation and adapter
  * selection read instance identity and `role` property.
@@ -102,7 +111,7 @@ const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
   // PHONE_RESPONSE_TAIL_SILENCE_SECONDS.
   sdk.responseTailSilence = PHONE_RESPONSE_TAIL_SILENCE_SECONDS;
   const originalPlaceCall = sdk.placeCall.bind(sdk);
-  const adapter: TwilioAdapterLike = sdk;
+  const adapter: PhoneAgentAdapter = sdk;
   // Translate our `shouldRecord` to the SDK's published `record` option; this
   // one line is the only place the vendor option name appears.
   adapter.placeCall = ({ shouldRecord, ...rest }) =>
@@ -272,9 +281,9 @@ function reasonOf(error: unknown): string {
  * ElevenLabs timeout; connect/dial failure releases socket, surfaces with prefix.
  */
 function withOutboundDial(
-  adapter: TwilioAdapterLike,
+  adapter: PhoneAgentAdapter,
   { to, maxCallDurationSeconds }: { to: string; maxCallDurationSeconds: number },
-): TwilioAdapterLike {
+): PhoneAgentAdapter {
   const originalConnect = adapter.connect.bind(adapter);
   adapter.connect = async () => {
     try {
@@ -302,7 +311,7 @@ function withOutboundDial(
  * Build the phone transport runner from its dependencies. `phoneTransport` is
  * the production instance; tests build their own with a fake adapter factory.
  */
-export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRunner {
+export function createPhoneTransport(deps: PhoneTransportDeps): PhoneTransportRunner {
   const twilioAgentFactory = deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
 
   return {
@@ -329,7 +338,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
       await (adapter as { disconnect?: () => Promise<void> }).disconnect?.();
     },
 
-    createAgentAdapter({ agentId, credential, maxCallSeconds }): AgentAdapter {
+    createAgentAdapter({ agentId, credential, maxCallSeconds }): PhoneAgentAdapter {
       const twilio = twilioCredentialOf(credential);
       // The SDK caps an a-leg call at 300s and throws above it; a project whose
       // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
@@ -385,7 +394,7 @@ export function createPhoneTransport(deps: PhoneTransportDeps): VoiceTransportRu
       return withOutboundDial(adapter, {
         to: agentId,
         maxCallDurationSeconds,
-      }) as unknown as AgentAdapter;
+      });
     },
   };
 }

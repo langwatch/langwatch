@@ -1,41 +1,17 @@
 /** @vitest-environment node
- * @integration
- * Codex in FAST/coding-default: project runs simulations against
- * workflow/code/http targets (real Postgres and model-provider boundary).
+ * Codex in FAST/coding-default: project runs simulations against workflow/code/http targets.
+ * The model-provider boundary is scripted from its own feature registry: FAST-role features
+ * resolve the codex default, which refuses direct execution as the real backstop does.
  */
-import { randomBytes } from "node:crypto";
-
 import type { Agent } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
-  CodexTokenRefresher,
-  ModelProviderConnectionRateLimiter,
-  ModelProviderCredentialCodec,
-  PostgresModelProviderAdapter,
-  PrefixedModelProviderIdAdapter,
-  RegistryModelProviderCatalogAdapter,
-  UnavailableModelProviderCredentialProbeAdapter,
-  UnmanagedModelProviderGatewayAdapter,
-  VercelAiModelTranslationAdapter,
-  modelProviderConnectionPingChannels,
-  type CustomKeysRead,
-} from "@langwatch/model-provider-process";
-import { createLogger } from "@langwatch/observability";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
+  CODEX_DEFAULT_MODEL,
+  findFeatureByKey,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   createTestScenarioExecutionPrefetcherService,
@@ -43,252 +19,27 @@ import {
 } from "./support/scenario-execution-prefetcher.fixture.ts";
 
 const DEFAULT_ROLE_MODEL = "openai/gpt-5-mini";
+const PROJECT_ID = "project_codex";
 
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
-/** Round-trips credentials as plain JSON — nothing here asserts on ciphertext. */
-class IdentityCredentialCodec extends ModelProviderCredentialCodec {
-  encode(value: Record<string, unknown> | null): unknown {
-    return value ? JSON.stringify(value) : null;
-  }
-
-  decode(value: unknown): CustomKeysRead {
-    if (typeof value === "object" && value !== null) {
-      return { state: "read", keys: Object.fromEntries(Object.entries(value)) };
+/** The project's defaults: FAST is the codex model "apply coding defaults" writes. */
+const modelProviders = createApiFixture<ModelProviderApi>({
+  findProviderForProject: async () => null,
+  getExecutionProviders: async () => ({}),
+  findResolvedDefault: async ({ featureKey }) => ({
+    model:
+      findFeatureByKey(featureKey)[0]?.role === "FAST" ? CODEX_DEFAULT_MODEL : DEFAULT_ROLE_MODEL,
+    source: "role_default",
+    scope: "project",
+  }),
+  prepareExecution: async ({ model }) => {
+    if (model === CODEX_DEFAULT_MODEL) {
+      throw new Error("Codex models run on coding-assistant surfaces only");
     }
-    if (typeof value !== "string") return { state: "absent", keys: {} };
-    try {
-      return { state: "read", keys: JSON.parse(value) };
-    } catch {
-      return { state: "unreadable", keys: {} };
-    }
-  }
-}
+    return { model, api_key: "sk-openai-test" };
+  },
+});
 
-class UnusedCodexTokenRefresher extends CodexTokenRefresher {
-  refresh(): Promise<never> {
-    throw new Error("no codex token refresh is expected in this suite");
-  }
-}
-
-class UnlimitedConnections extends ModelProviderConnectionRateLimiter {
-  async assertAvailable(): Promise<void> {}
-}
-
-const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({
-      guard: new AllowTestQueries(),
-      logger: createLogger("scenario-test"),
-    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
-  : null;
-
-function database(): PrismaClient {
-  if (connection === null) throw new Error("a database URL is required for this suite");
-  return connection.client as PrismaClient;
-}
-
-/** The real service, over the real repositories, with only the outbound edges stood down. */
-function realModelProviders(prisma: PrismaClient): ModelProviderApi {
-  const service = PostgresModelProviderAdapter.create({
-    database: prisma,
-    projects: {
-      findWithTeam: async (id: string) =>
-        prisma.project.findUnique({ where: { id }, include: { team: true } }),
-      getWithTeam: async (id: string) => {
-        const project = await prisma.project.findUnique({
-          where: { id },
-          include: { team: true },
-        });
-        if (!project) throw new Error(`project ${id} not found`);
-        return project;
-      },
-      listIdsByOrganization: async ({ organizationId }: { organizationId: string }) => {
-        const rows = await prisma.project.findMany({
-          where: { team: { organizationId } },
-          select: { id: true },
-        });
-        return rows.map((row) => row.id);
-      },
-      listNamesByIds: async ({ projectIds }: { projectIds: string[] }) => {
-        const rows = await prisma.project.findMany({
-          where: { id: { in: projectIds } },
-          include: { team: true },
-        });
-        return rows.map((row) => ({
-          id: row.id,
-          name: row.name,
-          slug: row.slug,
-          teamId: row.teamId,
-          organizationId: row.team.organizationId,
-          isPersonal: row.isPersonal,
-          ownerUserId: row.ownerUserId,
-        }));
-      },
-    } as unknown as ProjectApi,
-    organizations: createApiFixture<OrganizationApi>({
-      getBillingProfile: async ({ organizationId }: { organizationId: string }) => {
-        const organization = await prisma.organization.findUnique({
-          where: { id: organizationId },
-        });
-        if (!organization) throw new Error(`organization ${organizationId} not found`);
-        return {
-          id: organization.id,
-          name: organization.name,
-          billingCustomerId: organization.stripeCustomerId,
-        };
-      },
-      listTeams: async ({ organizationId }: { organizationId: string }) => {
-        const data = await prisma.team.findMany({ where: { organizationId } });
-        return { data, pagination: { page: 1, limit: data.length, total: data.length } };
-      },
-    }),
-    authorization: createApiFixture<AuthzApi>({
-      getDecision: async () => ({ permitted: true, organizationRole: "ADMIN" }),
-    }),
-    credentials: new IdentityCredentialCodec(),
-    codexTokenRefresher: new UnusedCodexTokenRefresher(),
-    connectionRateLimiter: new UnlimitedConnections(),
-    catalog: RegistryModelProviderCatalogAdapter.create({
-      managed: UnmanagedModelProviderGatewayAdapter.create(),
-      probe: UnavailableModelProviderCredentialProbeAdapter.create(),
-      systemProviderEnvironment: {},
-      isSaas: false,
-    }),
-    translation: VercelAiModelTranslationAdapter.create({
-      projects: createApiFixture<ProjectApi>({}),
-      executionProxyBaseUrl: "http://langwatch_nlp:5561/go/proxy/v1",
-    }),
-    connectionPing: modelProviderConnectionPingChannels.memory.create(),
-    ids: PrefixedModelProviderIdAdapter.create({
-      suffix: () => randomBytes(6).toString("hex"),
-    }),
-  }).build();
-
-  return createApiFixture<ModelProviderApi>({
-    findProviderForProject: service.findProviderForProject.bind(service),
-    getExecutionProviders: service.getExecutionProviders.bind(service),
-    prepareExecution: service.prepareExecution.bind(service),
-    findResolvedDefault: service.findResolvedDefault.bind(service),
-  });
-}
-
-describe.skipIf(!databaseUrl)("given a project whose FAST role default is a codex model", () => {
-  const ns = `codex-coding-${randomBytes(5).toString("hex")}`;
-  const prisma = database();
-
-  let organizationId: string;
-  let teamId: string;
-  let projectId: string;
-  let userId: string;
-  let modelProviders: ModelProviderApi;
-
-  beforeAll(async () => {
-    const organization = await prisma.organization.create({
-      data: { name: `Codex Coding Org ${ns}`, slug: `--test-${ns}` },
-    });
-    organizationId = organization.id;
-    const team = await prisma.team.create({
-      data: { name: `Team ${ns}`, slug: `--team-${ns}`, organizationId },
-    });
-    teamId = team.id;
-    const project = await prisma.project.create({
-      data: {
-        name: `Project ${ns}`,
-        slug: `--proj-${ns}`,
-        teamId,
-        language: "typescript",
-        framework: "other",
-        apiKey: `test-platform-key-${ns}`,
-      },
-    });
-    projectId = project.id;
-    const user = await prisma.user.create({
-      data: { name: "Codex Coding Test User", email: `${ns}@example.com` },
-    });
-    userId = user.id;
-
-    modelProviders = realModelProviders(prisma);
-
-    // A real, enabled OpenAI provider so the DEFAULT role — which the
-    // simulator and judge always resolve — has real execution parameters.
-    await modelProviders.upsert(
-      {
-        projectId,
-        provider: "openai",
-        enabled: true,
-        customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
-        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      },
-      { id: userId },
-    );
-    // A real, enabled Codex provider, so a regression reproduces the
-    // REPORTED failure (the execution backstop) rather than a different
-    // one like "provider not found" that would also mark a prefetch
-    // unsuccessful.
-    await modelProviders.upsert(
-      {
-        projectId,
-        provider: "openai_codex",
-        enabled: true,
-        customKeys: {
-          CODEX_ACCESS_TOKEN: `codex-access-${ns}`,
-          CODEX_REFRESH_TOKEN: `codex-refresh-${ns}`,
-          CODEX_ID_TOKEN: `codex-id-token-${ns}`,
-          CODEX_ACCOUNT_ID: `codex-account-${ns}`,
-          CODEX_PLAN: "pro",
-          CODEX_EMAIL: `${ns}@example.com`,
-          CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
-        },
-        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-      },
-      { id: userId },
-    );
-
-    // Exactly the pair "apply coding defaults" writes for FAST, plus a
-    // DEFAULT-role default so the simulator and judge resolve.
-    await modelProviders.setDefault(
-      {
-        scope: { scopeType: "PROJECT", scopeId: projectId },
-        key: "DEFAULT",
-        model: DEFAULT_ROLE_MODEL,
-      },
-      { id: userId },
-    );
-    await modelProviders.setDefault(
-      {
-        scope: { scopeType: "PROJECT", scopeId: projectId },
-        key: "FAST",
-        model: CODEX_DEFAULT_MODEL,
-      },
-      { id: userId },
-    );
-  }, 60_000);
-
-  afterAll(async () => {
-    if (!projectId || !organizationId || !teamId || !userId) return;
-    const ids = { organizationId, teamId, userId };
-    const providerIds = (
-      await prisma.modelProvider.findMany({
-        where: { organizationId: ids.organizationId },
-        select: { id: true },
-      })
-    ).map((row) => row.id);
-    await prisma.modelProviderScope.deleteMany({
-      where: { modelProviderId: { in: providerIds } },
-    });
-    await prisma.modelProvider.deleteMany({ where: { organizationId: ids.organizationId } });
-    await prisma.modelDefaultConfig.deleteMany({ where: { organizationId: ids.organizationId } });
-    await prisma.project.deleteMany({ where: { teamId: ids.teamId } });
-    await prisma.team.deleteMany({ where: { id: ids.teamId } });
-    await prisma.organization.deleteMany({ where: { id: ids.organizationId } });
-    await prisma.user.deleteMany({ where: { id: ids.userId } });
-  });
-
+describe("given a project whose FAST role default is a codex model", () => {
   const httpAgent: Agent = {
     id: "agent_http",
     type: "http" as const,
@@ -345,14 +96,14 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
       },
       suiteConfigFetcher: { getBySetId: async () => null },
       promptFetcher: { findByIdOrHandle: async () => null },
-      agentFetcher: { findById: async () => ({ ...agent, projectId }) },
+      agentFetcher: { findById: async () => ({ ...agent, projectId: PROJECT_ID }) },
       workflowVersionFetcher: {
         getLatestDsl: async () => ({
           workflowId: "wf_codex",
           dsl: { spec_version: "1.5", nodes: [], edges: [] },
         }),
       },
-      projectFetcher: { findUnique: async () => ({ apiKey: `test-platform-key-${ns}` }) },
+      projectFetcher: { findUnique: async () => ({ apiKey: "test-platform-key" }) },
       // Never consulted: `modelProviders` below replaces the stand-in these feed.
       modelParamsProvider: {
         prepare: async () => {
@@ -385,7 +136,7 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
     // role for a non-prompt target would be refused rather than pass silently.
     it("is refused by the coding-assistant backstop", async () => {
       await expect(
-        modelProviders.prepareExecution({ projectId, model: CODEX_DEFAULT_MODEL }),
+        modelProviders.prepareExecution({ projectId: PROJECT_ID, model: CODEX_DEFAULT_MODEL }),
       ).rejects.toThrow(/coding-assistant surfaces only/);
     });
   });
@@ -401,10 +152,10 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
         legacyDefaultModel: DEFAULT_ROLE_MODEL,
       }).prefetch({
         context: {
-          projectId,
+          projectId: PROJECT_ID,
           scenarioId: "scen_codex",
-          setId: `set_${ns}_${label}`,
-          batchRunId: `batch_${ns}_${label}`,
+          setId: `set_${label}`,
+          batchRunId: `batch_${label}`,
         },
         target,
       });

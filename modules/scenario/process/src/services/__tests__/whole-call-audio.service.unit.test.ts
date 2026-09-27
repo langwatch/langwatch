@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ELEVENLABS_CONVERSATION_ID_ATTR,
-  getWholeCallAudio,
+  WholeCallAudioService,
   TWILIO_CALL_SID_ATTR,
   type WholeCallAudioInfrastructure,
 } from "../whole-call-audio.service.ts";
@@ -26,7 +26,7 @@ function fakeInfrastructure({
   };
 }
 
-describe("getWholeCallAudio", () => {
+describe("WholeCallAudioService.getHandle", () => {
   describe("given a run whose spans carry a Twilio call sid", () => {
     describe("when the whole-call audio is resolved", () => {
       /** @scenario "A phone run's whole-call audio is resolved from the call's own trace" */
@@ -38,10 +38,9 @@ describe("getWholeCallAudio", () => {
           },
         });
 
-        const handle = await getWholeCallAudio({
+        const handle = await WholeCallAudioService.create(infrastructure).getHandle({
           projectId: "project_1",
           scenarioRunId: "run_1",
-          infrastructure,
         });
 
         expect(handle).toEqual({ kind: "twilio", callSid: "CA123" });
@@ -58,10 +57,9 @@ describe("getWholeCallAudio", () => {
           },
         });
 
-        const handle = await getWholeCallAudio({
+        const handle = await WholeCallAudioService.create(infrastructure).getHandle({
           projectId: "project_1",
           scenarioRunId: "run_1",
-          infrastructure,
         });
 
         expect(handle).toEqual({
@@ -81,10 +79,9 @@ describe("getWholeCallAudio", () => {
         });
 
         await expect(
-          getWholeCallAudio({
+          WholeCallAudioService.create(infrastructure).getHandle({
             projectId: "project_1",
             scenarioRunId: "run_1",
-            infrastructure,
           }),
         ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
       });
@@ -102,10 +99,9 @@ describe("getWholeCallAudio", () => {
           },
         });
 
-        const handle = await getWholeCallAudio({
+        const handle = await WholeCallAudioService.create(infrastructure).getHandle({
           projectId: "project_1",
           scenarioRunId: "run_1",
-          infrastructure,
         });
 
         expect(handle).toEqual({ kind: "twilio", callSid: "CA777" });
@@ -121,10 +117,9 @@ describe("getWholeCallAudio", () => {
         });
 
         await expect(
-          getWholeCallAudio({
+          WholeCallAudioService.create(infrastructure).getHandle({
             projectId: "project_1",
             scenarioRunId: "run_1",
-            infrastructure,
           }),
         ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
       });

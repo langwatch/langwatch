@@ -2,17 +2,21 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
+import { VOICE_HTTP_TIMEOUT_MS } from "@langwatch/scenario-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getTwilioRecordingWavUrl, type TwilioCredential } from "../twilio-recording.service.ts";
-import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
+import { HttpVoiceRecordingChannel } from "../http.voice-recording.channel.ts";
 
-const CREDENTIAL: TwilioCredential = {
+const CREDENTIAL = {
   accountSid: "AC123",
   authToken: "tok-secret",
 };
 
-describe("getTwilioRecordingWavUrl", () => {
+const getTwilioRecordingWavUrl = (
+  input: Parameters<HttpVoiceRecordingChannel["getTwilioRecordingWavUrl"]>[0],
+) => HttpVoiceRecordingChannel.create().getTwilioRecordingWavUrl(input);
+
+describe("HttpVoiceRecordingChannel.getTwilioRecordingWavUrl", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -112,6 +116,38 @@ describe("getTwilioRecordingWavUrl", () => {
 
       expect(failure).toBeInstanceOf(Error);
       expect(failure).not.toMatchObject({ code: "voice_recording_unavailable" });
+    });
+  });
+
+  describe("when a recording is opened with a caller signal already aborted", () => {
+    it("rejects promptly instead of waiting for the timeout", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          (_url: string, init: { signal?: AbortSignal }) =>
+            new Promise((_resolve, reject) => {
+              if (init.signal?.aborted) {
+                reject(new DOMException("aborted", "AbortError"));
+                return;
+              }
+              init.signal?.addEventListener("abort", () =>
+                reject(new DOMException("aborted", "AbortError")),
+              );
+            }),
+        ),
+      );
+
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        HttpVoiceRecordingChannel.create().open({
+          signal: controller.signal,
+          url: "https://provider.example/v1/audio",
+          headers: {},
+          mediaType: "audio/mpeg",
+        }),
+      ).rejects.toMatchObject({ code: "voice_recording_unavailable" });
     });
   });
 });
