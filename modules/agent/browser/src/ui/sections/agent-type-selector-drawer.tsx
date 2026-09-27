@@ -2,7 +2,10 @@ import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ArrowLeft, Cable, Code, Globe, Workflow } from "lucide-react";
 
-export type AgentType = "code" | "workflow" | "http";
+import { useAgentTypeSelection } from "../../behavior/use-agent-type-selection.ts";
+import type { NewAgentType } from "../../model/new-agent-drawer.ts";
+
+export type AgentType = NewAgentType;
 
 export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
@@ -10,11 +13,7 @@ export type AgentTypeSelectorDrawerProps = {
   onGoBack?: () => void;
   canGoBack?: boolean;
   onSelect?: (type: AgentType) => void;
-  /**
-   * Where "Connect from Code" goes. The card is offered only when the caller
-   * hands one over: this package writes no addresses of its own, and the
-   * overlay that shows the snippet belongs to the composing application.
-   */
+  /** Where "Connect from Code" goes; opened by address, it navigates to the connect drawer. */
   onConnectFromCode?: () => void;
 };
 
@@ -45,17 +44,18 @@ const agentTypes: {
 ];
 
 export function AgentTypeSelectorDrawer({
-  open = false,
+  open,
   onClose,
   onGoBack,
   canGoBack = false,
   onSelect,
   onConnectFromCode,
 }: AgentTypeSelectorDrawerProps) {
+  const selection = useAgentTypeSelection({ onSelect, onClose, onConnectFromCode });
   return (
     <Drawer.Root
-      open={open}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && onClose?.()}
+      open={open !== false && open !== undefined}
+      onOpenChange={({ open: nextOpen }) => !nextOpen && selection.close()}
       size="md"
       modal={false}
     >
@@ -85,19 +85,19 @@ export function AgentTypeSelectorDrawer({
             </Text>
 
             <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
-              {onConnectFromCode && <ConnectFromCodeCard onClick={onConnectFromCode} />}
+              <ConnectFromCodeCard onClick={selection.connectFromCode} />
               {agentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
                   {...agentType}
-                  onClick={() => onSelect?.(agentType.type)}
+                  onClick={() => selection.select(agentType.type)}
                 />
               ))}
             </VStack>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={selection.close}>
             Cancel
           </Button>
         </Drawer.Footer>

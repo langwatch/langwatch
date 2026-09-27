@@ -6,8 +6,8 @@ import { Plus } from "lucide-react";
 import { useCallback, useMemo, type ReactNode } from "react";
 
 import { agentApi } from "../../behavior/agent-api.ts";
+import { connectedAgentsOf } from "../../behavior/use-connected-agent-detail.ts";
 import { VOICE_AGENTS_FLAG_KEY } from "../../features/voice-editor/model/voice-talk.ts";
-import type { ConnectedAgentBrowser } from "../../model/agent-client.ts";
 import {
   useAgentManagementHost,
   type AgentManagementHost,
@@ -155,26 +155,7 @@ export function AgentManagementScreen() {
   const items = useMemo(() => agentsQuery.data ?? [], [agentsQuery.data]);
   // The connected agents draw their own card (ADR-128); `items` keeps every
   // type, including these, for the archive dialog's own lookup by id.
-  const connectedAgents = useMemo<ConnectedAgentBrowser[]>(
-    () =>
-      items
-        .filter((agent) => agent.type === "connected")
-        .map((agent) => ({
-          id: agent.id,
-          name: agent.name,
-          environment: agent.environment ?? null,
-          hostLabel: agent.hostLabel ?? null,
-          lastSeenAt: agent.lastSeenAt ?? null,
-          status: agent.status,
-          instances: agent.instances,
-          owner: agent.owner,
-          selectable: agent.selectable,
-          notSelectableReason: agent.notSelectableReason,
-          parameters: agent.parameters,
-          config: agent.config,
-        })),
-    [items],
-  );
+  const connectedAgents = useMemo(() => connectedAgentsOf(items), [items]);
   const reading = host.route();
   const historyAgentId = reading.query[AGENT_HISTORY_QUERY_KEY];
   const isCreating = reading.query[AGENT_NEW_QUERY_KEY] === AGENT_NEW_QUERY_VALUE;
