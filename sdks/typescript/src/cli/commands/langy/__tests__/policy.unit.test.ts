@@ -827,6 +827,31 @@ describe("given a folder shared with a Langy conversation", () => {
       }
     });
 
+    /** @scenario "The script of sed or awk and the pattern of grep are not judged paths" */
+    it("reads the script or pattern as the command's own words and still checks every file", () => {
+      for (const command of [
+        "git remote show origin | sed -n '/HEAD branch/s/.*: //p'",
+        "sed -e '/^#/d' agent.mjs",
+        "awk '/^import/ {print $2}' agent.mjs",
+        "grep -n '/api/' agent.mjs",
+        "rg '/v1/chat' src",
+      ]) {
+        expect(bash(command).kind, command).not.toBe("refuse");
+      }
+      for (const command of [
+        "sed -n '/HEAD branch/p' /etc/passwd",
+        "sed -e 's/a/b/' ../other/notes.txt",
+        "sed -f /etc/evil.sed agent.mjs",
+        "awk '{print}' /etc/passwd",
+        "grep -n root /etc/passwd",
+        "grep -e root -- /etc/passwd",
+      ]) {
+        const decision = bash(command);
+        expect(decision.kind, command).toBe("refuse");
+        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
+      }
+    });
+
     it("allows a home path that lands inside the folder", () => {
       const decision = decide({
         call: { tool: "local_read", params: { path: "~/acme/src/app.py" } },

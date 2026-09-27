@@ -392,6 +392,13 @@ Feature: The CLI decides what Langy may run on the developer's machine
       And /dev/null given to a command as an argument, not as a redirect, is still checked as a path
 
     @unit
+    Scenario: The script of sed or awk and the pattern of grep are not judged paths
+      When Langy runs "sed -n '/HEAD branch/s/.*: //p'", an awk program or a grep pattern that starts with a slash
+      Then the script or pattern is read as the command's own words
+      And the command is not refused for leaving the folder
+      And every file the command is given, including a sed or grep script file, is still checked
+
+    @unit
     Scenario: A refusal names the argument it judged a path
       When a command is refused for naming a path outside the folder
       Then the refusal names the argument it read as a path

@@ -1633,6 +1633,23 @@ function decideBash({
   };
 }
 
+/**
+ * Commands whose first operand is a program or a pattern, never a file:
+ * `sed -n '/HEAD branch/s/.*: //p'` names no path. `-e` gives that operand as
+ * a flag value instead, and `-f` names a script file, which is still checked.
+ */
+const SCRIPT_COMMANDS: ReadonlySet<string> = new Set([
+  "sed",
+  "awk",
+  "gawk",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+]);
+const SCRIPT_FLAGS: ReadonlySet<string> = new Set(["-e", "--expression", "--regexp"]);
+const SCRIPT_FILE_FLAGS: ReadonlySet<string> = new Set(["-f", "--file"]);
+
 /** The device a redirect discards output into, or reads nothing from. */
 const DISCARD_DEVICE = "/dev/null";
 
@@ -1653,9 +1670,30 @@ export function pathTokensOf(part: CommandPart): string[] {
   const name = part.tokens[0] ?? "";
   const named = new Set<string>();
   let afterEndOfOptions = false;
+  // Only a command in SCRIPT_COMMANDS has a script operand to skip.
+  let scriptTaken = !SCRIPT_COMMANDS.has(name);
   for (let index = 0; index < part.tokens.length; index += 1) {
     const token = part.tokens[index]!;
     const next = part.tokens[index + 1];
+    if (index > 0 && !scriptTaken && part.redirectTarget[index] !== true) {
+      if (SCRIPT_FLAGS.has(token) && next !== undefined) {
+        scriptTaken = true;
+        index += 1;
+        continue;
+      }
+      if (SCRIPT_FILE_FLAGS.has(token)) {
+        scriptTaken = true;
+        continue;
+      }
+      if (token === "--") {
+        afterEndOfOptions = true;
+        continue;
+      }
+      if (afterEndOfOptions || !token.startsWith("-")) {
+        scriptTaken = true;
+        continue;
+      }
+    }
     if (part.redirectTarget[index] === true) {
       // `2>/dev/null` discards output rather than reaching a file outside the
       // folder; any other redirect target is judged as the path it names.
