@@ -47,6 +47,8 @@ export const authWeb = defineWebModule("auth")
     },
   })
   .withCapabilities({
+    /** Who is here: the composition root awaits this before it renders. */
+    session: { load: () => import("./session.ts") },
     /** Auth's half of a peer's host: a sign-in that names a connection, and
      *  one spelling for a sign-in code. */
     signIn: { load: () => import("./behavior/sign-in-capability.ts") },

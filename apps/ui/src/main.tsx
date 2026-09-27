@@ -1,10 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import { UI_SESSION_QUERY_KEY } from "@langwatch/auth-browser/session";
-import {
-  useBrowserUiSession,
-  useUiSessionReading,
-} from "@langwatch/auth-browser/session-capability";
+import { authWeb } from "@langwatch/auth-browser/declaration";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import type {
   UiDeployment,
@@ -21,11 +17,7 @@ import {
 } from "@langwatch/browser-host/transport";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
-import {
-  createBrowserUiScope,
-  isUiPublicRoute,
-  useUiScopeReading,
-} from "@langwatch/organization-browser/surfaces/scope-capability";
+import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { createUi } from "@langwatch/ui-kernel";
 import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/application";
 import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
@@ -96,30 +88,56 @@ function UiBootPageError() {
   );
 }
 
+type AuthSessionCapability = Awaited<
+  ReturnType<typeof authWeb.installation.capabilities.session.load>
+>;
+type OrganizationScopeCapability = Awaited<
+  ReturnType<typeof organizationWeb.installation.capabilities.scope.load>
+>;
+
+/** Auth's session and organization's scope, loaded through their declarations. */
+type UiRootCapabilities = {
+  session: AuthSessionCapability;
+  scope: OrganizationScopeCapability;
+};
+
+async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
+  const [session, scope] = await Promise.all([
+    authWeb.installation.capabilities.session.load(),
+    organizationWeb.installation.capabilities.scope.load(),
+  ]);
+  return { session, scope };
+}
+
 /**
  * Where the two capabilities meet, and the only place they do — in the order
  * record 10.1 rules. `auth` and `organization` never import each other.
  */
-function useBrowserUiCapabilities({
-  transport,
-  feedback,
-}: {
-  transport: UiFeatureApiTransport;
-  feedback: UiFeedback;
-}): UiSessionCapabilities {
-  const { pathname } = useLocation();
-  const sessionReading = useUiSessionReading({
-    feedback,
-    isPublicRoute: isUiPublicRoute(pathname),
-  });
-  const scopeReading = useUiScopeReading({ transport, session: sessionReading });
-  const session = useBrowserUiSession({
+function browserUiCapabilitiesHook({ session: auth, scope: organization }: UiRootCapabilities) {
+  return function useBrowserUiCapabilities({
     transport,
-    session: sessionReading,
-    scope: scopeReading.scope,
-  });
+    feedback,
+  }: {
+    transport: UiFeatureApiTransport;
+    feedback: UiFeedback;
+  }): UiSessionCapabilities {
+    const { pathname } = useLocation();
+    const sessionReading = auth.useUiSessionReading({
+      feedback,
+      isPublicRoute: organization.isUiPublicRoute(pathname),
+    });
+    const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
+    const session = auth.useBrowserUiSession({
+      transport,
+      session: sessionReading,
+      scope: scopeReading.scope,
+    });
 
-  return { session, scope: createBrowserUiScope({ reading: scopeReading, session }) };
+    return {
+      session,
+      scope: organization.createBrowserUiScope({ reading: scopeReading, session }),
+    };
+  };
 }
 
 class BrowserUiShell extends UiShell {
@@ -132,6 +150,7 @@ class BrowserUiShell extends UiShell {
     drawers,
     transport,
     hosts,
+    rootCapabilities,
   }: {
     config: UiFeatureConfig;
     isDevelopment: boolean;
@@ -141,11 +160,12 @@ class BrowserUiShell extends UiShell {
     drawers: UiDrawerRegistry;
     transport: UiFeatureApiTransport;
     hosts: readonly UiModuleHostMount[];
+    rootCapabilities: UiRootCapabilities;
   }): BrowserUiShell {
     const telemetry = uiTelemetryOf(config);
     return new BrowserUiShell(
       createUiApplication({
-        sessionQueryKey: UI_SESSION_QUERY_KEY,
+        sessionQueryKey: rootCapabilities.session.UI_SESSION_QUERY_KEY,
         drawers,
         features: {
           loaders: screens.loaders,
@@ -155,7 +175,7 @@ class BrowserUiShell extends UiShell {
           transport,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
-          session: useBrowserUiCapabilities,
+          session: browserUiCapabilitiesHook(rootCapabilities),
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
@@ -227,6 +247,7 @@ export async function startUi(): Promise<void> {
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient();
+  const rootCapabilities = await loadUiRootCapabilities();
   const installed = await createUi({ document, mount: "root" })
     .withModules(webModules)
     .withTransport(transport)
@@ -245,6 +266,7 @@ export async function startUi(): Promise<void> {
       drawers: installedModuleDrawers(installed.modules),
       transport,
       hosts: installedModuleHostMounts(installed.modules),
+      rootCapabilities,
     }),
   }).start();
 }
