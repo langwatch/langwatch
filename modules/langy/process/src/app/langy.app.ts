@@ -135,7 +135,11 @@ import { LangySessionKeyMetricsOtelService } from "../services/langy-session-key
 import { LangySessionKeyReapService } from "../services/langy-session-key-reap.service.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../services/langy-turns-bounds.service.ts";
+import { LangyUiActionCatalogService } from "../services/langy-ui-action-catalog.service.ts";
+import { LangyUiActionDoorService } from "../services/langy-ui-action-door.service.ts";
 import { LangyUiActionPageService } from "../services/langy-ui-action-page.service.ts";
+import { LangyUiActionSurfaceService } from "../services/langy-ui-action-surface.service.ts";
+import { LangyUiActionService } from "../services/langy-ui-action.service.ts";
 import { LangyVirtualKeyGatewayService } from "../services/langy-virtual-key-gateway.service.ts";
 import { LangyVirtualKeyProvisioningService } from "../services/langy-virtual-key-provisioning.service.ts";
 import { LangyWorkerMetricsOtelService } from "../services/langy-worker-metrics-otel.service.ts";
@@ -174,6 +178,7 @@ type LangyAppDependencies = {
   sessionKeyReap: LangySessionKeyReapService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
+  uiActionDoor: LangyUiActionDoorService;
   /** What the local doors reach beyond `LangyApi` (ADR-129). */
   localControl: LangyLocalControl;
   localWorker: LangyLocalWorkerService;
@@ -272,6 +277,7 @@ export class LangyApp implements LangyApiContract {
         secrets: setup.dependencies.secrets,
         gateway: setup.dependencies.gateway,
       }),
+      uiActionSurface: LangyUiActionSurfaceService.create(setup.dependencies.featureFlags),
     });
     const commands = buildLangyConversationCommands({
       eventing: setup.members.eventing,
@@ -342,8 +348,23 @@ export class LangyApp implements LangyApiContract {
       authz: setup.dependencies.authz,
     });
     const redis = setup.members.redis;
+    const catalog = LangyUiActionCatalogService.create();
+    const uiActionDoor = LangyUiActionDoorService.create({
+      callers,
+      catalog,
+      authz: setup.dependencies.authz,
+      actions: redis
+        ? LangyUiActionService.create({
+            redis,
+            conversations: { getById: (args) => langy.getById(args) },
+            buffer: setup.repositories.tokenBuffer.open({ redis }),
+            actions: catalog,
+          })
+        : null,
+    });
     return new LangyApp({
       langy,
+      uiActionDoor,
       internalDoor: door,
       repositories: setup.repositories,
       redis: setup.members.redis,
@@ -445,6 +466,18 @@ export class LangyApp implements LangyApiContract {
     input: langyContractModule.LangyRestCallerInput,
   ): Promise<langyContractModule.LangyRestCaller> {
     return this.dependencies.callers.getCaller(input);
+  }
+
+  listUiActions(
+    input: langyContractModule.LangyKeyCaller,
+  ): Promise<langyContractModule.LangyUiActionsListed> {
+    return this.dependencies.uiActionDoor.list(input);
+  }
+
+  dispatchUiAction(
+    input: langyContractModule.LangyUiActionDispatchInput,
+  ): Promise<langyContractModule.LangyUiActionDispatched> {
+    return this.dependencies.uiActionDoor.dispatch(input);
   }
 
   getRestActor(input: { userId: string }): Promise<LangyCredentialSession> {

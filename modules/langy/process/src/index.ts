@@ -180,12 +180,7 @@ export { LangyTurnsBoundsService } from "./services/langy-turns-bounds.service.t
 // --------------------------------------------------------------------------- The four public and
 // internal REST doors.
 export { langyTurnsRest } from "./transport/langy-turns.rest.ts";
-export {
-  langyUiActionsRest,
-  langyUiActionsRestMembers,
-  LangyUiActionRestCatalog,
-  type LangyUiActionsRestMembers,
-} from "./transport/langy-ui-actions.rest.ts";
+export { langyUiActionsRest } from "./transport/langy-ui-actions.rest.ts";
 export { langyInternalRest } from "./transport/langy-internal.rest.ts";
 export type { RelayTally } from "@langwatch/langy-contract";
 export type {
