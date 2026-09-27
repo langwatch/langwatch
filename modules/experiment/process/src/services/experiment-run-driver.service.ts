@@ -4,7 +4,6 @@
  * and cell primitives stay on the orchestrator; this is the order they happen in.
  */
 
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   EvaluationV3Event,
   ExecutionCell,
@@ -15,17 +14,25 @@ import { createLogger } from "@langwatch/observability";
 import type { RunActor } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
+import { comparisonSkipMessage } from "../eventing/experiment-comparison-skip.process.ts";
 import { buildStripScoreEvaluatorIds } from "../eventing/experiment-evaluator-score-filter.process.ts";
 import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import { createEventStream } from "../eventing/experiment-run-event-stream.process.ts";
 import type { OrchestratorInput } from "../rules/experiment-run-input.rules.ts";
+import { loadedDataForTarget } from "../rules/experiment-target-data.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
+import { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
+import {
+  ExperimentCellPlanService,
+  type SeededTargetOutput,
+} from "./experiment-cell-plan.service.ts";
+import { ExperimentComparisonPlanService } from "./experiment-comparison-plan.service.ts";
+import { ExperimentConnectedCellService } from "./experiment-connected-cell.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunLoopService, type PhaseTwoPlan } from "./experiment-run-loop.service.ts";
-import { ExperimentRunOrchestratorService } from "./experiment-run-orchestrator.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";
 import { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
-import { ExperimentTargetDataService } from "./experiment-target-data.service.ts";
+import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 
 /** The agent fields the ownership check reads. */
 export type ExperimentConnectedAgentSubject = {
@@ -50,6 +57,7 @@ const logger = createLogger("langwatch:experiment:run-driver");
 
 const resultDispatches = ExperimentResultDispatchService.create();
 const sandboxKey = ExperimentRunSandboxKeyService.create();
+const cellPlan = ExperimentCellPlanService.create();
 
 /** What a run fixes before its first cell, and every collaborator its phases read through. */
 interface PreparedRun {
@@ -68,7 +76,7 @@ export class ExperimentRunDriverService {
   }
 
   /** Executes all cells and yields SSE events with parallel execution. */
-  static async *runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
+  async *runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
     const { projectId, experimentId, ports, loadedAgents, actor } = input;
 
     // A personal development agent runs on one person's own machine, so only
@@ -79,7 +87,7 @@ export class ExperimentRunDriverService {
       actor,
     });
 
-    const run = await ExperimentRunDriverService.prepareRun(input);
+    const run = await this.prepareRun(input);
     const { runId, storage } = run;
     const { pushEvent, signalComplete, waitForEvent } = createEventStream();
     const recordEvent = (event: EvaluationV3Event) =>
@@ -98,10 +106,10 @@ export class ExperimentRunDriverService {
       cells: run.cells,
       concurrency: input.concurrency ?? input.defaultConcurrency,
       isAborted: () => ports.abort.isAborted(runId),
-      cellEvents: (cell) => ExperimentRunDriverService.cellEvents({ cell, run, input }),
+      cellEvents: (cell) => this.cellEvents({ cell, run, input }),
       pushEvent,
       recordEvent,
-      planPhaseTwo: () => ExperimentRunDriverService.planPhaseTwo({ run, input }),
+      planPhaseTwo: () => this.planPhaseTwo({ run, input }),
     });
 
     yield { type: "execution_started", runId, total: loop.totalCells };
@@ -114,14 +122,14 @@ export class ExperimentRunDriverService {
 
     const processingPromise = loop.run().finally(() => signalComplete());
 
-    yield* ExperimentRunDriverService.streamRun({
+    yield* this.streamRun({
       loop,
       waitForEvent,
       processingPromise,
       input,
       run,
     });
-    yield* ExperimentRunDriverService.finishRun({ loop, run, startTime });
+    yield* this.finishRun({ loop, run, startTime });
   }
 
   /**
@@ -129,10 +137,10 @@ export class ExperimentRunDriverService {
    * the target metadata a result is attributed to, and the one sandbox credential a run that
    * executes Python needs. The run is marked running here, so every dispatch path has it.
    */
-  private static async prepareRun(input: OrchestratorInput): Promise<PreparedRun> {
+  private async prepareRun(input: OrchestratorInput): Promise<PreparedRun> {
     const { projectId, scope, state, datasetRows, ports } = input;
     const runId = input.runId ?? generateHumanReadableId();
-    const cells = ExperimentRunOrchestratorService.generateCells({
+    const cells = cellPlan.generateCells({
       state,
       datasetRows,
       scope,
@@ -172,13 +180,13 @@ export class ExperimentRunDriverService {
       }),
     };
 
-    await ExperimentRunDriverService.recordRunStart({ input, run: prepared });
+    await this.recordRunStart({ input, run: prepared });
 
     return prepared;
   }
 
   /** Opening rows in storage: the run and its carried board. */
-  private static async recordRunStart({
+  private async recordRunStart({
     input,
     run,
   }: {
@@ -197,7 +205,7 @@ export class ExperimentRunDriverService {
         experimentId,
         workflowVersionId: input.workflowVersionId,
         totalCells: run.cells.length,
-        targets: ExperimentRunOrchestratorService.buildTargetMetadata({
+        targets: resultDispatches.buildTargetMetadata({
           targets: input.state.targets,
           loadedPrompts: input.loadedPrompts,
           loadedAgents: input.loadedAgents,
@@ -230,7 +238,7 @@ export class ExperimentRunDriverService {
    * agent wrapping a Studio workflow) through execute_flow once per row, and everything else as a
    * single component.
    */
-  private static cellEvents({
+  private cellEvents({
     cell,
     run,
     input,
@@ -241,7 +249,7 @@ export class ExperimentRunDriverService {
   }): AsyncGenerator<EvaluationV3Event> {
     const { projectId, ports, workflows, datasetColumns, loadedEvaluators } = input;
     const loadedData = {
-      ...ExperimentTargetDataService.loadedDataForTarget({
+      ...loadedDataForTarget({
         targetConfig: cell.targetConfig,
         loadedPrompts: input.loadedPrompts,
         loadedAgents: input.loadedAgents,
@@ -251,6 +259,7 @@ export class ExperimentRunDriverService {
       sandboxApiKey: run.sandboxApiKey,
     };
     const isAborted = () => ports.abort.isAborted(run.runId);
+    const cells = ExperimentCellExecutionService.create({ ports, workflows });
     const shared = {
       cell,
       projectId,
@@ -258,14 +267,16 @@ export class ExperimentRunDriverService {
       loadedEvaluators,
       resultMapperConfig: run.resultMapperConfig,
       isAborted,
-      ports,
-      workflows,
     };
 
     // A connected agent has no node in the engine: it runs in the customer's
     // own process and is reached through the relay.
     if (cell.targetConfig.type === "agent" && loadedData.agent?.type === "connected") {
-      return ExperimentRunOrchestratorService.executeConnectedCell({
+      return ExperimentConnectedCellService.create({
+        ports,
+        workflows,
+        cells,
+      }).executeConnectedCell({
         ...shared,
         agent: loadedData.agent,
       });
@@ -276,20 +287,18 @@ export class ExperimentRunDriverService {
         (cell.targetConfig.type === "agent" && loadedData.agent?.type === "workflow")) &&
       !!loadedData.workflow;
     if (runsAsWorkflow) {
-      return ExperimentRunOrchestratorService.executeWorkflowCell({
+      return ExperimentWorkflowCellService.create({ ports, workflows, cells }).executeWorkflowCell({
         ...shared,
         workflowDsl: loadedData.workflow!.dsl,
         sandboxApiKey: run.sandboxApiKey,
       });
     }
 
-    return ExperimentRunOrchestratorService.executeCell({
+    return cells.executeCell({
       cell,
       projectId,
-      ports,
       datasetColumns,
       loadedData,
-      workflows,
       resultMapperConfig: run.resultMapperConfig,
       isAborted,
     });
@@ -299,7 +308,7 @@ export class ExperimentRunDriverService {
    * Phase 2 planned once phase 1 has finished, so every comparison has its variants' outputs. An
    * `evaluator` scope seeds nothing, so it has no comparison work even though every row is in it.
    */
-  private static async planPhaseTwo({
+  private async planPhaseTwo({
     run,
     input,
   }: {
@@ -311,17 +320,18 @@ export class ExperimentRunDriverService {
       return null;
     }
 
-    const scopedRowIndices = ExperimentRunOrchestratorService.resolveScopedRowIndices({
+    const scopedRowIndices = cellPlan.resolveScopedRowIndices({
       scope,
       rowCount: datasetRows.length,
     });
-    const { cells, skipReasons } = ExperimentRunOrchestratorService.generateComparisonCells({
+    const { cells, skipReasons } = ExperimentComparisonPlanService.create({
+      loadedPrompts: input.loadedPrompts,
+      loadedEvaluators: input.loadedEvaluators,
+    }).generateComparisonCells({
       state,
       datasetRows,
       completedTargetOutputs: run.storage.outputs,
       completedTargetEvaluatorScores: run.storage.evaluatorScores,
-      loadedPrompts: input.loadedPrompts,
-      loadedEvaluators: input.loadedEvaluators,
       // Only the rows this run owns. Without this, re-running row 1 alone
       // wrote "waiting on …" over every other row's verdict.
       scopedRowIndices,
@@ -332,8 +342,7 @@ export class ExperimentRunDriverService {
       // One synthetic evaluator_result error per skipped row, so the comparison
       // column does not sit at "No verdict yet" forever.
       skipEvents: skipReasons.map((reason) => {
-        const { detail, errorType } =
-          ExperimentRunOrchestratorService.comparisonSkipMessage(reason);
+        const { detail, errorType } = comparisonSkipMessage(reason);
 
         return {
           type: "evaluator_result",
@@ -344,10 +353,11 @@ export class ExperimentRunDriverService {
             status: "error",
             details: detail,
             error_type: errorType,
-          } as unknown as SingleEvaluationResult,
+            traceback: [],
+          },
         } satisfies EvaluationV3Event;
       }),
-      backfillEvents: ExperimentRunDriverService.seededBackfillEvents({
+      backfillEvents: this.seededBackfillEvents({
         run,
         input,
         hasComparisons: cells.length > 0,
@@ -361,7 +371,7 @@ export class ExperimentRunDriverService {
    * verdict, so the results view showed nothing and no cost; re-recording them carries the seeded
    * cost and duration across so the per-target headers are not blank.
    */
-  private static seededBackfillEvents({
+  private seededBackfillEvents({
     run,
     input,
     hasComparisons,
@@ -379,7 +389,7 @@ export class ExperimentRunDriverService {
 
     return Object.entries(seeded)
       .map(([key, value]) =>
-        ExperimentRunOrchestratorService.findSeededTargetResultEvent(key, value, {
+        this.findSeededTargetResultEvent(key, value, {
           storage: run.storage,
           rowsThisRunOwns,
           datasetRows: input.datasetRows,
@@ -388,8 +398,58 @@ export class ExperimentRunDriverService {
       .filter((event): event is EvaluationV3Event => event !== null);
   }
 
+  /** Back-fill event for one REUSED candidate output, or null when this entry needs none. */
+  private findSeededTargetResultEvent(
+    key: string,
+    seeded: SeededTargetOutput,
+    options: {
+      storage: Pick<ExperimentRunStorageService, "hasProduced">;
+      rowsThisRunOwns: Set<number>;
+      datasetRows: Record<string, unknown>[];
+    },
+  ): EvaluationV3Event | null {
+    const { storage, rowsThisRunOwns, datasetRows } = options;
+    if (storage.hasProduced(key)) {
+      return null;
+    }
+
+    const separator = key.indexOf(":");
+    if (separator < 0) {
+      return null;
+    }
+
+    const rowIndex = Number(key.slice(0, separator));
+    const targetId = key.slice(separator + 1);
+    if (!Number.isInteger(rowIndex)) {
+      return null;
+    }
+
+    if (!rowsThisRunOwns.has(rowIndex)) {
+      return null;
+    }
+
+    if (!datasetRows[rowIndex]) {
+      return null;
+    }
+
+    if (seeded.output === null || seeded.output === undefined) {
+      return null;
+    }
+
+    return {
+      type: "target_result",
+      rowIndex,
+      targetId,
+      output: seeded.output,
+      ...(seeded.cost !== undefined && { cost: seeded.cost }),
+      ...(seeded.duration !== undefined && {
+        duration: seeded.duration,
+      }),
+    } as EvaluationV3Event;
+  }
+
   /** Hands the caller every event as it arrives, and the stop frame when a user ended the run. */
-  private static async *streamRun({
+  private async *streamRun({
     loop,
     waitForEvent,
     processingPromise,
@@ -433,7 +493,7 @@ export class ExperimentRunDriverService {
   }
 
   /** Final frame: summary when complete, nothing if stopped. */
-  private static async *finishRun({
+  private async *finishRun({
     loop,
     run,
     startTime,

@@ -18,7 +18,10 @@ export const lenientPositiveIntSchema = z.coerce
   .optional()
   .catch(undefined);
 
-/** A path version is always present, so a segment that is no version number reads as 0, which none is. */
+/**
+ * A path version is always present, so a segment that is no version number
+ * reads as 0, which none is.
+ */
 const pathVersionSchema = z.preprocess((raw) => {
   const version = Number(raw);
   return Number.isInteger(version) && version > 0 ? version : 0;

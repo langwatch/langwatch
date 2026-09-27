@@ -21,20 +21,23 @@ const resetBoundary = () => {
   scripted.dispatched = [];
 };
 
-const ports = {
-  attachments: createNoAttachmentsFixture(),
-  studio: {
-    postEvent: async ({
-      event,
-    }: {
-      event: { type: string; payload: Record<string, any> };
-      onEvent: (event: StudioServerEvent) => void;
-    }) => {
-      scripted.dispatched.push(event);
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postEvent: async ({
+        event,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+      },
     },
+    cost: { findTokenPrice: async () => undefined },
   },
-  cost: { priceMetrics: async () => undefined },
-} as unknown as ExperimentRunCollaborators;
+  "ports",
+);
 
 const workflows = createApiFixture<WorkflowApi>({
   enrichStudioEvent: async ({ event }) => event,
@@ -70,7 +73,7 @@ describe("given a run that minted a sandbox credential", () => {
     it("carries the credential on the dispatched workflow", async () => {
       const loadedData = { sandboxApiKey: "sandbox-key-123" };
 
-      for await (const _event of ExperimentRunOrchestratorService.executeCell({
+      for await (const _event of ExperimentRunOrchestratorService.create().executeCell({
         cell: makeCell(),
         projectId: "p1",
         ports,
@@ -94,7 +97,7 @@ describe("given a run that minted a sandbox credential", () => {
     it("dispatches the workflow with no sandbox_api_key field", async () => {
       const loadedData = { sandboxApiKey: undefined };
 
-      for await (const _event of ExperimentRunOrchestratorService.executeCell({
+      for await (const _event of ExperimentRunOrchestratorService.create().executeCell({
         cell: makeCell(),
         projectId: "p1",
         ports,

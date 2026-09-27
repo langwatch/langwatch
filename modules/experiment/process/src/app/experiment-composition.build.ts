@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
  * (deleted by b383462d96) used to hand-compose. See the handoff for the run
  * loop's own scope: `ports`/`progress` stay `null` on purpose.
  */
-import { TupleParam, type ClickHouseSettings } from "@clickhouse/client";
+import type { ClickHouseSettings } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
@@ -25,13 +25,14 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
+import {
+  buildExperimentRunProcessingPipeline,
+  type ExperimentRunProcessingPipeline,
+} from "../eventing/experiment-run-processing.pipeline.ts";
 import { ExperimentRunStateStore } from "../eventing/experiment-run-state.store.ts";
 import type { WorkflowEvaluationRunner } from "../eventing/experiment-workflow-evaluation.subscriber.ts";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
-import {
-  ClickHouseExperimentRunProcessingRepository,
-  type ExperimentRunProcessingPipeline,
-} from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
+import { ClickHouseExperimentRunProcessingRepository } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
@@ -96,16 +97,11 @@ class ExperimentCapabilityUnavailableError extends Error {
   }
 }
 
-/** A door this deployment composed nothing behind. Every member REJECTS. */
-function refusing<T>(capability: string): T {
-  return new Proxy(
-    {},
-    {
-      get: () => (): Promise<never> =>
-        Promise.reject(new ExperimentCapabilityUnavailableError(capability)),
-      has: () => true,
-    },
-  ) as T;
+/** Wizard workflow authoring this deployment composed nothing behind: every member rejects. */
+function unavailableWorkflowAuthoring(): ExperimentWorkflowAuthoring {
+  const unavailable = (): Promise<never> =>
+    Promise.reject(new ExperimentCapabilityUnavailableError("wizard workflow authoring"));
+  return { create: unavailable, saveVersion: unavailable, copyWithDatasets: unavailable };
 }
 
 /**
@@ -283,18 +279,23 @@ export function buildExperimentRunProcessing(input: {
   const { redis, defaultRetentionDays, workflowEvaluations } = input;
   const resolveClient = memberSessionResolver(input.clickhouse);
   if (redis) {
-    return RedisExperimentRunProcessingRepository.create({
+    const cached = RedisExperimentRunProcessingRepository.create({
       resolveClient,
       defaultRetentionDays,
       redis,
-    }).buildProcessing(workflowEvaluations);
+    });
+    return buildExperimentRunProcessingPipeline({
+      workflowEvaluations,
+      experimentRunStateFoldStore: cached.stateFoldStore(),
+      experimentRunItemAppendStore: cached.itemStore(),
+    });
   }
 
   const eventing = ClickHouseExperimentRunProcessingRepository.create({
     resolveClient,
     clickhouseEnabled: true,
   });
-  return ClickHouseExperimentRunProcessingRepository.pipeline({
+  return buildExperimentRunProcessingPipeline({
     workflowEvaluations,
     experimentRunStateFoldStore: ExperimentRunStateStore.create({
       repository: eventing.stateRepository({ defaultRetentionDays }),
@@ -342,14 +343,13 @@ export function buildExperimentInfrastructure(input: {
   const { prisma, clickhouse, redis, logger, execution, publicBaseUrl, dependencies } = input;
   const resolveClient = memberSessionResolver(clickhouse);
   const runHistoryTelemetry = LoggedExperimentRunHistoryTelemetry.create(logger);
-  const tupleParam = (values: string[]) => new TupleParam(values);
 
   const experiments = ExperimentService.create({
     repository: PrismaExperimentRepository.create(prisma),
     runRepository: ClickHouseExperimentRunRepository.create({
       workflowVersions: PrismaExperimentWorkflowVersionRepository.create(prisma),
       resolveClient,
-      tupleParam,
+      tupleParam: (values) => ClickHouseExperimentRunRepository.tupleParam(values),
       telemetry: runHistoryTelemetry,
     }),
     dspyRepository: ClickHouseExperimentDspyRepository.create({
@@ -401,7 +401,7 @@ export function buildExperimentInfrastructure(input: {
     permissions: authz,
     people: PrismaExperimentPeopleRepository.create(prisma),
     modelCosts: modelCostCatalogue(dependencies.modelProviders),
-    workflowAuthoring: refusing<ExperimentWorkflowAuthoring>("wizard workflow authoring"),
+    workflowAuthoring: unavailableWorkflowAuthoring(),
     runLoop,
     workflowEvaluations: WorkflowEvaluationService.create({
       experiments,

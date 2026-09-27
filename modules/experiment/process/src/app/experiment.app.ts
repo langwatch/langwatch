@@ -96,7 +96,7 @@ import type {
   ExperimentWorkbenchObserver,
 } from "#app/experiment-workbench.members";
 
-import type { ExperimentRunProcessingPipeline } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
+import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
@@ -880,7 +880,7 @@ export class ExperimentApp implements ExperimentApi {
       runId: string;
     }>,
   ): Promise<{ success: true; runId: string; message: "Abort requested" }> {
-    return ExperimentRunOrchestratorService.requestOwnedAbort({
+    return ExperimentRunOrchestratorService.create().requestOwnedAbort({
       ports: this.#dependencies.runLoop.ports,
       progress: this.#dependencies.runLoop.progress,
       projectId: input.projectId,

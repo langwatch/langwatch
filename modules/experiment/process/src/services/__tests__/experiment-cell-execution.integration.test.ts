@@ -30,21 +30,24 @@ const datasetColumns = [
   { id: "expected", name: "expected", type: "string" },
 ];
 
-const ports = {
-  attachments: createNoAttachmentsFixture(),
-  studio: {
-    postEvent: async ({
-      event,
-      onEvent,
-    }: {
-      event: { type: string; payload: Record<string, any> };
-      onEvent: (event: StudioServerEvent) => void;
-    }) => {
-      scripted.dispatched.push(event);
-      for (const serverEvent of scripted.component) onEvent(serverEvent);
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postEvent: async ({
+        event,
+        onEvent,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+        for (const serverEvent of scripted.component) onEvent(serverEvent);
+      },
     },
   },
-} as unknown as ExperimentRunCollaborators;
+  "ports",
+);
 
 const workflows = createApiFixture<WorkflowApi>({
   enrichStudioEvent: async ({ event }) => event,
@@ -114,7 +117,7 @@ const makeCell = (evaluator: EvaluatorConfig): ExecutionCell => ({
 /** Run one cell to its end and collect every event it produced. */
 const runCell = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of ExperimentRunOrchestratorService.executeCell({
+  for await (const event of ExperimentRunOrchestratorService.create().executeCell({
     cell,
     projectId: "p1",
     ports,
@@ -245,7 +248,7 @@ describe("given an evaluator run as its own column", () => {
 
   const runColumn = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
-    for await (const event of ExperimentRunOrchestratorService.executeCell({
+    for await (const event of ExperimentRunOrchestratorService.create().executeCell({
       cell,
       projectId: "p1",
       ports,

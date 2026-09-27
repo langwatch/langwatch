@@ -26,6 +26,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { promptLoadKey, workflowLoadKey } from "../rules/experiment-execution-data.rules.ts";
 import {
   ExperimentExecutionDataService,
   type ExperimentWorkflowDsl,
@@ -284,7 +285,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await ExperimentExecutionDataService.loadExecutionData({
+      const result = await ExperimentExecutionDataService.create().loadExecutionData({
         projectId: PROJECT_ID,
         dataset: {
           type: "inline",
@@ -300,9 +301,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         throw new Error(`loadExecutionData failed: ${result.error}`);
       }
 
-      const loadedWorkflow = result.loadedWorkflows.get(
-        ExperimentExecutionDataService.workflowLoadKey({ workflowId }),
-      );
+      const loadedWorkflow = result.loadedWorkflows.get(workflowLoadKey({ workflowId }));
       expect(loadedWorkflow).toBeDefined();
       expect(loadedWorkflow?.id).toBe(workflowId);
       expect(loadedWorkflow?.versionId).toBe(versionId);
@@ -338,7 +337,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupAgentIds.push(agent.id);
 
-      const result = await ExperimentExecutionDataService.loadExecutionData({
+      const result = await ExperimentExecutionDataService.create().loadExecutionData({
         projectId: PROJECT_ID,
         dataset: {
           type: "inline",
@@ -361,7 +360,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing agent", async () => {
         const missingAgentId = `test_agent_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.loadExecutionData({
+        const result = await ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,
           dataset: {
             type: "inline",
@@ -401,7 +400,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         });
         expect(second.version).toBe(2);
 
-        const result = await ExperimentExecutionDataService.loadExecutionData({
+        const result = await ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,
           dataset: {
             type: "inline",
@@ -421,13 +420,13 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         }
 
         const first = result.loadedPrompts.get(
-          ExperimentExecutionDataService.promptLoadKey({
+          promptLoadKey({
             promptId: created.id,
             promptVersionNumber: 1,
           }),
         );
         const latest = result.loadedPrompts.get(
-          ExperimentExecutionDataService.promptLoadKey({
+          promptLoadKey({
             promptId: created.id,
             promptVersionNumber: 2,
           }),
@@ -447,7 +446,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       it("fails and names the missing evaluator", async () => {
         const missingEvaluatorId = `test_eval_${nanoid(8)}`;
 
-        const result = await ExperimentExecutionDataService.loadExecutionData({
+        const result = await ExperimentExecutionDataService.create().loadExecutionData({
           projectId: PROJECT_ID,
           dataset: {
             type: "inline",

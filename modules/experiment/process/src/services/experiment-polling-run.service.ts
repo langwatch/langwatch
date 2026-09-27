@@ -155,7 +155,7 @@ const runExecution = async ({
   };
 
   try {
-    const orchestrator = ExperimentRunOrchestratorService.runOrchestrator({
+    const orchestrator = ExperimentRunOrchestratorService.create().runOrchestrator({
       ...orchestratorInput,
       scope,
       runId,
@@ -205,7 +205,7 @@ export class ExperimentPollingRunService {
    * immediately with the run id and results URL. The run streams its events into
    * the run-state manager so the caller can poll GET /runs/:runId(/results).
    */
-  static async startPollingRun(
+  async startPollingRun(
     input: StartPollingRunInput,
   ): Promise<{ runId: string; runUrl: string; total: number }> {
     const {
@@ -219,7 +219,7 @@ export class ExperimentPollingRunService {
       ...orchestratorInput
     } = input;
     const effectiveScope: ExecutionScope = scope ?? { type: "full" };
-    const totalCells = ExperimentRunOrchestratorService.countScopedCells({
+    const totalCells = ExperimentRunOrchestratorService.create().countScopedCells({
       state: orchestratorInput.state,
       datasetRows: orchestratorInput.datasetRows,
       scope: effectiveScope,
@@ -275,7 +275,7 @@ export class ExperimentPollingRunService {
   }
 
   /** Records why a registered run could not start, in the words a poll reads. */
-  static failRegistered(input: {
+  failRegistered(input: {
     error: unknown;
     runId: string;
     experimentSlug: string;
@@ -287,7 +287,7 @@ export class ExperimentPollingRunService {
   }
 
   /** Runs a run already registered under `runId` to its end, as the worker does for a request. */
-  static async runRegistered(input: StartPollingRunInput & { runId: string }): Promise<void> {
+  async runRegistered(input: StartPollingRunInput & { runId: string }): Promise<void> {
     const {
       projectSlug,
       experimentSlug,

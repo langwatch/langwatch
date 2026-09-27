@@ -22,15 +22,15 @@ import {
   type TargetResultEventData,
 } from "../../../eventing/experiment-run-events.process.ts";
 import { ExperimentRunItemStore } from "../../../eventing/experiment-run-item.store.ts";
+import {
+  RecordEvaluatorResultCommand,
+  RecordTargetResultCommand,
+} from "../../../eventing/experiment-run-processing.commands.ts";
 import { ExperimentRunResultStorageMapProjection } from "../../../eventing/experiment-run-result-storage.projection.ts";
 import {
   ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
 } from "../../experiment-clickhouse.repository.ts";
-import {
-  RecordEvaluatorResultCommand,
-  RecordTargetResultCommand,
-} from "../clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 
 const tenantId = `test-run-snapshot-${nanoid()}`;

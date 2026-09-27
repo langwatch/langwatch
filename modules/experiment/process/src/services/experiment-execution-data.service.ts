@@ -13,6 +13,14 @@ import {
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
+import {
+  applyParametersToRows,
+  JSON_COLUMN_TYPES,
+  type LoadedDataset,
+  normalizeColumnIdsToNames,
+  parseJsonColumns,
+  rowsFromInlineData,
+} from "../rules/experiment-execution-data.rules.ts";
 import { ExperimentTargetLoadingService } from "./experiment-target-loading.service.ts";
 
 /**
@@ -53,72 +61,6 @@ export abstract class ExperimentWorkflowDsl {
   }): Promise<{ id: string; version: string; dsl: unknown } | null>;
 }
 
-/** The column type a parameter value writes into the dataset. */
-function parameterColumnType(value: string | number | boolean): string {
-  if (typeof value === "number") return "number";
-  if (typeof value === "boolean") return "boolean";
-  return "string";
-}
-
-// Column types that store JSON and need parsing
-const JSON_COLUMN_TYPES = ["chat_messages", "json", "list", "spans", "rag_contexts"] as const;
-
-/**
- * Parses JSON string values in specified columns.
- */
-const parseJsonColumns = (
-  rows: Record<string, unknown>[],
-  jsonColumnKeys: Set<string>,
-): Record<string, unknown>[] => {
-  if (jsonColumnKeys.size === 0) {
-    return rows;
-  }
-
-  return rows.map((row) => {
-    const parsedRow = { ...row };
-    for (const key of jsonColumnKeys) {
-      const value = parsedRow[key];
-      if (typeof value === "string" && value.trim()) {
-        try {
-          parsedRow[key] = JSON.parse(value);
-        } catch {
-          // Keep original string if not valid JSON
-        }
-      }
-    }
-
-    return parsedRow;
-  });
-};
-
-/**
- * Normalizes inline dataset records from column IDs to column names.
- */
-const normalizeColumnIdsToNames = (
-  rows: Record<string, unknown>[],
-  columns: { id: string; name: string }[],
-): Record<string, unknown>[] => {
-  const idToName = Object.fromEntries(columns.map((c) => [c.id, c.name]));
-
-  return rows.map((row) => {
-    const normalized: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(row)) {
-      // Use name if we have a mapping, otherwise keep the key as-is
-      normalized[idToName[key] ?? key] = value;
-    }
-
-    return normalized;
-  });
-};
-
-/**
- * Result of loading a dataset.
- */
-export type LoadedDataset = {
-  rows: Record<string, unknown>[];
-  columns: { id: string; name: string; type: string }[];
-};
-
 /**
  * Flexible dataset input type that works with both runtime (DatasetReference)
  * and persisted state schemas.
@@ -131,29 +73,6 @@ type DatasetInput = {
   };
   datasetId?: string;
   columns: { id: string; name: string; type: string }[];
-};
-
-/**
- * Normalizes inline row-first data (from the run API or an SDK) into the
- * loaded dataset shape. Columns are derived from the union of keys across
- * rows.
- */
-const rowsFromInlineData = (data: Record<string, unknown>[]): LoadedDataset => {
-  const columnNames: string[] = [];
-  const seen = new Set<string>();
-  for (const row of data) {
-    for (const key of Object.keys(row)) {
-      if (!seen.has(key)) {
-        seen.add(key);
-        columnNames.push(key);
-      }
-    }
-  }
-
-  return {
-    rows: data,
-    columns: columnNames.map((name) => ({ id: name, name, type: "string" })),
-  };
 };
 
 /**
@@ -247,7 +166,7 @@ export class ExperimentExecutionDataService {
   /**
    * Loads and normalizes a dataset (inline or saved).
    */
-  static async loadDataset(
+  async loadDataset(
     dataset: DatasetInput,
     projectId: string,
     datasets: DatasetApi,
@@ -299,74 +218,11 @@ export class ExperimentExecutionDataService {
   }
 
   /**
-   * Applies caller-provided parameters as constant columns across every row.
-   */
-  static applyParametersToRows({
-    rows,
-    columns,
-    parameters,
-  }: {
-    rows: Record<string, unknown>[];
-    columns: { id: string; name: string; type: string }[];
-    parameters?: Record<string, string | number | boolean>;
-  }): {
-    rows: Record<string, unknown>[];
-    columns: { id: string; name: string; type: string }[];
-  } {
-    if (!parameters || Object.keys(parameters).length === 0) {
-      return { rows, columns };
-    }
-
-    const existingNames = new Set(columns.map((c) => c.name));
-    // A parameter overriding an existing column rewrites every row's value below,
-    // so the column's declared type must follow the parameter or the rows and the
-    // column metadata would disagree (e.g. a number written into a "string" column).
-    const columnsWithParameters = [
-      ...columns.map((column) =>
-        Object.hasOwn(parameters, column.name)
-          ? { ...column, type: parameterColumnType(parameters[column.name]!) }
-          : column,
-      ),
-      ...Object.entries(parameters)
-        .filter(([key]) => !existingNames.has(key))
-        .map(([key, value]) => ({
-          id: key,
-          name: key,
-          type: parameterColumnType(value),
-        })),
-    ];
-
-    // With no rows, the parameters themselves form a single synthetic row.
-    const baseRows = rows.length === 0 ? [{}] : rows;
-    const rowsWithParameters = baseRows.map((row) => ({ ...row, ...parameters }));
-
-    return { rows: rowsWithParameters, columns: columnsWithParameters };
-  }
-
-  /**
-   * Cache key for a loaded workflow. Two targets that pin the same workflow to
-   * different versions must not share a loaded DSL, so the key includes the
-   * requested version (or "published" when following the latest committed one).
-   */
-  static workflowLoadKey(target: { workflowId?: string; workflowVersionId?: string }): string {
-    return `${target.workflowId ?? ""}::${target.workflowVersionId ?? "published"}`;
-  }
-
-  /**
-   * Cache key for a loaded prompt. Two targets that pin the same prompt to
-   * different versions must not share a loaded prompt, so the key includes the
-   * requested version (or "latest" when the target follows the newest one).
-   */
-  static promptLoadKey(target: { promptId?: string; promptVersionNumber?: number }): string {
-    return `${target.promptId ?? ""}@${target.promptVersionNumber ?? "latest"}`;
-  }
-
-  /**
    * Everything a run needs before its first row: the dataset it evaluates and every prompt, agent,
    * workflow and evaluator its targets name. A missing target is reported as the sentinel error
    * shape rather than run around, so a deleted target stops the run instead of emptying a column.
    */
-  static async loadExecutionData({
+  async loadExecutionData({
     projectId,
     dataset,
     targets,
@@ -381,7 +237,7 @@ export class ExperimentExecutionDataService {
     services: ExecutionDataServices;
     inputs?: ExecutionDataInputs;
   }): Promise<LoadedExecutionData | { error: string; status: number }> {
-    const baseDataset = await ExperimentExecutionDataService.resolveBaseDataset({
+    const baseDataset = await this.resolveBaseDataset({
       projectId,
       dataset,
       services,
@@ -395,7 +251,7 @@ export class ExperimentExecutionDataService {
     // holds for inline data a transport let through and for saved datasets
     // alike. Refused, not truncated: a run over a silently shortened dataset
     // reports success over the wrong rows.
-    const rowBound = await ExperimentExecutionDataService.resolveRowBound(projectId, services);
+    const rowBound = await this.resolveRowBound(projectId, services);
     if (baseDataset.rows.length > rowBound) {
       return {
         error: `The dataset has ${baseDataset.rows.length} rows; this plan allows at most ${rowBound} per run. Reduce the rows or run against a saved dataset.`,
@@ -405,14 +261,14 @@ export class ExperimentExecutionDataService {
 
     // Caller parameters become constant columns across every row, and a single
     // synthetic row when there is no dataset.
-    const { rows: datasetRows, columns: datasetColumns } =
-      ExperimentExecutionDataService.applyParametersToRows({
-        rows: baseDataset.rows,
-        columns: baseDataset.columns,
-        parameters: inputs?.parameters,
-      });
+    const { rows: datasetRows, columns: datasetColumns } = applyParametersToRows({
+      rows: baseDataset.rows,
+      columns: baseDataset.columns,
+      parameters: inputs?.parameters,
+    });
 
-    const loadedPrompts = await ExperimentTargetLoadingService.loadPrompts({
+    const targetLoading = ExperimentTargetLoadingService.create();
+    const loadedPrompts = await targetLoading.loadPrompts({
       projectId,
       targets,
       services,
@@ -421,7 +277,7 @@ export class ExperimentExecutionDataService {
       return loadedPrompts;
     }
 
-    const loadedAgents = await ExperimentTargetLoadingService.loadAgents({
+    const loadedAgents = await targetLoading.loadAgents({
       projectId,
       targets,
       services,
@@ -430,7 +286,7 @@ export class ExperimentExecutionDataService {
       return loadedAgents;
     }
 
-    const loadedWorkflows = await ExperimentTargetLoadingService.loadWorkflows({
+    const loadedWorkflows = await targetLoading.loadWorkflows({
       projectId,
       targets,
       services,
@@ -440,7 +296,7 @@ export class ExperimentExecutionDataService {
       return loadedWorkflows;
     }
 
-    const loadedEvaluators = await ExperimentTargetLoadingService.loadEvaluators({
+    const loadedEvaluators = await targetLoading.loadEvaluators({
       projectId,
       targets,
       evaluators,
@@ -465,7 +321,7 @@ export class ExperimentExecutionDataService {
    * `experimentInlineRowsMax` on the organization's tier, boot overrides
    * included — the same resolution the entitlement application makes.
    */
-  private static async resolveRowBound(
+  private async resolveRowBound(
     projectId: string,
     services: ExecutionDataServices,
   ): Promise<number> {
@@ -481,7 +337,7 @@ export class ExperimentExecutionDataService {
    * The rows a run starts from: inline data, a named saved dataset, or the attached dataset
    * reference, in that precedence.
    */
-  private static async resolveBaseDataset({
+  private async resolveBaseDataset({
     projectId,
     dataset,
     services,
@@ -497,7 +353,7 @@ export class ExperimentExecutionDataService {
     }
 
     if (!inputs?.datasetId) {
-      return ExperimentExecutionDataService.loadDataset(dataset, projectId, services.datasets);
+      return this.loadDataset(dataset, projectId, services.datasets);
     }
 
     const loadedDataset = await services.datasets.getDatasetWithRecords({
@@ -506,16 +362,13 @@ export class ExperimentExecutionDataService {
       entrySelection: "all",
       limitMb: null,
     });
-    const columns = (
-      (loadedDataset.dataset.columnTypes as unknown as {
-        name: string;
-        type: string;
-      }[]) ?? []
-    ).map((c) => ({ id: c.name, name: c.name, type: c.type }));
+    const columns = loadedDataset.dataset.columnTypes.map((c) => ({
+      id: c.name,
+      name: c.name,
+      type: c.type,
+    }));
     const jsonColumnKeys = new Set(
-      columns
-        .filter((c) => (JSON_COLUMN_TYPES as readonly string[]).includes(c.type))
-        .map((c) => c.name),
+      columns.filter((c) => JSON_COLUMN_TYPES.some((type) => type === c.type)).map((c) => c.name),
     );
 
     return {

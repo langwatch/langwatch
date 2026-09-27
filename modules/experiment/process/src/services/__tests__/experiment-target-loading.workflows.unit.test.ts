@@ -77,11 +77,11 @@ async function load({
   agents = [],
 }: {
   catalogue: Catalogue;
-  targets: Parameters<typeof ExperimentTargetLoadingService.loadWorkflows>[0]["targets"];
+  targets: Parameters<ExperimentTargetLoadingService["loadWorkflows"]>[0]["targets"];
   agents?: Agent[];
 }) {
   const { calls, services } = servicesOver(catalogue);
-  const result = await ExperimentTargetLoadingService.loadWorkflows({
+  const result = await ExperimentTargetLoadingService.create().loadWorkflows({
     projectId: PROJECT_ID,
     targets,
     services,

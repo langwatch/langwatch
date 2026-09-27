@@ -19,7 +19,7 @@ import type {
 import {
   RecordEvaluatorResultCommand,
   RecordTargetResultCommand,
-} from "../clickhouse.experiment-run-processing.repository.ts";
+} from "../../../eventing/experiment-run-processing.commands.ts";
 
 const TENANT = createTenantId("project_test");
 const RUN = "bold-jolly-bee";

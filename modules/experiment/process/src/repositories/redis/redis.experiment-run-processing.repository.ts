@@ -1,18 +1,18 @@
-import { RedisCachedFoldStore } from "@langwatch/eventing";
+import {
+  type AppendStore,
+  type FoldProjectionStore,
+  RedisCachedFoldStore,
+} from "@langwatch/eventing";
 import type { Cluster, Redis } from "ioredis";
 
 import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
+import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
 import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
-import type { WorkflowEvaluationRunner } from "../../eventing/experiment-workflow-evaluation.subscriber.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
 } from "../clickhouse/clickhouse.experiment-clickhouse.repository.ts";
-import {
-  ClickHouseExperimentRunProcessingRepository,
-  type ExperimentRunProcessingPipeline,
-} from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse/clickhouse.experiment-run-state.repository.ts";
 
 /**
@@ -48,30 +48,34 @@ export class RedisExperimentRunProcessingRepository {
 
   private constructor(private readonly options: ClickHouseExperimentRunProcessingAdapterOptions) {}
 
-  buildProcessing(workflowEvaluations: WorkflowEvaluationRunner): ExperimentRunProcessingPipeline {
-    const clickHouse = ClickhouseExperimentClickHouseRepository.create(this.options.resolveClient);
-
-    return ClickHouseExperimentRunProcessingRepository.pipeline({
-      workflowEvaluations,
-      experimentRunStateFoldStore: new RedisCachedFoldStore<ExperimentRunStateData>(
-        ExperimentRunStateStore.create({
-          repository: ClickHouseExperimentRunStateRepository.create({
-            clickhouse: clickHouse,
-            defaultRetentionDays: this.options.defaultRetentionDays,
-          }),
+  /** The run-state fold, read through the Redis cache and written to ClickHouse. */
+  stateFoldStore(): FoldProjectionStore<ExperimentRunStateData> {
+    return new RedisCachedFoldStore<ExperimentRunStateData>(
+      ExperimentRunStateStore.create({
+        repository: ClickHouseExperimentRunStateRepository.create({
+          clickhouse: this.clickHouse(),
+          defaultRetentionDays: this.options.defaultRetentionDays,
         }),
-        this.options.redis,
-        {
-          keyPrefix: EXPERIMENT_RUN_FOLD_CACHE_KEY_PREFIX,
-          ...(this.options.foldCacheTtlSeconds === undefined
-            ? {}
-            : { ttlSeconds: this.options.foldCacheTtlSeconds }),
-        },
-      ),
-      experimentRunItemAppendStore: ExperimentRunItemStore.create({
-        clickhouse: clickHouse,
-        defaultRetentionDays: this.options.defaultRetentionDays,
       }),
+      this.options.redis,
+      {
+        keyPrefix: EXPERIMENT_RUN_FOLD_CACHE_KEY_PREFIX,
+        ...(this.options.foldCacheTtlSeconds === undefined
+          ? {}
+          : { ttlSeconds: this.options.foldCacheTtlSeconds }),
+      },
+    );
+  }
+
+  /** The run-item append, straight to ClickHouse. */
+  itemStore(): AppendStore<ClickHouseExperimentRunResultRecord> {
+    return ExperimentRunItemStore.create({
+      clickhouse: this.clickHouse(),
+      defaultRetentionDays: this.options.defaultRetentionDays,
     });
+  }
+
+  private clickHouse(): ClickhouseExperimentClickHouseRepository {
+    return ClickhouseExperimentClickHouseRepository.create(this.options.resolveClient);
   }
 }

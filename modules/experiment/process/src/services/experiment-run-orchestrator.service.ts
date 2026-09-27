@@ -47,7 +47,6 @@ import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.se
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentRunDriverService } from "./experiment-run-driver.service.ts";
-import type { ExperimentRunStorageService } from "./experiment-run-storage.service.ts";
 import { ExperimentWorkflowCellService } from "./experiment-workflow-cell.service.ts";
 
 /**
@@ -108,12 +107,12 @@ export class ExperimentRunOrchestratorService {
   }
 
   /** The dataset rows a run may touch, given its scope. See {@link ExperimentCellPlanService}. */
-  static resolveScopedRowIndices = (
+  resolveScopedRowIndices = (
     input: Parameters<ExperimentCellPlanService["resolveScopedRowIndices"]>[0],
   ): number[] => cellPlan.resolveScopedRowIndices(input);
 
   /** Generates all cells to execute for the scope. See {@link ExperimentCellPlanService}. */
-  static generateCells = ({
+  generateCells = ({
     state,
     datasetRows,
     scope,
@@ -132,7 +131,7 @@ export class ExperimentRunOrchestratorService {
     });
 
   /** How many cells a scope dispatches. See {@link ExperimentCellPlanService}. */
-  static countScopedCells = ({
+  countScopedCells = ({
     state,
     datasetRows,
     scope,
@@ -145,65 +144,15 @@ export class ExperimentRunOrchestratorService {
   }): number => cellPlan.countScopedCells({ state, datasetRows, scope, seedTargetOutputs });
 
   /** "a", "a and b", "a, b and c" for the skip-reason message. See the comparison-skip process. */
-  static formatList = (names: string[]): string => processFormatList(names);
+  formatList = (names: string[]): string => processFormatList(names);
 
   /** The row-level error copy for a skipped comparison. See the comparison-skip process. */
-  static comparisonSkipMessage = (
+  comparisonSkipMessage = (
     reason: Pick<ComparisonSkipReason, "kind" | "variantNames">,
   ): { detail: string; errorType: string } => processComparisonSkipMessage(reason);
 
-  /** Back-fill event for one REUSED candidate output, or null when this entry needs none. */
-  static findSeededTargetResultEvent(
-    key: string,
-    seeded: SeededTargetOutput,
-    options: {
-      storage: Pick<ExperimentRunStorageService, "hasProduced">;
-      rowsThisRunOwns: Set<number>;
-      datasetRows: Record<string, unknown>[];
-    },
-  ): EvaluationV3Event | null {
-    const { storage, rowsThisRunOwns, datasetRows } = options;
-    if (storage.hasProduced(key)) {
-      return null;
-    }
-
-    const separator = key.indexOf(":");
-    if (separator < 0) {
-      return null;
-    }
-
-    const rowIndex = Number(key.slice(0, separator));
-    const targetId = key.slice(separator + 1);
-    if (!Number.isInteger(rowIndex)) {
-      return null;
-    }
-
-    if (!rowsThisRunOwns.has(rowIndex)) {
-      return null;
-    }
-
-    if (!datasetRows[rowIndex]) {
-      return null;
-    }
-
-    if (seeded.output === null || seeded.output === undefined) {
-      return null;
-    }
-
-    return {
-      type: "target_result",
-      rowIndex,
-      targetId,
-      output: seeded.output,
-      ...(seeded.cost !== undefined && { cost: seeded.cost }),
-      ...(seeded.duration !== undefined && {
-        duration: seeded.duration,
-      }),
-    } as EvaluationV3Event;
-  }
-
   /** Phase 2 generator for comparison evaluators. See {@link ExperimentComparisonPlanService}. */
-  static generateComparisonCells = ({
+  generateComparisonCells = ({
     state,
     datasetRows,
     completedTargetOutputs,
@@ -229,7 +178,7 @@ export class ExperimentRunOrchestratorService {
     });
 
   /** Its own tiny implementation, not a delegation: it only reaches `cost`, not a full port bag. */
-  static priceMetrics = async (
+  priceMetrics = async (
     cost: ExperimentModelCost,
     projectId: string,
     metrics: ExecutionState["metrics"] | undefined,
@@ -248,7 +197,7 @@ export class ExperimentRunOrchestratorService {
   };
 
   /** Executes a single cell and yields events. See {@link ExperimentCellExecutionService}. */
-  static async *executeCell({
+  async *executeCell({
     cell,
     projectId,
     ports,
@@ -278,7 +227,7 @@ export class ExperimentRunOrchestratorService {
   }
 
   /** Executes a cell targeting a studio workflow. See {@link ExperimentWorkflowCellService}. */
-  static async *executeWorkflowCell({
+  async *executeWorkflowCell({
     cell,
     projectId,
     workflowDsl,
@@ -318,7 +267,7 @@ export class ExperimentRunOrchestratorService {
    * Executes a cell whose target is a connected agent (ADR-128): one turn through the relay
    * dispatcher. Each row is its own conversation. See {@link ExperimentConnectedCellService}.
    */
-  static async *executeConnectedCell(input: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
+  async *executeConnectedCell(input: ConnectedCellInput): AsyncGenerator<EvaluationV3Event> {
     const { ports, workflows, dispatch, sleep, now, ...cellInput } = input;
     yield* ExperimentConnectedCellService.create({
       ports,
@@ -331,7 +280,7 @@ export class ExperimentRunOrchestratorService {
   }
 
   /** Builds the per-evaluator dispatch input. See {@link ExperimentEvaluatorInputService}. */
-  static buildEvaluatorInputs = (
+  buildEvaluatorInputs = (
     cell: ExecutionCell,
     evaluatorId: string,
     targetOutput: Record<string, unknown>,
@@ -339,7 +288,7 @@ export class ExperimentRunOrchestratorService {
     evaluatorInputSvc.buildEvaluatorInputs({ cell, evaluatorId, targetOutput });
 
   /** Row label for a column that couldn't run. See {@link ExperimentEvaluatorInputService}. */
-  static evaluatorTargetDisplayName = ({
+  evaluatorTargetDisplayName = ({
     target,
     loadedEvaluators,
   }: {
@@ -351,7 +300,7 @@ export class ExperimentRunOrchestratorService {
     });
 
   /** Whether this evaluator COLUMN gets nothing. See {@link ExperimentEvaluatorInputService}. */
-  static evaluatorTargetHasNoResolvedInputs = ({
+  evaluatorTargetHasNoResolvedInputs = ({
     cell,
     loadedEvaluators,
   }: {
@@ -365,7 +314,7 @@ export class ExperimentRunOrchestratorService {
     );
 
   /** Whether the evaluator gets nothing. See {@link ExperimentEvaluatorInputService}. */
-  static hasNoResolvedInputs = ({
+  hasNoResolvedInputs = ({
     cell,
     evaluator,
     inputs,
@@ -376,17 +325,17 @@ export class ExperimentRunOrchestratorService {
   }): boolean => evaluatorInputSvc.hasNoResolvedInputs({ cell, evaluator, inputs });
 
   /** Per-target metadata stored with a run. See {@link ExperimentResultDispatchService}. */
-  static buildTargetMetadata = (
+  buildTargetMetadata = (
     input: Parameters<ExperimentResultDispatchService["buildTargetMetadata"]>[0],
   ): ESBatchEvaluationTarget[] => resultDispatches.buildTargetMetadata(input);
 
   /** Build the recordTargetResult dispatch payload. See {@link ExperimentResultDispatchService}. */
-  static buildTargetResultDispatch = (
+  buildTargetResultDispatch = (
     input: Parameters<ExperimentResultDispatchService["findTargetResultDispatch"]>[0],
   ): RecordTargetResultCommandData | null => resultDispatches.findTargetResultDispatch(input);
 
   /** The recordEvaluatorResult dispatch payload. See {@link ExperimentResultDispatchService}. */
-  static buildEvaluatorResultDispatch = (
+  buildEvaluatorResultDispatch = (
     input: Parameters<ExperimentResultDispatchService["buildEvaluatorResultDispatch"]>[0],
   ): RecordEvaluatorResultCommandData => resultDispatches.buildEvaluatorResultDispatch(input);
 
@@ -394,20 +343,20 @@ export class ExperimentRunOrchestratorService {
    * Build the stored rows for board cells a run carries rather than
    * produces. Delegates to {@link ExperimentCarriedBoardService}.
    */
-  static buildCarriedOverDispatches = (
+  buildCarriedOverDispatches = (
     input: Parameters<ExperimentCarriedBoardService["buildCarriedOverDispatches"]>[0],
   ): ReturnType<ExperimentCarriedBoardService["buildCarriedOverDispatches"]> =>
     carriedBoard.buildCarriedOverDispatches(input);
 
   /** Main orchestrator: executes all cells and yields SSE events under a parallel semaphore. */
-  static runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
-    return ExperimentRunDriverService.runOrchestrator(input);
+  runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
+    return ExperimentRunDriverService.create().runOrchestrator(input);
   }
 
   /**
    * Requests abort of a running execution.
    */
-  static requestAbort = async ({
+  requestAbort = async ({
     abort,
     runId,
   }: {
@@ -417,7 +366,7 @@ export class ExperimentRunOrchestratorService {
     await abort.requestAbort(runId);
   };
 
-  static async requestOwnedAbort(input: {
+  async requestOwnedAbort(input: {
     ports: ExperimentRunCollaborators | null;
     progress: ExperimentRunProgressRepository | null;
     projectId: string;

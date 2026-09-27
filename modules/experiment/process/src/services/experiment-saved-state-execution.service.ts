@@ -25,7 +25,7 @@ import {
 import type { ExperimentService } from "./experiment.service.ts";
 
 type LoadedExecutionData = Extract<
-  Awaited<ReturnType<typeof ExperimentExecutionDataService.loadExecutionData>>,
+  Awaited<ReturnType<ExperimentExecutionDataService["loadExecutionData"]>>,
   { datasetRows: unknown }
 >;
 
@@ -65,7 +65,7 @@ export class ExperimentSavedStateExecutionService {
   /**
    * The saved outputs a scoped run may reuse instead of producing again.
    */
-  static findSavedRunSeeding({
+  findSavedRunSeeding({
     prepared,
     scope,
   }: {
@@ -86,7 +86,7 @@ export class ExperimentSavedStateExecutionService {
   /**
    * The board cells a run with no page attached carries rather than produces.
    */
-  static planSavedRunCarryOver({
+  planSavedRunCarryOver({
     prepared,
     scope,
     extraCells,
@@ -104,7 +104,7 @@ export class ExperimentSavedStateExecutionService {
     });
   }
 
-  static buildStateFromWorkbench(
+  buildStateFromWorkbench(
     workbenchState: z.infer<typeof persistedEvaluationsV3StateSchema>,
   ): EvaluationsV3State {
     return {
@@ -129,7 +129,7 @@ export class ExperimentSavedStateExecutionService {
    * Loads orchestrator input from saved state. Throws standard validation errors;
    * loader refusals returned as {error, status}.
    */
-  static async prepareSavedStateExecution({
+  async prepareSavedStateExecution({
     experiments,
     services,
     projectId,
@@ -150,7 +150,7 @@ export class ExperimentSavedStateExecutionService {
 
     const { experimentId, workbenchState, dataset } = saved;
 
-    const dataResult = await ExperimentExecutionDataService.loadExecutionData({
+    const dataResult = await ExperimentExecutionDataService.create().loadExecutionData({
       projectId,
       dataset,
       targets: workbenchState.targets,
@@ -165,7 +165,7 @@ export class ExperimentSavedStateExecutionService {
     return {
       experiment: { id: experimentId, slug },
       workbenchState,
-      state: ExperimentSavedStateExecutionService.buildStateFromWorkbench(workbenchState),
+      state: this.buildStateFromWorkbench(workbenchState),
       datasetRows: dataResult.datasetRows,
       datasetColumns: dataResult.datasetColumns,
       loadedPrompts: dataResult.loadedPrompts as Map<string, VersionedPrompt>,

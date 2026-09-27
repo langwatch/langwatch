@@ -1,4 +1,5 @@
 import type { CallOutcome } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
 /**
  * Facade-level seams: behaviour that crosses two collaborators, or proves
@@ -79,7 +80,7 @@ describe("given two datasets where the active one is not the first", () => {
   describe("when the run builds its cells", () => {
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("reads the mapping bucket of the active dataset", () => {
-      const cells = ExperimentRunOrchestratorService.generateCells({
+      const cells = ExperimentRunOrchestratorService.create().generateCells({
         state: twoDatasetState(),
         datasetRows: createTestDataset(1),
         scope: {
@@ -93,7 +94,7 @@ describe("given two datasets where the active one is not the first", () => {
 
     /** @scenario "The run reads its mappings from the dataset the rows come from" */
     it("resolves the evaluator's inputs instead of dispatching an empty payload", () => {
-      const cells = ExperimentRunOrchestratorService.generateCells({
+      const cells = ExperimentRunOrchestratorService.create().generateCells({
         state: twoDatasetState(),
         datasetRows: createTestDataset(1),
         scope: {
@@ -102,7 +103,7 @@ describe("given two datasets where the active one is not the first", () => {
       });
 
       expect(
-        ExperimentRunOrchestratorService.buildEvaluatorInputs(cells[0]!, "eval-1", {
+        ExperimentRunOrchestratorService.create().buildEvaluatorInputs(cells[0]!, "eval-1", {
           output: "Answer 0",
         }),
       ).toEqual({
@@ -141,10 +142,13 @@ describe("given a run whose target is a connected agent", () => {
       evaluatorConfigs: [],
       datasetEntry: {},
     } as any;
-    const ports = {
-      attachments: createNoAttachmentsFixture(),
-      studio: { postEvent: async () => {} },
-    } as unknown as ExperimentRunCollaborators;
+    const ports = createApiFixture<ExperimentRunCollaborators>(
+      {
+        attachments: createNoAttachmentsFixture(),
+        studio: { postEvent: async () => {} },
+      },
+      "ports",
+    );
     const workflows = {
       prepareStudioEvent: async ({ event }: { event: unknown }) => event,
     } as any;
@@ -158,7 +162,7 @@ describe("given a run whose target is a connected agent", () => {
     const now = vi.fn(() => 42);
 
     const events = [];
-    for await (const event of ExperimentRunOrchestratorService.executeConnectedCell({
+    for await (const event of ExperimentRunOrchestratorService.create().executeConnectedCell({
       cell,
       projectId: "p1",
       agent,
