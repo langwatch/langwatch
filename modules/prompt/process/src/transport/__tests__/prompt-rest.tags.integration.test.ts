@@ -5,17 +5,15 @@
  */
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { PrismaClient, PromptTag } from "@langwatch/prisma-client/generated";
-import {
-  PromptTagMissingError,
-  PromptTagNotFoundError,
-  type PromptApi,
-} from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaPromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
 import type { PromptTagDatabase } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PromptTagCatalogueService } from "../../services/prompt-tag-catalogue.service.ts";
 import { PromptTagService } from "../../services/prompt-tag.service.ts";
+import type { PromptService } from "../../services/prompt.service.ts";
 import { mountPromptRest, PROMPT_TEST_ORGANIZATION } from "./prompt-rest.harness.ts";
 
 /** The unique-constraint failure Prisma raises on (organizationId, name). */
@@ -120,22 +118,21 @@ function buildApi() {
   const repository = PrismaPromptTagRepository.create({ prisma: inMemoryTagDatabase() });
   const tags = PromptTagService.create(repository);
 
-  // The three tag operations the routes reach, delegated exactly as
-  // `PromptApp` delegates them, plus the cascade guard the two writes ask.
+  // The three tag operations the routes reach, over the real tag catalogue the
+  // application forwards to; the credential check is the application's own.
+  const catalogue = PromptTagCatalogueService.create({
+    prompts: createApiFixture<PromptService>({
+      createTag: (input: { organizationId: string; name: string }) => tags.create(input),
+      deleteTagByName: (input: { organizationId: string; name: string }) =>
+        tags.deleteByName(input),
+    }),
+  });
   const app = createApiFixture<PromptApi>({
     listTags: (input: { organizationId: string }) => tags.getAll(input),
-    createTag: (input: { organizationId: string; name: string }) => tags.create(input),
-    deleteTagByName: (input: { organizationId: string; name: string }) =>
-      // `PromptApp` re-raises the tag service's plain domain refusals on the
-      // handled channel; the door reads the handled one, so the delegate does
-      // the same mapping rather than letting a plain error reach it.
-      tags.deleteByName(input).catch((error: unknown) => {
-        if (error instanceof PromptTagNotFoundError) {
-          throw new PromptTagMissingError(input.name);
-        }
-        throw error;
-      }),
-    assertMayManageTagCatalog: async () => undefined,
+    createTagDefinition: (input: { organizationId: string; name: string }) =>
+      catalogue.createTagDefinition(input),
+    deleteTagDefinition: ({ organizationId, name }: { organizationId: string; name: string }) =>
+      catalogue.deleteTagDefinition({ organizationId, name }),
   });
 
   const family = mountPromptRest({ app });
