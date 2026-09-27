@@ -12,6 +12,7 @@ import { createLogger } from "@langwatch/observability";
 import type { AuthDirectory } from "../app/auth.members.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";
 import { isAllowedAuthOrigin } from "../rules/auth-origin.rules.ts";
+import { isBetterAuthPath } from "../rules/better-auth-path.rules.ts";
 
 const logger = createLogger("langwatch:auth");
 
@@ -174,14 +175,16 @@ export const authRest = defineRestRouter(AuthDoorApi)
   /**
    * An any-method route so OPTIONS, HEAD and CORS preflight reach Better Auth,
    * which terminates the request itself. Declared last, so the four named
-   * routes above resolve first.
+   * routes above resolve first; it declines the CLI plane, whose families mount later.
    */
   .get("/api/auth/*", "betterAuthHandshake")
   .withAccess(AUTH_DOOR)
   .withResponse("forwarded", { produces: AUTH_ANSWER, because: BETTER_AUTH_FORWARDS })
   .anyMethod()
   .handle(async ({ app, request, response }) =>
-    response.pass(await betterAuthHandshake({ app, request })),
+    isBetterAuthPath({ pathname: new URL(request.url).pathname })
+      ? response.pass(await betterAuthHandshake({ app, request }))
+      : response.decline(),
   )
   .build();
 

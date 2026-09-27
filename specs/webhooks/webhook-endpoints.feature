@@ -575,6 +575,13 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then no load-more control is shown
 
     @unit
+    Scenario: The delivery-log prune is admitted by the tenancy guard
+      Given the delivery log behind the production tenancy guard
+      When the hourly maintenance prunes deliveries older than 30 days
+      Then it runs the one system-owned retention sweep across every tenant
+      And the guard does not refuse it as a cross-tenant delete
+
+    @unit
     Scenario: Webhook management is an organization-scoped permission
       Given a user with an organization admin role
       Then the webhook and spend permissions resolve against the org role

@@ -30,10 +30,10 @@ import {
   WEBHOOK_DISABLED_REASON_MANUAL,
 } from "../../services/webhook-endpoint-policy.service.ts";
 import type { WebhookEndpointRepository } from "../webhook-endpoint.repository.ts";
+import { PrismaWebhookRetentionRepository } from "./prisma.webhook-retention.repository.ts";
 
 const logger = createLogger("langwatch:webhooks:endpoint-service");
 const WEBHOOK_PREVIOUS_SECRET_TTL_MS = 24 * 60 * 60 * 1000;
-const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const destinations = WebhookDestinationService.create();
 
 /**
@@ -800,14 +800,9 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRepositor
     if (this.deps.pruneDeliveries) {
       return this.deps.pruneDeliveries(now);
     }
-    const result = await this.prisma.webhookEndpointDelivery.deleteMany({
-      where: {
-        firedAt: {
-          lt: toDate(now.subtract({ milliseconds: WEBHOOK_DELIVERY_RETENTION_MS })),
-        },
-      },
+    return PrismaWebhookRetentionRepository.create({ prisma: this.prisma }).pruneDeliveries({
+      now,
     });
-    return result.count;
   }
 
   private async getEndpoint(params: {
