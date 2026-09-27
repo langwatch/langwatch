@@ -1635,20 +1635,102 @@ function decideBash({
 
 /**
  * Commands whose first operand is a program or a pattern, never a file:
- * `sed -n '/HEAD branch/s/.*: //p'` names no path. `-e` gives that operand as
- * a flag value instead, and `-f` names a script file, which is still checked.
+ * `sed -n '/HEAD branch/s/.*: //p'` names no path. Each one maps to its short
+ * options that take a value, so the value is not mistaken for that operand.
  */
-const SCRIPT_COMMANDS: ReadonlySet<string> = new Set([
-  "sed",
-  "awk",
-  "gawk",
-  "grep",
-  "egrep",
-  "fgrep",
-  "rg",
+const SCRIPT_COMMANDS: ReadonlyMap<string, string> = new Map([
+  ["sed", "l"],
+  ["awk", "Fv"],
+  ["gawk", "FvilE"],
+  ["grep", "ABCmdD"],
+  ["egrep", "ABCmdD"],
+  ["fgrep", "ABCmdD"],
+  ["rg", "ABCmgtTjMErd"],
 ]);
-const SCRIPT_FLAGS: ReadonlySet<string> = new Set(["-e", "--expression", "--regexp"]);
-const SCRIPT_FILE_FLAGS: ReadonlySet<string> = new Set(["-f", "--file"]);
+/** Long options that give the script as their value, so no operand is the script. */
+const SCRIPT_LONG_FLAGS: ReadonlySet<string> = new Set(["--expression", "--regexp", "--source"]);
+/** Long options that name a script file, or that make rg take no pattern at all. */
+const NO_SCRIPT_OPERAND_LONG_FLAGS: ReadonlySet<string> = new Set([
+  "--file",
+  "--files",
+  "--type-list",
+]);
+
+/**
+ * The tokens of a SCRIPT_COMMANDS part that are script or pattern text rather
+ * than paths, and the script files its attached `-fFILE` options name.
+ *
+ * Every `-e` value is text. The first operand is text only while no option
+ * gave the script (`-e`, `-f`, `--regexp=` and the like), since then the
+ * operands are all files. Anything this reading is unsure of stays a path: a
+ * redirect target is never text, and a long option written without `=` is
+ * taken to consume the next token, which is then checked like any other.
+ */
+function scriptText(part: CommandPart): { text: Set<number>; scriptFiles: string[] } {
+  const text = new Set<number>();
+  const scriptFiles: string[] = [];
+  const valueOptions = SCRIPT_COMMANDS.get(part.tokens[0] ?? "");
+  if (valueOptions === undefined) return { text, scriptFiles };
+  const takesNext = (index: number) =>
+    index < part.tokens.length && part.redirectTarget[index] !== true;
+  let scriptGiven = false;
+  let afterEndOfOptions = false;
+  let firstOperand: number | undefined;
+  for (let index = 1; index < part.tokens.length; index += 1) {
+    const token = part.tokens[index]!;
+    if (part.redirectTarget[index] === true) continue;
+    if (afterEndOfOptions || !token.startsWith("-") || token === "-") {
+      firstOperand ??= index;
+      continue;
+    }
+    if (token === "--") {
+      afterEndOfOptions = true;
+      continue;
+    }
+    if (token.startsWith("--")) {
+      const equalsAt = token.indexOf("=");
+      const flag = equalsAt === -1 ? token : token.slice(0, equalsAt);
+      const value = equalsAt === -1 ? undefined : token.slice(equalsAt + 1);
+      if (SCRIPT_LONG_FLAGS.has(flag)) {
+        scriptGiven = true;
+        if (value === undefined && takesNext(index + 1)) {
+          text.add(index + 1);
+          index += 1;
+        }
+      } else if (NO_SCRIPT_OPERAND_LONG_FLAGS.has(flag)) {
+        scriptGiven = true;
+        if (flag === "--file" && value === undefined) index += 1;
+      } else if (value === undefined && takesNext(index + 1)) {
+        index += 1;
+      }
+      continue;
+    }
+    for (let at = 1; at < token.length; at += 1) {
+      const letter = token[at]!;
+      const attached = token.slice(at + 1);
+      if (letter === "e") {
+        scriptGiven = true;
+        if (attached === "" && takesNext(index + 1)) {
+          text.add(index + 1);
+          index += 1;
+        }
+        break;
+      }
+      if (letter === "f") {
+        scriptGiven = true;
+        if (attached !== "") scriptFiles.push(attached);
+        else index += 1;
+        break;
+      }
+      if (valueOptions.includes(letter)) {
+        if (attached === "") index += 1;
+        break;
+      }
+    }
+  }
+  if (!scriptGiven && firstOperand !== undefined) text.add(firstOperand);
+  return { text, scriptFiles };
+}
 
 /** The device a redirect discards output into, or reads nothing from. */
 const DISCARD_DEVICE = "/dev/null";
@@ -1670,30 +1752,12 @@ export function pathTokensOf(part: CommandPart): string[] {
   const name = part.tokens[0] ?? "";
   const named = new Set<string>();
   let afterEndOfOptions = false;
-  // Only a command in SCRIPT_COMMANDS has a script operand to skip.
-  let scriptTaken = !SCRIPT_COMMANDS.has(name);
+  const script = scriptText(part);
+  for (const file of script.scriptFiles) named.add(file);
   for (let index = 0; index < part.tokens.length; index += 1) {
     const token = part.tokens[index]!;
     const next = part.tokens[index + 1];
-    if (index > 0 && !scriptTaken && part.redirectTarget[index] !== true) {
-      if (SCRIPT_FLAGS.has(token) && next !== undefined) {
-        scriptTaken = true;
-        index += 1;
-        continue;
-      }
-      if (SCRIPT_FILE_FLAGS.has(token)) {
-        scriptTaken = true;
-        continue;
-      }
-      if (token === "--") {
-        afterEndOfOptions = true;
-        continue;
-      }
-      if (afterEndOfOptions || !token.startsWith("-")) {
-        scriptTaken = true;
-        continue;
-      }
-    }
+    if (script.text.has(index)) continue;
     if (part.redirectTarget[index] === true) {
       // `2>/dev/null` discards output rather than reaching a file outside the
       // folder; any other redirect target is judged as the path it names.

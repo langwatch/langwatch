@@ -835,6 +835,9 @@ describe("given a folder shared with a Langy conversation", () => {
         "awk '/^import/ {print $2}' agent.mjs",
         "grep -n '/api/' agent.mjs",
         "rg '/v1/chat' src",
+        "sed -e 's/a/b/' -e '/^#/d' agent.mjs",
+        "sed -ne '/HEAD/p' agent.mjs",
+        "grep -A 2 -n '/api/' agent.mjs",
       ]) {
         expect(bash(command).kind, command).not.toBe("refuse");
       }
@@ -845,6 +848,15 @@ describe("given a folder shared with a Langy conversation", () => {
         "awk '{print}' /etc/passwd",
         "grep -n root /etc/passwd",
         "grep -e root -- /etc/passwd",
+        "grep --regexp=KEY /etc/passwd",
+        "grep --regexp KEY /etc/passwd",
+        "grep -eroot /etc/passwd",
+        "grep -ie root /etc/passwd",
+        "grep -f/etc/patterns agent.mjs",
+        "grep --file=/etc/patterns agent.mjs",
+        "grep -e > /etc/passwd",
+        "rg --files /etc",
+        "rg --ignore-file /etc/ignore KEY",
       ]) {
         const decision = bash(command);
         expect(decision.kind, command).toBe("refuse");

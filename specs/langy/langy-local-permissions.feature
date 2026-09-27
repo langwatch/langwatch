@@ -397,6 +397,8 @@ Feature: The CLI decides what Langy may run on the developer's machine
       Then the script or pattern is read as the command's own words
       And the command is not refused for leaving the folder
       And every file the command is given, including a sed or grep script file, is still checked
+      And when an option gives the script or pattern (-e, -f, --regexp=), no operand is read as one
+      And a redirect target is always checked as a path
 
     @unit
     Scenario: A refusal names the argument it judged a path
