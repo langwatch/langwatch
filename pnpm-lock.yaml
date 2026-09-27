@@ -10660,6 +10660,9 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
