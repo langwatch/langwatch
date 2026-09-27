@@ -274,12 +274,11 @@ export async function thenIAmCalledByMyEmailNeverNull(page: Page, email: string)
   // behind it. Answer them the way a person in a hurry does, then carry on.
   await whenIDeclineWhatTheShellOffersFirst(page);
   await page.getByRole("button", { name: `Open user menu for ${email}` }).click();
-  const group = page.getByText(new RegExp(`\\(${escapeRegExp(email)}\\)`));
+  // The menu's account line: the email alone for a nameless account, never
+  // "null (you@x.com)" or empty parentheses around it.
+  const group = page.getByRole("menu").getByText(email, { exact: true });
   await expect(group).toBeVisible({ timeout: 10000 });
-  await expect(group).not.toContainText("null");
-  // The literal bug this guards: no name renders the email on both sides of
-  // the parenthesis, e.g. "you@x.com (you@x.com)" — never "null (you@x.com)".
-  await expect(group).toContainText(email);
+  await expect(page.getByRole("menu")).not.toContainText("null");
 }
 
 /**
@@ -345,10 +344,6 @@ export async function whenIDeclineTheJoinTakeover(page: Page): Promise<void> {
   }
   await takeover.getByRole("button", { name: /keep working on my own/ }).click();
   await expect(takeover).not.toBeVisible();
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 // =============================================================================
