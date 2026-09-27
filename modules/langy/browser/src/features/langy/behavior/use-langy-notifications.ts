@@ -1,9 +1,7 @@
 /**
- * Langy's browser notifications: the person's choice (on the account), the
- * browser's permission, and the notifier that watches a conversation and sends
- * one when a long turn finishes, a card waits on the person, or Langy calls its
- * `notify` tool, only ever while they are away from the tab.
- * Spec: specs/langy/langy-notifications.feature
+ * Langy's browser notifications: the person's choice (on the account), the browser's
+ * permission, and the notifier that sends one for a long turn, a waiting card or a `notify`
+ * call, only while the person is away. Spec: specs/langy/langy-notifications.feature
  */
 import {
   isPageAway,
@@ -82,10 +80,72 @@ export function useLangyNotificationPreference(): LangyNotificationPreferenceSta
   };
 }
 
-/** A key is any card that waits on the person: a pending permission, a question, a folder request. */
+/** A key per card that waits on the person: a pending permission, a question, a folder request. */
 export type LangyDecisionKeys = readonly string[];
 
 const IN_FLIGHT = new Set(["submitted", "streaming"]);
+
+/** Where the turn clock stands after a status change, and a finished turn's length. */
+function advanceTurnClock({
+  previousStatus,
+  status,
+  startedAt,
+  now,
+}: {
+  previousStatus: string;
+  status: string;
+  startedAt: number | null;
+  now: number;
+}): { startedAt: number | null; finishedMs: number | null } {
+  const wasInFlight = IN_FLIGHT.has(previousStatus);
+  const isInFlight = IN_FLIGHT.has(status);
+  if (isInFlight && !wasInFlight) return { startedAt: now, finishedMs: null };
+  if (!wasInFlight || isInFlight || startedAt === null) return { startedAt, finishedMs: null };
+  return { startedAt: null, finishedMs: status === "ready" ? now - startedAt : null };
+}
+
+type DecisionBaseline = { conversationId: string | null; keys: Set<string> };
+
+/** Whether a key arrived after the conversation's baseline; a new conversation resets it. */
+function takeNewDecision({
+  baseline,
+  conversationId,
+  decisionKeys,
+}: {
+  baseline: DecisionBaseline | null;
+  conversationId: string | null;
+  decisionKeys: LangyDecisionKeys;
+}): { baseline: DecisionBaseline; isNew: boolean } {
+  if (baseline?.conversationId !== conversationId) {
+    return { baseline: { conversationId, keys: new Set(decisionKeys) }, isNew: false };
+  }
+  const fresh = decisionKeys.filter((key) => !baseline.keys.has(key));
+  for (const key of fresh) baseline.keys.add(key);
+  return { baseline, isNew: fresh.length > 0 };
+}
+
+type NotifyCall = NonNullable<ReturnType<typeof readNotifyCall>>;
+
+/** The `notify` calls in these messages not seen before; marks them seen. */
+function takeUnseenNotifyCalls({
+  messages,
+  seen,
+}: {
+  messages: readonly { role?: string; parts?: readonly unknown[] }[];
+  seen: Set<string>;
+}): NotifyCall[] {
+  const calls: NotifyCall[] = [];
+  for (const message of messages) {
+    if (message.role === "user") continue;
+    for (const part of message.parts ?? []) {
+      const call = readNotifyCall(part);
+      if (!call || seen.has(call.callId)) continue;
+      seen.add(call.callId);
+      calls.push(call);
+    }
+  }
+  return calls;
+}
 
 /**
  * Watches one conversation and sends the notifications the rule allows. What
@@ -149,47 +209,32 @@ export function useLangyNotifier({
   }, [conversationId]);
 
   useEffect(() => {
-    const wasInFlight = IN_FLIGHT.has(previousStatus.current);
-    const isInFlight = IN_FLIGHT.has(status);
+    const clock = advanceTurnClock({
+      previousStatus: previousStatus.current,
+      status,
+      startedAt: turnStartedAt.current,
+      now: now(),
+    });
     previousStatus.current = status;
-    if (isInFlight && !wasInFlight) {
-      turnStartedAt.current = now();
-      return;
-    }
-    if (wasInFlight && !isInFlight && turnStartedAt.current !== null) {
-      const durationMs = now() - turnStartedAt.current;
-      turnStartedAt.current = null;
-      if (status === "ready") send({ kind: "turn_finished", durationMs });
-    }
+    turnStartedAt.current = clock.startedAt;
+    if (clock.finishedMs !== null) send({ kind: "turn_finished", durationMs: clock.finishedMs });
   }, [status, now, send]);
 
   // `notify` calls: only one that lands while a turn is in flight here is news;
   // a hydrated history carries old calls that already had their moment.
   useEffect(() => {
-    const live = IN_FLIGHT.has(status);
-    for (const message of messages) {
-      if (message.role === "user") continue;
-      for (const part of message.parts ?? []) {
-        const call = readNotifyCall(part);
-        if (!call || seenNotifyCalls.current.has(call.callId)) continue;
-        seenNotifyCalls.current.add(call.callId);
-        if (live) send({ kind: "tool", title: call.title, body: call.body });
-      }
-    }
+    const calls = takeUnseenNotifyCalls({ messages, seen: seenNotifyCalls.current });
+    if (!IN_FLIGHT.has(status)) return;
+    for (const call of calls) send({ kind: "tool", title: call.title, body: call.body });
   }, [messages, status, send]);
 
   // Cards that wait on the person: the keys held when the conversation was
   // first read are the baseline, and only a key after that notifies.
-  const baseline = useRef<{ conversationId: string | null; keys: Set<string> } | null>(null);
+  const baseline = useRef<DecisionBaseline | null>(null);
   useEffect(() => {
     if (!decisionKeysReady) return;
-    if (baseline.current?.conversationId !== conversationId) {
-      baseline.current = { conversationId, keys: new Set(decisionKeys) };
-      return;
-    }
-    const known = baseline.current.keys;
-    const fresh = decisionKeys.filter((key) => !known.has(key));
-    for (const key of fresh) known.add(key);
-    if (fresh.length > 0) send({ kind: "decision_needed" });
+    const next = takeNewDecision({ baseline: baseline.current, conversationId, decisionKeys });
+    baseline.current = next.baseline;
+    if (next.isNew) send({ kind: "decision_needed" });
   }, [conversationId, decisionKeys, decisionKeysReady, send]);
 }

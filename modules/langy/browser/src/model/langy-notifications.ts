@@ -1,7 +1,6 @@
 /**
- * Langy's notification rules, pure: which tool parts are the notification
- * tools, what a turn or a card turns into, and whether anything is sent at all.
- * The browser capability shows the notification; this module decides.
+ * Langy's notification rules, pure: which tool parts are the notification tools, what a
+ * turn or a card turns into, and whether anything is sent at all.
  * Spec: specs/langy/langy-notifications.feature
  */
 import type { BrowserNotificationPermission } from "@langwatch/browser-host/browser-notifications";
@@ -16,7 +15,7 @@ export const LANGY_LONG_TURN_MS = 60_000;
 export const LANGY_NOTIFY_TITLE_MAX = 80;
 export const LANGY_NOTIFY_BODY_MAX = 240;
 
-/** The tag every Langy notification of one conversation shares, so a newer one replaces the older. */
+/** One conversation's notifications share a tag, so a newer one replaces the older. */
 export function langyNotificationTag(conversationId: string): string {
   return `langy:${conversationId}`;
 }

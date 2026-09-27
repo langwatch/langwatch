@@ -86,9 +86,8 @@ const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 const WRITING_TOOL_NAMES = new Set(["write", "edit", "local_write", "local_edit"]);
 
 /**
- * The calls the ender reads through: plan writes, skill loads, read-only
- * lookups and the notification tools say nothing to the turn's reply, so a
- * turn ending on these ended on
+ * The calls the ender reads through: plan writes, skill loads, read-only lookups and the
+ * notification tools say nothing to the turn's reply, so a turn ending on these ended on
  * whatever came before them (`langwatch navigate` is the one exception).
  */
 export const TRANSPARENT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([

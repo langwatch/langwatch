@@ -1,10 +1,7 @@
 /**
- * Browser notifications, for any feature that sends them: the permission the
- * browser holds, asking for it, whether the person is away from the tab, and
- * showing one whose click brings the tab forward. A feature keeps its own
- * rules for when to notify and the person's own choice; this module only
- * speaks to the browser.
- * Spec: specs/langy/langy-notifications.feature
+ * Browser notifications for any feature: the permission, asking for it, whether the person
+ * is away, and showing one whose click brings the tab forward. When to notify is the
+ * feature's rule. Spec: specs/langy/langy-notifications.feature
  */
 import { useCallback, useEffect, useState } from "react";
 
@@ -100,10 +97,10 @@ export function useBrowserNotificationPermission(): {
     let status: PermissionStatus | undefined;
     let cancelled = false;
     const refresh = () => setPermission(readBrowserNotificationPermission());
-    const query = globalThis.navigator?.permissions?.query;
-    if (typeof query === "function") {
-      query
-        .call(globalThis.navigator.permissions, { name: "notifications" as PermissionName })
+    const permissions = globalThis.navigator?.permissions;
+    if (typeof permissions?.query === "function") {
+      permissions
+        .query({ name: "notifications" as PermissionName })
         .then((result) => {
           if (cancelled) return;
           status = result;

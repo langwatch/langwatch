@@ -17,6 +17,12 @@ export const LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT =
   "Click the icon beside the address, allow notifications for this site, then come back to this tab.";
 export const LANGY_NOTIFICATIONS_MENU_UNSUPPORTED = "Not supported in this browser";
 
+function menuLabel({ blocked, unsupported }: { blocked: boolean; unsupported: boolean }) {
+  if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED;
+  if (unsupported) return LANGY_NOTIFICATIONS_MENU_UNSUPPORTED;
+  return LANGY_NOTIFICATIONS_MENU_LABEL;
+}
+
 export function LangyNotificationsMenuGroup() {
   const notifications = useLangyNotificationPreference();
   const { permission, choice } = notifications;
@@ -41,15 +47,11 @@ export function LangyNotificationsMenuGroup() {
         onClick={toggle}
       >
         <HStack gap={2.5} width="full" align="start">
-          <Box paddingTop="2px">{blocked || unsupported ? <BellOff size={14} /> : <Bell size={14} />}</Box>
+          <Box paddingTop="2px">
+            {blocked || unsupported ? <BellOff size={14} /> : <Bell size={14} />}
+          </Box>
           <Box flex={1}>
-            <Text textStyle="sm">
-              {blocked
-                ? LANGY_NOTIFICATIONS_MENU_BLOCKED
-                : unsupported
-                  ? LANGY_NOTIFICATIONS_MENU_UNSUPPORTED
-                  : LANGY_NOTIFICATIONS_MENU_LABEL}
-            </Text>
+            <Text textStyle="sm">{menuLabel({ blocked, unsupported })}</Text>
             <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
               {blocked ? LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT : LANGY_NOTIFICATIONS_MENU_HINT}
             </Text>

@@ -1,8 +1,6 @@
 /**
- * The two notification tools. `notify` sends the person a browser
- * notification through the panel, within a limit so a model loop cannot
- * spam them. `offer_notifications` puts up the card that asks whether Langy
- * may notify at all, once per conversation.
+ * `notify` sends a browser notification through the panel, within a limit so a model loop
+ * cannot spam; `offer_notifications` asks, once per conversation, whether Langy may notify.
  * Spec: specs/langy/langy-notifications.feature
  */
 

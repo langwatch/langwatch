@@ -69,7 +69,7 @@ describe("UserService notification preference", () => {
 
       await expect(
         service.getNotificationPreference({ id, topic: "email" as "langy" }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/topic/);
     });
   });
 });

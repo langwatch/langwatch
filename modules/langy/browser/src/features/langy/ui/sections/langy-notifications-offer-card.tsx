@@ -1,7 +1,6 @@
 /**
- * The card `offer_notifications` puts up: the setup takes a while, may Langy
- * notify the person once it is done. The answer lives on the account, so the
- * card reads it rather than the tool part, and a reload shows what was chosen.
+ * The card `offer_notifications` puts up. The answer lives on the account, so the card
+ * reads it rather than the tool part, and a reload shows what was chosen.
  * Spec: specs/langy/langy-notifications.feature
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
