@@ -16,10 +16,10 @@ import type { EvaluationV3Event } from "@langwatch/experiment-contract";
 import { expect } from "vitest";
 
 import { CONFIG } from "./config";
-import type { FakeTabRun } from "./fake-tab-run";
-import type { FakeWorkbenchTab } from "./fake-workbench-tab";
 import { getWorkbenchState, listExperimentRuns } from "./seed-optimization-workbench";
 import { getSessionCookie, trpcQuery } from "./trpc";
+import type { WorkbenchPage } from "./workbench-page";
+import type { WorkbenchPageRun } from "./workbench-page-runs";
 import { api } from "./workbench-rest";
 
 /** How long a run's rows may take to become queryable before it is a failure. */
@@ -165,7 +165,7 @@ const verdictsOf = ({
   run,
   evaluatorId,
 }: {
-  run: FakeTabRun;
+  run: WorkbenchPageRun;
   evaluatorId: string;
 }): { rowIndex: number; result: Record<string, unknown> }[] =>
   run.events
@@ -187,7 +187,7 @@ export function expectComparisonScored({
   run,
   evaluatorId,
 }: {
-  run: FakeTabRun;
+  run: WorkbenchPageRun;
   evaluatorId: string;
 }): void {
   const verdicts = verdictsOf({ run, evaluatorId });
@@ -225,24 +225,19 @@ export function expectComparisonScored({
   ).toBeGreaterThan(0);
 }
 
-/** Every column named produced an output for every row the run covered. */
-export function expectColumnsFilled({
-  tab,
+/** Every column named shows an output on the page for every row the run covered. */
+export async function expectColumnsFilled({
+  page,
   targetIds,
   rows,
 }: {
-  tab: FakeWorkbenchTab;
+  page: WorkbenchPage;
   targetIds: string[];
   rows: number;
-}): void {
-  const results = tab.state().results;
+}): Promise<void> {
   for (const targetId of targetIds) {
-    const summary = results?.targets.find((target) => target.targetId === targetId);
-    expect(summary, `no results for column ${targetId}`).toBeDefined();
-    expect(
-      summary?.filledCells,
-      `column ${targetId} filled ${summary?.filledCells} of ${rows} rows`,
-    ).toBe(rows);
+    const filled = await page.filledCells(targetId);
+    expect(filled, `column ${targetId} shows ${filled} of ${rows} rows filled`).toBe(rows);
   }
 }
 
