@@ -43,6 +43,11 @@ export class ModelRestrictedForFeatureError extends HandledError {
     restrictedModels: readonly string[];
   }) {
     const restrictedModel = restrictedModels[0] ?? "restricted model";
+    // The "coding-assistant surfaces only" needle now covers two distinct
+    // reasons a codex model is refused: the provider terms (codex is licensed
+    // for coding-assistant surfaces only) and the execution path (topic
+    // clustering runs through langevals/litellm, outside the codex gateway).
+    // See CODEX_EXCLUDED_FAST_FEATURE_KEYS in codexRestrictions.ts.
     super(
       "model_restricted_for_feature",
       `"${restrictedModel}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be the model for "${featureKey}".`,

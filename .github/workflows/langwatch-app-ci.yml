@@ -335,6 +335,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -494,6 +498,21 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # The checkout above sets fetch-depth: 2, so HEAD (the PR merge
+            # commit) already has its two parents and `origin/main...HEAD` has a
+            # merge base for vitest's --changed. This deepen is kept only as a
+            # defensive fallback: if the checkout is ever shallowed, one extra
+            # level re-links the merge commit's parents, which is all the
+            # three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
+            # The 4-minute floor in test-unit-global-setup.ts is sized for one
+            # sharded slice (~315 files, ~3 min). This branch is unsharded and
+            # --changed selects every file whose module graph reaches the diff,
+            # which for a widely imported module is well over a slice: a run
+            # that selected 589 files was cut at 310 started with every result
+            # green. 12 minutes matches test-component's floor below and still
+            # cuts a finalize wedge long before the 25-minute job cap.
+            LANGWATCH_UNIT_HARD_FLOOR_MS=720000 \
             pnpm test:unit --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
@@ -591,6 +610,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -629,6 +652,13 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # The checkout above sets fetch-depth: 2, so HEAD (the PR merge
+            # commit) already has its two parents and `origin/main...HEAD` has a
+            # merge base for vitest's --changed. This deepen is kept only as a
+            # defensive fallback: if the checkout is ever shallowed, one extra
+            # level re-links the merge commit's parents, which is all the
+            # three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
             pnpm test:component --run --changed origin/main --passWithNoTests \
               --reporter=default --reporter=./src/test-utils/shardFailureReporter.ts \
               --dangerouslyIgnoreUnhandledErrors
@@ -771,6 +801,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
+          # HEAD is the PR merge commit; depth 2 gives it both parents so the
+          # `--changed origin/main` three-dot diff has a merge base without
+          # relying on the later deepen fetch. See CodeRabbit on PR #8291.
+          fetch-depth: 2
           # Drops docs/ + assets/ media. See LEAN CHECKOUT at the top of this file.
           sparse-checkout: |
             /*
@@ -888,6 +922,13 @@ jobs:
           fi
           if [ "${{ needs.changes.outputs.heavy }}" != "true" ]; then
             git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+            # The checkout above sets fetch-depth: 2, so HEAD (the PR merge
+            # commit) already has its two parents and `origin/main...HEAD` has a
+            # merge base for vitest's --changed. This deepen is kept only as a
+            # defensive fallback: if the checkout is ever shallowed, one extra
+            # level re-links the merge commit's parents, which is all the
+            # three-dot diff needs.
+            git fetch --no-tags --deepen=1 origin "$GITHUB_REF"
             pnpm test:integration --changed origin/main --passWithNoTests \
               --reporter=default --reporter=json --reporter=./src/test-utils/shardFailureReporter.ts \
               --outputFile=test-results.json

@@ -198,4 +198,137 @@ describe("resolveModelForFeature — restricted-model exhaustion (unit)", () => 
     expect(r.source).toBe("role_default");
     expect(r.scope).toBe("organization");
   });
+
+  // Topic clustering is a FAST feature but codex cannot execute it (it runs
+  // through langevals/litellm, not the gateway), so a codex FAST default must
+  // be skipped for it while still resolving for the other fast assists — the
+  // daily silent failure in issue #8287.
+  describe("given the FAST role default is a codex model", () => {
+    /** @scenario "A codex FAST default is skipped in favor of a wider tier" */
+    it("resolves the wider tier's model for topic clustering, skipping codex FAST", async () => {
+      const prisma = fakePrisma({
+        project: PROJECT,
+        configs: [
+          cfg({
+            id: "cfg-proj",
+            config: { FAST: CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+          }),
+          cfg({
+            id: "cfg-org",
+            config: { FAST: "openai/gpt-5-mini" },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          }),
+        ],
+      });
+
+      const r = await resolveModelForFeature("analytics.topic_clustering_llm", {
+        prisma,
+        projectId: PROJECT.id,
+      });
+      expect(r.model).toBe("openai/gpt-5-mini");
+      expect(r.source).toBe("role_default");
+      expect(r.scope).toBe("organization");
+    });
+
+    /** @scenario "Exhaustion caused only by codex models reports the restriction, not missing configuration" */
+    it("throws ModelRestrictedForFeatureError, not ModelNotConfiguredError, when only codex is set anywhere", async () => {
+      const prisma = fakePrisma({
+        project: PROJECT,
+        configs: [
+          cfg({
+            id: "cfg-proj",
+            config: { FAST: CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+          }),
+          cfg({
+            id: "cfg-org",
+            config: { FAST: CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          }),
+        ],
+      });
+
+      try {
+        await resolveModelForFeature("analytics.topic_clustering_llm", {
+          prisma,
+          projectId: PROJECT.id,
+        });
+        expect.fail("expected resolveModelForFeature to throw");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ModelRestrictedForFeatureError);
+        expect(err).not.toBeInstanceOf(ModelNotConfiguredError);
+        const restricted = err as ModelRestrictedForFeatureError;
+        expect(restricted.restrictedModels).toContain(CODEX_DEFAULT_MODEL);
+      }
+    });
+
+    /** @scenario "A codex topic clustering override is skipped" */
+    it("skips a codex per-feature override and resolves the org FAST default", async () => {
+      const prisma = fakePrisma({
+        project: PROJECT,
+        configs: [
+          cfg({
+            id: "cfg-proj",
+            config: { "analytics.topic_clustering_llm": CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+          }),
+          cfg({
+            id: "cfg-org",
+            config: { FAST: "openai/gpt-5-mini" },
+            scopes: [{ scopeType: "ORGANIZATION", scopeId: "org-1" }],
+          }),
+        ],
+      });
+
+      const r = await resolveModelForFeature("analytics.topic_clustering_llm", {
+        prisma,
+        projectId: PROJECT.id,
+      });
+      expect(r.model).toBe("openai/gpt-5-mini");
+    });
+
+    /** @scenario "Other fast assists still resolve the codex FAST default" */
+    it("still resolves the codex FAST default for a runnable fast assist", async () => {
+      const prisma = fakePrisma({
+        project: PROJECT,
+        configs: [
+          cfg({
+            id: "cfg-proj",
+            config: { FAST: CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+          }),
+        ],
+      });
+
+      const r = await resolveModelForFeature("scenarios.generator", {
+        prisma,
+        projectId: PROJECT.id,
+      });
+      expect(r.model).toBe(CODEX_DEFAULT_MODEL);
+      expect(r.source).toBe("role_default");
+      expect(r.scope).toBe("project");
+    });
+
+    /** @scenario "Embeddings never resolve a codex model" */
+    it("throws ModelRestrictedForFeatureError for an EMBEDDINGS codex value", async () => {
+      const prisma = fakePrisma({
+        project: PROJECT,
+        configs: [
+          cfg({
+            id: "cfg-proj",
+            config: { EMBEDDINGS: CODEX_DEFAULT_MODEL },
+            scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+          }),
+        ],
+      });
+
+      await expect(
+        resolveModelForFeature("analytics.topic_clustering_embeddings", {
+          prisma,
+          projectId: PROJECT.id,
+        }),
+      ).rejects.toBeInstanceOf(ModelRestrictedForFeatureError);
+    });
+  });
 });

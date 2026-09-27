@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { CODEX_DEFAULT_MODEL } from "../../../modelProviders/codexRestrictions";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
+import { ModelRestrictedForFeatureError } from "../../../modelProviders/modelRestrictedForFeatureError";
 import {
   CLUSTERING_ERROR_CODES,
   ClusteringError,
@@ -58,6 +60,27 @@ describe("classifyClusteringError", () => {
 
       expect(classifyClusteringError(error)).toEqual({
         code: "model_not_configured",
+        isUserActionable: true,
+      });
+    });
+  });
+
+  describe("given the model-resolution cascade found only a restricted model", () => {
+    /** @scenario "A restricted model failure is the customer's to fix" */
+    it.each([
+      ["analytics.topic_clustering_llm", "FAST" as const],
+      ["analytics.topic_clustering_embeddings", "EMBEDDINGS" as const],
+    ])("classifies %s as user-actionable model_restricted", (featureKey, role) => {
+      const error = new ModelRestrictedForFeatureError({
+        featureKey,
+        role,
+        featureDisplayName: "Topic clustering",
+        projectId: "project_x",
+        restrictedModels: [CODEX_DEFAULT_MODEL],
+      });
+
+      expect(classifyClusteringError(error)).toEqual({
+        code: "model_restricted",
         isUserActionable: true,
       });
     });

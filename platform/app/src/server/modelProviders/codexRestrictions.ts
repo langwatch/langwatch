@@ -4,8 +4,19 @@
  * The Codex provider bills the user's ChatGPT plan through OpenAI's codex
  * backend, whose terms license it for coding-assistant harnesses and light
  * AI assists — not general inference. The rule: Langy itself plus the FAST
- * tier's assists. Everything else (prompt playground, evaluations,
- * workflows, batch runs) must neither offer nor accept a codex model.
+ * tier's assists, minus the few FAST features that never actually execute
+ * through codex's one execution road (the AI gateway Responses endpoint).
+ * Everything else (prompt playground, evaluations, workflows, batch runs)
+ * must neither offer nor accept a codex model.
+ *
+ * FAST stays a legal role for a codex default — the Codex connect flows write
+ * FAST=codex on purpose. A FAST feature that codex cannot actually run is
+ * excluded from the allowed FEATURE set instead, so the cascade resolver skips
+ * the codex value per-feature and keeps walking the scope chain (project →
+ * team → organization), raising ModelRestrictedForFeatureError if no other
+ * configured value exists — it never substitutes a model or falls back to
+ * another role, and the role is not closed wholesale (see
+ * CODEX_EXCLUDED_FAST_FEATURE_KEYS).
  *
  * Consumed by:
  *   - the provider registry entry (`restrictedToFeatureKeys`),
@@ -34,16 +45,40 @@ export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
 
 /**
- * The rule, not a hand-kept list: Langy itself plus every FAST-role assist.
- * The fast tier IS the "light AI assists" the codex terms cover, so a new
- * fast feature is codex-allowed by construction — while DEFAULT (playground,
- * evaluators, workflows) and EMBEDDINGS stay out. A test pins the expansion
- * so the set never widens silently.
+ * FAST features that a codex default must NOT license, even though they sit
+ * in the FAST tier.
+ *
+ * Topic clustering is a FAST feature, but it executes via `prepareLitellmParams`
+ * (langevals/litellm), whose codex backstop refuses codex models outright —
+ * codex's only execution road is the AI gateway Responses endpoint, which
+ * topic clustering never uses. Licensing the model at RESOLUTION while
+ * refusing it at EXECUTION produced a daily silent failure: scheduled
+ * clustering resolved FAST=codex, then threw at the litellm layer with a
+ * customer-hostile "coding-assistant surfaces only" message (issue #8287).
+ * Excluding it here makes the cascade resolver skip the codex value and keep
+ * walking the scope chain (project → team → organization) for this feature,
+ * raising ModelRestrictedForFeatureError when no other configured value exists
+ * rather than resolving FAST=codex.
+ */
+export const CODEX_EXCLUDED_FAST_FEATURE_KEYS: readonly string[] = [
+  "analytics.topic_clustering_llm",
+];
+
+/**
+ * The rule, not a hand-kept list: Langy itself plus every FAST-role assist,
+ * minus the FAST features codex cannot actually execute
+ * (CODEX_EXCLUDED_FAST_FEATURE_KEYS). The fast tier IS the "light AI assists"
+ * the codex terms cover, so a new fast feature is codex-allowed by
+ * construction — while DEFAULT (playground, evaluators, workflows) and
+ * EMBEDDINGS stay out. A test pins the expansion so the set never widens
+ * silently.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
   CONNECTION_TEST_FEATURE_KEY,
-  ...featuresByRole("FAST").map((f) => f.key),
+  ...featuresByRole("FAST")
+    .map((f) => f.key)
+    .filter((key) => !CODEX_EXCLUDED_FAST_FEATURE_KEYS.includes(key)),
 ];
 
 export function isCodexAllowedFeature(featureKey: string): boolean {
@@ -82,10 +117,18 @@ export function isModelAllowedForFeature({
 }
 
 /**
- * Role-level defaults apply across every feature in the role at once, so a
- * restricted model may only sit on a role whose ENTIRE feature set is
- * codex-allowed: LANGY (Langy's own role) and FAST (the assists). DEFAULT
- * and EMBEDDINGS carry general-inference surfaces and stay closed.
+ * Whether a codex model may be SAVED as a role default. LANGY (Langy's own
+ * role) and FAST (the assists) are legal — the Codex connect flows write
+ * FAST=codex on purpose. DEFAULT and EMBEDDINGS carry general-inference
+ * surfaces and stay closed.
+ *
+ * This is deliberately a role-wide "yes" for FAST even though a few FAST
+ * features cannot run codex (CODEX_EXCLUDED_FAST_FEATURE_KEYS): those are
+ * skipped per-feature by the cascade resolver via `isModelAllowedForFeature`,
+ * so the default stays writable while the resolver skips the codex value for
+ * the unrunnable feature and walks the scope chain (raising
+ * ModelRestrictedForFeatureError if no other configured value exists), rather
+ * than closing the whole role.
  */
 export function isModelAllowedAsRoleDefault(
   modelId: string,

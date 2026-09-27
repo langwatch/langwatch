@@ -23,6 +23,7 @@
  */
 
 import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
+import { ModelRestrictedForFeatureError } from "../../modelProviders/modelRestrictedForFeatureError";
 
 export const CLUSTERING_ERROR_CODES = {
   /**
@@ -32,6 +33,15 @@ export const CLUSTERING_ERROR_CODES = {
    * certainty.
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
+  /**
+   * The configured model is a terms-restricted codex model the resolver had to
+   * skip for this feature — it resolves for the FAST role but cannot execute
+   * topic clustering (langevals/litellm refuses codex; codex runs only through
+   * the AI gateway). The customer fixes it by choosing another model for topic
+   * clustering. Distinct from MODEL_NOT_CONFIGURED: something IS configured, it
+   * just is not usable here (issue #8287).
+   */
+  MODEL_RESTRICTED: "model_restricted",
   /**
    * The model provider rejected the customer's credentials.
    *
@@ -71,6 +81,7 @@ export interface ClassifiedClusteringError {
  */
 const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
   CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+  CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
 ]);
@@ -114,6 +125,16 @@ export function classifyClusteringError(
   if (error instanceof ModelNotConfiguredError) {
     return {
       code: CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+      isUserActionable: true,
+    };
+  }
+  // Also raised by the resolver: every value the cascade found was a
+  // terms-restricted codex model it had to skip. Something IS configured, so
+  // this is not "nothing set" — the fix is choosing a different model. Matched
+  // by type, never by message string.
+  if (error instanceof ModelRestrictedForFeatureError) {
+    return {
+      code: CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
       isUserActionable: true,
     };
   }
