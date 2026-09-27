@@ -239,7 +239,9 @@ describe("the api process installation", () => {
       await runtime.stop();
     }
   });
+});
 
+describe("the api process installation", () => {
   it("answers the hosted MCP approval step from the installed hosted-mcp module", async () => {
     const { runtime } = await bootApi();
 
@@ -296,6 +298,65 @@ describe("the api process installation", () => {
         status: 400,
         body: { error: "Unknown or unregistered client_id" },
       });
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  it("answers every push ingestion receiver from the installed governance module", async () => {
+    const { runtime } = await bootApi();
+
+    try {
+      const closed = {
+        authenticate: () => {
+          throw new Error("the ingestion receivers resolve their own source secret.");
+        },
+      };
+      const host = RestHost.create({
+        identities: {
+          project: closed,
+          organization: closed,
+          apiKey: closed,
+          scimToken: closed,
+          "instance-admin": closed,
+          browser: closed,
+        },
+        bearers: () => closed,
+        audit: { record: async () => {} },
+      });
+      const isIngest = (transport: { protocol: string; namespace?: string }) =>
+        transport.protocol === "rest" && transport.namespace === "ingest";
+      const owner = serverModules.find((module) => (module.transports ?? []).some(isIngest));
+      const ingest = owner?.transports?.find(isIngest);
+      if (!owner || !ingest) throw new Error("no installed module declares the ingest family");
+      expect(owner.name).toBe("governance");
+      host.mount(ingest.router(), () => runtime.service(owner.apiContract));
+      const paths = [
+        "/api/ingest/otel/src_never",
+        "/api/ingest/webhook/src_never",
+        "/api/ingest/otel/src_never/v1/logs",
+        "/api/ingest/otel/src_never/v1/metrics",
+      ];
+
+      const answers = await Promise.all(
+        paths.map(async (path) => {
+          const response = await host.app.fetch(
+            new Request(`http://api.test${path}`, {
+              method: "POST",
+              headers: {
+                authorization: "Bearer lw_is_nobodysSecret",
+                "content-type": "application/json",
+              },
+              body: "{}",
+            }),
+          );
+          return [path, response.status] as const;
+        }),
+      );
+
+      expect(Object.fromEntries(answers)).toEqual(
+        Object.fromEntries(paths.map((path) => [path, 401])),
+      );
     } finally {
       await runtime.stop();
     }

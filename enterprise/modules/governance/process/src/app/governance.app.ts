@@ -168,6 +168,7 @@ import {
   type OrganizationService,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -204,6 +205,7 @@ import { AiToolProviderReachService } from "../services/ai-tool-provider-reach.s
 import { GovernanceAiToolSlugService } from "../services/ai-tool-slug.service.ts";
 import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
 import { AnthropicAdminPullerService } from "../services/anthropic-admin-puller.service.ts";
+import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
 import { DatabricksGeniePullerService } from "../services/databricks-genie-puller.service.ts";
 import { DepartmentService } from "../services/department.service.ts";
@@ -229,14 +231,8 @@ import { GovernanceCostBreakdownService } from "../services/governance-cost-brea
 import { GovernanceCostNoticesService } from "../services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../services/governance-cost-summary.service.ts";
 import { GovernanceIngestAccessService } from "../services/governance-ingest-access.service.ts";
-import {
-  GovernanceIngestReceiverService,
-  type GovernanceIngestLogCollectionChannel,
-  type GovernanceIngestMetricCollectionChannel,
-  type GovernanceIngestPrincipalDirectory,
-  type GovernanceIngestSpend,
-  type GovernanceIngestTraceCollection,
-} from "../services/governance-ingest-receiver.service.ts";
+import { GovernanceIngestPrincipalService } from "../services/governance-ingest-principal.service.ts";
+import { GovernanceIngestReceiverService } from "../services/governance-ingest-receiver.service.ts";
 import { GovernanceIngestService } from "../services/governance-ingest.service.ts";
 import { GovernanceMcpToolsService } from "../services/governance-mcp-tools.service.ts";
 import { GovernancePeopleScreenService } from "../services/governance-people-screen.service.ts";
@@ -281,9 +277,7 @@ import { SuppressionSnapshotService } from "../services/suppression-snapshot.ser
 import type {
   GovernanceEncryptor,
   GovernanceHttpClient,
-  GovernanceIngestRateLimiter,
   PulledUsageDispatcher,
-  GovernanceProjectDirectory,
 } from "./governance.members.ts";
 
 const logger = createLogger("langwatch:governance");
@@ -291,30 +285,6 @@ const logger = createLogger("langwatch:governance");
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
 /** Where an actor's own workspace lives, for the admin's drill-in link. */
-/**
- * What the push-mode `/api/ingest` receivers reach: the tenant every payload
- * lands under, the pipelines each signal is folded into, and the throttle the
- * gate applies before a byte is read. Only the trace pipeline is required —
- * a signal this deployment folds nowhere answers `not-served` rather than
- * pretending to accept it.
- */
-export interface GovernanceIngestMembers {
-  /** The hidden per-organization governance project every receiver writes under. */
-  projects: Pick<GovernanceProjectDirectory, "ensureInternal">;
-  /** Who a cost event's actor email names, where they are a member. */
-  principals: GovernanceIngestPrincipalDirectory;
-  /** The trace pipeline. Required — without it there is no receiver at all. */
-  traceCollection: GovernanceIngestTraceCollection;
-  /** The log pipeline, where this process folds logs. */
-  logCollection?: GovernanceIngestLogCollectionChannel | undefined;
-  /** The metric pipeline, where this process folds metrics. */
-  metricCollection?: GovernanceIngestMetricCollectionChannel | undefined;
-  /** The spend ledger a cost event is priced into, where one is composed. */
-  spend?: GovernanceIngestSpend | undefined;
-  /** The per-caller throttle, where this deployment composed a counter. */
-  rateLimit?: GovernanceIngestRateLimiter | undefined;
-}
-
 /**
  * What this application is assembled from, once its three peers have been
  * resolved from {@link GovernanceApp.dependencies} and merged with the
@@ -390,6 +360,9 @@ export interface GovernanceAppDependencies {
     | "budgetOverviewForUser"
     | "findSpendDaysForOrganizationProjects"
     | "checkBudget"
+    | "resolveApplicableBudgets"
+    | "insertSpendDebit"
+    | "appendBudgetChange"
     | "getPrincipalSpendSummary"
     | "findPrincipalDailySpend"
     | "findPrincipalModelSpend"
@@ -450,12 +423,6 @@ export interface GovernanceAppDependencies {
    * else's personal keys — is a plain decision at the organization scope.
    */
   permissions: Pick<AuthzService, "getDecision">;
-  /**
-   * What the push-mode ingestion receivers reach beyond this feature.
-   * Optional for the same reason as {@link governance} — supplied only
-   * alongside it.
-   */
-  ingest?: GovernanceIngestMembers;
 }
 
 /**
@@ -499,13 +466,14 @@ type GovernanceSetup = Readonly<{
     /** The process's own fact, absent where the deployment named no `BASE_HOST`. */
     publicBaseUrl?: string | undefined;
   }> &
-    Pick<GovernanceBespokeMembers, "governance" | "ingest">;
+    Pick<GovernanceBespokeMembers, "governance"> &
+    Readonly<{ rateLimiter: RateLimiter }>;
   repositories: GovernanceRepositories;
 }>;
 
 export class GovernanceApp implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
-  static readonly reads = ["encryption", "isSaas", "publicBaseUrl"] as const;
+  static readonly reads = ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"] as const;
   /**
    * The peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so
@@ -563,7 +531,6 @@ export class GovernanceApp implements GovernanceRestApi {
       ingestionSecrets,
       dependencies: {
         governance: members.governance,
-        ingest: members.ingest,
         agents: dependencies.agents,
         projects: dependencies.projects,
         auth: dependencies.auth,
@@ -585,6 +552,7 @@ export class GovernanceApp implements GovernanceRestApi {
       encryption: members.encryption,
       gatewayBaseUrl: governanceGatewayBaseUrl({ config, isSaas: members.isSaas }),
       publicBaseUrl: members.publicBaseUrl,
+      rateLimiter: members.rateLimiter,
     });
   }
 
@@ -597,6 +565,7 @@ export class GovernanceApp implements GovernanceRestApi {
     encryption,
     gatewayBaseUrl,
     publicBaseUrl,
+    rateLimiter,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -606,6 +575,7 @@ export class GovernanceApp implements GovernanceRestApi {
     encryption: GovernanceEncryptor;
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
+    rateLimiter: RateLimiter;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
@@ -868,26 +838,21 @@ export class GovernanceApp implements GovernanceRestApi {
       templates: this.templates,
       ingestionKeys: this.ingestionKeys,
     });
-    const { governance, ingest } = dependencies;
-    if (governance && ingest) {
-      const ingestAccess = GovernanceIngestAccessService.create({
-        governance: () => governance,
-        rateLimit: ingest.rateLimit,
-      });
-      const ingestReceiver = GovernanceIngestReceiverService.create({
-        governance: () => governance,
-        projects: () => ingest.projects,
-        directory: () => ingest.principals,
-        traceCollection: ingest.traceCollection,
-        logCollection: ingest.logCollection,
-        metricCollection: ingest.metricCollection,
-        spend: ingest.spend,
-      });
-      this.ingestService = GovernanceIngestService.create({
-        access: ingestAccess,
-        receiver: ingestReceiver,
-      });
-    }
+    this.ingestService = GovernanceIngestService.create({
+      access: GovernanceIngestAccessService.create({ sources: this.ingestionSources, rateLimiter }),
+      receiver: GovernanceIngestReceiverService.create({
+        sources: this.ingestionSources,
+        costEvents: CanonicalCostExtractorService.create(),
+        ottl,
+        projects: dependencies.projects,
+        directory: GovernanceIngestPrincipalService.create({
+          users: dependencies.users,
+          organizations: dependencies.organizations,
+        }),
+        traceCollection: (input) => dependencies.traces.otlpTraces(input),
+        spend: dependencies.gateway,
+      }),
+    });
   }
 
   private readonly dependencies: GovernanceAppDependencies;
@@ -933,7 +898,7 @@ export class GovernanceApp implements GovernanceRestApi {
   private readonly cliCredentialService: GovernanceCliCredentialApi;
   private readonly cliActivityService: GovernanceCliActivityApi;
   private readonly cliService: GovernanceCliService;
-  private readonly ingestService?: GovernanceIngestService;
+  private readonly ingestService: GovernanceIngestService;
 
   /**
    * Every accessor below resolves to the ~100-operation governance facade
@@ -1230,19 +1195,19 @@ export class GovernanceApp implements GovernanceRestApi {
   // ── The push-mode ingestion receivers ─────────────────────────────────────
 
   ingestOtlpTraces(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
-    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpTraces(input);
+    return this.ingestService.receiveOtlpTraces(input);
   }
 
   ingestWebhook(input: GovernanceIngestWebhookInput): Promise<GovernanceIngestResponse> {
-    return (this.ingestService ?? this.unfinishedCapability()).receiveWebhook(input);
+    return this.ingestService.receiveWebhook(input);
   }
 
   ingestOtlpLogs(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
-    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpLogs(input);
+    return this.ingestService.receiveOtlpLogs(input);
   }
 
   ingestOtlpMetrics(input: GovernanceIngestOtlpInput): Promise<GovernanceIngestResponse> {
-    return (this.ingestService ?? this.unfinishedCapability()).receiveOtlpMetrics(input);
+    return this.ingestService.receiveOtlpMetrics(input);
   }
 
   // ── Ingestion templates ───────────────────────────────────────────────────

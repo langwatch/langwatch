@@ -93,6 +93,7 @@ import { departmentsTrpcTransport } from "./transport/departments.trpc.ts";
 import { governanceAgentsTrpcTransport } from "./transport/governance-agents.trpc.ts";
 import { governanceCliRest } from "./transport/governance-cli.rest.ts";
 import { governanceCostTrpcTransport } from "./transport/governance-cost.trpc.ts";
+import { governanceIngestRest } from "./transport/governance-ingest.rest.ts";
 import { governancePeopleTrpcTransport } from "./transport/governance-people.trpc.ts";
 import {
   governanceRest,
@@ -108,8 +109,6 @@ import { sessionPolicyTrpcTransport } from "./transport/session-policy.trpc.ts";
 
 /**
  * The whole module, declared: one application and the families it answers.
- * `governanceIngestRest` is not mounted yet: its receivers still read the
- * facade (.claude/handoffs/governance-facade-removal.md, lane C).
  */
 export const governanceServer = defineServerModule("governance")
   .withRepositories(governanceRepositories)
@@ -117,6 +116,7 @@ export const governanceServer = defineServerModule("governance")
   .withTransports(
     governanceRest,
     governanceCliRest,
+    governanceIngestRest,
     departmentsTrpcTransport,
     ingestionTemplatesTrpcTransport,
     aiToolsTrpcTransport,

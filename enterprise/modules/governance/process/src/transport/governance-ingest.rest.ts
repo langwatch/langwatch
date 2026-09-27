@@ -6,22 +6,15 @@ import {
   GovernanceRestApi,
   governanceIngestHeadersSchema,
   governanceIngestReceiptSchema,
-  governanceIngestRefusalSchema,
   governanceIngestSourceParamsSchema,
 } from "@langwatch/enterprise-governance-contract";
 
-const ingestAnswers = {
-  202: governanceIngestReceiptSchema,
-  400: governanceIngestRefusalSchema,
-  401: governanceIngestRefusalSchema,
-  404: governanceIngestRefusalSchema,
-  429: governanceIngestRefusalSchema,
-  503: governanceIngestRefusalSchema,
-} as const;
+/** The acknowledgement; every refusal is a thrown HandledError the runtime renders. */
+const ingestAnswers = { 202: governanceIngestReceiptSchema } as const;
 
 const INGEST_DOOR = publicRoute({
   reason:
-    "an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success and refusal bodies",
+    "an ingestion source's bearer secret is resolved in-handler against IngestionSource, and the receiver answers OTLP's own partial-success body",
 });
 
 export const governanceIngestRest = defineRestRouter(GovernanceRestApi)

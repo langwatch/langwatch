@@ -271,3 +271,76 @@ export class AgentListingUnavailableError extends HandledError {
     this.name = "AgentListingUnavailableError";
   }
 }
+
+/**
+ * A push receiver's bearer names no ingestion source, or names one other than the path's. One
+ * refusal for both, so the answer never confirms that some other source id exists.
+ */
+export class IngestionSourceUnauthorizedError extends HandledError {
+  declare readonly code: "ingestion_source_unauthorized";
+
+  constructor() {
+    super("ingestion_source_unauthorized", "The ingestion source secret was not recognized.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "IngestionSourceUnauthorizedError";
+  }
+}
+
+/** One caller sent more to the push receivers than the window allows; it retries after the wait. */
+export class IngestionRateLimitedError extends HandledError {
+  declare readonly code: "ingestion_rate_limited";
+
+  constructor({ retryAfterSec }: { retryAfterSec: number }) {
+    super(
+      "ingestion_rate_limited",
+      "Too many requests from this client. Slow down and retry after the Retry-After window.",
+      {
+        httpStatus: 429,
+        retryable: true,
+        fault: "customer",
+        meta: { retryAfterMs: retryAfterSec * 1000 },
+      },
+    );
+    this.name = "IngestionRateLimitedError";
+  }
+}
+
+/** A permanent 404: this deployment folds that signal nowhere, so an exporter must not retry. */
+export class IngestionSignalNotServedError extends HandledError {
+  declare readonly code: "ingestion_signal_not_served";
+
+  constructor(signal: string) {
+    super(
+      "ingestion_signal_not_served",
+      `This deployment does not receive ${signal} on an ingestion source.`,
+      { httpStatus: 404, fault: "customer", meta: { signal } },
+    );
+    this.name = "IngestionSignalNotServedError";
+  }
+}
+
+/** The source's type is not served at the path it was sent to. */
+export class IngestionWrongEndpointError extends HandledError {
+  declare readonly code: "ingestion_wrong_endpoint";
+
+  constructor(description: string) {
+    super("ingestion_wrong_endpoint", description, { httpStatus: 400, fault: "customer" });
+    this.name = "IngestionWrongEndpointError";
+  }
+}
+
+/** Nothing was durably accepted; the exporter retries the whole request. */
+export class IngestionReceiverUnavailableError extends HandledError {
+  declare readonly code: "ingestion_receiver_unavailable";
+
+  constructor() {
+    super("ingestion_receiver_unavailable", "The ingestion receiver is temporarily unavailable.", {
+      httpStatus: 503,
+      retryable: true,
+      fault: "platform",
+    });
+    this.name = "IngestionReceiverUnavailableError";
+  }
+}

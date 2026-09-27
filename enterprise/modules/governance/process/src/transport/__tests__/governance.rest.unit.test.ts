@@ -32,6 +32,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -149,6 +150,7 @@ async function buildApi(
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
+      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

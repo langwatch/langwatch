@@ -3,14 +3,16 @@
  * The gate every push-mode receiver shares: throttle, then the bearer secret,
  * then the path's own source id, which must be the one the secret resolved to.
  */
-import type {
-  GovernanceApi,
-  GovernanceIngestionSource,
-} from "@langwatch/enterprise-governance-contract";
+import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
+import type { RateLimiter } from "@langwatch/process-stores/members";
 
-import type { GovernanceIngestRateLimiter } from "../app/governance.members.ts";
-import { extractClientIp } from "../rules/governance-ingest-rate-limit.rules.ts";
+import {
+  extractClientIp,
+  INGEST_RATE_LIMIT_MAX_REQUESTS,
+  INGEST_RATE_LIMIT_WINDOW_SECONDS,
+} from "../rules/governance-ingest-rate-limit.rules.ts";
+import type { IngestionSourceService } from "./ingestion-source.service.ts";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -20,9 +22,9 @@ export type GovernanceIngestAuthorization =
   | Readonly<{ outcome: "rate-limited"; retryAfterSec: number }>;
 
 export type GovernanceIngestAccessMembers = Readonly<{
-  governance: () => Pick<GovernanceApi, "findIngestionSourceByIngestSecret">;
-  /** The per-caller throttle, where this deployment composed a counter. */
-  rateLimit?: GovernanceIngestRateLimiter | undefined;
+  sources: Pick<IngestionSourceService, "findByIngestSecret">;
+  /** The process's counter the per-caller throttle is kept in. */
+  rateLimiter: RateLimiter;
 }>;
 
 /** What the receivers ask before they read a byte of a payload. */
@@ -62,21 +64,18 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
 
   /** Wedged BEFORE the secret lookup, so scanners shed at the edge. */
   private async throttle(headers: Headers): Promise<GovernanceIngestAuthorization | null> {
-    const limiter = this.members.rateLimit;
-
-    if (!limiter) return null;
-
     const ip = extractClientIp(headers);
-    const decision = await limiter.check({ ip });
+    const decision = await this.members.rateLimiter.check(`ingest:${ip}`, {
+      requests: INGEST_RATE_LIMIT_MAX_REQUESTS,
+      seconds: INGEST_RATE_LIMIT_WINDOW_SECONDS,
+    });
 
     if (decision.allowed) return null;
 
-    logger.warn(
-      { ip, retryAfterSec: decision.retryAfterSec },
-      "ingest rate-limit exceeded; rejecting with 429",
-    );
+    const retryAfterSec = decision.retryAfterSeconds ?? INGEST_RATE_LIMIT_WINDOW_SECONDS;
+    logger.warn({ ip, retryAfterSec }, "ingest rate-limit exceeded; rejecting with 429");
 
-    return { outcome: "rate-limited", retryAfterSec: decision.retryAfterSec };
+    return { outcome: "rate-limited", retryAfterSec };
   }
 
   /**
@@ -93,6 +92,6 @@ export class GovernanceIngestAccessService implements GovernanceIngestAccessApi 
 
     if (!match?.[1]) return null;
 
-    return this.members.governance().findIngestionSourceByIngestSecret(match[1]);
+    return this.members.sources.findByIngestSecret(match[1]);
   }
 }

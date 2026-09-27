@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The pulled-usage pipeline per role: the worker hosts main's cost rollup fold, the api constructs none. */
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -16,6 +14,9 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** The pulled-usage pipeline per role: the worker hosts main's cost rollup fold, the api constructs none. */
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -48,6 +49,7 @@ function buildApp() {
     members: {
       encryption: createApiFixture<GovernanceEncryptor>(),
       isSaas: false,
+      rateLimiter: memoryRateLimiter(),
     },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),

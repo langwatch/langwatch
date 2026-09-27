@@ -5,12 +5,12 @@
  * the batch under the organization's hidden governance project, and the cost
  * events inside a log batch priced into the spend ledger.
  */
-import {
-  type CanonicalCostEvent,
-  type GovernanceApi,
-  type GovernanceIngestionSource,
+import type {
+  CanonicalCostEvent,
+  GovernanceIngestionSource,
+  GovernanceOttlGateway,
 } from "@langwatch/enterprise-governance-contract";
-import { usdToNanoUsd } from "@langwatch/gateway-contract";
+import { type GatewayApi, usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   applyOtlpReceiverPolicy,
@@ -18,6 +18,7 @@ import {
   parseOtlpMetrics,
   parseOtlpTraces,
 } from "@langwatch/otlp";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   IExportLogsServiceRequest,
@@ -26,7 +27,8 @@ import type {
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
 
-import type { GovernanceProjectDirectory } from "../app/governance.members.ts";
+import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
+import type { IngestionSourceService } from "./ingestion-source.service.ts";
 
 const logger = createLogger("langwatch:ingest");
 
@@ -67,26 +69,10 @@ export type GovernanceIngestMetricCollectionChannel = (input: {
  * none: a debit row nobody evicts a cache for is spend the gateway keeps
  * routing against a stale balance.
  */
-export type GovernanceIngestSpend = Readonly<{
-  insertDebit: (rows: readonly Record<string, unknown>[]) => Promise<unknown>;
-  resolveApplicableBudgets: (scopes: {
-    organizationId: string;
-    teamId: string;
-    projectId: string;
-    virtualKeyId: string;
-    principalUserId: string | null;
-  }) => Promise<
-    readonly {
-      budget: Readonly<{ id: string; scopeType: string; scopeId: string; window: string }>;
-    }[]
-  >;
-  appendChange: (input: {
-    organizationId: string;
-    projectId: string;
-    kind: string;
-    payload: Record<string, unknown>;
-  }) => Promise<unknown>;
-}>;
+export type GovernanceIngestSpend = Pick<
+  GatewayApi,
+  "resolveApplicableBudgets" | "insertSpendDebit" | "appendBudgetChange"
+>;
 
 /**
  * The principal resolution a priced cost event performs, stated as the one
@@ -148,31 +134,32 @@ export type GovernanceIngestMetricReceipt =
     }>;
 
 export type GovernanceIngestReceiverMembers = Readonly<{
-  /** The SAME governance service the console reads sources and templates from. */
-  governance: () => Pick<
-    GovernanceApi,
-    "ingestionSourceRecordEventReceived" | "extractCanonicalCostEvents" | "ottlTransform"
-  >;
+  /** The SAME source service the console reads sources from; it stamps each received event. */
+  sources: Pick<IngestionSourceService, "recordEventReceived">;
+  /** Canonical cost extraction, run over the log batch the OTTL rules may have rewritten. */
+  costEvents: Pick<CanonicalCostExtractorService, "extract">;
+  /** The gateway's OTTL engine, for sources whose parser config carries statements. */
+  ottl: Pick<GovernanceOttlGateway, "transform">;
   /**
    * The hidden per-organization governance project every receiver writes
    * under. Lazily ensured and idempotent, so a race-created project resolves
    * cleanly rather than splitting one organization across two tenants.
    */
-  projects: () => Pick<GovernanceProjectDirectory, "ensureInternal">;
+  projects: Pick<ProjectApi, "ensureInternal">;
   /** The trace pipeline. Required — without it there is no receiver at all. */
   traceCollection: GovernanceIngestTraceCollection;
   /** The log pipeline, where this process folds logs. */
   logCollection?: GovernanceIngestLogCollectionChannel | undefined;
   /** The metric pipeline, where this process folds metrics. */
   metricCollection?: GovernanceIngestMetricCollectionChannel | undefined;
-  /** The spend ledger a cost event is priced into, where one is composed. */
-  spend?: GovernanceIngestSpend | undefined;
+  /** The spend ledger a cost event is priced into. */
+  spend: GovernanceIngestSpend;
   /**
    * The typed client the principal resolution reads. A cost event names a
    * person by EMAIL, and a non-member resolves to no principal while the spend
    * still rolls up at organization, team and project scope.
    */
-  directory: () => GovernanceIngestPrincipalDirectory;
+  directory: GovernanceIngestPrincipalDirectory;
 }>;
 
 /** What the `/api/ingest` transport hands each signal's payload to. */
@@ -533,13 +520,11 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
 
           costEventCount = events.length;
 
-          const spend = this.members.spend;
-
-          if (events.length > 0 && spend) {
+          if (events.length > 0) {
             ledgerRowsWritten += await this.priceCostEvents({
               events,
               source,
-              spend,
+              spend: this.members.spend,
               governanceProjectId: tenantId,
             });
           }
@@ -708,7 +693,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     contentType: string | undefined;
     parsed: IExportLogsServiceRequest;
   }): Promise<CanonicalCostEvent[]> {
-    const governance = this.members.governance();
+    const { costEvents, ottl } = this.members;
     const { source } = input;
     const parserConfig = (source.parserConfig as Record<string, unknown> | null) ?? {};
     const ottlStatements = Array.isArray(parserConfig.ottlStatements)
@@ -724,7 +709,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     const encoding: "json" | "proto" = declaredType.includes("json") ? "json" : "proto";
 
     try {
-      const result = await governance.ottlTransform({
+      const result = await ottl.transform({
         sourceId: source.id,
         kind: "log",
         encoding,
@@ -742,7 +727,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           "OTTL transform rejected statements at receive — falling back to un-mutated extraction",
         );
 
-        return governance.extractCanonicalCostEvents(input.parsed);
+        return costEvents.extract(input.parsed);
       }
 
       const mutated = Buffer.from(result.payloadB64, "base64");
@@ -761,17 +746,17 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           "OTTL transform returned unparseable payload — falling back to un-mutated extraction",
         );
 
-        return governance.extractCanonicalCostEvents(input.parsed);
+        return costEvents.extract(input.parsed);
       }
 
-      return governance.extractCanonicalCostEvents(reparsed.request);
+      return costEvents.extract(reparsed.request);
     } catch (transformErr) {
       logger.warn(
         { sourceId: source.id, err: String(transformErr) },
         "OTTL transform request failed — falling back to un-mutated extraction",
       );
 
-      return governance.extractCanonicalCostEvents(input.parsed);
+      return costEvents.extract(input.parsed);
     }
   }
 
@@ -788,7 +773,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
     governanceProjectId: string;
   }): Promise<number> {
     const { events, source, spend, governanceProjectId } = input;
-    const directory = this.members.directory();
+    const { directory } = this.members;
     let ledgerRowsWritten = 0;
 
     for (const event of events) {
@@ -870,7 +855,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           occurredAt: event.occurredAt,
         }));
 
-        await spend.insertDebit(rows);
+        await spend.insertSpendDebit(rows);
         ledgerRowsWritten += rows.length;
 
         // A change event so the gateway's subscriber evicts its cache and the
@@ -878,10 +863,9 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
         // logged rather than raised: the row has already landed, and the cache
         // is corrected by the next change anyway.
         try {
-          await spend.appendChange({
+          await spend.appendBudgetChange({
             organizationId: source.organizationId,
             projectId: governanceProjectId,
-            kind: "BUDGET_UPDATED",
             payload: {
               source: "ingestion_source",
               sourceId: source.id,
@@ -909,7 +893,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
   }
 
   private async governanceTenantOf(source: GovernanceIngestionSource): Promise<string> {
-    const project = await this.members.projects().ensureInternal({
+    const project = await this.members.projects.ensureInternal({
       organizationId: source.organizationId,
       kind: "internal_governance",
     });
@@ -918,6 +902,6 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
   }
 
   private recordEvent(source: GovernanceIngestionSource): Promise<unknown> {
-    return this.members.governance().ingestionSourceRecordEventReceived(source.id);
+    return this.members.sources.recordEventReceived(source.id);
   }
 }

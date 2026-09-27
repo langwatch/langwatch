@@ -23,6 +23,7 @@ import {
 } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { memoryRateLimiter } from "@langwatch/test-harness";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -104,7 +105,11 @@ async function buildApp(options: {
       users: createApiFixture<UserApi>({ findById, findByEmail }),
       auditLog: createApiFixture<AuditLogApi>(),
     },
-    members: { encryption: createApiFixture<GovernanceEncryptor>(), isSaas: false },
+    members: {
+      encryption: createApiFixture<GovernanceEncryptor>(),
+      isSaas: false,
+      rateLimiter: memoryRateLimiter(),
+    },
     resources: new ResourceScope(),
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
