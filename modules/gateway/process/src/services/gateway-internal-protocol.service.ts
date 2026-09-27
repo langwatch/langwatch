@@ -7,7 +7,16 @@ import {
   type GatewayInternalCodexRefreshResult,
   type GatewayInternalSpendCommandName,
   type GatewayInternalSpendCommandRecord,
+  type GatewayGuardrailCheckInput,
+  type GatewayGuardrailCheckResult,
   type GatewayInternalProtocol,
+  type GatewayRealtimeCorrelation,
+  type GatewayRealtimeRelease,
+  type GatewayRealtimeReservation,
+  type GatewayRealtimeReservationResult,
+  type GatewayRealtimeSessionUpdate,
+  type GatewayRealtimeUsageOutcome,
+  type GatewayRealtimeUsageReport,
   isLicenseTokenShape,
   registryHashForToken,
   type GatewayLicenseTokenRefusal,
@@ -223,7 +232,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     return this.#members.changes.currentRevision(organizationId);
   }
 
-  async checkGuardrails(input: Parameters<GatewayGuardrailEvaluationService["check"]>[0]) {
+  async checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
     const guardrails = this.#members.guardrails;
     if (!guardrails) return { status: "unavailable" } as const;
     return { status: "evaluated", verdict: await guardrails.check(input) } as const;
@@ -294,22 +303,16 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async reserveRealtimeSession(
-    input: Omit<
-      Parameters<GatewayRealtimeSessionService["reserveRealtimeSession"]>[0],
-      "collaborators"
-    >,
-  ) {
+    input: GatewayRealtimeReservation,
+  ): Promise<GatewayRealtimeReservationResult> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return { ok: false, reason: "unavailable" } as const;
     return realtimeSessionService.reserveRealtimeSession({ collaborators, ...input });
   }
 
   async correlateRealtimeSession(
-    input: Omit<
-      Parameters<GatewayRealtimeSessionService["correlateRealtimeSession"]>[0],
-      "collaborators"
-    >,
-  ) {
+    input: GatewayRealtimeCorrelation,
+  ): Promise<GatewayRealtimeSessionUpdate> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return "unavailable" as const;
     const correlated = await realtimeSessionService.correlateRealtimeSession({
@@ -320,11 +323,8 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async releaseRealtimeSession(
-    input: Omit<
-      Parameters<GatewayRealtimeSessionService["releaseRealtimeSession"]>[0],
-      "collaborators"
-    >,
-  ) {
+    input: GatewayRealtimeRelease,
+  ): Promise<GatewayRealtimeSessionUpdate> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return "unavailable" as const;
     const released = await realtimeSessionService.releaseRealtimeSession({
@@ -335,11 +335,8 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async reportRealtimeSessionUsage(
-    input: Omit<
-      Parameters<GatewayRealtimeSessionService["reportRealtimeSessionUsage"]>[0],
-      "collaborators"
-    >,
-  ) {
+    input: GatewayRealtimeUsageReport,
+  ): Promise<GatewayRealtimeUsageOutcome> {
     const collaborators = this.#members.realtimeSessions;
     if (!collaborators) return "unavailable" as const;
     return realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input });

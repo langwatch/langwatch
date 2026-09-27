@@ -111,8 +111,9 @@ export class GatewayUsageService {
   }
 
   /**
-   * `chRepo` is a required key with an optional value: a ClickHouse-less deploy passes undefined
-   * explicitly, while a caller forgetting it fails to compile instead of silently reporting nothing.
+   * `chRepo` is a required key with an optional value: a ClickHouse-less deploy passes
+   * undefined explicitly, while a caller forgetting it fails to compile instead of silently
+   * reporting nothing.
    */
   static create(args: {
     projects: GatewayUsageProjects;

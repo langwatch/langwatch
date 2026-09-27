@@ -276,12 +276,12 @@ export class GatewayService {
       ],
     });
 
-    return this.repository.resolveScopeTargets(
+    return this.repository.resolveScopeTargets({
       budgets,
       organizationId,
       projects,
       virtualKeyProjectScopes,
-    );
+    });
   }
 
   listSpendTenantIds(organizationId: string): Promise<string[]> {

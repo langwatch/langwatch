@@ -3,7 +3,7 @@ import {
   GatewayInvalidCursorError,
   type GatewayCacheRuleCursor,
 } from "@langwatch/gateway-contract";
-import { Temporal, type Instant } from "@langwatch/time";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 /**
  * Cursor pagination for Postgres-backed REST lists, matching the ClickHouse
@@ -20,7 +20,7 @@ export const PAGE_LIMIT_MAX = 200;
 export interface KeysetColumn {
   name: string;
   /** The value from the last row served. */
-  value: string | number | Date;
+  value: string | number | Instant;
   /** The direction this column is ordered in, matching the query's orderBy. */
   direction: "asc" | "desc";
 }
@@ -56,11 +56,17 @@ export function keysetAfter(columns: KeysetColumn[]): Record<string, unknown>[] 
   return columns.map((column, index) => {
     const branch: Record<string, unknown> = {};
     for (const earlier of columns.slice(0, index)) {
-      branch[earlier.name] = earlier.value;
+      branch[earlier.name] = prismaValue(earlier.value);
     }
-    branch[column.name] = column.direction === "desc" ? { lt: column.value } : { gt: column.value };
+    const value = prismaValue(column.value);
+    branch[column.name] = column.direction === "desc" ? { lt: value } : { gt: value };
     return branch;
   });
+}
+
+/** A key value as Prisma compares it: an instant crosses as the Date Prisma takes. */
+function prismaValue(value: string | number | Instant): string | number | Date {
+  return typeof value === "object" ? toDate(value) : value;
 }
 
 /**

@@ -2,7 +2,7 @@
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
-import type { RestIdentity } from "@langwatch/api/rest";
+import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
 import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -19,6 +19,35 @@ import {
   type GatewayVirtualKeyScope,
   type VirtualKeyWithScopes,
   GatewayApi as GatewayApiToken,
+  type GatewayBucketSpendInput,
+  type GatewayBucketSpendResult,
+  type GatewayChangeFeed,
+  type GatewayCodexRefreshInput,
+  type GatewayInternalCodexRefreshResult,
+  type GatewayGuardrailCheckInput,
+  type GatewayGuardrailCheckResult,
+  type GatewayJwtClaimsInput,
+  type GatewayRealtimeCorrelation,
+  type GatewayRealtimeRelease,
+  type GatewayRealtimeReservation,
+  type GatewayRealtimeReservationResult,
+  type GatewayRealtimeSessionUpdate,
+  type GatewayRealtimeUsageOutcome,
+  type GatewayRealtimeUsageReport,
+  type GatewaySignedJwt,
+  type GatewaySpendByRequestTypeQuery,
+  type GatewaySpendEventPage,
+  type GatewaySpendEventsPageQuery,
+  type gatewayInternalBucketSpendAnswers,
+  type gatewayInternalChangesAnswers,
+  type gatewayInternalCodexRefreshAnswers,
+  type gatewayInternalConfigAnswers,
+  type gatewayInternalGuardrailAnswers,
+  type gatewayInternalPatchSessionAnswers,
+  type gatewayInternalReportUsageAnswers,
+  type gatewayInternalReserveSessionAnswers,
+  type gatewayInternalResolveKeyAnswers,
+  type gatewayInternalSpendCommandsAnswers,
   parseVirtualKeyConfig,
   type ArchiveGatewayBudgetInput,
   type ArchiveGatewayCacheRuleInput,
@@ -74,6 +103,8 @@ import {
   type GatewayInternalSpendSubmission,
   type GatewayVirtualKeyRecord,
   GatewayBudgetNotFoundError,
+  GatewayCacheRuleNotFoundError,
+  GatewaySpendSourceUnavailableError,
   type GatewayPrincipalDailySpend,
   type GatewayPrincipalModelSpend,
   type GatewayPrincipalSpendSummary,
@@ -138,6 +169,7 @@ import {
   GatewayGuardrailEvaluationService,
   type EvaluatorRunner,
 } from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
 import type {
@@ -161,6 +193,16 @@ import type {
 import type { GatewayService } from "../services/gateway.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
+import type {
+  GatewayInternalBucketRequest,
+  GatewayInternalChangesRequest,
+  GatewayInternalConfigRequest,
+  GatewayInternalDoorApi,
+  GatewayInternalRawRequest,
+  GatewayInternalResolveKeyRequest,
+  GatewayInternalSessionRequest,
+} from "../transport/gateway-internal.rest.ts";
+import type { GatewaySpendScope, GatewaySpendScopeQuery } from "../transport/gateway-spend.rest.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 import { GatewayEndUserCapsAdapter } from "./gateway-end-user-caps.composition.ts";
 import {
@@ -646,7 +688,7 @@ export type GatewayInternalProtocolCollaborators = Readonly<{
   spend?: GatewayInternalSpendPipeline | undefined;
 }>;
 
-export class GatewayApp implements GatewayApi {
+export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
     /**
@@ -860,6 +902,7 @@ export class GatewayApp implements GatewayApi {
   #budgetOverview: BudgetOverviewService | undefined;
   #budgetLedger: GatewayBudgetLedgerService | undefined;
   #internalProtocol: GatewayInternalProtocolService;
+  #internalAnswers: GatewayInternalDoorService;
   #internalDoor: RestIdentity;
   #connectUpstream: GatewayConnectUpstreamService | undefined;
   #addresses: GatewayDeploymentAddresses;
@@ -898,6 +941,7 @@ export class GatewayApp implements GatewayApi {
     this.#spend = spend;
     this.#spendPipeline = spendPipeline;
     this.#internalProtocol = internalProtocol;
+    this.#internalAnswers = GatewayInternalDoorService.create({ protocol: internalProtocol });
     this.#internalDoor = internalDoor;
     this.#budgetOverviewDeps = budgetOverviewDeps;
     // The union's second arm exists for the REST-only composition (agent cache
@@ -964,19 +1008,16 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.findTraceDestination(projectId);
   }
 
-  signJwt(...args: Parameters<GatewayInternalProtocolService["signJwt"]>): {
-    jwt: string;
-    expiresAt: number;
-  } {
-    return this.#internalProtocol.signJwt(...args);
+  signJwt(input: GatewayJwtClaimsInput): GatewaySignedJwt {
+    return this.#internalProtocol.signJwt(input);
   }
 
   touchVirtualKeyUsage(id: string): Promise<void> {
     return this.#internalProtocol.touchVirtualKeyUsage(id);
   }
 
-  refreshCodex(...args: Parameters<GatewayInternalProtocolService["refreshCodex"]>) {
-    return this.#internalProtocol.refreshCodex(...args);
+  refreshCodex(input: GatewayCodexRefreshInput): Promise<GatewayInternalCodexRefreshResult> {
+    return this.#internalProtocol.refreshCodex(input);
   }
 
   findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
@@ -991,21 +1032,7 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.materialiseConfig(input);
   }
 
-  listChanges(
-    organizationId: string,
-    since: bigint,
-    limit: number,
-  ): Promise<{
-    currentRevision: bigint;
-    events: {
-      kind: string;
-      virtualKeyId: string | null;
-      budgetId: string | null;
-      modelProviderId: string | null;
-      projectId: string | null;
-      revision: bigint;
-    }[];
-  }> {
+  listChanges(organizationId: string, since: bigint, limit: number): Promise<GatewayChangeFeed> {
     return this.#internalProtocol.listChanges(organizationId, since, limit);
   }
 
@@ -1013,23 +1040,12 @@ export class GatewayApp implements GatewayApi {
     return this.#internalProtocol.currentRevision(organizationId);
   }
 
-  checkGuardrails(...args: Parameters<GatewayInternalProtocolService["checkGuardrails"]>) {
-    return this.#internalProtocol.checkGuardrails(...args);
+  checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
+    return this.#internalProtocol.checkGuardrails(input);
   }
 
-  budgetBucketSpend(
-    ...args: Parameters<GatewayInternalProtocolService["budgetBucketSpend"]>
-  ): Promise<
-    | {
-        status: "not_found";
-      }
-    | {
-        status: "available";
-        spentMicroUsd: number;
-        bucketScopeId: string | null;
-      }
-  > {
-    return this.#internalProtocol.budgetBucketSpend(...args);
+  budgetBucketSpend(input: GatewayBucketSpendInput): Promise<GatewayBucketSpendResult> {
+    return this.#internalProtocol.budgetBucketSpend(input);
   }
 
   submitSpendCommands(
@@ -1043,27 +1059,85 @@ export class GatewayApp implements GatewayApi {
   }
 
   reserveRealtimeSession(
-    ...args: Parameters<GatewayInternalProtocolService["reserveRealtimeSession"]>
-  ) {
-    return this.#internalProtocol.reserveRealtimeSession(...args);
+    input: GatewayRealtimeReservation,
+  ): Promise<GatewayRealtimeReservationResult> {
+    return this.#internalProtocol.reserveRealtimeSession(input);
   }
 
   correlateRealtimeSession(
-    ...args: Parameters<GatewayInternalProtocolService["correlateRealtimeSession"]>
-  ) {
-    return this.#internalProtocol.correlateRealtimeSession(...args);
+    input: GatewayRealtimeCorrelation,
+  ): Promise<GatewayRealtimeSessionUpdate> {
+    return this.#internalProtocol.correlateRealtimeSession(input);
   }
 
-  releaseRealtimeSession(
-    ...args: Parameters<GatewayInternalProtocolService["releaseRealtimeSession"]>
-  ) {
-    return this.#internalProtocol.releaseRealtimeSession(...args);
+  releaseRealtimeSession(input: GatewayRealtimeRelease): Promise<GatewayRealtimeSessionUpdate> {
+    return this.#internalProtocol.releaseRealtimeSession(input);
   }
 
   reportRealtimeSessionUsage(
-    ...args: Parameters<GatewayInternalProtocolService["reportRealtimeSessionUsage"]>
-  ) {
-    return this.#internalProtocol.reportRealtimeSessionUsage(...args);
+    input: GatewayRealtimeUsageReport,
+  ): Promise<GatewayRealtimeUsageOutcome> {
+    return this.#internalProtocol.reportRealtimeSessionUsage(input);
+  }
+
+  answerInternalResolveKey(
+    input: GatewayInternalResolveKeyRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalResolveKeyAnswers>> {
+    return this.#internalAnswers.answerResolveKey(input);
+  }
+
+  answerInternalCodexRefresh(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalCodexRefreshAnswers>> {
+    return this.#internalAnswers.answerCodexRefresh(input);
+  }
+
+  answerInternalConfig(
+    input: GatewayInternalConfigRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalConfigAnswers>> {
+    return this.#internalAnswers.answerConfig(input);
+  }
+
+  answerInternalChanges(
+    input: GatewayInternalChangesRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalChangesAnswers>> {
+    return this.#internalAnswers.answerChanges(input);
+  }
+
+  answerInternalGuardrailCheck(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>> {
+    return this.#internalAnswers.answerGuardrailCheck(input);
+  }
+
+  answerInternalBudgetBucketSpend(
+    input: GatewayInternalBucketRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalBucketSpendAnswers>> {
+    return this.#internalAnswers.answerBudgetBucketSpend(input);
+  }
+
+  answerInternalSpendCommands(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalSpendCommandsAnswers>> {
+    return this.#internalAnswers.answerSpendCommands(input);
+  }
+
+  answerInternalReserveRealtimeSession(
+    input: GatewayInternalRawRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalReserveSessionAnswers>> {
+    return this.#internalAnswers.answerReserveRealtimeSession(input);
+  }
+
+  answerInternalPatchRealtimeSession(
+    input: GatewayInternalSessionRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalPatchSessionAnswers>> {
+    return this.#internalAnswers.answerPatchRealtimeSession(input);
+  }
+
+  answerInternalReportRealtimeUsage(
+    input: GatewayInternalSessionRequest,
+  ): Promise<RestDeclaredResult<typeof gatewayInternalReportUsageAnswers>> {
+    return this.#internalAnswers.answerReportRealtimeUsage(input);
   }
 
   getAgentCacheEntry(input: { projectId: string; name: string }): Promise<{
@@ -1165,9 +1239,7 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** Resolves Postgres filters to ClickHouse ids. A no-match resolves to EMPTY. */
-  resolveSpendScope(
-    input: Parameters<PrismaGatewaySpendScopeRepository["resolveSpendScope"]>[0],
-  ): ReturnType<PrismaGatewaySpendScopeRepository["resolveSpendScope"]> {
+  resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope> {
     // Held rather than rebuilt per call: the adapter keeps a project cache, and
     // a fresh one per request would resolve every filter from cold.
     this.#spendScope ??= PrismaGatewaySpendScopeRepository.create({
@@ -1421,6 +1493,15 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.budgetDecisions.findCacheRule(input);
   }
 
+  async getCacheRule(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<GatewayCacheRuleResource> {
+    const row = await this.findCacheRule(input);
+    if (!row) throw new GatewayCacheRuleNotFoundError();
+    return row;
+  }
+
   createCacheRule(input: CreateGatewayCacheRuleInput): Promise<GatewayCacheRuleResource> {
     return this.#dependencies.budgetDecisions.cacheRuleCreate(input);
   }
@@ -1456,9 +1537,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.usage.summaryForVirtualKey(input);
   }
 
-  async sumSpendNanoUsdByRequestType(
-    input: Parameters<GatewayApi["sumSpendNanoUsdByRequestType"]>[0],
-  ): Promise<number> {
+  async sumSpendNanoUsdByRequestType(input: GatewaySpendByRequestTypeQuery): Promise<number> {
     const service = this.#dependencies.spendEvents;
     // No ledger means nothing was ever recorded on it, so nothing was spent.
     if (!service) return 0;
@@ -1479,11 +1558,12 @@ export class GatewayApp implements GatewayApi {
     return service.findSpendDaysForOrganizationProjects(input);
   }
 
-  async listSpendEventsPage(
-    input: Parameters<GatewayApi["listSpendEventsPage"]>[0],
-  ): ReturnType<GatewayApi["listSpendEventsPage"]> {
+  async listSpendEventsPage(input: GatewaySpendEventsPageQuery): Promise<GatewaySpendEventPage> {
     const service = this.#dependencies.spendEvents;
-    if (!service) return null;
+    // No ClickHouse spend source: an empty page that says so, never a confident zero.
+    if (!service) {
+      return { rows: [], nextCursor: null, virtualKeyNames: {}, clickHouseDisabled: true };
+    }
 
     const { rows, nextCursor } = await service.getSpendEventsPage({
       tenantId: input.projectId,
@@ -1832,6 +1912,21 @@ export class GatewayApp implements GatewayApi {
     window: { fromDate: Instant; toDate: Instant };
   }): Promise<Map<string, { spentUsd: string; requests: number }>> {
     return this.#dependencies.spendByVirtualKey(input);
+  }
+
+  async getVirtualKeySpend(input: {
+    organizationId: string;
+    virtualKeyId: string;
+    window: { fromDate: Instant; toDate: Instant };
+  }): Promise<{ spentUsd: string; requests: number }> {
+    if (!this.isSpendSourceAvailable()) throw new GatewaySpendSourceUnavailableError();
+    const spend = await this.spendByVirtualKey({
+      organizationId: input.organizationId,
+      virtualKeyIds: [input.virtualKeyId],
+      window: input.window,
+    });
+    const row = spend.get(input.virtualKeyId);
+    return { spentUsd: row?.spentUsd ?? "0", requests: row?.requests ?? 0 };
   }
 
   // ── The virtual-key write pre-flights ────────────────────────────────────

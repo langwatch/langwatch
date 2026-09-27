@@ -16,7 +16,6 @@ import {
   type GatewayCacheRule,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { toDate } from "@langwatch/time";
 
 import type { GatewayAudit, GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
@@ -68,7 +67,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
           ? {
               OR: keysetAfter([
                 { name: "priority", value: input.cursor.priority, direction: "desc" },
-                { name: "createdAt", value: toDate(input.cursor.createdAt), direction: "asc" },
+                { name: "createdAt", value: input.cursor.createdAt, direction: "asc" },
                 { name: "id", value: input.cursor.id, direction: "asc" },
               ]),
             }

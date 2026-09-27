@@ -184,22 +184,6 @@ export class GatewayGuardrailProjectMismatchError extends HandledError {
 }
 
 /**
- * Per-key spend ledger not available on this deployment; platform fault,
- * not recoverable by the caller.
- */
-export class GatewaySpendUnavailableError extends HandledError {
-  declare readonly code: "gateway_spend_unavailable";
-
-  constructor() {
-    super("gateway_spend_unavailable", "Per-key spend is not available", {
-      httpStatus: 412,
-      fault: "platform",
-    });
-    this.name = "GatewaySpendUnavailableError";
-  }
-}
-
-/**
  * Duplicate external_id in organization; 409 (not 400) since the request
  * was well-formed a moment earlier.
  */

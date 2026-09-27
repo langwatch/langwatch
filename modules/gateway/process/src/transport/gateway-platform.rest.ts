@@ -10,8 +10,6 @@ import {
 import {
   type gatewayBudgetWireSchema,
   GatewayApi,
-  GatewayCacheRuleNotFoundError,
-  GatewaySpendSourceUnavailableError,
   toStoredEnum,
   toWireEnum,
   gatewayVirtualKeyDtoSchema,
@@ -345,19 +343,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       id: input.id,
       organizationId,
     });
-    if (!app.isSpendSourceAvailable()) {
-      throw new GatewaySpendSourceUnavailableError();
-    }
-    const spend = await app.spendByVirtualKey({
+    const spend = await app.getVirtualKeySpend({
       organizationId,
-      virtualKeyIds: [vk.id],
+      virtualKeyId: vk.id,
       window: { fromDate, toDate },
     });
-    const row = spend.get(vk.id);
     return {
       virtual_key_id: vk.id,
-      spent_usd: row?.spentUsd ?? "0",
-      requests: row?.requests ?? 0,
+      spent_usd: spend.spentUsd,
+      requests: spend.requests,
       window: { from: fromDate.epochMilliseconds, to: toDate.epochMilliseconds },
     };
   })
@@ -744,8 +738,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const row = await app.findCacheRule({ id: input.id, organizationId });
-    if (!row) throw new GatewayCacheRuleNotFoundError();
+    const row = await app.getCacheRule({ id: input.id, organizationId });
     return { cache_rule: toCacheRuleDto(row) };
   })
 

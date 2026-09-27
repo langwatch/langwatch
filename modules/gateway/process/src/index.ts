@@ -85,7 +85,6 @@ export {
   GatewayGuardrailProjectMismatchError,
   GatewayScopeOrgMismatchError,
   GatewaySpendGroupByUnstableError,
-  GatewaySpendUnavailableError,
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,

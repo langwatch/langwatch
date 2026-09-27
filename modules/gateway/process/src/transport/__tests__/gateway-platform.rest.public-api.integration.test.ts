@@ -15,6 +15,8 @@ import {
 } from "@langwatch/api/rest";
 import {
   type GatewayApi,
+  GatewayCacheRuleNotFoundError,
+  GatewaySpendSourceUnavailableError,
   type GatewayVirtualKeySnakeDto,
   virtualKeyBudgetInputSchema,
 } from "@langwatch/gateway-contract";
@@ -232,8 +234,7 @@ describe("the gateway platform family's public wire", () => {
   describe("given list and spend reads", () => {
     const visibleKey = {
       getVisibleVirtualKeyForProjectCredential: async () => virtualKeyRow(),
-      isSpendSourceAvailable: () => true,
-      spendByVirtualKey: async () => new Map(),
+      getVirtualKeySpend: async () => ({ spentUsd: "0", requests: 0 }),
     };
 
     /** @scenario A fresh key reports zero spend for the current month */
@@ -331,21 +332,20 @@ describe("the gateway platform family's public wire", () => {
   describe("given a key spend read", () => {
     const visibleKey = {
       getVisibleVirtualKeyForProjectCredential: async () => virtualKeyRow(),
-      isSpendSourceAvailable: () => true,
-      spendByVirtualKey: async () => new Map(),
+      getVirtualKeySpend: async () => ({ spentUsd: "0", requests: 0 }),
     };
 
     /** @scenario The spend read validates its window */
     it("answers the framework's 422 validation_error when from is not before to", async () => {
-      const spendByVirtualKey = vi.fn();
-      const answer = await mount({ ...visibleKey, spendByVirtualKey })(
+      const getVirtualKeySpend = vi.fn();
+      const answer = await mount({ ...visibleKey, getVirtualKeySpend })(
         "GET",
         "/virtual-keys/vk_1/spend?from=1760000000000&to=1750000000000",
       );
 
       expect([answer.status, answer.body.code]).toEqual([422, "validation_error"]);
       expect(JSON.stringify(answer.body.meta)).toContain("from");
-      expect(spendByVirtualKey).not.toHaveBeenCalled();
+      expect(getVirtualKeySpend).not.toHaveBeenCalled();
     });
 
     /** @scenario The spend window is epoch milliseconds, like every spend endpoint */
@@ -364,24 +364,24 @@ describe("the gateway platform family's public wire", () => {
 
     /** @scenario A fresh key reports zero spend for the current month */
     it("answers 412 spend_source_unavailable rather than a zero it cannot vouch for", async () => {
-      const spendByVirtualKey = vi.fn();
       const answer = await mount({
         ...visibleKey,
-        isSpendSourceAvailable: () => false,
-        spendByVirtualKey,
+        getVirtualKeySpend: async () => {
+          throw new GatewaySpendSourceUnavailableError();
+        },
       })("GET", "/virtual-keys/vk_1/spend");
 
       expect([answer.status, answer.body.code]).toEqual([412, "spend_source_unavailable"]);
-      expect(spendByVirtualKey).not.toHaveBeenCalled();
     });
   });
 
   describe("given a cache rule the organization does not hold", () => {
     it("answers 404 rather than an internal failure", async () => {
-      const answer = await mount({ findCacheRule: async () => null })(
-        "GET",
-        "/cache-rules/cr_missing",
-      );
+      const answer = await mount({
+        getCacheRule: async () => {
+          throw new GatewayCacheRuleNotFoundError();
+        },
+      })("GET", "/cache-rules/cr_missing");
 
       expect([answer.status, answer.body.code]).toEqual([404, "gateway_cache_rule_not_found"]);
     });

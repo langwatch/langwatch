@@ -6,7 +6,6 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
-  gatewaySpendEnvelopeSchema,
   gatewaySpendEventEnvelopeSchema,
   USD_DISPLAY_STRING_FORMAT,
   type GatewaySpendEnvelope,
@@ -96,6 +95,17 @@ export type GatewaySpendWebhookDelivery = {
   }): Promise<void>;
 };
 
+/** Postgres filters a spend read narrows by, before they resolve to ClickHouse ids. */
+export type GatewaySpendScopeQuery = {
+  organizationId: string;
+  projectIds?: string[];
+  teamIds?: string[];
+  externalIds?: string[];
+};
+
+/** The tenants and keys a spend read covers; a no-match is empty, never "unfiltered". */
+export type GatewaySpendScope = { tenantIds: string[]; virtualKeyIds?: string[] };
+
 /**
  * The whole of what the four reconciliation routes ask the application for.
  * The webhook half stays structural (not importing `WebhookApi`) so the type
@@ -134,12 +144,7 @@ export type GatewaySpendApp = Readonly<{
   settlementPolicy(): GatewaySettlementPolicy;
 
   /** Resolves Postgres filters to CH ids. A no-match resolves to EMPTY, never "unfiltered". */
-  resolveSpendScope(input: {
-    organizationId: string;
-    projectIds?: string[];
-    teamIds?: string[];
-    externalIds?: string[];
-  }): Promise<{ tenantIds: string[]; virtualKeyIds?: string[] }>;
+  resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope>;
 
   /** Every attributed-user budget that applies to one end user, with spend. */
   endUserCaps(input: {

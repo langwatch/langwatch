@@ -337,12 +337,17 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     }));
   }
 
-  async resolveScopeTargets(
-    budgets: { scopeType: string; scopeId: string }[],
-    organizationId: string | null,
-    projects: ProjectIdentity[],
-    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
-  ): Promise<Map<string, GatewayBudgetScopeTarget>> {
+  async resolveScopeTargets({
+    budgets,
+    organizationId,
+    projects,
+    virtualKeyProjectScopes,
+  }: {
+    budgets: { scopeType: string; scopeId: string }[];
+    organizationId: string | null;
+    projects: ProjectIdentity[];
+    virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[];
+  }): Promise<Map<string, GatewayBudgetScopeTarget>> {
     const targets =
       await PrismaGatewayBudgetScopeTargetRepository.create().resolveScopeTargetsBatch({
         prisma: this.prisma,
@@ -635,7 +640,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
                 OR: keysetAfter([
                   {
                     name: "createdAt",
-                    value: toDate(args.cursor.createdAt),
+                    value: args.cursor.createdAt,
                     direction: "desc",
                   },
                   { name: "id", value: args.cursor.id, direction: "desc" },

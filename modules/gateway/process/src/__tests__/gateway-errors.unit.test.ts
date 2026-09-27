@@ -5,12 +5,12 @@
  * `meta`, never the sentence — customer copy comes from the presentation
  * registry keyed by `code` (ADR-045), pinned only on this package's half.
  */
+import { GatewaySpendSourceUnavailableError } from "@langwatch/gateway-contract";
 import { describe, expect, it } from "vitest";
 
 import {
   GatewayGroupBudgetUnsupportedError,
   GatewayScopeOrgMismatchError,
-  GatewaySpendUnavailableError,
   VirtualKeyNotFoundError,
 } from "../index.ts";
 
@@ -56,7 +56,7 @@ describe("gateway handled errors", () => {
     it("attributes the refusal to the platform and names no engine", () => {
       for (const error of [
         new GatewayGroupBudgetUnsupportedError(),
-        new GatewaySpendUnavailableError(),
+        new GatewaySpendSourceUnavailableError(),
       ]) {
         expect(error.fault).toBe("platform");
 

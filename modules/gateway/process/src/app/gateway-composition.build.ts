@@ -436,15 +436,7 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
   if (!("kind" in actor)) {
     return { kind: "session", session: extractSessionActor(actor) };
   }
-  if (
-    actor.kind === "apiKey" &&
-    "apiKeyId" in actor &&
-    typeof actor.apiKeyId === "string" &&
-    "organizationId" in actor &&
-    typeof actor.organizationId === "string" &&
-    "userId" in actor &&
-    (typeof actor.userId === "string" || actor.userId === null)
-  ) {
+  if (isApiKeyActor(actor)) {
     return {
       kind: "apiKey",
       apiKeyId: actor.apiKeyId,
@@ -461,6 +453,17 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
   }
 
   return { kind: "session", session: null };
+}
+
+/** Whether the actor is an API key with every member the gateway reads, each well-typed. */
+function isApiKeyActor(actor: {
+  kind: unknown;
+}): actor is { kind: "apiKey"; apiKeyId: string; organizationId: string; userId: string | null } {
+  if (actor.kind !== "apiKey") return false;
+  if (!("apiKeyId" in actor) || typeof actor.apiKeyId !== "string") return false;
+  if (!("organizationId" in actor) || typeof actor.organizationId !== "string") return false;
+  if (!("userId" in actor)) return false;
+  return typeof actor.userId === "string" || actor.userId === null;
 }
 
 /**

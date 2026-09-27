@@ -4760,16 +4760,8 @@ const presentations = {
     describe: () =>
       "A key can only use guardrails from its own project. Pick one from this project instead.",
   },
-  gateway_spend_unavailable: {
-    // fault: platform. Says what is missing, not which engine is missing it.
-    title: "Spend isn't available for this key",
-    describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
-  },
   spend_source_unavailable: {
-    // The public REST spelling of the refusal above. Both doors answer the
-    // same way on a deployment with no per-key spend ledger; the wire code
-    // differs because the REST one is published in the management API docs
-    // and callers already branch on it.
+    // fault: platform. Says what is missing, not which engine is missing it.
     title: "Spend isn't available for this key",
     describe: () => "This deployment doesn't record spend per key, so there's no figure to show.",
   },
