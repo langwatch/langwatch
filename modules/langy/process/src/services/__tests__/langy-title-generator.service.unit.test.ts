@@ -47,7 +47,12 @@ class RefusingTitleModel implements LangyTitleModelResolver {
 class UnconfiguredTitleModel implements LangyTitleModelResolver {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(
-      new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID),
+      new ModelNotConfiguredError({
+        featureKey: "langy_title",
+        role: "FAST",
+        featureDisplayName: "Langy titles",
+        projectId: PROJECT_ID,
+      }),
     );
   }
 }

@@ -1,9 +1,8 @@
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
 /** Guard that malformed JSON entries don't crash or leak keys (#5837 AC5b). */
 import { describe, expect, it } from "vitest";
 
-import { makeProvider } from "./model-provider.test-helpers.ts";
+import { makeProvider, storedRow } from "./model-provider.test-helpers.ts";
 
 describe("given a row whose custom entry has a non-string display name", () => {
   describe("when display names are built alongside a valid entry on another row", () => {
@@ -19,15 +18,15 @@ describe("given a row whose custom entry has a non-string display name", () => {
           },
         ],
       });
-      const badRow = makeProvider({
+      const badRow = storedRow({
         provider: "vendorB",
         customModels: [
-          { displayName: "Orphan Two", mode: "chat" } as CustomModelEntry,
+          { displayName: "Orphan Two", mode: "chat" },
           {
             modelId: "gamma-service",
             displayName: 42,
             mode: "chat",
-          } as unknown as CustomModelEntry,
+          },
         ],
       });
 
@@ -51,9 +50,9 @@ describe("given a row whose custom models column is not an array", () => {
           },
         ],
       });
-      const corruptRow = makeProvider({
+      const corruptRow = storedRow({
         provider: "vendorD",
-        customModels: { corrupted: true } as unknown as CustomModelEntry[],
+        customModels: { corrupted: true },
       });
 
       const result = buildCustomModelDisplayNames([goodRow, corruptRow]);
@@ -68,7 +67,7 @@ describe("given a row whose custom models array mixes malformed entries with a v
     // Guard mixed malformed and valid entries in the same array; valid entry is last
     // to catch loops that throw on first bad entry instead of continuing.
     it("resolves the valid entry despite malformed entries earlier in the same array", () => {
-      const row = makeProvider({
+      const row = storedRow({
         provider: "vendorZ",
         id: "mp_1",
         customModels: [
@@ -78,7 +77,7 @@ describe("given a row whose custom models array mixes malformed entries with a v
           null, // null entry
           "a-bare-string", // wrong element type entirely
           { modelId: "m6", displayName: "Valid Name", mode: "chat" }, // the valid one, last
-        ] as unknown as CustomModelEntry[],
+        ],
       });
 
       // An uncaught throw here fails the test before the assertion below

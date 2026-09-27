@@ -48,17 +48,6 @@ describe("getSchemaShape()", () => {
     });
   });
 
-  it("returns shape from nested _def.schema.shape", () => {
-    const schema = {
-      _def: {
-        schema: {
-          shape: { ANTHROPIC_API_KEY: {} },
-        },
-      },
-    };
-    expect(getSchemaShape(schema)).toEqual({ ANTHROPIC_API_KEY: {} });
-  });
-
   it("returns shape from a wrapped schema via innerType()", () => {
     const schema = {
       innerType: () => ({ shape: { GROQ_API_KEY: {} } }),

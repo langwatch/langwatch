@@ -36,34 +36,21 @@ export const EXACT_CREDENTIAL_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The credential field names a provider definition declares. Must unwrap refined/optional
- * schemas across both zod 3 (`ZodEffects`/`innerType()`) and zod 4 (`.unwrap()`/`_def.innerType`)
- * spellings, or affected providers silently render an empty credential form.
+ * The credential field names a provider definition declares, read through refinements and
+ * wrappers, or affected providers silently render an empty credential form.
  */
 export function getSchemaShape(schema: unknown, depth = 0): Record<string, unknown> {
   // Wrappers nest — `.optional().nullable()` is two of them — so this recurses,
-  // and the bound is what keeps a cyclic or self-referential `_def` from
-  // spinning rather than returning nothing.
-  if (depth > 8) return {};
+  // and the bound is what keeps a self-referential wrapper from spinning.
+  if (depth > 8 || typeof schema !== "object" || schema === null) return {};
 
-  const s = schema as {
-    shape?: Record<string, unknown>;
-    unwrap?: () => unknown;
-    innerType?: unknown;
-    _def?: { schema?: unknown; innerType?: unknown };
-  };
-  if (!s) return {};
-  if (s.shape) return s.shape;
-  if (s._def?.schema) return getSchemaShape(s._def.schema, depth + 1);
-
-  // Zod 4 exposes a wrapper's inner schema as `.unwrap()` and as
-  // `_def.innerType`; zod 3 exposed it as an `innerType()` METHOD. Both are
-  // read, because the two majors coexist across this workspace's boundaries
-  // and a schema can arrive from either.
-  if (typeof s.unwrap === "function") return getSchemaShape(s.unwrap(), depth + 1);
-  if (s._def?.innerType) return getSchemaShape(s._def.innerType, depth + 1);
-  if (typeof s.innerType === "function") {
-    return getSchemaShape((s.innerType as () => unknown)(), depth + 1);
-  }
+  // Only public accessors: `.shape` on an object (zod 4 keeps it through `.superRefine`),
+  // `.unwrap()` on either major's wrappers, `.innerType()` on zod 3's refinements.
+  const shape: unknown = "shape" in schema ? schema.shape : undefined;
+  if (typeof shape === "object" && shape !== null) return { ...shape };
+  const unwrap: unknown = "unwrap" in schema ? schema.unwrap : undefined;
+  if (typeof unwrap === "function") return getSchemaShape(unwrap.call(schema), depth + 1);
+  const innerType: unknown = "innerType" in schema ? schema.innerType : undefined;
+  if (typeof innerType === "function") return getSchemaShape(innerType.call(schema), depth + 1);
   return {};
 }

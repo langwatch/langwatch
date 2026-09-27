@@ -10,18 +10,32 @@ export class ModelNotConfiguredError extends HandledError {
   declare readonly code: "model_not_configured";
   readonly cause = MODEL_NOT_CONFIGURED_CAUSE;
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly role: ModelRole,
-    public readonly featureDisplayName: string,
-    public readonly projectId: string,
-  ) {
+  readonly featureKey: string;
+  readonly role: ModelRole;
+  readonly featureDisplayName: string;
+  readonly projectId: string;
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+    projectId,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+    projectId: string;
+  }) {
     super(
       "model_not_configured",
       `No model configured for "${featureKey}" (role: ${role}, project: ${projectId}).`,
       { httpStatus: 400, meta: { featureKey, role, featureDisplayName, projectId } },
     );
     this.name = "ModelNotConfiguredError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+    this.projectId = projectId;
   }
 }
 
@@ -38,16 +52,34 @@ export class ModelProviderDisabledError extends HandledError {
   declare readonly code: "model_provider_disabled";
   readonly cause = MODEL_PROVIDER_DISABLED_CAUSE;
 
-  constructor(
-    public readonly featureKey: string,
-    public readonly featureDisplayName: string,
-    public readonly role: ModelRole,
-    public readonly projectId: string,
-    public readonly resolvedScope: "project" | "team" | "organization",
-    public readonly resolvedModel: string,
-    public readonly providerKey: string,
-    public readonly alternate: ModelProviderResolvedAlternate | null,
-  ) {
+  readonly featureKey: string;
+  readonly featureDisplayName: string;
+  readonly role: ModelRole;
+  readonly projectId: string;
+  readonly resolvedScope: "project" | "team" | "organization";
+  readonly resolvedModel: string;
+  readonly providerKey: string;
+  readonly alternate: ModelProviderResolvedAlternate | null;
+
+  constructor({
+    featureKey,
+    featureDisplayName,
+    role,
+    projectId,
+    resolvedScope,
+    resolvedModel,
+    providerKey,
+    alternate,
+  }: {
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+    projectId: string;
+    resolvedScope: "project" | "team" | "organization";
+    resolvedModel: string;
+    providerKey: string;
+    alternate: ModelProviderResolvedAlternate | null;
+  }) {
     super(
       "model_provider_disabled",
       `Model "${resolvedModel}" is configured at ${resolvedScope} scope for "${featureKey}", but its provider "${providerKey}" is currently disabled.`,
@@ -66,6 +98,14 @@ export class ModelProviderDisabledError extends HandledError {
       },
     );
     this.name = "ModelProviderDisabledError";
+    this.featureKey = featureKey;
+    this.featureDisplayName = featureDisplayName;
+    this.role = role;
+    this.projectId = projectId;
+    this.resolvedScope = resolvedScope;
+    this.resolvedModel = resolvedModel;
+    this.providerKey = providerKey;
+    this.alternate = alternate;
   }
 
   toResponseBody(): {

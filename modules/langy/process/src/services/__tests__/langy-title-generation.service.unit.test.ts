@@ -85,12 +85,12 @@ describe("LangyTitleGeneratorService", () => {
       const generate = LangyTitleGeneratorService.create({
         messages: messages(),
         models: resolver(() => {
-          throw new ModelNotConfiguredError(
-            "langy.conversation_title",
-            "FAST",
-            "Langy chat titles",
-            "project_1",
-          );
+          throw new ModelNotConfiguredError({
+            featureKey: "langy.conversation_title",
+            role: "FAST",
+            featureDisplayName: "Langy chat titles",
+            projectId: "project_1",
+          });
         }),
       }).generator();
 

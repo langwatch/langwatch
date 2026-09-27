@@ -3,7 +3,10 @@
  * Centralizes `makeProvider` so every file building provider-row fixtures
  * derives them from one definition rather than copies that can drift apart.
  */
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import type {
+  CustomModelDisplayNameRow,
+  ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
 
 /**
  * Builds a `MaybeStoredModelProvider` fixture with every optional column
@@ -23,3 +26,8 @@ export const makeProvider = (
   extraHeaders: null,
   ...overrides,
 });
+
+/** A row as stored JSON may hold it: the label builder reads these columns defensively. */
+export const storedRow = (
+  overrides: Partial<CustomModelDisplayNameRow> & { provider: string },
+): CustomModelDisplayNameRow => ({ enabled: true, ...overrides });

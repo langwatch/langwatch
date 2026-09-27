@@ -6,7 +6,8 @@ const grammar = ohm.grammar(`
 
     ObjectExpr = ClassExpr | DictExpr
 
-    ClassExpr = identifier "(" ListOf<ArgValue, ","> ")"
+    ClassExpr = identifier ClassArgs
+    ClassArgs = "(" ListOf<ArgValue, ","> ")"
     DictExpr = "{" ListOf<DictPair, ","> "}"
 
     ArgValue = KeyValue | Expression
@@ -39,7 +40,8 @@ const grammar = ohm.grammar(`
 const semantics = grammar.createSemantics().addOperation("toJSON", {
   Expression: (e) => e.toJSON(),
   ObjectExpr: (e) => e.toJSON(),
-  ClassExpr: (id, _1, args, _2) => {
+  ClassArgs: (_open, args, _close) => args.toJSON(),
+  ClassExpr: (id, args) => {
     let argIndex = 0;
     const processedArgs = args.toJSON().map((arg: unknown) => {
       if (Array.isArray(arg)) {
@@ -58,13 +60,8 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   DictPair: (key, _, val) => [key.toJSON(), val.toJSON()],
   Array: (_, elements, __) => elements.toJSON(),
   String: (q1, chars, _q2) => chars.sourceString,
-  Number: (n) => n.toJSON(),
-  float: function (_neg, _whole, _dot, _fract, _e, _eneg, _exp) {
-    return parseFloat(this.sourceString);
-  },
-  integer: function (_neg, _digits) {
-    return parseInt(this.sourceString, 10);
-  },
+  // A float or an integer: the grammar already refused anything else, so Number() reads it whole.
+  Number: (n) => Number(n.sourceString),
   Boolean: (b) => b.sourceString === "True",
   null: (_) => null,
   AngleBracket: (_1, content, _2) => `<${content.sourceString}>`,

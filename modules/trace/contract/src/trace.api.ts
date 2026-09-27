@@ -250,7 +250,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     occurredAtMs?: number;
     viewerUserId: string;
   }): Promise<SpanDetail>;
-  /** `GET /api/traces/facets` for an API key: the discovery payload, or one field's paged values. */
+  /** `GET /api/traces/facets` for an API key: the discovery payload or one field's paged values. */
   readTraceFacetsForApiKey(input: {
     projectId: string;
     query: TraceFacetsQuery;

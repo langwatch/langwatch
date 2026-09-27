@@ -82,12 +82,12 @@ describe("ModelProviderExecutionHandleService", () => {
       it("propagates model_not_configured so the missing-model prompt opens", async () => {
         await expect(
           getModel(async () => {
-            throw new ModelNotConfiguredError(
-              "prompt.create_default",
-              "DEFAULT",
-              "Prompts",
-              project.id,
-            );
+            throw new ModelNotConfiguredError({
+              featureKey: "prompt.create_default",
+              role: "DEFAULT",
+              featureDisplayName: "Prompts",
+              projectId: project.id,
+            });
           }),
         ).rejects.toMatchObject({ code: "model_not_configured" });
       });

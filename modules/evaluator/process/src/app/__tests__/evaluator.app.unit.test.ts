@@ -160,12 +160,12 @@ describe("EvaluatorApp", () => {
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
-              throw new ModelNotConfiguredError(
+              throw new ModelNotConfiguredError({
                 featureKey,
-                "EMBEDDINGS",
-                "Topic clustering embeddings",
-                "project-1",
-              );
+                role: "EMBEDDINGS",
+                featureDisplayName: "Topic clustering embeddings",
+                projectId: "project-1",
+              });
             }
             return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
@@ -190,12 +190,12 @@ describe("EvaluatorApp", () => {
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
-              throw new ModelNotConfiguredError(
+              throw new ModelNotConfiguredError({
                 featureKey,
-                "EMBEDDINGS",
-                "Topic clustering embeddings",
-                "project-1",
-              );
+                role: "EMBEDDINGS",
+                featureDisplayName: "Topic clustering embeddings",
+                projectId: "project-1",
+              });
             }
             return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
@@ -230,12 +230,12 @@ describe("EvaluatorApp", () => {
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
-              throw new ModelNotConfiguredError(
+              throw new ModelNotConfiguredError({
                 featureKey,
-                "EMBEDDINGS",
-                "Topic clustering embeddings",
-                "project-1",
-              );
+                role: "EMBEDDINGS",
+                featureDisplayName: "Topic clustering embeddings",
+                projectId: "project-1",
+              });
             }
             return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
@@ -266,12 +266,12 @@ describe("EvaluatorApp", () => {
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
-              throw new ModelNotConfiguredError(
+              throw new ModelNotConfiguredError({
                 featureKey,
-                "EMBEDDINGS",
-                "Topic clustering embeddings",
-                "project-1",
-              );
+                role: "EMBEDDINGS",
+                featureDisplayName: "Topic clustering embeddings",
+                projectId: "project-1",
+              });
             }
             return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
@@ -294,12 +294,12 @@ describe("EvaluatorApp", () => {
       const { app, repository } = harness({
         modelProviders: {
           resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => {
-            throw new ModelNotConfiguredError(
+            throw new ModelNotConfiguredError({
               featureKey,
-              featureKey === "evaluator.create_default" ? "DEFAULT" : "EMBEDDINGS",
-              "Evaluator default",
-              "project-1",
-            );
+              role: featureKey === "evaluator.create_default" ? "DEFAULT" : "EMBEDDINGS",
+              featureDisplayName: "Evaluator default",
+              projectId: "project-1",
+            });
           }),
         },
       });

@@ -60,12 +60,12 @@ describe("ModelProviderWorkflowStudioDslService materializing node LLM configs",
     /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */
     it("fills the modelless LLM node with the registry flagship", async () => {
       const resolveModelForFeature = vi.fn(async () => {
-        throw new ModelNotConfiguredError(
-          "workflows.create_default",
-          "DEFAULT",
-          "Workflow default",
-          "project-1",
-        );
+        throw new ModelNotConfiguredError({
+          featureKey: "workflows.create_default",
+          role: "DEFAULT",
+          featureDisplayName: "Workflow default",
+          projectId: "project-1",
+        });
       });
       const adapter = buildAdapter(resolveModelForFeature);
 

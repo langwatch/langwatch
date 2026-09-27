@@ -124,12 +124,44 @@ export const getLastOutputAsText = (spans: Span[]): string => {
 };
 
 /**
+ * Property access on a value of unknown shape, with JavaScript's own semantics: a
+ * primitive reads through its wrapper, and `null`/`undefined` throw the TypeError a
+ * plain `value.key` would. Callers rely on that throw reaching `jsonToText`'s catch.
+ */
+const field = (value: unknown, key: string | number): unknown => {
+  if (value === null || value === undefined) {
+    throw new TypeError(
+      `Cannot read properties of ${value === null ? "null" : "undefined"} (reading '${key}')`,
+    );
+  }
+  const boxed: Readonly<Record<string | number, unknown>> = Object(value);
+  return boxed[key];
+};
+
+/** `value?.key`: nothing for `null`/`undefined`, the property otherwise. */
+const optionalField = (value: unknown, key: string | number): unknown =>
+  value === null || value === undefined ? undefined : field(value, key);
+
+/** `key in value`, including the TypeError `in` throws on a primitive. */
+const hasKey = (value: unknown, key: string): boolean => {
+  if (typeof value !== "object" && typeof value !== "function") {
+    throw new TypeError(`Cannot use 'in' operator to search for '${key}' in a ${typeof value}`);
+  }
+  if (value === null) {
+    throw new TypeError(`Cannot use 'in' operator to search for '${key}' in null`);
+  }
+  return key in value;
+};
+
+/**
  * Extract text from a content block, handling both OpenAI/Anthropic style
  * ({type:"text", text:"..."}) and pi-ai/Vercel AI SDK style ({type:"text", content:"..."}).
  */
-const textFromContentBlock = (c: any): string => {
-  if ("text" in c && typeof c.text === "string") return c.text;
-  if ("content" in c && typeof c.content === "string") return c.content;
+const textFromContentBlock = (c: unknown): string => {
+  const text = hasKey(c, "text") ? field(c, "text") : undefined;
+  if (typeof text === "string") return text;
+  const content = hasKey(c, "content") ? field(c, "content") : undefined;
+  if (typeof content === "string") return content;
   return JSON.stringify(c);
 };
 
@@ -137,17 +169,17 @@ const textFromContentBlock = (c: any): string => {
  * Get the content array from a message, checking both `content` and `parts`
  * fields (Vercel AI SDK / pi-ai use `parts` instead of `content`).
  */
-const getMessageContent = (message: any): unknown => {
-  return message.content ?? message.parts;
+const getMessageContent = (message: unknown): unknown => {
+  return field(message, "content") ?? field(message, "parts");
 };
 
 /**
  * The text of the LAST message in a chat-messages-shaped array, preferring
  * the last one from `preferRole` if given.
  */
-const extractLastMessageText = (json: any[], preferRole?: string): string => {
+const extractLastMessageText = (json: readonly unknown[], preferRole?: string): string => {
   const preferredMessage = preferRole
-    ? [...json].reverse().find((m: any) => m?.role === preferRole)
+    ? [...json].reverse().find((m) => optionalField(m, "role") === preferRole)
     : undefined;
   const lastMessage = preferredMessage ?? json[json.length - 1];
   const content = getMessageContent(lastMessage);
@@ -160,14 +192,14 @@ const extractLastMessageText = (json: any[], preferRole?: string): string => {
   return lastMessage ? JSON.stringify(lastMessage) : "";
 };
 
-const stringified = (value_: any) => {
+const stringified = (value_: unknown): string => {
   if (typeof value_ === "string") {
     return value_;
   }
   try {
     return JSON.stringify(value_);
   } catch {
-    return value_.toString();
+    return String(value_);
   }
 };
 
@@ -179,7 +211,7 @@ const messageContentToText = (content: unknown, message: unknown): string => {
   return JSON.stringify(message);
 };
 
-const chatMessagesToText = (messages: any[], last: boolean): string => {
+const chatMessagesToText = (messages: readonly unknown[], last: boolean): string => {
   if (last) {
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return "";
@@ -228,29 +260,29 @@ const SPECIAL_TEXT_KEYS = [
   "prompt",
 ] as const;
 
-const extractSpecialTextKey = (json: any): string | undefined => {
+const extractSpecialTextKey = (json: unknown): unknown => {
   for (const key of SPECIAL_TEXT_KEYS) {
-    if (!hasNonEmptyValue(json[key])) continue;
+    const value = field(json, key);
+    if (!hasNonEmptyValue(value)) continue;
     // `message` is only taken when it is the text itself, not a message object.
-    if (key === "message" && typeof json.message !== "string") continue;
+    if (key === "message" && typeof value !== "string") continue;
 
-    return json[key];
+    return value;
   }
 
   return undefined;
 };
 
 /** Langgraph on Flowise, and LangChain's agent return values. */
-const extractFlowiseMessages = (json: any): string | undefined => {
-  if (
-    json.messages?.length > 0 &&
-    hasNonEmptyValue(json.messages?.[json.messages?.length - 1]?.content)
-  ) {
-    return json.messages[json.messages?.length - 1].content;
+const extractFlowiseMessages = (json: unknown): unknown => {
+  const messages = field(json, "messages");
+  const count = optionalField(messages, "length");
+  if (typeof count === "number" && count > 0) {
+    const content = optionalField(optionalField(messages, count - 1), "content");
+    if (hasNonEmptyValue(content)) return field(field(messages, count - 1), "content");
   }
-  if (hasNonEmptyValue(json.return_values?.output)) {
-    return json.return_values.output;
-  }
+  const output = optionalField(field(json, "return_values"), "output");
+  if (hasNonEmptyValue(output)) return output;
 
   return undefined;
 };
@@ -262,43 +294,49 @@ const LANGCHAIN_INPUT_KEYS = ["input", "text", "query", "question"] as const;
 // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
 // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
 // returned "" to trigger a fallback to the next span in the sequence.
-const extractLangChainWrapper = (json: any): string | undefined => {
-  if (typeof json.inputs === "object") {
+const extractLangChainWrapper = (json: unknown): unknown => {
+  const inputs = field(json, "inputs");
+  if (typeof inputs === "object") {
     for (const key of LANGCHAIN_INPUT_KEYS) {
-      if (json.inputs[key] !== undefined) return json.inputs[key];
+      const input = field(inputs, key);
+      if (input !== undefined) return input;
     }
   }
-  if (typeof json.outputs === "object" && json.outputs.output !== undefined) {
-    return json.outputs.output;
+  const outputs = field(json, "outputs");
+  if (typeof outputs === "object" && field(outputs, "output") !== undefined) {
+    return field(outputs, "output");
   }
-  if (typeof json.outputs === "string") {
-    return json.outputs;
+  if (typeof outputs === "string") {
+    return outputs;
   }
-  if (typeof json.outputs === "object" && json.outputs.text !== undefined) {
-    return json.outputs.text;
+  if (typeof outputs === "object" && field(outputs, "text") !== undefined) {
+    return field(outputs, "text");
   }
-  if (Array.isArray(json.llm?.replies)) {
-    return json.llm.replies[0];
+  const replies = optionalField(field(json, "llm"), "replies");
+  if (Array.isArray(replies)) {
+    return replies[0];
   }
 
   return undefined;
 };
 
 /** Langgraph.js keeps the answer on the last `AIMessage`'s kwargs. */
-const extractLanggraphMessage = (json: any): string | undefined => {
-  if (!Array.isArray(json.messages)) return undefined;
+const extractLanggraphMessage = (json: unknown): unknown => {
+  const messages = field(json, "messages");
+  if (!Array.isArray(messages)) return undefined;
 
-  const lastMessage = json.messages.at(-1);
-  if (!Array.isArray(lastMessage?.id)) return undefined;
-  if (!lastMessage.id.includes("AIMessage")) return undefined;
+  const lastMessage: unknown = messages.at(-1);
+  const id = optionalField(lastMessage, "id");
+  if (!Array.isArray(id)) return undefined;
+  if (!id.includes("AIMessage")) return undefined;
 
-  const content = lastMessage.kwargs?.content;
+  const content = optionalField(field(lastMessage, "kwargs"), "content");
   if (content) return content;
 
   return undefined;
 };
 
-const mapSpecialKeys = (json: any): string | undefined => {
+const mapSpecialKeys = (json: unknown): unknown => {
   const direct = extractSpecialTextKey(json);
   if (direct !== undefined) return direct;
 
@@ -312,16 +350,21 @@ const mapSpecialKeys = (json: any): string | undefined => {
   if (langgraph !== undefined) return langgraph;
 
   // Optimization Studio
-  if (json.end !== undefined) {
-    return mapSpecialKeys(json.end) ?? json.end;
+  const end = field(json, "end");
+  if (end !== undefined) {
+    return mapSpecialKeys(end) ?? end;
   }
 
   return undefined;
 };
 
-const firstAndOnlyKey = (json: any) => {
-  if (typeof json === "object" && !Array.isArray(json) && Object.keys(json).length === 1) {
-    const firstItem = json[Object.keys(json)[0]!];
+const firstAndOnlyKey = (json: unknown) => {
+  if (typeof json !== "object" || Array.isArray(json)) return undefined;
+  // `Object.keys(null)` threw here before; `jsonToText` catches it, so null still does.
+  if (json === null) throw new TypeError("Cannot convert undefined or null to object");
+  const keys = Object.keys(json);
+  if (keys.length === 1) {
+    const firstItem = field(json, keys[0]!);
     const mapped = typeof firstItem === "object" ? mapSpecialKeys(firstItem) : undefined;
     if (mapped !== undefined) {
       return stringified(mapped);
@@ -336,22 +379,24 @@ const firstAndOnlyKey = (json: any) => {
 // Handle arrays that look like chat messages (objects with "role" property)
 // This covers cases where validation doesn't match chat_messages due to
 // non-standard roles like "toolResult"
-const looksLikeChatMessages = (json: any): boolean =>
+const looksLikeChatMessages = (json: unknown): json is readonly unknown[] =>
   Array.isArray(json) &&
   json.length > 0 &&
   typeof json[0] === "object" &&
   json[0] !== null &&
   "role" in json[0];
 
-const roleArrayToText = (json: any[], last: boolean, preferRole: string | undefined): string => {
+const roleArrayToText = (
+  json: readonly unknown[],
+  last: boolean,
+  preferRole: string | undefined,
+): string => {
   if (last) return extractLastMessageText(json, preferRole);
 
-  return json
-    .map((message: any) => messageContentToText(getMessageContent(message), message))
-    .join("");
+  return json.map((message) => messageContentToText(getMessageContent(message), message)).join("");
 };
 
-const mapJsonValue = (json: any): string | undefined => {
+const mapJsonValue = (json: unknown): unknown => {
   if (Array.isArray(json) && json.length === 1) {
     return typeof json[0] === "string" ? json[0] : mapSpecialKeys(json[0]);
   }
