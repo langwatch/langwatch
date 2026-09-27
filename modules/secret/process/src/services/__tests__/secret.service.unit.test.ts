@@ -7,7 +7,10 @@ import {
 } from "@langwatch/secret-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ReversibleTestSecretEncryption } from "../../app/__tests__/secret.fixture.ts";
+import {
+  ReversibleTestSecretEncryption,
+  teamWithMembers,
+} from "../../app/__tests__/secret.fixture.ts";
 import type {
   CreateStoredSecretInput,
   SecretIdentity,
@@ -83,6 +86,7 @@ class RecordingSecretRepository implements SecretRepository {
 function createService(options?: {
   reservedNames?: readonly string[];
   maximumPerProject?: number;
+  teamMembers?: readonly string[];
 }) {
   const repository = new RecordingSecretRepository();
   const service = SecretService.create({
@@ -90,6 +94,7 @@ function createService(options?: {
     encryption: new ReversibleTestSecretEncryption(),
     reservedNames: options?.reservedNames ?? ["LANGY_KEY"],
     maximumPerProject: options?.maximumPerProject,
+    ...teamWithMembers(options?.teamMembers ?? []),
   });
 
   return { repository, service };
@@ -135,12 +140,14 @@ describe("SecretService", () => {
     const { repository, service } = createService({ reservedNames: ["PRODUCT_KEY"] });
 
     await expect(
-      service.create({
-        projectId: "project-1",
-        name: "PRODUCT_KEY",
-        value: "value",
-        actorId: "user-1",
-      }),
+      service.create(
+        {
+          projectId: "project-1",
+          name: "PRODUCT_KEY",
+          value: "value",
+        },
+        { id: "user-1" },
+      ),
     ).rejects.toBeInstanceOf(SecretReservedNameError);
     expect(repository.createCall).not.toHaveBeenCalled();
   });
@@ -150,26 +157,27 @@ describe("SecretService", () => {
     repository.countValue = 1;
 
     await expect(
-      service.create({
-        projectId: "project-1",
-        name: "NEW_KEY",
-        value: "value",
-        actorId: "user-1",
-      }),
+      service.create(
+        {
+          projectId: "project-1",
+          name: "NEW_KEY",
+          value: "value",
+        },
+        { id: "user-1" },
+      ),
     ).rejects.toBeInstanceOf(SecretLimitReachedError);
     expect(repository.createCall).not.toHaveBeenCalled();
   });
 
+  /** @scenario "Writes use the authenticated user actor" */
   it("encrypts writes and records the authenticated actor", async () => {
     const { repository, service } = createService();
     repository.rows.push(row());
 
-    await service.update({
-      projectId: "project-1",
-      id: "secret-1",
-      value: "rotated",
-      actorId: "user-2",
-    });
+    await service.update(
+      { projectId: "project-1", id: "secret-1", value: "rotated" },
+      { id: "user-2" },
+    );
 
     expect(repository.updateCall).toHaveBeenCalledWith({
       projectId: "project-1",
@@ -179,17 +187,52 @@ describe("SecretService", () => {
     });
   });
 
+  describe("when no caller is named, as for a legacy project key", () => {
+    /** @scenario "A key bound to no user writes as the first member of the project's team" */
+    it("attributes the create and the update to the first member of the project's team", async () => {
+      const { repository, service } = createService({ teamMembers: ["user-first", "user-second"] });
+      repository.rows.push(row());
+
+      await service.create({ projectId: "project-1", name: "NEW_KEY", value: "value" });
+      await service.update({ projectId: "project-1", id: "secret-1", value: "rotated" });
+
+      expect(repository.createCall).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: "user-first" }),
+      );
+      expect(repository.updateCall).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: "user-first" }),
+      );
+    });
+
+    /** @scenario "A key bound to no user is refused when the project's team has no member" */
+    it("refuses by code and writes nothing when the team has no member", async () => {
+      const { repository, service } = createService({ teamMembers: [] });
+      repository.rows.push(row());
+
+      await expect(
+        service.create({ projectId: "project-1", name: "NEW_KEY", value: "value" }),
+      ).rejects.toMatchObject({ code: "authenticated_actor_required" });
+      await expect(
+        service.update({ projectId: "project-1", id: "secret-1", value: "rotated" }),
+      ).rejects.toMatchObject({ code: "authenticated_actor_required" });
+      expect(repository.createCall).not.toHaveBeenCalled();
+      expect(repository.updateCall).not.toHaveBeenCalled();
+    });
+  });
+
   it("preserves an atomic duplicate error from persistence", async () => {
     const { repository, service } = createService();
     repository.create = () => Promise.reject(new SecretDuplicateError("KEY"));
 
     await expect(
-      service.create({
-        projectId: "project-1",
-        name: "KEY",
-        value: "value",
-        actorId: "user-1",
-      }),
+      service.create(
+        {
+          projectId: "project-1",
+          name: "KEY",
+          value: "value",
+        },
+        { id: "user-1" },
+      ),
     ).rejects.toBeInstanceOf(SecretDuplicateError);
   });
 });

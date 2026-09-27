@@ -1,6 +1,8 @@
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 /** The secret feature application shared by all transports. */
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
   SecretApi,
@@ -36,7 +38,7 @@ type SecretSetup = FeatureSetup<
 
 export class SecretApp implements SecretApiContract {
   static readonly contract = SecretApi;
-  static readonly dependencies = {};
+  static readonly dependencies = { projects: ProjectApi, permissions: AuthzApi };
   static readonly reads = reads("encryption");
 
   #secrets: SecretService;
@@ -53,6 +55,8 @@ export class SecretApp implements SecretApiContract {
         repository: setup.repositories.secrets,
         encryption: setup.members.encryption,
         reservedNames: RESERVED_PROJECT_SECRET_NAMES,
+        projects: setup.dependencies.projects,
+        permissions: setup.dependencies.permissions,
       }),
       OneTimeRevealService.create({
         store: setup.repositories.reveals,
@@ -91,18 +95,14 @@ export class SecretApp implements SecretApiContract {
     return this.#secrets.delete(input);
   }
 
-  /**
-   * Stores a new secret, attributed to the caller who asked for it. The
-   * attribution is here rather than in each door: "who added this" is a
-   * property of the act, not of the transport it arrived over.
-   */
-  create(input: Omit<CreateSecretInput, "actorId">, by: SecretCaller): Promise<Secret> {
-    return this.#secrets.create({ ...input, actorId: by.id });
+  /** Stores a new secret, attributed to the caller, or to the team's first member without one. */
+  create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
+    return this.#secrets.create(input, by);
   }
 
-  /** Replaces a secret's value, attributed to the caller who asked for it. */
-  update(input: Omit<UpdateSecretInput, "actorId">, by: SecretCaller): Promise<Secret> {
-    return this.#secrets.update({ ...input, actorId: by.id });
+  /** Replaces a secret's value, attributed as `create` attributes. */
+  update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
+    return this.#secrets.update(input, by);
   }
 }
 

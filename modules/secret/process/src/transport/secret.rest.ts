@@ -9,7 +9,7 @@
 
 import type { Actor } from "@langwatch/actor";
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
-import { defineRestRouter, UnauthorizedError } from "@langwatch/api/rest";
+import { defineRestRouter } from "@langwatch/api/rest";
 import {
   SecretApi,
   secretPublicCreateInputSchema,
@@ -33,12 +33,8 @@ const secretBodyLimit = {
   onExceeded: () => new PayloadTooLargeError(),
 } as const;
 
-/**
- * Who a write is attributed to. A credential bound to nobody cannot write: the
- * row carries `createdById`/`updatedById`, and a key is not a person.
- */
-function callerOf(actor: Actor | null): SecretCaller {
-  if (actor === null) throw new UnauthorizedError("Authentication required");
+/** Who a write is attributed to. A legacy project key has no actor, and the app attributes it. */
+function callerOf(actor: Actor): SecretCaller {
   if (actor.type === "user" || actor.type === "api_key") return { id: actor.id };
 
   throw new AuthenticatedActorRequiredError();
@@ -97,7 +93,7 @@ export const secretRest = defineRestRouter(SecretApi)
     toSecretPublic(
       await app.create(
         { projectId: scope.id, name: input.name, value: input.value },
-        callerOf(actor),
+        actor === null ? void 0 : callerOf(actor),
       ),
     ),
   )
@@ -111,7 +107,10 @@ export const secretRest = defineRestRouter(SecretApi)
   .withBodyLimit(secretBodyLimit)
   .handle(async ({ app, input, scope, actor }) =>
     toSecretPublic(
-      await app.update({ projectId: scope.id, id: input.id, value: input.value }, callerOf(actor)),
+      await app.update(
+        { projectId: scope.id, id: input.id, value: input.value },
+        actor === null ? void 0 : callerOf(actor),
+      ),
     ),
   )
 

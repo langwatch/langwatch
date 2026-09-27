@@ -31,10 +31,23 @@ Feature: Canonical project-secret lifecycle
     And the handler calls the service with that projectId
 
   Scenario: Writes use the authenticated user actor
-    Given a Secret create or update request
+    Given a Secret create or update request from a credential bound to a user
     When the handler needs audit attribution
-    Then it reads context.actor().id
-    And a credential with no user identity receives a handled refusal
+    Then the write is attributed to that user
+
+  Scenario: A key bound to no user writes as the first member of the project's team
+    Given a legacy project API key, bound to no user
+    And the project's team has members
+    When it creates or replaces a project secret
+    Then the write succeeds as it did on main
+    And it is attributed to the first member bound to the project's team
+
+  Scenario: A key bound to no user is refused when the project's team has no member
+    Given a legacy project API key, bound to no user
+    And nobody is bound to the project's team
+    When it creates or replaces a project secret
+    Then it is refused with the handled code authenticated_actor_required
+    And no secret is written
 
   Scenario: Secret values never leave the boundary
     Given a project secret is stored encrypted

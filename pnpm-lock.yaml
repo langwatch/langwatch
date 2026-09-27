@@ -12322,6 +12322,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
@@ -12337,6 +12340,9 @@ importers:
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
@@ -12356,6 +12362,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../packages/api-fixture
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config

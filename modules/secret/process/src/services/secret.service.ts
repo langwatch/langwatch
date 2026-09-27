@@ -1,3 +1,6 @@
+import { AuthenticatedActorRequiredError } from "@langwatch/api";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   createSecretInputSchema,
   deleteSecretInputSchema,
@@ -13,6 +16,7 @@ import {
   type GetSecretInput,
   type ListSecretsInput,
   type Secret,
+  type SecretCaller,
   type UpdateSecretInput,
 } from "@langwatch/secret-contract";
 
@@ -24,6 +28,8 @@ export interface SecretServiceOptions {
   encryption: SecretEncryption;
   reservedNames: readonly string[];
   maximumPerProject?: number;
+  projects: Pick<ProjectApi, "getWithTeam">;
+  permissions: Pick<AuthzApi, "listTeamMemberBindings">;
 }
 
 export class SecretService {
@@ -70,8 +76,8 @@ export class SecretService {
     return this.getMutableSecret(parsed);
   }
 
-  async create(input: CreateSecretInput): Promise<Secret> {
-    const parsed = createSecretInputSchema.parse(input);
+  async create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
+    const parsed = createSecretInputSchema.omit({ actorId: true }).parse(input);
     if (this.reservedNames.has(parsed.name)) {
       throw new SecretReservedNameError(parsed.name);
     }
@@ -85,19 +91,19 @@ export class SecretService {
       projectId: parsed.projectId,
       name: parsed.name,
       encryptedValue: this.options.encryption.encrypt(parsed.value),
-      actorId: parsed.actorId,
+      actorId: await this.getAttributedUserId(parsed.projectId, by),
     });
   }
 
-  async update(input: UpdateSecretInput): Promise<Secret> {
-    const parsed = updateSecretInputSchema.parse(input);
+  async update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret> {
+    const parsed = updateSecretInputSchema.omit({ actorId: true }).parse(input);
     await this.getMutableSecret(parsed);
 
     return this.options.repository.update({
       projectId: parsed.projectId,
       id: parsed.id,
       encryptedValue: this.options.encryption.encrypt(parsed.value),
-      actorId: parsed.actorId,
+      actorId: await this.getAttributedUserId(parsed.projectId, by),
     });
   }
 
@@ -105,6 +111,21 @@ export class SecretService {
     const parsed = deleteSecretInputSchema.parse(input);
     await this.getMutableSecret(parsed);
     await this.options.repository.delete({ projectId: parsed.projectId, id: parsed.id });
+  }
+
+  /** A key bound to nobody writes as the first member of the project's team, as main did. */
+  private async getAttributedUserId(projectId: string, by?: SecretCaller): Promise<string> {
+    if (by) return by.id;
+
+    const project = await this.options.projects.getWithTeam(projectId);
+    const bindings = await this.options.permissions.listTeamMemberBindings({
+      organizationId: project.team.organizationId,
+      teamIds: [project.teamId],
+    });
+    const [owner] = bindings.get(project.teamId) ?? [];
+    if (!owner) throw new AuthenticatedActorRequiredError();
+
+    return owner.userId;
   }
 
   /**

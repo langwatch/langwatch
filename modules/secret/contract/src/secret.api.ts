@@ -23,8 +23,10 @@ export interface SecretApi {
   get(input: GetSecretInput): Promise<Secret>;
   getValues(input: ListSecretsInput): Promise<Record<string, string>>;
   delete(input: DeleteSecretInput): Promise<void>;
-  create(input: Omit<CreateSecretInput, "actorId">, by: SecretCaller): Promise<Secret>;
-  update(input: Omit<UpdateSecretInput, "actorId">, by: SecretCaller): Promise<Secret>;
+  /** With no caller, the write is attributed to the first member of the project's team. */
+  create(input: Omit<CreateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret>;
+  /** With no caller, the write is attributed to the first member of the project's team. */
+  update(input: Omit<UpdateSecretInput, "actorId">, by?: SecretCaller): Promise<Secret>;
   /** Parks a secret for a single later read, and answers the id that reads it. */
   stashReveal(input: StashRevealInput): Promise<StashedReveal>;
   /** Serves a stashed secret and forgets it. Every later read is refused. */

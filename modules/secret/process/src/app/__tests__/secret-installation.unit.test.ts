@@ -3,12 +3,15 @@ import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
 import { secretServer } from "../../secret.server.ts";
-import { ReversibleTestSecretEncryption } from "./secret.fixture.ts";
+import { ReversibleTestSecretEncryption, teamWithMembers } from "./secret.fixture.ts";
 
 function process(role: "api" | "worker") {
+  const team = teamWithMembers(["user-first"]);
+
   return createApp({ role })
     .withModules([withMemoryRepositories(secretServer)])
-    .withEncryption(new ReversibleTestSecretEncryption());
+    .withEncryption(new ReversibleTestSecretEncryption())
+    .provide({ project: team.projects, authz: team.permissions });
 }
 
 const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "sk-live" };
