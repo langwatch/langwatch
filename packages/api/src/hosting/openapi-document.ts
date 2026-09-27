@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { Hono, MiddlewareHandler } from "hono";
 /**
  * The live OpenAPI document: generated from the mounted REST families' own
@@ -67,22 +69,82 @@ function documentation() {
   };
 }
 
+/** Public for the life of a deploy, but not across deploys: revalidated, never `immutable`. */
+const CACHE_CONTROL = "public, max-age=60, must-revalidate";
+
+type PublishedDocument = Readonly<{ bytes: Uint8Array<ArrayBuffer>; etag: string }>;
+
 /**
- * GET /api/openapi.json over RestHost.app, with the two corrections schema builders cannot make:
- * 3.1's numeric exclusive bounds, and hoisting recursive `$defs` whose refs dangle
- * (specs/api-reference).
+ * The OpenAPI document over RestHost.app, generated once, with the 3.1 exclusive bounds and
+ * hoisted recursive `$defs` schema builders cannot produce. Every location sharing this
+ * handler serves one document under one entity tag (packages/api/specs/api-discovery.feature).
  */
 export function openapiDocumentRoute(restApp: Hono): MiddlewareHandler {
+  let published: Promise<PublishedDocument> | undefined;
+
   return async (context) => {
-    const generated = await generateSpecs(restApp, { documentation: documentation() });
-    // The corrections rewrite in place, and hono-openapi hands every request the
-    // SAME resolved schema objects: correcting those would leave the second request
-    // a `$defs` block already hoisted away and a ref pointing at nothing.
-    const document: unknown = JSON.parse(JSON.stringify(generated));
+    published ??= publish(restApp).catch((failure: unknown) => {
+      published = undefined;
+      throw failure;
+    });
+    const { bytes, etag } = await published;
+    const headers = { ETag: etag, "Cache-Control": CACHE_CONTROL };
 
-    hoistStraySchemaDefs(document);
-    publishEnumRecordKeys(document);
+    if (alreadyHeld({ ifNoneMatch: context.req.header("if-none-match"), etag })) {
+      return new Response(null, { status: 304, headers });
+    }
 
-    return context.json(normalizeExclusiveBounds(document));
+    return jsonBytesResponse({ bytes, headers });
   };
+}
+
+async function publish(restApp: Hono): Promise<PublishedDocument> {
+  const generated = await generateSpecs(restApp, { documentation: documentation() });
+  // The corrections rewrite in place, and hono-openapi hands every call the SAME
+  // resolved schema objects, so they run over a copy.
+  const document: unknown = JSON.parse(JSON.stringify(generated));
+
+  hoistStraySchemaDefs(document);
+  publishEnumRecordKeys(document);
+
+  const bytes = Buffer.from(JSON.stringify(normalizeExclusiveBounds(document)), "utf8");
+  const digest = createHash("sha256").update(bytes).digest("base64url").slice(0, 27);
+
+  return { bytes, etag: `"${digest}"` };
+}
+
+/** `If-None-Match` is a comma-separated list whose tags may carry the weak `W/` prefix. */
+function alreadyHeld({ ifNoneMatch, etag }: { ifNoneMatch: string | undefined; etag: string }) {
+  if (!ifNoneMatch) return false;
+  if (ifNoneMatch.trim() === "*") return true;
+
+  return ifNoneMatch
+    .split(",")
+    .map((tag) => tag.trim().replace(/^W\//, ""))
+    .includes(etag);
+}
+
+/** A stream over the shared bytes: handing `Response` the array itself copies it per request. */
+function jsonBytesResponse({
+  bytes,
+  headers,
+}: {
+  bytes: Uint8Array<ArrayBuffer>;
+  headers: Record<string, string>;
+}): Response {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      ...headers,
+      "Content-Type": "application/json; charset=utf-8",
+      "Content-Length": String(bytes.byteLength),
+    },
+  });
 }

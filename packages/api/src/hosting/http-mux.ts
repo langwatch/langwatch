@@ -20,7 +20,7 @@ export type HttpTarget = Readonly<{
   fetch: HttpHandler;
   onFailure?: HttpFailureAnswer;
 }>;
-type Route = { prefix: string; target: HttpTarget };
+type Route = { prefix: string; exact: boolean; target: HttpTarget };
 
 /** Registers the most specific prefix first; targets retain the original request URL. */
 export class HttpMux {
@@ -47,7 +47,7 @@ export class HttpMux {
   route(
     prefix: string,
     target: HttpTarget | HttpHandler,
-    options: { onFailure?: HttpFailureAnswer } = {},
+    options: { onFailure?: HttpFailureAnswer; exact?: boolean } = {},
   ): this {
     this.#assertMutable();
 
@@ -68,6 +68,7 @@ export class HttpMux {
 
     this.#routes.push({
       prefix,
+      exact: options.exact === true,
       target: { fetch: (request) => resolved.fetch(request), onFailure },
     });
 
@@ -135,8 +136,8 @@ export class HttpMux {
     const router = new Hono();
     this.#routes.sort((left, right) => right.prefix.length - left.prefix.length);
 
-    for (const { prefix, target } of this.#routes) {
-      const paths = prefix === "/" ? ["*"] : [prefix, `${prefix}/*`];
+    for (const { prefix, exact, target } of this.#routes) {
+      const paths = pathsOf(prefix, exact);
       for (const route of paths) router.all(route, (context) => target.fetch(context.req.raw));
     }
 
@@ -149,8 +150,10 @@ export class HttpMux {
   #answerFailure(failure: unknown, request: Request): Response {
     const pathname = new URL(request.url).pathname;
 
-    const route = this.#routes.find(
-      ({ prefix }) => prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`),
+    const route = this.#routes.find(({ prefix, exact }) =>
+      exact
+        ? pathname === prefix || pathname === `${prefix}/`
+        : prefix === "/" || pathname === prefix || pathname.startsWith(`${prefix}/`),
     );
 
     try {
@@ -165,4 +168,11 @@ export class HttpMux {
   #assertMutable(): void {
     if (this.#router) throw new Error("HTTP routes and middleware are sealed once serving starts.");
   }
+}
+
+/** An exact route answers its path and that path with one trailing slash, nothing beneath it. */
+function pathsOf(prefix: string, exact: boolean): string[] {
+  if (exact) return prefix === "/" ? ["/"] : [prefix, `${prefix}/`];
+
+  return prefix === "/" ? ["*"] : [prefix, `${prefix}/*`];
 }
