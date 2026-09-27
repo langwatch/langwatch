@@ -77,6 +77,8 @@ jobs:
       LANGEVALS_ENDPOINT: "http://localhost:5564"
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
       NEXTAUTH_URL: "http://localhost:5570"
+      # The hosted MCP module refuses to install without a public base URL.
+      BASE_HOST: "http://localhost:5570"
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       # Trust the in-repo TEST license keypair so the members suite
       # (dev/tests/agentic-e2e/tests/members/steps.ts withEnterpriseLicense()) can
