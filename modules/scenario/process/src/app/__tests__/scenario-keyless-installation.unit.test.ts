@@ -68,6 +68,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
     .withMember("nlpCodeBlockTimeoutSeconds", undefined)
     .withMember("isSaas", false)
     .withMember("nodeEnvironment", "test")
+    .withMember("voicePublicUrl", { unavailable: "no media door in a test process" })
     .withMember("scenarioChildBundle", {
       packageRoot: "/app/apps/scenario-child",
       sourcePath: "/app/apps/scenario-child/src/main.ts",

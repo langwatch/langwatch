@@ -5,13 +5,15 @@
 
 import type { Logger } from "@langwatch/observability";
 import * as ScenarioRunner from "@langwatch/scenario";
-import type { ChildProcessJobData } from "@langwatch/scenario-contract";
+import type { ChildProcessJobData, VoiceTransport } from "@langwatch/scenario-contract";
 import { type TracerProvider, trace } from "@opentelemetry/api";
 
 import type { ScenarioHttp } from "../app/scenario.app.ts";
 import { litellmModelChannels } from "../channels/litellm-model-channels.registry.ts";
 import type { NlpFetchTimeouts } from "../channels/nlp-fetch.channel.ts";
 import { SerializedAgentChannelRegistry } from "../channels/serialized-agent-channels.registry.ts";
+import { SerializedAgentChannel } from "../channels/serialized-agent.channel.ts";
+import type { VoiceTransportRunner } from "../channels/voice-transport.channel.ts";
 import {
   agentGreetsFirst,
   buildAgentGreetsFirstScript,
@@ -39,6 +41,8 @@ export interface ScenarioChildRuntime {
   logger: Logger;
   /** The operator's nlpgo deadlines, read by the process that started this. */
   nlpTimeouts?: NlpFetchTimeouts;
+  /** The voice transports, built with this child's environment drilled in. */
+  voiceTransports: Record<VoiceTransport, VoiceTransportRunner>;
 }
 
 export interface ScenarioChildExecutionResult {
@@ -141,6 +145,7 @@ async function executeScenarioChildValue({
   // factories consume it as workflow.api_key; prompt and http ignore it.
   const adapter = SerializedAgentChannelRegistry.create({
     nlpTimeouts: runtime.nlpTimeouts,
+    voiceTransports: runtime.voiceTransports,
   }).build({
     adapterData,
     modelParams,
@@ -217,7 +222,8 @@ async function executeScenarioChildValue({
   }
   // The connected agent instance that answered the run's turns, for the
   // parent's record of which process served the run.
-  const servedInstance = adapter.servedInstance;
+  const servedInstance =
+    adapter instanceof SerializedAgentChannel ? adapter.servedInstance : undefined;
   if (servedInstance) outputResult.agentInstance = servedInstance;
   return outputResult;
 }

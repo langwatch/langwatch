@@ -9,6 +9,7 @@ import { processConfig, Server, type ProcessServer } from "@langwatch/process-se
 import { scenarioChildBundle } from "@langwatch/scenario-child";
 
 import { apiHealthRoute } from "./api-health-route.ts";
+import { processEnvironment } from "./config.ts";
 
 /**
  * The local launcher hosts both halves in one Node process: only the owner may
@@ -22,6 +23,7 @@ export type ApiStartOptions = Readonly<{
 /** Boots the API and starts serving. The server it answers with drains it. */
 export async function startApi(options: ApiStartOptions = {}): Promise<ProcessServer> {
   const preamble = Server.create("langwatch-api")
+    .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules))
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
@@ -56,6 +58,7 @@ export async function startApi(options: ApiStartOptions = {}): Promise<ProcessSe
     .withMember("gatewayInternalProtocol", () => ({}))
     .withMember("connectJudge", () => null)
     .withMember("scenarioChildBundle", () => scenarioChildBundle)
+    .withMember("voicePublicUrl", () => ({ unavailable: "this role runs no scenario children" }))
     .withMember("monitor", () => void 0)
     .exposeTransports((transports) =>
       transports

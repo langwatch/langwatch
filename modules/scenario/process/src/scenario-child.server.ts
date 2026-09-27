@@ -15,3 +15,5 @@ export {
 } from "./services/scenario-child-execution.service.ts";
 export { HttpNlpFetchChannel } from "./channels/http/http.nlp-fetch.channel.ts";
 export type { ScenarioHttp, ScenarioHttpResponse } from "./app/scenario.app.ts";
+export { createVoiceTransportRegistry } from "./channels/voice-transport.channels.ts";
+export type { PhoneTransportEnvironment } from "./channels/http/http.phone-voice-transport.channel.ts";

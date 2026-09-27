@@ -13,6 +13,8 @@ export interface VoiceWorkerEnv {
   voiceWsPort: number;
   /** The public https origin Twilio dials back, or undefined when unset. */
   voicePublicBaseUrl: string | undefined;
+  /** The quick-tunnel fallback: on unless `VOICE_TUNNEL` is the literal "false". */
+  voiceTunnelEnabled: boolean;
 }
 
 const portSchema = z.preprocess(
@@ -46,5 +48,7 @@ export function readVoiceWorkerEnv(env: NodeJS.ProcessEnv): VoiceWorkerEnv {
     );
   }
 
-  return { voiceWorkerOnly, voiceWsPort, voicePublicBaseUrl };
+  const voiceTunnelEnabled = (env.VOICE_TUNNEL ?? "").trim().toLowerCase() !== "false";
+
+  return { voiceWorkerOnly, voiceWsPort, voicePublicBaseUrl, voiceTunnelEnabled };
 }

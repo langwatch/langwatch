@@ -111,6 +111,7 @@ export async function bootApi({
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
+        voicePublicUrl: { unavailable: "no media door in a test process" },
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },

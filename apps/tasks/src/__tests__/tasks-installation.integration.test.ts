@@ -124,6 +124,7 @@ async function bootTasks() {
         gatewayInternalProtocol: {},
         connectJudge: null,
         scenarioChildBundle,
+        voicePublicUrl: { unavailable: "no media door in a test process" },
         monitor: void 0,
         langwatchQl: {
           admin: { configured: false },
@@ -148,6 +149,7 @@ describe("the tasks process installation", () => {
       const names = runtime.tasks(isTask).map((task) => task.name);
       expect(names).toEqual([
         "backfill-annotations-to-clickhouse",
+        "clear-stale-pending-sso-setup",
         "slack-alert",
         "report-schedule-backfill",
         "stripe-prices-sync",

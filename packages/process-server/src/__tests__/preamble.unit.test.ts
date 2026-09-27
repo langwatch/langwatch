@@ -1,7 +1,7 @@
 import { Config } from "@langwatch/config";
 import { Secret, SecretsPreflightError } from "@langwatch/secrets";
 // @vitest-environment node
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { processConfig } from "../config.ts";
@@ -14,13 +14,10 @@ const owner = {
 } as const;
 
 describe("the §4 preamble", () => {
-  afterEach(() => vi.unstubAllEnvs());
   it("parses config first and hands it to the secrets chain builder", async () => {
-    vi.stubEnv("GITHUB_APP_ID", "1207");
-    vi.stubEnv("PREAMBLE_TEST_TOKEN", "tok");
-
     const sawConfig = vi.fn();
     const server = await Server.create("preamble-test")
+      .withEnvironment({ GITHUB_APP_ID: "1207", PREAMBLE_TEST_TOKEN: "tok" })
       .withConfig([owner])
       .withProcessOwnership(false)
       .withSecrets((config, secrets) => {
@@ -35,9 +32,8 @@ describe("the §4 preamble", () => {
   });
 
   it("preflights every required handle before anything constructs", async () => {
-    vi.stubEnv("PREAMBLE_TEST_TOKEN", void 0);
-
     const failure = await Server.create("preamble-test")
+      .withEnvironment({})
       .withConfig([owner])
       .withProcessOwnership(false)
       .withSecrets((_, secrets) => secrets.withEnv())
@@ -52,8 +48,8 @@ describe("the §4 preamble", () => {
   });
 
   it("boots and runs the worker through resolved owner config", async () => {
-    vi.stubEnv("PREAMBLE_TEST_TOKEN", "tok");
     const server = await Server.create("preamble-test")
+      .withEnvironment({ PREAMBLE_TEST_TOKEN: "tok" })
       .withConfig(processConfig([owner], "worker"))
       .withHealthPort(0)
       .withProcessOwnership(false)

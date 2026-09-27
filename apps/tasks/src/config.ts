@@ -70,3 +70,6 @@ export interface TaskInput {
   environment: Readonly<Record<string, string | undefined>>;
   signal: AbortSignal;
 }
+
+/** The environment this process was started with, handed to the preamble. */
+export const processEnvironment: Readonly<Record<string, string | undefined>> = process.env;

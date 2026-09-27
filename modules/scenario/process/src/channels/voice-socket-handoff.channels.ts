@@ -2,7 +2,7 @@
 // Parent takes raw socket off HTTP upgrade; child completes WebSocket handshake on own ws server.
 
 import type { ChildProcess } from "node:child_process";
-import type { Socket } from "node:net";
+import { Socket } from "node:net";
 
 /** Discriminates the handoff message from every other child IPC message. */
 export const VOICE_MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket" as const;
@@ -123,10 +123,10 @@ export function createVoiceSocketReceiver(proc: VoiceSocketProcess = process): V
     onVoiceSocket(handler) {
       const listener = (message: unknown, handle: unknown): void => {
         if (!isVoiceMediaSocketMessage(message)) return;
-        if (handle == null) return;
+        if (!(handle instanceof Socket)) return;
         handler({
           message,
-          socket: handle as Socket,
+          socket: handle,
           head: Buffer.from(message.headBase64, "base64"),
         });
       };

@@ -19,6 +19,7 @@ import {
   type TaskConnections,
   type TaskInput,
   type TasksConfig,
+  processEnvironment,
 } from "./config.ts";
 import { openTasksDatabase } from "./database.ts";
 import { lwqlProvision } from "./lwql-provision.ts";
@@ -78,6 +79,7 @@ export async function runModuleTask({
   signal: AbortSignal;
 }): Promise<void> {
   const server = await Server.create("langwatch-tasks")
+    .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules))
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
@@ -103,6 +105,7 @@ export async function runModuleTask({
       .withMember("gatewayInternalProtocol", () => ({}))
       .withMember("connectJudge", () => null)
       .withMember("scenarioChildBundle", () => scenarioChildBundle)
+      .withMember("voicePublicUrl", () => ({ unavailable: "this role runs no scenario children" }))
       .withMember("monitor", () => void 0)
       .withPipelines((pipelines) => pipelines.produce())
       .boot();

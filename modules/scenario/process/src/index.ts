@@ -161,3 +161,8 @@ export {
 export { ScenarioRunExportCsvService } from "./services/scenario-run-export-csv.service.ts";
 export { ScenarioRunExportDownloadService } from "./services/scenario-run-export-download.service.ts";
 export { ScenarioRunExportService } from "./services/scenario-run-export.service.ts";
+export {
+  VoicePublicUrlService,
+  type ResolvedVoicePublicUrl,
+  type VoicePublicUrl,
+} from "./services/voice-public-url.service.ts";

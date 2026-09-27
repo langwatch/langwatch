@@ -46,6 +46,7 @@ export const scenarioHostMembers = {
     sourcePath: "/app/apps/scenario-child/src/main.ts",
     sourceRoots: ["/app/apps/scenario-child/src"],
   },
+  voicePublicUrl: { unavailable: "no media door in a test process" },
   nlpServiceUrl: void 0,
   nlpCodeBlockTimeoutSeconds: void 0,
   isSaas: false,

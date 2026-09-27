@@ -54,6 +54,7 @@ describe("the preamble's telemetry slot", () => {
   it("hands the telemetry factory the actor's secret paths", async () => {
     let seen: readonly string[] = [];
     const server = await Server.create("actor-redaction-test")
+      .withEnvironment({})
       .withConfig(processConfig([], "worker"))
       .withHealthPort(0)
       .withProcessOwnership(false)

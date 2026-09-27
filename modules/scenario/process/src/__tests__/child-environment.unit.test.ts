@@ -25,7 +25,7 @@ const config = {
   sourceRoots: ["/app/src"],
   nodeEnv: "test",
   isSaas: false,
-  voicePublicBaseUrl: "https://voice.example.com",
+  voicePublicUrl: { url: "https://voice.example.com" },
   baseHost: "https://app.example.com",
   egress: { blockLocal: false, allowedHosts: [] },
   parentEnvironment: {},
@@ -50,6 +50,20 @@ describe("buildChildEnvironment", () => {
         expect(result.BASE_HOST).toBe("https://app.example.com");
         expect(result.VOICE_WS_PORT).toBeUndefined();
       });
+    });
+  });
+
+  describe("given a voice target whose worker has no public origin", () => {
+    it("forwards the reason the phone run names", () => {
+      const result = buildChildEnvironment({
+        config: { ...config, voicePublicUrl: { unavailable: "spawn cloudflared ENOENT" } },
+        jobData: jobData("voice"),
+        labels: [],
+        telemetry,
+      });
+
+      expect(result.VOICE_PUBLIC_BASE_URL).toBeUndefined();
+      expect(result.VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON).toBe("spawn cloudflared ENOENT");
     });
   });
 

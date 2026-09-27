@@ -28,6 +28,7 @@ import { ScenarioProcessorMetricsService } from "./scenario-processor-metrics.se
 import { ScenarioProcessorService } from "./scenario-processor.service.ts";
 import type { ScenarioService } from "./scenario.service.ts";
 import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
+import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:executor");
 
@@ -53,6 +54,7 @@ export type ScenarioChildBundle = Readonly<{
 /** The process facts a child is started with, read as members. */
 export type ScenarioExecutorHost = Readonly<{
   scenarioChildBundle: ScenarioChildBundle;
+  voicePublicUrl: VoicePublicUrl;
   nlpServiceUrl: string | undefined;
   isSaas: boolean;
   nodeEnvironment: string | undefined;
@@ -165,7 +167,7 @@ export class ScenarioExecutorService {
       sourceRoots: [...host.scenarioChildBundle.sourceRoots],
       nodeEnv: host.nodeEnvironment,
       isSaas: host.isSaas,
-      voicePublicBaseUrl: config.voicePublicBaseUrl,
+      voicePublicUrl: host.voicePublicUrl,
       baseHost: host.publicBaseUrl,
       egress: {
         blockLocal: config.blockLocalHttpCalls,

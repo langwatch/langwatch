@@ -13,6 +13,7 @@ import type {
 import type * as undiciModule from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createVoiceTransportRegistry } from "../channels/voice-transport.channels.ts";
 import { SerializedAgentChannelRegistry } from "../index.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 
@@ -87,7 +88,9 @@ describe("createAdapter — project API key threading", () => {
 
     /** @scenario "The workflow adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
-      const adapter = SerializedAgentChannelRegistry.create().build({
+      const adapter = SerializedAgentChannelRegistry.create({
+        voiceTransports: createVoiceTransportRegistry({}),
+      }).build({
         adapterData: workflowData,
         modelParams,
         nlpServiceUrl,
@@ -114,7 +117,9 @@ describe("createAdapter — project API key threading", () => {
 
     /** @scenario "The code adapter sends the project's platform API key, not an LLM key" */
     it("emits the project API key as workflow.api_key on the outbound request", async () => {
-      const adapter = SerializedAgentChannelRegistry.create().build({
+      const adapter = SerializedAgentChannelRegistry.create({
+        voiceTransports: createVoiceTransportRegistry({}),
+      }).build({
         adapterData: codeData,
         modelParams,
         nlpServiceUrl,
@@ -147,7 +152,9 @@ describe("createAdapter — project API key threading", () => {
       // compile, which is the point: http must stay the one factory that
       // touches neither key.
       expect(() =>
-        SerializedAgentChannelRegistry.create().build({
+        SerializedAgentChannelRegistry.create({
+          voiceTransports: createVoiceTransportRegistry({}),
+        }).build({
           adapterData: httpData,
           nlpServiceUrl,
         }),

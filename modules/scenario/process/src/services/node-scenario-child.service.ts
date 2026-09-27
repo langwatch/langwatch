@@ -7,6 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   CHILD_PROCESS,
   ScenarioAgentInstanceSchema,
+  VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV,
   type ChildProcessJobData,
   type ScenarioExecutionResult,
 } from "@langwatch/scenario-contract";
@@ -37,6 +38,7 @@ import type {
   ScenarioExecutionPoolService,
 } from "./scenario-execution-pool.service.ts";
 import type { VoiceNonceRegistryService } from "./voice-nonce-registry.service.ts";
+import type { VoicePublicUrl } from "./voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
@@ -59,8 +61,8 @@ export interface ScenarioChildProcessConfig {
   sourceRoots: string[];
   nodeEnv: string | undefined;
   isSaas: boolean;
-  /** The worker media listener's public origin, forwarded only to voice children. */
-  voicePublicBaseUrl?: string;
+  /** The worker's public media origin, or why it has none, forwarded only to voice children. */
+  voicePublicUrl?: VoicePublicUrl;
   /** The deployment origin used by the phone transport's fallback refusal. */
   baseHost?: string;
   /**
@@ -334,7 +336,7 @@ function buildChildEnvironmentValue(input: {
     [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
     ...(input.jobData.target.type === "voice"
       ? {
-          VOICE_PUBLIC_BASE_URL: input.config.voicePublicBaseUrl,
+          ...voicePublicUrlEnvironment(input.config.voicePublicUrl),
           BASE_HOST: input.config.baseHost,
         }
       : {}),
@@ -442,4 +444,11 @@ function childExitResult({
     ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
     ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
   };
+}
+
+/** The public origin a voice child dials back through, or the reason the phone run names. */
+function voicePublicUrlEnvironment(publicUrl: VoicePublicUrl | undefined): NodeJS.ProcessEnv {
+  if (publicUrl === undefined) return {};
+  if ("url" in publicUrl) return { VOICE_PUBLIC_BASE_URL: publicUrl.url };
+  return { [VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV]: publicUrl.unavailable };
 }
