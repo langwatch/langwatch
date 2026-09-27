@@ -111,4 +111,58 @@ describe("given a file outside the governed roots", () => {
       ).toEqual([]);
     });
   });
+
+  describe("when a test marks a cast that feeds a wrong-typed input to the code under test", () => {
+    const TEST = "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts";
+
+    /** @scenario "A marked wrong-typed input in a test is left alone" */
+    it("reports nothing for the marked cast", () => {
+      const code = [
+        "// wrong-typed input: the runtime refuses a router from another namespace",
+        "const foreign = other as unknown as Router;",
+      ].join("\n");
+
+      expect(report(code, TEST)).toEqual([]);
+    });
+
+    /** @scenario "A marked wrong-typed input in a test is left alone" */
+    it("reads the marker anywhere in the comment block directly above", () => {
+      const code = [
+        "// tRPC hands an undeclared procedure's input through untouched.",
+        "// wrong-typed input: undefined where the type promises an object",
+        "const call = middleware as unknown as (input: undefined) => Promise<unknown>;",
+      ].join("\n");
+
+      expect(report(code, TEST)).toEqual([]);
+    });
+
+    /** @scenario "An unmarked or misplaced marker still reports the cast" */
+    it("still reports a cast with no marker, a marker with no reason, or a marker one line away", () => {
+      expect(report("const x = y as unknown as T;", TEST)).toHaveLength(1);
+      expect(report("// wrong-typed input:\nconst x = y as unknown as T;", TEST)).toHaveLength(1);
+      expect(
+        report("// wrong-typed input: a reason\n\nconst x = y as unknown as T;", TEST),
+      ).toHaveLength(1);
+    });
+
+    /** @scenario "An unmarked or misplaced marker still reports the cast" */
+    it("excuses only the statement it sits above", () => {
+      const code = [
+        "// wrong-typed input: the first one only",
+        "const x = y as unknown as T;",
+        "const z = w as unknown as T;",
+      ].join("\n");
+
+      const found = report(code, TEST);
+      expect(found).toHaveLength(1);
+      expect(found[0].line).toBe(3);
+    });
+
+    /** @scenario "An unmarked or misplaced marker still reports the cast" */
+    it("still reports a marked cast in production code", () => {
+      const code = "// wrong-typed input: a reason\nconst x = y as unknown as T;";
+
+      expect(report(code)).toHaveLength(1);
+    });
+  });
 });

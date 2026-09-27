@@ -1,11 +1,13 @@
 import { defineRule } from "../define-rule.mjs";
 
 // Config is drilled, never ambient: one parse per process, in the app's
-// `main.ts`/`config.ts`, and `@langwatch/secrets` resolves the classified keys.
+// `main.ts`/`config.ts` (the test process's seam is packages/vitest-config, Alex 2026-09-27),
+// and `@langwatch/secrets` resolves the classified keys.
 // `apps/server` is the published npx CLI, whose configuration surface is the environment.
 
 const GOVERNED_SOURCE = /^(?:(?:packages|modules|enterprise)\/.+|apps\/(?!server\/)[^/]+)\/src\//;
 const PROCESS_BOOT = /^apps\/[^/]+\/src\/(?:main|config)\.[cm]?tsx?$/;
+const TEST_PROCESS_BOOT = /^packages\/vitest-config\/src\//;
 const SECRETS_PACKAGE = /^packages\/secrets\//;
 const BENCHMARK = /(?:^|\/)(?:__bench__|benchmarks?)(?:\/|$)|\.bench\.[cm]?[jt]sx?$/;
 
@@ -14,6 +16,7 @@ function readsEnvironmentLegitimately(file) {
   return (
     !GOVERNED_SOURCE.test(path) ||
     PROCESS_BOOT.test(path) ||
+    TEST_PROCESS_BOOT.test(path) ||
     SECRETS_PACKAGE.test(path) ||
     file.isTest ||
     BENCHMARK.test(path)
@@ -51,7 +54,7 @@ export const environmentBoundariesRule = defineRule({
   messages: {
     environment: {
       what: "Do not read `process.env` here.",
-      fix: "Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts` reads the environment.",
+      fix: "Declare the key in the module's config schema and take the parsed value as an argument; only an app's `src/main.ts` or `src/config.ts`, or the test process's `packages/vitest-config`, reads the environment.",
     },
   },
   applies: (file) => !readsEnvironmentLegitimately(file),

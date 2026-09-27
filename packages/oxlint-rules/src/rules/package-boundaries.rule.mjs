@@ -13,6 +13,8 @@ const BROWSER_RUNTIME =
   /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|browser-trpc|design-system|ui-kernel)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process-server|process-stores)(?:\/|$))/;
+/** apps/tasks' migration-runner sources: its top-level `*migrat*` files. */
+const MIGRATION_RUNNER = /^apps\/tasks\/src\/[^/]*migrat[^/]*\.[cm]?tsx?$/;
 const KIT_FETCH = /^@langwatch\/browser-trpc(?:\/|$)/;
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
 const BROWSER_ROLES = new Set(["browser", "browser-kit"]);
@@ -173,6 +175,8 @@ function crossModuleFinding({ file, target, subpath, node }) {
 function outsideModuleFinding(file, target, subpath) {
   if (target.role === "process") {
     if (isTestSeam(file, subpath, target)) return undefined;
+    // Migrations run by hand, before any module boots (§7; Alex, 2026-09-27).
+    if (MIGRATION_RUNNER.test(file.workspacePath)) return undefined;
 
     return APPLICATION.test(file.workspacePath) ? "compositionRoot" : "processOutsideModule";
   }
@@ -187,7 +191,9 @@ function outsideModuleFinding(file, target, subpath) {
   return undefined;
 }
 
-function ownershipFinding({ file, target, subpath, node }) {
+function ownershipFinding({ file, target, subpath, node, typeOnly }) {
+  // Types are erased: a browser package's types may cross; its values stay closed (Alex, 2026-09-27).
+  if (typeOnly && target.role === "browser") return undefined;
   if (file.module) return crossModuleFinding({ file, target, subpath, node });
 
   return outsideModuleFinding(file, target, subpath);
@@ -197,7 +203,7 @@ function isCoreSource(file) {
   return !file.enterprise && file.role !== "other";
 }
 
-function packageFindings({ file, specifier, cwd, node }) {
+function packageFindings({ file, specifier, cwd, node, typeOnly }) {
   const found = modulePackageOf(cwd, specifier);
   if (!found) return [];
   const { pkg: target, subpath } = found;
@@ -205,7 +211,8 @@ function packageFindings({ file, specifier, cwd, node }) {
   if (!target.exports.has(subpath)) {
     findings.push({ messageId: "sealedExports", data: { subpath, package: target.name } });
   }
-  const shape = directionFinding(file, target) ?? ownershipFinding({ file, target, subpath, node });
+  const shape =
+    directionFinding(file, target) ?? ownershipFinding({ file, target, subpath, node, typeOnly });
   if (shape) findings.push({ messageId: shape, data: { specifier, ...peerData(target) } });
   if (isCoreSource(file) && target.enterprise && target.role !== "contract") {
     findings.push({ messageId: "coreImportsEnterprise", data: { specifier } });
@@ -214,7 +221,7 @@ function packageFindings({ file, specifier, cwd, node }) {
   return findings;
 }
 
-function specifierFindings({ file, specifier, cwd, node }) {
+function specifierFindings({ file, specifier, cwd, node, typeOnly = false }) {
   const replacement = retiredReplacement(specifier);
   if (replacement)
     return [{ messageId: "retiredPackageRuntime", data: { specifier, replacement } }];
@@ -224,7 +231,7 @@ function specifierFindings({ file, specifier, cwd, node }) {
     const escape = escapeFinding(file, specifier, cwd);
     if (escape) findings.push(escape);
   }
-  findings.push(...packageFindings({ file, specifier, cwd, node }));
+  findings.push(...packageFindings({ file, specifier, cwd, node, typeOnly }));
   if (file.module && SCHEMA_BINDING.has(specifier)) {
     findings.push({ messageId: "schemaBoundary", data: { specifier } });
   }
@@ -232,6 +239,17 @@ function specifierFindings({ file, specifier, cwd, node }) {
   if (runtime) findings.push({ messageId: runtime, data: { specifier } });
 
   return findings;
+}
+
+/** Whether a declaration carries types only, so nothing it names survives compilation. */
+function isTypeOnly(node) {
+  if (node.importKind === "type" || node.exportKind === "type") return true;
+  const specifiers = node.specifiers ?? [];
+
+  return (
+    specifiers.length > 0 &&
+    specifiers.every((entry) => entry.importKind === "type" || entry.exportKind === "type")
+  );
 }
 
 export const boundaryRule = defineRule({
@@ -304,22 +322,23 @@ export const boundaryRule = defineRule({
     },
   },
   create(context, file) {
-    const check = (node) => {
+    const check = (node, typeOnly = false) => {
       if (typeof node?.value !== "string") return;
       for (const finding of specifierFindings({
         file,
         specifier: node.value,
         cwd: context.cwd,
         node,
+        typeOnly,
       })) {
         context.report({ node, ...finding });
       }
     };
 
     return {
-      ImportDeclaration: (node) => check(node.source),
-      ExportNamedDeclaration: (node) => check(node.source),
-      ExportAllDeclaration: (node) => check(node.source),
+      ImportDeclaration: (node) => check(node.source, isTypeOnly(node)),
+      ExportNamedDeclaration: (node) => check(node.source, isTypeOnly(node)),
+      ExportAllDeclaration: (node) => check(node.source, isTypeOnly(node)),
       ImportExpression: (node) => check(node.source),
       CallExpression(node) {
         const isRequire = node.callee.type === "Identifier" && node.callee.name === "require";

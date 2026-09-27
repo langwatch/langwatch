@@ -198,7 +198,8 @@ of:
    other's implementations. A peer is never a member.
 3. **A deployment fact** (signing key, public base URL, admin list) → the
    module's **declared config schema**; the process values the slice. Module
-   code never reads `process.env`.
+   code never reads `process.env`. The test process's boot seam is `packages/vitest-config`,
+   read like an app's `main.ts`/`config.ts` (Alex, 2026-09-27).
 4. **An availability decision** (a capability this deployment may not have) →
    a **declared supply token** the process answers with one `.provide({...})`
    line — or the seam dies with the dead capability. A module never defaults
@@ -291,7 +292,8 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
 1. **`trace-browser` is closed.** Nothing else imports it, ever. The moment
    another module needs a trace hook, store or component, that thing moves to
    `trace-browser-kit`. Sharing is declared by moving, never observed by
-   reaching in.
+   reaching in. Closed to values only: an `import type` / `export type` of a browser package
+   crosses, because types are erased (Alex, 2026-09-27).
 2. **A kit is a leaf.** It may import contracts (any module's),
    `design-system` and `browser-host`. It may not import its own module's
    browser package (the rule that broke the nine cyclic web pairs), any other
@@ -1000,7 +1002,8 @@ the chain call is plumbing that carries config's answer, and the test seam
 `pnpm --filter @langwatch/tasks task prisma-migrate clickhouse-migrate` — run
 before serve by the start script and the deploy pipeline. Prisma migrations
 live with the schema; ClickHouse migrations are goose SQL files. A serving
-process holding DDL locks is how deploys die.
+process holding DDL locks is how deploys die. Because they run before any module boots, apps/tasks'
+migration-runner files (`src/*migrat*.ts`) may name process packages (Alex, 2026-09-27).
 
 **Clients appear in exactly one place: the chain.** From there only registry
 and channel factories touch them. There is no second path.
@@ -1593,6 +1596,8 @@ The installation test is the same chain as production:
 const runtime = await createApp({ role: "api" }) // no server: nothing to tear down
   .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
   .withConfig({ annotation: {}, trace: {}, presence: {} })
+A test proving how code handles a wrong-typed input may cast it, marked `// wrong-typed input: <why>`
+directly above; the marker, not the test's name, excuses that one cast (Alex, 2026-09-27).
   .withStores(memoryStores()) // branded → memory tier everywhere
   .boot();
 
@@ -1723,6 +1728,8 @@ Nx is the workspace task runner (ADR-150). It reads the workspace that
 already exists: projects come from `pnpm-workspace.yaml`, targets from each
 package's `scripts` block. No package carries a `project.json`, no script is
 an Nx executor, and Nx generates nothing — a module is still installed by
+`typescript/no-misused-spread` is off in `packages/*/type-tests/**` only, where the spread is what
+the type test asserts (Alex, 2026-09-27).
 editing `modules/catalogue.json` and running `pnpm generate:modules`. The
 whole configuration is `nx.json` at the root.
 

@@ -285,4 +285,71 @@ describe("given package-boundaries", () => {
       );
     });
   });
+
+  describe("when a type-only import names another module's browser package", () => {
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("reports nothing for import type, inline type specifiers or export type", () => {
+      const shell = "apps/ui/src/shell/navigation.tsx";
+      const picker = "@langwatch/project-browser/surfaces/project-picker";
+
+      expect(report(BROWSER, `import type { Picker } from "${picker}";`)).toEqual([]);
+      expect(report(BROWSER, `import { type Picker, type Props } from "${picker}";`)).toEqual([]);
+      expect(report(shell, `import type { Picker } from "${picker}";`)).toEqual([]);
+      expect(report(shell, `export type { Picker } from "${picker}";`)).toEqual([]);
+    });
+
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("still reports a value import, and a mixed import that carries one value", () => {
+      const shell = "apps/ui/src/shell/navigation.tsx";
+      const picker = "@langwatch/project-browser/surfaces/project-picker";
+
+      expect(ids(BROWSER, `import { Picker } from "${picker}";`)).toEqual(["crossModuleBrowser"]);
+      expect(ids(BROWSER, `import { type Props, Picker } from "${picker}";`)).toEqual([
+        "crossModuleBrowser",
+      ]);
+      expect(ids(shell, `export { Picker } from "${picker}";`)).toEqual(["browserSideDoor"]);
+      expect(ids(shell, `import "${picker}";`)).toEqual(["browserSideDoor"]);
+    });
+
+    /** @scenario "A type-only import of a browser package is let through, a value import is not" */
+    it("still reports a type-only import of another module's process package", () => {
+      expect(ids(SERVICE, 'import type { P } from "@langwatch/project-process";')).toEqual([
+        "crossModuleProcess",
+      ]);
+    });
+  });
+
+  describe("when apps/tasks' migration runner names a process package", () => {
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it.each(["apps/tasks/src/system-migrations-pass.ts", "apps/tasks/src/prisma-migrate.ts"])(
+      "reports nothing for %s",
+      (file) => {
+        expect(
+          report(file, 'import { ProjectMigrations } from "@langwatch/project-process";'),
+        ).toEqual([]);
+      },
+    );
+
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it.each([
+      "apps/tasks/src/main.ts",
+      "apps/tasks/src/lwql-provision.ts",
+      "apps/api/src/prisma-migrate.ts",
+      "apps/tasks/src/storage-seed/migrate.ts",
+    ])("still reports compositionRoot for %s", (file) => {
+      expect(ids(file, 'import { ProjectMigrations } from "@langwatch/project-process";')).toEqual([
+        "compositionRoot",
+      ]);
+    });
+
+    /** @scenario "apps/tasks' migration runner may name a process package, nothing else in an app may" */
+    it("still reports the runner reaching past a browser declaration", () => {
+      expect(
+        ids(
+          "apps/tasks/src/system-migrations-pass.ts",
+          'import { P } from "@langwatch/project-browser/surfaces/project-picker";',
+        ),
+      ).toEqual(["browserSideDoor"]);
+    });
+  });
 });

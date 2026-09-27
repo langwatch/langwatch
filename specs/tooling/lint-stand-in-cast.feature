@@ -71,3 +71,17 @@ Feature: The stand-in-cast lint rule
     Given a file outside the governed roots that casts through unknown
     When the stand-in-cast rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: A marked wrong-typed input in a test is left alone
+    Given a test casts through unknown to feed the code under test a wrong-typed input
+    And the comment block directly above the cast's statement reads `// wrong-typed input: <why>`
+    When the stand-in-cast rule runs over it
+    Then it reports nothing for that cast
+
+  @unit
+  Scenario: An unmarked or misplaced marker still reports the cast
+    Given a test cast with no marker, a marker with no reason, a marker separated by a blank line, or a second cast below a marked one
+    And the same marked cast in production code
+    When the stand-in-cast rule runs over it
+    Then it reports the cast
