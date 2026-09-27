@@ -1074,6 +1074,10 @@ never thinks about resolution at all. The per-module resolver adapters
 - A protocol door whose logic main kept in the handler takes the raw request as one `*Api` op
   (`OtlpDoorRequest`: method, path, headers, body bytes) and returns its outcomes; the handler only renders
   them. Shared door helpers live in the protocol's framework package (`@langwatch/otlp`) (Alex, 2026-09-26).
+- A socket that must be handed on unopened (voice media to a scenario child) is a declared raw-socket
+  door: a path pattern and a handler given the request, the raw socket and `head`, hosted on its own
+  port by the role that owns the children. A public address the role resolves at boot is a supplied
+  member (`{ url } | { unavailable }`), never a module writing `process.env` (Alex, 2026-09-27).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
 - **A route's documentation lives on the route, in its own `.withDocs()`
