@@ -84,9 +84,6 @@ export {
   takeOverClaim,
   withIdempotency,
   type IdempotencyConflictReason,
-  type IdempotencyReceiptCreateInput,
-  type IdempotencyReceiptPersistence,
-  type IdempotencyReceiptRecord,
   type IdempotencyResponseCipher,
   type IdempotentExecuted,
   type IdempotentOutcome,
@@ -95,6 +92,11 @@ export {
   type RestIdempotency,
   type WithIdempotencyParams,
 } from "./idempotency.ts";
+export type {
+  IdempotencyReceiptCreateInput,
+  IdempotencyReceiptPersistence,
+  IdempotencyReceiptRecord,
+} from "./repositories/prisma/prisma.idempotency-receipt.ts";
 
 export {
   bindRestHeader,

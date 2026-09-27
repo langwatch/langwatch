@@ -21,11 +21,11 @@ import {
   restVersionSelectorMiddleware,
 } from "../addressing.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
-import {
-  withIdempotency,
-  type IdempotencyReceiptPersistence,
-  type IdempotencyReceiptRecord,
-} from "../idempotency.ts";
+import { withIdempotency } from "../idempotency.ts";
+import type {
+  IdempotencyReceiptPersistence,
+  IdempotencyReceiptRecord,
+} from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import {
   bindRestHeader,
   bindRestMiddleware,
