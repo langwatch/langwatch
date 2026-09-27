@@ -2,25 +2,44 @@
  * That a procedure dispatched by name lands in the cache everything else reads.
  */
 
-import { trpcQueryFilter, trpcQueryKey } from "@langwatch/api/web";
+import {
+  trpcQueryFilter,
+  trpcQueryKey,
+  type ModuleApiMap,
+  type RouterFromMap,
+} from "@langwatch/api/web";
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
+import { createTRPCUntypedClient } from "@trpc/client";
+import { observable } from "@trpc/server/observable";
+import { describe, expect, it } from "vitest";
 
 import { BrowserUiRpc } from "../browser-rpc";
 import type { UiFeatureApiTransport } from "../transport";
 
+type SentOperation = { type: string; path: string; input: unknown };
+
+/** A real untyped client whose only link answers `answer` and records what was sent. */
 function transportAnswering(answer: unknown): {
   transport: UiFeatureApiTransport;
-  query: ReturnType<typeof vi.fn>;
-  mutation: ReturnType<typeof vi.fn>;
+  sent: SentOperation[];
 } {
-  const query = vi.fn(async () => answer);
-  const mutation = vi.fn(async () => answer);
-  return { transport: { query, mutation } as unknown as UiFeatureApiTransport, query, mutation };
+  const sent: SentOperation[] = [];
+  const transport: UiFeatureApiTransport = createTRPCUntypedClient<RouterFromMap<ModuleApiMap>>({
+    links: [
+      () =>
+        ({ op }) =>
+          observable((observer) => {
+            sent.push({ type: op.type, path: op.path, input: op.input });
+            observer.next({ result: { type: "data", data: answer } });
+            observer.complete();
+          }),
+    ],
+  });
+  return { transport, sent };
 }
 
 function keyFor(path: string, input: unknown): readonly unknown[] {
-  return trpcQueryKey(path, { input, type: "query" }) as unknown as readonly unknown[];
+  return trpcQueryKey(path, { input, type: "query" });
 }
 
 describe("given a procedure dispatched by name", () => {
@@ -74,16 +93,18 @@ describe("given a procedure dispatched by name", () => {
 
     it("sends the mutation on the transport rather than the query lane", async () => {
       const queryClient = new QueryClient();
-      const { transport, query, mutation } = transportAnswering({ ok: true });
+      const { transport, sent } = transportAnswering({ ok: true });
       const rpc = BrowserUiRpc.create({ transport, queryClient });
 
       await rpc.mutate("agents.delete", { id: "agent_1", projectId: "project_1" });
 
-      expect(mutation).toHaveBeenCalledWith("agents.delete", {
-        id: "agent_1",
-        projectId: "project_1",
-      });
-      expect(query).not.toHaveBeenCalled();
+      expect(sent).toEqual([
+        {
+          type: "mutation",
+          path: "agents.delete",
+          input: { id: "agent_1", projectId: "project_1" },
+        },
+      ]);
     });
   });
 });
