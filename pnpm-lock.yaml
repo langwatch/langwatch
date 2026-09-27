@@ -1457,6 +1457,9 @@ importers:
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../../packages/react-rum
+      '@langwatch/rum-contract':
+        specifier: workspace:*
+        version: link:../../modules/rum/contract
       '@langwatch/scenario-browser':
         specifier: workspace:*
         version: link:../../modules/scenario/browser

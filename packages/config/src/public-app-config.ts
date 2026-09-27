@@ -21,8 +21,6 @@ export const processWebConfigSchema = z.strictObject({
   mode: z.enum(["development", "test", "production"]),
   deployment: z.enum(["saas", "self-hosted"]),
   nlp: z.boolean(),
-  browserTracing: z.boolean(),
-  sampleRatio: z.number().min(0).max(1),
   /** Keeps the development badge off a development build (demos, screenshots). */
   hideDevIndicator: z.boolean().optional(),
 });

@@ -143,6 +143,9 @@
       "path": "../../modules/ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/rum/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/organization/browser/tsconfig.build.json"
     },
     {

@@ -24,8 +24,6 @@ const injectedConfig = {
     mode: "test",
     deployment: "self-hosted",
     nlp: true,
-    browserTracing: false,
-    sampleRatio: 0,
   },
 } as const;
 

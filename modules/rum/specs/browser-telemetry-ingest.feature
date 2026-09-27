@@ -103,3 +103,28 @@ Feature: The platform's own browser telemetry reaches its collector through the 
     Scenario: A caller with no session is named by the nearest proxy's address
       When a report carries no session and a forwarded-for chain
       Then it is counted against the last address in the chain
+
+  Rule: rum owns the browser tracing switch it hands the page
+
+    `RUM_ENABLED` and `RUM_SAMPLE_RATIO` are rum's config, and rum projects
+    its slice of the page's browser config: tracing is on only when switched
+    on AND a collector would receive what the browser sends.
+
+    @unit
+    Scenario: Browser tracing stays off while the switch is off
+      Given a deployment that names a collector but does not set RUM_ENABLED to "true"
+      When rum projects its browser config
+      Then browser tracing is disabled
+
+    @unit
+    Scenario: Browser tracing is on with the sample ratio when switched on and a collector is configured
+      Given RUM_ENABLED is "true" and RUM_SAMPLE_RATIO is "0.25"
+      And RUM_COLLECTOR_ENDPOINT or the deprecated OTEL_EXPORTER_OTLP_ENDPOINT names a collector
+      When rum projects its browser config
+      Then browser tracing is enabled with a sample ratio of 0.25
+
+    @unit
+    Scenario: Browser tracing stays off when switched on without a collector
+      Given RUM_ENABLED is "true" and neither collector variable is set
+      When rum projects its browser config
+      Then browser tracing is disabled

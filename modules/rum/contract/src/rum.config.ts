@@ -1,17 +1,32 @@
-import { Config, type ConfigOf } from "@langwatch/config";
+import { Config, type ConfigOf, telemetryExporterEndpoint } from "@langwatch/config";
+import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
 
+const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
+
 /**
- * Where the proxied export goes. Unset, rum falls back to observability's
- * deprecated `OTEL_EXPORTER_OTLP_*` collector and warns once at boot; with
- * neither, the door refuses as not configured.
+ * rum owns the browser tracing switch (ADR-058). Where the proxied export goes:
+ * its own collector, else observability's deprecated `OTEL_EXPORTER_OTLP_*`
+ * (warned once at boot); with neither, the door refuses as not configured.
  */
 export const rumConfig = Config.define((c) => ({
+  enabled: c.env(
+    "RUM_ENABLED",
+    z
+      .string()
+      .optional()
+      .transform((value) => value === "true"),
+  ),
+  sampleRatio: c.env(
+    "RUM_SAMPLE_RATIO",
+    z.preprocess(blankIsUnset, z.coerce.number().min(0).max(1).default(1).catch(1)),
+  ),
   collectorEndpoint: c.env(
     "RUM_COLLECTOR_ENDPOINT",
-    z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
+    z.preprocess(blankIsUnset, z.string().min(1).optional()),
   ),
+  telemetryEndpoint: telemetryExporterEndpoint,
 }));
 
 export type RumConfig = ConfigOf<typeof rumConfig>;
@@ -20,3 +35,20 @@ export type RumConfig = ConfigOf<typeof rumConfig>;
 export const rumSecrets = {
   collectorHeaders: Secret.load("RUM_COLLECTOR_HEADERS", { optional: true }),
 } as const;
+
+/** All a browser learns: whether to trace, and what share of sessions to record. */
+export const rumWebConfigSchema = z.strictObject({
+  enabled: z.boolean(),
+  sampleRatio: z.number().min(0).max(1),
+});
+
+export type RumWebConfig = z.infer<typeof rumWebConfigSchema>;
+
+/** Tracing is on only when switched on AND some collector would receive what the browser sends. */
+export const rumBrowserConfig = defineBrowserConfig({
+  schema: rumWebConfigSchema,
+  project: (config: RumConfig) => ({
+    enabled: config.enabled && Boolean(config.collectorEndpoint ?? config.telemetryEndpoint),
+    sampleRatio: config.sampleRatio,
+  }),
+});

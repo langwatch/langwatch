@@ -12,6 +12,7 @@ import { evaluationWebConfigSchema } from "@langwatch/evaluation-contract";
 import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 import { notificationWebConfigSchema } from "@langwatch/notification-contract";
 import { opsWebConfigSchema } from "@langwatch/ops-contract";
+import { rumWebConfigSchema } from "@langwatch/rum-contract";
 import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
 import type { output, ZodType } from "zod";
 
@@ -25,6 +26,7 @@ export type UiFeatureConfig = Readonly<{
   gateway: output<typeof gatewayWebConfigSchema>;
   notification: output<typeof notificationWebConfigSchema>;
   ops: output<typeof opsWebConfigSchema>;
+  rum: output<typeof rumWebConfigSchema>;
 }>;
 
 export function parseUiFeatureConfig(config: PublicAppConfig): UiFeatureConfig {
@@ -39,6 +41,7 @@ export function parseUiFeatureConfig(config: PublicAppConfig): UiFeatureConfig {
     gateway: slice("gateway", gatewayWebConfigSchema),
     notification: slice("notification", notificationWebConfigSchema),
     ops: slice("ops", opsWebConfigSchema),
+    rum: slice("rum", rumWebConfigSchema),
   };
 }
 
@@ -65,8 +68,8 @@ export function uiTelemetryOf(config: UiFeatureConfig): UiPublicTelemetry {
   return {
     mode: config.process.mode,
     telemetry: {
-      browserTracing: config.process.browserTracing,
-      sampleRatio: config.process.sampleRatio,
+      browserTracing: config.rum.enabled,
+      sampleRatio: config.rum.sampleRatio,
       ...config.ops,
     },
   };

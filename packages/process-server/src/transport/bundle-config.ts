@@ -73,25 +73,16 @@ const processFacts = z.object({
   hideDevIndicator: z.boolean().optional(),
 });
 
-const telemetryFacts = z.object({
-  otlpEndpoint: z.string().optional(),
-  rumEnabled: z.boolean().optional(),
-  rumSampleRatio: z.number().optional(),
-});
-
 /** An unrecognised NODE_ENV is production-shaped, as every default is (§6). */
 const browserMode = processWebConfigSchema.shape.mode.catch("production");
 
 function projectProcessConfig(config: Readonly<Record<string, unknown>>): ProcessWebConfig {
   const facts = processFacts.parse(config.process ?? {});
-  const telemetry = telemetryFacts.parse(config.observability ?? {});
   return processWebConfigSchema.parse({
     ...(facts.baseHost ? { appBaseUrl: facts.baseHost } : {}),
     mode: browserMode.parse(facts.nodeEnvironment),
     deployment: facts.isSaas ? "saas" : "self-hosted",
     nlp: Boolean(facts.nlpServiceUrl),
-    browserTracing: Boolean(telemetry.rumEnabled && telemetry.otlpEndpoint),
-    sampleRatio: telemetry.rumSampleRatio ?? 1,
     ...(facts.hideDevIndicator ? { hideDevIndicator: true } : {}),
   });
 }

@@ -5,6 +5,7 @@ import {
   RumApi,
   type RumApi as RumApiContract,
   type RumConfig,
+  rumBrowserConfig,
   rumConfig,
   rumSecrets,
 } from "@langwatch/rum-contract";
@@ -43,6 +44,7 @@ export class RumApp implements RumApiContract {
   static readonly contract = RumApi;
   static readonly dependencies = {};
   static readonly config = rumConfig;
+  static readonly publicConfig = rumBrowserConfig.project;
   static readonly secrets = rumSecrets;
   static readonly reads = ["logger", "telemetryExporter"] as const;
 

@@ -10,8 +10,6 @@ function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices 
       mode: "production",
       deployment: "self-hosted",
       nlp: true,
-      browserTracing: false,
-      sampleRatio: 0,
     },
     origin: "https://page.example",
     hasLangevals: true,
@@ -30,8 +28,6 @@ describe("deriveUiDeployment", () => {
           mode: "development",
           deployment: "saas",
           nlp: false,
-          browserTracing: false,
-          sampleRatio: 0,
         },
       }),
     );
@@ -50,8 +46,6 @@ describe("deriveUiDeployment", () => {
             mode: "production",
             deployment: "self-hosted",
             nlp: true,
-            browserTracing: false,
-            sampleRatio: 1,
           },
         }),
       );

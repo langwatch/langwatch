@@ -48,6 +48,14 @@ export const { blockLocalHttpCalls, allowedProxyHosts } = Config.define((c) => (
   ),
 }));
 
+/** The platform's OTLP collector: observability exports to it, rum's switch falls back to it. */
+export const { telemetryExporterEndpoint } = Config.define((c) => ({
+  telemetryExporterEndpoint: c.env(
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    z.preprocess((value) => (value === "" ? undefined : value), z.string().min(1).optional()),
+  ),
+}));
+
 /** The terminal fallback for a target that names no model; blank is not a model. */
 export const { langwatchDefaultModel } = Config.define((c) => ({
   langwatchDefaultModel: c.env(

@@ -9,8 +9,6 @@ const served: PublicAppConfig = {
     mode: "production",
     deployment: "saas",
     nlp: false,
-    browserTracing: true,
-    sampleRatio: 0.1,
   },
   auth: { passkeys: true, identityFrontDoor: false, authProvider: "auth0" },
   authz: {},
@@ -19,6 +17,7 @@ const served: PublicAppConfig = {
   gateway: { gatewayBaseUrl: "https://gateway.langwatch.test" },
   notification: { email: true },
   ops: {},
+  rum: { enabled: true, sampleRatio: 0.1 },
 };
 
 describe("browser feature configuration", () => {
@@ -50,8 +49,8 @@ describe("browser feature configuration", () => {
     /** @scenario "The browser validates its configuration before the first render" */
     it("throws naming the owner rather than handing a feature a value it cannot act on", () => {
       expect(() =>
-        parseUiFeatureConfig({ ...served, process: { ...served.process, sampleRatio: 2 } }),
-      ).toThrow(/"process"/);
+        parseUiFeatureConfig({ ...served, rum: { ...served.rum, sampleRatio: 2 } }),
+      ).toThrow(/"rum"/);
     });
   });
 
