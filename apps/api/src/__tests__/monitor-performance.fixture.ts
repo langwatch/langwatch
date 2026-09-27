@@ -4,12 +4,15 @@
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { buildSeriesName, type AnalyticsSeries } from "@langwatch/analytics-contract";
-import { createAnalyticsService } from "@langwatch/analytics-process";
+import {
+  buildSeriesName,
+  type AnalyticsApi,
+  type AnalyticsSeries,
+} from "@langwatch/analytics-contract";
 import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import { generate } from "@langwatch/ksuid";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness/clickhouse";
-import { nanoid } from "nanoid";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HALF_DAY_MS = 12 * 60 * 60 * 1000;
@@ -110,7 +113,7 @@ const traceSummaryRow = ({
 }) => {
   const occurredAt = new Date(occurredAtMs);
   return {
-    ProjectionId: `projection-${nanoid()}`,
+    ProjectionId: `projection-${generate("test").toString()}`,
     TenantId: tenantId,
     TraceId: traceId,
     Version: "v1",
@@ -152,14 +155,14 @@ const evaluationRunRow = ({
     score,
     passed,
     status = "processed",
-    evaluationId = `eval-${nanoid()}`,
+    evaluationId = `eval-${generate("test").toString()}`,
     updatedAtMs = scheduledAtMs,
   },
 }: {
   tenantId: string;
   seed: SeededEvaluation;
 }) => ({
-  ProjectionId: `projection-${nanoid()}`,
+  ProjectionId: `projection-${generate("test").toString()}`,
   TenantId: tenantId,
   EvaluationId: evaluationId,
   Version: "1",
@@ -172,7 +175,7 @@ const evaluationRunRow = ({
   Label: null,
   ScheduledAt: new Date(scheduledAtMs),
   UpdatedAt: new Date(updatedAtMs),
-  LastProcessedEventId: `event-${nanoid()}`,
+  LastProcessedEventId: `event-${generate("test").toString()}`,
 });
 
 /**
@@ -193,7 +196,7 @@ export const buildSeedMatrix = ({
   currentStartMs: number;
   previousStartMs: number;
 }): SeededEvaluation[] => {
-  const correctedEvaluationId = `corrected-${nanoid()}`;
+  const correctedEvaluationId = `corrected-${generate("test").toString()}`;
   const correctedTraceId = `${tenantId}-trace-corrected`;
   const day1Ms = currentStartMs + DAY_MS + HALF_DAY_MS;
   const day2Ms = currentStartMs + 2 * DAY_MS + HALF_DAY_MS;
@@ -394,24 +397,20 @@ const analyticsPageSeries = ({
  * table reads — daily for the chart, full-period for the headline.
  */
 export const readAnalyticsPageNumbers = async ({
-  client,
+  analytics,
   tenantId,
   evaluatorId,
   metric,
   currentStartMs,
   endMs,
 }: {
-  client: ClickHouseClient;
+  analytics: AnalyticsApi;
   tenantId: string;
   evaluatorId: string;
   metric: AnalyticsPageMetric;
   currentStartMs: number;
   endMs: number;
 }) => {
-  const analytics = createAnalyticsService({
-    resolveClient: async () => client,
-    clickhouseEnabled: true,
-  });
   const series = analyticsPageSeries({ evaluatorId, metric });
   const baseInput = {
     projectId: tenantId,

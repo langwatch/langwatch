@@ -9826,9 +9826,6 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
-      '@langwatch/analytics-process':
-        specifier: workspace:*
-        version: link:../../analytics/process
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -9881,9 +9878,6 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
-      '@langwatch/clickhouse-migrations':
-        specifier: workspace:*
-        version: link:../../../packages/clickhouse-migrations
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

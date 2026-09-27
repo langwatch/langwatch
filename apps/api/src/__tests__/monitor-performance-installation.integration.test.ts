@@ -1,28 +1,25 @@
 /**
  * @vitest-environment node
  * @see specs/analytics/evaluation-pass-rate-consistency.feature
+ * The Online Evaluations table loads every monitor's trend in one bounded ClickHouse read, and
+ * publishes the same numbers the analytics page does, both asked through the installed api.
  */
-
-// The Online Evaluations table loads every monitor's trend in one bounded
-// ClickHouse read, and publishes the same numbers the analytics page does.
-// The seeded dataset carries every way those two could diverge.
-
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createAnalyticsComparisonWindow } from "@langwatch/analytics-process";
-import {
-  createMonitorPerformanceReads,
-  type EvaluationClickHouseResolver,
-} from "@langwatch/evaluation-process";
-import { nanoid } from "nanoid";
+import { AnalyticsApi, analyticsComparisonWindow } from "@langwatch/analytics-contract";
+import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { generate } from "@langwatch/ksuid";
+import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { bootApiOverClickHouse } from "./api-analytical.fixture.ts";
 import {
   buildSeedMatrix,
   deleteSeededTenantRows,
   readAnalyticsPageNumbers,
   seedMonitorPerformance,
   startMigratedClickHouse,
-} from "./support/monitor-performance.fixtures.ts";
+} from "./monitor-performance.fixture.ts";
 
 const clickHouseUrl =
   process.env.LANGWATCH_TEST_CLICKHOUSE_URL ??
@@ -30,46 +27,60 @@ const clickHouseUrl =
   process.env.CI_CLICKHOUSE_URL;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const tenantId = `test-monitor-performance-${nanoid()}`;
+const tenantId = `test-monitor-performance-${generate("test").toString()}`;
 const scoreEvaluatorId = `${tenantId}-score`;
 const guardrailEvaluatorId = `${tenantId}-guardrail`;
 const endMs = Date.now();
 const currentStartMs = endMs - 7 * DAY_MS;
-// Derived through the same service the monitors surface uses, so the window
-// the trend is measured against is the one the page would have asked for.
-const previousStartMs = createAnalyticsComparisonWindow().currentVsPrevious({
-  startDate: currentStartMs,
-  endDate: endMs,
-}).previousPeriodStartDate.epochMilliseconds;
+// The window analytics compares against, from the rule its contract publishes.
+const previousStartMs = analyticsComparisonWindow({
+  start: Temporal.Instant.fromEpochMilliseconds(currentStartMs),
+  end: Temporal.Instant.fromEpochMilliseconds(endMs),
+}).previousPeriodStart.epochMilliseconds;
 
 let clickHouse: ClickHouseClient;
+let runtime: Awaited<ReturnType<typeof bootApiOverClickHouse>>["runtime"];
 let queryCount = 0;
 
-// Each test names its own budget: the package's global testTimeout is 10s,
-// and these reach a real ClickHouse while sharing the machine with the rest
-// of the suite.
-
-/** The client the table reads through, counting the queries it issues. */
-const countingResolver = (): EvaluationClickHouseResolver => async () => ({
-  insert: (input) => clickHouse.insert(input),
-  query: async (input) => {
-    queryCount++;
-    return clickHouse.query(input);
-  },
-});
-
-const plainResolver = (): EvaluationClickHouseResolver => async () => ({
-  insert: (input) => clickHouse.insert(input),
-  query: (input) => clickHouse.query(input),
-});
+/** The process's routed ClickHouse member over the migrated test server, counting its reads. */
+function countingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      queryCount++;
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({
+        table: request.table,
+        values: request.rows,
+        format: "JSONEachRow",
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+    async command(request) {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
+  return new ClickHouseQueryClient({ driver });
+}
 
 const monitors = () => [
   { id: scoreEvaluatorId, isGuardrail: false },
   { id: guardrailEvaluatorId, isGuardrail: true },
 ];
 
-const readTablePerformance = (resolve: EvaluationClickHouseResolver) =>
-  createMonitorPerformanceReads({ resolveClickHouse: resolve }).getMonitorPerformance({
+const readTablePerformance = () =>
+  runtime.service(EvaluationApi).getMonitorPerformance({
     tenantId,
     monitors: monitors(),
     previousStartMs,
@@ -83,11 +94,7 @@ const expectSameNumbers = ({
   analyticsPage,
 }: {
   table: { current: number | null; previous: number | null; points: number[] };
-  analyticsPage: {
-    current: number | null;
-    previous: number | null;
-    dailyValues: number[];
-  };
+  analyticsPage: { current: number | null; previous: number | null; dailyValues: number[] };
 }) => {
   expect(analyticsPage.current).not.toBeNull();
   expect(analyticsPage.previous).not.toBeNull();
@@ -99,10 +106,26 @@ const expectSameNumbers = ({
   });
 };
 
+describe("the api installed over a ClickHouse", () => {
+  it("boots with evaluation on its live repositories, reading nothing until asked", async () => {
+    const refusing: QueryDriver = {
+      execute: () => Promise.reject(new Error("no statement is expected at boot")),
+      insert: () => Promise.reject(new Error("no statement is expected at boot")),
+      command: () => Promise.reject(new Error("no statement is expected at boot")),
+    };
+    const booted = await bootApiOverClickHouse({
+      clickhouse: new ClickHouseQueryClient({ driver: refusing }),
+    });
+
+    expect(booted.runtime.service(EvaluationApi)).toBeDefined();
+    expect(booted.runtime.service(AnalyticsApi)).toBeDefined();
+    await booted.runtime.stop();
+  }, 60_000);
+});
+
 describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   beforeAll(async () => {
     clickHouse = await startMigratedClickHouse();
-
     await seedMonitorPerformance({
       client: clickHouse,
       tenantId,
@@ -114,9 +137,11 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
         previousStartMs,
       }),
     });
+    ({ runtime } = await bootApiOverClickHouse({ clickhouse: countingQueryClient(clickHouse) }));
   }, 180_000);
 
   afterAll(async () => {
+    await runtime?.stop();
     await deleteSeededTenantRows({ client: clickHouse, tenantId });
   });
 
@@ -124,7 +149,7 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   it("loads current and previous performance with one real ClickHouse query", async () => {
     queryCount = 0;
 
-    const performance = await readTablePerformance(countingResolver());
+    const performance = await readTablePerformance();
 
     expect(queryCount).toBe(1);
     expect(performance).toEqual([
@@ -146,9 +171,7 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   }, 60_000);
 
   it("returns an explicit no-data result for a monitor without runs", async () => {
-    const performance = await createMonitorPerformanceReads({
-      resolveClickHouse: plainResolver(),
-    }).getMonitorPerformance({
+    const performance = await runtime.service(EvaluationApi).getMonitorPerformance({
       tenantId,
       monitors: [{ id: `${tenantId}-empty`, isGuardrail: false }],
       previousStartMs,
@@ -171,9 +194,9 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
   describe("when the analytics page reads the same period", () => {
     /** @scenario The configuration table matches the analytics page numbers */
     it("reports the same score values as the analytics page", async () => {
-      const [scorePerformance] = await readTablePerformance(plainResolver());
+      const [scorePerformance] = await readTablePerformance();
       const analyticsPage = await readAnalyticsPageNumbers({
-        client: clickHouse,
+        analytics: runtime.service(AnalyticsApi),
         tenantId,
         evaluatorId: scoreEvaluatorId,
         metric: "evaluations.evaluation_score",
@@ -186,9 +209,9 @@ describe.skipIf(!clickHouseUrl)("online evaluation monitor performance", () => {
 
     /** @scenario The configuration table matches the analytics page numbers */
     it("reports the same pass rate as the analytics page", async () => {
-      const [, guardrailPerformance] = await readTablePerformance(plainResolver());
+      const [, guardrailPerformance] = await readTablePerformance();
       const analyticsPage = await readAnalyticsPageNumbers({
-        client: clickHouse,
+        analytics: runtime.service(AnalyticsApi),
         tenantId,
         evaluatorId: guardrailEvaluatorId,
         metric: "evaluations.evaluation_pass_rate",
