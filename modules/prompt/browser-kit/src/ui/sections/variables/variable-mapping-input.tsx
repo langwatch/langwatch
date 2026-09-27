@@ -1,6 +1,11 @@
 import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@chakra-ui/react";
 import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit";
-import type { ComponentType, Field } from "@langwatch/workflow-contract";
+import type {
+  AvailableSource,
+  FieldMapping,
+  NestedField,
+  SourceType,
+} from "@langwatch/workflow-contract";
 import { Check, ChevronRight, Database, Type } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -10,63 +15,13 @@ import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 // Types
 // ============================================================================
 
-/** Source types aligned with DSL ComponentType + dataset */
-export type SourceType = ComponentType | "dataset";
-
-/** Field type - uses DSL Field type for strong typing */
-export type FieldType = Field["type"];
-
-/**
- * A field selectable in the mapping dropdown, supporting nested fields via
- * `children` (static array or dynamic `getChildren()`).
- */
-export type NestedField = {
-  /** Field name (used as path segment) */
-  name: string;
-  /** Display label (defaults to name if not provided) */
-  label?: string;
-  /** Field type for display */
-  type: FieldType;
-  /**
-   * Static children - use when children are known at definition time.
-   * Example: spans always have input/output/params subfields.
-   */
-  children?: NestedField[];
-  /**
-   * Dynamic children - use when children depend on runtime data.
-   * Example: metadata keys depend on actual trace data.
-   * The function is called when the field is selected to populate nested options.
-   */
-  getChildren?: () => NestedField[];
-  /**
-   * Whether selecting this field is "complete" without drilling down.
-   * Defaults to false when it has children; override to allow a parent
-   * like "spans" to be selected whole OR drilled into.
-   */
-  isComplete?: boolean;
-  /**
-   * Custom label for the "Use all X" option when isComplete is true and field has children.
-   * Defaults to "Use all {fieldName}" if not provided.
-   */
-  isCompleteLabel?: string;
-};
-
-export type AvailableSource = {
-  id: string;
-  name: string;
-  type: SourceType;
-  /** Fields available for mapping. Supports nested fields via children. */
-  fields: NestedField[];
-};
-
-/**
- * Field mapping - either to a source field or a hardcoded value. For
- * source mappings, `path` is an array of field segments (e.g.
- * `["spans", "gpt-4", "output"]`).
- */
-export type FieldMapping =
-  | { type: "source"; sourceId: string; path: string[] }
-  | { type: "value"; value: string };
+export type {
+  AvailableSource,
+  FieldMapping,
+  FieldType,
+  NestedField,
+  SourceType,
+} from "@langwatch/workflow-contract";
 
 type VariableMappingInputProps = {
   /** Current mapping (source or value) */

@@ -215,42 +215,11 @@ export function useEvaluatorEditorController(
   const mappingsConfig =
     props.mappingsConfig ?? (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange = flowCallbacks?.onMappingChange;
-  // Comparison: when this context is set, the drawer renders
-  // ComparisonConfigForm instead of the per-row mappings section.
-  const comparisonContext = complexProps.comparisonContext as
-    | {
-        initialComparison?: ComparisonEvaluatorConfig;
-        targets: TargetConfig[];
-        datasetColumns: { id: string; name: string }[];
-        datasetName?: string;
-      }
-    | undefined;
-  const onComparisonChange = (
-    flowCallbacks as
-      | {
-          onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
-        }
-      | undefined
-  )?.onComparisonChange;
-
-  // ComparisonConfigForm keeps its own draft and only pushes changes outward,
-  // so the editor has to mirror it here — otherwise the footer can't know
-  // whether enough variants are picked to enable Save.
-  const [comparison, setComparison] = useState<ComparisonEvaluatorConfig>(
-    comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
-  );
-  const initialComparison = comparisonContext?.initialComparison;
-  useEffect(() => {
-    setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
-  }, [initialComparison]);
-
-  const handleComparisonChange = useCallback(
-    (next: ComparisonEvaluatorConfig) => {
-      setComparison(next);
-      onComparisonChange?.(next);
-    },
-    [onComparisonChange],
-  );
+  const { comparisonContext, comparison, handleComparisonChange, onComparisonChange } =
+    useComparisonDraft({
+      complexProps,
+      flowCallbacks,
+    });
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -258,20 +227,10 @@ export function useEvaluatorEditorController(
   const gate = props.gate ?? (complexProps.gate as EvaluatorGateConfig | undefined);
   const onRequiredChange = props.onRequiredChange ?? flowCallbacks?.onRequiredChange;
   const onRemove = props.onRemove ?? flowCallbacks?.onRemove;
-  // The switch flips right away; the attachment behind it follows through
-  // the callback, the way a mapping does.
-  const [required, setRequired] = useState(gate?.required ?? false);
-  const gateRequired = gate?.required;
-  useEffect(() => {
-    setRequired(gateRequired ?? false);
-  }, [gateRequired]);
-  const handleRequiredChange = useCallback(
-    (next: boolean) => {
-      setRequired(next);
-      onRequiredChange?.(next);
-    },
-    [onRequiredChange],
-  );
+  const { required, handleRequiredChange } = useRequiredToggle({
+    gateRequired: gate?.required,
+    onRequiredChange,
+  });
 
   const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
   const initialLocalConfig =
@@ -315,43 +274,7 @@ export function useEvaluatorEditorController(
     return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
   }, [evaluatorType]);
 
-  // Pull the cascade-resolved defaults so the form's initial model /
-  // embeddings_model values reflect what this project actually has
-  // configured (claude-opus, gemini-pro, etc.) instead of the generic
-  // DEFAULT_MODEL constant baked into the evaluator zod schemas.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id && isOpen },
-  );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id && isOpen },
-  );
-
-  const defaultSettings = useMemo(() => {
-    if (!evaluatorDef || !project) return {};
-    return (
-      getEvaluatorDefaultSettings(
-        evaluatorDef,
-        {
-          defaultModel: resolvedDefaultModel.data?.model ?? null,
-          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
-        },
-        {
-          defaultModel: DEFAULT_MODEL,
-          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
-        },
-      ) ?? {}
-    );
-  }, [
-    evaluatorDef,
-    project,
-    resolvedDefaultModel.data?.model,
-    resolvedDefaultEmbeddings.data?.model,
-  ]);
+  const defaultSettings = useResolvedDefaultSettings({ evaluatorDef, project, isOpen });
 
   const forceUserToDecideAName = Boolean(
     evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match",
@@ -428,15 +351,7 @@ export function useEvaluatorEditorController(
 
   useEffect(() => {
     const subscription = form.watch((formValues) => {
-      const saved = savedFormValuesRef.current;
-      let isUnsaved = true;
-
-      if (saved) {
-        const nameChanged = formValues.name?.trim() !== saved.name.trim();
-        const settingsChanged =
-          JSON.stringify(formValues.settings) !== JSON.stringify(saved.settings);
-        isUnsaved = nameChanged || settingsChanged;
-      }
+      const isUnsaved = differsFromSaved(formValues, savedFormValuesRef.current);
 
       setHasUnsavedChanges(isUnsaved);
 
@@ -956,4 +871,131 @@ export function EvaluatorEditorHeading({ controller }: { controller: EvaluatorEd
       showUnpublishedBadge={hasUnsavedChanges && !!onLocalConfigChange}
     />
   );
+}
+
+function differsFromSaved(
+  formValues: { name?: string; settings?: unknown },
+  saved: EvaluatorFormValues | null,
+): boolean {
+  if (!saved) return true;
+  const nameChanged = formValues.name?.trim() !== saved.name.trim();
+  return nameChanged || JSON.stringify(formValues.settings) !== JSON.stringify(saved.settings);
+}
+
+function useComparisonDraft({
+  complexProps,
+  flowCallbacks,
+}: {
+  complexProps: ReturnType<typeof getComplexProps>;
+  flowCallbacks: ReturnType<typeof getFlowCallbacks>;
+}) {
+  // Comparison: when this context is set, the drawer renders
+  // ComparisonConfigForm instead of the per-row mappings section.
+  const comparisonContext = complexProps.comparisonContext as
+    | {
+        initialComparison?: ComparisonEvaluatorConfig;
+        targets: TargetConfig[];
+        datasetColumns: { id: string; name: string }[];
+        datasetName?: string;
+      }
+    | undefined;
+  const onComparisonChange = (
+    flowCallbacks as
+      | {
+          onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
+        }
+      | undefined
+  )?.onComparisonChange;
+
+  // ComparisonConfigForm keeps its own draft and only pushes changes outward,
+  // so the editor has to mirror it here — otherwise the footer can't know
+  // whether enough variants are picked to enable Save.
+  const [comparison, setComparison] = useState<ComparisonEvaluatorConfig>(
+    comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
+  );
+  const initialComparison = comparisonContext?.initialComparison;
+  useEffect(() => {
+    setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
+  }, [initialComparison]);
+
+  const handleComparisonChange = useCallback(
+    (next: ComparisonEvaluatorConfig) => {
+      setComparison(next);
+      onComparisonChange?.(next);
+    },
+    [onComparisonChange],
+  );
+  return { comparisonContext, comparison, handleComparisonChange, onComparisonChange };
+}
+
+function useRequiredToggle({
+  gateRequired,
+  onRequiredChange,
+}: {
+  gateRequired: boolean | undefined;
+  onRequiredChange: ((required: boolean) => void) | undefined;
+}) {
+  // The switch flips right away; the attachment follows through the callback.
+  const [required, setRequired] = useState(gateRequired ?? false);
+  useEffect(() => {
+    setRequired(gateRequired ?? false);
+  }, [gateRequired]);
+  const handleRequiredChange = useCallback(
+    (next: boolean) => {
+      setRequired(next);
+      onRequiredChange?.(next);
+    },
+    [onRequiredChange],
+  );
+  return { required, handleRequiredChange };
+}
+
+/** The evaluator's defaults, preferring the models this project actually has configured. */
+function useResolvedDefaultSettings({
+  evaluatorDef,
+  project,
+  isOpen,
+}: {
+  evaluatorDef: Parameters<typeof getEvaluatorDefaultSettings>[0];
+  project: { id: string } | undefined;
+  isOpen: boolean;
+}) {
+  // Pull the cascade-resolved defaults so the form's initial model /
+  // embeddings_model values reflect what this project actually has
+  // configured (claude-opus, gemini-pro, etc.) instead of the generic
+  // DEFAULT_MODEL constant baked into the evaluator zod schemas.
+  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id && isOpen },
+  );
+  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id && isOpen },
+  );
+
+  const defaultSettings = useMemo(() => {
+    if (!evaluatorDef || !project) return {};
+    return (
+      getEvaluatorDefaultSettings(
+        evaluatorDef,
+        {
+          defaultModel: resolvedDefaultModel.data?.model ?? null,
+          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
+        },
+        {
+          defaultModel: DEFAULT_MODEL,
+          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
+        },
+      ) ?? {}
+    );
+  }, [
+    evaluatorDef,
+    project,
+    resolvedDefaultModel.data?.model,
+    resolvedDefaultEmbeddings.data?.model,
+  ]);
+  return defaultSettings;
 }

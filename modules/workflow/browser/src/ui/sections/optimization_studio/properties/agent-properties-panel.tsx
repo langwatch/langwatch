@@ -197,7 +197,6 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   const codeSnapshot = readCodeSnapshot(node.data);
   const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
   const [code, setCode] = useState(initialCode({ localSettings, codeSnapshot, codeConfig }));
-  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   const applyAgentToEditorState = useCallback(
     (agent: NonNullable<typeof agentData>) => {
@@ -217,21 +216,17 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // edits. Node writes need a real content difference, so this cannot
   // loop with the node-to-editor derivation above.
   const appliedAgentSignature = useRef<string | null>(null);
-  const agentSignature = agentData
-    ? JSON.stringify({ name: agentData.name, config: agentData.config })
-    : null;
+  const agentSignature = agentData ? agentSignatureOf(agentData) : null;
 
   useEffect(() => {
     if (!agentData || !agentSignature) return;
-    if (appliedAgentSignature.current === agentSignature) return;
-    // Local draft wins until saved or discarded.
-    if (localConfig?.settings) return;
-
-    const isFirstArrival = appliedAgentSignature.current === null;
-    appliedAgentSignature.current = agentSignature;
-    if (isFirstArrival && nodeMatchesAgent(node.data, agentData)) {
-      return;
-    }
+    const apply = takeAgentRecord({
+      applied: appliedAgentSignature,
+      signature: agentSignature,
+      hasDraft: !!localConfig?.settings,
+      matchesNode: () => nodeMatchesAgent(node.data, agentData),
+    });
+    if (!apply) return;
 
     applyAgentToEditorState(agentData);
     setNode({
@@ -261,22 +256,8 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // Watch name changes
   const savedName = agentData?.name ?? node.data.name ?? "";
   const debouncedSetLocalConfig = useDebouncedCallback(
-    (formValues: { name?: string }) => {
-      const nameChanged = formValues.name !== savedName;
-      if (nameChanged) {
-        setNode({
-          id: node.id,
-          data: {
-            localConfig: {
-              name: formValues.name as string,
-              settings: localConfig?.settings,
-            },
-          },
-        });
-      } else if (!localConfig?.settings) {
-        setNode({ id: node.id, data: { localConfig: undefined } });
-      }
-    },
+    (formValues: { name?: string }) =>
+      persistNameDraft({ name: formValues.name, savedName, localConfig, nodeId: node.id, setNode }),
     300,
     { trailing: true },
   );
@@ -302,20 +283,12 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // to the record while a snapshot-less node loads.
   useEffect(() => {
     if (agentType !== "http") return;
-    const baseline =
-      readHttpSnapshot(node.data) ?? (agentData ? getHttpConfig(agentData.config) : undefined);
-    if (!baseline) return;
-    const draft = { url, method, bodyTemplate, outputPath, headers, auth };
-    if (httpDraftDiffers(draft, baseline)) {
-      persistLocalSettings({
-        url,
-        method,
-        bodyTemplate,
-        outputPath,
-        headers,
-        auth,
-      });
-    }
+    trackHttpDraft({
+      nodeData: node.data,
+      agentConfig: agentData?.config,
+      draft: { url, method, bodyTemplate, outputPath, headers, auth },
+      persist: persistLocalSettings,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     url,
@@ -333,12 +306,12 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // Track Code changes for localConfig persistence
   useEffect(() => {
     if (agentType !== "code") return;
-    const baseline =
-      readCodeSnapshot(node.data) ?? (agentData ? getCodeFromConfig(agentData.config) : undefined);
-    if (baseline === undefined) return;
-    if (code !== baseline) {
-      persistLocalSettings({ code });
-    }
+    trackCodeDraft({
+      nodeData: node.data,
+      agentConfig: agentData?.config,
+      code,
+      persist: persistLocalSettings,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, agentType, agentData, node.data.parameters, persistLocalSettings]);
 
@@ -451,10 +424,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
             name: trimmedName,
             ...(config ? { config } : {}),
           } as typeof agentData;
-          appliedAgentSignature.current = JSON.stringify({
-            name: updatedAgent.name,
-            config: updatedAgent.config,
-          });
+          appliedAgentSignature.current = agentSignatureOf(updatedAgent);
           trpcContext.agents.getById.setData({ id: agentId, projectId }, updatedAgent);
           setNode({
             id: node.id,
@@ -494,10 +464,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
       // Back to the saved record - including any library update that
       // arrived while the draft was holding it back.
       applyAgentToEditorState(agentData);
-      appliedAgentSignature.current = JSON.stringify({
-        name: agentData.name,
-        config: agentData.config,
-      });
+      appliedAgentSignature.current = agentSignatureOf(agentData);
       setNode({
         id: node.id,
         data: {
@@ -509,10 +476,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     }
     // Record still loading: drop the draft, keep the node's snapshot.
     form.reset({ name: node.data.name ?? "" });
-    const snapshotCode = readCodeSnapshot(node.data);
-    if (snapshotCode !== undefined) setCode(snapshotCode);
-    const snapshotHttp = readHttpSnapshot(node.data);
-    if (snapshotHttp) applyHttpDraft(snapshotHttp, httpSetters);
+    resetDraftToSnapshot({ nodeData: node.data, setCode, httpSetters });
     setNode({ id: node.id, data: { localConfig: undefined } });
   }, [
     form,
@@ -626,23 +590,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
       )}
 
       {/* Inline Code editor */}
-      {agentType === "code" && (
-        <VStack gap={4} align="stretch" paddingX={4} width="full">
-          <Field.Root>
-            <Field.Label fontSize="sm">Python Code</Field.Label>
-            <Text fontSize="xs" color="fg.muted" marginBottom={1}>
-              Define a Python class with a `__call__` method that takes inputs and returns outputs.
-            </Text>
-            <CodeBlockEditor
-              code={code}
-              onChange={(v) => setCode(v)}
-              language="python"
-              externalModal
-              onEditClick={() => setIsCodeModalOpen(true)}
-            />
-          </Field.Root>
-        </VStack>
-      )}
+      {agentType === "code" && <AgentCodeSection code={code} setCode={setCode} />}
 
       {agentType === "workflow" && (
         <Box paddingX={4}>
@@ -678,16 +626,6 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
           availableTypes={CODE_OUTPUT_TYPES}
         />
       </Box>
-
-      {/* Code editor modal (outside drawer to avoid focus conflicts) */}
-      {agentType === "code" && (
-        <CodeEditorModal
-          code={code}
-          setCode={(v) => setCode(v)}
-          open={isCodeModalOpen}
-          onClose={() => setIsCodeModalOpen(false)}
-        />
-      )}
     </BasePropertiesPanel>
   );
 }
@@ -803,4 +741,134 @@ function agentConfigFor({
     inputs: inputs.map((i) => ({ identifier: i.identifier, type: i.type })),
     outputs: outputs.map((o) => ({ identifier: o.identifier, type: o.type })),
   });
+}
+
+type AgentLocalConfig = AgentComponent["localConfig"];
+type AgentRecordConfig = Parameters<typeof getHttpConfig>[0] | undefined;
+
+/** A renamed agent keeps its draft settings; a name back at the saved one clears an empty draft. */
+function persistNameDraft({
+  name,
+  savedName,
+  localConfig,
+  nodeId,
+  setNode,
+}: {
+  name: string | undefined;
+  savedName: string;
+  localConfig: AgentLocalConfig;
+  nodeId: string;
+  setNode: (node: { id: string; data: Partial<AgentComponent> }) => void;
+}) {
+  if (name !== savedName) {
+    setNode({
+      id: nodeId,
+      data: { localConfig: { name: name as string, settings: localConfig?.settings } },
+    });
+    return;
+  }
+  if (!localConfig?.settings) setNode({ id: nodeId, data: { localConfig: undefined } });
+}
+
+/** Baseline is the node's DSL snapshot, else the record while a snapshot-less node loads. */
+function trackHttpDraft({
+  nodeData,
+  agentConfig,
+  draft,
+  persist,
+}: {
+  nodeData: AgentComponent;
+  agentConfig: AgentRecordConfig;
+  draft: HttpDraft;
+  persist: (settings: Record<string, unknown>) => void;
+}) {
+  const baseline =
+    readHttpSnapshot(nodeData) ?? (agentConfig ? getHttpConfig(agentConfig) : undefined);
+  if (baseline && httpDraftDiffers(draft, baseline)) persist({ ...draft });
+}
+
+function trackCodeDraft({
+  nodeData,
+  agentConfig,
+  code,
+  persist,
+}: {
+  nodeData: AgentComponent;
+  agentConfig: AgentRecordConfig;
+  code: string;
+  persist: (settings: Record<string, unknown>) => void;
+}) {
+  const baseline =
+    readCodeSnapshot(nodeData) ?? (agentConfig ? getCodeFromConfig(agentConfig) : undefined);
+  if (baseline !== undefined && code !== baseline) persist({ code });
+}
+
+function agentSignatureOf(agent: { name: string; config: unknown }): string {
+  return JSON.stringify({ name: agent.name, config: agent.config });
+}
+
+/**
+ * Whether a library record should overwrite the editor: only a new record, never over a local
+ * draft, and not on first arrival when the node already matches it. Marks the record applied.
+ */
+function takeAgentRecord({
+  applied,
+  signature,
+  hasDraft,
+  matchesNode,
+}: {
+  applied: { current: string | null };
+  signature: string;
+  hasDraft: boolean;
+  matchesNode: () => boolean;
+}): boolean {
+  if (applied.current === signature || hasDraft) return false;
+  const isFirstArrival = applied.current === null;
+  applied.current = signature;
+  return !(isFirstArrival && matchesNode());
+}
+
+function resetDraftToSnapshot({
+  nodeData,
+  setCode,
+  httpSetters,
+}: {
+  nodeData: AgentComponent;
+  setCode: (code: string) => void;
+  httpSetters: Parameters<typeof applyHttpDraft>[1];
+}) {
+  const snapshotCode = readCodeSnapshot(nodeData);
+  if (snapshotCode !== undefined) setCode(snapshotCode);
+  const snapshotHttp = readHttpSnapshot(nodeData);
+  if (snapshotHttp) applyHttpDraft(snapshotHttp, httpSetters);
+}
+
+function AgentCodeSection({ code, setCode }: { code: string; setCode: (code: string) => void }) {
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  return (
+    <>
+      <VStack gap={4} align="stretch" paddingX={4} width="full">
+        <Field.Root>
+          <Field.Label fontSize="sm">Python Code</Field.Label>
+          <Text fontSize="xs" color="fg.muted" marginBottom={1}>
+            Define a Python class with a `__call__` method that takes inputs and returns outputs.
+          </Text>
+          <CodeBlockEditor
+            code={code}
+            onChange={(v) => setCode(v)}
+            language="python"
+            externalModal
+            onEditClick={() => setIsCodeModalOpen(true)}
+          />
+        </Field.Root>
+      </VStack>
+      {/* Code editor modal (outside drawer to avoid focus conflicts) */}
+      <CodeEditorModal
+        code={code}
+        setCode={(v) => setCode(v)}
+        open={isCodeModalOpen}
+        onClose={() => setIsCodeModalOpen(false)}
+      />
+    </>
+  );
 }
