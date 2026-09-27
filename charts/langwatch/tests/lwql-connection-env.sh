@@ -269,8 +269,8 @@ $(cat "$err")"
   if ! grep -qE "name: lw-lwql-access-render-[0-9]+" "$out"; then
     fail "topology-no-job" "no revision-named lw-lwql-access-render-<n> Job rendered on chart-managed ClickHouse."
   fi
-  if ! grep -q "renderLwqlAccessConfig" "$out"; then
-    fail "topology-no-render-cmd" "the access-render Job does not invoke renderLwqlAccessConfig."
+  if ! grep -q "task lwql-render-access-config" "$out"; then
+    fail "topology-no-render-cmd" "the access-render Job does not run the lwql-render-access-config task."
   fi
   # Isolate the render Job document from the rendered template — it also emits the
   # ServiceAccount/Role/RoleBinding, which ARE hooks (below), so a whole-file hook
