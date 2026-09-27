@@ -38,6 +38,9 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",

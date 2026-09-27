@@ -439,12 +439,17 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   /**
    * Update an LLM config's metadata (name only)
    */
-  updateConfig(
-    idOrHandle: string,
-    projectId: string,
-    data: Partial<CreateLlmConfigParams>,
-    options?: { tx?: Prisma.TransactionClient },
-  ): Promise<LlmPromptConfig> {
+  updateConfig({
+    idOrHandle,
+    projectId,
+    data,
+    options,
+  }: {
+    idOrHandle: string;
+    projectId: string;
+    data: Partial<CreateLlmConfigParams>;
+    options?: { tx?: Prisma.TransactionClient };
+  }): Promise<LlmPromptConfig> {
     return this.#refusingTakenHandle(() =>
       this.#writeConfig({ idOrHandle, projectId, data, options }),
     );

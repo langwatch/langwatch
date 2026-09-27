@@ -297,23 +297,7 @@ function SubscriptionDrawer({
   useEffect(() => {
     if (!isOpen) return;
     if (mode === "edit" && subscription) {
-      const limitValues = LIMIT_FIELDS.reduce(
-        (acc, f) => {
-          const raw = subscription[f.key];
-          acc[f.key as LimitKey] = typeof raw === "number" ? raw.toString() : "";
-          return acc;
-        },
-        {} as Record<LimitKey, string>,
-      );
-      setForm({
-        organizationId: subscription.organizationId,
-        plan: subscription.plan,
-        status: subscription.status,
-        stripeSubscriptionId: subscription.stripeSubscriptionId ?? "",
-        startDate: toDateInputValue(subscription.startDate),
-        endDate: toDateInputValue(subscription.endDate),
-        ...limitValues,
-      });
+      setForm(formFromSubscription(subscription));
     } else if (mode === "create") {
       setForm(EMPTY_FORM);
     }
@@ -322,7 +306,8 @@ function SubscriptionDrawer({
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const title = mode === "edit" ? "Edit Subscription" : "New Subscription";
+  const copy = DRAWER_COPY[mode];
+  const title = copy.title;
 
   const handleSave = () => {
     if (!form.organizationId) {
@@ -333,21 +318,11 @@ function SubscriptionDrawer({
       });
       return;
     }
-    const payload: Record<string, unknown> = {
-      organizationId: form.organizationId,
-      plan: form.plan,
-      status: form.status,
-      stripeSubscriptionId: form.stripeSubscriptionId || null,
-      startDate: dateInputToISO(form.startDate),
-      endDate: dateInputToISO(form.endDate),
-    };
-    for (const f of LIMIT_FIELDS) {
-      payload[f.key] = numOrNull(form[f.key as LimitKey]);
-    }
+    const payload = payloadFromForm(form);
 
     const onSuccess = () => {
       toaster.create({
-        title: mode === "edit" ? "Subscription updated" : "Subscription created",
+        title: copy.saved,
         type: "success",
         duration: 3000,
       });
@@ -356,8 +331,7 @@ function SubscriptionDrawer({
     const onError = (err: Error) =>
       showErrorToast({
         error: err,
-        fallbackTitle:
-          mode === "edit" ? "Couldn't update the subscription" : "Couldn't create the subscription",
+        fallbackTitle: copy.failed,
       });
 
     if (mode === "edit" && subscription) {
@@ -366,17 +340,6 @@ function SubscriptionDrawer({
       create.mutate(payload, { onSuccess, onError });
     }
   };
-
-  // Group limit fields by the "group" tag so the form renders tight sections.
-  const groupedLimits = useMemo(() => {
-    const map = new Map<string, typeof LIMIT_FIELDS>();
-    for (const f of LIMIT_FIELDS) {
-      const bucket = map.get(f.group) ?? [];
-      bucket.push(f);
-      map.set(f.group, bucket);
-    }
-    return Array.from(map.entries());
-  }, []);
 
   return (
     <Drawer.Root
@@ -443,7 +406,7 @@ function SubscriptionDrawer({
               </Field.Root>
             </HStack>
 
-            {groupedLimits.map(([group, fields]) => (
+            {GROUPED_LIMITS.map(([group, fields]) => (
               <VStack key={group} gap={3} align="stretch">
                 <SectionHeading>{group} limits</SectionHeading>
                 <SimpleGrid columns={2} gap={3}>
@@ -588,3 +551,64 @@ function OrganizationPicker({
     </Field.Root>
   );
 }
+
+const DRAWER_COPY = {
+  edit: {
+    title: "Edit Subscription",
+    saved: "Subscription updated",
+    failed: "Couldn't update the subscription",
+  },
+  create: {
+    title: "New Subscription",
+    saved: "Subscription created",
+    failed: "Couldn't create the subscription",
+  },
+} as const;
+
+/** The edit form, filled from a stored subscription. */
+function formFromSubscription(subscription: AdminSubscription): FormState {
+  const limitValues = LIMIT_FIELDS.reduce(
+    (acc, f) => {
+      const raw = subscription[f.key];
+      acc[f.key as LimitKey] = typeof raw === "number" ? raw.toString() : "";
+      return acc;
+    },
+    {} as Record<LimitKey, string>,
+  );
+  return {
+    organizationId: subscription.organizationId,
+    plan: subscription.plan,
+    status: subscription.status,
+    stripeSubscriptionId: subscription.stripeSubscriptionId ?? "",
+    startDate: toDateInputValue(subscription.startDate),
+    endDate: toDateInputValue(subscription.endDate),
+    ...limitValues,
+  };
+}
+
+/** What the admin write receives for this form. */
+function payloadFromForm(form: FormState): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    organizationId: form.organizationId,
+    plan: form.plan,
+    status: form.status,
+    stripeSubscriptionId: form.stripeSubscriptionId || null,
+    startDate: dateInputToISO(form.startDate),
+    endDate: dateInputToISO(form.endDate),
+  };
+  for (const f of LIMIT_FIELDS) {
+    payload[f.key] = numOrNull(form[f.key as LimitKey]);
+  }
+  return payload;
+}
+
+/** Limit fields grouped by their "group" tag so the form renders tight sections. */
+const GROUPED_LIMITS = (() => {
+  const map = new Map<string, typeof LIMIT_FIELDS>();
+  for (const f of LIMIT_FIELDS) {
+    const bucket = map.get(f.group) ?? [];
+    bucket.push(f);
+    map.set(f.group, bucket);
+  }
+  return Array.from(map.entries());
+})();

@@ -35,6 +35,7 @@
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",

@@ -175,11 +175,15 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     return this.#withLatest(config, version, params);
   }
 
-  async updateConfig(
-    idOrHandle: string,
-    projectId: string,
-    data: Partial<CreateLlmConfigParams>,
-  ): Promise<PromptConfigRow> {
+  async updateConfig({
+    idOrHandle,
+    projectId,
+    data,
+  }: {
+    idOrHandle: string;
+    projectId: string;
+    data: Partial<CreateLlmConfigParams>;
+  }): Promise<PromptConfigRow> {
     const existing = [...this.#state.configs.values()].find(
       (row) =>
         row.projectId === projectId &&
@@ -228,7 +232,11 @@ export class MemoryLlmConfigRepository extends LlmConfigRepository {
     authorId?: string;
     runtimeParameters?: Record<string, unknown>;
   }): Promise<LlmConfigWithLatestVersion> {
-    const updated = await this.updateConfig(params.idOrHandle, params.projectId, params.data);
+    const updated = await this.updateConfig({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      data: params.data,
+    });
     const prior = await this.versions.findLatestVersion(updated.id, params.projectId);
     const created = this.appendVersion({
       configId: updated.id,

@@ -2,7 +2,7 @@ import { Box, Button, Flex, Heading, HStack, Input, Spacer, Text, VStack } from 
 import { Drawer } from "@langwatch/design-system/drawer";
 import { nowInstant } from "@langwatch/time";
 import { Play, RotateCcw } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { useExecutionStore } from "../../behavior/execution.store.ts";
 import { useFoundryProjectStore } from "../../behavior/foundry-project.store.ts";
@@ -10,7 +10,7 @@ import { useFoundryTransport } from "../../behavior/foundry-runtime.tsx";
 import { usePresetStore } from "../../behavior/preset.store.ts";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
 import { useTraceStore } from "../../behavior/trace.store.ts";
-import { SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
+import { type Preset, SPAN_TYPE_ICONS, type SpanConfig } from "../../model/foundry-types.ts";
 
 export function FoundryDrawer({ onClose }: { onClose: () => void }) {
   const { currentProject: project } = useFoundryTransport();
@@ -26,24 +26,8 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
   const { builtIn } = usePresetStore();
   const [showPresets, setShowPresets] = useState(!trace.spans.length);
   const [lastTraceId, setLastTraceId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const sendRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        sendRef.current?.click();
-      }
-      if (e.key === "r" && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        resetTrace();
-      }
-    }
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [resetTrace]);
+  const sendRef = useFoundryShortcuts(resetTrace);
 
   async function handleSend() {
     if (running || !apiKey) return;
@@ -65,7 +49,6 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
       const traceId = await executor.executeTrace(trace);
       updateLogEntry(logId, { status: "success", traceId });
       setLastTraceId(traceId);
-      setCopied(false);
     } catch (err) {
       updateLogEntry(logId, {
         status: "error",
@@ -95,41 +78,13 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
         <Drawer.Body padding={0}>
           <VStack align="stretch" gap={0} h="full">
             {showPresets ? (
-              <VStack align="stretch" gap={1} p={4} flex={1} overflow="auto">
-                <Text fontSize="sm" fontWeight="semibold" mb={2}>
-                  Pick a preset to start
-                </Text>
-                {builtIn.slice(0, 8).map((preset) => (
-                  <Flex
-                    key={preset.id}
-                    as="button"
-                    align="center"
-                    justify="space-between"
-                    rounded="md"
-                    border="1px solid"
-                    borderColor="border"
-                    px={3}
-                    py={2}
-                    _hover={{ bg: "bg.subtle" }}
-                    onClick={() => {
-                      setTrace(structuredClone(preset.config));
-                      setShowPresets(false);
-                    }}
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm" fontWeight="medium">
-                        {preset.name}
-                      </Text>
-                      <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-                        {preset.description}
-                      </Text>
-                    </VStack>
-                    <Text fontSize="xs" color="fg.muted">
-                      {countSpans(preset.config.spans)} spans
-                    </Text>
-                  </Flex>
-                ))}
-              </VStack>
+              <PresetPicker
+                presets={builtIn.slice(0, 8)}
+                onPick={(config) => {
+                  setTrace(structuredClone(config));
+                  setShowPresets(false);
+                }}
+              />
             ) : (
               <>
                 <Box flex={1} overflow="auto" p={3}>
@@ -156,60 +111,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
                     />
                   ))}
 
-                  {selectedSpan && (
-                    <Box
-                      mt={3}
-                      p={3}
-                      rounded="md"
-                      border="1px solid"
-                      borderColor="border"
-                      bg="bg.subtle"
-                    >
-                      <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
-                        {SPAN_TYPE_ICONS[selectedSpan.type]} {selectedSpan.name}
-                      </Text>
-                      {selectedSpan.type === "llm" &&
-                        selectedSpan.llm?.messages?.map((msg, i) => (
-                          <Box key={i} mb={1}>
-                            <Text fontSize="10px" color="fg.muted" mb={0.5}>
-                              {msg.role}
-                            </Text>
-                            <Input
-                              size="sm"
-                              fontSize="xs"
-                              value={msg.content}
-                              onChange={(e) => {
-                                const msgs = [...(selectedSpan.llm?.messages ?? [])];
-                                msgs[i] = {
-                                  ...msgs[i]!,
-                                  content: e.target.value,
-                                };
-                                updateSpan(selectedSpan.id, {
-                                  llm: { ...selectedSpan.llm, messages: msgs },
-                                });
-                              }}
-                            />
-                          </Box>
-                        ))}
-                      {selectedSpan.type !== "llm" && (
-                        <Input
-                          size="sm"
-                          fontSize="xs"
-                          placeholder="Input..."
-                          value={
-                            selectedSpan.input?.type === "text"
-                              ? (selectedSpan.input.value as string)
-                              : ""
-                          }
-                          onChange={(e) =>
-                            updateSpan(selectedSpan.id, {
-                              input: { type: "text", value: e.target.value },
-                            })
-                          }
-                        />
-                      )}
-                    </Box>
-                  )}
+                  {selectedSpan && <SelectedSpanEditor span={selectedSpan} onUpdate={updateSpan} />}
                 </Box>
 
                 <Box p={3} borderTop="1px solid" borderColor="border" bg="bg.subtle">
@@ -230,38 +132,7 @@ export function FoundryDrawer({ onClose }: { onClose: () => void }) {
                       <RotateCcw size={14} />
                     </Button>
                   </HStack>
-                  {lastTraceId && (
-                    <Box
-                      as="button"
-                      mt={2}
-                      w="full"
-                      rounded="md"
-                      bg={copied ? "green.950/30" : "bg.emphasized"}
-                      px={3}
-                      py={2}
-                      cursor="pointer"
-                      transition="background 0.15s"
-                      _hover={{ bg: copied ? "green.950/30" : "bg.muted" }}
-                      _active={{ bg: "green.950/40" }}
-                      onClick={() => {
-                        void navigator.clipboard.writeText(lastTraceId);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }}
-                    >
-                      <Text
-                        fontSize="xs"
-                        color={copied ? "green.400" : "fg.default"}
-                        fontWeight="medium"
-                        mb={0.5}
-                      >
-                        {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
-                      </Text>
-                      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
-                        {lastTraceId}
-                      </Text>
-                    </Box>
-                  )}
+                  {lastTraceId && <SentTraceNotice traceId={lastTraceId} />}
                   <Text fontSize="10px" color="fg.muted" mt={1} textAlign="center">
                     ⌘Enter to send · R to reset
                   </Text>
@@ -333,4 +204,157 @@ function findSpan(spans: SpanConfig[], id: string): SpanConfig | undefined {
 
 function countSpans(spans: SpanConfig[]): number {
   return spans.reduce((n, s) => n + 1 + countSpans(s.children), 0);
+}
+
+/** The selected span's editable input: its messages for an LLM span, its text otherwise. */
+function SelectedSpanEditor({
+  span,
+  onUpdate,
+}: {
+  span: SpanConfig;
+  onUpdate: (id: string, partial: Partial<SpanConfig>) => void;
+}) {
+  return (
+    <Box mt={3} p={3} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle">
+      <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
+        {SPAN_TYPE_ICONS[span.type]} {span.name}
+      </Text>
+      {span.type === "llm" &&
+        span.llm?.messages?.map((msg, i) => (
+          <Box key={i} mb={1}>
+            <Text fontSize="10px" color="fg.muted" mb={0.5}>
+              {msg.role}
+            </Text>
+            <Input
+              size="sm"
+              fontSize="xs"
+              value={msg.content}
+              onChange={(e) => {
+                const msgs = [...(span.llm?.messages ?? [])];
+                msgs[i] = {
+                  ...msgs[i]!,
+                  content: e.target.value,
+                };
+                onUpdate(span.id, {
+                  llm: { ...span.llm, messages: msgs },
+                });
+              }}
+            />
+          </Box>
+        ))}
+      {span.type !== "llm" && (
+        <Input
+          size="sm"
+          fontSize="xs"
+          placeholder="Input..."
+          value={span.input?.type === "text" ? (span.input.value as string) : ""}
+          onChange={(e) =>
+            onUpdate(span.id, {
+              input: { type: "text", value: e.target.value },
+            })
+          }
+        />
+      )}
+    </Box>
+  );
+}
+
+/** The last sent trace's id, copied on click. */
+function SentTraceNotice({ traceId }: { traceId: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Box
+      as="button"
+      mt={2}
+      w="full"
+      rounded="md"
+      bg={copied ? "green.950/30" : "bg.emphasized"}
+      px={3}
+      py={2}
+      cursor="pointer"
+      transition="background 0.15s"
+      _hover={{ bg: copied ? "green.950/30" : "bg.muted" }}
+      _active={{ bg: "green.950/40" }}
+      onClick={() => {
+        void navigator.clipboard.writeText(traceId);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+    >
+      <Text fontSize="xs" color={copied ? "green.400" : "fg.default"} fontWeight="medium" mb={0.5}>
+        {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
+      </Text>
+      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
+        {traceId}
+      </Text>
+    </Box>
+  );
+}
+
+/** The built-in presets a new trace starts from. */
+function PresetPicker({
+  presets,
+  onPick,
+}: {
+  presets: Preset[];
+  onPick: (config: Preset["config"]) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={1} p={4} flex={1} overflow="auto">
+      <Text fontSize="sm" fontWeight="semibold" mb={2}>
+        Pick a preset to start
+      </Text>
+      {presets.map((preset) => (
+        <Flex
+          key={preset.id}
+          as="button"
+          align="center"
+          justify="space-between"
+          rounded="md"
+          border="1px solid"
+          borderColor="border"
+          px={3}
+          py={2}
+          _hover={{ bg: "bg.subtle" }}
+          onClick={() => onPick(preset.config)}
+        >
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" fontWeight="medium">
+              {preset.name}
+            </Text>
+            <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+              {preset.description}
+            </Text>
+          </VStack>
+          <Text fontSize="xs" color="fg.muted">
+            {countSpans(preset.config.spans)} spans
+          </Text>
+        </Flex>
+      ))}
+    </VStack>
+  );
+}
+
+/** ⌘Enter sends the trace, R resets it, except while typing in a field. */
+function useFoundryShortcuts(resetTrace: () => void): RefObject<HTMLButtonElement | null> {
+  const sendRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        e.preventDefault();
+        sendRef.current?.click();
+      }
+      if (e.key === "r" && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        resetTrace();
+      }
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [resetTrace]);
+
+  return sendRef;
 }

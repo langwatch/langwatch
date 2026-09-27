@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, chakra, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { RotateCcw, XCircle } from "lucide-react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
@@ -34,31 +34,24 @@ export function DeadLetterRow({
 }) {
   return (
     <>
-      {/* Reachable by keyboard, not only by mouse. The expanded region holds
-          the trace id, which is the only route from this page to WHY the
-          message died — so a row that opens on click alone puts the
-          diagnosis behind a pointer. */}
-      <Table.Row
-        cursor="pointer"
-        onClick={onToggle}
-        tabIndex={0}
-        role="button"
-        aria-expanded={isExpanded}
-        onKeyDown={(event) => {
-          // Only the row's own key events. Enter or Space on the nested
-          // Redrive button bubbles up here too, and without this the
-          // operator would redrive AND toggle the row in one press.
-          if (event.target !== event.currentTarget) return;
-          if (event.key !== "Enter" && event.key !== " ") return;
-          event.preventDefault();
-          onToggle();
-        }}
-        data-testid={`dead-row-${message.messageKey}`}
-      >
+      {/* The row opens on click; its first cell is a real button so the
+          expanded region (the trace id, the only route to WHY the message
+          died) is reachable by keyboard too. */}
+      <Table.Row cursor="pointer" onClick={onToggle} data-testid={`dead-row-${message.messageKey}`}>
         <Table.Cell>
-          <Text textStyle="xs" fontWeight="medium">
-            {message.processName}
-          </Text>
+          <chakra.button
+            type="button"
+            aria-expanded={isExpanded}
+            textAlign="left"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+          >
+            <Text textStyle="xs" fontWeight="medium">
+              {message.processName}
+            </Text>
+          </chakra.button>
         </Table.Cell>
         <Table.Cell>
           <Text textStyle="xs" fontFamily="mono">

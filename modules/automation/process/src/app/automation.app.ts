@@ -931,6 +931,10 @@ export class AutomationApp implements AutomationApi {
     callerAddress: string | null;
     via: UnsubscribeChannel;
   }): Promise<void> {
+    if (!input.token) {
+      throw new UnsubscribeLinkInvalidError("This unsubscribe link has no token.", 400);
+    }
+
     await this.#countUnsubscribe({
       action: input.via === "one-click" ? "one-click" : "confirm",
       callerAddress: input.callerAddress,

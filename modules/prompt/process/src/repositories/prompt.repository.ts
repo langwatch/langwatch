@@ -107,11 +107,11 @@ export abstract class LlmConfigRepository {
     versionId?: string;
   }): Promise<LlmConfigWithLatestVersion>;
 
-  abstract updateConfig(
-    idOrHandle: string,
-    projectId: string,
-    data: Partial<CreateLlmConfigParams>,
-  ): Promise<PromptConfigRow>;
+  abstract updateConfig(input: {
+    idOrHandle: string;
+    projectId: string;
+    data: Partial<CreateLlmConfigParams>;
+  }): Promise<PromptConfigRow>;
 
   abstract updateConfigAndCreateVersion(params: {
     idOrHandle: string;

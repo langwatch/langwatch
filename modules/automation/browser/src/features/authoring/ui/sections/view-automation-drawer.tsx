@@ -98,142 +98,6 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
     ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ?? null)
     : null;
 
-  const destinationSummary = (): React.ReactNode => {
-    if (!trigger) return null;
-    switch (trigger.action) {
-      case "SEND_SLACK_MESSAGE":
-        // The webhook URL carries a secret token — mask it and surface the
-        // full URL only on hover, mirroring the list page's Slack cell.
-        return actionParams.slackWebhook ? (
-          <Tooltip content={actionParams.slackWebhook}>
-            <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
-              Slack webhook
-            </Text>
-          </Tooltip>
-        ) : (
-          <Text textStyle="sm">Slack webhook</Text>
-        );
-      case "SEND_EMAIL":
-        return actionParams.members?.length ? (
-          <Text textStyle="sm" wordBreak="break-all">
-            {actionParams.members.join(", ")}
-          </Text>
-        ) : null;
-      case "SEND_WEBHOOK": {
-        let hostname = "Webhook";
-        try {
-          hostname = actionParams.url ? new URL(actionParams.url).hostname : hostname;
-        } catch {
-          // Stored rows are validated; retain a safe label for legacy data.
-        }
-        return (
-          <Text textStyle="sm" wordBreak="break-all">
-            {actionParams.method ?? "POST"} {hostname}
-          </Text>
-        );
-      }
-      case "ADD_TO_DATASET":
-        return datasetName ? <Text textStyle="sm">{datasetName}</Text> : null;
-      case "ADD_TO_ANNOTATION_QUEUE":
-        return actionParams.annotators?.length ? (
-          <Text textStyle="sm" wordBreak="break-all">
-            {actionParams.annotators.map((a) => a.name).join(", ")}
-          </Text>
-        ) : null;
-      default:
-        return null;
-    }
-  };
-
-  const conditionsSummary = () => {
-    if (!trigger) return null;
-    if (isGraphAlert) {
-      const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
-      const window = actionParams.timePeriod ? TIME_PERIOD_LABELS[actionParams.timePeriod] : null;
-      const seriesLabel = actionParams.seriesName
-        ? (resolveSeriesLabel(graphQuery.data?.graph, actionParams.seriesName) ??
-          actionParams.seriesName)
-        : "Metric";
-      return (
-        <Text textStyle="sm">
-          {seriesLabel}
-          {operator ? ` ${operator}` : ""}
-          {actionParams.threshold !== undefined ? ` ${actionParams.threshold}` : ""}
-          {window ? ` over ${window}` : ""}
-        </Text>
-      );
-    }
-    if (trigger.filterQuery) {
-      // ADR-043: a trace-subject automation shows its search query, mirroring
-      // the automations page's "Acts on" cell.
-      return (
-        <Code size="sm" variant="surface" whiteSpace="pre-wrap" wordBreak="break-word">
-          {trigger.filterQuery}
-        </Code>
-      );
-    }
-    const filters = parseAutomationFiltersWire(trigger.filters);
-    if (Object.keys(filters).length > 0) {
-      return <FilterDisplay filters={JSON.stringify(filters)} hasBorder={true} />;
-    }
-    return (
-      <Text textStyle="sm" color="fg.muted">
-        No conditions
-      </Text>
-    );
-  };
-
-  const kindLabel = (): string => {
-    if (isGraphAlert) return "Alert";
-    if (isSchedule) return "Schedule";
-    return "Automation";
-  };
-
-  const kindBadge = (): React.ReactNode => {
-    if (isGraphAlert) {
-      return (
-        <Badge colorPalette="purple" gap={1}>
-          <TrendingUp size={12} />
-          Alert
-        </Badge>
-      );
-    }
-    if (isSchedule) {
-      return (
-        <Badge colorPalette="purple" gap={1}>
-          <Calendar size={12} />
-          Schedule
-        </Badge>
-      );
-    }
-    if (trigger) return <Badge colorPalette="gray">Automation</Badge>;
-    return null;
-  };
-
-  const recentFiresBody = (): React.ReactNode => {
-    if (recentFiresQuery.isLoading) return <Skeleton height="60px" width="full" />;
-    if ((recentFiresQuery.data ?? []).length === 0) {
-      return (
-        <Text textStyle="sm" color="fg.muted">
-          {isGraphAlert ? "This alert has not fired yet." : "This automation has not fired yet."}
-        </Text>
-      );
-    }
-    return <RecentFiresList fires={recentFiresQuery.data ?? []} isGraphAlert={isGraphAlert} />;
-  };
-
-  const webhookDeliveriesBody = (): React.ReactNode => {
-    if (webhookDeliveriesQuery.isLoading) return <Skeleton height="60px" width="full" />;
-    if ((webhookDeliveriesQuery.data ?? []).length === 0) {
-      return (
-        <Text textStyle="sm" color="fg.muted">
-          No delivery attempts recorded yet.
-        </Text>
-      );
-    }
-    return <WebhookDeliveriesList deliveries={webhookDeliveriesQuery.data ?? []} />;
-  };
-
   return (
     <Drawer.Root
       open={true}
@@ -250,9 +114,11 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
             {triggerQuery.isLoading ? (
               <Skeleton height="24px" width="200px" />
             ) : (
-              <Heading size="md">{trigger?.name ?? kindLabel()}</Heading>
+              <Heading size="md">
+                {trigger?.name ?? kindLabelOf({ isGraphAlert, isSchedule })}
+              </Heading>
             )}
-            {kindBadge()}
+            {kindBadgeOf({ trigger, isGraphAlert, isSchedule })}
           </VStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -272,21 +138,32 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Destination
               </Text>
-              {destinationSummary() ?? <Text textStyle="sm">None</Text>}
+              {destinationSummaryOf({ trigger, actionParams, datasetName }) ?? (
+                <Text textStyle="sm">None</Text>
+              )}
             </VStack>
 
             <VStack align="start" gap={1} width="full">
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Conditions
               </Text>
-              {conditionsSummary()}
+              {conditionsSummaryOf({
+                trigger,
+                isGraphAlert,
+                actionParams,
+                graph: graphQuery.data?.graph,
+              })}
             </VStack>
 
             <VStack align="start" gap={2} width="full">
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Recent fires
               </Text>
-              {recentFiresBody()}
+              {recentFiresBodyOf({
+                isLoading: recentFiresQuery.isLoading,
+                fires: recentFiresQuery.data ?? [],
+                isGraphAlert,
+              })}
             </VStack>
 
             {isWebhook ? (
@@ -294,7 +171,10 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
                 <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                   Recent deliveries
                 </Text>
-                {webhookDeliveriesBody()}
+                {webhookDeliveriesBodyOf({
+                  isLoading: webhookDeliveriesQuery.isLoading,
+                  deliveries: webhookDeliveriesQuery.data ?? [],
+                })}
               </VStack>
             ) : null}
           </VStack>
@@ -532,4 +412,189 @@ function DeliveryAttemptRow({
       ) : null}
     </Box>
   );
+}
+
+type ViewedTrigger = RouterOutputs["automation"]["getTriggerById"];
+
+/** Where the automation delivers, with any secret in it masked. */
+function destinationSummaryOf({
+  trigger,
+  actionParams,
+  datasetName,
+}: {
+  trigger: ViewedTrigger | undefined;
+  actionParams: TriggerActionParams;
+  datasetName: string | null;
+}): React.ReactNode {
+  if (!trigger) return null;
+  switch (trigger.action) {
+    case "SEND_SLACK_MESSAGE":
+      // The webhook URL carries a secret token — mask it and surface the
+      // full URL only on hover, mirroring the list page's Slack cell.
+      return actionParams.slackWebhook ? (
+        <Tooltip content={actionParams.slackWebhook}>
+          <Text textStyle="sm" lineClamp={1} width="fit-content" cursor="help">
+            Slack webhook
+          </Text>
+        </Tooltip>
+      ) : (
+        <Text textStyle="sm">Slack webhook</Text>
+      );
+    case "SEND_EMAIL":
+      return actionParams.members?.length ? (
+        <Text textStyle="sm" wordBreak="break-all">
+          {actionParams.members.join(", ")}
+        </Text>
+      ) : null;
+    case "SEND_WEBHOOK": {
+      let hostname = "Webhook";
+      try {
+        hostname = actionParams.url ? new URL(actionParams.url).hostname : hostname;
+      } catch {
+        // Stored rows are validated; retain a safe label for legacy data.
+      }
+      return (
+        <Text textStyle="sm" wordBreak="break-all">
+          {actionParams.method ?? "POST"} {hostname}
+        </Text>
+      );
+    }
+    case "ADD_TO_DATASET":
+      return datasetName ? <Text textStyle="sm">{datasetName}</Text> : null;
+    case "ADD_TO_ANNOTATION_QUEUE":
+      return actionParams.annotators?.length ? (
+        <Text textStyle="sm" wordBreak="break-all">
+          {actionParams.annotators.map((a) => a.name).join(", ")}
+        </Text>
+      ) : null;
+    default:
+      return null;
+  }
+}
+
+/** What the automation watches: a graph threshold, a search query, or trace filters. */
+function conditionsSummaryOf({
+  trigger,
+  isGraphAlert,
+  actionParams,
+  graph,
+}: {
+  trigger: ViewedTrigger | undefined;
+  isGraphAlert: boolean;
+  actionParams: TriggerActionParams;
+  graph: unknown;
+}): React.ReactNode {
+  if (!trigger) return null;
+  if (isGraphAlert) {
+    const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
+    const window = actionParams.timePeriod ? TIME_PERIOD_LABELS[actionParams.timePeriod] : null;
+    const seriesLabel = actionParams.seriesName
+      ? (resolveSeriesLabel(graph, actionParams.seriesName) ?? actionParams.seriesName)
+      : "Metric";
+    return (
+      <Text textStyle="sm">
+        {seriesLabel}
+        {operator ? ` ${operator}` : ""}
+        {actionParams.threshold !== undefined ? ` ${actionParams.threshold}` : ""}
+        {window ? ` over ${window}` : ""}
+      </Text>
+    );
+  }
+  if (trigger.filterQuery) {
+    // ADR-043: a trace-subject automation shows its search query, mirroring
+    // the automations page's "Acts on" cell.
+    return (
+      <Code size="sm" variant="surface" whiteSpace="pre-wrap" wordBreak="break-word">
+        {trigger.filterQuery}
+      </Code>
+    );
+  }
+  const filters = parseAutomationFiltersWire(trigger.filters);
+  if (Object.keys(filters).length > 0) {
+    return <FilterDisplay filters={JSON.stringify(filters)} hasBorder={true} />;
+  }
+  return (
+    <Text textStyle="sm" color="fg.muted">
+      No conditions
+    </Text>
+  );
+}
+
+function kindLabelOf({
+  isGraphAlert,
+  isSchedule,
+}: {
+  isGraphAlert: boolean;
+  isSchedule: boolean;
+}): string {
+  if (isGraphAlert) return "Alert";
+  if (isSchedule) return "Schedule";
+  return "Automation";
+}
+
+function kindBadgeOf({
+  trigger,
+  isGraphAlert,
+  isSchedule,
+}: {
+  trigger: ViewedTrigger | undefined;
+  isGraphAlert: boolean;
+  isSchedule: boolean;
+}): React.ReactNode {
+  if (isGraphAlert) {
+    return (
+      <Badge colorPalette="purple" gap={1}>
+        <TrendingUp size={12} />
+        Alert
+      </Badge>
+    );
+  }
+  if (isSchedule) {
+    return (
+      <Badge colorPalette="purple" gap={1}>
+        <Calendar size={12} />
+        Schedule
+      </Badge>
+    );
+  }
+  if (trigger) return <Badge colorPalette="gray">Automation</Badge>;
+  return null;
+}
+
+function recentFiresBodyOf({
+  isLoading,
+  fires,
+  isGraphAlert,
+}: {
+  isLoading: boolean;
+  fires: RecentFire[];
+  isGraphAlert: boolean;
+}): React.ReactNode {
+  if (isLoading) return <Skeleton height="60px" width="full" />;
+  if (fires.length === 0) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        {isGraphAlert ? "This alert has not fired yet." : "This automation has not fired yet."}
+      </Text>
+    );
+  }
+  return <RecentFiresList fires={fires} isGraphAlert={isGraphAlert} />;
+}
+
+function webhookDeliveriesBodyOf({
+  isLoading,
+  deliveries,
+}: {
+  isLoading: boolean;
+  deliveries: WebhookDelivery[];
+}): React.ReactNode {
+  if (isLoading) return <Skeleton height="60px" width="full" />;
+  if (deliveries.length === 0) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        No delivery attempts recorded yet.
+      </Text>
+    );
+  }
+  return <WebhookDeliveriesList deliveries={deliveries} />;
 }

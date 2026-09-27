@@ -17,13 +17,13 @@ import { PrismaPromptTagAssignmentRepository } from "../repositories/prisma/pris
 import { PrismaPromptTagRepository } from "../repositories/prisma/prisma.prompt-tag.repository.ts";
 import { PrismaLlmConfigRepository } from "../repositories/prisma/prisma.prompt.repository.ts";
 import { PromptTagService } from "../services/prompt-tag.service.ts";
-import type { PromptVersionService } from "../services/prompt-version.service.ts";
+import { PromptVersionService } from "../services/prompt-version.service.ts";
 import { PromptService } from "../services/prompt.service.ts";
 import { defaultModelFixture } from "./default-model.test-fixture.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const namespace = `psd-${nanoid(8)}`;
-const versions = { assertNoSystemPromptConflict: () => {} } as unknown as PromptVersionService;
+const versions = PromptVersionService.create();
 
 describe.skipIf(!DB_URL)("given a prompt handle after the prompt is archived", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({

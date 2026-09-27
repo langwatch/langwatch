@@ -43,23 +43,8 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
-  const activeProjectionNames = parseActiveProjections(status?.currentProjection);
-  const activeProjections = new Set(activeProjectionNames);
 
   const stateColor = STATE_COLORS[status?.state ?? ""] ?? "blue";
-
-  const progressPercent =
-    status && status.aggregatesTotal > 0
-      ? Math.round((status.aggregatesProcessed / status.aggregatesTotal) * 100)
-      : 0;
-
-  const throughputRate = useMemo(() => {
-    if (!status?.startedAt || !status.eventsProcessed) return null;
-    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
-    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
-    if (elapsed < 1) return null;
-    return Math.round(status.eventsProcessed / elapsed);
-  }, [status?.startedAt, status?.completedAt, status?.eventsProcessed]);
 
   return (
     <Drawer.Root
@@ -88,133 +73,7 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
               No replay is currently running.
             </Text>
           ) : (
-            <VStack align="stretch" gap={4}>
-              {/* Phase timeline */}
-              <PhaseTimeline
-                currentPhase={status.currentPhase}
-                completedState={
-                  status.state !== "running"
-                    ? (status.state as "completed" | "failed" | "cancelled")
-                    : null
-                }
-              />
-
-              {/* Current phase detail */}
-              {status.currentPhase && (
-                <HStack gap={2}>
-                  <Text textStyle="lg">{PHASE_ICONS[status.currentPhase] ?? "·"}</Text>
-                  <VStack align="start" gap={0}>
-                    <Text textStyle="sm" fontWeight="medium">
-                      {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
-                    </Text>
-                    {activeProjectionNames.length > 0 && (
-                      <Text textStyle="xs" color="fg.muted">
-                        {activeProjectionNames.length === 1
-                          ? activeProjectionNames[0]
-                          : `${activeProjectionNames.length} projections`}
-                      </Text>
-                    )}
-                  </VStack>
-                </HStack>
-              )}
-
-              {/* Progress bar */}
-              {status.aggregatesTotal > 0 && (
-                <VStack align="stretch" gap={1}>
-                  <HStack justify="space-between">
-                    <Text textStyle="xs" color="fg.muted">
-                      Aggregates
-                    </Text>
-                    <Text textStyle="xs" fontWeight="medium">
-                      {status.aggregatesProcessed.toLocaleString()} /{" "}
-                      {status.aggregatesTotal.toLocaleString()} ({progressPercent}%)
-                    </Text>
-                  </HStack>
-                  <Progress.Root value={progressPercent} size="sm" colorPalette={stateColor}>
-                    <Progress.Track>
-                      <Progress.Range />
-                    </Progress.Track>
-                  </Progress.Root>
-                </VStack>
-              )}
-
-              <Separator />
-
-              {/* Stats grid */}
-              <HStack gap={4} flexWrap="wrap">
-                <Stat.Root>
-                  <Stat.Label>Events</Stat.Label>
-                  <Stat.ValueText textStyle="lg">
-                    {status.eventsProcessed.toLocaleString()}
-                  </Stat.ValueText>
-                </Stat.Root>
-                <Stat.Root>
-                  <Stat.Label>Projections</Stat.Label>
-                  <Stat.ValueText textStyle="lg">{status.projectionNames.length}</Stat.ValueText>
-                </Stat.Root>
-                {throughputRate !== null && (
-                  <Stat.Root>
-                    <Stat.Label>Events/s</Stat.Label>
-                    <Stat.ValueText textStyle="lg">
-                      {throughputRate.toLocaleString()}
-                    </Stat.ValueText>
-                  </Stat.Root>
-                )}
-                <Stat.Root>
-                  <Stat.Label>Elapsed</Stat.Label>
-                  <Stat.ValueText textStyle="lg">
-                    {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
-                  </Stat.ValueText>
-                </Stat.Root>
-              </HStack>
-
-              {/* Projection list */}
-              <VStack align="stretch" gap={1}>
-                <Text textStyle="xs" color="fg.muted">
-                  Projections
-                </Text>
-                <HStack gap={1} flexWrap="wrap">
-                  {status.projectionNames.map((name) => (
-                    <Badge
-                      key={name}
-                      size="sm"
-                      variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
-                      colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
-                    >
-                      {name}
-                    </Badge>
-                  ))}
-                </HStack>
-              </VStack>
-
-              {/* Description */}
-              {status.description && (
-                <VStack align="stretch" gap={1}>
-                  <Text textStyle="xs" color="fg.muted">
-                    Description
-                  </Text>
-                  <Text textStyle="sm">{status.description}</Text>
-                </VStack>
-              )}
-
-              {/* Error */}
-              {status.error && (
-                <Box
-                  padding={3}
-                  borderRadius="md"
-                  bg="red.subtle"
-                  borderWidth="1px"
-                  borderColor="red.200"
-                >
-                  <Text textStyle="xs" fontWeight="medium" color="red.fg" marginBottom={1}>
-                    Error
-                  </Text>
-                  <Text textStyle="xs" color="red.fg">
-                    {status.error}
-                  </Text>
-                </Box>
-              )}
-            </VStack>
+            <ReplayStatusDetail status={status} stateColor={stateColor} />
           )}
         </Drawer.Body>
         <Drawer.Footer>
@@ -247,5 +106,144 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+type ReplayStatus = NonNullable<ReturnType<typeof useReplayStatus>["data"]>;
+
+/** A replay that has started: its phase, progress, throughput and projections. */
+function ReplayStatusDetail({ status, stateColor }: { status: ReplayStatus; stateColor: string }) {
+  const isRunning = status.state === "running";
+  const activeProjectionNames = parseActiveProjections(status.currentProjection);
+  const activeProjections = new Set(activeProjectionNames);
+  const progressPercent =
+    status.aggregatesTotal > 0
+      ? Math.round((status.aggregatesProcessed / status.aggregatesTotal) * 100)
+      : 0;
+
+  const throughputRate = useMemo(() => {
+    if (!status.startedAt || !status.eventsProcessed) return null;
+    const end = status.completedAt ? toEpochMs(status.completedAt) : nowInstant().epochMilliseconds;
+    const elapsed = (end - toEpochMs(status.startedAt)) / 1000;
+    if (elapsed < 1) return null;
+    return Math.round(status.eventsProcessed / elapsed);
+  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
+
+  return (
+    <VStack align="stretch" gap={4}>
+      {/* Phase timeline */}
+      <PhaseTimeline
+        currentPhase={status.currentPhase}
+        completedState={
+          status.state !== "running" ? (status.state as "completed" | "failed" | "cancelled") : null
+        }
+      />
+
+      {/* Current phase detail */}
+      {status.currentPhase && (
+        <HStack gap={2}>
+          <Text textStyle="lg">{PHASE_ICONS[status.currentPhase] ?? "·"}</Text>
+          <VStack align="start" gap={0}>
+            <Text textStyle="sm" fontWeight="medium">
+              {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
+            </Text>
+            {activeProjectionNames.length > 0 && (
+              <Text textStyle="xs" color="fg.muted">
+                {activeProjectionNames.length === 1
+                  ? activeProjectionNames[0]
+                  : `${activeProjectionNames.length} projections`}
+              </Text>
+            )}
+          </VStack>
+        </HStack>
+      )}
+
+      {/* Progress bar */}
+      {status.aggregatesTotal > 0 && (
+        <VStack align="stretch" gap={1}>
+          <HStack justify="space-between">
+            <Text textStyle="xs" color="fg.muted">
+              Aggregates
+            </Text>
+            <Text textStyle="xs" fontWeight="medium">
+              {status.aggregatesProcessed.toLocaleString()} /{" "}
+              {status.aggregatesTotal.toLocaleString()} ({progressPercent}%)
+            </Text>
+          </HStack>
+          <Progress.Root value={progressPercent} size="sm" colorPalette={stateColor}>
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+        </VStack>
+      )}
+
+      <Separator />
+
+      {/* Stats grid */}
+      <HStack gap={4} flexWrap="wrap">
+        <Stat.Root>
+          <Stat.Label>Events</Stat.Label>
+          <Stat.ValueText textStyle="lg">{status.eventsProcessed.toLocaleString()}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Projections</Stat.Label>
+          <Stat.ValueText textStyle="lg">{status.projectionNames.length}</Stat.ValueText>
+        </Stat.Root>
+        {throughputRate !== null && (
+          <Stat.Root>
+            <Stat.Label>Events/s</Stat.Label>
+            <Stat.ValueText textStyle="lg">{throughputRate.toLocaleString()}</Stat.ValueText>
+          </Stat.Root>
+        )}
+        <Stat.Root>
+          <Stat.Label>Elapsed</Stat.Label>
+          <Stat.ValueText textStyle="lg">
+            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
+          </Stat.ValueText>
+        </Stat.Root>
+      </HStack>
+
+      {/* Projection list */}
+      <VStack align="stretch" gap={1}>
+        <Text textStyle="xs" color="fg.muted">
+          Projections
+        </Text>
+        <HStack gap={1} flexWrap="wrap">
+          {status.projectionNames.map((name) => (
+            <Badge
+              key={name}
+              size="sm"
+              variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+              colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
+            >
+              {name}
+            </Badge>
+          ))}
+        </HStack>
+      </VStack>
+
+      {/* Description */}
+      {status.description && (
+        <VStack align="stretch" gap={1}>
+          <Text textStyle="xs" color="fg.muted">
+            Description
+          </Text>
+          <Text textStyle="sm">{status.description}</Text>
+        </VStack>
+      )}
+
+      {/* Error */}
+      {status.error && (
+        <Box padding={3} borderRadius="md" bg="red.subtle" borderWidth="1px" borderColor="red.200">
+          <Text textStyle="xs" fontWeight="medium" color="red.fg" marginBottom={1}>
+            Error
+          </Text>
+          <Text textStyle="xs" color="red.fg">
+            {status.error}
+          </Text>
+        </Box>
+      )}
+    </VStack>
   );
 }

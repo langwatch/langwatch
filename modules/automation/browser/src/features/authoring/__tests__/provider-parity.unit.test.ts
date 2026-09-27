@@ -70,7 +70,9 @@ describe("provider registry parity", () => {
       });
     });
   });
+});
 
+describe("provider registry parity, Slack Block Kit templates", () => {
   describe("given the bundled Slack Block Kit templates", () => {
     const baseContext = {
       trigger: {
