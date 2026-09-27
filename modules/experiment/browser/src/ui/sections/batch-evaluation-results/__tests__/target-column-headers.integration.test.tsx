@@ -19,7 +19,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 
 // TraceIdPeek (rendered transitively) calls useFeatureFlag → tRPC, which has
 // no withTRPC wrapper in these tests.
-vi.mock("@langwatch/workflow-browser/feature-flag", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
 

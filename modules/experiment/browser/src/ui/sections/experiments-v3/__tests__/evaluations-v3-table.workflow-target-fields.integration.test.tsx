@@ -98,8 +98,9 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/dataset-browser/dataset-drawer", () => ({
+vi.mock("../../../../behavior/experiments-v3/lent-dataset-capabilities.tsx", () => ({
   AddOrEditDatasetDrawer: () => null,
+  DatasetRecordSync: () => null,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

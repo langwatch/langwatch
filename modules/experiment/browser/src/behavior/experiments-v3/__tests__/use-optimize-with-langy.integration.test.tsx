@@ -32,7 +32,7 @@ vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
 }));
 
 const flagEnabled = vi.hoisted(() => ({ value: true }));
-vi.mock("@langwatch/workflow-browser/feature-flag", () => ({
+vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 

@@ -10,20 +10,18 @@ import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { cellPictureUrl } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import {
-  ExpandedTextDialog,
-  HoverableBigText,
-} from "@langwatch/workflow-browser/hoverable-big-text";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { HoverableBigText } from "../../../../behavior/lent-hoverable-big-text.tsx";
 import { TraceIdPeek } from "../../../../behavior/lent-trace.tsx";
 import {
   cellText,
   getEvaluationColumns,
   readKey,
 } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
+import { ExpandedTextDialog } from "../../expanded-text-dialog.tsx";
 
 type EvaluationRowData = {
   rowNumber: number;
