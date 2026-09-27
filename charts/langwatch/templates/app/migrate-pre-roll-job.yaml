@@ -80,6 +80,7 @@ spec:
         {{- include "langwatch.labels" . | nindent 8 }}
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       {{- with (include "langwatch.serviceAccountName" .) }}
       serviceAccountName: {{ . }}
       {{- end }}

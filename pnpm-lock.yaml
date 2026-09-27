@@ -5114,6 +5114,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -5145,9 +5148,6 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9110,6 +9110,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/secret-contract':
         specifier: workspace:*
         version: link:../../secret/contract
@@ -9159,9 +9162,6 @@ importers:
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../feature-flag/process
-      '@langwatch/redis-client':
-        specifier: workspace:*
-        version: link:../../../packages/redis-client
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9655,6 +9655,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../packages/redis-client
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
       '@langwatch/task':
         specifier: workspace:*
         version: link:../../../packages/task
@@ -9686,9 +9689,6 @@ importers:
       '@langwatch/api-fixture':
         specifier: workspace:*
         version: link:../../../packages/api-fixture
-      '@langwatch/secrets':
-        specifier: workspace:*
-        version: link:../../../packages/secrets
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness

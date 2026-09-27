@@ -50,6 +50,7 @@
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
@@ -62,7 +63,6 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/bcrypt": "catalog:",
     "typescript": "catalog:",

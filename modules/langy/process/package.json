@@ -86,6 +86,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -104,7 +105,6 @@
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
-    "@langwatch/redis-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/sdk-trace-base": "catalog:",
