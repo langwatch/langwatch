@@ -2,7 +2,7 @@
   "name": "@langwatch/vitest-config",
   "version": "0.1.0",
   "private": true,
-  "description": "The one vitest shape every LangWatch package declares: the jsdom/node builder, the real-browser lane, and the console guard a unit suite sets up. A leaf on purpose — it depends on vitest and nothing else, so the packages vitest itself is tested with can declare it without a cycle.",
+  "description": "The one vitest shape every LangWatch package declares: the jsdom/node builder, the real-browser lane, and the console guard a unit suite sets up. It also configures the test process's logger as its boot seam, so observability and time, beneath it, keep plain vitest configs.",
   "keywords": [
     "config",
     "langwatch",
@@ -32,6 +32,9 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

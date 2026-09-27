@@ -218,8 +218,9 @@
       "rules": { "node/no-process-env": "off" },
     },
     {
-      // The one place each process reads its environment into typed config.
-      "files": ["apps/*/src/config.ts", "**/*.entrypoint.ts"],
+      // The one place each process reads its environment into typed config; the test
+      // process's is packages/vitest-config (Alex, 2026-09-27).
+      "files": ["apps/*/src/config.ts", "**/*.entrypoint.ts", "packages/vitest-config/src/**"],
       "rules": { "node/no-process-env": "off" },
     },
   ],

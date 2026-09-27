@@ -4,6 +4,7 @@ import { defineConfig, type ViteUserConfig } from "vitest/config";
 
 // Absolute so it resolves the same regardless of the consuming package's cwd.
 const CONSOLE_GUARD_SETUP = fileURLToPath(new URL("./console-guard.ts", import.meta.url));
+const LOGGER_SETUP = fileURLToPath(new URL("./logger-setup.ts", import.meta.url));
 
 /**
  * The one vitest shape every package declares — vitest 5's speed options
@@ -54,8 +55,11 @@ export function moduleVitestTestOptions(
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate ?? false;
   const resolvedCss = css ?? !FAST_MODE;
-  const resolvedSetupFiles =
-    kind === "unit" ? [CONSOLE_GUARD_SETUP, ...(setupFiles ?? [])] : setupFiles;
+  const resolvedSetupFiles = [
+    LOGGER_SETUP,
+    ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
+    ...(setupFiles ?? []),
+  ];
   return {
     environment: kind === "jsdom" ? "jsdom" : "node",
     isolate: resolvedIsolate,
@@ -83,7 +87,7 @@ export function moduleVitestTestOptions(
     // a `vitest/browser` import jsdom cannot answer.
     exclude: [...(exclude ?? DEFAULT_EXCLUDE), BROWSER_TEST_GLOB],
     ...(include ? { include } : {}),
-    ...(resolvedSetupFiles ? { setupFiles: resolvedSetupFiles } : {}),
+    setupFiles: resolvedSetupFiles,
     ...(testTimeout === undefined ? {} : { testTimeout }),
     ...(dir === undefined ? {} : { dir }),
     ...test,
