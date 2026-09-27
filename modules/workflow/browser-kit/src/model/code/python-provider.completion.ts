@@ -63,12 +63,199 @@ function memberCompletion({
   };
 }
 
+type SuggestContext = {
+  monaco: Monaco;
+  contractRef: ContractRef;
+  model: editor.ITextModel;
+  lineBefore: string;
+  range: IRange;
+};
+
+type Suggestions = { suggestions: languages.CompletionItem[] };
+
+/** `from X import Y` -> the members of X; undefined when X is not a known module. */
+function importMemberSuggestions({
+  monaco,
+  lineBefore,
+  range,
+}: SuggestContext): Suggestions | undefined {
+  const moduleName = IMPORT_MEMBER_PREFIX.exec(lineBefore)?.[1];
+  const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : void 0;
+  if (!mod) return undefined;
+  return {
+    suggestions: mod.members.map((m) =>
+      memberCompletion({ monaco, module: mod, member: m, range }),
+    ),
+  };
+}
+
+/** `import X` / `from X` -> module names. */
+function importModuleSuggestions({ monaco, range }: SuggestContext): Suggestions {
+  return {
+    suggestions: PYTHON_STDLIB_MODULE_NAMES.map((name) => ({
+      label: name,
+      kind: monaco.languages.CompletionItemKind.Module,
+      detail: PYTHON_STDLIB_MODULE_BY_NAME.get(name)?.doc ?? "",
+      insertText: name,
+      range,
+    })),
+  };
+}
+
+/** `secrets.` -> secret names as str-typed constants; `<module>.` -> module members. */
+function attributeSuggestions(
+  { monaco, contractRef, model, range }: SuggestContext,
+  owner: string | undefined,
+): Suggestions {
+  if (!owner) return { suggestions: [] };
+  if (owner === "secrets") {
+    return {
+      suggestions: contractRef.current.secretNames.map((name) => ({
+        label: name,
+        kind: monaco.languages.CompletionItemKind.Constant,
+        detail: "str",
+        documentation: {
+          value: `**secrets.${name}**\n\nProject secret. Injected at runtime as a string — managed in Settings → Secrets.`,
+        },
+        insertText: name,
+        range,
+        sortText: `0_${name}`,
+      })),
+    };
+  }
+  const mod = scanImports(model.getValue()).get(owner);
+  if (!mod) return { suggestions: [] };
+  return {
+    suggestions: mod.members.map((m) =>
+      memberCompletion({ monaco, module: mod, member: m, range }),
+    ),
+  };
+}
+
+function builtinCompletion({
+  monaco,
+  builtin,
+  range,
+}: {
+  monaco: Monaco;
+  builtin: (typeof PYTHON_BUILTINS)[number];
+  range: IRange;
+}): languages.CompletionItem {
+  const isCallable = builtin.kind === "function";
+  return {
+    label: builtin.name,
+    kind: itemKind(monaco, builtin.kind),
+    detail: builtin.signature ?? "",
+    documentation: { value: builtin.doc ?? "" },
+    insertText: isCallable ? `${builtin.name}($0)` : builtin.name,
+    ...(isCallable ? { insertTextRules: INSERT_AS_SNIPPET } : {}),
+    range,
+  };
+}
+
+/** `secrets` itself is always discoverable from a fresh buffer. */
+function secretsHandleSuggestions({
+  monaco,
+  contractRef,
+  range,
+}: SuggestContext): languages.CompletionItem[] {
+  const count = contractRef.current.secretNames.length;
+  if (count === 0) return [];
+  return [
+    {
+      label: "secrets",
+      kind: monaco.languages.CompletionItemKind.Variable,
+      detail: "SimpleNamespace",
+      documentation: {
+        value: `Project secrets namespace. Access with \`secrets.NAME\`.\n\n${count} secret${count === 1 ? "" : "s"} available.`,
+      },
+      insertText: "secrets",
+      range,
+      sortText: "0_secrets",
+    },
+  ];
+}
+
+/** Output keys when the user is mid-dict-literal or returning a dict. */
+function outputKeySuggestions({
+  monaco,
+  contractRef,
+  lineBefore,
+  range,
+}: SuggestContext): languages.CompletionItem[] {
+  const wantsKey =
+    /\breturn\s*\{[^}]*$/.test(lineBefore) || /\{[^}]*$/.test(lineBefore.trimStart());
+  if (!wantsKey) return [];
+  return contractRef.current.outputs.map((field) => {
+    const defaultLit = defaultValueLiteralFor(field.type);
+    return {
+      label: `"${field.identifier}"`,
+      kind: monaco.languages.CompletionItemKind.Field,
+      detail: `${field.type}  →  ${defaultLit}`,
+      documentation: {
+        value: `Declared node output **${field.identifier}**: \`${field.type}\`. Inserted with a \`${defaultLit}\` default placeholder so the value already matches the declared type.`,
+      },
+      insertText: `"${field.identifier}": \${0:${defaultLit}}`,
+      insertTextRules: INSERT_AS_SNIPPET,
+      range,
+      sortText: `0_output_${field.identifier}`,
+    };
+  });
+}
+
+/** Builtins, keywords, imported modules, node inputs and the `secrets` handle. */
+function defaultSuggestions(context: SuggestContext): Suggestions {
+  const { monaco, contractRef, model, range } = context;
+  const imports = scanImports(model.getValue());
+  return {
+    suggestions: [
+      ...PYTHON_BUILTINS.map((builtin) => builtinCompletion({ monaco, builtin, range })),
+      ...PYTHON_KEYWORDS.map((kw) => ({
+        label: kw,
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        insertText: kw,
+        range,
+      })),
+      ...Array.from(imports.keys()).map((name) => ({
+        label: name,
+        kind: monaco.languages.CompletionItemKind.Module,
+        detail: imports.get(name)?.doc ?? "",
+        insertText: name,
+        range,
+      })),
+      // Node inputs are bound as locals from the `input` arg dict; sorted first.
+      ...contractRef.current.inputs.map((field) => ({
+        label: field.identifier,
+        kind: monaco.languages.CompletionItemKind.Variable,
+        detail: field.type,
+        documentation: {
+          value: `**${field.identifier}**: \`${field.type}\`\n\nNode input. Wired in the properties panel.`,
+        },
+        insertText: field.identifier,
+        range,
+        sortText: `0_input_${field.identifier}`,
+      })),
+      ...secretsHandleSuggestions(context),
+      ...outputKeySuggestions(context),
+    ],
+  };
+}
+
+function suggestionsAt(context: SuggestContext): Suggestions {
+  if (IMPORT_MEMBER_PREFIX.test(context.lineBefore)) {
+    const members = importMemberSuggestions(context);
+    if (members) return members;
+  }
+  if (IMPORT_MODULE_PREFIX.test(context.lineBefore)) return importModuleSuggestions(context);
+  const attrMatch = ATTR_ACCESS.exec(context.lineBefore);
+  if (attrMatch) return attributeSuggestions(context, attrMatch[1]);
+  return defaultSuggestions(context);
+}
+
 export function registerCompletion(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerCompletionItemProvider("python", {
-    // Only trigger on `.` for attribute access. Triggering on space pops the
-    // suggest widget on every whitespace and (in some browsers) intercepts the
-    // space keystroke entirely. Users can still invoke explicitly with
-    // Ctrl+Space / Cmd+I.
+    // Only trigger on `.`: triggering on space pops the suggest widget on every
+    // whitespace and can swallow the keystroke. Ctrl+Space / Cmd+I still work.
     triggerCharacters: ["."],
     provideCompletionItems: (model: editor.ITextModel, position: Position) => {
       const lineBefore = model.getValueInRange({
@@ -77,162 +264,14 @@ export function registerCompletion(monaco: Monaco, contractRef: ContractRef): ID
         endLineNumber: position.lineNumber,
         endColumn: position.column,
       });
-
       const word = model.getWordUntilPosition(position);
-      const replaceRange: IRange = {
+      const range: IRange = {
         startLineNumber: position.lineNumber,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
         endColumn: word.endColumn,
       };
-
-      // `from X import Y` -> suggest module members of X.
-      const importMemberMatch = IMPORT_MEMBER_PREFIX.exec(lineBefore);
-      if (importMemberMatch) {
-        const moduleName = importMemberMatch[1];
-        const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : void 0;
-        if (mod) {
-          return {
-            suggestions: mod.members.map((m) =>
-              memberCompletion({ monaco, module: mod, member: m, range: replaceRange }),
-            ),
-          };
-        }
-      }
-
-      // `import X` / `from X` -> suggest module names.
-      const importMatch = IMPORT_MODULE_PREFIX.exec(lineBefore);
-      if (importMatch) {
-        return {
-          suggestions: PYTHON_STDLIB_MODULE_NAMES.map((name) => ({
-            label: name,
-            kind: monaco.languages.CompletionItemKind.Module,
-            detail: PYTHON_STDLIB_MODULE_BY_NAME.get(name)?.doc ?? "",
-            insertText: name,
-            range: replaceRange,
-          })),
-        };
-      }
-
-      // `secrets.` -> suggest secret names as str-typed constants.
-      // `<module>.` -> suggest module members.
-      const attrMatch = ATTR_ACCESS.exec(lineBefore);
-      if (attrMatch) {
-        const owner = attrMatch[1];
-        if (!owner) {
-          return { suggestions: [] };
-        }
-        if (owner === "secrets") {
-          return {
-            suggestions: contractRef.current.secretNames.map((name) => ({
-              label: name,
-              kind: monaco.languages.CompletionItemKind.Constant,
-              detail: "str",
-              documentation: {
-                value: `**secrets.${name}**\n\nProject secret. Injected at runtime as a string — managed in Settings → Secrets.`,
-              },
-              insertText: name,
-              range: replaceRange,
-              sortText: `0_${name}`,
-            })),
-          };
-        }
-        const imports = scanImports(model.getValue());
-        const mod = imports.get(owner);
-        if (mod) {
-          return {
-            suggestions: mod.members.map((m) =>
-              memberCompletion({ monaco, module: mod, member: m, range: replaceRange }),
-            ),
-          };
-        }
-        return { suggestions: [] };
-      }
-
-      // Default surface: builtins, keywords, imported modules, node inputs,
-      // and a discoverable `secrets` handle.
-      const imports = scanImports(model.getValue());
-      const importedNames = Array.from(imports.keys());
-      const suggestions: languages.CompletionItem[] = [
-        ...PYTHON_BUILTINS.map((b) => {
-          const isCallable = b.kind === "function";
-          return {
-            label: b.name,
-            kind: itemKind(monaco, b.kind),
-            detail: b.signature ?? "",
-            documentation: { value: b.doc ?? "" },
-            insertText: isCallable ? `${b.name}($0)` : b.name,
-            ...(isCallable ? { insertTextRules: INSERT_AS_SNIPPET } : {}),
-            range: replaceRange,
-          };
-        }),
-        ...PYTHON_KEYWORDS.map((kw) => ({
-          label: kw,
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          insertText: kw,
-          range: replaceRange,
-        })),
-        ...importedNames.map((name) => ({
-          label: name,
-          kind: monaco.languages.CompletionItemKind.Module,
-          detail: imports.get(name)?.doc ?? "",
-          insertText: name,
-          range: replaceRange,
-        })),
-        // Node inputs — bound as locals from the `input` arg dict in the
-        // runtime adapter. Sort them to the top so users discover the contract.
-        ...contractRef.current.inputs.map((field) => ({
-          label: field.identifier,
-          kind: monaco.languages.CompletionItemKind.Variable,
-          detail: field.type,
-          documentation: {
-            value: `**${field.identifier}**: \`${field.type}\`\n\nNode input. Wired in the properties panel.`,
-          },
-          insertText: field.identifier,
-          range: replaceRange,
-          sortText: `0_input_${field.identifier}`,
-        })),
-      ];
-
-      // `secrets` itself is always discoverable from a fresh buffer.
-      if (contractRef.current.secretNames.length > 0) {
-        suggestions.push({
-          label: "secrets",
-          kind: monaco.languages.CompletionItemKind.Variable,
-          detail: "SimpleNamespace",
-          documentation: {
-            value: `Project secrets namespace. Access with \`secrets.NAME\`.\n\n${contractRef.current.secretNames.length} secret${contractRef.current.secretNames.length === 1 ? "" : "s"} available.`,
-          },
-          insertText: "secrets",
-          range: replaceRange,
-          sortText: "0_secrets",
-        });
-      }
-
-      // Suggest output keys when the user is mid-dict-literal or returning.
-      // Cheap detection: if the surrounding text on/before this line looks
-      // like a return dict, offer the declared outputs as string-key snippets.
-      const wantsKey =
-        /\breturn\s*\{[^}]*$/.test(lineBefore) || /\{[^}]*$/.test(lineBefore.trimStart());
-      if (wantsKey) {
-        for (const field of contractRef.current.outputs) {
-          const defaultLit = defaultValueLiteralFor(field.type);
-          suggestions.push({
-            label: `"${field.identifier}"`,
-            kind: monaco.languages.CompletionItemKind.Field,
-            detail: `${field.type}  →  ${defaultLit}`,
-            documentation: {
-              value: `Declared node output **${field.identifier}**: \`${field.type}\`. Inserted with a \`${defaultLit}\` default placeholder so the value already matches the declared type.`,
-            },
-            insertText: `"${field.identifier}": \${0:${defaultLit}}`,
-            insertTextRules: INSERT_AS_SNIPPET,
-            range: replaceRange,
-            sortText: `0_output_${field.identifier}`,
-          });
-        }
-      }
-
-      return { suggestions };
+      return suggestionsAt({ monaco, contractRef, model, lineBefore, range });
     },
   });
 }

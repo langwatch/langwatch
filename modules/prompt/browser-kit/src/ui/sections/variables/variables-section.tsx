@@ -199,51 +199,27 @@ export const VariablesSection = ({
         )}
       </HStack>
 
-      {/* Variables List */}
-      {variables.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle">
-          No variables defined
-        </Text>
-      ) : (
-        <VStack align="stretch" gap={2}>
-          {variables.map((variable) => {
-            const isLocked = lockedVariables.has(variable.identifier);
-            const infoTooltip = variableInfo[variable.identifier];
-            const isMappingDisabled_internal =
-              isMappingDisabled || disabledMappings.has(variable.identifier);
-
-            return (
-              <VariableRow
-                key={variable.identifier}
-                variable={variable}
-                mapping={mappings[variable.identifier]}
-                availableSources={availableSources}
-                showMappings={showMappings}
-                canRemove={canAddRemove && !isLocked}
-                readOnly={readOnly || isLocked}
-                isEditing={editingId === variable.identifier}
-                isMissing={missingMappingIds.has(variable.identifier)}
-                optionalHighlighting={optionalHighlighting}
-                onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
-                onEndEdit={() => setEditingId(null)}
-                onUpdate={(updates) => handleUpdateVariable(variable.identifier, updates)}
-                onRemove={() => handleRemoveVariable(variable.identifier)}
-                onMappingChange={
-                  onMappingChange
-                    ? (mapping) => onMappingChange(variable.identifier, mapping)
-                    : undefined
-                }
-                defaultValue={values[variable.identifier]}
-                onDefaultValueChange={
-                  onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
-                }
-                infoTooltip={infoTooltip}
-                isMappingDisabled={isMappingDisabled_internal}
-              />
-            );
-          })}
-        </VStack>
-      )}
+      <VariableList
+        variables={variables}
+        mappings={mappings}
+        availableSources={availableSources}
+        values={values}
+        showMappings={showMappings}
+        canAddRemove={canAddRemove}
+        readOnly={readOnly}
+        missingMappingIds={missingMappingIds}
+        optionalHighlighting={optionalHighlighting}
+        lockedVariables={lockedVariables}
+        variableInfo={variableInfo}
+        disabledMappings={disabledMappings}
+        isMappingDisabled={isMappingDisabled}
+        onMappingChange={onMappingChange}
+        onValueChange={onValueChange}
+        editingId={editingId}
+        setEditingId={setEditingId}
+        onUpdate={handleUpdateVariable}
+        onRemove={handleRemoveVariable}
+      />
 
       {/* Validation error for missing mappings */}
       {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
@@ -254,6 +230,98 @@ export const VariablesSection = ({
     </VStack>
   );
 };
+
+type VariableListProps = Required<
+  Pick<
+    VariablesSectionProps,
+    | "variables"
+    | "mappings"
+    | "availableSources"
+    | "values"
+    | "showMappings"
+    | "canAddRemove"
+    | "readOnly"
+    | "missingMappingIds"
+    | "optionalHighlighting"
+    | "lockedVariables"
+    | "variableInfo"
+    | "disabledMappings"
+    | "isMappingDisabled"
+  >
+> &
+  Pick<VariablesSectionProps, "onMappingChange" | "onValueChange"> & {
+    editingId: string | null;
+    setEditingId: (identifier: string | null) => void;
+    onUpdate: (identifier: string, updates: Partial<Variable>) => boolean;
+    onRemove: (identifier: string) => void;
+  };
+
+function VariableList({
+  variables,
+  mappings,
+  availableSources,
+  values,
+  showMappings,
+  canAddRemove,
+  readOnly,
+  missingMappingIds,
+  optionalHighlighting,
+  lockedVariables,
+  variableInfo,
+  disabledMappings,
+  isMappingDisabled,
+  onMappingChange,
+  onValueChange,
+  editingId,
+  setEditingId,
+  onUpdate,
+  onRemove,
+}: VariableListProps) {
+  return variables.length === 0 ? (
+    <Text fontSize="13px" color="fg.subtle">
+      No variables defined
+    </Text>
+  ) : (
+    <VStack align="stretch" gap={2}>
+      {variables.map((variable) => {
+        const isLocked = lockedVariables.has(variable.identifier);
+        const infoTooltip = variableInfo[variable.identifier];
+        const isMappingDisabled_internal =
+          isMappingDisabled || disabledMappings.has(variable.identifier);
+
+        return (
+          <VariableRow
+            key={variable.identifier}
+            variable={variable}
+            mapping={mappings[variable.identifier]}
+            availableSources={availableSources}
+            showMappings={showMappings}
+            canRemove={canAddRemove && !isLocked}
+            readOnly={readOnly || isLocked}
+            isEditing={editingId === variable.identifier}
+            isMissing={missingMappingIds.has(variable.identifier)}
+            optionalHighlighting={optionalHighlighting}
+            onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
+            onEndEdit={() => setEditingId(null)}
+            onUpdate={(updates) => onUpdate(variable.identifier, updates)}
+            onRemove={() => onRemove(variable.identifier)}
+            onMappingChange={
+              onMappingChange
+                ? (mapping) => onMappingChange(variable.identifier, mapping)
+                : undefined
+            }
+            defaultValue={values[variable.identifier]}
+            onDefaultValueChange={
+              onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
+            }
+            infoTooltip={infoTooltip}
+            isMappingDisabled={isMappingDisabled_internal}
+          />
+        );
+      })}
+    </VStack>
+  );
+}
 
 // ============================================================================
 // Variable Row Component

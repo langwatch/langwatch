@@ -1,4 +1,4 @@
-import { Badge, HStack, Text, Tooltip } from "@chakra-ui/react";
+import { Badge, chakra, Text, Tooltip } from "@chakra-ui/react";
 
 type VersionBadgeProps = {
   version: number;
@@ -12,7 +12,10 @@ export function VersionBadge({ version, latestVersion, onUpgrade }: VersionBadge
     return (
       <Tooltip.Root positioning={{ placement: "top" }}>
         <Tooltip.Trigger asChild>
-          <HStack
+          <chakra.button
+            type="button"
+            display="flex"
+            alignItems="center"
             gap={1}
             fontSize="sm"
             flexWrap="nowrap"
@@ -23,7 +26,6 @@ export function VersionBadge({ version, latestVersion, onUpgrade }: VersionBadge
             cursor="pointer"
             _hover={{ opacity: 0.8 }}
             data-testid="version-badge-outdated"
-            role="button"
           >
             <Badge colorPalette="gray" textTransform="none">
               v{version}
@@ -32,7 +34,7 @@ export function VersionBadge({ version, latestVersion, onUpgrade }: VersionBadge
             <Badge colorPalette="green" textTransform="none">
               v{latestVersion}
             </Badge>
-          </HStack>
+          </chakra.button>
         </Tooltip.Trigger>
         <Tooltip.Positioner>
           <Tooltip.Content>
