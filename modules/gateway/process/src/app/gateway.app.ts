@@ -151,7 +151,10 @@ import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import {
+  type GatewayAgentCacheEntryStore,
+  RedisGatewayAgentCacheEntryRepository,
+} from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { ConnectManagedKeyService } from "../services/connect-managed-key.service.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
@@ -675,7 +678,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption"> &
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
       publicBaseUrl?: string | undefined;
@@ -752,6 +755,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     "prisma",
     "clickhouse",
     "encryption",
+    "redis",
     "gatewayInternalProtocol",
     "publicBaseUrl",
   ] as const;
@@ -846,7 +850,13 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi {
     });
 
     return new GatewayApp({
-      members: controlPlane,
+      members: {
+        ...controlPlane,
+        agentCache: {
+          store: RedisGatewayAgentCacheEntryRepository.create(setup.members.redis),
+          encryption: setup.members.encryption,
+        },
+      },
       voice: {
         webhook: GatewayElevenLabsWebhookService.create({
           credentials: voiceCredentials,

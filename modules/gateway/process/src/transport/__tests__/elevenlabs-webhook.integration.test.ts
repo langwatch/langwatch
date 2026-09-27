@@ -22,6 +22,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvedSecrets } from "@langwatch/process-stores";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -135,6 +136,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     })
     .withRelational(database())
     .withAnalytical(peer("analytical store"))
+    .withKeyvalue(memoryRedisDouble())
     .withSecrets(resolvedSecrets({}))
     .withMember("gatewayInternalProtocol", {
       spend: {

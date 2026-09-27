@@ -8,6 +8,7 @@ import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
 import { GatewayApp } from "../gateway.app.ts";
@@ -44,6 +45,7 @@ function gatewayApp({
       clickhouse: createApiFixture<ClickHouseQueryClient>({}),
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
+      redis: redisDouble(),
       publicBaseUrl: "https://app.acme.example",
     },
     config: {

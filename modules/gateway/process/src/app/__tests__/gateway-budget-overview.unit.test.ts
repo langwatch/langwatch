@@ -12,6 +12,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GatewayApp } from "../gateway.app.ts";
@@ -94,6 +95,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
+      redis: redisDouble(),
     },
     config: {
       spendSettlementGraceMs: void 0,

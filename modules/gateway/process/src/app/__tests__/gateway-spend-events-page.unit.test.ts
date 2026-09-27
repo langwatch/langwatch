@@ -12,6 +12,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GatewayApp } from "../gateway.app.ts";
@@ -107,6 +108,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       clickhouse: fakeClickHouse(),
       gatewayInternalProtocol: {},
       encryption: createApiFixture<Encryption>(),
+      redis: redisDouble(),
     },
     config: {
       spendSettlementGraceMs: void 0,
