@@ -3,7 +3,7 @@ import {
   type ComparisonEvaluatorConfig,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
   type EvaluationsV3State,
-  type EvaluatorConfig,
+  type CellEvaluatorConfig,
   type ExecutionCell,
 } from "@langwatch/experiment-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
@@ -358,7 +358,7 @@ describe("given a comparison that is its own column", () => {
       ["0:target-2", "answer two"],
     ]);
 
-  const dispatchedFields = (cell: { evaluatorConfigs: EvaluatorConfig[] }) =>
+  const dispatchedFields = (cell: { evaluatorConfigs: CellEvaluatorConfig[] }) =>
     Object.keys(cell.evaluatorConfigs[0]!.mappings["dataset-1"]?.["comparison-target"] ?? {});
 
   describe("when the judge behind it is the N-way one", () => {

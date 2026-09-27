@@ -3,12 +3,7 @@
  * Python and TypeScript SDKs still call. Same operations, permissions, doors and bodies; kept out
  * of the published document, as main kept it.
  */
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  projectRestFacts,
-  type RestRawResult,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
 import {
   abortExperimentRunRequestSchema,
   abortExperimentRunResponseSchema,
@@ -37,7 +32,8 @@ import { HTTPException } from "hono/http-exception";
 import {
   experimentWorkbenchCredential,
   ExperimentV3RestApi,
-  rawAnswerOf,
+  runEventsOf,
+  negotiatedRunAnswer,
 } from "./experiment-v3.rest.ts";
 
 const payloadTooLarge = (): Error =>
@@ -57,21 +53,21 @@ export const experimentV3LegacyRest = defineRestRouter(ExperimentV3RestApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("evaluations:create")
-  .withRawResponse({ produces: ["application/json", "text/event-stream"] })
+  .withResponse("negotiated", {})
   .withDocs(HIDDEN)
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
-  .handle(
-    async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> =>
-      rawAnswerOf(
-        await app.startSavedRun({
-          projectId: scope.id,
-          projectSlug: project.projectSlug,
-          slug: input.evaluationSlug,
-          body: raw,
-          acceptsEvents: (request.headers.get("Accept") ?? "").includes("text/event-stream"),
-          credential,
-        }),
-      ),
+  .handle(async ({ app, input, raw, response, scope }, project, credential) =>
+    negotiatedRunAnswer(
+      response,
+      await app.startSavedRun({
+        projectId: scope.id,
+        projectSlug: project.projectSlug,
+        slug: input.evaluationSlug,
+        body: raw,
+        acceptsEvents: response.wantsEvents,
+        credential,
+      }),
+    ),
   )
 
   .get("/runs", "getApiEvaluationsV3Runs")
@@ -165,10 +161,10 @@ export const experimentWorkbenchRunLegacyRest = defineRestRouter(ExperimentV3Res
   .post("/execute", "executeEvaluationsV3Experiment")
   .withInput(executionRequestSchema)
   .withPermission("evaluations:manage", { at: "route", param: "projectId" })
-  .withRawResponse({ produces: "text/event-stream" })
+  .withResponse("sse", {})
   .withDocs(HIDDEN)
-  .handle(async ({ app, input, actor }): Promise<RestRawResult> =>
-    rawAnswerOf(await app.executeWorkbenchRun(input, actor)),
+  .handle(async ({ app, input, actor, response }) =>
+    response.events(runEventsOf((await app.executeWorkbenchRun(input, actor)).events)),
   )
 
   .post("/abort", "abortEvaluationsV3ExperimentRun")

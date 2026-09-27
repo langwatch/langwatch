@@ -244,6 +244,7 @@ export type {
   RestEvent,
   RestEventsProducer,
   RestForwardedProducer,
+  RestNegotiatedProducer,
   RestProducedFor,
   RestProducerFor,
   RestProtocolProducer,

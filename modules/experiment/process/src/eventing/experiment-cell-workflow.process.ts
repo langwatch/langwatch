@@ -1,5 +1,5 @@
 import type {
-  EvaluatorConfig,
+  CellEvaluatorConfig,
   LocalPromptConfig,
   TargetConfig,
   ExecutionCell,
@@ -932,7 +932,7 @@ const buildEvaluatorNodes = ({
   cell,
   loadedEvaluators,
 }: {
-  evaluatorConfigs: EvaluatorConfig[];
+  evaluatorConfigs: CellEvaluatorConfig[];
   targetId: string;
   cell: ExecutionCell;
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
@@ -989,7 +989,7 @@ export const buildEvaluatorNode = ({
   dbEvaluatorId,
   name,
 }: {
-  evaluator: EvaluatorConfig;
+  evaluator: CellEvaluatorConfig;
   nodeId: string;
   targetId: string;
   cell: ExecutionCell;
@@ -1062,7 +1062,7 @@ const buildEdges = ({
   entryNodeId: string;
   targetNodeId: string;
   targetConfig: TargetConfig;
-  evaluatorConfigs: EvaluatorConfig[];
+  evaluatorConfigs: CellEvaluatorConfig[];
   evaluatorNodeIds: Record<string, string>;
   cell: ExecutionCell;
   datasetColumns: { id: string; name: string; type: string }[];
@@ -1129,7 +1129,7 @@ const evaluatorInputEdges = ({
   targetId: string;
   evaluatorNodeId: string;
   inputField: string;
-  mapping: EvaluatorConfig["mappings"][string][string][string];
+  mapping: CellEvaluatorConfig["mappings"][string][string][string];
   datasetColumns: { id: string; name: string; type: string }[];
 }): StudioEdge[] => {
   if (mapping.type !== "source") return [];
@@ -1218,7 +1218,7 @@ const getEvaluatorInputValue = ({
   cell,
 }: {
   inputIdentifier: string;
-  evaluator: EvaluatorConfig;
+  evaluator: CellEvaluatorConfig;
   targetId: string;
   cell: ExecutionCell;
 }): unknown => {

@@ -7,7 +7,7 @@
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
 import {
   type EvaluationV3Event,
-  type EvaluatorConfig,
+  type CellEvaluatorConfig,
   EvaluatorNoInputsResolvedError,
   type ExecutionCell,
 } from "@langwatch/experiment-contract";
@@ -17,7 +17,7 @@ import { HandledError } from "@langwatch/handled-error";
 export const NO_INPUTS_RESOLVED = "NoInputsResolved";
 
 /** What the row calls the evaluator that could not run. */
-export const evaluatorDisplayName = (evaluator: EvaluatorConfig): string =>
+export const evaluatorDisplayName = (evaluator: CellEvaluatorConfig): string =>
   AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ?? evaluator.evaluatorType;
 
 /** The error cell an evaluator that could not run reports for itself. */
@@ -65,7 +65,7 @@ export const noInputsResolvedResult = ({
   evaluatorId,
 }: {
   cell: ExecutionCell;
-  evaluator: EvaluatorConfig;
+  evaluator: CellEvaluatorConfig;
   evaluatorId: string;
 }): EvaluationV3Event => ({
   type: "evaluator_result",

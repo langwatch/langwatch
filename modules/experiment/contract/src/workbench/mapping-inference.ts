@@ -248,12 +248,17 @@ const DATASET_INPUT_FIELDS = new Set([
  * Infers new mappings for the evaluator's input fields, preferring `target`'s outputs
  * or `dataset`'s columns depending on the field, and skipping already-mapped fields.
  */
-export const inferEvaluatorMappings = (
-  evaluatorInputs: Field[],
-  dataset: DatasetReference,
-  target: TargetConfig,
-  existingMappings: Record<string, FieldMapping> = {},
-): Record<string, FieldMapping> => {
+export const inferEvaluatorMappings = ({
+  evaluatorInputs,
+  dataset,
+  target,
+  existingMappings = {},
+}: {
+  evaluatorInputs: Field[];
+  dataset: DatasetReference;
+  target: TargetConfig;
+  existingMappings?: Record<string, FieldMapping>;
+}): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
 
   for (const input of evaluatorInputs) {
@@ -378,12 +383,12 @@ export const inferAllEvaluatorMappings = (
   for (const dataset of datasets) {
     for (const target of targets) {
       const existingMappings = result[dataset.id]?.[target.id] ?? {};
-      const newMappings = inferEvaluatorMappings(
-        evaluator.inputs,
+      const newMappings = inferEvaluatorMappings({
+        evaluatorInputs: evaluator.inputs,
         dataset,
         target,
         existingMappings,
-      );
+      });
 
       if (Object.keys(newMappings).length > 0) {
         // Copy the per-dataset bucket before writing into it: `result` is a

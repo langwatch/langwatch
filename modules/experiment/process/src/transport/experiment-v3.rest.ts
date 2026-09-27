@@ -9,7 +9,9 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type RestRawResult,
+  type RestAnswer,
+  type RestEvent,
+  type RestNegotiatedProducer,
 } from "@langwatch/api/rest";
 import {
   listRunsQuerySchema,
@@ -31,8 +33,8 @@ import {
   startRunResponseSchema,
   workbenchStateQuerySchema,
   workbenchStateAnswerSchema,
+  type EvaluationV3Event,
   type SavedRunAnswer,
-  type WorkbenchRunAnswer,
 } from "@langwatch/experiment-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -72,13 +74,6 @@ export interface ExperimentV3RestApi {
 
 export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
 
-/**
- * A JSON answer this door writes itself, rather than validating against one
- * success schema — each route states its 200 body in its own words.
- */
-export const jsonAnswer = (body: unknown, status: number): Response =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-
 /** The resolved project credential used to attribute workbench writes. */
 export const experimentWorkbenchCredential = defineRestMiddleware(
   "experimentWorkbenchCredential",
@@ -107,7 +102,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withRawBody("text", { mediaType: "application/json" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_JSON_BYTES, onExceeded: payloadTooLarge })
   .withPermission("evaluations:create")
-  .withRawResponse({ produces: ["application/json", "text/event-stream"] })
+  .withResponse("negotiated", {})
   .withDocs({
     summary: "Run an experiment",
     description:
@@ -136,18 +131,18 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
     },
   })
   .withMiddleware(projectRestFacts, experimentWorkbenchCredential)
-  .handle(
-    async ({ app, input, raw, request, scope }, project, credential): Promise<RestRawResult> =>
-      rawAnswerOf(
-        await app.startSavedRun({
-          projectId: scope.id,
-          projectSlug: project.projectSlug,
-          slug: input.slug,
-          body: raw,
-          acceptsEvents: (request.headers.get("Accept") ?? "").includes("text/event-stream"),
-          credential,
-        }),
-      ),
+  .handle(async ({ app, input, raw, response, scope }, project, credential) =>
+    negotiatedRunAnswer(
+      response,
+      await app.startSavedRun({
+        projectId: scope.id,
+        projectSlug: project.projectSlug,
+        slug: input.slug,
+        body: raw,
+        acceptsEvents: response.wantsEvents,
+        credential,
+      }),
+    ),
   )
 
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
@@ -326,39 +321,22 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
 
   .build();
 
-/** A run door's answer as main wrote it: a flat JSON body, or `data:` frames until the run ends. */
-export function rawAnswerOf(answer: SavedRunAnswer | WorkbenchRunAnswer): RestRawResult {
-  if (answer.kind === "refused") return jsonAnswer({ error: answer.error }, answer.status);
-
-  if (answer.kind === "started") {
-    const { kind: _started, ...started } = answer;
-    return jsonAnswer(started, 200);
-  }
-
-  return {
-    status: 200,
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-    body: eventStreamOf(answer.events),
-  };
+/** A run's progress as event-stream frames: one `data:` frame per event. */
+export async function* runEventsOf(
+  events: AsyncIterable<EvaluationV3Event>,
+): AsyncIterable<RestEvent> {
+  for await (const event of events) yield { data: JSON.stringify(event) };
 }
 
-/** Each event as one `data:` frame, closing when the events end. */
-function eventStreamOf(events: AsyncIterable<unknown>): ReadableStream {
-  const encoder = new TextEncoder();
+/** A saved run's answer: the started run as JSON, or its progress as it happens. */
+export function negotiatedRunAnswer(
+  response: RestNegotiatedProducer,
+  answer: SavedRunAnswer,
+): RestAnswer<"negotiated"> {
+  if (answer.kind === "started") {
+    const { kind: _started, ...started } = answer;
+    return response.json(started);
+  }
 
-  return new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of events) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-        }
-      } finally {
-        controller.close();
-      }
-    },
-  });
+  return response.events(runEventsOf(answer.events));
 }

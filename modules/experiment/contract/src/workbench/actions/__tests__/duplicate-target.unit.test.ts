@@ -15,7 +15,7 @@ describe("duplicateTarget", () => {
       });
 
       expect(state.targets).toHaveLength(2);
-      expect(result?.targetId).toMatch(/^target-[\w-]{8}$/);
+      expect(result?.targetId).toMatch(/target_[0-9A-Za-z]+$/);
       expect(result?.targetId).not.toBe("target-a");
       const copy = state.targets[1]!;
       expect(copy.promptId).toBe("prompt-1");

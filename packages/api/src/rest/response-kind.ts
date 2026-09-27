@@ -13,7 +13,13 @@ import { declined, type Declined } from "./response.ts";
  * framework - headers, framing, what the document publishes - which is why
  * they are named apart rather than sharing one raw hatch.
  */
-export type RestResponseKind = "bytes" | "sse" | "redirect" | "protocol" | "forwarded";
+export type RestResponseKind =
+  | "bytes"
+  | "sse"
+  | "negotiated"
+  | "redirect"
+  | "protocol"
+  | "forwarded";
 
 /** The brand a produced answer carries, and the runtime refuses an answer without. */
 const PRODUCED: unique symbol = Symbol.for("@langwatch/api/rest/produced");
@@ -94,6 +100,16 @@ export type RestEventsProducer = Readonly<{
   events(source: AsyncIterable<RestEvent>): RestAnswer<"sse">;
 }>;
 
+/**
+ * What a route that answers JSON or an event stream, by the caller's `Accept`,
+ * hands over: which one the caller asked for, and a producer for each.
+ */
+export type RestNegotiatedProducer = Readonly<{
+  wantsEvents: boolean;
+  json(body: unknown): RestAnswer<"negotiated">;
+  events(source: AsyncIterable<RestEvent>): RestAnswer<"negotiated">;
+}>;
+
 /** What a redirecting route hands over: where the caller goes, and for how long. */
 export type RestRedirectProducer = Readonly<{
   to(
@@ -144,6 +160,7 @@ export type RestForwardedProducer = Readonly<{
 type ProducerByKind<Produces extends string | readonly string[]> = Readonly<{
   bytes: RestBytesProducer<Produces>;
   sse: RestEventsProducer;
+  negotiated: RestNegotiatedProducer;
   redirect: RestRedirectProducer;
   protocol: RestProtocolProducer<Produces>;
   forwarded: RestForwardedProducer;
@@ -272,21 +289,46 @@ const BYTES_PRODUCER: RestBytesProducer = Object.freeze({
   },
 });
 
+const EVENT_STREAM_HEADERS = Object.freeze({
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache, no-transform",
+  Connection: "keep-alive",
+  "X-Accel-Buffering": "no",
+});
+
 const EVENTS_PRODUCER: RestEventsProducer = Object.freeze({
   events(source) {
     return answer({
       kind: "sse",
       status: 200,
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      },
+      headers: { ...EVENT_STREAM_HEADERS },
       body: { form: "events", events: source },
     });
   },
 });
+
+/** The negotiated producer for one request, reading the event stream off its `Accept`. */
+function negotiatedProducer(accept: string): RestNegotiatedProducer {
+  return Object.freeze({
+    wantsEvents: accept.includes("text/event-stream"),
+    json(body: unknown) {
+      return answer({
+        kind: "negotiated",
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: { form: "bytes", bytes: JSON.stringify(body) ?? "null" },
+      });
+    },
+    events(source: AsyncIterable<RestEvent>) {
+      return answer({
+        kind: "negotiated",
+        status: 200,
+        headers: { ...EVENT_STREAM_HEADERS },
+        body: { form: "events", events: source },
+      });
+    },
+  });
+}
 
 /**
  * Which redirect the caller is given: 303 turns a POST into a GET of the new
@@ -341,7 +383,7 @@ const PRODUCERS = {
   redirect: REDIRECT_PRODUCER,
   protocol: PROTOCOL_PRODUCER,
   forwarded: FORWARDED_PRODUCER,
-} as const satisfies Record<RestResponseKind, unknown>;
+} as const satisfies Record<Exclude<RestResponseKind, "negotiated">, unknown>;
 
 /** An HTTP status a response can carry; anything else a refusal names is a 500. */
 function isStatusCode(status: number): status is StatusCode {
@@ -363,9 +405,15 @@ export function refusalProducer(): RestRefusalProducer {
   return REFUSAL_PRODUCER;
 }
 
-/** The producer for a declared kind, as the runtime hands it to the handler. */
-export function producerFor(kind: RestResponseKind): (typeof PRODUCERS)[RestResponseKind] {
-  return PRODUCERS[kind];
+/** The producer for a declared kind, as the runtime hands it to the request's handler. */
+export function producerFor({
+  kind,
+  accept,
+}: {
+  kind: RestResponseKind;
+  accept: string;
+}): RestProducerFor<RestResponseKind> {
+  return kind === "negotiated" ? negotiatedProducer(accept) : PRODUCERS[kind];
 }
 
 /** Whether a handler's result came from a producer, rather than being hand-built. */
@@ -385,5 +433,7 @@ export function kindNeedsReason(kind: RestResponseKind): boolean {
 
 /** What a kind publishes when the declaration named no media type of its own. */
 export function defaultProducesFor(kind: RestResponseKind): readonly string[] {
+  if (kind === "negotiated") return ["application/json", "text/event-stream"];
+
   return kind === "sse" ? ["text/event-stream"] : [];
 }

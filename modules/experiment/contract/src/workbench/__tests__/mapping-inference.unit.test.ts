@@ -37,7 +37,7 @@ describe("inferEvaluatorMappings", () => {
       );
       const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({ evaluatorInputs, dataset, target });
 
       expect(mappings.output).toBeUndefined();
     });
@@ -52,7 +52,7 @@ describe("inferEvaluatorMappings", () => {
       );
       const evaluatorInputs: Field[] = [{ identifier: "expected_output", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({ evaluatorInputs, dataset, target });
 
       expect(mappings.expected_output).toBeUndefined();
     });
@@ -67,7 +67,7 @@ describe("inferEvaluatorMappings", () => {
       );
       const evaluatorInputs: Field[] = [{ identifier: "input", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({ evaluatorInputs, dataset, target });
 
       expect(mappings.input).toBeUndefined();
     });
@@ -87,7 +87,7 @@ describe("inferEvaluatorMappings", () => {
       );
       const evaluatorInputs: Field[] = [{ identifier: "output", type: "str" }];
 
-      const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, target);
+      const mappings = inferEvaluatorMappings({ evaluatorInputs, dataset, target });
 
       expect(mappings.output).toBeUndefined();
     });

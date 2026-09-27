@@ -496,16 +496,13 @@ export const experimentInitForbiddenSchema = handledErrorEnvelopeSchema.safeExte
   max: z.number().optional().describe("What the plan allows"),
 });
 
-/** A refusal main answers in its own flat body, at the status it chose. */
-export type WorkbenchRunRefusal = Readonly<{ kind: "refused"; status: number; error: string }>;
-
 /** A run whose progress the caller follows as it happens. */
 export type WorkbenchRunStream = Readonly<{
   kind: "streaming";
   events: AsyncIterable<EvaluationV3Event>;
 }>;
 
-export type WorkbenchRunAnswer = WorkbenchRunRefusal | WorkbenchRunStream;
+export type WorkbenchRunAnswer = WorkbenchRunStream;
 
 export type SavedRunAnswer =
   | WorkbenchRunAnswer

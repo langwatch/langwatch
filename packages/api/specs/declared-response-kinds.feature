@@ -31,6 +31,13 @@ Feature: Declared response kinds
     And a caller that hangs up ends the handler's own stream
 
   @integration
+  Scenario: A negotiated route answers JSON or an event stream by what the caller accepts
+    Given a route declaring the negotiated kind
+    When a caller that accepts an event stream asks
+    Then the handler is told so and its events are framed by the framework
+    And a caller that accepts only JSON receives the JSON body the handler produced
+
+  @integration
   Scenario: A wire we do not own is written exactly as the handler wrote it
     Given a route declaring the protocol kind with the reason it is needed
     When its handler writes a status, a media type and a body

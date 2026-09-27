@@ -24,19 +24,34 @@ export type AutosaveState = "idle" | "saving" | "saved" | "error";
  * Zod schema for field mapping validation.
  * Discriminated union: source mapping OR value mapping.
  */
+const sourceFieldMappingSchema = z.object({
+  type: z.literal("source"),
+  source: z.enum(["dataset", "target"]),
+  sourceId: z.string(),
+  sourceField: z.string(),
+});
+
 export const fieldMappingSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("source"),
-    source: z.enum(["dataset", "target"]),
-    sourceId: z.string(),
-    sourceField: z.string(),
-  }),
+  sourceFieldMappingSchema,
   z.object({
     type: z.literal("value"),
     value: z.string(),
   }),
 ]);
 export type FieldMapping = z.infer<typeof fieldMappingSchema>;
+
+/**
+ * An evaluator input's mapping as a run carries it: an author's typed text, or
+ * a per-row value the run resolved itself (comparison candidates, costs).
+ */
+export const evaluatorFieldMappingSchema = z.discriminatedUnion("type", [
+  sourceFieldMappingSchema,
+  z.object({
+    type: z.literal("value"),
+    value: z.unknown(),
+  }),
+]);
+export type EvaluatorFieldMapping = z.infer<typeof evaluatorFieldMappingSchema>;
 
 /**
  * Zod schema for dataset column validation.
@@ -493,17 +508,17 @@ export type EvaluationsV3Actions = {
   exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
 
   // Dataset cell/column actions (works for both inline and saved)
-  setCellValue: (datasetId: string, row: number, columnId: string, value: string) => void;
+  setCellValue: (args: { datasetId: string; row: number; columnId: string; value: string }) => void;
   getCellValue: (datasetId: string, row: number, columnId: string) => string;
   getRowCount: (datasetId: string) => number;
 
   // Saved dataset actions
-  updateSavedRecordValue: (
-    datasetId: string,
-    rowIndex: number,
-    columnId: string,
-    value: string,
-  ) => void;
+  updateSavedRecordValue: (args: {
+    datasetId: string;
+    rowIndex: number;
+    columnId: string;
+    value: string;
+  }) => void;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
   getSavedRecordInfo: (
     datasetId: string,
@@ -540,12 +555,12 @@ export type EvaluationsV3Actions = {
     outputs?: Field[];
   }) => void;
   /** Set a mapping for a target input field for a specific dataset */
-  setTargetMapping: (
-    targetId: string,
-    datasetId: string,
-    inputField: string,
-    mapping: FieldMapping,
-  ) => void;
+  setTargetMapping: (args: {
+    targetId: string;
+    datasetId: string;
+    inputField: string;
+    mapping: FieldMapping;
+  }) => void;
   /** Remove a mapping for a target input field for a specific dataset */
   removeTargetMapping: (targetId: string, datasetId: string, inputField: string) => void;
   /**
@@ -561,20 +576,20 @@ export type EvaluationsV3Actions = {
   removeEvaluator: (evaluatorId: string) => void;
 
   /** Set a mapping for an evaluator input field for a specific dataset and target */
-  setEvaluatorMapping: (
-    evaluatorId: string,
-    datasetId: string,
-    targetId: string,
-    inputField: string,
-    mapping: FieldMapping,
-  ) => void;
+  setEvaluatorMapping: (args: {
+    evaluatorId: string;
+    datasetId: string;
+    targetId: string;
+    inputField: string;
+    mapping: FieldMapping;
+  }) => void;
   /** Remove a mapping for an evaluator input field for a specific dataset and target */
-  removeEvaluatorMapping: (
-    evaluatorId: string,
-    datasetId: string,
-    targetId: string,
-    inputField: string,
-  ) => void;
+  removeEvaluatorMapping: (args: {
+    evaluatorId: string;
+    datasetId: string;
+    targetId: string;
+    inputField: string;
+  }) => void;
 
   // Results actions
   setResults: (results: Partial<EvaluationResults>) => void;

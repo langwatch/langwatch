@@ -23,6 +23,7 @@ import {
   type SavedRunRequest,
   type WorkbenchRunAnswer,
   type executionRequestSchema,
+  ExperimentEvaluationInputError,
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -82,7 +83,7 @@ export class ExperimentWorkbenchRunService {
       throw new InvalidExperimentConfigurationError(slug);
     }
     if (!parseResult.data.datasets[0]) {
-      return { kind: "refused", status: 400, error: "No dataset configured" };
+      throw new ExperimentEvaluationInputError({ status: 400, reason: "No dataset configured" });
     }
 
     let rawBody: unknown = {};
@@ -90,13 +91,13 @@ export class ExperimentWorkbenchRunService {
       try {
         rawBody = JSON.parse(input.body);
       } catch {
-        return { kind: "refused", status: 400, error: "Invalid JSON body" };
+        throw new ExperimentEvaluationInputError({ status: 400, reason: "Invalid JSON body" });
       }
     }
     const inputsParse = runInputsBodySchema.safeParse(rawBody);
     if (!inputsParse.success) {
       const error = inputsParse.error.issues[0]?.message ?? "Invalid request body";
-      return { kind: "refused", status: 400, error };
+      throw new ExperimentEvaluationInputError({ status: 400, reason: error });
     }
     const runInputs = inputsParse.data;
 
@@ -114,7 +115,7 @@ export class ExperimentWorkbenchRunService {
       },
     );
     if ("error" in prepared) {
-      return { kind: "refused", status: prepared.status, error: prepared.error };
+      throw new ExperimentEvaluationInputError({ status: prepared.status, reason: prepared.error });
     }
 
     const scope: ExecutionScope = runInputs.row_indices
@@ -207,7 +208,10 @@ export class ExperimentWorkbenchRunService {
       inputs: { data: input.data, datasetId: input.dataset_id, parameters: input.parameters },
     });
     if ("error" in dataResult) {
-      return { kind: "refused", status: dataResult.status, error: dataResult.error };
+      throw new ExperimentEvaluationInputError({
+        status: dataResult.status,
+        reason: dataResult.error,
+      });
     }
 
     const state: EvaluationsV3State = {

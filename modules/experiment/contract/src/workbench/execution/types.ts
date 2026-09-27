@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   type DatasetReference,
   type EvaluatorConfig,
+  type EvaluatorFieldMapping,
   evaluatorConfigSchema,
   type TargetConfig,
   targetConfigSchema,
@@ -351,6 +352,14 @@ export type EvaluationV3Event =
 // ============================================================================
 
 /**
+ * An evaluator as one cell runs it: a value mapping may carry a per-row value
+ * the run resolved itself (comparison candidates, costs), not only typed text.
+ */
+export type CellEvaluatorConfig = Omit<EvaluatorConfig, "mappings"> & {
+  mappings: Record<string, Record<string, Record<string, EvaluatorFieldMapping>>>;
+};
+
+/**
  * A "cell" is the unit of execution: one row + one target.
  * All evaluators for that target are included in the same workflow.
  */
@@ -358,7 +367,7 @@ export type ExecutionCell = {
   rowIndex: number;
   targetId: string;
   targetConfig: TargetConfig;
-  evaluatorConfigs: EvaluatorConfig[];
+  evaluatorConfigs: CellEvaluatorConfig[];
   datasetEntry: Record<string, unknown>;
   /** If true, skip target execution and use precomputedTargetOutput instead */
   skipTarget?: boolean;

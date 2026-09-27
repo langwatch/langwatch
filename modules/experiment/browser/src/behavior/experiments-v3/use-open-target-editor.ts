@@ -205,12 +205,12 @@ export const useOpenTargetEditor = () => {
               // isn't modal and the user may switch datasets while it's open.
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -243,12 +243,12 @@ export const useOpenTargetEditor = () => {
               // live: this drawer isn't modal either.
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -279,12 +279,12 @@ export const useOpenTargetEditor = () => {
               // live: this drawer isn't modal either.
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -316,12 +316,12 @@ export const useOpenTargetEditor = () => {
             setFlowCallbacks("agentCodeEditor", {
               onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
                 if (mapping) {
-                  setTargetMapping(
-                    target.id,
-                    activeDatasetId,
-                    identifier,
-                    convertFromUIMapping(mapping, isDatasetSource),
-                  );
+                  setTargetMapping({
+                    targetId: target.id,
+                    datasetId: activeDatasetId,
+                    inputField: identifier,
+                    mapping: convertFromUIMapping(mapping, isDatasetSource),
+                  });
                 } else {
                   removeTargetMapping(target.id, activeDatasetId, identifier);
                 }
@@ -404,12 +404,12 @@ export const useOpenTargetEditor = () => {
         // this drawer isn't modal either.
         const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
           if (mapping) {
-            setTargetMapping(
-              target.id,
-              activeDatasetId,
-              identifier,
-              convertFromUIMapping(mapping, isDatasetSource),
-            );
+            setTargetMapping({
+              targetId: target.id,
+              datasetId: activeDatasetId,
+              inputField: identifier,
+              mapping: convertFromUIMapping(mapping, isDatasetSource),
+            });
           } else {
             removeTargetMapping(target.id, activeDatasetId, identifier);
           }
