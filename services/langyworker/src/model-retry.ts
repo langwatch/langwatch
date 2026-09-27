@@ -42,7 +42,7 @@ export type FailedModelCall = {
  * hardLimitReasonCodes (llmproxy.go).
  */
 const PLAN_LIMIT_PATTERN =
-  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|quota exceeded|out of budget|billing/i;
+  /usage_limit_reached|codex_plan_limit|insufficient_quota|billing_hard_limit_reached|quota exceeded|out of budget|credit balance/i;
 
 /** The wording providers, SDKs and transports use for a failure worth another try. */
 const TRANSIENT_PATTERN = new RegExp(
@@ -210,6 +210,10 @@ export function installModelRetry({
     const delayMs = retryDelayMs({ attempt, errorMessage, random });
     if (delayMs === null) return false;
     internals._retryAttempt = attempt;
+    // Held before the attempt is announced, so a stop that answers the
+    // announcement still ends the wait.
+    const controller = new AbortController();
+    internals._retryAbortController = controller;
     internals._emit({
       type: "auto_retry_start",
       attempt,
@@ -223,8 +227,6 @@ export function installModelRetry({
     if (messages.at(-1)?.role === "assistant") {
       internals.agent.state.messages = messages.slice(0, -1);
     }
-    const controller = new AbortController();
-    internals._retryAbortController = controller;
     try {
       await sleep(delayMs, controller.signal);
     } catch {

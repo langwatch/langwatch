@@ -18,11 +18,6 @@ import {
   type ExtensionAPI,
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
-import {
-  MODEL_RETRY_MAX_ATTEMPTS,
-  MODEL_RETRY_MAX_NAMED_WAIT_MS,
-  retryDelayMs,
-} from "../model-retry.js";
 import { callIds, conversationId, type TurnContext } from "./turn-context.js";
 
 export const CODE_ACCESS_TOOL_NAME = "code_access";
@@ -131,8 +126,20 @@ const REQUEST_TIMEOUT_MS = 20_000;
 /** Wait this long after a failed poll before the next one. */
 const POLL_RETRY_DELAY_MS = 1_000;
 
-/** Give up on the folder after this many failed polls in a row. */
+/** Give up on a call the app says it lost after this many polls in a row. */
 const MAX_POLL_FAILURES = 3;
+
+/** Retries of a request the app failed for a transient reason, after the first. */
+const APP_RETRY_MAX_ATTEMPTS = 5;
+
+/** The first wait before asking the app again. Each retry doubles it: 1 to 16 s. */
+const APP_RETRY_BASE_DELAY_MS = 1_000;
+
+/** How far a wait is shifted at random, as a share of it, either way. */
+const APP_RETRY_JITTER = 0.2;
+
+/** A wait the app names past this is not waited out: the call fails. */
+const APP_RETRY_MAX_NAMED_WAIT_MS = 60_000;
 
 /** The longest a single local call may wait for its answer. */
 const CALL_MAX_WAIT_MS = 20 * 60 * 1000;
@@ -270,13 +277,16 @@ function retryAfterHeaderMs(response: Response): number | undefined {
 }
 
 /**
- * The wait before retry `attempt` of a call to the app: the wait a busy app
- * named when it is short enough, otherwise the model retry's backoff.
+ * The wait before retry `attempt` of a request to the app, or null when a busy
+ * app named a wait too long to take. A named wait is taken as named; otherwise
+ * the backoff doubles from APP_RETRY_BASE_DELAY_MS with jitter either way.
  */
-function appRetryWaitMs({ error, attempt }: { error: unknown; attempt: number }): number {
+function appRetryWaitMs({ error, attempt }: { error: unknown; attempt: number }): number | null {
   const named = error instanceof AppBusyError ? error.retryAfterMs : undefined;
-  if (named !== undefined && named <= MODEL_RETRY_MAX_NAMED_WAIT_MS) return named;
-  return retryDelayMs({ attempt, errorMessage: "" }) ?? 0;
+  if (named !== undefined) return named > APP_RETRY_MAX_NAMED_WAIT_MS ? null : named;
+  const backoff = APP_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+  const shift = backoff * APP_RETRY_JITTER * (2 * Math.random() - 1);
+  return Math.max(0, Math.round(backoff + shift));
 }
 
 /**
@@ -314,6 +324,18 @@ function rejectionText(body: ApiErrorBody): string {
   );
   const detail = lines.length > 0 ? lines.join("; ") : (body.error?.message ?? "invalid request");
   return `LangWatch refused this call before it reached the machine: ${detail}. Fix the parameters and call the tool again.`;
+}
+
+/** The code the app answers with when no folder is connected (a 503). */
+const WORKSPACE_OFFLINE_CODE = "langy_local_workspace_offline";
+
+/** The handled error code of a refused response, if its body names one. */
+async function errorCode(response: Response): Promise<string | undefined> {
+  try {
+    return ((await response.json()) as ApiErrorBody).error?.code;
+  } catch {
+    return undefined;
+  }
 }
 
 function endpoint(): string {
@@ -374,6 +396,11 @@ export async function callApp<T>({
     throw new AppUnreachableError("the LangWatch app did not answer");
   }
   if (response.status === 429 || response.status === 503) {
+    // A 503 is also how the app says no folder is connected, after it waited
+    // for one: asking again would only wait again.
+    if (response.status === 503 && (await errorCode(response)) === WORKSPACE_OFFLINE_CODE) {
+      throw new AppUnreachableError("no local folder is connected to this conversation");
+    }
     throw new AppBusyError(retryAfterHeaderMs(response));
   }
   if (!response.ok) throw new AppUnreachableError("the LangWatch app did not answer");
@@ -554,9 +581,11 @@ async function startLocalCall({
         timeoutMs: REQUEST_TIMEOUT_MS,
       });
     } catch (error) {
-      if (!(error instanceof AppBusyError) || attempt > MODEL_RETRY_MAX_ATTEMPTS) throw error;
+      if (!(error instanceof AppBusyError) || attempt > APP_RETRY_MAX_ATTEMPTS) throw error;
       if (signal?.aborted) throw new CallCancelledError(CANCELLED_PUSHBACK);
-      await sleep(appRetryWaitMs({ error, attempt }), signal);
+      const waitMs = appRetryWaitMs({ error, attempt });
+      if (waitMs === null) throw error;
+      await sleep(waitMs, signal);
     }
   }
 }
@@ -587,7 +616,8 @@ export async function runLocalCall({
     signal,
   });
 
-  let failures = 0;
+  let transientFailures = 0;
+  let lostFailures = 0;
   for (;;) {
     if (signal?.aborted) {
       await cancelCall(started.callId);
@@ -611,21 +641,24 @@ export async function runLocalCall({
         await cancelCall(started.callId);
         throw new CallCancelledError(CANCELLED_PUSHBACK);
       }
-      failures += 1;
       // A read repeats nothing, so an app that did not answer, failed or was
-      // busy is asked again on the model retry's schedule. A call the app says
-      // it lost keeps the short count: waiting longer does not bring it back.
+      // busy is asked again with a growing wait. A call the app says it lost
+      // keeps its own short count: waiting longer does not bring it back.
       const transient = error instanceof AppUnreachableError && !(error instanceof CallLostError);
       if (transient) {
-        if (failures > MODEL_RETRY_MAX_ATTEMPTS) throw error;
-        await sleep(appRetryWaitMs({ error, attempt: failures }), signal);
+        transientFailures += 1;
+        const waitMs = appRetryWaitMs({ error, attempt: transientFailures });
+        if (transientFailures > APP_RETRY_MAX_ATTEMPTS || waitMs === null) throw error;
+        await sleep(waitMs, signal);
         continue;
       }
-      if (failures >= MAX_POLL_FAILURES) throw error;
+      lostFailures += 1;
+      if (lostFailures >= MAX_POLL_FAILURES) throw error;
       await sleep(POLL_RETRY_DELAY_MS, signal);
       continue;
     }
-    failures = 0;
+    transientFailures = 0;
+    lostFailures = 0;
 
     if (poll.state !== "done") continue;
 

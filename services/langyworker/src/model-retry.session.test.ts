@@ -17,7 +17,7 @@ import { Type } from "typebox";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { TurnEventMapper } from "./events.js";
-import { installModelRetry, MODEL_RETRY_MAX_ATTEMPTS } from "./model-retry.js";
+import { abortableSleep, installModelRetry, MODEL_RETRY_MAX_ATTEMPTS } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
 import type { WorkerEvent } from "./protocol.js";
 
@@ -82,7 +82,10 @@ async function scriptedProvider(streams: string[]): Promise<{ url: string; reque
   return { url: `http://127.0.0.1:${port}/v1`, requests: () => served };
 }
 
-async function sessionAgainst(baseUrl: string): Promise<{
+async function sessionAgainst(
+  baseUrl: string,
+  sleep: (ms: number, signal: AbortSignal) => Promise<void> = async () => undefined,
+): Promise<{
   session: AgentSession;
   toolRuns: () => number;
 }> {
@@ -149,7 +152,7 @@ async function sessionAgainst(baseUrl: string): Promise<{
     }),
     tools: ["count_me"],
   });
-  installModelRetry({ session, sleep: async () => undefined });
+  installModelRetry({ session, sleep });
   return { session, toolRuns: () => runs };
 }
 
@@ -202,6 +205,38 @@ describe("a pi session with the model retry installed", () => {
 
       expect(provider.requests()).toBe(1 + MODEL_RETRY_MAX_ATTEMPTS);
       expect(session.agent.state.errorMessage).toMatch(/overloaded/i);
+    });
+
+    describe("when a later turn in the same session fails for a transient reason", () => {
+      it("retries it with the full budget again", async () => {
+        const failures = Array.from({ length: 1 + MODEL_RETRY_MAX_ATTEMPTS }, () => OVERLOADED_STREAM);
+        const provider = await scriptedProvider([...failures, OVERLOADED_STREAM, ANSWER_STREAM]);
+        const { session } = await sessionAgainst(provider.url);
+        await session.prompt("count");
+
+        await session.prompt("answer");
+
+        expect(provider.requests()).toBe(1 + MODEL_RETRY_MAX_ATTEMPTS + 2);
+        expect(session.getLastAssistantText()).toBe("Counted.");
+      });
+    });
+  });
+
+  describe("when the turn is stopped during a wait", () => {
+    /** @scenario "Stopping the turn during a wait ends the retries" */
+    it("ends the wait and makes no further call to the model", async () => {
+      const provider = await scriptedProvider([OVERLOADED_STREAM, ANSWER_STREAM]);
+      const { session } = await sessionAgainst(provider.url, (_ms, signal) =>
+        abortableSleep(60_000, signal),
+      );
+      session.subscribe((event) => {
+        if ((event as { type?: string }).type === "auto_retry_start") void session.abort();
+      });
+
+      await session.prompt("count");
+
+      expect(provider.requests()).toBe(1);
+      expect(session.getLastAssistantText()).not.toBe("Counted.");
     });
   });
 });

@@ -59,6 +59,11 @@ describe("isTransientModelFailure", () => {
     ])("retries %s", (message) => {
       expect(isTransientModelFailure(failed(message))).toBe(true);
     });
+
+    it("retries a 503 whose help text links to the billing page", () => {
+      const message = "503 Service unavailable. See Plans & Billing for your usage.";
+      expect(isTransientModelFailure(failed(message))).toBe(true);
+    });
   });
 
   describe("when the failure is a refusal", () => {

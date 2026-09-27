@@ -92,6 +92,24 @@ describe("polling a local call", () => {
       expect(app.polled()).toBe(6);
     });
   });
+
+  describe("when transient failures come before polls for a lost call", () => {
+    it("keeps the lost call's own three polls", async () => {
+      const app = fakePolls([
+        { status: 502 },
+        { status: 502 },
+        { status: 502 },
+        { status: 200, body: { callId: "call_1", state: "running" } },
+        { status: 404 },
+        { status: 404 },
+        { status: 404 },
+      ]);
+      const settled = run().catch((error: unknown) => error);
+      await vi.runAllTimersAsync();
+      expect(await settled).toBeInstanceOf(Error);
+      expect(app.polled()).toBe(7);
+    });
+  });
 });
 
 describe("starting a local call", () => {
@@ -126,6 +144,33 @@ describe("starting a local call", () => {
       await vi.runAllTimersAsync();
       expect(await settled).toBeInstanceOf(Error);
       expect(app.posted).toHaveLength(6);
+    });
+
+    it("gives up at once when the app names a wait longer than a minute", async () => {
+      const app = fakeApp([
+        { status: 429, headers: { "retry-after": "120" } },
+        { status: 200, body: { callId: "call_1" } },
+      ]);
+      const settled = run().catch((error: unknown) => error);
+      await vi.runAllTimersAsync();
+      expect(await settled).toBeInstanceOf(Error);
+      expect(app.posted).toHaveLength(1);
+    });
+  });
+
+  describe("when the app answers 503 because no folder is connected", () => {
+    it("fails on the first answer without asking again", async () => {
+      const app = fakeApp([
+        {
+          status: 503,
+          body: { error: { code: "langy_local_workspace_offline", message: "No local folder" } },
+        },
+        { status: 200, body: { callId: "call_1" } },
+      ]);
+      const settled = run().catch((error: unknown) => error);
+      await vi.runAllTimersAsync();
+      expect(await settled).toBeInstanceOf(Error);
+      expect(app.posted).toHaveLength(1);
     });
   });
 
