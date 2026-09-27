@@ -36,12 +36,14 @@ export class ModelProviderTextGenerationService {
       const model = await this.#execution.resolve({
         projectId: input.projectId,
         featureKey: input.featureKey,
+        ...(input.model === undefined ? {} : { model: input.model }),
       });
       const completion = await generateText({
         model,
         system: input.system,
         messages: input.messages.map((message) => ({ ...message })),
         ...(input.maxOutputTokens === undefined ? {} : { maxOutputTokens: input.maxOutputTokens }),
+        ...(input.maxRetries === undefined ? {} : { maxRetries: input.maxRetries }),
         ...(input.temperature === undefined ? {} : { temperature: input.temperature }),
         ...(input.reasoningEffort === undefined
           ? {}

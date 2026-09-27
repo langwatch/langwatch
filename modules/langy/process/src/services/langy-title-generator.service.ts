@@ -72,20 +72,19 @@ export class LangyTitleGeneratorService {
     }
 
     try {
-      const resolved = await this.deps.models.resolveModelForFeature({
-        projectId,
-        featureKey: LANGY_TITLE_FEATURE_KEY,
-      });
+      const model = await this.titleModel(projectId);
       const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
+        ...(model.fallback ? { model: model.name } : {}),
         system: TITLE_SYSTEM_PROMPT,
         messages: [{ role: "user", content: `Conversation so far:\n\n${transcript}\n\nTitle:` }],
         temperature: 0.2,
+        maxRetries: 1,
       });
       const title = normalizeLangyConversationTitle(text);
 
-      return title ? { outcome: "generated", title, model: resolved.model } : UNCHANGED;
+      return title ? { outcome: "generated", title, model: model.name } : UNCHANGED;
     } catch (error) {
       if (!isModelNotConfigured(error)) throw error;
       logger.warn(
@@ -94,6 +93,22 @@ export class LangyTitleGeneratorService {
       );
 
       return UNCHANGED;
+    }
+  }
+
+  /** The project's model for titles, else the cheap default so titles work out of the box. */
+  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
+    try {
+      const resolved = await this.deps.models.resolveModelForFeature({
+        projectId,
+        featureKey: LANGY_TITLE_FEATURE_KEY,
+      });
+
+      return { name: resolved.model, fallback: false };
+    } catch (error) {
+      if (!isModelNotConfigured(error)) throw error;
+
+      return { name: LANGY_TITLE_GENERATION.MODEL, fallback: true };
     }
   }
 }

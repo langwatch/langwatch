@@ -73,7 +73,12 @@ describe("given a conversation the customer never named", () => {
 
       expect(resolved).toEqual([{ projectId: PROJECT_ID, featureKey: "langy.conversation_title" }]);
       expect(completions).toMatchObject([
-        { projectId: PROJECT_ID, featureKey: "langy.conversation_title", temperature: 0.2 },
+        {
+          projectId: PROJECT_ID,
+          featureKey: "langy.conversation_title",
+          temperature: 0.2,
+          maxRetries: 1,
+        },
       ]);
     });
 

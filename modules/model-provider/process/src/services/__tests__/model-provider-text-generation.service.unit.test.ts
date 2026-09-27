@@ -67,6 +67,20 @@ describe("ModelProviderTextGenerationService", () => {
     });
   });
 
+  it("runs the caller's explicit model with its retry budget", async () => {
+    const { generate, model, resolve } = harness();
+    ai.generateText.mockResolvedValue({ text: "a title" });
+
+    await generate({ ...request, model: "openai/gpt-5-mini", maxRetries: 1 });
+
+    expect(resolve).toHaveBeenCalledWith({
+      projectId: "project_1",
+      featureKey: "workflows.commit_message",
+      model: "openai/gpt-5-mini",
+    });
+    expect(ai.generateText).toHaveBeenCalledWith(expect.objectContaining({ model, maxRetries: 1 }));
+  });
+
   it("refuses a provider failure as ai_call_failed", async () => {
     const { generate } = harness();
     ai.generateText.mockRejectedValue(new Error("provider 500"));

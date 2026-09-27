@@ -4,6 +4,7 @@
  * @see specs/langy/langy-conversation-title.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderApi,
@@ -110,10 +111,38 @@ describe("LangyTitleGeneratorService", () => {
   });
 
   describe("when the project has no model configured for titles", () => {
-    /** @scenario "A project with no model for titles is not retried" */
-    it("produces no title and raises nothing", async () => {
+    /** @scenario "A project with no model for titles falls back to the cheap default" */
+    it("generates the title on the cheap default model", async () => {
       const { api, generateText } = modelProviders({
         resolveModelForFeature: async () => {
+          throw unconfigured();
+        },
+        generateText: async () => ({ text: "Instrument traces" }),
+      });
+      const generate = LangyTitleGeneratorService.create({
+        messages: messages(),
+        models: api,
+      }).generator();
+
+      await expect(generate(args)).resolves.toEqual({
+        outcome: "generated",
+        title: "Instrument traces",
+        model: LANGY_TITLE_GENERATION.MODEL,
+      });
+      expect(generateText).toHaveBeenCalledWith(
+        expect.objectContaining({ model: LANGY_TITLE_GENERATION.MODEL, maxRetries: 1 }),
+      );
+    });
+  });
+
+  describe("when not even the cheap default can be asked", () => {
+    /** @scenario "A project with no model for titles is not retried" */
+    it("produces no title and raises nothing", async () => {
+      const { api } = modelProviders({
+        resolveModelForFeature: async () => {
+          throw unconfigured();
+        },
+        generateText: async () => {
           throw unconfigured();
         },
       });
@@ -123,7 +152,6 @@ describe("LangyTitleGeneratorService", () => {
       }).generator();
 
       await expect(generate(args)).resolves.toEqual({ outcome: "unchanged" });
-      expect(generateText).not.toHaveBeenCalled();
     });
   });
 
