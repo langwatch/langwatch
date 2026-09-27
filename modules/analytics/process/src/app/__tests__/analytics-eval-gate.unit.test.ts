@@ -18,6 +18,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
 import { AnalyticsApp } from "../analytics.app.ts";
 
 const PROJECT_ID = "project-judging";
@@ -54,13 +55,9 @@ async function harness(flagAnswer: boolean) {
       clickhouse: createApiFixture<ClickHouseQueryClient>(),
       rateLimiter: { check: () => Promise.resolve({ allowed: true }) } satisfies RateLimiter,
       publicBaseUrl: "https://app.langwatch.test",
-      langwatchQl: {
-        admin: { configured: false },
-        postgres: { configured: false },
-        database: () => {
-          throw new Error("no database in this test");
-        },
-      },
+      clickhouseAdmin: { configured: false },
+      databaseTarget: { configured: false },
+      prisma: createApiFixture<LwqlProvisioningDatabase>({}, "prisma"),
     },
     config: {
       langwatchQl: {

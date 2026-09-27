@@ -1,15 +1,13 @@
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { DataPrivacyScope, ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { withMemoryRepositories } from "@langwatch/kernel";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
-import {
-  type DataPrivacyDirectoryReader,
-  type DataPrivacyOrganizationDirectory,
-  type DataPrivacyProjectLineage,
-} from "../data-privacy.app.ts";
+import type { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
+import { MemoryDataPrivacyRepositories } from "../../repositories/memory/memory.data-privacy.repositories.ts";
+import { DataPrivacyApp } from "../data-privacy.app.ts";
 import type { DataPrivacyResolution } from "../data-privacy.members.ts";
 
 /** The policy source the redaction cases drive their PII cases over. */
@@ -18,40 +16,6 @@ export class DataPrivacyResolutionFake implements DataPrivacyResolution {
 
   async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
     return this.resolved;
-  }
-}
-
-/** One organization's lineage, held in the test rather than in Postgres. */
-export class MemoryDataPrivacyDirectory implements DataPrivacyDirectoryReader {
-  static create(
-    rows: {
-      lineage?: DataPrivacyProjectLineage;
-      directory?: DataPrivacyOrganizationDirectory;
-      scopeOrganizationId?: string | null;
-    } = {},
-  ): MemoryDataPrivacyDirectory {
-    return new MemoryDataPrivacyDirectory(rows);
-  }
-
-  private constructor(
-    private readonly rows: {
-      lineage?: DataPrivacyProjectLineage;
-      directory?: DataPrivacyOrganizationDirectory;
-      scopeOrganizationId?: string | null;
-    },
-  ) {}
-
-  async findProjectLineage(): Promise<DataPrivacyProjectLineage | null> {
-    return this.rows.lineage ?? null;
-  }
-
-  async findOrganizationDirectory(): Promise<DataPrivacyOrganizationDirectory> {
-    return this.rows.directory ?? { departments: [], teams: [], projects: [], groups: [] };
-  }
-
-  async findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null> {
-    void input;
-    return this.rows.scopeOrganizationId ?? null;
   }
 }
 
@@ -120,14 +84,8 @@ export function createDataPrivacyTestProjects(): ProjectApi {
 }
 
 /** The technical inputs a booted data-privacy feature needs from its process. */
-export function dataPrivacyTestInfrastructure(directory = MemoryDataPrivacyDirectory.create()) {
-  return {
-    directory,
-  };
-}
-
 /** `createApp` composes no secrets chain, so the module's one handle is answered here. */
-export function installableDataPrivacy(googleCredentials?: string) {
+export function installableDataPrivacy({ googleCredentials }: { googleCredentials?: string } = {}) {
   const server = withMemoryRepositories(dataPrivacyServer);
   const secrets = new ScopedSecrets(async (_handle, build) => build(googleCredentials));
   const installable: typeof server = {
@@ -135,4 +93,22 @@ export function installableDataPrivacy(googleCredentials?: string) {
     install: (args) => server.install({ ...args, secrets }),
   };
   return installable;
+}
+
+/** The app built directly over memory repositories, for a case that seeds the directory. */
+export function createDataPrivacyTestApp({
+  directory,
+  dependencies,
+}: {
+  directory: MemoryDataPrivacyDirectoryRepository;
+  dependencies: Parameters<typeof DataPrivacyApp.create>[0]["dependencies"];
+}): Promise<DataPrivacyApp> {
+  return DataPrivacyApp.create({
+    repositories: { ...MemoryDataPrivacyRepositories.create(), directory },
+    members: { nodeEnvironment: undefined },
+    dependencies,
+    config: { googleDlpDisabled: undefined, enforcement: undefined },
+    secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
+    resources: { own: () => void 0, ownService: () => void 0 },
+  });
 }

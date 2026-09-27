@@ -78,19 +78,12 @@ export interface DataPrivacyDirectoryReader {
   findScopeOrganizationId(input: { scope: DataPrivacyScope }): Promise<string | null>;
 }
 
-export type DataPrivacyInfrastructure = Readonly<{
-  /** Which organization owns a scope target, and what each scope is called. */
-  directory: DataPrivacyDirectoryReader;
-  ttlMs?: number;
-  now?: () => number;
-}>;
-
 /** Main's worker read 250_000 characters per attribute before skipping one (its own constant). */
 const PII_REDACTION_MAX_ATTRIBUTE_LENGTH = 250_000;
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyApp.dependencies,
-  Readonly<{ dataPrivacy: DataPrivacyInfrastructure; nodeEnvironment: string | undefined }>,
+  Readonly<{ nodeEnvironment: string | undefined }>,
   DataPrivacyServerConfig,
   DataPrivacyRepositories
 >;
@@ -108,7 +101,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     permissions: AuthzApi,
     evaluation: EvaluationApi,
   };
-  static readonly reads = ["dataPrivacy", "nodeEnvironment"] as const;
+  static readonly reads = ["nodeEnvironment"] as const;
   static readonly config = dataPrivacyConfig;
   /** The DLP service account's key; model-provider's Vertex dispatch borrows it. */
   static readonly secrets = {
@@ -157,7 +150,6 @@ export class DataPrivacyApp implements DataPrivacyApi {
         (build) =>
           build(credential),
     );
-    const members = supplied.dataPrivacy;
     const metrics = PiiAnalysisMetricsOtelService.create();
     const presidio = PresidioRedactionService.create({
       evaluation: dependencies.evaluation,
@@ -176,8 +168,6 @@ export class DataPrivacyApp implements DataPrivacyApi {
       repository: repositories.policies,
       projects: dependencies.projects,
       organizations: dependencies.organizations,
-      ...(members.ttlMs === undefined ? {} : { ttlMs: members.ttlMs }),
-      ...(members.now === undefined ? {} : { now: members.now }),
     });
     const permissions = DataPrivacyPermissionsService.create({ authz: dependencies.permissions });
 
@@ -194,11 +184,11 @@ export class DataPrivacyApp implements DataPrivacyApi {
       }),
       snapshots: DataPrivacySnapshotService.create({
         policies: privacy,
-        directory: members.directory,
+        directory: repositories.directory,
         permissions,
       }),
       scopeAuthorization: DataPrivacyScopeAuthorizationService.create({
-        directory: members.directory,
+        directory: repositories.directory,
         permissions,
       }),
       contentDrop: ContentDropPolicyService.create(),

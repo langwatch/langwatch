@@ -780,12 +780,14 @@ untenanted statement client for DDL) and `databaseTarget` (the credential-free
 Postgres endpoint). Each answers `{ configured: false }` rather than refusing.
 A module never re-derives them from `process.env`.
 
-**An availability decision travels as a member the process answers** (ruled
-2026-09-24). LangWatchQL is one: analytics reads a `langwatchQl` member, and
-each process's `main.ts` answers it with one call to the module's exported
-supply function, over `clickhouseAdmin`, `databaseTarget` and `prisma`. Its
+**A module builds its own objects from the store members it already reads;
+`main.ts` wires none of them** (Alex, 2026-09-28; superseding the 2026-09-24
+supply-function form). LangWatchQL is one: analytics reads `clickhouseAdmin`,
+`databaseTarget` and `prisma` and builds its connection bundle itself. Its
 passwords stay the module's own `static readonly secrets`. No password means
-the member answers "unavailable" and every query is refused (ADR-159).
+LangWatchQL answers "unavailable" and every query is refused (ADR-159).
+Data-privacy's directory is another: its repository registry builds it over
+`prisma`.
 
 **`configSchema` is deleted, not migrated** (ruled 2026-09-18). The legacy
 static — an App-level Zod schema re-parsed per feature and fed by the deleted
@@ -1084,8 +1086,9 @@ never thinks about resolution at all. The per-module resolver adapters
   them. Shared door helpers live in the protocol's framework package (`@langwatch/otlp`) (Alex, 2026-09-26).
 - A socket that must be handed on unopened (voice media to a scenario child) is a declared raw-socket
   door: a path pattern and a handler given the request, the raw socket and `head`, hosted on its own
-  port by the role that owns the children. A public address the role resolves at boot is a supplied
-  member (`{ url } | { unavailable }`), never a module writing `process.env` (Alex, 2026-09-27).
+  port by the role that owns the children. The module resolves the public address itself, in its own
+  app with an async create and a close, in the worker role only; other roles read it as
+  `{ unavailable }`. It is never a module writing `process.env` (Alex, 2026-09-28).
 - A protocol whose handler must write the raw Node response itself (hosted MCP's SDK transports) is a
   declared raw HTTP door, `RawHttpProtocol` (`@langwatch/api`): exact paths, prefixes claiming a path and
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),

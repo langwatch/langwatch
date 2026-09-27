@@ -9,8 +9,15 @@
  * process cannot supply one.
  */
 export const serverModuleMembers = {
-  agent: ["publicBaseUrl", "redis"],
-  analytics: ["clickhouse", "langwatchQl", "publicBaseUrl", "rateLimiter"],
+  agent: ["publicBaseUrl"],
+  analytics: [
+    "clickhouse",
+    "clickhouseAdmin",
+    "databaseTarget",
+    "prisma",
+    "publicBaseUrl",
+    "rateLimiter",
+  ],
   annotation: [],
   "api-key": [],
   "audit-log": [],
@@ -19,12 +26,12 @@ export const serverModuleMembers = {
   automation: ["encryption", "isSaas", "logger", "mail", "publicBaseUrl"],
   "coding-agent": [],
   dashboard: ["publicBaseUrl"],
-  "data-privacy": ["dataPrivacy", "nodeEnvironment"],
+  "data-privacy": ["nodeEnvironment"],
   "data-retention": ["clickhouse", "nodeEnvironment"],
   dataset: ["content", "objectStorage", "publicBaseUrl", "queue"],
   entitlement: ["logger"],
   evaluation: ["objectStorage"],
-  evaluator: ["prisma", "publicBaseUrl"],
+  evaluator: ["publicBaseUrl"],
   experiment: ["clickhouse", "logger", "prisma", "redis"],
   "feature-flag": [],
   gateway: [
@@ -79,6 +86,7 @@ export const serverModuleMembers = {
     "rateLimiter",
     "redis",
     "scenarioChildBundle",
+    "voicePublicUrl",
   ],
   secret: ["encryption"],
   share: ["redis"],

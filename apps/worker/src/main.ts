@@ -1,6 +1,4 @@
 import "@langwatch/time/polyfill";
-import { langWatchQlSupply } from "@langwatch/analytics-process";
-import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processMetrics, processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server, type ProcessServer } from "@langwatch/process-server";
@@ -48,16 +46,6 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
   const app = await server
     .composeProcess("worker")
     .withModules(processModules)
-    .withMember("dataPrivacy", (members) => ({
-      directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-    }))
-    .withMember("langwatchQl", (members) =>
-      langWatchQlSupply({
-        admin: members.read("clickhouseAdmin"),
-        postgres: members.read("databaseTarget"),
-        database: () => members.read("prisma"),
-      }),
-    )
     // Dataset's two optional seams. This process composes neither, so the
     // module's own absent-behaviour applies: normalize runs in-process.
     .withMember("queue", () => void 0)

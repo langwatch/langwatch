@@ -107,7 +107,6 @@ export async function bootApiOverClickHouse({ clickhouse }: { clickhouse: ClickH
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-api",
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,

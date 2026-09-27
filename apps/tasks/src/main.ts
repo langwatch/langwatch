@@ -1,8 +1,6 @@
 import "@langwatch/time/polyfill";
 import process from "node:process";
 
-import { langWatchQlSupply } from "@langwatch/analytics-process";
-import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
 import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { bootNodeExecutable, configureLogger, createLogger } from "@langwatch/observability";
 import { processConfig, Server } from "@langwatch/process-server";
@@ -90,16 +88,6 @@ export async function runModuleTask({
     const app = await server
       .composeProcess("tasks")
       .withModules(processModules)
-      .withMember("dataPrivacy", (members) => ({
-        directory: createDataPrivacyDirectoryReader(members.read("prisma")),
-      }))
-      .withMember("langwatchQl", (members) =>
-        langWatchQlSupply({
-          admin: members.read("clickhouseAdmin"),
-          postgres: members.read("databaseTarget"),
-          database: () => members.read("prisma"),
-        }),
-      )
       .withMember("queue", () => void 0)
       .withMember("content", () => void 0)
       .withMember("gatewayInternalProtocol", () => ({}))

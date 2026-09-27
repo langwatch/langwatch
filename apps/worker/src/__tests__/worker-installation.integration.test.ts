@@ -117,7 +117,6 @@ async function bootWorker({ live = false }: { live?: boolean } = {}) {
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
         adminEmails: config.process.adminEmails,
         processName: "langwatch-worker",
-        dataPrivacy: { directory: unreachable<object>("dataPrivacy.directory") },
         storageResolver: void 0,
         storage: void 0,
         queue: void 0,

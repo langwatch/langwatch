@@ -9,7 +9,6 @@ export {
   createClickHouseFilterConditions,
   createLegacyFilterMatching,
   createPreconditionTraceData,
-  langWatchQlSupply,
 } from "./analytics.server.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
