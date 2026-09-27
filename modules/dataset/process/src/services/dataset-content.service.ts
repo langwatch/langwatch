@@ -284,16 +284,17 @@ export class DatasetContentService implements DatasetContent {
     dataset: Dataset;
     input: CreateDatasetRecordsInput;
   }): Promise<DatasetRecord[]> {
-    const entries = input.entries.map((entry) => ({ ...entry }));
+    const forcedIds = input.entries.map((entry) => entry.id);
+    const entries = input.entries.map(({ id: _id, ...entry }) => entry);
     const storage = this.storage;
     await this.chunks.append({
       dataset,
       projectId: input.projectId,
       entries,
-      forcedIds: entries.map((entry) => entry.id),
+      forcedIds,
       storage,
     });
-    return entries.map((entry) => toDatasetRecord({ id: entry.id, entry }, dataset));
+    return entries.map((entry, index) => toDatasetRecord({ id: forcedIds[index], entry }, dataset));
   }
 
   async deleteRecords({

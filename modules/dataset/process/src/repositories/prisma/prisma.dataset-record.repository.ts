@@ -81,8 +81,8 @@ export class PrismaDatasetRecordRepository
     entries: (DatasetRecordInput & { id: string })[];
   }): Promise<DatasetRecord[]> {
     await this.database.datasetRecord.createMany({
-      data: input.entries.map((entry) => ({
-        id: entry.id,
+      data: input.entries.map(({ id, ...entry }) => ({
+        id,
         datasetId: input.datasetId,
         projectId: input.projectId,
         entry: entry as Prisma.InputJsonValue,

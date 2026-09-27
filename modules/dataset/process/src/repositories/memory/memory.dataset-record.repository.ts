@@ -81,10 +81,10 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
   }): Promise<DatasetRecord[]> {
     const now = toDate(this.#database.now());
 
-    for (const entry of input.entries) {
+    for (const { id, ...entry } of input.entries) {
       this.#database.putRecord(
         datasetRecordSchema.parse({
-          id: entry.id,
+          id,
           datasetId: input.datasetId,
           projectId: input.projectId,
           entry,
