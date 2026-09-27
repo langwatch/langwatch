@@ -498,10 +498,9 @@ export async function runLocalCall({
 }
 
 /**
- * Posts the call. The app does not deduplicate a start, so it is sent again
- * only when the app said it did not take it (429, 503), never after a network
- * error or another 5xx that may have reached it: running a command twice on
- * the developer's machine is worse than a failed tool call.
+ * Posts the call. The app does not deduplicate a start, so it is re-sent only on 429 or 503, never
+ * after a network error or another 5xx that may have reached it: running a command twice on the
+ * developer's machine is worse than a failed tool call.
  */
 async function startLocalCall({
   body,
@@ -531,6 +530,19 @@ async function startLocalCall({
   }
 }
 
+/** The wait before re-polling after a transient failure: the app's own wait, else the model's. */
+function transientPollWaitMs({
+  error,
+  attempt,
+}: {
+  error: AppUnreachableError;
+  attempt: number;
+}): number {
+  const named = error instanceof AppBusyError ? error.retryAfterMs : undefined;
+  if (named !== undefined && named <= MODEL_RETRY_MAX_NAMED_WAIT_MS) return named;
+  return retryDelayMs({ attempt, errorMessage: "" }) ?? 0;
+}
+
 /** One poll of a local call, retried on failure, until it settles or its budget runs out. */
 async function pollOneLocalCall({
   callId,
@@ -558,15 +570,9 @@ async function pollOneLocalCall({
     // A read repeats nothing, so an app that did not answer, failed or was busy
     // is asked again on the model retry's schedule. A call the app says it lost
     // keeps the short count: waiting longer does not bring it back.
-    const transient = error instanceof AppUnreachableError && !(error instanceof CallLostError);
-    if (transient) {
+    if (error instanceof AppUnreachableError && !(error instanceof CallLostError)) {
       if (nextFailures > MODEL_RETRY_MAX_ATTEMPTS) throw error;
-      const named = error instanceof AppBusyError ? error.retryAfterMs : undefined;
-      const wait =
-        named !== undefined && named <= MODEL_RETRY_MAX_NAMED_WAIT_MS
-          ? named
-          : retryDelayMs({ attempt: nextFailures, errorMessage: "" });
-      await sleep(wait ?? 0, signal);
+      await sleep(transientPollWaitMs({ error, attempt: nextFailures }), signal);
       return { failures: nextFailures };
     }
     if (nextFailures >= MAX_POLL_FAILURES) throw error;

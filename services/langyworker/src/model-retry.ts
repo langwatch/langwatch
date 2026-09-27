@@ -1,19 +1,8 @@
 /**
- * The retry for a model call that failed for a transient reason: an overloaded
- * provider, a dropped stream, a network error, a timeout, a 5xx or a 429.
- *
- * It runs inside pi's own retry loop, which is the right place for it: pi drops
- * the failed assistant message and makes the same call again against the
- * conversation as it stands, so every tool call that already ran keeps its
- * result and nothing the turn did runs twice. pi decides what to retry and how
- * long to wait with two methods of its session; this module replaces both with
- * the policy below (which errors, how many times, the backoff with jitter and a
- * wait the provider names) and leaves the loop, the abort and the events to pi.
- *
- * The relay (services/langyagent/adapters/otelrelay/llmretry.go) still re-sends
- * a rejected 429 by its Retry-After header before the worker sees it; this
- * retry covers what the relay cannot, a failure inside a stream already
- * answered 200.
+ * Retry policy for a transient model failure, plugged into pi's own retry loop so tool calls that
+ * already ran keep their results. The relay's llmretry.go re-sends a rejected 429 first; this
+ * covers a failure inside a stream already answered 200.
+ * @see specs/langy/langy-model-call-retry.feature
  */
 
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
@@ -90,10 +79,9 @@ export function leadingStatus(errorMessage: string): number | undefined {
 }
 
 /**
- * Whether a failed model call is worth another try. A status the message
- * opens with decides first: 408, 429 and 5xx are transient, every other 4xx
- * is a refusal (validation, permission, a request the provider will refuse the
- * same way). With no status, the wording decides. A plan limit never retries.
+ * Whether a failed model call is worth another try. A leading status decides first: 408, 429 and
+ * 5xx are transient, any other 4xx is a refusal. With no status, the wording decides. A plan limit
+ * never retries.
  */
 export function isTransientModelFailure(call: FailedModelCall): boolean {
   if (call.stopReason !== "error") return false;
@@ -123,10 +111,9 @@ export function namedWaitMs(errorMessage: string): number | undefined {
 }
 
 /**
- * The wait before retry number `attempt` (from 1), or null when the provider
- * named a wait too long to take. A named wait is taken as named; otherwise the
- * backoff doubles from MODEL_RETRY_BASE_DELAY_MS, shifted by up to
- * MODEL_RETRY_JITTER either way so retries from many turns do not line up.
+ * The wait before retry `attempt` (from 1), or null when the provider named a wait too long to
+ * take. A named wait is taken as named; otherwise the backoff doubles from
+ * MODEL_RETRY_BASE_DELAY_MS, shifted by up to MODEL_RETRY_JITTER so retries do not line up.
  */
 export function retryDelayMs({
   attempt,
