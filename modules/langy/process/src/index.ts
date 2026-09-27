@@ -187,14 +187,6 @@ export type {
   LangyInternalMetrics,
   LangyRelayFrameMetrics,
 } from "./services/langy-internal.service.ts";
-export {
-  resolveLangyRestActor,
-  resolveLangyRestCaller,
-  type LangyRestCaller,
-  type LangyRestCeiling,
-  type LangyRestCredentialMembers,
-  type LangyRestCredentialReader,
-} from "./transport/langy-rest-credentials.ts";
 export type {
   LangyActorResolution,
   LangyActorUserReader,

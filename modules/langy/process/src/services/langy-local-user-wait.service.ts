@@ -7,6 +7,7 @@
 import { clearTimeout, setTimeout } from "node:timers";
 
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import {
   LangyLocalRecordNotFoundError,
   LangyLocalRecordUnreadableError,
@@ -22,6 +23,7 @@ import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import { turnWaitsKey, waitKey } from "../rules/langy-local-control-keys.rules.ts";
 import { LANGY_LIVENESS } from "../rules/langy-streaming-constants.rules.ts";
 
@@ -81,6 +83,7 @@ export class UserWaitService {
     hostname: string;
   }): Promise<StoredUserWait> {
     const wait = blankUserWait({
+      waitId: generate(LANGY_ID_RESOURCES.wait).toString(),
       now: this.now(),
       ...params,
       kind: "permission",
@@ -124,6 +127,7 @@ export class UserWaitService {
     questions: UserWaitQuestion[];
   }): Promise<StoredUserWait> {
     const wait = blankUserWait({
+      waitId: generate(LANGY_ID_RESOURCES.wait).toString(),
       now: this.now(),
       ...params,
       kind: "question",

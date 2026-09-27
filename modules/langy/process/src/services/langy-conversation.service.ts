@@ -44,7 +44,7 @@ export interface LangyConversationRuntime {
 const defaultRuntime: LangyConversationRuntime = {
   now: () => nowInstant().epochMilliseconds,
   generateId: (resource) => generate(LANGY_ID_RESOURCES[resource]).toString(),
-  createTurnId: () => crypto.randomUUID(),
+  createTurnId: () => generate(LANGY_ID_RESOURCES.turn).toString(),
 };
 
 /**

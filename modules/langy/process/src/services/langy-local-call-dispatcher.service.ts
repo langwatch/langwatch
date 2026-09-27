@@ -7,6 +7,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import {
   CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
@@ -28,8 +29,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import { callActivityLine } from "../rules/langy-local-call-activity.rules.ts";
 import {
@@ -101,7 +102,7 @@ export class LocalCallDispatcherService {
 
     const createdAt = this.now();
     const stored = {
-      callId: `lcall_${nanoid()}`,
+      callId: generate(LANGY_ID_RESOURCES.call).toString(),
       projectId,
       conversationId,
       turnId,

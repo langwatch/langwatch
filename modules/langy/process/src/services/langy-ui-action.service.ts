@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   LangyUiHandlerFailedError,
   LangyUiNoBrowserError,
@@ -7,9 +8,9 @@ import {
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Redis } from "ioredis";
-import { nanoid } from "nanoid";
 
 import type { LangyUiActionCatalog, LangyUiActionDefinition } from "../app/langy.members.ts";
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyStreamRedis,
   LangyTokenBufferRepository,
@@ -178,7 +179,7 @@ export class LangyUiActionService {
     // like a cheaper answer, but its heartbeat is mounted per view (today only traces-v2), so on
     // every other page "presence enabled, zero sessions" is the permanent state and a pre-check on
     // it sent EVERY action to the backend with an open tab right there.
-    const actionId = nanoid();
+    const actionId = generate(LANGY_ID_RESOURCES.uiAction).toString();
     const pending: PendingUiAction = {
       projectId,
       conversationId,

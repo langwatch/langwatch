@@ -6,6 +6,7 @@
 
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import {
   LangyTurnInProgressError,
   PRESENCE_HEARTBEAT_MS,
@@ -20,8 +21,8 @@ import {
 import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
 
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyLocalPresenceRepository,
   PresenceHeartbeat,
@@ -282,7 +283,7 @@ export class LocalControlSessionCoreService {
       };
     }
 
-    const instanceId = frame.instance.id || `lci_${nanoid(10)}`;
+    const instanceId = frame.instance.id || generate(LANGY_ID_RESOURCES.instance).toString();
     const now = this.now();
     await this.presence.register({
       conversationId: credential.conversationId,

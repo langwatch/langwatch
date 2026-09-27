@@ -5,10 +5,10 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { Temporal, nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 
 /** The stored epoch millis as the ISO string the wire has always carried. */
@@ -25,6 +25,7 @@ import {
   LangyLocalRequestInvalidError,
 } from "@langwatch/langy-contract";
 
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import {
   controlRequestClaimKey,
   controlRequestKey,
@@ -167,7 +168,7 @@ export class ControlRequestService {
 
     const createdAt = this.now();
     const request: StoredControlRequest = {
-      id: `lcr_${nanoid()}`,
+      id: generate(LANGY_ID_RESOURCES.controlRequest).toString(),
       conversationId,
       conversationTitle,
       conversationUrl,

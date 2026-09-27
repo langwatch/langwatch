@@ -33,15 +33,16 @@ export interface LangyVirtualKeyService {
     projectId: string;
     organizationId: string;
     actorUserId: string;
-  }): Promise<string | null>;
+  }): Promise<string>;
 }
 
 export interface LangyGithubService {
   readonly enabled: boolean;
-  mintTurnToken(input: {
+  /** Empty where the integration mints nothing for this organization or repository. */
+  findTurnTokens(input: {
     organizationId: string;
     repositoryFullName?: string;
-  }): Promise<{ token: string; repoScopeKey: string } | null>;
+  }): Promise<{ token: string; repoScopeKey: string }[]>;
 }
 
 export interface LangyCredentialRuntimeService {
@@ -103,11 +104,6 @@ export class LangyCredentialService {
       organizationId: project.organizationId,
       actorUserId: session.user.id,
     });
-    if (!llmVirtualKey) {
-      throw new LangyCredentialResolutionError(
-        "Failed to provision Langy virtual key — no actor user could be resolved.",
-      );
-    }
 
     const github = await this.tryMintGithubToken({
       projectId,
@@ -181,7 +177,7 @@ export class LangyCredentialService {
     }
 
     try {
-      const minted = await this.deps.github.mintTurnToken({
+      const [minted] = await this.deps.github.findTurnTokens({
         organizationId,
         ...(repositoryFullName ? { repositoryFullName } : {}),
       });
@@ -200,7 +196,7 @@ export class LangyCredentialService {
       this.deps.errors?.report(error, {
         projectId,
         userId: session.user.id,
-        context: "mintTurnToken:LangyCredentialService.getOrProvision",
+        context: "findTurnTokens:LangyCredentialService.getOrProvision",
       });
 
       return {};
