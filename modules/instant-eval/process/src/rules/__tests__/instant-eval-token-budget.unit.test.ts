@@ -10,6 +10,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  cutInstantEvalTextForRetry,
   estimateInstantEvalRequestTokens,
   estimateJudgedTextTokens,
   estimateTokensFromBytes,
@@ -69,12 +70,37 @@ describe("given a text longer than its budget", () => {
     it("keeps the opening and the ending, with a marker between them", () => {
       const prepared = prepareInstantEvalText({
         text: `User: I want a refund. ${"filler. ".repeat(1_000)}Assistant: refund issued.`,
-        budgetTokens: 100,
+        budgetTokens: 200,
       });
 
       expect(prepared.text.startsWith("User: I want a refund.")).toBe(true);
       expect(prepared.text.endsWith("Assistant: refund issued.")).toBe(true);
       expect(prepared.text).toMatch(/tokens omitted from the middle/);
+    });
+
+    /** @scenario "A text is cut at the densest ratio judged text has shown" */
+    it("cuts it to the budget times the densest measured bytes per token", () => {
+      const prepared = prepareInstantEvalText({
+        text: `User: I want a refund. ${"filler. ".repeat(10_000)}Assistant: refund issued.`,
+        budgetTokens: 1_000,
+      });
+
+      const bytes = new TextEncoder().encode(prepared.text).length;
+      expect(bytes).toBeLessThanOrEqual(
+        1_000 * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken,
+      );
+      expect(bytes).toBeGreaterThan(900 * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken);
+      expect(prepared.text).toMatch(/\[\.\.\. \d+ tokens omitted from the middle/);
+    });
+
+    /** @scenario "A text is cut at the densest ratio judged text has shown" */
+    it("sends whole a text that fits at the densest ratio", () => {
+      const text = "x".repeat(1_000 * INSTANT_EVAL_CLASSIFIER_LIMITS.fitBytesPerInputToken);
+
+      expect(prepareInstantEvalText({ text, budgetTokens: 1_000 })).toEqual({
+        text,
+        isTruncated: false,
+      });
     });
 
     it("leaves a text inside its budget exactly as it was", () => {
@@ -128,6 +154,34 @@ describe("given a piece of judged text", () => {
       expect(estimateInstantEvalRequestTokens({ text, questions })).toBe(
         estimateJudgedTextTokens({ text }) + instantEvalQuestionTokens(questions),
       );
+    });
+  });
+});
+
+describe("given a text the judge refused as too large", () => {
+  describe("when it is cut for the retry", () => {
+    /** @scenario "The too-large retry cuts enough for a text denser than any measured" */
+    it("cuts it to the budget at a ratio below any judged text measured", () => {
+      const text = `OPENING ${"filler. ".repeat(20_000)}ENDING`;
+
+      const cut = cutInstantEvalTextForRetry({ text, budgetTokens: 1_000 });
+
+      const bytes = new TextEncoder().encode(cut).length;
+      expect(bytes).toBeLessThanOrEqual(
+        1_000 * INSTANT_EVAL_CLASSIFIER_LIMITS.retryBytesPerInputToken,
+      );
+      expect(cut.startsWith("OPENING")).toBe(true);
+      expect(cut.endsWith("ENDING")).toBe(true);
+    });
+
+    /** @scenario "A text the classifier refuses as too large is cut once and retried" */
+    it("keeps at most three quarters of a text already under that", () => {
+      const text = `OPENING ${"filler. ".repeat(100)}ENDING`;
+
+      const cut = cutInstantEvalTextForRetry({ text, budgetTokens: 30_000 });
+
+      expect(cut.length).toBeLessThanOrEqual(text.length * 0.75);
+      expect(cut.endsWith("ENDING")).toBe(true);
     });
   });
 });

@@ -65,23 +65,55 @@ export interface PreparedInstantEvalText {
 }
 
 /**
- * Cuts a text to a budget, keeping both ends. Measured with the generic rule
- * rather than the denser one, because the extraction functions cut their
- * `max_tokens` argument by it: a conversation rendered to fit must not be cut twice.
+ * Cuts a text to a budget, keeping both ends, measured at the densest ratio
+ * judged text has shown (JSON-heavy traces 2.0 bytes per token, prose
+ * transcripts up to 3.3): at the average ratio a dense text is refused as too large.
  */
 export function prepareInstantEvalText({
   text,
   budgetTokens,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
 }: {
   text: string;
   budgetTokens: number;
+  limits?: InstantEvalClassifierLimits;
 }): PreparedInstantEvalText {
-  if (estimateTokensFromBytes(text) <= budgetTokens) return { text, isTruncated: false };
+  const bytesPerToken = limits.fitBytesPerInputToken;
+  if (new TextEncoder().encode(text).length <= Math.floor(budgetTokens * bytesPerToken)) {
+    return { text, isTruncated: false };
+  }
   return {
-    text: cutToEstimatedTokensKeepingEnds({ text, maxTokens: budgetTokens }),
+    text: cutToEstimatedTokensKeepingEnds({ text, maxTokens: budgetTokens, bytesPerToken }),
     isTruncated: true,
   };
 }
+
+/**
+ * The text cut again after the judge refused it as too large: to the budget
+ * at a ratio below any judged text measured, or to three quarters of its
+ * length when that is shorter, so the retry always sends less.
+ */
+export function cutInstantEvalTextForRetry({
+  text,
+  budgetTokens,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
+}: {
+  text: string;
+  budgetTokens: number;
+  limits?: InstantEvalClassifierLimits;
+}): string {
+  const bytesPerToken = limits.retryBytesPerInputToken;
+  const threeQuarters =
+    (new TextEncoder().encode(text).length * TOO_LARGE_RETRY_FRACTION) / bytesPerToken;
+  return cutToEstimatedTokensKeepingEnds({
+    text,
+    maxTokens: Math.floor(Math.min(budgetTokens, threeQuarters)),
+    bytesPerToken,
+  });
+}
+
+/** The most of a refused text the retry keeps. */
+const TOO_LARGE_RETRY_FRACTION = 0.75;
 
 /**
  * What one classification is expected to cost in input tokens, counting the

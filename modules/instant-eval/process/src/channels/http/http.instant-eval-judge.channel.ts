@@ -5,13 +5,13 @@
 
 import {
   INSTANT_EVAL_CLASSIFIER_LIMITS,
+  type InstantEvalClassifierLimits,
   InstantEvalClassifierUnavailableError,
   type InstantEvalJudgement,
   instantEvalSkipped,
 } from "@langwatch/instant-eval-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import { cutToEstimatedTokensKeepingEnds } from "@langwatch/trace-contract";
 import { type Dispatcher, Pool, fetch as undiciFetch } from "undici";
 
 import {
@@ -21,8 +21,8 @@ import {
 } from "../../rules/instant-eval-judge-wire.rules.ts";
 import { INSTANT_EVAL_PRICING } from "../../rules/instant-eval-pricing.rules.ts";
 import {
+  cutInstantEvalTextForRetry,
   estimateJudgedTextTokens,
-  estimateTokensFromBytes,
   instantEvalQuestionTokens,
   instantEvalTextBudget,
   prepareInstantEvalText,
@@ -51,9 +51,6 @@ const MAX_ATTEMPTS = 5;
 const MAX_RETRY_AFTER_MS = 30_000;
 
 const REQUEST_TIMEOUT_MS = 120_000;
-
-/** How much of a text is kept when the judge refuses it as too large. */
-const TOO_LARGE_RETRY_FRACTION = 0.75;
 
 /** At least the classifications one page keeps in flight. */
 const POOL_CONNECTIONS = 128;
@@ -119,10 +116,15 @@ export class HttpInstantEvalJudgeChannel implements InstantEvalJudgeChannel {
     const budget = instantEvalTextBudget({ questions: request.questions, limits: this.limits });
     if (budget === 0) return instantEvalSkipped("classifier_input_too_large");
 
-    const prepared = prepareInstantEvalText({ text: request.text, budgetTokens: budget });
+    const prepared = prepareInstantEvalText({
+      text: request.text,
+      budgetTokens: budget,
+      limits: this.limits,
+    });
     return this.attempt({
       request,
       text: prepared.text,
+      budgetTokens: budget,
       isTextTruncated: prepared.isTruncated,
       ...(signal ? { signal } : {}),
     });
@@ -132,15 +134,23 @@ export class HttpInstantEvalJudgeChannel implements InstantEvalJudgeChannel {
   private async attempt({
     request,
     text,
+    budgetTokens,
     isTextTruncated,
     signal,
   }: {
     request: InstantEvalClassifyRequest;
     text: string;
+    budgetTokens: number;
     isTextTruncated: boolean;
     signal?: AbortSignal;
   }): Promise<InstantEvalJudgement> {
-    const state: AttemptState = { text, isTruncated: isTextTruncated, isCutForSize: false };
+    const state: AttemptState = {
+      text,
+      budgetTokens,
+      limits: this.limits,
+      isTruncated: isTextTruncated,
+      isCutForSize: false,
+    };
 
     // The questions cost the same on every attempt; the text may be cut
     // between them, so it is measured per send, with the judge's own ratio.
@@ -251,6 +261,8 @@ async function readAnswer({
 /** What one text has become across the attempts so far. */
 interface AttemptState {
   text: string;
+  readonly budgetTokens: number;
+  readonly limits: InstantEvalClassifierLimits;
   isTruncated: boolean;
   /** Whether the too-large retry has already spent its one cut. */
   isCutForSize: boolean;
@@ -297,16 +309,17 @@ function settled(judgement: InstantEvalJudgement): Settlement {
 }
 
 /**
- * Cuts the text once so it can be sent again, or gives up: one miss is
- * expected of a bytes-over-four estimate, a second is a text too large.
+ * Cuts the text once so it can be sent again, or gives up: the retry's ratio
+ * is below any judged text measured, so a second refusal is a text too large.
  */
 function cutForRetry(state: AttemptState): Settlement {
   if (state.isCutForSize) return settled(instantEvalSkipped("classifier_input_too_large"));
   state.isCutForSize = true;
   state.isTruncated = true;
-  state.text = cutToEstimatedTokensKeepingEnds({
+  state.text = cutInstantEvalTextForRetry({
     text: state.text,
-    maxTokens: Math.floor(estimateTokensFromBytes(state.text) * TOO_LARGE_RETRY_FRACTION),
+    budgetTokens: state.budgetTokens,
+    limits: state.limits,
   });
   return { kind: "retry" };
 }

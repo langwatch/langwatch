@@ -12,17 +12,19 @@ export function estimateTokensFromBytes(text: string): number {
 /**
  * Cut a string down to an estimated token count, on a character boundary: a
  * byte cut can land inside a multi-byte character, and a half-decoded
- * character is not text anyone can read.
+ * character is not text anyone can read. `bytesPerToken` defaults to four.
  */
 export function cutToEstimatedTokens({
   text,
   maxTokens,
+  bytesPerToken = 4,
 }: {
   text: string;
   maxTokens: number;
+  bytesPerToken?: number;
 }): string {
   const bytes = new TextEncoder().encode(text);
-  const limit = Math.max(0, maxTokens) * 4;
+  const limit = byteLimit({ maxTokens, bytesPerToken });
   if (bytes.length <= limit) return text;
   return new TextDecoder().decode(bytes.subarray(0, characterBoundaryAtOrBefore({ bytes, limit })));
 }
@@ -52,11 +54,13 @@ function characterBoundaryAtOrBefore({
 export function cutToEstimatedTokensAtLineBreak({
   text,
   maxTokens,
+  bytesPerToken = 4,
 }: {
   text: string;
   maxTokens: number;
+  bytesPerToken?: number;
 }): string {
-  const cut = cutToEstimatedTokens({ text, maxTokens });
+  const cut = cutToEstimatedTokens({ text, maxTokens, bytesPerToken });
   if (cut.length === text.length) return cut;
   const lastBreak = cut.lastIndexOf("\n");
   return lastBreak > 0 ? cut.slice(0, lastBreak) : cut;
@@ -71,21 +75,25 @@ export function cutToEstimatedTokensKeepingEnds({
   text,
   maxTokens,
   atLineBreak = false,
+  bytesPerToken = 4,
 }: {
   text: string;
   maxTokens: number;
   atLineBreak?: boolean;
+  bytesPerToken?: number;
 }): string {
   const bytes = new TextEncoder().encode(text);
-  const limit = Math.max(0, maxTokens) * 4;
+  const limit = byteLimit({ maxTokens, bytesPerToken });
   if (bytes.length <= limit) return text;
 
-  const markerBytes = new TextEncoder().encode(elisionMarker(Math.ceil(bytes.length / 4))).length;
+  const markerBytes = new TextEncoder().encode(
+    elisionMarker(Math.ceil(bytes.length / bytesPerToken)),
+  ).length;
   const room = limit - markerBytes;
   if (room < MIN_KEPT_END_BYTES * 2) {
     return atLineBreak
-      ? cutToEstimatedTokensAtLineBreak({ text, maxTokens })
-      : cutToEstimatedTokens({ text, maxTokens });
+      ? cutToEstimatedTokensAtLineBreak({ text, maxTokens, bytesPerToken })
+      : cutToEstimatedTokens({ text, maxTokens, bytesPerToken });
   }
 
   const decoder = new TextDecoder();
@@ -109,10 +117,14 @@ export function cutToEstimatedTokensKeepingEnds({
       (bytes.length -
         new TextEncoder().encode(head).length -
         new TextEncoder().encode(tail).length) /
-        4,
+        bytesPerToken,
     ),
   );
   return `${head}${elisionMarker(omitted)}${tail}`;
+}
+
+function byteLimit({ maxTokens, bytesPerToken }: { maxTokens: number; bytesPerToken: number }) {
+  return Math.floor(Math.max(0, maxTokens) * Math.max(0.1, bytesPerToken));
 }
 
 /** Below this many bytes per end, a kept ending is too short to read. */
