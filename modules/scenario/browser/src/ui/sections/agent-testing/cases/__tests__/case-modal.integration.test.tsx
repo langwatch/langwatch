@@ -107,7 +107,7 @@ vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", () => ({
+vi.mock("../../../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 

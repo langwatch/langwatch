@@ -181,7 +181,7 @@ vi.mock("../../../../../behavior/auth-session.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-provider-settings", () => ({
+vi.mock("../../../../../behavior/use-model-providers-settings.ts", () => ({
   useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 

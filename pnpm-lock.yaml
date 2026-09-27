@@ -7105,6 +7105,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -12130,9 +12133,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/experiment-browser':
-        specifier: workspace:*
-        version: link:../../experiment/browser
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -12163,6 +12163,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract

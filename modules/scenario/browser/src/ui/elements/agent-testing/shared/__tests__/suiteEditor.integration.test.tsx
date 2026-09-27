@@ -73,7 +73,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser/surfaces/project-span-names", () => ({
+vi.mock("../../../../../behavior/use-project-span-names.ts", () => ({
   useProjectSpanNames: () => ({
     spanNames: [{ key: "run_sql", label: "run_sql" }],
     metadataKeys: [],

@@ -37,3 +37,4 @@ export * from "./catalog/static-model-costs.ts";
 export * from "./model-cost-preview.ts";
 export * from "./catalog/tier-targets.ts";
 export * from "./model-provider.config.ts";
+export * from "./model-provider-availability.ts";

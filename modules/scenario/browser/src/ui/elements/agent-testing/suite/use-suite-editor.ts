@@ -16,11 +16,11 @@ import {
   type ScenarioMappingContext,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
 import { useCallback, useEffect, useMemo } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useProjectSpanNames } from "../../../../behavior/use-project-span-names.ts";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
 import type { CustomizeChip } from "../shared/customize-chips.tsx";
