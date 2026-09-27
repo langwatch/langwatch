@@ -8,9 +8,9 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 
 import { Redis } from "ioredis";
 
+import { HostedMcpApp } from "../../../app/hosted-mcp.app.ts";
 import type { McpLiveProjectLookup } from "../../../app/hosted-mcp.members.ts";
 import {
-  createMcpHandler,
   McpApiKeyCipher,
   McpClientAddress,
   McpProjectLookup,
@@ -181,14 +181,14 @@ export async function startReplicaPair({
   const urls: string[] = [];
   try {
     for (let i = 0; i < 2; i++) {
-      const handler = createMcpHandler({
+      const handler = HostedMcpApp.fromDependencies({
         redis,
         projects: new HarnessProjectLookup(apiKeys),
         grants: new HarnessSessionGrant(),
         cipher: new HarnessCipher(),
         address: new HarnessClientAddress(),
         baseHost: "https://app.langwatch.ai",
-      });
+      }).createHandler();
       const server = createServer((req, res) => handler.handleRequest(req, res));
       await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
       const address = server.address();

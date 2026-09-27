@@ -21,6 +21,12 @@ export abstract class McpOAuthTokenRepository {
     code: string;
   }): Promise<McpAuthorizationCodeConsumption>;
 
+  abstract storeAuthorizationCode(input: {
+    code: string;
+    record: McpAuthorizationCodeRecord;
+    ttlSeconds: number;
+  }): Promise<void>;
+
   abstract hasRegisteredClient(input: { clientId: string }): Promise<boolean>;
 
   abstract findBearer(input: { token: string }): Promise<McpOAuthBearerLookup>;

@@ -36,9 +36,9 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...actual, createLogger: () => loggerStub };
 });
 
+import { HostedMcpApp } from "../../app/hosted-mcp.app.ts";
 import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import {
-  createMcpHandler,
   McpApiKeyCipher,
   McpClientAddress,
   McpProjectLookup,
@@ -83,14 +83,14 @@ describe("Feature: MCP request logging", () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    handler = createMcpHandler({
+    handler = HostedMcpApp.fromDependencies({
       redis: null,
       projects: new LoggingProjectLookup(),
       grants: new AlwaysGranted(),
       cipher: new PassThroughCipher(),
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",
-    });
+    }).createHandler();
     server = createServer((req, res) => handler.handleRequest(req, res));
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
