@@ -69,7 +69,6 @@ function makeProjection() {
   });
 }
 
-
 /**
  * The working context the contribute service stamps a model-call
  * contribution with, as it rides the event.
