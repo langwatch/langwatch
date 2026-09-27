@@ -267,17 +267,26 @@ func (phase *parityPhase) inventoryRoutes(ctx context.Context, mainDocument map[
 	return nil
 }
 
-// buildSdkForRoutes builds the TypeScript SDK the route inventory loads:
+// buildSdkForRoutes builds the workspace packages the route inventory loads:
 // served routes are read from the composed application, whose packages import
-// the SDK's built entry, and the parity prepare deliberately skips the build.
+// built entries (the SDK, mail), and the parity prepare deliberately skips the
+// build. A checkout that ships dev/scripts/ensure-built.mjs builds every such
+// package through it; one without it only needs the SDK.
 func (phase *parityPhase) buildSdkForRoutes(ctx context.Context, dir string) error {
-	phase.state.logf("parity prepare %s: pnpm --filter langwatch build", dir)
 	build := commandSpec{name: "pnpm", args: []string{"--filter", "langwatch", "build"}, dir: dir}
+	if _, err := os.Stat(filepath.Join(dir, ensureBuiltScript)); err == nil {
+		build = commandSpec{name: "node", args: []string{ensureBuiltScript}, dir: dir}
+	}
+	argv := build.name + " " + strings.Join(build.args, " ")
+	phase.state.logf("parity prepare %s: %s", dir, argv)
 	if err := phase.state.run(ctx, build, phase.state.stderr); err != nil {
-		return fmt.Errorf("parity prepare %s (pnpm --filter langwatch build): %w", dir, err)
+		return fmt.Errorf("parity prepare %s (%s): %w", dir, argv, err)
 	}
 	return nil
 }
+
+// ensureBuiltScript builds every workspace package whose dist another package imports.
+const ensureBuiltScript = "dev/scripts/ensure-built.mjs"
 
 // completeWithRest adds REST parity from both served documents, rewrites the
 // outputs, and returns the tRPC changes for the report and ledger.

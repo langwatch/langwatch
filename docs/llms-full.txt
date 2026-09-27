@@ -11766,7 +11766,7 @@ The Zod schemas backing each request and response body are the same schemas the 
 
 ## OpenAPI spec generation + SDK regen
 
-Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json` — three routes serve it and both SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
+Governance routes register through the same `describeRoute` + `hono-openapi` pipeline as the rest of the public REST API. The canonical OpenAPI document is a checked-in artifact at `specs/api-reference/openapi-document.json`. Three routes serve it and the SDKs generate their clients from it. The copy published alongside these docs is `docs/api-reference/openapiLangWatch.json`.
 
 ```bash
 # from the repo root: check that every operation the document lists is still
