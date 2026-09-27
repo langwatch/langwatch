@@ -225,7 +225,7 @@ describe("LangyTurnPreparationService golden path", () => {
   });
 
   /** @scenario "A new conversation takes its placeholder title in sentence case" */
-  it("starts a new conversation with its first message as a sentence-case title", async () => {
+  it("records the first message as a sentence-case placeholder and chooses no title at creation", async () => {
     const fixture = makeFixture();
 
     await LangyTurnService.create(fixture.deps).startConversationTurn({
@@ -235,10 +235,37 @@ describe("LangyTurnPreparationService golden path", () => {
 
     expect(fixture.acceptTurn).toHaveBeenCalledWith(
       expect.objectContaining({
-        conversationStart: expect.objectContaining({ title: "Apidiff question" }),
+        conversationStart: expect.objectContaining({ title: null }),
         userMessage: expect.objectContaining({ title: "Apidiff question" }),
       }),
     );
+  });
+
+  describe("when the guided onboarding kickoff starts the conversation", () => {
+    /** @scenario "The kickoff names its conversation Getting started" */
+    it("creates the conversation titled Getting started, never after the brief", async () => {
+      const fixture = makeFixture();
+
+      await LangyTurnService.create(fixture.deps).startConversationTurn({
+        ...input,
+        messages: [
+          {
+            role: "user",
+            parts: [
+              { type: "guided-onboarding-kickoff", input: { path: "llmops" } },
+              { type: "text", text: "A long brief the model reads about the tour." },
+            ],
+          },
+        ],
+      });
+
+      expect(fixture.acceptTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationStart: expect.objectContaining({ title: "Getting started" }),
+          userMessage: expect.objectContaining({ title: "Getting started" }),
+        }),
+      );
+    });
   });
 
   it("omits message_recorded when explicitly re-driving an existing message", async () => {

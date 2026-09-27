@@ -4,22 +4,17 @@
  * brief the model reads. @see specs/langy/langy-guided-onboarding.feature
  */
 import {
+  GUIDED_KICKOFF_CONVERSATION_TITLE,
+  GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
   GUIDED_PATH_TITLES,
   type GuidedPath,
   guidedPathSchema,
 } from "@langwatch/onboarding-contract";
 import { z } from "zod";
 
-export const GUIDED_ONBOARDING_KICKOFF_PART_TYPE = "guided-onboarding-kickoff";
+export { GUIDED_KICKOFF_CONVERSATION_TITLE, GUIDED_ONBOARDING_KICKOFF_PART_TYPE };
 
 export const GUIDED_ONBOARDING_SKILL_NAME = "guided-onboarding";
-
-/**
- * The title of the conversation the kickoff starts. It is set when the
- * conversation is created and it sticks, so the brief never reads as a title
- * in the panel header, the history list or the follow-along link.
- */
-export const GUIDED_KICKOFF_CONVERSATION_TITLE = "Getting started";
 
 export const guidedKickoffTourStatusSchema = z.enum(["completed", "skipped", "none"]);
 export type GuidedKickoffTourStatus = z.infer<typeof guidedKickoffTourStatusSchema>;

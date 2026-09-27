@@ -5,6 +5,27 @@
  */
 
 import { extractLangyTextFromParts, LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
+import {
+  GUIDED_KICKOFF_CONVERSATION_TITLE,
+  GUIDED_ONBOARDING_KICKOFF_PART_TYPE,
+} from "@langwatch/onboarding-contract";
+
+/**
+ * Whether the first message chooses its conversation's title at creation, sticky over any
+ * generated one. Only the kickoff does; a plain message's placeholder is replaced later.
+ */
+export function startsWithGuidedKickoff(parts: readonly unknown[] | undefined): boolean {
+  return parts?.some(isGuidedKickoffPart) ?? false;
+}
+
+function isGuidedKickoffPart(part: unknown): boolean {
+  return (
+    typeof part === "object" &&
+    part !== null &&
+    "type" in part &&
+    part.type === GUIDED_ONBOARDING_KICKOFF_PART_TYPE
+  );
+}
 
 /**
  * Words that keep their capital mid-sentence: product/company/language names
@@ -40,9 +61,15 @@ const ALWAYS_CAPITALISED = new Set([
 /** An ordinary capitalised word: one capital, then lower case letters only. */
 const CAPITALISED_WORD = /^[A-Z][a-z]*(?:['’][a-z]+)?$/;
 
-/** The placeholder a new conversation takes from its first user message; empty without text. */
-export function placeholderTitleOf(parts: unknown): string {
-  return normalizeLangyConversationTitle(extractLangyTextFromParts(parts));
+/**
+ * The placeholder a new conversation takes from its first user message: "Getting started" for the
+ * guided onboarding kickoff, else the message text in the one style. Empty without text.
+ * @see specs/langy/langy-guided-onboarding.feature
+ */
+export function placeholderTitleOf(parts: readonly unknown[] | undefined): string {
+  return startsWithGuidedKickoff(parts)
+    ? GUIDED_KICKOFF_CONVERSATION_TITLE
+    : normalizeLangyConversationTitle(extractLangyTextFromParts(parts));
 }
 
 /** Bring a raw title into the one style. Empty string means "no title". */

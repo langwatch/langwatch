@@ -51,3 +51,12 @@ export function guidedPathLanding({
       return "/governance";
   }
 }
+
+/** The typed message part that hands the guided onboarding to Langy once the tour ends. */
+export const GUIDED_ONBOARDING_KICKOFF_PART_TYPE = "guided-onboarding-kickoff";
+
+/**
+ * The title of the conversation the kickoff starts. It is set when the
+ * conversation is created and it sticks, so the brief never reads as a title.
+ */
+export const GUIDED_KICKOFF_CONVERSATION_TITLE = "Getting started";
