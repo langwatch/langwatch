@@ -244,6 +244,12 @@
       "subjects": ["custom-role", "role"]
     },
     {
+      "id": "sample-agents",
+      "root": "modules/sample-agents",
+      "classification": "core",
+      "subjects": ["sample-agents"]
+    },
+    {
       "id": "scenario",
       "root": "modules/scenario",
       "classification": "core",

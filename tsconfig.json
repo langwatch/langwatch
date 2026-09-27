@@ -568,6 +568,12 @@
       "path": "modules/role/process/tsconfig.json"
     },
     {
+      "path": "modules/sample-agents/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/sample-agents/process/tsconfig.json"
+    },
+    {
       "path": "modules/scenario/browser/tsconfig.json"
     },
     {
@@ -602,9 +608,6 @@
     },
     {
       "path": "modules/share/process/tsconfig.json"
-    },
-    {
-      "path": "packages/storage-seed/tsconfig.json"
     },
     {
       "path": "modules/stored-object/contract/tsconfig.json"

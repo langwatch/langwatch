@@ -65,6 +65,7 @@
     "@langwatch/project-process": "workspace:*",
     "@langwatch/prompt-process": "workspace:*",
     "@langwatch/role-process": "workspace:*",
+    "@langwatch/sample-agents-process": "workspace:*",
     "@langwatch/scenario-process": "workspace:*",
     "@langwatch/secret-process": "workspace:*",
     "@langwatch/share-process": "workspace:*",

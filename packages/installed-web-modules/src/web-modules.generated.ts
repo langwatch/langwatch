@@ -171,6 +171,7 @@ type ServerHalfOnDisk =
   | "prompt"
   | "role"
   | "saas"
+  | "sample-agents"
   | "scenario"
   | "scim"
   | "secret"

@@ -12,7 +12,7 @@ Near-complete coverage landed across three PRs:
 ## Information Architecture
 
 ```
-observability/       — Tracing, Analytics, Custom Query, User Events, Annotations
+observability/       — Tracing, Analytics, Custom Query, User Events, Sample Agents, Annotations
 evaluations/         — Experiments, Online Evaluation (guardrails via as_guardrail=True), Instant Evals
 agent-simulations/   — Scenarios, Runs, Test Suites, Run Plans
 prompt-management/   — Prompts, Prompt Playground
@@ -66,6 +66,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Analytics                    |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        ✅        | ✅  |  ✅  |
 | Custom Query                 |   —    |   ✅   |   —    | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
 | User Events                  |   ✅   |   —    |   ✅   |  —  |      —       |  —  |  —  |        —         | ✅  |  ✅  |
+| Sample Agents                |   —    |   —    |   —    |  —  |      —       |  —  |  —  |        —         | ✅  |  —   |
 | Annotations                  |   ✅   |   ✅   |   ✅   | ✅  |      —       | ✅  | ✅  |        —         | ✅  |  ✅  |
 | **Evaluations**              |        |        |        |     |              |     |     |                  |     |      |
 | Experiments                  |   ✅   |   ✅   |   —    | ✅  |      ✅      | ✅  | ✅  |        —         | ✅  |  ✅  |
@@ -112,6 +113,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 ### Coverage notes
 
 - **User Events** — Python (`langwatch.track_event`) and Go (`client.Events`, plus `langwatch.Span.RecordEvent` on the tracing side). No TS, CLI, UI, or MCP by design.
+- **Sample Agents** — the scripted hotel concierge at `POST /api/demo/hotel_bot`, called with a project key to fill that project with example traces. API only, and hidden from the public API reference.
 - **SDK go** — The Go SDK splits across two modules: `github.com/langwatch/langwatch/sdks/go` (tracing, spans, evaluations, events, prompt telemetry, data-capture controls, and the eight provider instrumentations under `instrumentation/`) and `github.com/langwatch/langwatch/sdks/go/client` (the typed REST client, whose `Client` fields name the covered features). Table entries read `langwatch.*` for the tracing module and `client.*` for the REST client.
 - **Go gaps** — Analytics, Experiments, Suites, Agents, Workflows, Evaluators, Dashboards, Model Providers, Project Secrets, Model Defaults, Agent Skills, API Keys, and every AI Gateway feature have no Go surface: the REST client exposes only Prompts, Datasets, Traces, Annotations, Events, Evaluations, Triggers, Monitors, Scenarios, and Projects.
 - **Prompt Playground** — Pure UI feature; no SDK/CLI/MCP planned.

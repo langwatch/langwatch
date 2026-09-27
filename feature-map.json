@@ -182,6 +182,18 @@
           "sync": "code-to-platform"
         },
         {
+          "id": "observability.sample-agents",
+          "name": "Sample Agents",
+          "description": "A scripted hotel concierge you call with your project key: it fills the project with example traces, and turns about half the calls away so failures show too",
+          "surfaces": {
+            "code": { "sdk": null, "cli": null, "skill": null, "docs": null },
+            "platform": { "ui": null, "mcp": null, "skill": null, "docs": null },
+            "api": "/api/demo/hotel_bot",
+            "docs": null
+          },
+          "sync": null
+        },
+        {
           "id": "observability.annotations",
           "name": "Annotations",
           "description": "Expert labeling, trace review, and structured evaluation workflows",

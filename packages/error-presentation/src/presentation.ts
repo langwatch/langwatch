@@ -3471,6 +3471,11 @@ const presentations = {
     describe: () =>
       "Export it in pages instead, or filter it down to the rows you need and export those.",
   },
+  demo_bot_declined: {
+    title: "The demo bot turned this call away",
+    describe: () =>
+      "The sample hotel bot refuses about half its calls on purpose, so your project shows failures too. Send the call again.",
+  },
   department_not_found: {
     title: "That department is gone",
     describe: () =>

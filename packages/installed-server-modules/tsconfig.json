@@ -162,6 +162,9 @@
       "path": "../../modules/role/process/tsconfig.build.json"
     },
     {
+      "path": "../../modules/sample-agents/process/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/scenario/process/tsconfig.build.json"
     },
     {

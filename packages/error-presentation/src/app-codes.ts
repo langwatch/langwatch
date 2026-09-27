@@ -206,6 +206,7 @@ export const APP_ERROR_CODES = [
   "dataset_too_large_to_export",
   "dataset_too_large_to_search",
   "dataset_upload_not_pending",
+  "demo_bot_declined",
   "department_assignment_target_not_found",
   "department_not_found",
   "dspy_step_not_found",
