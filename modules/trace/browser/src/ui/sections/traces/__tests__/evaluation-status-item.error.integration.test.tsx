@@ -11,7 +11,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ query: { project: "test-proj" } }),
 }));
 
-vi.mock("../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),

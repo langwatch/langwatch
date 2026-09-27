@@ -1,3 +1,4 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useCallback } from "react";
 
 import {
@@ -5,7 +6,6 @@ import {
   type TraceHistoryEntry,
   useDrawerStore,
 } from "../../../../behavior/drawer.store.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 
 type OpenDrawer = ReturnType<typeof useDrawer>["openDrawer"];

@@ -76,7 +76,7 @@ vi.mock("../../../behavior/use-organization-team-project.ts", () => ({
     organization: { id: "org-1" },
   }),
 }));
-vi.mock("../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn() }),
 }));
 vi.mock("@langwatch/design-system/toaster", () => ({

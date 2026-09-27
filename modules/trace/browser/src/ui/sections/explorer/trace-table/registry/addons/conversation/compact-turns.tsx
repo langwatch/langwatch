@@ -1,4 +1,5 @@
 import { Badge, Box, Button, Circle, HStack, Icon, Text } from "@chakra-ui/react";
+import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import {
   formatCost,
   formatDuration,
@@ -11,7 +12,6 @@ import type React from "react";
 import type { ReactNode } from "react";
 
 import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store.ts";
-import { useDrawer, useDrawerParams } from "../../../../../../../behavior/use-drawer.ts";
 import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import {
   EXPANDED_BG,

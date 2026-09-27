@@ -1,4 +1,5 @@
 import { Box, Circle, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -13,7 +14,6 @@ import numeral from "numeral";
 import { useMemo } from "react";
 
 import { api } from "../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 

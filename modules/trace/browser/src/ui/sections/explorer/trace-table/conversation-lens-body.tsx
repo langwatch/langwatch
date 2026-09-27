@@ -1,4 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useExplorerStore, type LensConfig } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
@@ -10,7 +11,6 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,

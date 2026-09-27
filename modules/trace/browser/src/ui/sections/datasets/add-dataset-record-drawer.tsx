@@ -3,7 +3,7 @@
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { useDrawer as useHostDrawer } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
@@ -11,7 +11,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { api } from "../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import NextLink from "../../elements/next-link.tsx";
@@ -120,7 +119,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   // trace they were reading say, rather than clearing the page. Opened with
   // nothing underneath (a bulk selection, the end-of-queue hand-off), going
   // back closes the drawer outright.
-  const { goBack } = useDrawer();
+  const { goBack, openDrawer } = useDrawer();
 
   // Selected Dataset ID - Local Storage
   const {
@@ -128,9 +127,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
     setSelectedDataSetId: setLocalStorageDatasetId,
     rememberCreatedDataset,
   } = useLocalStorageSelectedDataSetId();
-  // The dataset editor is dataset's routed drawer: this one navigates to it, and
-  // comes back to the dataset it saved, remembered before the return remounts it.
-  const hostDrawer = useHostDrawer();
 
   const {
     handleSubmit,
@@ -171,8 +167,9 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
     },
   );
 
+  // Dataset's editor is its own routed drawer: go there, and come back to the dataset it saved.
   const openDatasetEditor = () =>
-    hostDrawer.openDrawer("addOrEditDataset", {
+    openDrawer("addOrEditDataset", {
       ...(selectedDataset
         ? {
             datasetToSave: {
@@ -186,7 +183,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
         rememberCreatedDataset(saved.datasetId);
         void trpc.dataset.getAll.invalidate();
       },
-      onClose: hostDrawer.goBack,
+      onClose: goBack,
     });
 
   const handleOnClose = () => {

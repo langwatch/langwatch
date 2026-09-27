@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
     currentDrawer: mocks.currentDrawer,
     openDrawer: mocks.openDrawer,

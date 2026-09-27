@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useEffect, useState } from "react";
@@ -19,7 +20,6 @@ import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 
 import { api } from "../../behavior/trace-api.ts";
-import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { slugify } from "../../model/slugify.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";

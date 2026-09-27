@@ -66,7 +66,7 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: { traces: { getById: { useQuery: () => ({ data: mocks.state.trace }) } } },
 }));
 
-vi.mock("../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: mocks.openDrawer }),
 }));
 

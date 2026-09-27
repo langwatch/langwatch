@@ -1,10 +1,10 @@
 import { Badge, Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
 import { Link } from "../../../blocks/link.tsx";
 import { usePromptByHandle } from "../hooks/use-prompt-by-handle.ts";

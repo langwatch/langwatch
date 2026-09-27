@@ -31,6 +31,11 @@ const harness = vi.hoisted(() => {
   };
 });
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("@langwatch/browser-host/use-router", () => ({
   default: harness.router,
   useRouter: () => harness.router,
@@ -92,7 +97,7 @@ vi.mock("../../hooks/use-trace-refresh.ts", () => ({
 }));
 
 const { clearDrawerStack, getDrawerStack, useDrawer } =
-  await import("../../../../../behavior/use-drawer.ts");
+  await import("@langwatch/browser-host/use-drawer");
 const { useDrawerStore } = await import("../../../../../index.ts");
 const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold.ts");
 
@@ -133,6 +138,8 @@ describe("given a trace opened from a simulation run's drawer", () => {
         drawer.current.openDrawer("scenarioRunDetail", {
           urlParams: { scenarioRunId: "run-1" },
         });
+      });
+      act(() => {
         drawer.current.openDrawer("traceV2Details", { traceId: TRACE });
       });
       useDrawerStore.getState().openTrace(TRACE, null);
@@ -156,6 +163,8 @@ describe("given the drawer stack still holds a drawer I already left", () => {
       const { result: drawer } = renderHook(() => useDrawer());
       act(() => {
         drawer.current.openDrawer("traceV2Details", { traceId: "trace-0" });
+      });
+      act(() => {
         drawer.current.openDrawer("addDatasetRecord", { traceId: "trace-0" });
       });
       // The stack is now describing the dataset drawer, and the reader has

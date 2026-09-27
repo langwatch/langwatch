@@ -1,10 +1,10 @@
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
 import {

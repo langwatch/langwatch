@@ -4,8 +4,9 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type * as HostDrawer from "@langwatch/browser-host/use-drawer";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => {
@@ -18,7 +19,6 @@ const harness = vi.hoisted(() => {
     PATH,
     createRecord: vi.fn(),
     openHostDrawer: vi.fn(),
-    hostGoBack: vi.fn(),
     rememberCreatedDataset: vi.fn(),
     router: {
       get query() {
@@ -37,6 +37,11 @@ const harness = vi.hoisted(() => {
     },
   };
 });
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
   default: harness.router,
@@ -57,9 +62,23 @@ vi.mock("../../../../behavior/use-local-storage-selected-dataset-id.ts", () => (
   }),
 }));
 
-vi.mock("@langwatch/browser-host/use-drawer", () => ({
-  useDrawer: () => ({ openDrawer: harness.openHostDrawer, goBack: harness.hostGoBack }),
-}));
+// The real navigator, with the hop to dataset's editor recorded rather than taken.
+vi.mock("@langwatch/browser-host/use-drawer", async (importOriginal) => {
+  const actual = await importOriginal<typeof HostDrawer>();
+  return {
+    ...actual,
+    useDrawer: () => {
+      const drawer = actual.useDrawer();
+      return {
+        ...drawer,
+        openDrawer: (...args: Parameters<typeof drawer.openDrawer>) => {
+          if (args[0] === "addOrEditDataset") harness.openHostDrawer(args[0], args[1]);
+          else drawer.openDrawer(...args);
+        },
+      };
+    },
+  };
+});
 
 vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
@@ -118,25 +137,35 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
+import { clearDrawerStack, useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 
-import { clearDrawerStack, useDrawer } from "../../../../behavior/use-drawer.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
 function OpenFromTrace() {
-  const { openDrawer } = useDrawer();
+  const { openDrawer, currentDrawer } = useDrawer();
+  const opened = useRef<string[]>([]);
   useEffect(() => {
-    openDrawer("traceV2Details", { traceId: "trace-1", t: "1700000000" });
-    openDrawer("addDatasetRecord", { traceId: "trace-1" });
-  }, [openDrawer]);
+    // One step per render, since the navigator reads the address it rendered with.
+    const next = opened.current.length === 0 ? "traceV2Details" : "addDatasetRecord";
+    if (opened.current.length === 2 || (next === "addDatasetRecord" && !currentDrawer)) return;
+    opened.current.push(next);
+    openDrawer(
+      next,
+      next === "traceV2Details" ? { traceId: "trace-1", t: "1700000000" } : { traceId: "trace-1" },
+    );
+  }, [currentDrawer, openDrawer]);
   return null;
 }
 
 /** Opens the dataset drawer straight from a selection, with no trace behind. */
 function OpenFromSelection() {
   const { openDrawer } = useDrawer();
+  const opened = useRef(false);
   useEffect(() => {
+    if (opened.current) return;
+    opened.current = true;
     openDrawer("addDatasetRecord", {
       selectedTraceIds: ["trace-1", "trace-2"],
     });
@@ -276,7 +305,7 @@ describe("given the reader wants a new dataset from the drawer", () => {
 
       expect(harness.openHostDrawer).toHaveBeenCalledWith(
         "addOrEditDataset",
-        expect.objectContaining({ onClose: harness.hostGoBack }),
+        expect.objectContaining({ onClose: expect.any(Function) }),
       );
     });
 

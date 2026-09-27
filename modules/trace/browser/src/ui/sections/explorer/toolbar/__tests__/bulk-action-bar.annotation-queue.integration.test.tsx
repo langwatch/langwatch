@@ -22,7 +22,7 @@ vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
   useLangyStore: (selector: (s: { attachContext: () => void; openPanel: () => void }) => unknown) =>
     selector({ attachContext: vi.fn(), openPanel: vi.fn() }),
 }));
-vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({

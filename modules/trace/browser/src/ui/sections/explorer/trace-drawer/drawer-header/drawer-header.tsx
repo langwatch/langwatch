@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -39,7 +40,6 @@ import {
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
-import { useDrawer } from "../../../../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
 import {

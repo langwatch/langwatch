@@ -1,9 +1,9 @@
+import { getTopDrawer, useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { getTopDrawer, useDrawer } from "../../../../behavior/use-drawer.ts";
 import { useConversationContext } from "../hooks/use-conversation-context.ts";
 import { useConversationPrefetch } from "../hooks/use-conversation-prefetch.ts";
 import { useDrawerUrlSync } from "../hooks/use-drawer-url-sync.ts";

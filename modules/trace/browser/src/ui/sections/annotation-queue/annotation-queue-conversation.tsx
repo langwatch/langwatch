@@ -5,12 +5,12 @@
 
 import { CodeBlock } from "@chakra-ui/react";
 import type { UiAnnotationQueueConversationProps } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useCallback, useMemo } from "react";
 
 import { api } from "../../../behavior/trace-api.ts";
-import { useDrawer } from "../../../behavior/use-drawer.ts";
 import { useConversationTurns } from "../explorer/hooks/use-conversation-turns.ts";
 import { useDrawerProjectId } from "../explorer/hooks/use-drawer-project-id.ts";
 import { ConversationView } from "../explorer/trace-drawer/conversation-view/conversation-view.tsx";

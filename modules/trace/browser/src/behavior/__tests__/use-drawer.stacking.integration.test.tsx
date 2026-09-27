@@ -31,12 +31,18 @@ const harness = vi.hoisted(() => {
   };
 });
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("@langwatch/browser-host/use-router", () => ({
   default: harness.router,
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack, useDrawer } = await import("../use-drawer.ts");
+const { clearDrawerStack, getDrawerStack, useDrawer } =
+  await import("@langwatch/browser-host/use-drawer");
 
 /** What the address bar holds for the drawer, as the browser would show it. */
 function drawerInUrl(): Record<string, string> {
