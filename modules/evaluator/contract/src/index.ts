@@ -28,3 +28,4 @@ export type {
 
 export * from "./evaluation-result-parsing.ts";
 export * from "./select-best-compare-prompts.ts";
+export * from "./evaluator-settings-schema.ts";

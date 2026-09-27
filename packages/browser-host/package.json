@@ -182,6 +182,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

@@ -182,38 +182,21 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   const httpConfig = agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
   const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
 
-  const [url, setUrl] = useState(
-    (localSettings?.url as string) ?? httpSnapshot?.url ?? httpConfig?.url ?? "",
-  );
-  const [method, setMethod] = useState<HttpMethod>(
-    (localSettings?.method as HttpMethod) ?? httpSnapshot?.method ?? httpConfig?.method ?? "POST",
-  );
-  const [bodyTemplate, setBodyTemplate] = useState(
-    (localSettings?.bodyTemplate as string) ??
-      httpSnapshot?.bodyTemplate ??
-      httpConfig?.bodyTemplate ??
-      "",
-  );
-  const [outputPath, setOutputPath] = useState(
-    (localSettings?.outputPath as string) ??
-      httpSnapshot?.outputPath ??
-      httpConfig?.outputPath ??
-      "",
-  );
-  const [headers, setHeaders] = useState<HttpHeader[]>(
-    (localSettings?.headers as HttpHeader[]) ?? httpSnapshot?.headers ?? httpConfig?.headers ?? [],
-  );
-  const [auth, setAuth] = useState<HttpAuth | undefined>(
-    (localSettings?.auth as HttpAuth) ?? httpSnapshot?.auth ?? httpConfig?.auth ?? { type: "none" },
+  const initialHttp = initialHttpDraft({ localSettings, httpSnapshot, httpConfig });
+  const [url, setUrl] = useState(initialHttp.url);
+  const [method, setMethod] = useState<HttpMethod>(initialHttp.method);
+  const [bodyTemplate, setBodyTemplate] = useState(initialHttp.bodyTemplate);
+  const [outputPath, setOutputPath] = useState(initialHttp.outputPath);
+  const [headers, setHeaders] = useState<HttpHeader[]>(initialHttp.headers);
+  const [auth, setAuth] = useState<HttpAuth | undefined>(initialHttp.auth);
+  const httpSetters = useMemo(
+    () => ({ setUrl, setMethod, setBodyTemplate, setOutputPath, setHeaders, setAuth }),
+    [],
   );
   // ---- Code state ----
   const codeSnapshot = readCodeSnapshot(node.data);
   const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
-  const [code, setCode] = useState(
-    (localSettings?.code as string) ??
-      codeSnapshot ??
-      (codeConfig ? getCodeFromConfig(codeConfig) : DEFAULT_CODE),
-  );
+  const [code, setCode] = useState(initialCode({ localSettings, codeSnapshot, codeConfig }));
   const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   const applyAgentToEditorState = useCallback(
@@ -221,17 +204,12 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
       form.reset({ name: agent.name });
       if (agent.type === "http") {
         const config = getHttpConfig(agent.config);
-        setUrl(config.url || "");
-        setMethod(config.method ?? "POST");
-        setBodyTemplate(config.bodyTemplate ?? "");
-        setOutputPath(config.outputPath ?? "");
-        setHeaders(config.headers ?? []);
-        setAuth(config.auth ?? { type: "none" });
+        applyHttpDraft({ ...config, url: config.url || "" }, httpSetters);
       } else if (agent.type === "code") {
         setCode(getCodeFromConfig(agent.config));
       }
     },
-    [form],
+    [form, httpSetters],
   );
 
   // Outer updates: apply the library record into the editor/DSL only when
@@ -327,15 +305,8 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     const baseline =
       readHttpSnapshot(node.data) ?? (agentData ? getHttpConfig(agentData.config) : undefined);
     if (!baseline) return;
-    const changed =
-      url !== (baseline.url ?? "") ||
-      method !== (baseline.method ?? "POST") ||
-      bodyTemplate !== (baseline.bodyTemplate ?? "") ||
-      outputPath !== (baseline.outputPath ?? "") ||
-      JSON.stringify(headers) !== JSON.stringify(baseline.headers ?? []) ||
-      JSON.stringify(auth) !== JSON.stringify(baseline.auth ?? { type: "none" });
-
-    if (changed) {
+    const draft = { url, method, bodyTemplate, outputPath, headers, auth };
+    if (httpDraftDiffers(draft, baseline)) {
       persistLocalSettings({
         url,
         method,
@@ -453,22 +424,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     const projectId = project.id;
     const trimmedName = form.getValues().name.trim();
 
-    let config: AgentComponentConfig | undefined;
-    if (agentType === "http") {
-      config = buildHttpConfig({ url, method, bodyTemplate, outputPath, headers, auth });
-    } else if (agentType === "code") {
-      config = buildCodeConfig({
-        code,
-        inputs: (node.data.inputs ?? []).map((i) => ({
-          identifier: i.identifier,
-          type: i.type,
-        })),
-        outputs: (node.data.outputs ?? []).map((o) => ({
-          identifier: o.identifier,
-          type: o.type,
-        })),
-      });
-    }
+    const config = agentConfigFor({
+      agentType,
+      http: { url, method, bodyTemplate, outputPath, headers, auth },
+      code,
+      inputs: node.data.inputs ?? [],
+      outputs: node.data.outputs ?? [],
+    });
 
     updateMutation.mutate(
       {
@@ -550,14 +512,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     const snapshotCode = readCodeSnapshot(node.data);
     if (snapshotCode !== undefined) setCode(snapshotCode);
     const snapshotHttp = readHttpSnapshot(node.data);
-    if (snapshotHttp) {
-      setUrl(snapshotHttp.url ?? "");
-      setMethod(snapshotHttp.method ?? "POST");
-      setBodyTemplate(snapshotHttp.bodyTemplate ?? "");
-      setOutputPath(snapshotHttp.outputPath ?? "");
-      setHeaders(snapshotHttp.headers ?? []);
-      setAuth(snapshotHttp.auth ?? { type: "none" });
-    }
+    if (snapshotHttp) applyHttpDraft(snapshotHttp, httpSetters);
     setNode({ id: node.id, data: { localConfig: undefined } });
   }, [
     form,
@@ -568,6 +523,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     node.data,
     debouncedSetLocalConfig,
     persistLocalSettings,
+    httpSetters,
   ]);
 
   const hasLocalChanges = !!localConfig;
@@ -734,4 +690,117 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
       )}
     </BasePropertiesPanel>
   );
+}
+
+type HttpDraft = {
+  url: string;
+  method: HttpMethod;
+  bodyTemplate: string;
+  outputPath: string;
+  headers: HttpHeader[];
+  auth: HttpAuth | undefined;
+};
+type HttpDraftSource = Partial<HttpDraft> | undefined;
+
+/** Unsaved local edits win, then the node's snapshot, then the library record. */
+function initialHttpDraft({
+  localSettings,
+  httpSnapshot,
+  httpConfig,
+}: {
+  localSettings: Record<string, unknown> | undefined;
+  httpSnapshot: HttpDraftSource;
+  httpConfig: HttpDraftSource;
+}): HttpDraft {
+  return {
+    url: (localSettings?.url as string) ?? httpSnapshot?.url ?? httpConfig?.url ?? "",
+    method:
+      (localSettings?.method as HttpMethod) ?? httpSnapshot?.method ?? httpConfig?.method ?? "POST",
+    bodyTemplate:
+      (localSettings?.bodyTemplate as string) ??
+      httpSnapshot?.bodyTemplate ??
+      httpConfig?.bodyTemplate ??
+      "",
+    outputPath:
+      (localSettings?.outputPath as string) ??
+      httpSnapshot?.outputPath ??
+      httpConfig?.outputPath ??
+      "",
+    headers:
+      (localSettings?.headers as HttpHeader[]) ??
+      httpSnapshot?.headers ??
+      httpConfig?.headers ??
+      [],
+    auth: (localSettings?.auth as HttpAuth) ??
+      httpSnapshot?.auth ??
+      httpConfig?.auth ?? { type: "none" },
+  };
+}
+
+function initialCode({
+  localSettings,
+  codeSnapshot,
+  codeConfig,
+}: {
+  localSettings: Record<string, unknown> | undefined;
+  codeSnapshot: string | undefined;
+  codeConfig: Parameters<typeof getCodeFromConfig>[0] | undefined;
+}): string {
+  return (
+    (localSettings?.code as string) ??
+    codeSnapshot ??
+    (codeConfig ? getCodeFromConfig(codeConfig) : DEFAULT_CODE)
+  );
+}
+
+function applyHttpDraft(
+  source: Partial<HttpDraft>,
+  setters: {
+    setUrl: (url: string) => void;
+    setMethod: (method: HttpMethod) => void;
+    setBodyTemplate: (bodyTemplate: string) => void;
+    setOutputPath: (outputPath: string) => void;
+    setHeaders: (headers: HttpHeader[]) => void;
+    setAuth: (auth: HttpAuth | undefined) => void;
+  },
+) {
+  setters.setUrl(source.url ?? "");
+  setters.setMethod(source.method ?? "POST");
+  setters.setBodyTemplate(source.bodyTemplate ?? "");
+  setters.setOutputPath(source.outputPath ?? "");
+  setters.setHeaders(source.headers ?? []);
+  setters.setAuth(source.auth ?? { type: "none" });
+}
+
+function httpDraftDiffers(draft: HttpDraft, baseline: Partial<HttpDraft>): boolean {
+  return (
+    draft.url !== (baseline.url ?? "") ||
+    draft.method !== (baseline.method ?? "POST") ||
+    draft.bodyTemplate !== (baseline.bodyTemplate ?? "") ||
+    draft.outputPath !== (baseline.outputPath ?? "") ||
+    JSON.stringify(draft.headers) !== JSON.stringify(baseline.headers ?? []) ||
+    JSON.stringify(draft.auth) !== JSON.stringify(baseline.auth ?? { type: "none" })
+  );
+}
+
+function agentConfigFor({
+  agentType,
+  http,
+  code,
+  inputs,
+  outputs,
+}: {
+  agentType: string | undefined;
+  http: HttpDraft;
+  code: string;
+  inputs: DslField[];
+  outputs: DslField[];
+}): AgentComponentConfig | undefined {
+  if (agentType === "http") return buildHttpConfig(http);
+  if (agentType !== "code") return undefined;
+  return buildCodeConfig({
+    code,
+    inputs: inputs.map((i) => ({ identifier: i.identifier, type: i.type })),
+    outputs: outputs.map((o) => ({ identifier: o.identifier, type: o.type })),
+  });
 }

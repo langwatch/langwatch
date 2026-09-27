@@ -36,7 +36,7 @@ import {
   type ReactFlowProps,
   ReactFlowProvider,
 } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { BarChart2 } from "react-feather";
@@ -58,6 +58,7 @@ import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-p
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { isConnectionAllowed } from "../../../model/control-flow.ts";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 import Head from "../../elements/compat/next-head.tsx";
@@ -183,33 +184,12 @@ export default function OptimizationStudio() {
   const expandFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
-    // A new request supersedes whatever the last one was still animating
-    // towards. Without this an in-flight expand keeps resizing the panel back
-    // up while a "closed" request is collapsing it. The cleared request that
-    // this effect writes at the end is not a new one, so it must not cancel.
-    if (openResultsPanelRequest !== undefined && expandFrameRef.current !== null) {
-      window.cancelAnimationFrame(expandFrameRef.current);
-      expandFrameRef.current = null;
-    }
-
-    if (openResultsPanelRequest === "evaluations") {
-      panelRef.current?.expand(0);
-      panelRef.current?.resize(6);
-
-      const step = () => {
-        const panel = panelRef.current;
-        if (!panel) return;
-        const size = panel.getSize();
-        if (size < 70) {
-          panel.resize(size + 10);
-          expandFrameRef.current = window.requestAnimationFrame(step);
-        }
-      };
-      step();
-    }
-    if (openResultsPanelRequest === "closed" && !isResultsPanelCollapsed) {
-      panelRef.current?.collapse();
-    }
+    applyResultsPanelRequest({
+      request: openResultsPanelRequest,
+      panelRef,
+      expandFrameRef,
+      isCollapsed: isResultsPanelCollapsed,
+    });
     setOpenResultsPanelRequest(undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openResultsPanelRequest]);
@@ -262,26 +242,7 @@ export default function OptimizationStudio() {
                   <StudioWorkflowNamePopover />
                   <StatusCircle
                     status={socketStatus}
-                    tooltip={
-                      socketStatus === "connecting-python" ? (
-                        <VStack align="start" gap={1} padding={2}>
-                          <HStack>
-                            <StatusCircle
-                              status={
-                                socketStatus === "connecting-python" ? "connected" : "connecting"
-                              }
-                            />
-                            <Text>Socket Connection</Text>
-                          </HStack>
-                          <HStack>
-                            <StatusCircle status="connecting" />
-                            <Text>Python Runtime</Text>
-                          </HStack>
-                        </VStack>
-                      ) : (
-                        titleCase(socketStatus)
-                      )
-                    }
+                    tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
                   />
                 </HStack>
                 <HStack width="full" justify="end">
@@ -714,4 +675,61 @@ function normalizePaletteFields(fields: unknown[] | undefined) {
     const parsed = fieldSchema.safeParse(field);
     return parsed.success ? [parsed.data] : [];
   });
+}
+
+/** Answers the latest results-panel request: expand animated, collapse, or nothing. */
+function applyResultsPanelRequest({
+  request,
+  panelRef,
+  expandFrameRef,
+  isCollapsed,
+}: {
+  request: WorkflowStore["openResultsPanelRequest"];
+  panelRef: RefObject<ImperativePanelHandle | null>;
+  expandFrameRef: RefObject<number | null>;
+  isCollapsed: boolean;
+}) {
+  // A new request supersedes whatever the last one was still animating
+  // towards. Without this an in-flight expand keeps resizing the panel back
+  // up while a "closed" request is collapsing it. The cleared request that
+  // this effect writes at the end is not a new one, so it must not cancel.
+  if (request !== undefined && expandFrameRef.current !== null) {
+    window.cancelAnimationFrame(expandFrameRef.current);
+    expandFrameRef.current = null;
+  }
+
+  if (request === "evaluations") {
+    panelRef.current?.expand(0);
+    panelRef.current?.resize(6);
+
+    const step = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const size = panel.getSize();
+      if (size < 70) {
+        panel.resize(size + 10);
+        expandFrameRef.current = window.requestAnimationFrame(step);
+      }
+    };
+    step();
+  }
+  if (request === "closed" && !isCollapsed) {
+    panelRef.current?.collapse();
+  }
+}
+
+function SocketStatusTooltip({ socketStatus }: { socketStatus: SocketStatus }) {
+  if (socketStatus !== "connecting-python") return <>{titleCase(socketStatus)}</>;
+  return (
+    <VStack align="start" gap={1} padding={2}>
+      <HStack>
+        <StatusCircle status="connected" />
+        <Text>Socket Connection</Text>
+      </HStack>
+      <HStack>
+        <StatusCircle status="connecting" />
+        <Text>Python Runtime</Text>
+      </HStack>
+    </VStack>
+  );
 }

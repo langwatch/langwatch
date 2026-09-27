@@ -25,9 +25,8 @@ import { slugify } from "@langwatch/design-system/slugify";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   evaluatorDisplayName,
-  type Evaluators,
-  type EvaluatorTypes,
   evaluatorsSchema,
+  evaluatorSettingsSchemaFor,
   evaluatorTypesSchema,
   getEvaluatorDefaultSettings,
   type EvaluatorDefinition,
@@ -69,12 +68,12 @@ import { TryItOut } from "./try-it-out.tsx";
 
 export interface CheckConfigFormData {
   name: string;
-  checkType: EvaluatorTypes | undefined;
+  checkType: string | undefined;
   sample: number;
   preconditions: CheckPreconditions;
-  settings: Evaluators[EvaluatorTypes]["settings"];
-  executionMode: EvaluationExecutionMode;
-  storeSettingsOnCode: boolean;
+  settings: Record<string, unknown>;
+  executionMode?: EvaluationExecutionMode;
+  storeSettingsOnCode?: boolean;
   mappings: MappingState;
 }
 
@@ -301,7 +300,7 @@ function EvaluatorSummaryCard({
 }: {
   form: CheckForm;
   evaluatorDefinition: EvaluatorDefinition;
-  checkType: EvaluatorTypes;
+  checkType: string;
   isNameAlreadyInUse: boolean;
   nameValue: string;
   slug: string;
@@ -311,6 +310,7 @@ function EvaluatorSummaryCard({
     register,
     formState: { errors },
   } = form;
+  const settingsLookup = evaluatorSettingsSchemaFor(checkType);
   return (
     <Card.Root width="full">
       <Card.Body>
@@ -369,9 +369,9 @@ function EvaluatorSummaryCard({
               </Text>
             </VStack>
           </HorizontalFormControl>
-          {checkType && evaluatorsSchema.shape[checkType] && (
+          {settingsLookup.found && (
             <DynamicZodForm
-              schema={evaluatorsSchema.shape[checkType].shape.settings}
+              schema={settingsLookup.schema}
               evaluatorType={checkType}
               prefix="settings"
               errors={errors.settings}
@@ -397,7 +397,7 @@ function ExecutionCard({
 }: {
   form: CheckForm;
   evaluatorDefinition: EvaluatorDefinition;
-  checkType: EvaluatorTypes;
+  checkType: string;
   slug: string;
   watched: Pick<
     CheckConfigFormData,
@@ -426,6 +426,7 @@ function ExecutionCard({
   const fields = targetFields;
   const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
   const [accordionValue, setAccordionValue] = useState(accordionIndex ? ["0"] : []);
+  const settingsLookup = evaluatorSettingsSchemaFor(checkType);
   return (
     <Card.Root width="full" padding={0}>
       <Card.Body padding={0}>
@@ -457,7 +458,7 @@ function ExecutionCard({
               name={nameValue}
               executionMode={executionMode}
               settings={settings}
-              storeSettingsOnCode={storeSettingsOnCode}
+              storeSettingsOnCode={storeSettingsOnCode ?? false}
             />
           )}
         </VStack>
@@ -503,9 +504,9 @@ function ExecutionCard({
                   remove={removePrecondition}
                   fields={fieldsPrecondition}
                 />
-                {checkType && evaluatorsSchema.shape[checkType] && (
+                {settingsLookup.found && (
                   <DynamicZodForm
-                    schema={evaluatorsSchema.shape[checkType].shape.settings}
+                    schema={settingsLookup.schema}
                     evaluatorType={checkType}
                     prefix="settings"
                     errors={errors.settings}
@@ -589,18 +590,13 @@ function checkConfigResolver(
   return (data, context, options) => {
     // A saved monitor can name an evaluator this server no longer has, so the
     // schema lookup is by presence rather than by type.
-    const settingsSchema = data.checkType
-      ? evaluatorsSchema.shape[data.checkType]?.shape.settings
-      : undefined;
 
-    const schema = z.object({
+    const schema: z.ZodType<CheckConfigFormData, CheckConfigFormData> = z.object({
       name: z.string().min(1).max(255).refine(validateNameUniqueness),
       checkType: evaluatorTypesSchema,
       sample: z.number().min(0.01).max(1),
       preconditions: checkPreconditionsSchema,
-      settings: data.checkType?.startsWith("custom/")
-        ? z.object({}).optional()
-        : (settingsSchema ?? evaluatorsSchema.shape["langevals/basic"].shape.settings),
+      settings: formSettingsSchema(data.checkType),
       executionMode: z
         .enum([
           EvaluationExecutionMode.ON_MESSAGE,
@@ -610,13 +606,7 @@ function checkConfigResolver(
         .optional(),
       mappings: mappingStateSchema,
     });
-    // settings is selected at runtime from data.checkType, so the schema output
-    // is not provably CheckConfigFormData.
-    return (zodResolver(schema) as unknown as Resolver<CheckConfigFormData>)(
-      { ...data, settings: data.settings || {} },
-      context,
-      options,
-    );
+    return zodResolver(schema)({ ...data, settings: data.settings || {} }, context, options);
   };
 }
 
@@ -630,7 +620,7 @@ function applyEvaluatorDefaults({
 }: {
   form: CheckForm;
   availableEvaluators: Readonly<Record<string, EvaluatorDefinition>>;
-  checkType: EvaluatorTypes;
+  checkType: string;
   nameValue: string;
   evaluatorDefinition: EvaluatorDefinition | undefined;
   resolvedModels: { defaultModel: string | null; embeddingsModel: string | null };
@@ -683,4 +673,15 @@ function runOnHintFor({
       No preconditions defined
     </Text>
   );
+}
+
+/** Custom evaluators carry no settings; an unknown built-in falls back to the basic one's. */
+function formSettingsSchema(
+  checkType: string | undefined,
+): z.ZodType<Record<string, unknown>, Record<string, unknown>> {
+  if (checkType?.startsWith("custom/")) return z.object({});
+  const basic = evaluatorsSchema.shape["langevals/basic"].shape.settings;
+  if (!checkType) return basic;
+  const lookup = evaluatorSettingsSchemaFor(checkType);
+  return lookup.found ? lookup.schema : basic;
 }

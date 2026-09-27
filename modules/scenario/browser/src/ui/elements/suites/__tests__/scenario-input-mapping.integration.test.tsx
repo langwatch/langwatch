@@ -18,10 +18,6 @@ import {
 
 // -- Mock transitive deps that pull in complex modules --
 
-vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
-  CodeEditor: () => null,
-}));
-
 // -- Helpers --
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

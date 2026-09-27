@@ -43,11 +43,6 @@
       "types": "./dist/version-history.d.ts",
       "default": "./src/version-history.ts"
     },
-    "./surfaces/code-editor-transport": {
-      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
-      "types": "./dist/ui/sections/optimization_studio/code/workflow-code-editor.transport.d.ts",
-      "default": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx"
-    },
     "./studio-scope": {
       "langwatch-declaration-source": "./src/studio-scope.ts",
       "types": "./dist/studio-scope.d.ts",

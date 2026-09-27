@@ -46,6 +46,9 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
       "path": "../react-rum/tsconfig.build.json"
     },
     {

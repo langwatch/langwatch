@@ -15,10 +15,6 @@ import {
   PromptTargetMappingSection,
 } from "../prompt-target-mapping-section.tsx";
 
-vi.mock("@langwatch/workflow-browser/surfaces/code-editor-transport", () => ({
-  CodeEditor: () => null,
-}));
-
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

@@ -27,9 +27,8 @@ vi.mock("../use-version-state.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/model-provider-browser/surfaces/model-selector", () => ({
-  allModelOptions: [],
-  useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
+vi.mock("../../../../behavior/use-model-selection.ts", () => ({
+  useModelSelection: () => ({ modelOption: { isDisabled: false } }),
 }));
 
 vi.mock("@langwatch/browser-trpc/workflow-api", () => ({

@@ -3,7 +3,6 @@ import { api } from "@langwatch/browser-trpc/workflow-api";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { AISparklesLoader, allModelOptions } from "@langwatch/model-provider-browser-kit";
-import { useModelSelectionOptions } from "@langwatch/model-provider-browser/surfaces/model-selector";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -11,6 +10,7 @@ import { useFormContext } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useModelSelection } from "../../../behavior/use-model-selection.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { useVersionState } from "./use-version-state.ts";
 
@@ -110,7 +110,11 @@ export function NewVersionFields({
   );
 
   const defaultModel = resolvedDefault.data?.model ?? "";
-  const { modelOption } = useModelSelectionOptions(allModelOptions, defaultModel, "chat");
+  const { modelOption } = useModelSelection({
+    options: allModelOptions,
+    model: defaultModel,
+    mode: "chat",
+  });
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
   const isModelConfigured = resolvedDefault.data != null && !isDefaultModelDisabled;
 
