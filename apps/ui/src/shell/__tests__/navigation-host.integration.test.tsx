@@ -28,6 +28,9 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import UiAppChrome from "../ui-app-chrome";
+import { loadUiRootCapabilities } from "../ui-root-capabilities";
+
+const ROOT = await loadUiRootCapabilities();
 
 vi.mock("@langwatch/navigation-browser/chrome", () => ({
   NavigationShell: ({ children }: { children: ReactNode }) => (
@@ -162,7 +165,7 @@ function renderChrome() {
         <UiCapabilityContextProvider value={CAPABILITIES}>
           <UiDesignSystemShell>
             <Routes>
-              <Route element={<UiAppChrome />}>
+              <Route element={<UiAppChrome capabilities={ROOT} />}>
                 <Route path="/:project/traces" element={<HostProbe />} />
               </Route>
             </Routes>
@@ -222,7 +225,7 @@ describe("the application chrome", () => {
     render(
       <MemoryRouter initialEntries={["/my-project/traces"]}>
         <Routes>
-          <Route element={<UiAppChrome />}>
+          <Route element={<UiAppChrome capabilities={ROOT} />}>
             <Route path="/:project/traces" element={<HostProbe />} />
           </Route>
         </Routes>
@@ -264,7 +267,7 @@ describe("the application chrome", () => {
             <UiCapabilityContextProvider value={{ ...CAPABILITIES, rpc: new RefusingRpc() }}>
               <UiDesignSystemShell>
                 <Routes>
-                  <Route element={<UiAppChrome />}>
+                  <Route element={<UiAppChrome capabilities={ROOT} />}>
                     <Route path="/:project/traces" element={<HostProbe />} />
                   </Route>
                 </Routes>

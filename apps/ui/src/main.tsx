@@ -1,6 +1,5 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
-import { authWeb } from "@langwatch/auth-browser/declaration";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
 import type {
   UiDeployment,
@@ -17,7 +16,6 @@ import {
 } from "@langwatch/browser-host/transport";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
-import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { createUi } from "@langwatch/ui-kernel";
 import { createUiApplication, type UiApplication } from "@langwatch/ui-kernel/application";
 import { UiApplicationShell } from "@langwatch/ui-kernel/application-shell";
@@ -39,9 +37,11 @@ import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";
 import { useLocation } from "react-router";
 
-import { uiDesignSystem } from "./design-system";
+import { composeUiDesignSystem } from "./design-system";
 import { installedUiDeclarations } from "./shell/ui-declarations";
+import { loadUiRootCapabilities, type UiRootCapabilities } from "./shell/ui-root-capabilities";
 import { uiRouteTable } from "./shell/ui-route-table";
+import { uiShellLayouts } from "./shell/ui-shell-layouts";
 import { uiUnservedPageLoaders } from "./shell/ui-unserved-pages";
 import {
   parseUiFeatureConfig,
@@ -86,27 +86,6 @@ function UiBootPageError() {
       <p style={{ opacity: 0.7 }}>Something went wrong on our side. Try again in a moment.</p>
     </div>
   );
-}
-
-type AuthSessionCapability = Awaited<
-  ReturnType<typeof authWeb.installation.capabilities.session.load>
->;
-type OrganizationScopeCapability = Awaited<
-  ReturnType<typeof organizationWeb.installation.capabilities.scope.load>
->;
-
-/** Auth's session and organization's scope, loaded through their declarations. */
-type UiRootCapabilities = {
-  session: AuthSessionCapability;
-  scope: OrganizationScopeCapability;
-};
-
-async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
-  const [session, scope] = await Promise.all([
-    authWeb.installation.capabilities.session.load(),
-    organizationWeb.installation.capabilities.scope.load(),
-  ]);
-  return { session, scope };
 }
 
 /**
@@ -196,7 +175,7 @@ class BrowserUiShell extends UiShell {
           session: UiPendingProvider,
           transport: UiPendingProvider,
           graphicsQuality: GraphicsQualityProvider,
-          designSystem: uiDesignSystem,
+          designSystem: composeUiDesignSystem(rootCapabilities),
           commandBar: UiPendingProvider,
           toaster: UiErrorToaster,
           footer: UiNoFooter,
@@ -207,10 +186,7 @@ class BrowserUiShell extends UiShell {
         pages: {
           loaders: uiUnservedPageLoaders,
           table: uiRouteTable,
-          shellLayouts: {
-            auth: () => import("./shell/ui-auth-host"),
-            chrome: () => import("./shell/ui-app-chrome"),
-          },
+          shellLayouts: uiShellLayouts(rootCapabilities),
           errorFallback: UiPageError,
           rootErrorBoundary: UiBootPageError,
         },

@@ -7,7 +7,10 @@ import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { uiDesignSystem } from "../../design-system";
+import { composeUiDesignSystem } from "../../design-system";
+import { loadUiRootCapabilities } from "../ui-root-capabilities";
+
+const uiDesignSystem = composeUiDesignSystem(await loadUiRootCapabilities());
 
 // jsdom ships no matchMedia, and the colour-mode provider reads it on mount.
 beforeAll(() => {

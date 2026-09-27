@@ -9,7 +9,9 @@ import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
 import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
 import { describe, expect, it } from "vitest";
 
+import { loadUiRootCapabilities } from "../ui-root-capabilities";
 import { uiRouteTable } from "../ui-route-table";
+import { uiShellLayouts } from "../ui-shell-layouts";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 /** Composed exactly as `main.tsx` composes it. */
@@ -19,10 +21,7 @@ const loaders = mergeUiPageLoaders({
 });
 
 /** Composed exactly as `main.tsx` composes it. */
-const shellLayouts = {
-  auth: () => import("../ui-auth-host"),
-  chrome: () => import("../ui-app-chrome"),
-};
+const shellLayouts = uiShellLayouts(await loadUiRootCapabilities());
 
 describe("given the route table and the modules this build installs", () => {
   describe("when the shell builds its router from them", () => {
