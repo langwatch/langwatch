@@ -13,7 +13,6 @@ const mockSetNode = vi.fn();
 const mockUpdateNodeInternals = vi.fn();
 const mockSetEdges = vi.fn();
 const mockDeselectAllNodes = vi.fn();
-const mockNodeDataToLocalPromptConfig = vi.fn();
 
 let capturedProps: Record<string, any> = {};
 let mockEdges: any[] = [];
@@ -31,8 +30,8 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       deselectAllNodes: mockDeselectAllNodes,
     }),
 }));
-vi.mock("@langwatch/prompt-browser/surfaces/prompt-editor-drawer", () => ({
-  PromptEditorDrawer: (props: any) => {
+vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
+  StudioPromptEditor: (props: any) => {
     capturedProps = props;
     return <div data-testid="mock-prompt-editor" />;
   },
@@ -44,10 +43,6 @@ vi.mock("@xyflow/react", () => ({
 
 vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: any) => fn,
-}));
-
-vi.mock("@langwatch/prompt-browser/llm-prompt-config-utils", () => ({
-  nodeDataToLocalPromptConfig: (...args: any[]) => mockNodeDataToLocalPromptConfig(...args),
 }));
 
 // ---- Helpers ----
@@ -76,15 +71,14 @@ describe("SignaturePromptEditorBridge", () => {
     vi.clearAllMocks();
     capturedProps = {};
     mockEdges = [];
-    mockNodeDataToLocalPromptConfig.mockReturnValue(undefined);
   });
 
   describe("when rendering", () => {
-    it("passes headless=true to PromptEditorDrawer", () => {
+    it("hands the node's data to the lent editor, which reads its inline config", () => {
       const node = createSignatureNode();
       render(<SignaturePromptEditorBridge node={node} />);
 
-      expect(capturedProps.headless).toBe(true);
+      expect(capturedProps.nodeData).toBe(node.data);
     });
 
     it("passes node promptId and promptVersionId", () => {
@@ -126,14 +120,6 @@ describe("SignaturePromptEditorBridge", () => {
 
     /** @scenario "A saved prompt opens from the library when its node is reopened" */
     it("does not pass the inline config as initialLocalConfig when the node references a saved prompt with no local edits", () => {
-      const fallbackConfig: LocalPromptConfig = {
-        llm: { model: "gpt-5-mini" },
-        messages: [{ role: "system", content: "You are helpful" }],
-        inputs: [{ identifier: "question", type: "str" }],
-        outputs: [{ identifier: "answer", type: "str" }],
-      };
-      mockNodeDataToLocalPromptConfig.mockReturnValue(fallbackConfig);
-
       const node = createSignatureNode({
         promptId: "prompt-123",
         parameters: [
@@ -147,36 +133,21 @@ describe("SignaturePromptEditorBridge", () => {
       // prompt loaded from the library instead of overriding it with this stale
       // inline mirror (the bug that made a just-saved prompt look deleted).
       expect(capturedProps.initialLocalConfig).toBeUndefined();
-      // The inline mirror is still provided, but only as the not-found fallback.
-      expect(capturedProps.inlineConfigFallback).toBe(fallbackConfig);
+      // The inline mirror still reaches the editor, only as the not-found fallback.
+      expect(capturedProps.nodeData).toBe(node.data);
     });
 
     it("passes undefined for both configs when node has promptId but no inline parameters", () => {
-      mockNodeDataToLocalPromptConfig.mockReturnValue(undefined);
-
       const node = createSignatureNode({ promptId: "prompt-123" });
       render(<SignaturePromptEditorBridge node={node} />);
-
-      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
       expect(capturedProps.initialLocalConfig).toBeUndefined();
-      expect(capturedProps.inlineConfigFallback).toBeUndefined();
     });
 
     it("provides the inline config as the fallback when there is no promptId and no localPromptConfig", () => {
-      const fallbackConfig: LocalPromptConfig = {
-        llm: { model: "gpt-5-mini" },
-        messages: [],
-        inputs: [],
-        outputs: [],
-      };
-      mockNodeDataToLocalPromptConfig.mockReturnValue(fallbackConfig);
-
       const node = createSignatureNode();
       render(<SignaturePromptEditorBridge node={node} />);
-
-      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
       expect(capturedProps.initialLocalConfig).toBeUndefined();
-      expect(capturedProps.inlineConfigFallback).toBe(fallbackConfig);
+      expect(capturedProps.nodeData).toBe(node.data);
     });
   });
 

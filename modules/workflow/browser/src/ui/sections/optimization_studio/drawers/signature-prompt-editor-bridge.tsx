@@ -1,7 +1,5 @@
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import type { FieldMapping } from "@langwatch/prompt-browser-kit";
-import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-browser/llm-prompt-config-utils";
-import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import {
   type Component,
   type Field,
@@ -13,6 +11,7 @@ import { useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { StudioPromptEditor } from "../../../../behavior/lent-prompt.tsx";
 import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
@@ -234,16 +233,6 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
   // node's inline parameters (which made a just-saved prompt look deleted).
   const initialLocalConfig = signatureNode.data.localPromptConfig;
 
-  // Inline mirror of the node's parameters, used by the drawer ONLY when the
-  // referenced prompt is not found in the project (e.g. a workflow imported
-  // from another project) so it can still show the node's actual configuration
-  // instead of an empty "New Prompt" form. It is never merged over a prompt
-  // that loads successfully from the library.
-  const inlineConfigFallback = useMemo(
-    () => nodeDataToLocalPromptConfig(signatureNode.data),
-    [signatureNode.data],
-  );
-
   const handleLocalConfigChange = useCallback(
     (config: LocalPromptConfig | undefined) => {
       if (!config) {
@@ -345,13 +334,12 @@ export function SignaturePromptEditorBridge({ node }: { node: Node<Component> })
   );
 
   return (
-    <PromptEditorDrawer
-      headless={true}
+    <StudioPromptEditor
+      nodeData={signatureNode.data}
       onClose={deselectAllNodes}
       promptId={signatureNode.data.promptId}
       promptVersionId={signatureNode.data.promptVersionId}
       initialLocalConfig={initialLocalConfig}
-      inlineConfigFallback={inlineConfigFallback}
       onLocalConfigChange={handleLocalConfigChange}
       onSave={handleSave}
       onVersionChange={handleVersionChange}

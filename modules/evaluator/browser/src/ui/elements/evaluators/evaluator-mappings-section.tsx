@@ -10,6 +10,7 @@ import {
   VariablesSection,
 } from "@langwatch/prompt-browser-kit";
 import { useProjectSpanNames } from "@langwatch/trace-browser/surfaces/project-span-names";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const logger = createLogger("EvaluatorMappingsSection");
@@ -203,6 +204,7 @@ export function EvaluatorMappingsSection({
   return (
     <Box ref={containerRef}>
       <VariablesSection
+        renderSourceIcon={renderSourceTypeIcon}
         title="Variables"
         variables={variables}
         // biome-ignore lint/suspicious/noEmptyBlockStatements: evaluator inputs are read-only

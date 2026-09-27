@@ -31,4 +31,13 @@ export const promptWeb = defineWebModule("prompt")
           .PromptEditorDrawer,
       }),
     },
+  })
+  /** The prompt editor, embedded headless in the studio's signature node panel (§3.4 rule 7). */
+  .withCapabilities({
+    studioPromptEditor: {
+      load: async () => ({
+        default: (await import("./ui/sections/prompts/lent-studio-prompt-editor.tsx"))
+          .LentStudioPromptEditor,
+      }),
+    },
   });
