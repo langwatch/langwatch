@@ -156,6 +156,20 @@ Feature: Authentication settings - every way in, in one place, with the guards v
     Then nothing is confirmed
     And the account's address still reads as not confirmed
 
+  @integration
+  Scenario: An own address that is already confirmed is not confirmed again
+    Given "sam" has confirmed the account's own address
+    When "sam" asks from Settings for another confirmation link
+    Then no link is sent
+    And "sam" is told the address cannot be confirmed again
+
+  @integration
+  Scenario: An own address the account is not known by sends nothing
+    Given the account's own address is not one of the addresses "sam" is known by
+    When "sam" asks from Settings for the confirmation link
+    Then no link is sent
+    And "sam" is told the address was not found
+
   @unit
   Scenario: The own address confirmation only ever goes to the session's own address
     Given "sam" is signed in

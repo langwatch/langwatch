@@ -381,6 +381,7 @@ describe("given the deployment has no classifier", () => {
     /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
     it.each([
       "instant_eval_classifier_unavailable",
+      "instant_eval_classifier_not_configured",
       "instant_eval_not_enabled",
     ] as const)("opens the model popover, and closing it applies the phrase search (%s)", (code) => {
       const { result } = renderHook(() =>

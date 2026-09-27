@@ -36,6 +36,7 @@ import {
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { codeChallengeSchema } from "./identity.schemas";
 
 /**
  * The unauthenticated auth screens (D13, ADR-117 §6).
@@ -345,8 +346,7 @@ export const authRouter = createTRPCRouter({
   sendMyAddressConfirmation: protectedProcedure
     .input(
       z.object({
-        // RFC 7636 §4.2: the S256 challenge, 43 base64url characters.
-        codeChallenge: z.string().regex(/^[A-Za-z0-9._~-]{43}$/),
+        codeChallenge: codeChallengeSchema,
       }),
     )
     .noPermission({

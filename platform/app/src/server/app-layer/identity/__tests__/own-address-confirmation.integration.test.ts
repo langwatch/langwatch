@@ -241,6 +241,7 @@ describe("an existing account whose own address was never confirmed", () => {
   });
 
   describe("when the own address is already confirmed", () => {
+    /** @scenario "An own address that is already confirmed is not confirmed again" */
     it("sends nothing and says it cannot be confirmed again", async () => {
       const { codeVerifier, codeChallenge } = pkce();
       await service.sendOwnAddressConfirmation({
@@ -262,6 +263,20 @@ describe("an existing account whose own address was never confirmed", () => {
           codeChallenge: pkce().codeChallenge,
         }),
       ).rejects.toMatchObject({ code: "identity_identifier_not_verifiable" });
+      expect(sent).toHaveLength(0);
+    });
+  });
+
+  describe("when no identifier of the account carries its own address", () => {
+    /** @scenario "An own address the account is not known by sends nothing" */
+    it("sends nothing and says the address was not found", async () => {
+      await expect(
+        service.sendOwnAddressConfirmation({
+          userId: USER,
+          email: "someone-else@acme.test",
+          codeChallenge: pkce().codeChallenge,
+        }),
+      ).rejects.toMatchObject({ code: "identity_identifier_not_found" });
       expect(sent).toHaveLength(0);
     });
   });
