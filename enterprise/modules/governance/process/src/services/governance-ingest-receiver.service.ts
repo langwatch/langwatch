@@ -360,7 +360,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           const tenantId = await this.governanceTenantOf(source);
 
           stampOriginAttrs(parsed.request, source);
-          applyOtlpReceiverPolicy(parsed.request, "traces", null);
+          applyOtlpReceiverPolicy({ request: parsed.request, signal: "traces", apiKeyId: null });
 
           const result = await this.members.traceCollection({
             tenantId,
@@ -488,7 +488,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
           const tenantId = await this.governanceTenantOf(source);
 
           stampLogOriginAttrs(parsed.request, source);
-          applyOtlpReceiverPolicy(parsed.request, "logs", null);
+          applyOtlpReceiverPolicy({ request: parsed.request, signal: "logs", apiKeyId: null });
 
           try {
             await logCollection({
@@ -641,7 +641,7 @@ export class GovernanceIngestReceiverService implements GovernanceIngestReceiver
       const tenantId = await this.governanceTenantOf(source);
 
       stampMetricOriginAttrs({ request: parsedRequest, source });
-      applyOtlpReceiverPolicy(parsedRequest, "metrics", null);
+      applyOtlpReceiverPolicy({ request: parsedRequest, signal: "metrics", apiKeyId: null });
 
       const result = await metricCollection({
         tenantId,
