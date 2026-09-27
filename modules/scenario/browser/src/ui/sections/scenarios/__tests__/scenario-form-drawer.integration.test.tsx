@@ -12,9 +12,6 @@ import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock heavy sub-components that pull in generated types
-vi.mock("@langwatch/prompt-browser/surfaces/prompt-editor-drawer", () => ({
-  PromptEditorDrawer: () => null,
-}));
 vi.mock("../save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: ({
     onSaveWithoutRunning,

@@ -42,6 +42,14 @@ const emptyQuery = vi.hoisted(() => () => ({
   isLoading: false,
 }));
 
+// Trace lends the thread; a synchronous stand-in keeps this suite on the drawer's layout.
+vi.mock("../../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (
+    await import("../../../../sections/simulations/__tests__/stub-conversation-thread.tsx")
+  ).StubConversationThread,
+}));
+
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     // The run dialog reads the saved evaluators for the ones a run carries.

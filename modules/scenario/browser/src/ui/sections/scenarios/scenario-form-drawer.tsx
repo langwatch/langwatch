@@ -23,7 +23,6 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
-import { PromptEditorDrawer } from "@langwatch/prompt-browser/surfaces/prompt-editor-drawer";
 import type { Scenario } from "@langwatch/scenario-contract";
 import {
   parseCallerVoiceConfig,
@@ -128,7 +127,7 @@ export function ScenarioFormDrawerFromUrl(props: Omit<ScenarioFormDrawerProps, "
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, goBack } = useDrawer();
   const rawComplexProps = getComplexProps();
   const complexPropsData =
     rawComplexProps && "initialFormData" in rawComplexProps
@@ -150,7 +149,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   // Target selection with localStorage persistence
   const { selectedTarget, handleTargetChange, persistTarget } = useSelectedTarget(scenarioId);
-  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const [parametersDialogOpen, setParametersDialogOpen] = useState(false);
 
   // Run-model dialog: after a target is picked in Save and Run, the user
@@ -159,6 +157,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
   // Initialize from persisted target when scenario loads
   const handleCreateAgent = useCreateAgentTarget({ handleTargetChange, openDrawer });
+  const handleCreatePrompt = useCreatePromptTarget({ handleTargetChange, openDrawer, goBack });
 
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
@@ -345,7 +344,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 onSaveAndRun={handleSaveAndRun}
                 onSaveWithoutRunning={handleSaveWithoutRunning}
                 onCreateAgent={handleCreateAgent}
-                onCreatePrompt={() => setPromptDrawerOpen(true)}
+                onCreatePrompt={handleCreatePrompt}
                 isLoading={isSubmitting || isHydrating}
               />
             )}
@@ -374,22 +373,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         onJudgeChange={setRunJudgeModel}
         onConfirm={confirmRunWithModels}
         isRunning={isSubmitting}
-      />
-
-      {/* Prompt Creation Drawer */}
-      <PromptEditorDrawer
-        open={promptDrawerOpen}
-        onClose={() => setPromptDrawerOpen(false)}
-        onSave={(prompt) => {
-          // Auto-select the newly created prompt
-          handleTargetChange({ type: "prompt", id: prompt.id });
-          setPromptDrawerOpen(false);
-          toaster.create({
-            title: "Prompt created",
-            description: `"${prompt.name}" is now selected as the target.`,
-            type: "success",
-          });
-        }}
       />
     </Drawer.Root>
   );
@@ -649,6 +632,31 @@ function useCreateAgentTarget({
      */
     openDrawer("agentTypeSelector");
   }, [handleTargetChange, openDrawer]);
+}
+
+/** Opens prompt's own editor by address; a saved prompt becomes the run target. */
+function useCreatePromptTarget({
+  handleTargetChange,
+  openDrawer,
+  goBack,
+}: {
+  handleTargetChange: (target: TargetValue) => void;
+  openDrawer: Dispatchers["openDrawer"];
+  goBack: Dispatchers["goBack"];
+}) {
+  return useCallback(() => {
+    setFlowCallbacks("promptEditor", {
+      onSave: (prompt: { id: string; name: string }) => {
+        handleTargetChange({ type: "prompt", id: prompt.id });
+        toaster.create({
+          title: "Prompt created",
+          description: `"${prompt.name}" is now selected as the target.`,
+          type: "success",
+        });
+      },
+    });
+    openDrawer("promptEditor", { onClose: goBack });
+  }, [handleTargetChange, openDrawer, goBack]);
 }
 
 /** Creates or updates the scenario, turning a stale edit into a reload prompt. */

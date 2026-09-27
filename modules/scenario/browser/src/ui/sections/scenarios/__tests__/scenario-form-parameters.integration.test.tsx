@@ -9,9 +9,6 @@ import userEvent from "@testing-library/user-event";
 import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/prompt-browser/surfaces/prompt-editor-drawer", () => ({
-  PromptEditorDrawer: () => null,
-}));
 vi.mock("../scenario-editor-sidebar.tsx", () => ({
   ScenarioEditorSidebar: () => null,
 }));
