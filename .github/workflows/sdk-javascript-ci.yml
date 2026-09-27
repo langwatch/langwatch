@@ -308,9 +308,9 @@ jobs:
       - name: Seed test project
         working-directory: .
         env:
-          # Seed the credential the SDK test process receives without putting
-          # LANGWATCH_API_KEY on the platform process itself.
-          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
+          # The e2e global setup probes the seed's DEFAULT_INGESTION_KEY, so
+          # the seed writes that key.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -365,7 +365,7 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
-          LANGWATCH_API_KEY: sk-lw-1234567890
+          LANGWATCH_API_KEY: sk-lw-local-development-key
           # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
           # gateway base URL). Step-scoped on purpose: the LangWatch app
           # booted above must not inherit a gateway base URL.
