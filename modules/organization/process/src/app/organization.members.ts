@@ -269,24 +269,37 @@ export type OrganizationInvitesCreated = Readonly<{
  * management REST family administers, so an administrator and a provisioning
  * tool see one set of invitations with one acceptance link each.
  */
+export type OrganizationInvitationsCreateInput = Readonly<{
+  organizationId: string;
+  invites: readonly Readonly<{
+    email: string;
+    teamIds?: string;
+    teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
+    role: "ADMIN" | "MEMBER" | "EXTERNAL";
+  }>[];
+  /**
+   * Chosen by the transport that asked, never by the composition: a batch naming a team
+   * outside the organization is refused under `strict` and filtered under `lenient`.
+   */
+  validation: OrganizationInviteValidation;
+}>;
+
+export type OrganizationInvitationsResent = Readonly<{
+  invite: OrganizationInvite;
+  emailNotSent: boolean;
+}>;
+
+export type OrganizationInvitationsListing = OrganizationInvite &
+  Omit<OrganizationListedInvite, keyof OrganizationInvite>;
+
+/** The two facts an invitation's display status is read from. */
+export type OrganizationInvitationsStatusFacts = Readonly<{
+  status: string;
+  expiration: OrganizationInvite["expiration"];
+}>;
+
 export interface OrganizationInvitations {
-  create(
-    input: Readonly<{
-      organizationId: string;
-      invites: readonly Readonly<{
-        email: string;
-        teamIds?: string;
-        teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
-        role: "ADMIN" | "MEMBER" | "EXTERNAL";
-      }>[];
-      /**
-       * Chosen by the transport that asked, never by the composition: a batch
-       * naming a team outside the organization is refused under `strict` and
-       * filtered under `lenient`.
-       */
-      validation: OrganizationInviteValidation;
-    }>,
-  ): Promise<OrganizationInvitesCreated>;
+  create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated>;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;
   /**
    * Throttled per INVITATION, because the thing protected is the recipient's
@@ -295,7 +308,7 @@ export interface OrganizationInvitations {
   assertSendAllowed(input: Readonly<{ inviteId: string }>): Promise<void>;
   resend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
-  ): Promise<Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>>;
+  ): Promise<OrganizationInvitationsResent>;
   extend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
   ): Promise<Readonly<{ invite: OrganizationInvite }>>;
@@ -314,9 +327,7 @@ export interface OrganizationInvitations {
   ): Promise<void>;
   list(
     input: Readonly<{ organizationId: string }>,
-  ): Promise<
-    readonly (OrganizationInvite & Omit<OrganizationListedInvite, keyof OrganizationInvite>)[]
-  >;
+  ): Promise<readonly OrganizationInvitationsListing[]>;
   findByCode(
     input: Readonly<{ inviteCode: string }>,
   ): Promise<OrganizationInviteWithOrganization | null>;
@@ -351,9 +362,7 @@ export interface OrganizationInvitations {
   /** The invited address, masked: an invite code is a bearer token. */
   maskAddress(email: string): string;
   /** PENDING / ACCEPTED / EXPIRED / REVOKED, expiry included. */
-  displayStatus(
-    invite: Readonly<{ status: string; expiration: OrganizationInvite["expiration"] }>,
-  ): string;
+  displayStatus(invite: OrganizationInvitationsStatusFacts): string;
   /** Tells the organization's administrators a seat limit was reached. */
   notifySeatLimitReached(
     input: Readonly<{

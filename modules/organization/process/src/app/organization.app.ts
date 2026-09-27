@@ -124,10 +124,10 @@ import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-const
 import type { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
 import { MemberProvenanceService } from "../services/member-provenance.service.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
+import { OrganizationInitializationService } from "../services/organization-initialization.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
 import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
 import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import {
@@ -262,22 +262,6 @@ const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
 
 /**
- * A door this deployment composed nothing behind. Every member REJECTS rather
- * than throwing: each one is declared as answering a promise, and a caller
- * that awaits must not have to guard the call itself as well.
- */
-function refusing<T>(capability: string): T {
-  return new Proxy(
-    {},
-    {
-      get: () => (): Promise<never> =>
-        Promise.reject(new OrganizationCapabilityUnavailableError(capability)),
-      has: () => true,
-    },
-  ) as T;
-}
-
-/**
  * The organization feature's application: implements {@link OrganizationApi}
  * and {@link TeamManagementApi} explicitly, so a `/api/teams` member this
  * class doesn't serve fails the build instead of throwing at request time.
@@ -410,7 +394,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           directory: members.directory,
         })
       : null;
-    application.#onboarding = OrganizationOnboardingService.create({
+    application.#initialization = OrganizationInitializationService.create({
       ceremony: members.ceremony,
       signals: members.signals,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
@@ -422,25 +406,21 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   /**
    * Test-only construction over stub services, wired the way `create` wires
-   * a booted one (door services close over the application). Unnamed
-   * members refuse by name, matching an unconfigured deployment.
+   * a booted one (door services close over the application). Every member is
+   * supplied: a suite names what it leaves unconfigured.
    */
   static createForTesting(setup: {
-    dependencies: Omit<ServerOrganizationAppDependencies, "groups" | "shares" | "apiKeys"> & {
+    dependencies: Omit<ServerOrganizationAppDependencies, "groups"> & {
       groups?: OrganizationGroupService;
-      shares?: ShareApi;
-      apiKeys?: ApiKeyApi;
     };
-    members?: Partial<OrganizationInfrastructure>;
+    members: OrganizationInfrastructure;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
-    memberProvenance?: MemberProvenanceService;
+    memberProvenance: MemberProvenanceService;
   }): ServerOrganizationApp {
-    const { groups, shares, apiKeys, ...dependencies } = setup.dependencies;
+    const { groups, ...dependencies } = setup.dependencies;
     const application = new ServerOrganizationApp({
       ...dependencies,
-      shares: shares ?? refusing<ShareApi>("trace share revocation"),
-      apiKeys: apiKeys ?? refusing<ApiKeyApi>("api key provisioning"),
       groups:
         groups ??
         OrganizationGroupScopeService.create({
@@ -448,23 +428,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           projects: dependencies.projects,
         }),
     });
-    const members = {
-      plans: refusing<OrganizationPlanGate>("organization plan gate"),
-      signals: refusing<OrganizationSignals>("organization signals"),
-      ceremony: refusing<OrganizationCeremony>("sign-up ceremony"),
-      directory: refusing<OrganizationDirectory>("identity directory"),
-      settingsSecrets: refusing<OrganizationSettingsSecret>("settings cipher"),
-      demoProject: { userId: "", projectId: "" },
-      seatCounts: refusing<OrganizationSeatRepository>("seat counts"),
-      invitations: null,
-      inviteCreationThrottle: refusing<InviteCreationThrottleService>("invite creation throttle"),
-      joinRequests: null,
-      ...setup.members,
-    } as OrganizationInfrastructure;
+    const { members } = setup;
 
     application.#members = members;
-    application.#memberProvenance =
-      setup.memberProvenance ?? refusing<MemberProvenanceService>("member provenance");
+    application.#memberProvenance = setup.memberProvenance;
     application.#visibility = OrganizationVisibilityService.create({
       reader: {
         getAllForUser: (input) => dependencies.membership.getAllForUser(input),
@@ -498,7 +465,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
           directory: members.directory,
         })
       : null;
-    application.#onboarding = OrganizationOnboardingService.create({
+    application.#initialization = OrganizationInitializationService.create({
       ceremony: members.ceremony,
       signals: members.signals,
       createAndAssign: (input, by) => application.createAndAssign(input, by),
@@ -521,16 +488,20 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   #personalTeamScope!: PersonalTeamScopeService;
   #invitationDoor!: OrganizationInvitationDoorService | null;
   #joinDoor!: OrganizationJoinDoorService | null;
-  #onboarding!: OrganizationOnboardingService;
+  #initialization!: OrganizationInitializationService;
 
-  /** The invitation ceremony, or the refusal a deployment without one answers. */
-  get #invitations(): OrganizationInvitationDoorService {
-    return this.#invitationDoor ?? refusing("organization invitation service");
+  /** The invitation ceremony; a deployment without one refuses by name. */
+  #invitations(): OrganizationInvitationDoorService {
+    if (!this.#invitationDoor) {
+      throw new OrganizationCapabilityUnavailableError("organization invitation service");
+    }
+    return this.#invitationDoor;
   }
 
-  /** The join-request ledger, or the refusal a deployment without one answers. */
-  get #joinRequests(): OrganizationJoinDoorService {
-    return this.#joinDoor ?? refusing("join-request ledger");
+  /** The join-request ledger; a deployment without one refuses by name. */
+  #joinRequests(): OrganizationJoinDoorService {
+    if (!this.#joinDoor) throw new OrganizationCapabilityUnavailableError("join-request ledger");
+    return this.#joinDoor;
   }
 
   /** The ledger actor a write is recorded under — one spelling, shared by every door. */
@@ -699,6 +670,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null> {
     return this.#dependencies.membership.findProvisioningSummary(organizationId);
+  }
+
+  getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary> {
+    return this.#dependencies.membership.getProvisioningSummary(organizationId);
   }
 
   getMemberAccessBreakdown(
@@ -1376,45 +1351,47 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#visibility.getMemberOrRefuse(input, by);
   }
 
-  createInvitations(
+  async createInvitations(
     input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteCreated[]> {
-    return this.#invitations.create(input, by);
+    return this.#invitations().create(input, by);
   }
 
-  revokeInvitation(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void> {
-    return this.#invitations.revoke(input);
+  async revokeInvitation(
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): Promise<void> {
+    return this.#invitations().revoke(input);
   }
 
-  resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent> {
-    return this.#invitations.resend(input);
+  async resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent> {
+    return this.#invitations().resend(input);
   }
 
-  extendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended> {
-    return this.#invitations.extend(input);
+  async extendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteExtended> {
+    return this.#invitations().extend(input);
   }
 
-  listPendingInvitations(
+  async listPendingInvitations(
     input: Readonly<{ organizationId: string }>,
   ): Promise<OrganizationListedInvite[]> {
-    return this.#invitations.list(input);
+    return this.#invitations().list(input);
   }
 
-  createPaymentPendingInvites(
+  async createPaymentPendingInvites(
     input: Readonly<{
       organizationId: string;
       subscriptionId: string;
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
   ): Promise<void> {
-    return this.#invitations.createPaymentPending(input);
+    return this.#invitations().createPaymentPending(input);
   }
 
-  cancelPaymentPendingInvites(
+  async cancelPaymentPendingInvites(
     input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void> {
-    return this.#invitations.cancelPaymentPending(input);
+    return this.#invitations().cancelPaymentPending(input);
   }
 
   async countMemberSeats(
@@ -1427,23 +1404,23 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return { fullMembers, liteMembers };
   }
 
-  approvePaymentPendingInvites(
+  async approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,
   ): Promise<void> {
-    return this.#invitations.approvePaymentPending(input);
+    return this.#invitations().approvePaymentPending(input);
   }
 
-  acceptInvitation(
+  async acceptInvitation(
     input: Readonly<{ inviteCode: string }>,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteAccepted> {
-    return this.#invitations.accept(input, by);
+    return this.#invitations().accept(input, by);
   }
 
-  applyPendingInvite(
+  async applyPendingInvite(
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied> {
-    return this.#invitations.applyPending(input);
+    return this.#invitations().applyPending(input);
   }
 
   /**
@@ -1686,47 +1663,51 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
   // -- the join-request doors ------------------------------------------------
 
-  lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinRequests.lookup(input);
+  async lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
+    return this.#joinRequests().lookup(input);
   }
 
-  listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine> {
-    return this.#joinRequests.listOwn(input);
+  async listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine> {
+    return this.#joinRequests().listOwn(input);
   }
 
-  fileJoinRequest(
+  async fileJoinRequest(
     input: Readonly<{ userId: string; organizationId: string }>,
   ): Promise<JoinRequestFiled> {
-    return this.#joinRequests.file(input);
+    return this.#joinRequests().file(input);
   }
 
-  withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void> {
-    return this.#joinRequests.withdraw(input);
+  async withdrawJoinRequest(
+    input: Readonly<{ joinRequestId: string; userId: string }>,
+  ): Promise<void> {
+    return this.#joinRequests().withdraw(input);
   }
 
-  listPendingJoinRequests(
+  async listPendingJoinRequests(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestPending> {
-    return this.#joinRequests.listPending(input);
+    return this.#joinRequests().listPending(input);
   }
 
-  approveJoinRequest(
+  async approveJoinRequest(
     input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
   ): Promise<void> {
-    return this.#joinRequests.approve(input);
+    return this.#joinRequests().approve(input);
   }
 
-  rejectJoinRequest(
+  async rejectJoinRequest(
     input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
   ): Promise<void> {
-    return this.#joinRequests.reject(input);
+    return this.#joinRequests().reject(input);
   }
 
-  readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining> {
-    return this.#joinRequests.readJoining(input);
+  async readJoiningPolicy(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<JoinRequestJoining> {
+    return this.#joinRequests().readJoining(input);
   }
 
-  setJoiningPolicy(
+  async setJoiningPolicy(
     input: Readonly<{
       organizationId: string;
       domainJoin: JoinRequestJoining["domainJoin"];
@@ -1734,25 +1715,25 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       actorUserId: string;
     }>,
   ): Promise<JoinRequestJoiningChanged> {
-    return this.#joinRequests.setJoining(input);
+    return this.#joinRequests().setJoining(input);
   }
 
-  offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
-    return this.#joinRequests.offer(input);
+  async offerJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
+    return this.#joinRequests().offer(input);
   }
 
-  dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void> {
-    return this.#joinRequests.dismissOffer(input);
+  async dismissJoinOffer(input: Readonly<{ userId: string }>): Promise<void> {
+    return this.#joinRequests().dismissOffer(input);
   }
 
-  admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
-    return this.#joinRequests.admitAutomatically(input);
+  async admitAutomatically(input: Readonly<{ userId: string }>): Promise<JoinRequestAdmitted> {
+    return this.#joinRequests().admitAutomatically(input);
   }
 
-  listAutomaticJoins(
+  async listAutomaticJoins(
     input: Readonly<{ organizationId: string }>,
   ): Promise<JoinRequestAutomaticJoins> {
-    return this.#joinRequests.listAutomaticJoins(input);
+    return this.#joinRequests().listAutomaticJoins(input);
   }
 
   // -- the sign-up ceremony --------------------------------------------------
@@ -1761,11 +1742,11 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: OnboardingInitializeOrganizationInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInitialized> {
-    return this.#onboarding.initialize(input, by);
+    return this.#initialization.initialize(input, by);
   }
 
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void {
-    this.#onboarding.recordIntegrationMethod(input);
+    this.#initialization.recordIntegrationMethod(input);
   }
 
   // -- the personal workspace's own switches, as the door names them ---------

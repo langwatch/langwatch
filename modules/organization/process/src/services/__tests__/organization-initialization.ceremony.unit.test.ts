@@ -9,7 +9,7 @@ import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationCeremony, OrganizationSignals } from "../../app/organization.members.ts";
-import { OrganizationOnboardingService } from "../organization-onboarding.service.ts";
+import { OrganizationInitializationService } from "../organization-initialization.service.ts";
 
 const ORGANIZATION = { id: "org_1", name: "Acme Corp" };
 const TEAM = { id: "team_1", slug: "acme-team", name: "Acme Team" };
@@ -55,7 +55,7 @@ function harness(
     signals,
     createAndAssign,
     ensurePersonalWorkspace,
-    onboarding: OrganizationOnboardingService.create({
+    onboarding: OrganizationInitializationService.create({
       ceremony,
       signals,
       createAndAssign,

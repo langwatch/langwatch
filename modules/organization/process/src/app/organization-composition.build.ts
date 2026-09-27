@@ -47,6 +47,10 @@ import type {
   OrganizationInviteRateLimit,
   OrganizationInviteSeatCensus,
   OrganizationInvitations,
+  OrganizationInvitationsCreateInput,
+  OrganizationInvitationsListing,
+  OrganizationInvitationsResent,
+  OrganizationInvitationsStatusFacts,
   OrganizationInvitesCreated,
   OrganizationInviteWithOrganization,
   OrganizationJoinRequests,
@@ -244,9 +248,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     },
   ) {}
 
-  create(
-    input: Parameters<OrganizationInvitations["create"]>[0],
-  ): Promise<OrganizationInvitesCreated> {
+  create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated> {
     return this.options.invites.createInvites({
       organizationId: input.organizationId,
       invites: input.invites.map((invite) => ({
@@ -273,7 +275,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
 
   resend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
-  ): ReturnType<InviteService["resendInvite"]> {
+  ): Promise<OrganizationInvitationsResent> {
     return this.options.invites.resendInvite(input);
   }
 
@@ -305,7 +307,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     await this.options.invites.approvePaymentPendingInvites(input);
   }
 
-  list(input: Readonly<{ organizationId: string }>): ReturnType<InviteService["listInvites"]> {
+  list(input: Readonly<{ organizationId: string }>): Promise<OrganizationInvitationsListing[]> {
     return this.options.invites.listInvites(input);
   }
 
@@ -366,7 +368,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return InviteService.maskInvitedAddress(email);
   }
 
-  displayStatus(invite: Parameters<OrganizationInvitations["displayStatus"]>[0]): string {
+  displayStatus(invite: OrganizationInvitationsStatusFacts): string {
     return resolveInviteDisplayStatus(invite);
   }
 

@@ -17,7 +17,7 @@ import type { OrganizationCeremony, OrganizationSignals } from "../app/organizat
 const CODING_AGENT_INTENT = "AGENT_GOVERNANCE";
 
 /** What the ceremony creates the organization and everything after it through. */
-export interface OrganizationOnboardingDependencies {
+export interface OrganizationInitializationDependencies {
   readonly ceremony: OrganizationCeremony;
   readonly signals: OrganizationSignals;
   createAndAssign(
@@ -45,12 +45,14 @@ export interface OrganizationOnboardingDependencies {
   ): Promise<unknown>;
 }
 
-export class OrganizationOnboardingService {
-  static create(dependencies: OrganizationOnboardingDependencies): OrganizationOnboardingService {
-    return new OrganizationOnboardingService(dependencies);
+export class OrganizationInitializationService {
+  static create(
+    dependencies: OrganizationInitializationDependencies,
+  ): OrganizationInitializationService {
+    return new OrganizationInitializationService(dependencies);
   }
 
-  private constructor(private readonly deps: OrganizationOnboardingDependencies) {}
+  private constructor(private readonly deps: OrganizationInitializationDependencies) {}
 
   async initialize(
     input: OnboardingInitializeOrganizationInput,
