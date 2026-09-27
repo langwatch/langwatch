@@ -113,6 +113,21 @@
       "rules": { "typescript/no-explicit-any": "error" },
     },
     {
+      // Published SDK surface keeps its public `any`s (Alex, 2026-09-27); internal SDK code stays strict.
+      "files": [
+        "sdks/typescript/src/client-sdk/services/prompts/errors/prompt-compilation.error.ts",
+        "sdks/typescript/src/client-sdk/services/traces/types.ts",
+        "sdks/typescript/src/observability-sdk/features/data-capture/types.ts",
+        "sdks/typescript/src/observability-sdk/span/types.ts",
+      ],
+      "rules": { "typescript/no-explicit-any": "off" },
+    },
+    {
+      // Prisma's extended client has no nameable type; the one cast stays (Alex, 2026-09-27).
+      "files": ["packages/prisma-client/src/connection.ts"],
+      "rules": { "langwatch/stand-in-cast": "off" },
+    },
+    {
       // Process source logs through `createLogger`, and a REST handler throws a
       // HandledError rather than building its own error response.
       "files": [
