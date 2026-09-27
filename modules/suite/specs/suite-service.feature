@@ -50,3 +50,16 @@ Feature: Suite service
     Given a run plan row that also holds the fields and evaluators columns
     When the Prisma suite repository creates or reads it
     Then it answers the run plan rather than refusing the extra columns
+
+  @unit @regression
+  Scenario: A test suite write refuses an evaluator the project does not hold
+    Given a test suite in the project
+    When it is created or edited with an evaluator id the project does not hold
+    Then the write is refused with suite_evaluator_not_found
+    And the test suite is not written
+
+  @unit @regression
+  Scenario: A test suite edit refuses dropping a field an attached evaluator still reads
+    Given a test suite whose attached evaluator reads one of its fields
+    When an edit removes that field and keeps the evaluator
+    Then the edit is refused with suite_field_in_use

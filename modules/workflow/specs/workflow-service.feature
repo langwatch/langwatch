@@ -40,6 +40,12 @@ Feature: Workflow service boundary
     Then it returns that version
     And a workflow from another project is not visible
 
+  @unit @regression
+  Scenario: Running a named version of an unpublished workflow is refused as not published
+    Given a workflow with a saved version that was never published
+    When a caller runs that version by its id
+    Then the run is refused as not published before any version is read
+
   @unit
   Scenario: Version history preserves the Studio response
     Given a workflow has current, latest, published and parent versions

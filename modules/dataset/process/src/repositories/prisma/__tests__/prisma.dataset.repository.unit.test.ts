@@ -83,4 +83,26 @@ describe("PrismaDatasetRepository", () => {
       });
     });
   });
+
+  describe("given a dataset in the caller's project", () => {
+    describe("when it is updated", () => {
+      /** @scenario "A dataset update is pinned to the caller's project" */
+      it("matches the row by its id and its project", async () => {
+        const update = vi.fn().mockResolvedValue(row("a"));
+        const prisma = prismaDouble({ dataset: { update } });
+
+        await PrismaDatasetRepository.create({ prisma }).update({
+          id: "a",
+          projectId: "project-1",
+          name: "Dataset a",
+          slug: "dataset-a",
+          columnTypes: [{ name: "input", type: "string" }],
+        });
+
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: "a", projectId: "project-1" } }),
+        );
+      });
+    });
+  });
 });

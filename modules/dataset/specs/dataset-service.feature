@@ -89,6 +89,13 @@ Feature: Shared Dataset service
     Then it answers null
     And it preserves found rows, ordering, totals, and unexpected failures
 
+  @unit @regression
+  Scenario: A dataset update is pinned to the caller's project
+    Given a dataset in the caller's project
+    When the caller renames it or changes its columns
+    Then the stored update matches the dataset by its id and its project
+    And the multitenancy guard lets the update through
+
   Rule: The Datasets pages are served from the browser application
 
     # Both pages moved out of platform/app with the family. What the application
