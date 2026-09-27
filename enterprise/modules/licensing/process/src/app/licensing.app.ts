@@ -53,6 +53,8 @@ import {
   type SeatChangeResult,
   type SignedIssuedLicense,
   type StoreLicenseResult,
+  type GenerateLicenseInput,
+  type GenerateLicenseOutput,
 } from "@langwatch/enterprise-licensing-contract";
 import type { ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { PrismaUsageMembershipRepository } from "@langwatch/entitlement-process";
@@ -212,6 +214,7 @@ export class LicensingApp implements LicensingApiContract {
   readonly #entitlements: LicensingEntitlementSourceService;
   readonly #runtime: LicensingRuntime;
   readonly #registry: LicenseRegistryService;
+  readonly #generation: LicenseGenerationService;
   readonly #credentials: ConnectCredentialService;
   readonly #sync: LicenseSyncService;
   readonly #contractBudgets: ContractBudgetService;
@@ -232,7 +235,9 @@ export class LicensingApp implements LicensingApiContract {
     registry,
     install,
     isSaas,
+    generation,
   }: {
+    generation: LicenseGenerationService;
     service: LicenseService;
     runtime: LicensingRuntime;
     entitlements: LicensingEntitlementSourceService;
@@ -245,6 +250,7 @@ export class LicensingApp implements LicensingApiContract {
     this.#entitlements = entitlements;
     this.#runtime = runtime;
     this.#registry = registry.registry;
+    this.#generation = generation;
     this.#credentials = registry.credentials;
     this.#sync = registry.sync;
     this.#contractBudgets = registry.contractBudgets;
@@ -311,6 +317,7 @@ export class LicensingApp implements LicensingApiContract {
       instanceLicenseKey,
     });
     const app = new LicensingApp({
+      generation: LicenseGenerationService.create(cryptography),
       service,
       runtime,
       entitlements: LicensingEntitlementSourceService.create({
@@ -483,6 +490,10 @@ export class LicensingApp implements LicensingApiContract {
       ...input,
       expiresAt: Temporal.Instant.from(input.expiresAt),
     });
+  }
+
+  async generateLicenseKey(input: GenerateLicenseInput): Promise<GenerateLicenseOutput> {
+    return this.#generation.generate(input);
   }
 
   recordIssuedLicense(input: {

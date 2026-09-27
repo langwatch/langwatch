@@ -8,7 +8,7 @@ import {
 } from "../services/license-purchase.service.ts";
 
 class TestLicenseGenerator extends LicenseGenerator {
-  readonly generate = vi.fn().mockReturnValue({
+  readonly generate = vi.fn().mockResolvedValue({
     licenseKey: "license-key",
     licenseData: {
       licenseId: "license-id",
@@ -50,14 +50,12 @@ describe("LicensePurchaseService", () => {
         currency: "eur",
       } as any,
       stripe,
-      privateKey: "private-key",
     });
 
     expect(generator.generate).toHaveBeenCalledWith({
       organizationName: "Acme",
       email: "buyer@example.com",
       maxMembers: 4,
-      privateKey: "private-key",
     });
     expect(delivery.sendLicenseEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -133,6 +131,5 @@ async function purchase({
     stripe: {
       checkout: { sessions: { listLineItems: async () => ({ data: [{ quantity: 4 }] }) } },
     },
-    privateKey: "private-key",
   });
 }

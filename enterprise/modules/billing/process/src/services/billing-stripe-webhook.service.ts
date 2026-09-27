@@ -35,11 +35,7 @@ type ItemCalculator = Pick<SubscriptionItemCalculatorService, "calculateQuantity
  * The webhook service routes these before any org lookup.
  */
 export interface LicensePurchaseHandler {
-  handle(params: {
-    checkoutSession: Stripe.Checkout.Session;
-    stripe: Stripe;
-    privateKey: string;
-  }): Promise<void>;
+  handle(params: { checkoutSession: Stripe.Checkout.Session; stripe: Stripe }): Promise<void>;
 }
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
@@ -89,7 +85,6 @@ export class EEWebhookService implements WebhookService {
   private readonly inviteApprover?: InviteApprover;
   private readonly licensePurchaseHandler?: LicensePurchaseHandler;
   private readonly licensePaymentLinkId?: string;
-  private readonly licensePrivateKey?: string;
   private readonly getPostHog?: () => PostHog | null;
   private readonly host: BillingWebhookHost;
   private readonly connectedBilling?: ConnectedBillingInvoiceEvents;
@@ -105,7 +100,6 @@ export class EEWebhookService implements WebhookService {
     inviteApprover,
     licensePurchaseHandler,
     licensePaymentLinkId,
-    licensePrivateKey,
     getPostHog,
     host,
     retention,
@@ -118,7 +112,6 @@ export class EEWebhookService implements WebhookService {
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
-    licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
@@ -131,7 +124,6 @@ export class EEWebhookService implements WebhookService {
     this.inviteApprover = inviteApprover;
     this.licensePurchaseHandler = licensePurchaseHandler;
     this.licensePaymentLinkId = licensePaymentLinkId;
-    this.licensePrivateKey = licensePrivateKey;
     this.getPostHog = getPostHog;
     this.host = host;
     this.connectedBilling = connectedBilling;
@@ -163,7 +155,6 @@ export class EEWebhookService implements WebhookService {
     inviteApprover?: InviteApprover;
     licensePurchaseHandler?: LicensePurchaseHandler;
     licensePaymentLinkId?: string;
-    licensePrivateKey?: string;
     getPostHog?: () => PostHog | null;
     host: BillingWebhookHost;
     retention: SeatRetentionRules;
@@ -256,23 +247,9 @@ export class EEWebhookService implements WebhookService {
       };
     }
 
-    if (!this.licensePrivateKey) {
-      logger.error(
-        { eventId: event.id },
-        "[stripeWebhook] LANGWATCH_LICENSE_PRIVATE_KEY is not configured",
-      );
-
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "License generation error: missing private key",
-      };
-    }
-
     await this.licensePurchaseHandler.handle({
       checkoutSession,
       stripe: this.stripe,
-      privateKey: this.licensePrivateKey,
     });
 
     return { status: "ok" };

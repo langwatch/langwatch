@@ -18,13 +18,13 @@ export type GeneratedLicense = {
   };
 };
 
+/** Signs a purchased licence; the signing key lives inside the generator the process built. */
 export abstract class LicenseGenerator {
   abstract generate(input: {
     organizationName: string;
     email: string;
     maxMembers: number;
-    privateKey: string;
-  }): GeneratedLicense;
+  }): Promise<GeneratedLicense>;
 }
 
 /** What a licence unlocks; shaped for licenseEmailProps.unlockedFeatures. */
@@ -130,11 +130,9 @@ export class LicensePurchaseService {
   async handle({
     checkoutSession,
     stripe,
-    privateKey,
   }: {
     checkoutSession: PurchasedCheckout;
     stripe: CheckoutLineItems;
-    privateKey: string;
   }): Promise<void> {
     const email = checkoutSession.customer_details?.email;
     if (!email) {
@@ -144,11 +142,10 @@ export class LicensePurchaseService {
     const businessName = checkoutSession.customer_details?.name ?? "";
     const lineItems = await stripe.checkout.sessions.listLineItems(checkoutSession.id);
     const quantity = lineItems.data[0]?.quantity ?? 1;
-    const { licenseKey, licenseData } = this.generateLicense.generate({
+    const { licenseKey, licenseData } = await this.generateLicense.generate({
       organizationName: businessName,
       email,
       maxMembers: quantity,
-      privateKey,
     });
 
     logger.info(

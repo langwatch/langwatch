@@ -53,6 +53,7 @@ import { billingWebhookHostChannels } from "../channels/billing-webhook-host-cha
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
 import { connectedInvoicingChannels } from "../channels/connected-invoicing-channels.registry.ts";
 import type { ConnectedStatementMailChannel } from "../channels/connected-statement-mail.channel.ts";
+import { licenseEmailChannels } from "../channels/license-email-channels.registry.ts";
 import { usageLimitEmailChannels } from "../channels/usage-limit-email-channels.registry.ts";
 import {
   type BillingReportingDefinition,
@@ -63,7 +64,10 @@ import { fireScenarioCreated } from "../rules/nurturing-feature-adoption-service
 import { BillableEventsQueryService } from "../services/billable-events-query.service.ts";
 import { BillingErrorReporterService } from "../services/billing-error-reporter.service.ts";
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
-import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
+import {
+  EEWebhookService,
+  type LicensePurchaseHandler,
+} from "../services/billing-stripe-webhook.service.ts";
 import type { SeatRetentionRules } from "../services/billing-subscription-lifecycle.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
 import { ConnectedBillingOverviewService } from "../services/connected-billing-overview.service.ts";
@@ -79,6 +83,9 @@ import { ConnectedUsageCeilingService } from "../services/connected-usage-ceilin
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { LicensePurchaseDeliveryService } from "../services/license-purchase-delivery.service.ts";
+import { LicensePurchaseService } from "../services/license-purchase.service.ts";
+import { LicensingLicenseGeneratorService } from "../services/licensing-license-generator.service.ts";
 import { MeteredUsageWarningService } from "../services/metered-usage-warning.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
@@ -142,6 +149,8 @@ type StripeWebhookComposition = Readonly<{
   host: BillingWebhookHost;
   /** Data-retention's rules, which a first seat activation stamps at the platform default. */
   retention: SeatRetentionRules;
+  /** Main's licence purchase: signs, records, mails and announces; absent without the key. */
+  licensePurchase?: LicensePurchaseHandler;
   /** Opens the invitations a seat checkout paid for; organization owns them. */
   invites?: Pick<OrganizationApi, "approvePaymentPendingInvites">;
 }>;
@@ -206,6 +215,23 @@ export class BillingApp
       StripeWebhookSignatureService.create(secret),
     );
     const notices = BillingApp.#composeNotices(setup);
+    const licensePurchase = await setup.secrets.into(
+      BillingApp.secrets.licensePrivateKey,
+      (privateKey) =>
+        privateKey
+          ? LicensePurchaseService.create({
+              generateLicense: LicensingLicenseGeneratorService.create({
+                licensing: setup.dependencies.licensing,
+                privateKey,
+              }),
+              delivery: LicensePurchaseDeliveryService.create({
+                licensing: setup.dependencies.licensing,
+                mail: licenseEmailChannels.ses.create(setup.members.mail),
+                notices,
+              }),
+            })
+          : void 0,
+    );
     return setup.secrets.into(BillingApp.secrets.stripeSecretKey, (stripeSecretKey) =>
       BillingApp.assemble({
         members: setup.members,
@@ -219,6 +245,7 @@ export class BillingApp
           host: billingWebhookHostChannels.slack.create({ notices }),
           retention: setup.dependencies.dataRetention,
           invites: setup.dependencies.organizations,
+          licensePurchase,
         },
         subscription: {
           notifier: billingSubscriptionNotifierChannels.slack.create({ notices }),
@@ -587,6 +614,7 @@ export class BillingApp
       itemCalculator: SubscriptionItemCalculatorService.create(prices),
       licensePaymentLinkId,
       inviteApprover: webhook.invites,
+      licensePurchaseHandler: webhook.licensePurchase,
       host: webhook.host,
       retention: webhook.retention,
       connectedBilling,
