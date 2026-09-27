@@ -3,6 +3,8 @@
  * The storage the identity branch of the adapter runs on (ADR-116 §1, §6).
  */
 
+import type { Instant } from "@langwatch/time";
+
 /**
  * better-auth's `account` model as identity serves it: the identifier says WHO holds the sign-in
  * method, the credential row says what secrets it carries.
@@ -21,11 +23,11 @@ export interface IdentityAccountRow {
   accessToken: string | null;
   refreshToken: string | null;
   idToken: string | null;
-  accessTokenExpiresAt: Date | null;
-  refreshTokenExpiresAt: Date | null;
+  accessTokenExpiresAt: Instant | null;
+  refreshTokenExpiresAt: Instant | null;
   scope: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 /** The secret set a write may carry. A field the patch does not name is

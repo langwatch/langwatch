@@ -1,8 +1,9 @@
-import { Box, HStack, Input, Link, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { MenuQueryHeader } from "../../menu-query-header.tsx";
 import {
   TEMPLATE_SYNTAX_DOCS_URL,
   type TemplateLogicConstruct,
@@ -133,51 +134,23 @@ export const TemplateLogicMenu = ({
         onClick={(e) => e.stopPropagation()}
         data-testid="template-logic-menu"
       >
-        {/* Search input (editable) or Query display (readonly) */}
-        {onQueryChange ? (
-          <Box padding={2} borderBottom="1px solid" borderColor="border.muted">
-            <Input
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setIsKeyboardNav(true);
-                  onHighlightChange(Math.min(highlightedIndex + 1, filteredConstructs.length - 1));
-                } else if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setIsKeyboardNav(true);
-                  onHighlightChange(Math.max(highlightedIndex - 1, 0));
-                } else if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSelect(highlightedIndex);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  onClose();
-                }
-              }}
-              placeholder="Search constructs..."
-              size="sm"
-              variant="outline"
-            />
-          </Box>
-        ) : (
-          query && (
-            <Box
-              padding={2}
-              borderBottom="1px solid"
-              borderColor="border.muted"
-              background="bg.subtle"
-            >
-              <Text fontSize="sm" color="fg.muted" fontFamily="mono">
-                {`{%${query ? ` ${query}` : ""}`}
-              </Text>
-            </Box>
-          )
-        )}
-
-        {/* Options List */}
+        <MenuQueryHeader
+          query={query}
+          onQueryChange={onQueryChange}
+          inputRef={searchInputRef}
+          readOnlyText={`{%${query ? ` ${query}` : ""}`}
+          placeholder="Search constructs..."
+          onMove={(delta) => {
+            setIsKeyboardNav(true);
+            onHighlightChange(
+              delta > 0
+                ? Math.min(highlightedIndex + 1, filteredConstructs.length - 1)
+                : Math.max(highlightedIndex - 1, 0),
+            );
+          }}
+          onEnter={() => handleSelect(highlightedIndex)}
+          onEscape={onClose}
+        />
         <Box maxHeight="240px" overflowY="auto">
           {filteredConstructs.length === 0 ? (
             <Box padding={3}>
@@ -187,36 +160,20 @@ export const TemplateLogicMenu = ({
             </Box>
           ) : (
             <VStack align="stretch" gap={0} padding={1}>
-              {filteredConstructs.map((construct, index) => {
-                const isHighlighted = index === highlightedIndex;
-
-                return (
-                  <HStack
-                    key={construct.keyword}
-                    paddingX={3}
-                    paddingY={2}
-                    gap={2}
-                    cursor="pointer"
-                    borderRadius="4px"
-                    background={isHighlighted ? "blue.50" : undefined}
-                    onMouseMove={() => {
-                      if (isKeyboardNav || highlightedIndex !== index) {
-                        setIsKeyboardNav(false);
-                        onHighlightChange(index);
-                      }
-                    }}
-                    onClick={() => handleSelect(index)}
-                    data-testid={`logic-construct-${construct.keyword}`}
-                  >
-                    <Text fontSize="13px" fontFamily="mono" fontWeight="600" minWidth="60px">
-                      {construct.keyword}
-                    </Text>
-                    <Text fontSize="xs" color="fg.muted">
-                      {construct.description}
-                    </Text>
-                  </HStack>
-                );
-              })}
+              {filteredConstructs.map((construct, index) => (
+                <ConstructOption
+                  key={construct.keyword}
+                  construct={construct}
+                  isHighlighted={index === highlightedIndex}
+                  onHover={() => {
+                    if (isKeyboardNav || highlightedIndex !== index) {
+                      setIsKeyboardNav(false);
+                      onHighlightChange(index);
+                    }
+                  }}
+                  onSelect={() => handleSelect(index)}
+                />
+              ))}
             </VStack>
           )}
         </Box>
@@ -242,3 +199,36 @@ export const TemplateLogicMenu = ({
     </Popover.Root>
   );
 };
+
+function ConstructOption({
+  construct,
+  isHighlighted,
+  onHover,
+  onSelect,
+}: {
+  construct: TemplateLogicConstruct;
+  isHighlighted: boolean;
+  onHover: () => void;
+  onSelect: () => void;
+}) {
+  return (
+    <HStack
+      paddingX={3}
+      paddingY={2}
+      gap={2}
+      cursor="pointer"
+      borderRadius="4px"
+      background={isHighlighted ? "blue.50" : undefined}
+      onMouseMove={onHover}
+      onClick={onSelect}
+      data-testid={`logic-construct-${construct.keyword}`}
+    >
+      <Text fontSize="13px" fontFamily="mono" fontWeight="600" minWidth="60px">
+        {construct.keyword}
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        {construct.description}
+      </Text>
+    </HStack>
+  );
+}

@@ -12,6 +12,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Store Events Flow", () => {
@@ -33,6 +34,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     it("publishes events after successful storage when configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -69,6 +71,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -99,6 +102,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -123,6 +127,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -146,6 +151,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const eventStore = createMockEventStore<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -173,6 +179,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       const foldDef1 = createMockFoldProjectionDefinition("projection1");
       const foldDef2 = createMockFoldProjectionDefinition("projection2");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -213,6 +220,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     it("handles events with same Event ID correctly", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -290,6 +298,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -331,6 +340,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       }));
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

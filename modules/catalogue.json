@@ -244,6 +244,18 @@
       "subjects": ["custom-role", "role"]
     },
     {
+      "id": "rum",
+      "root": "modules/rum",
+      "classification": "core",
+      "subjects": ["rum"]
+    },
+    {
+      "id": "sample-agents",
+      "root": "modules/sample-agents",
+      "classification": "core",
+      "subjects": ["sample-agents"]
+    },
+    {
       "id": "scenario",
       "root": "modules/scenario",
       "classification": "core",
@@ -310,6 +322,12 @@
       "subjects": ["billing"]
     },
     {
+      "id": "demo-data",
+      "root": "enterprise/modules/demo-data",
+      "classification": "enterprise",
+      "subjects": ["demo-data"]
+    },
+    {
       "id": "enterprise-ops",
       "root": "enterprise/modules/enterprise-ops",
       "classification": "enterprise",
@@ -374,12 +392,6 @@
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
       "subjects": ["scim"]
-    },
-    {
-      "id": "seed-demo",
-      "root": "enterprise/modules/seed-demo",
-      "classification": "enterprise",
-      "subjects": ["seed-demo"]
     },
     {
       "id": "sso",

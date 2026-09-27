@@ -35,12 +35,14 @@ import {
   codingAgentTranscriptSchema,
   type ContributeSpanFactsCommandData,
   type CodingAgentReceivedSpan,
+  type CodingAgentSessionEventsPage,
+  type CodingAgentSessionEventsPageInput,
 } from "@langwatch/coding-agent-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
@@ -61,6 +63,10 @@ import {
 } from "../rules/coding-agent-gates.rules.ts";
 import { liftLogContribution } from "../rules/coding-agent-log-facts.rules.ts";
 import { liftMetricContribution } from "../rules/coding-agent-metric-facts.rules.ts";
+import {
+  encodeSessionCursor,
+  readSessionCursor,
+} from "../rules/coding-agent-session-cursor.rules.ts";
 import { liftSpanContribution } from "../rules/coding-agent-span-facts.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockService } from "../services/coding-agent-clock.service.ts";
@@ -218,18 +224,6 @@ export class CodingAgentApp implements CodingAgentApi {
     });
   }
 
-  /**
-   * `codingAgents.*` on a process with no session store composed: the namespace
-   * still mounts and every call refuses by name, rather than each composing
-   * process hand-rolling its own refusal.
-   */
-  static refusing(): CodingAgentApi {
-    const refuse = (): never => {
-      throw new CodingAgentUnavailableError("coding-agent session store");
-    };
-    return new Proxy({}, { get: () => refuse, has: () => true }) as CodingAgentApi;
-  }
-
   readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
   readonly #traces: TraceApi;
@@ -354,6 +348,28 @@ export class CodingAgentApp implements CodingAgentApi {
     nextCursor: CodingAgentSessionCursor | null;
   }> {
     return this.#codingAgents.getSessionEvents(input);
+  }
+
+  /** The REST door's events page: both window bounds or neither, and an opaque cursor both ways. */
+  async readSessionEventsPage(
+    input: CodingAgentSessionEventsPageInput,
+  ): Promise<CodingAgentSessionEventsPage> {
+    // Half a window would silently widen the read past what the caller asked for.
+    if ((input.from === undefined) !== (input.to === undefined)) {
+      throw new ValidationError("from and to must be supplied together");
+    }
+    const { events, nextCursor } = await this.getSessionEvents({
+      projectId: input.projectId,
+      sessionId: input.sessionId,
+      kinds: input.kinds,
+      occurredAt:
+        input.from !== undefined && input.to !== undefined
+          ? { fromMs: input.from, toMs: input.to }
+          : undefined,
+      cursor: input.cursor !== undefined ? decodableCursor(input.cursor) : undefined,
+      limit: input.limit,
+    });
+    return { events, nextCursor: nextCursor ? encodeSessionCursor(nextCursor) : null };
   }
 
   /** The project's "at a glance" totals over a window. */
@@ -590,20 +606,14 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 }
 
+/** The cursor a caller sent back; one this door never wrote is a validation error. */
+function decodableCursor(raw: string): CodingAgentSessionCursor {
+  const read = readSessionCursor(raw);
+  if (!read.decodable) throw new ValidationError("cursor is not decodable");
+  return read.cursor;
+}
+
 /** Nothing readable, nothing priceable, nobody named. */
 function emptyCallerScope(): CodingAgentCallerScope {
   return { permittedProjectIds: [], costProjectIds: [], projects: {} };
-}
-
-/** A capability this deployment did not compose, refused by name. */
-export class CodingAgentUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "CodingAgentUnavailableError";
-  }
 }

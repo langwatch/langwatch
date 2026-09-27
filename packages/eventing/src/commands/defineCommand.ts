@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import type { CommandType } from "../domain/commandType.ts";
@@ -8,7 +8,7 @@ import type { Event } from "../domain/types.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type { Command, CommandHandler, CommandHandlerResult } from "./command.ts";
 import type { CommandEnvelope } from "./commandEnvelope.ts";
-import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope.ts";
+import { commandEnvelopeSchema, stripEnvelope } from "./commandEnvelope.ts";
 import type { CommandHandlerClass } from "./commandHandlerClass.ts";
 import { defineCommandSchema } from "./commandSchema.ts";
 
@@ -75,7 +75,7 @@ export function defineCommand<
   type CommandData = z.infer<TEventDataSchema> & CommandEnvelope;
   type ProducedEvent = DefinedCommandEvent<TEvtType, TVersion, TAggType, CommandData>;
 
-  const commandDataSchema = withCommandEnvelope(schema);
+  const commandDataSchema = z.intersection(commandEnvelopeSchema, schema);
 
   const cmdSchema = defineCommandSchema(commandType, commandDataSchema);
 
@@ -115,10 +115,5 @@ export function defineCommand<
     }
   }
 
-  // Cast required: TypeScript cannot unify a class expression's constructor signature
-  // with the intersection type `CommandHandlerClassStatic & (new () => CommandHandler)`.
-  // The inner class structurally satisfies DefinedCommandClass but TS needs the
-  // intermediate `unknown` to bridge the nominal gap between class literals and
-  // intersection constructor types.
-  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType, ProducedEvent>;
+  return DefinedCommand;
 }

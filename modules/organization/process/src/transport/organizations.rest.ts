@@ -4,7 +4,6 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 /** `/api/organizations`: admin-only provisioning with instance bearer key. */
-import { NotFoundError } from "@langwatch/handled-error";
 import {
   OrganizationApi,
   organizationsProvisioningRestCreatedSchema,
@@ -81,8 +80,7 @@ export const organizationsProvisioningRest: Readonly<{
       "Read one organization's provisioning summary, self-hosted instance administrators only.",
   })
   .handle(async ({ app, input }) => {
-    const organization = await app.findProvisioningSummary(input.organizationId);
-    if (!organization) throw new NotFoundError("not_found", "Organization", input.organizationId);
+    const organization = await app.getProvisioningSummary(input.organizationId);
 
     return {
       organization: { ...organization, createdAt: toDate(organization.createdAt) },

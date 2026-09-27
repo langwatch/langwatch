@@ -226,9 +226,9 @@ describe("traced()", () => {
 
   describe("when the service is awaited", () => {
     it("is not mistaken for a thenable", async () => {
-      const wrapped = service() as unknown as Record<string, unknown>;
+      const wrapped = service();
 
-      expect(wrapped.then).toBeUndefined();
+      expect(Reflect.get(wrapped, "then")).toBeUndefined();
       await expect(Promise.resolve(wrapped)).resolves.toBe(wrapped);
     });
   });

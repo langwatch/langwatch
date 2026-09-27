@@ -178,22 +178,14 @@ describe("POST /api/workflows/:id/evaluate", () => {
   });
 
   describe("given a key that cannot read the run it would start", () => {
-    /** @scenario A workflows-only key cannot start a run it could not read */
-    it("refuses before the trigger is reached", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
-        async () => started,
-      );
-      const response = await post(
-        buildApi({ triggerEvaluation, mayReadRuns: false }),
-        "workflow_1",
-      );
+    it("hands the ceiling's verdict to the trigger, which refuses it", async () => {
+      const triggerEvaluation = vi.fn<WorkflowApi["triggerEvaluation"]>(async () => started);
 
-      expect(response.status).toBe(403);
-      expect(await response.json()).toMatchObject({
-        code: "api_key_permission_denied",
-        meta: { permission: "evaluations:view" },
-      });
-      expect(triggerEvaluation).not.toHaveBeenCalled();
+      await post(buildApi({ triggerEvaluation, mayReadRuns: false }), "workflow_1");
+
+      expect(triggerEvaluation).toHaveBeenCalledWith(
+        expect.objectContaining({ callerMayReadRuns: false }),
+      );
     });
   });
 

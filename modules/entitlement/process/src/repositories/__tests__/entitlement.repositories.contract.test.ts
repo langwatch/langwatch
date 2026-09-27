@@ -80,13 +80,6 @@ const WINDOW = { startDate: 0, endDate: 1 };
 describe.each(backends)("given the $name entitlement repositories", ({ create }) => {
   describe("when the organization has no rows at all", () => {
     /** @scenario "The memory and Postgres entitlement repositories answer alike" */
-    it("counts no members of either kind", async () => {
-      const { membership } = create([]);
-
-      await expect(membership.getMemberCount(ACME)).resolves.toBe(0);
-      await expect(membership.getMembersLiteCount(ACME)).resolves.toBe(0);
-    });
-
     it("reports nothing spent this month", async () => {
       const { membership } = create([]);
 
@@ -104,13 +97,6 @@ describe.each(backends)("given the $name entitlement repositories", ({ create })
   });
 
   describe("when the organization has members and spend", () => {
-    it("counts full members and lite members apart", async () => {
-      const { membership } = create([ACME_USAGE]);
-
-      await expect(membership.getMemberCount(ACME)).resolves.toBe(3);
-      await expect(membership.getMembersLiteCount(ACME)).resolves.toBe(2);
-    });
-
     it("reports the month's spend for the organization", async () => {
       const { membership } = create([ACME_USAGE]);
 
@@ -145,11 +131,9 @@ describe.each(backends)("given the $name entitlement repositories", ({ create })
   });
 
   describe("when another organization holds rows of its own", () => {
-    it("never counts the other organization's members", async () => {
+    it("never counts the other organization's spend", async () => {
       const { membership } = create([ACME_USAGE, OTHER_USAGE]);
 
-      await expect(membership.getMemberCount(ACME)).resolves.toBe(3);
-      await expect(membership.getMembersLiteCount(ACME)).resolves.toBe(2);
       await expect(membership.findCurrentMonthCost(ACME)).resolves.toBe(42);
     });
 

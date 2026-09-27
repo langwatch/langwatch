@@ -1,20 +1,7 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { useDrawer } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import {
-  WORKBENCH_ACTION_KINDS,
-  WORKBENCH_ACTIONS,
-  pickWorkbenchActionNarration,
-  readLiveWorkbench,
-  scopeFromRunPayload,
-} from "@langwatch/experiment-contract";
-import { generate } from "@langwatch/ksuid";
-import {
-  LangyUiPageOutOfDateError,
-  LangyUiSaveFailedError,
-  type LangyUiActionHandlers,
   type ProposalHandlers,
   useRegisterLangyActions,
   useRegisterLangyHandlers,
@@ -30,12 +17,14 @@ import { useOptimizeWithLangy } from "../../../behavior/experiments-v3/use-optim
 import { useReportPageActivityToLangy } from "../../../behavior/experiments-v3/use-report-page-activity-to-langy.ts";
 import { useSavedDatasetLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
-import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
-import { startAndIdentifyRun } from "../../../model/experiments-v3/execution/run-identification.ts";
 import {
-  revealTargetColumn,
-  targetColumnLabel,
-} from "../../../model/experiments-v3/reveal-target-column.ts";
+  useDatasetProposalHandlers,
+  useEvaluatorProposalHandlers,
+  usePromptProposalHandlers,
+  useWorkbenchProposalHandlers,
+} from "../../../behavior/experiments-v3/use-workbench-proposal-handlers.ts";
+import { useWorkbenchUiActionHandlers } from "../../../behavior/experiments-v3/use-workbench-ui-action-handlers.ts";
+import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
 import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
@@ -47,11 +36,6 @@ import { SavedDatasetLoaders } from "../../../ui/sections/experiments-v3/saved-d
 import { TableSettingsMenu } from "../../../ui/sections/experiments-v3/table-settings-menu.tsx";
 import { UndoRedo } from "../../../ui/sections/experiments-v3/undo-redo.tsx";
 import { VersionHistoryButton } from "../../../ui/sections/experiments-v3/version-history-button.tsx";
-
-/** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
-const EVALUATOR_KSUID_RESOURCE = "evaluator";
-/** The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`). */
-const RECORD_KSUID_RESOURCE = "record";
 
 /**
  * Experiments Workbench Page
@@ -86,14 +70,6 @@ export default function ExperimentsWorkbenchPage() {
     [targets, resolvedTargetNames],
   );
 
-  const createEvaluator = api.evaluators.create.useMutation();
-  const updateEvaluator = api.evaluators.update.useMutation();
-  const deleteEvaluator = api.evaluators.delete.useMutation();
-  const createPrompt = api.prompts.create.useMutation();
-  const updatePrompt = api.prompts.update.useMutation();
-  const upsertDataset = api.dataset.upsert.useMutation();
-  const createDatasetRecords = api.datasetRecord.create.useMutation();
-  const utils = api.useUtils();
   const {
     execute: executeEvaluation,
     status: executionStatus,
@@ -109,7 +85,6 @@ export default function ExperimentsWorkbenchPage() {
   // candidates, which all carry the same prompt handle, and a second
   // derivation is how the panel ends up naming a different column.
   const [runTargetLabel, setRunTargetLabel] = useState<string | null>(null);
-  const { openDrawer } = useDrawer();
   // "Optimize this prompt": hand the column to Langy. The page is the Langy
   // integration point; undefined while flagged off, which hides the menu item.
   const optimizeTarget = useOptimizeWithLangy();
@@ -146,312 +121,29 @@ export default function ExperimentsWorkbenchPage() {
     actionActivity,
   });
 
-  const proposalHandlers = useMemo<ProposalHandlers>(() => {
-    const projectId = project?.id;
-    const projectSlug = project?.slug;
-    if (!projectId) return {} as ProposalHandlers;
-    return {
-      "evaluators.create": async (payload) => {
-        const { name, type, config } = payload as {
-          name: string;
-          type: "evaluator" | "workflow";
-          config: Record<string, unknown>;
-        };
-        const created = await createEvaluator.mutateAsync({
-          projectId,
-          name,
-          type,
-          config,
-        });
-        await utils.evaluators.getAll.invalidate({ projectId });
-        const evaluatorType = (
-          created?.config as {
-            evaluatorType?: string;
-          } | null
-        )?.evaluatorType;
-        return {
-          label: "Edit evaluator",
-          onOpen: () =>
-            openDrawer("evaluatorEditor", {
-              evaluatorId: created.id,
-              evaluatorType,
-            }),
-        };
-      },
-      "evaluators.update": async (payload) => {
-        const { id, name, config, evaluatorType } = payload as {
-          id: string;
-          name?: string;
-          config: Record<string, unknown>;
-          evaluatorType?: string;
-        };
-        await updateEvaluator.mutateAsync({
-          projectId,
-          id,
-          ...(name ? { name } : {}),
-          config,
-        });
-        await utils.evaluators.getAll.invalidate({ projectId });
-        return {
-          label: "Edit evaluator",
-          onOpen: () =>
-            openDrawer("evaluatorEditor", {
-              evaluatorId: id,
-              evaluatorType,
-            }),
-        };
-      },
-      "evaluators.delete": async (payload) => {
-        const { id } = payload as { id: string };
-        await deleteEvaluator.mutateAsync({ projectId, id });
-        await utils.evaluators.getAll.invalidate({ projectId });
-        // Drop any workbench columns that referenced the archived evaluator
-        // so the table reflects the delete immediately.
-        const current = useEvaluationsV3Store.getState().evaluators;
-        for (const entry of current) {
-          if (entry.dbEvaluatorId === id) {
-            useEvaluationsV3Store.getState().removeEvaluator(entry.id);
-          }
-        }
-        return undefined;
-      },
-      "workbench.addEvaluator": async (payload) => {
-        const { dbEvaluatorId, evaluatorType, name, fields } = payload as {
-          dbEvaluatorId: string;
-          evaluatorType: string;
-          name: string;
-          fields: { identifier: string; type: string; optional?: boolean }[];
-        };
-        addEvaluator({
-          id: generate(EVALUATOR_KSUID_RESOURCE).toString(),
-          evaluatorType: evaluatorType as never,
-          inputs: fields as never,
-          dbEvaluatorId,
-          mappings: {},
-          localEvaluatorConfig: { name },
-        });
-      },
-      "workbench.run": async () => {
-        // Fire-and-forget: the eval run can take minutes. Apply should
-        // confirm immediately; progress is visible in the workbench
-        // header.
-        void executeEvaluation({ type: "full" });
-      },
-      "prompts.create": async (payload) => {
-        const { handle, messages, model, temperature, maxTokens } = payload as {
-          handle: string;
-          messages: {
-            role: "system" | "user" | "assistant";
-            content: string;
-          }[];
-          model?: string;
-          temperature?: number;
-          maxTokens?: number;
-        };
-        await createPrompt.mutateAsync({
-          projectId,
-          data: { handle, messages, model, temperature, maxTokens },
-        });
-        await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
-        return projectSlug ? { href: `/${projectSlug}/prompts`, label: "Open prompt" } : undefined;
-      },
-      "prompts.update": async (payload) => {
-        const { id, commitMessage, messages, model, temperature, maxTokens } = payload as {
-          id: string;
-          commitMessage: string;
-          messages?: {
-            role: "system" | "user" | "assistant";
-            content: string;
-          }[];
-          model?: string;
-          temperature?: number;
-          maxTokens?: number;
-        };
-        await updatePrompt.mutateAsync({
-          projectId,
-          id,
-          data: {
-            commitMessage,
-            ...(messages ? { messages } : {}),
-            ...(model ? { model } : {}),
-            ...(temperature !== undefined ? { temperature } : {}),
-            ...(maxTokens !== undefined ? { maxTokens } : {}),
-          },
-        });
-        await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
-        return projectSlug ? { href: `/${projectSlug}/prompts`, label: "Open prompt" } : undefined;
-      },
-      "datasets.create": async (payload) => {
-        const { name, columnTypes, initialRows } = payload as {
-          name: string;
-          columnTypes: { name: string; type: string }[];
-          initialRows?: Record<string, unknown>[];
-        };
-        const created = await upsertDataset.mutateAsync({
-          projectId,
-          name,
-          columnTypes: columnTypes as never,
-          ...(initialRows && initialRows.length > 0
-            ? {
-                datasetRecords: initialRows.map((row) => ({
-                  id: generate(RECORD_KSUID_RESOURCE).toString(),
-                  entry: row,
-                })) as never,
-              }
-            : {}),
-        });
-        await utils.dataset.getAll.invalidate({ projectId });
-        return projectSlug && created?.id
-          ? {
-              href: `/${projectSlug}/datasets/${created.id}`,
-              label: "Open dataset",
-            }
-          : undefined;
-      },
-      "datasets.addRows": async (payload) => {
-        const { datasetId, rows } = payload as {
-          datasetId: string;
-          rows: Record<string, unknown>[];
-        };
-        await createDatasetRecords.mutateAsync({
-          projectId,
-          datasetId,
-          entries: rows.map((row) => ({
-            id: generate(RECORD_KSUID_RESOURCE).toString(),
-            ...row,
-          })) as never,
-        });
-        await utils.dataset.getAll.invalidate({ projectId });
-        return projectSlug
-          ? {
-              href: `/${projectSlug}/datasets/${datasetId}`,
-              label: "Open dataset",
-            }
-          : undefined;
-      },
-    };
-  }, [
-    project?.id,
-    project?.slug,
-    createEvaluator,
-    updateEvaluator,
-    deleteEvaluator,
-    createPrompt,
-    updatePrompt,
-    upsertDataset,
-    createDatasetRecords,
-    utils,
-    addEvaluator,
-    executeEvaluation,
-    openDrawer,
-  ]);
+  const evaluatorProposals = useEvaluatorProposalHandlers();
+  const workbenchProposals = useWorkbenchProposalHandlers({ addEvaluator, executeEvaluation });
+  const promptProposals = usePromptProposalHandlers();
+  const datasetProposals = useDatasetProposalHandlers();
+  const proposalHandlers = useMemo<ProposalHandlers>(
+    () => ({
+      ...evaluatorProposals,
+      ...workbenchProposals,
+      ...promptProposals,
+      ...datasetProposals,
+    }),
+    [evaluatorProposals, workbenchProposals, promptProposals, datasetProposals],
+  );
 
   useRegisterLangyHandlers(proposalHandlers, { experimentSlug: slug });
 
-  // The live UI actions this page executes for the agent
-  // (specs/langy/langy-ui-actions.feature).
-  const uiActionHandlers = useMemo<LangyUiActionHandlers>(() => {
-    // A page the server has already moved past cannot write: autosave stands
-    // down there by design. Answering "done" from that state told the agent a
-    // document existed that only this tab could see, so every later step was
-    // built on it. Checked before the change, so nothing is half applied, and
-    // again after the save, which is where the refusal actually lands.
-    const assertPageIsCurrent = () => {
-      if (useEvaluationsV3Store.getState().staleWorkbench) {
-        throw new LangyUiPageOutOfDateError();
-      }
-    };
-    /**
-     * Persist, and answer only if the write landed.
-     */
-    const saveOrRefuse = async () => {
-      const outcome = await saveNow();
-      if (outcome === "failed") {
-        throw new LangyUiSaveFailedError();
-      }
-      // Covers the refusal this save was given, and any staleness a broadcast
-      // raised while it was in flight. Both are the same answer to the agent.
-      assertPageIsCurrent();
-      if (outcome === "refused") {
-        throw new LangyUiPageOutOfDateError();
-      }
-    };
-    const handlers: LangyUiActionHandlers = {};
-    for (const kind of WORKBENCH_ACTION_KINDS) {
-      const definition = WORKBENCH_ACTIONS[kind];
-      if (definition.backend !== "transform") continue;
-      handlers[kind] = {
-        payloadSchema: definition.payloadSchema,
-        // Apply, then persist before answering. The agent reads a successful action as
-        // "the document now says this", and its next step is usually a server-side one
-        // — a run, a REST read, a version.
-        run: async (payload: unknown) => {
-          // Named while it works, so the panel's status line says what this
-          // page is doing rather than falling back to a verb that claims
-          // nothing. The edit itself is instant; the save after it is not.
-          setActionActivity(pickWorkbenchActionNarration(kind));
-          try {
-            assertPageIsCurrent();
-            const result = useEvaluationsV3Store.getState().applyWorkbenchAction({ kind, payload });
-            await saveOrRefuse();
-            // Every action that touches a column answers with its id. A new
-            // column lands to the right of all the others, off the edge of a
-            // wide workbench, so without this the reader watches a real change
-            // happen out of sight and reads the step as nothing happening.
-            const touched = (result as { targetId?: unknown } | undefined)?.targetId;
-            if (typeof touched === "string") revealTargetColumn(touched);
-            return result;
-          } finally {
-            setActionActivity(null);
-          }
-        },
-      };
-    }
-    handlers["workbench.getState"] = {
-      payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
-      run: (payload: { includeResults?: boolean }) =>
-        readLiveWorkbench({
-          state: useEvaluationsV3Store.getState(),
-          ...payload,
-          targetNames,
-        }),
-    };
-    handlers["workbench.run"] = {
-      payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
-      run: async (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
-        // Remembered before the run starts, so the status line can name the
-        // column the reader is watching fill rather than "the evaluation".
-        const runningTarget = payload.targetIds?.[0] ?? null;
-        setRunTargetLabel(runningTarget ? targetColumnLabel(runningTarget) : null);
-        // Watch the column that is about to fill, not whichever one the
-        // reader happened to be looking at.
-        if (runningTarget) revealTargetColumn(runningTarget);
-        // Only covers getting the run started: the save before it is the slow
-        // part. Once cells are arriving the run reports its own progress, and
-        // this is cleared so it cannot outlive the run it announced.
-        setActionActivity(pickWorkbenchActionNarration("workbench.run"));
-        try {
-          // Persist first: a run writes its results back as a new version, so
-          // any edit still sitting in this tab would be a version behind before
-          // the first cell lands. A tab that cannot save is a tab whose columns
-          // the run would not compute, so it refuses rather than running the
-          // wrong document.
-          assertPageIsCurrent();
-          await saveOrRefuse();
-          // The run itself streams into the table the user is watching and is not
-          // waited for; only its id is.
-          const runId = await startAndIdentifyRun({
-            start: (onRunStarted) =>
-              executeEvaluation(scopeFromRunPayload(payload), { onRunStarted }),
-          });
-          return { runId, status: "running" as const };
-        } finally {
-          setActionActivity(null);
-        }
-      },
-    };
-    return handlers;
-  }, [executeEvaluation, saveNow, targetNames]);
+  const uiActionHandlers = useWorkbenchUiActionHandlers({
+    executeEvaluation,
+    saveNow,
+    targetNames,
+    setActionActivity,
+    setRunTargetLabel,
+  });
 
   useRegisterLangyActions(uiActionHandlers);
 

@@ -119,6 +119,12 @@
       "path": "modules/role/contract/tsconfig.build.json"
     },
     {
+      "path": "modules/rum/contract/tsconfig.build.json"
+    },
+    {
+      "path": "modules/sample-agents/contract/tsconfig.build.json"
+    },
+    {
       "path": "modules/scenario/contract/tsconfig.build.json"
     },
     {

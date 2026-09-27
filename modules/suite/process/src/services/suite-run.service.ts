@@ -241,7 +241,7 @@ export class SuiteRunService {
       activeTargets,
     });
 
-    return { ...result, suiteId: suite.id, planName: suite.name, created };
+    return { ...result, suiteId: suite.id, planName: suite.name, planSlug: suite.slug, created };
   }
 
   /**

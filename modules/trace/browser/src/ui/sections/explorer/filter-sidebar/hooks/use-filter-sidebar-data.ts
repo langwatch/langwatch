@@ -48,7 +48,10 @@ import { useFilteredTraceFacets } from "../../hooks/use-filtered-trace-facets.ts
 import { useTraceFacets } from "../../hooks/use-trace-facets.ts";
 import { computeDiscreteEligible, resolveNumericModeByKey } from "../discrete-mode.ts";
 
-export function useFilterSidebarData() {
+type ValueStateLookup = ReturnType<typeof buildFacetStateLookup>;
+
+/** The filter store's query and the facet mutations the sidebar drives. */
+function useFacetFilterActions() {
   const ast = useFilterStore((s) => s.ast);
   const storeToggleFacet = useFilterStore((s) => s.toggleFacet);
   const storeExcludeFacet = useFilterStore((s) => s.excludeFacet);
@@ -58,57 +61,296 @@ export function useFilterSidebarData() {
   const setEvaluatorScoreRange = useFilterStore((s) => s.setEvaluatorScoreRange);
   const removeEvaluatorScoreRange = useFilterStore((s) => s.removeEvaluatorScoreRange);
 
-  // OR-group analysis, used only to route a same-field click into an
-  // existing OR group (the third-and-beyond value of an already-grouped
-  // facet). Cross-field OR is built in the filter bar, not here.
-  const orAnalysisRaw = useMemo(() => analyzeOrGroups(ast), [ast]);
-
-  // Hand the analysis + field to `routeToggleViaOrGroups`, which decides
-  // whether the new value AND-appends or splices into an existing
-  // same-field OR group, then forward the result to the store. The
-  // routing rule lives in the helper so it's unit-testable without
-  // rendering the sidebar — this hook is just the glue.
+  // A same-field click splices into an existing OR group when there is one;
+  // the routing rule lives in routeToggleViaOrGroups. Cross-field OR is the
+  // filter bar's, not this sidebar's.
+  const orAnalysis = useMemo(() => analyzeOrGroups(ast), [ast]);
   const toggleFacet = useCallback(
-    ({ field, value }: { field: string; value: string }) => {
-      const routing = routeToggleViaOrGroups({
-        analysis: orAnalysisRaw,
-        field,
-      });
-      storeToggleFacet(field, value, routing);
-    },
-    [storeToggleFacet, orAnalysisRaw],
+    ({ field, value }: { field: string; value: string }) =>
+      storeToggleFacet(field, value, routeToggleViaOrGroups({ analysis: orAnalysis, field })),
+    [storeToggleFacet, orAnalysis],
   );
-
-  // Drives the row's trailing exclude (`−`) affordance: jump straight to
-  // `NOT field:value` (or back to neutral if already excluded), bypassing
-  // the include→exclude cycle so excluding is one deliberate click.
+  // The row's trailing exclude jumps straight to `NOT field:value` (or back to
+  // neutral), so excluding is one deliberate click.
   const excludeFacet = useCallback(
-    ({ field, value }: { field: string; value: string }) => {
-      storeExcludeFacet(field, value);
-    },
+    ({ field, value }: { field: string; value: string }) => storeExcludeFacet(field, value),
     [storeExcludeFacet],
   );
-
   const setRange = useCallback(
-    ({ field, from, to }: { field: string; from: string; to: string }) => {
-      storeSetRange(field, from, to);
-    },
+    ({ field, from, to }: { field: string; from: string; to: string }) =>
+      storeSetRange(field, from, to),
     [storeSetRange],
   );
-
   const removeRange = useCallback(
-    ({ field }: { field: string }) => {
-      storeRemoveRange(field);
-    },
+    ({ field }: { field: string }) => storeRemoveRange(field),
     [storeRemoveRange],
   );
 
-  // The vocabulary (attribute keys, the warm start) comes from the tenant's
-  // discovery; the counts come from the read under the active query. ADR-139.
+  return {
+    ast,
+    toggleFacet,
+    excludeFacet,
+    setRange,
+    removeRange,
+    toggleEvaluatorSubFilter,
+    setEvaluatorScoreRange,
+    removeEvaluatorScoreRange,
+  };
+}
+
+/**
+ * The reader's per-project facet preferences: which sections they showed or
+ * hid, and how each numeric facet presents. Both persist per project.
+ */
+function useProjectFacetPrefs() {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? null;
+  const showFacet = useFacetVisibilityStore((s) => s.showFacet);
+  const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
+  const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
+  const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
+  const visibilityPrefs = useFacetVisibilityStore((s) => selectVisibilityFor(s, projectId));
+  const numericModes = useNumericModeStore((s) => selectNumericModesFor({ state: s, projectId }));
+  const setNumericModeRaw = useNumericModeStore((s) => s.setMode);
+  const numericModeHydrate = useNumericModeStore((s) => s.hydrateFromStorage);
+
+  useEffect(() => {
+    if (projectId) visibilityHydrate(projectId);
+  }, [projectId, visibilityHydrate]);
+  useEffect(() => {
+    if (projectId) numericModeHydrate(projectId);
+  }, [projectId, numericModeHydrate]);
+
+  const explicitlyShown = useMemo(
+    () => new Set(visibilityPrefs.explicitlyShown),
+    [visibilityPrefs.explicitlyShown],
+  );
+  const explicitlyHidden = useMemo(
+    () => new Set(visibilityPrefs.explicitlyHidden),
+    [visibilityPrefs.explicitlyHidden],
+  );
+
+  const setNumericMode = useCallback(
+    ({ field, mode }: { field: string; mode: NumericMode }) => {
+      if (projectId) setNumericModeRaw({ projectId, field, mode });
+    },
+    [projectId, setNumericModeRaw],
+  );
+  const showFacetForProject = useCallback(
+    (key: string) => {
+      if (projectId) showFacet(projectId, key);
+    },
+    [projectId, showFacet],
+  );
+  const hideFacetForProject = useCallback(
+    (key: string) => {
+      if (projectId) hideFacet(projectId, key);
+    },
+    [projectId, hideFacet],
+  );
+  const resetAllFacets = useCallback(() => {
+    if (projectId) resetAllVisibility(projectId);
+  }, [projectId, resetAllVisibility]);
+
+  return {
+    explicitlyShown,
+    explicitlyHidden,
+    numericModes,
+    setNumericMode,
+    showFacet: showFacetForProject,
+    hideFacet: hideFacetForProject,
+    resetAllFacets,
+  };
+}
+
+/** Every field the query filters on, read off the `${field}|${value}` lookup keys. */
+function activeFieldsOf(lookup: ValueStateLookup): Set<string> {
+  return new Set(
+    [...lookup.keys()].map((k) => {
+      const idx = k.indexOf("|");
+      return idx >= 0 ? k.slice(0, idx) : k;
+    }),
+  );
+}
+
+/**
+ * Whether a section shows at this density. A field the query filters on always
+ * shows, or its filter could not be removed from here; then the reader's own
+ * hide and show; compact shows everything, comfortable the curated few.
+ */
+function isSectionShown({
+  key,
+  activeFields,
+  explicitlyHidden,
+  explicitlyShown,
+  density,
+}: {
+  key: string;
+  activeFields: ReadonlySet<string>;
+  explicitlyHidden: ReadonlySet<string>;
+  explicitlyShown: ReadonlySet<string>;
+  density: string;
+}): boolean {
+  if (activeFields.has(key)) return true;
+  if (explicitlyHidden.has(key)) return false;
+  if (explicitlyShown.has(key)) return true;
+  return density === "compact" || COMFORTABLE_DEFAULT_SECTIONS.has(key);
+}
+
+/**
+ * The attribute sections: metadata always leads (its keys are full, so
+ * `attribute` + `metadata.environment` filters the right column), then each
+ * other stream that discovered any keys.
+ */
+function attributeSectionsFor({
+  metadataAttributeKeys,
+  traceAttributeKeys,
+  eventAttributeKeys,
+  spanAttributeKeys,
+}: {
+  metadataAttributeKeys: AttributeKey[];
+  traceAttributeKeys: AttributeKey[];
+  eventAttributeKeys: AttributeKey[];
+  spanAttributeKeys: AttributeKey[];
+}): AttributesSectionData[] {
+  const streams: AttributesSectionData[] = [
+    {
+      key: ATTRIBUTES_SECTION_KEY,
+      label: "Trace attributes",
+      kind: "attributes",
+      filterPrefix: "attribute",
+      keys: traceAttributeKeys,
+    },
+    {
+      key: EVENT_ATTRIBUTES_SECTION_KEY,
+      label: "Event attributes",
+      kind: "attributes",
+      filterPrefix: "event.attribute",
+      keys: eventAttributeKeys,
+    },
+    {
+      key: SPAN_ATTRIBUTES_SECTION_KEY,
+      label: "Span attributes",
+      kind: "attributes",
+      filterPrefix: "span.attribute",
+      keys: spanAttributeKeys,
+    },
+  ];
+  return [
+    {
+      key: METADATA_SECTION_KEY,
+      label: "Metadata",
+      kind: "attributes",
+      filterPrefix: "attribute",
+      keys: metadataAttributeKeys,
+      displayStripPrefix: "metadata.",
+      emptyDocsHref: METADATA_DOCS_URL,
+    },
+    ...streams.filter((section) => section.keys.length > 0),
+  ];
+}
+
+/**
+ * Values the query filters on that discovery did not return, as zero-count rows
+ * pinned above the rest, so an active filter never vanishes from the sidebar.
+ */
+function withQueryValues({
+  items,
+  ast,
+  key,
+  extra,
+}: {
+  items: FacetItem[];
+  ast: Parameters<typeof getFacetValues>[0];
+  key: string;
+  extra: (value: string) => Partial<FacetItem>;
+}): FacetItem[] {
+  const known = new Set(items.map((i) => i.value));
+  const { include, exclude } = getFacetValues(ast, key);
+  const pinned = [...new Set([...include, ...exclude])]
+    .filter((value) => !known.has(value))
+    .map((value) => ({ value, label: value, count: 0, synthetic: true, ...extra(value) }));
+  return [...pinned, ...items];
+}
+
+/** The rows each categorical and discrete numeric facet renders. */
+function facetItemsFor({
+  categoricals,
+  discreteEligible,
+  isSynthetic,
+  ast,
+  countState,
+}: {
+  categoricals: CategoricalSection[];
+  discreteEligible: ReturnType<typeof computeDiscreteEligible>;
+  isSynthetic: boolean;
+  ast: Parameters<typeof getFacetValues>[0];
+  countState: FacetCountState;
+}): Map<string, FacetItem[]> {
+  const map = new Map<string, FacetItem[]>();
+  for (const cat of categoricals) {
+    const items = buildFacetItems({ cat, isSynthetic: cat.synthetic ?? isSynthetic, countState });
+    map.set(
+      cat.key,
+      withQueryValues({ items, ast, key: cat.key, extra: () => ({ dimmed: true }) }),
+    );
+  }
+  for (const [key, range] of discreteEligible) {
+    const items = buildDiscreteFacetItems({
+      range,
+      synthetic: range.synthetic ?? isSynthetic,
+      countState,
+    });
+    const extra = (value: string) => ({
+      dotColor: hashColor(value),
+      dimmed: !VIBRANT_FIELDS.has(key),
+    });
+    map.set(key, withQueryValues({ items, ast, key, extra }));
+  }
+  return map;
+}
+
+/**
+ * The discovered sections, or the well-known defaults while discovery is in
+ * flight or returned nothing usable for this view.
+ */
+function sectionsOf({
+  descriptors,
+  activeFields,
+}: {
+  descriptors: Descriptors | undefined;
+  activeFields: ReadonlySet<string>;
+}) {
+  const real = partitionDescriptors(descriptors ?? [], activeFields);
+  if (!isPartitionEmpty(real)) return { ...real, isSynthetic: false };
+  return {
+    ...partitionDescriptors(synthesizeDefaultDescriptors(), activeFields),
+    isSynthetic: true,
+  };
+}
+
+/** Sections in the lens's order, before density and the reader's preferences apply. */
+function orderedSectionKeys({
+  sections,
+  lensSectionOrder,
+}: {
+  sections: { key: string; label: string }[];
+  lensSectionOrder: Parameters<typeof applyLensOrder>[1];
+}): string[] {
+  const naturalOrder = sortBySectionOrder(sections.map(({ key, label }) => ({ key, label }))).map(
+    (s) => s.key,
+  );
+  return applyLensOrder(naturalOrder, lensSectionOrder);
+}
+
+export function useFilterSidebarData() {
+  const actions = useFacetFilterActions();
+  const { ast } = actions;
+
+  // The vocabulary comes from the tenant's discovery, the counts from the read
+  // under the active query (ADR-139). The sample preview's fixtures are both.
   const { data: discovered, isLoading: facetsLoading } = useTraceFacets();
   const filtered = useFilteredTraceFacets();
-  // The sample preview has no ClickHouse footprint, so its fixture descriptors
-  // are the counts.
   const isSamplePreview = usePreviewTracesActive();
   const { descriptors, countState } = useMemo(
     () =>
@@ -125,297 +367,83 @@ export function useFilterSidebarData() {
   const lensSectionOrder = useFacetLensStore((s) => s.lens.sectionOrder);
   const setSectionOrder = useFacetLensStore((s) => s.setSectionOrder);
   const setAllSectionsOpen = useFacetLensStore((s) => s.setAllSectionsOpen);
-
-  // Density + per-user visibility prefs feed the "which sections should even show up"
-  // filter further down. Both are owned outside the sidebar (density is global,
-  // visibility is per-project) so we just subscribe + read them here.
   const density = useDensityStore((s) => s.density);
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? null;
-  const showFacet = useFacetVisibilityStore((s) => s.showFacet);
-  const hideFacet = useFacetVisibilityStore((s) => s.hideFacet);
-  const resetAllVisibility = useFacetVisibilityStore((s) => s.resetAll);
-  const visibilityHydrate = useFacetVisibilityStore((s) => s.hydrateFromStorage);
-  const visibilityPrefs = useFacetVisibilityStore((s) => selectVisibilityFor(s, projectId));
-  useEffect(() => {
-    if (projectId) visibilityHydrate(projectId);
-  }, [projectId, visibilityHydrate]);
+  const prefs = useProjectFacetPrefs();
 
-  // Per-facet numeric presentation (range slider vs discrete tick-list).
-  // Owned outside the sidebar (per-project, like visibility) — read the
-  // overrides here and resolve the effective mode against the registry
-  // default further down (`numericModeByKey`).
-  const numericModes = useNumericModeStore((s) => selectNumericModesFor({ state: s, projectId }));
-  const setNumericModeRaw = useNumericModeStore((s) => s.setMode);
-  const numericModeHydrate = useNumericModeStore((s) => s.hydrateFromStorage);
-  useEffect(() => {
-    if (projectId) numericModeHydrate(projectId);
-  }, [projectId, numericModeHydrate]);
-  const setNumericMode = useCallback(
-    ({ field, mode }: { field: string; mode: NumericMode }) => {
-      if (projectId) setNumericModeRaw({ projectId, field, mode });
-    },
-    [projectId, setNumericModeRaw],
-  );
-  // Stable Sets cheaper to query than `.includes()` inside the hot
-  // resolver below — the prefs lists are typically <20 items but
-  // `isSectionVisibleForDensity` runs once per section per render.
-  const explicitlyShownSet = useMemo(
-    () => new Set(visibilityPrefs.explicitlyShown),
-    [visibilityPrefs.explicitlyShown],
-  );
-  const explicitlyHiddenSet = useMemo(
-    () => new Set(visibilityPrefs.explicitlyHidden),
-    [visibilityPrefs.explicitlyHidden],
-  );
-
-  // Walk the AST once per identity change to build a flat lookup map.
-  // Every sidebar row used to call `getFacetValueState(ast, field, value)`,
-  // which walked the AST per call → N×M walks per render. With Phase 2's
-  // stable AST identity, this memo only reruns on real query changes.
+  // One walk of the query per identity change, so each row's state is a lookup.
   const facetStateLookup = useMemo(() => buildFacetStateLookup(ast), [ast]);
-
-  // AST-active fields always show, regardless of density or user
-  // overrides — hiding a facet whose value is currently filtered on
-  // would leave the user with no way to remove the filter from the
-  // sidebar (search bar still works, but that's worse UX). Derived
-  // from `facetStateLookup` which is keyed by `${field}|${value}`.
-  const activeFieldSet = useMemo(() => {
-    const fields = new Set<string>();
-    for (const k of facetStateLookup.keys()) {
-      const idx = k.indexOf("|");
-      fields.add(idx >= 0 ? k.slice(0, idx) : k);
-    }
-    return fields;
-  }, [facetStateLookup]);
-
+  const activeFields = useMemo(() => activeFieldsOf(facetStateLookup), [facetStateLookup]);
+  const { explicitlyHidden, explicitlyShown } = prefs;
   const isSectionVisibleForDensity = useCallback(
-    (key: string): boolean => {
-      // Explicit hide wins over everything except active filter — see
-      // comment on `activeFieldSet` above.
-      if (activeFieldSet.has(key)) return true;
-      if (explicitlyHiddenSet.has(key)) return false;
-      if (explicitlyShownSet.has(key)) return true;
-      // Compact = engineer mode, show everything the backend returned.
-      if (density === "compact") return true;
-      // Comfortable = "easy mode" — show only the curated cross-cutting
-      // facets unless the user added more via the "+ Add facet" menu.
-      return COMFORTABLE_DEFAULT_SECTIONS.has(key);
-    },
-    [density, activeFieldSet, explicitlyHiddenSet, explicitlyShownSet],
+    (key: string) =>
+      isSectionShown({ key, activeFields, explicitlyHidden, explicitlyShown, density }),
+    [density, activeFields, explicitlyHidden, explicitlyShown],
   );
 
-  const makeGetValueState = useCallback(
-    (field: string) =>
-      (value: string): FacetValueState =>
-        facetStateLookup.get(`${field}|${value}`) ?? "neutral",
-    [facetStateLookup],
+  const sections = useMemo(
+    () => sectionsOf({ descriptors, activeFields }),
+    [descriptors, activeFields],
   );
+  const { categoricals, ranges, isSynthetic } = sections;
 
-  // Synthesise when discover is still in flight, returned no descriptors, or returned
-  // descriptors that all partition away, so nothing usable survives for the current view.
-  const {
-    categoricals,
-    ranges,
-    traceAttributeKeys,
-    metadataAttributeKeys,
-    spanAttributeKeys,
-    eventAttributeKeys,
-    isSynthetic,
-  } = useMemo(() => {
-    const real = partitionDescriptors(descriptors ?? [], activeFieldSet);
-    if (!isPartitionEmpty(real)) {
-      return { ...real, isSynthetic: false };
-    }
-    const fallback = partitionDescriptors(synthesizeDefaultDescriptors(), activeFieldSet);
-    return { ...fallback, isSynthetic: true };
-  }, [descriptors, activeFieldSet]);
-
-  // Discrete-eligible numeric facets: range descriptors carrying a bounded
-  // distinct-value set. Their FacetItem[] is built into `facetItems` below so
-  // they can render through FacetSection; `numericModeByKey` resolves whether
-  // each shows the tick-list (discrete) or the slider (range).
+  // Numeric facets with a bounded distinct set can render as a tick-list;
+  // numericModeByKey says which of them do.
   const discreteEligible = useMemo(
-    () =>
-      computeDiscreteEligible({
-        ranges,
-        maxDistinctValues: DISCRETE_MODE_MAX_VALUES,
-      }),
+    () => computeDiscreteEligible({ ranges, maxDistinctValues: DISCRETE_MODE_MAX_VALUES }),
     [ranges],
   );
-
+  const numericModes = prefs.numericModes;
   const numericModeByKey = useMemo(
     () => resolveNumericModeByKey({ discreteEligible, numericModes }),
     [discreteEligible, numericModes],
   );
 
-  const attributeSections = useMemo<AttributesSectionData[]>(() => {
-    const sections: AttributesSectionData[] = [];
-    // Metadata leads the attribute block. Discovered keys are FULL
-    // (`metadata.environment`); `filterPrefix: "attribute"` + the full key yields
-    // `attribute.metadata.environment:value` → `Attributes['metadata.environment']`.
-    sections.push({
-      key: METADATA_SECTION_KEY,
-      label: "Metadata",
-      kind: "attributes",
-      filterPrefix: "attribute",
-      keys: metadataAttributeKeys,
-      displayStripPrefix: "metadata.",
-      emptyDocsHref: METADATA_DOCS_URL,
-    });
-    if (traceAttributeKeys.length > 0) {
-      sections.push({
-        key: ATTRIBUTES_SECTION_KEY,
-        label: "Trace attributes",
-        kind: "attributes",
-        filterPrefix: "attribute",
-        keys: traceAttributeKeys,
-      });
-    }
-    if (eventAttributeKeys.length > 0) {
-      sections.push({
-        key: EVENT_ATTRIBUTES_SECTION_KEY,
-        label: "Event attributes",
-        kind: "attributes",
-        filterPrefix: "event.attribute",
-        keys: eventAttributeKeys,
-      });
-    }
-    if (spanAttributeKeys.length > 0) {
-      sections.push({
-        key: SPAN_ATTRIBUTES_SECTION_KEY,
-        label: "Span attributes",
-        kind: "attributes",
-        filterPrefix: "span.attribute",
-        keys: spanAttributeKeys,
-      });
-    }
-    return sections;
-  }, [metadataAttributeKeys, traceAttributeKeys, spanAttributeKeys, eventAttributeKeys]);
-
-  const facetItems = useMemo(() => {
-    const map = new Map<string, FacetItem[]>();
-    for (const cat of categoricals) {
-      const baseItems = buildFacetItems({
-        cat,
-        isSynthetic: cat.synthetic ?? isSynthetic,
-        countState,
-      });
-      // Surface user-typed values as no-count AST rows, pinned to top so active
-      // filters stay visible above the show-more cut.
-      const known = new Set(baseItems.map((i) => i.value));
-      const { include, exclude } = getFacetValues(ast, cat.key);
-      const extras: FacetItem[] = [];
-      for (const value of [...include, ...exclude]) {
-        if (known.has(value)) continue;
-        known.add(value);
-        extras.push({
-          value,
-          label: value,
-          count: 0,
-          dimmed: true,
-          synthetic: true,
-        });
-      }
-      map.set(cat.key, [...extras, ...baseItems]);
-    }
-    // Discrete numeric facets render through FacetSection too — build their
-    // tick-list items from the descriptor's distinct values.
-    for (const [key, range] of discreteEligible) {
-      const baseItems = buildDiscreteFacetItems({
-        range,
-        synthetic: range.synthetic ?? isSynthetic,
-        countState,
-      });
-      // Same AST-extra handling as categoricals above: a selected discrete
-      // value that discover dropped from the distinct set would otherwise
-      // vanish from the sidebar while its filter stays active, leaving the
-      // user no way to clear it. Pin those rows to the top with a zero count.
-      const known = new Set(baseItems.map((i) => i.value));
-      const { include, exclude } = getFacetValues(ast, key);
-      const extras: FacetItem[] = [];
-      for (const value of [...include, ...exclude]) {
-        if (known.has(value)) continue;
-        known.add(value);
-        extras.push({
-          value,
-          label: value,
-          count: 0,
-          dotColor: hashColor(value),
-          dimmed: !VIBRANT_FIELDS.has(key),
-          synthetic: true,
-        });
-      }
-      map.set(key, [...extras, ...baseItems]);
-    }
-    return map;
-  }, [categoricals, discreteEligible, isSynthetic, ast, countState]);
+  const attributeSections = useMemo(() => attributeSectionsFor(sections), [sections]);
+  const facetItems = useMemo(
+    () => facetItemsFor({ categoricals, discreteEligible, isSynthetic, ast, countState }),
+    [categoricals, discreteEligible, isSynthetic, ast, countState],
+  );
 
   const getValueStates = useMemo(() => {
-    const map = new Map<string, (value: string) => FacetValueState>();
-    for (const cat of categoricals) {
-      map.set(cat.key, makeGetValueState(cat.key));
-    }
-    for (const key of discreteEligible.keys()) {
-      map.set(key, makeGetValueState(key));
-    }
-    return map;
-  }, [categoricals, discreteEligible, makeGetValueState]);
+    const getFor =
+      (field: string) =>
+      (value: string): FacetValueState =>
+        facetStateLookup.get(`${field}|${value}`) ?? "neutral";
+    const keys = [...categoricals.map((c) => c.key), ...discreteEligible.keys()];
+    return new Map(keys.map((key) => [key, getFor(key)]));
+  }, [categoricals, discreteEligible, facetStateLookup]);
 
-  const sectionByKey = useMemo(() => {
-    const map = new Map<string, Section>();
-    for (const c of categoricals) map.set(c.key, c);
-    for (const r of ranges) map.set(r.key, r);
-    for (const a of attributeSections) map.set(a.key, a);
-    return map;
-  }, [categoricals, ranges, attributeSections]);
+  const sectionByKey = useMemo(
+    () =>
+      new Map<string, Section>(
+        [...categoricals, ...ranges, ...attributeSections].map((section) => [section.key, section]),
+      ),
+    [categoricals, ranges, attributeSections],
+  );
 
-  // Full ordered list — covers everything the backend returned, before
-  // density / per-user visibility is applied. Kept around so the
-  // "+ Add facet" menu can offer the user any data-having facet that's
-  // currently filtered out.
-  const orderedKeysAll = useMemo(() => {
-    const naturalOrder = sortBySectionOrder([
-      ...categoricals.map((c) => ({ key: c.key, label: c.label })),
-      ...ranges.map((r) => ({ key: r.key, label: r.label })),
-      ...attributeSections.map((a) => ({ key: a.key, label: a.label })),
-    ]).map((s) => s.key);
-    return applyLensOrder(naturalOrder, lensSectionOrder);
-  }, [categoricals, ranges, attributeSections, lensSectionOrder]);
-
-  // Visible ordered list — what the sidebar actually renders. Filtered
-  // by density + per-user prefs + active-AST. Drops both "would-be-shown
-  // but explicitly hidden" and "would-be-hidden but not explicitly
-  // shown" sections in one pass.
+  // Everything the backend has data for, so "+ Add facet" can offer what the
+  // current visibility hides; the sidebar renders the visible subset.
+  const orderedKeysAll = useMemo(
+    () =>
+      orderedSectionKeys({
+        sections: [...categoricals, ...ranges, ...attributeSections],
+        lensSectionOrder,
+      }),
+    [categoricals, ranges, attributeSections, lensSectionOrder],
+  );
   const orderedKeys = useMemo(
     () => orderedKeysAll.filter(isSectionVisibleForDensity),
     [orderedKeysAll, isSectionVisibleForDensity],
   );
 
-  const showFacetForProject = useCallback(
-    (key: string) => {
-      if (projectId) showFacet(projectId, key);
-    },
-    [projectId, showFacet],
-  );
-  const hideFacetForProject = useCallback(
-    (key: string) => {
-      if (projectId) hideFacet(projectId, key);
-    },
-    [projectId, hideFacet],
-  );
-  const resetAllFacetsForProject = useCallback(() => {
-    if (projectId) resetAllVisibility(projectId);
-  }, [projectId, resetAllVisibility]);
-
   return {
-    ast,
+    ...actions,
     categoricals,
     ranges,
-    traceAttributeKeys,
-    metadataAttributeKeys,
-    spanAttributeKeys,
-    eventAttributeKeys,
+    traceAttributeKeys: sections.traceAttributeKeys,
+    metadataAttributeKeys: sections.metadataAttributeKeys,
+    spanAttributeKeys: sections.spanAttributeKeys,
+    eventAttributeKeys: sections.eventAttributeKeys,
     attributeSections,
     facetItems,
     getValueStates,
@@ -425,36 +453,19 @@ export function useFilterSidebarData() {
     countState,
     orderedKeys,
     sectionByKey,
-    /** Effective presentation mode per discrete-eligible numeric facet
-     *  (`override ?? "discrete"`). A missing key = not eligible (slider only). */
+    /** Presentation per discrete-eligible numeric facet; a missing key is slider only. */
     numericModeByKey,
     /** Switch a numeric facet's presentation (persisted per project). */
-    setNumericMode,
-    toggleFacet,
-    /** Force a value to excluded (`NOT field:value`) / back to neutral —
-     *  drives the row's trailing exclude affordance. */
-    excludeFacet,
-    setRange,
-    removeRange,
-    /** Evaluator-scoped group mutations — the drilldown wraps verdict /
-     *  score / label sub-conditions in `(evaluator:X AND …)` so they bind to
-     *  one evaluation. See {@link toggleEvaluatorSubFilter}. */
-    toggleEvaluatorSubFilter,
-    setEvaluatorScoreRange,
-    removeEvaluatorScoreRange,
+    setNumericMode: prefs.setNumericMode,
     setSectionOrder,
     setAllSectionsOpen,
-    showFacet: showFacetForProject,
-    hideFacet: hideFacetForProject,
-    /** Resets all per-user show/hide overrides — sidebar returns to the
-     *  density-default visibility. Wired into the facet picker's
-     *  "Reset to defaults" footer button. */
-    resetAllFacets: resetAllFacetsForProject,
-    /** Full inventory the picker walks — every key the backend has
-     *  data for, regardless of current visibility. */
+    showFacet: prefs.showFacet,
+    hideFacet: prefs.hideFacet,
+    /** Clears the reader's show/hide overrides, back to the density default. */
+    resetAllFacets: prefs.resetAllFacets,
+    /** Every key the backend has data for, whatever the current visibility. */
     orderedKeysAll,
-    /** Predicate the picker uses to render the checked state of each
-     *  row. Reads density + per-user prefs + AST-active fields. */
+    /** Whether a section shows: density, the reader's preferences, active filters. */
     isSectionVisibleForDensity,
   };
 }

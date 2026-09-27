@@ -15,6 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { buildTestCodingAgentProcessingPipeline } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import { CodingAgentSessionStateProjection } from "../coding-agent-session-state.projection.ts";
 import type { CodingAgentSessionState } from "../coding-agent-session.projection.ts";
 
 const QUEUE_NAME = "{test/prmap-throttle}";
@@ -57,11 +58,18 @@ function payloadFor(sessionId: string) {
       },
     } satisfies CodingAgentProcessingEvent,
     foldState: {
+      ...CodingAgentSessionStateProjection.create().createInitCodingAgentSession(),
+      sessionKeySource: "provider",
+      traceIds: [],
+      startedAtMs: 0,
+      createdAt: 0,
+      updatedAt: 0,
+      LastEventOccurredAt: 0,
       repositoryHost: "github.com",
       repositoryOwner: "acme",
       repositoryName: "widgets",
       gitBranch: "feat/shared",
-    } as unknown as CodingAgentSessionState,
+    } satisfies CodingAgentSessionState,
   };
 }
 

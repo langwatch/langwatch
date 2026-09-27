@@ -15,9 +15,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
 import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
+import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { LicenseService } from "../services/license.service.ts";
 import { NodeLicenseCryptographyService } from "../services/node-license-cryptography.service.ts";
 import { OFFLINE_LICENSE_FROM_MAIN as fixture } from "./support/offline-license-from-main.fixture.ts";
+import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "./testing.ts";
 
 const ORG = "org_offline";
 
@@ -87,6 +89,26 @@ describe("a license minted by main before Connect", () => {
       expect(verdict.valid).toBe(true);
       if (!verdict.valid) return;
       expect(verdict.licenseData).toEqual(fixture.expected);
+    });
+
+    /** @scenario "A licence minted as lic-<uuid> keeps verifying once new licences carry KSUIDs" */
+    it("still verifies under its lic-<uuid> id beside a licence minted with a KSUID id", () => {
+      const verdict = cryptography.validateLicense({ licenseKey: fixture.licenseKey });
+      const testCryptography = NodeLicenseCryptographyService.create({
+        publicKey: TEST_PUBLIC_KEY,
+      });
+      const minted = LicenseGenerationService.create(testCryptography).generate({
+        organizationName: "Acme",
+        email: "ops@acme.test",
+        planType: "GROWTH",
+        maxMembers: 3,
+        privateKey: TEST_PRIVATE_KEY,
+      });
+
+      expect(fixture.expected.licenseId).toMatch(/^lic-[0-9a-f-]{36}$/);
+      expect(verdict.valid && verdict.licenseData.licenseId).toBe(fixture.expected.licenseId);
+      expect(minted.licenseData.licenseId).toMatch(/^license_[0-9A-Za-z]+$/);
+      expect(testCryptography.validateLicense({ licenseKey: minted.licenseKey }).valid).toBe(true);
     });
 
     it("re-serializes byte for byte, so the signature still covers the same schema", () => {

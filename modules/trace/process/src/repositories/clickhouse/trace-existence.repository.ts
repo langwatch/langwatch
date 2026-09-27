@@ -5,8 +5,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { TraceUsageCount } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 import { TraceExistenceRepository } from "../trace-existence.repository.ts";
+import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chString } from "./clickhouse.trace-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));

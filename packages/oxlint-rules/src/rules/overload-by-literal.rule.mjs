@@ -19,7 +19,12 @@ export const overloadByLiteralRule = defineRule({
   create(context, file) {
     return {
       Program(program) {
-        for (const finding of reportsFor(context, file, "overload-by-literal", program)) {
+        for (const finding of reportsFor({
+          context,
+          file,
+          policy: "overload-by-literal",
+          program,
+        })) {
           context.report({
             node: finding.node,
             messageId: "splitTheOverloads",

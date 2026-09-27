@@ -20,7 +20,12 @@ export const passThroughClassRule = defineRule({
   create(context, file) {
     return {
       Program(program) {
-        for (const finding of reportsFor(context, file, "pass-through-class", program)) {
+        for (const finding of reportsFor({
+          context,
+          file,
+          policy: "pass-through-class",
+          program,
+        })) {
           context.report({
             node: finding.node,
             messageId: "passThrough",

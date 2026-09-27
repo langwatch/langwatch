@@ -1,5 +1,6 @@
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
 import type { CommandSchema } from "../../commands/commandSchema.ts";
@@ -24,10 +25,20 @@ import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import { mapValidationIssues } from "../../utils/errors.ts";
 import {
   type CommandHandlerOptions,
+  parseQueuedCommandPayload,
   processCommand,
   processCommandBatch,
 } from "../commands/commandDispatcher.ts";
 import { ConfigurationError, ValidationError } from "../errorHandling.ts";
+import {
+  JOB_ROUTING_FIELD,
+  type JobLane,
+  type JobRegistryEntry,
+  readJobRouting,
+  routeJob,
+  sealJobLane,
+  toRecord,
+} from "./jobLane.ts";
 
 const logger = createLogger("langwatch:event-sourcing:queue-manager");
 
@@ -42,58 +53,44 @@ function occurredAtScore(payload: { occurredAt?: unknown }): number {
     : (occurredAt as number);
 }
 
-/**
- * Metadata stored per job type in the global job registry.
- * Used by the global queue's process/groupKey/score callbacks to dispatch to the right handler.
- */
-export interface JobRegistryEntry {
-  process: (payload: any, delivery?: JobDelivery) => Promise<void>;
-  groupKeyFn: (payload: any) => string;
-  /**
-   * The tenant this lane's payload carries — the SAME accessor `buildGroupKey`
-   * prefixes the group key with. Recorded so the consumer can assert agreement
-   * without re-deriving lane shapes (reactor lanes read `payload.event.tenantId`).
-   */
-  getTenantId: (payload: any) => string;
-  /**
-   * Exact group for aggregate-scoped migration pre-registration. Absent when
-   * the job routes by a custom group key: that key is only knowable from a
-   * payload, and preflight has to name every group before one exists.
-   */
-  preflightGroupKey?: (identity: { tenantId: string; aggregateId: string }) => string;
-  scoreFn: (payload: any) => number;
-  delay?: number;
-  deduplication?: DeduplicationConfig<any>;
-  spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
-  /**
-   * Optional batch processor for group coalescing: with `coalesceMaxBatch
-   * > 1` the queue may fold same-group jobs into one call (dispatched job
-   * plus drained siblings, occurredAt order; first payload is dispatched).
-   */
-  processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
-  /**
-   * Max same-group jobs in one `processBatch` call, or payload-based resolver.
-   */
-  coalesceMaxBatch?: number | ((payload: any) => number);
-  /**
-   * Optional byte cap for a coalesced batch (ADR-066 pillar 2). Resolved by the
-   * global queue per job; undefined falls back to the GroupQueue default.
-   */
-  coalesceMaxBytes?: number;
+export type { JobRegistryEntry } from "./jobLane.ts";
+
+/** The facade a lane hands its callers: sends a typed payload, routed before it is queued. */
+interface JobSender<P> {
+  send: (payload: P, options?: QueueSendOptions<P>) => Promise<void>;
+  sendBatch: (payloads: P[], options?: QueueSendOptions<P>) => Promise<void>;
+  close: () => Promise<void>;
+  waitUntilReady: () => Promise<void>;
 }
 
-/**
- * How many same-group jobs fold here; resolver excludes unsafe payloads.
- */
-export function resolveCoalesceMaxBatch(
-  entry: Pick<JobRegistryEntry, "coalesceMaxBatch">,
-  payload: Record<string, unknown>,
-): number {
-  const bound = entry.coalesceMaxBatch;
-  if (typeof bound === "function") {
-    return bound(payload);
-  }
-  return bound ?? 1;
+/** Runs a coalesced batch under its first event's tenant; a batch is never empty. */
+function withBatchTenant<E extends Event>(
+  events: E[],
+  run: (tenantId: E["tenantId"]) => Promise<void>,
+): Promise<void> {
+  const [first] = events;
+  return first ? run(first.tenantId) : Promise.resolve();
+}
+
+const reactorPayloadSchema = z.object({ event: z.unknown(), foldState: z.unknown() });
+
+/** A send's dedup config over the queued envelope: its id was computed at send, in `__routing`. */
+function routedDeduplication<P>(
+  deduplication: DeduplicationConfig<P>,
+): DeduplicationConfig<Record<string, unknown>> {
+  return {
+    ...deduplication,
+    makeId: (envelope) => {
+      const dedupId = readJobRouting(envelope)?.dedupId;
+      if (dedupId === undefined) {
+        throw new ConfigurationError(
+          "QueueManager",
+          "A deduplicated job was queued without its id",
+        );
+      }
+      return dedupId;
+    },
+  };
 }
 
 interface CommandRegistryEntry<EventType extends Event, Payload extends TenantScopedPayload> {
@@ -138,6 +135,19 @@ function validateCommandPayload<EventType extends Event, Payload extends TenantS
   });
 }
 
+/** A caller's per-send options, whose dedup id it computes over the payload it passed in. */
+function sendOptionsOverRaw<Payload>(
+  options: QueueSendOptions<Record<string, unknown>> | undefined,
+  rawOf: (payload: Payload) => Record<string, unknown>,
+): QueueSendOptions<Payload> | undefined {
+  const deduplication = options?.deduplication;
+  if (!deduplication) return options ? { delay: options.delay } : undefined;
+  return {
+    delay: options.delay,
+    deduplication: { ...deduplication, makeId: (payload) => deduplication.makeId(rawOf(payload)) },
+  };
+}
+
 /**
  * Wraps a command's base facade with pre-send schema validation and the
  * migration preflight that claims groups BEFORE staging. Order matters:
@@ -145,7 +155,7 @@ function validateCommandPayload<EventType extends Event, Payload extends TenantS
  */
 function buildValidatingCommandFacade<EventType extends Event, Payload extends TenantScopedPayload>(
   cmdEntry: CommandRegistryEntry<EventType, Payload>,
-  baseFacade: EventSourcedQueueProcessor<Record<string, unknown>>,
+  baseFacade: JobSender<Payload>,
   registerPreflight: (
     identities: readonly { tenantId: string; aggregateId: string }[],
   ) => Promise<void>,
@@ -161,7 +171,10 @@ function buildValidatingCommandFacade<EventType extends Event, Payload extends T
     ) => {
       const validated = validateCommandPayload(cmdEntry, payload);
       await registerPreflight([identityOf(validated)]);
-      return baseFacade.send(payload, options);
+      return baseFacade.send(
+        validated,
+        sendOptionsOverRaw(options, () => payload),
+      );
     },
     sendBatch: async (
       payloads: Record<string, unknown>[],
@@ -169,7 +182,11 @@ function buildValidatingCommandFacade<EventType extends Event, Payload extends T
     ) => {
       const validated = payloads.map((payload) => validateCommandPayload(cmdEntry, payload));
       await registerPreflight(validated.map(identityOf));
-      return baseFacade.sendBatch(payloads, options);
+      const rawOf = new Map(validated.map((payload, index) => [payload, payloads[index] ?? {}]));
+      return baseFacade.sendBatch(
+        validated,
+        sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
+      );
     },
     close: baseFacade.close,
     waitUntilReady: baseFacade.waitUntilReady,
@@ -208,6 +225,7 @@ export class QueueManager<EventType extends Event = Event> {
   private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
   private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
   private readonly killSwitch?: KillSwitch;
+  private readonly parseEvent: (value: unknown) => EventType;
   private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
   private readonly reactorQueues = new Map<
     string,
@@ -230,10 +248,13 @@ export class QueueManager<EventType extends Event = Event> {
     globalQueue,
     globalJobRegistry,
     killSwitch,
+    parseEvent,
     logger = createLogger("langwatch:event-sourcing:queue-manager"),
   }: {
     aggregateType: AggregateType;
     pipelineName: string;
+    /** Parses a queued event with its pipeline's schema for its type (§9). */
+    parseEvent: (value: unknown) => EventType;
     globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
     globalJobRegistry?: Map<string, JobRegistryEntry>;
     killSwitch?: KillSwitch;
@@ -245,6 +266,7 @@ export class QueueManager<EventType extends Event = Event> {
     this.globalQueue = globalQueue;
     this.globalJobRegistry = globalJobRegistry;
     this.killSwitch = killSwitch;
+    this.parseEvent = parseEvent;
   }
 
   private createDefaultDeduplicationId(event: EventType): string {
@@ -319,88 +341,62 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /**
-   * Creates a facade that wraps the global queue, injecting
-   * __pipelineName/__jobType/__jobName metadata and namespacing dedup IDs,
-   * and registers the entry so the queue's callbacks dispatch to it.
+   * Registers a lane's sealed entry and answers its facade: each send computes the payload's
+   * routing from the typed value and carries it in `__routing` beside the job path (§9).
    */
-  private createFacade<P extends Record<string, unknown>>(
+  private createFacade<P extends object>(
     jobType: string,
     jobName: string,
-    entry: JobRegistryEntry,
-  ): EventSourcedQueueProcessor<P> {
+    lane: JobLane<P>,
+  ): JobSender<P> {
     if (!this.globalQueue || !this.globalJobRegistry) {
       throw new ConfigurationError(
         "QueueManager",
         "Cannot create facade without global queue and registry",
       );
     }
-
-    const regKey = this.registryKey(jobType, jobName);
-    this.globalJobRegistry.set(regKey, entry);
-
     const globalQueue = this.globalQueue;
     const pipelineName = this.pipelineName;
+    const namespaceDedupId = (id: string) => `${pipelineName}/${jobType}/${jobName}/${id}`;
+    this.globalJobRegistry.set(
+      this.registryKey(jobType, jobName),
+      sealJobLane(lane, namespaceDedupId, `${pipelineName}:${jobType}:${jobName}`),
+    );
 
-    const stripInternal = (payload: Record<string, unknown>) => {
-      const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
-      return clean;
+    const envelopeOf = (payload: P, deduplication: DeduplicationConfig<P> | undefined) => ({
+      ...toRecord(payload),
+      __pipelineName: pipelineName,
+      __jobType: jobType,
+      __jobName: jobName,
+      [JOB_ROUTING_FIELD]: routeJob({ lane, payload, deduplication, namespaceDedupId }),
+    });
+    const sendOptionsOf = (options: QueueSendOptions<P> | undefined) => {
+      const deduplication = options?.deduplication ?? lane.deduplication;
+      return {
+        deduplication,
+        queued: {
+          delay: options?.delay ?? lane.delay,
+          deduplication: deduplication ? routedDeduplication(deduplication) : undefined,
+        },
+      };
     };
 
-    // Namespace dedup IDs to avoid cross-pipeline/cross-type collisions
-    const namespaceDedup = (
-      dedup: DeduplicationConfig<any>,
-    ): DeduplicationConfig<Record<string, unknown>> => ({
-      ...dedup,
-      makeId: (payload: Record<string, unknown>) =>
-        `${pipelineName}/${jobType}/${jobName}/${dedup.makeId(stripInternal(payload))}`,
-    });
-
-    const namespacedEntryDedup: DeduplicationConfig<Record<string, unknown>> | undefined =
-      entry.deduplication ? namespaceDedup(entry.deduplication) : undefined;
-
-    const facade: EventSourcedQueueProcessor<P> = {
-      send: async (payload: P, options?: QueueSendOptions<P>) => {
-        const effectiveDedup = options?.deduplication
-          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
-          : namespacedEntryDedup;
-
-        await globalQueue.send(
-          {
-            ...payload,
-            __pipelineName: pipelineName,
-            __jobType: jobType,
-            __jobName: jobName,
-          },
-          {
-            delay: options?.delay ?? entry.delay,
-            deduplication: effectiveDedup,
-          },
-        );
+    return {
+      send: async (payload, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
+        await globalQueue.send(envelopeOf(payload, deduplication), queued);
       },
-      sendBatch: async (payloads: P[], options?: QueueSendOptions<P>) => {
-        const effectiveDedup = options?.deduplication
-          ? namespaceDedup(options.deduplication as DeduplicationConfig<any>)
-          : namespacedEntryDedup;
-
+      sendBatch: async (payloads, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
         await globalQueue.sendBatch(
-          payloads.map((p) => ({
-            ...p,
-            __pipelineName: pipelineName,
-            __jobType: jobType,
-            __jobName: jobName,
-          })),
-          {
-            delay: options?.delay ?? entry.delay,
-            deduplication: effectiveDedup,
-          },
+          payloads.map((payload) => envelopeOf(payload, deduplication)),
+          queued,
         );
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
       close: async () => undefined,
       waitUntilReady: () => globalQueue.waitUntilReady(),
     };
-
-    return facade;
   }
 
   // An arrow instance property, not a prototype method: tests hold a
@@ -488,13 +484,14 @@ export class QueueManager<EventType extends Event = Event> {
           ? (event: EventType) => customGroupKeyFn(event) ?? aggregateKey(event)
           : aggregateKey,
       });
-      const entry: JobRegistryEntry = {
+      const lane: JobLane<EventType> = {
+        parse: this.parseEvent,
         groupKeyFn,
         getTenantId,
         preflightGroupKey: customGroupKeyFn
           ? undefined
           : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
-        scoreFn: (event: any) => event.occurredAt ?? event.createdAt,
+        scoreFn: (event: EventType) => event.occurredAt ?? event.createdAt,
         process: async (event: EventType) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
@@ -504,11 +501,10 @@ export class QueueManager<EventType extends Event = Event> {
           onEventBatch &&
           handlerDef.options.coalesceMaxBatch &&
           handlerDef.options.coalesceMaxBatch > 1
-            ? async (events: any[]) => {
-                await onEventBatch(handlerName, events, {
-                  tenantId: events[0]?.tenantId,
-                });
-              }
+            ? (events: EventType[]) =>
+                withBatchTenant(events, (tenantId) =>
+                  onEventBatch(handlerName, events, { tenantId }),
+                )
             : undefined,
         coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
         delay: handlerDef.options.delay,
@@ -521,7 +517,7 @@ export class QueueManager<EventType extends Event = Event> {
         spanAttributes: handlerDef.options.spanAttributes,
       };
 
-      const facade = this.createFacade<EventType>(jobType, handlerName, entry);
+      const facade = this.createFacade(jobType, handlerName, lane);
       this.eventQueues.set(this.key(jobType, handlerName), facade);
       incrementCount();
     }
@@ -581,13 +577,15 @@ export class QueueManager<EventType extends Event = Event> {
           : (event: EventType) => `${event.aggregateType}:${String(event.aggregateId)}`,
       });
       const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
-      const entry: JobRegistryEntry = {
+      const jobLane: JobLane<EventType> = {
+        parse: this.parseEvent,
         groupKeyFn,
         getTenantId,
         preflightGroupKey: customGroupKeyFn
           ? undefined
           : this.buildPreflightGroupKey(`${lane.jobPath}/${projectionName}`),
-        scoreFn: projectionDef.scoreFn ?? ((event: any) => event.occurredAt ?? event.createdAt),
+        scoreFn:
+          projectionDef.scoreFn ?? ((event: EventType) => event.occurredAt ?? event.createdAt),
         process: async (event: EventType, delivery?: JobDelivery) => {
           await onEvent(projectionName, event, {
             tenantId: event.tenantId,
@@ -599,13 +597,14 @@ export class QueueManager<EventType extends Event = Event> {
         // so the tenant is taken from the first event.
         processBatch:
           onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
-            ? async (events: any[], delivery?: JobDelivery) => {
-                await onEventBatch(projectionName, events, {
-                  tenantId: events[0]?.tenantId,
-                  deliveryAttempt: delivery?.attempt,
-                  isDeliveryContinuation: delivery?.isContinuation,
-                });
-              }
+            ? (events: EventType[], delivery?: JobDelivery) =>
+                withBatchTenant(events, (tenantId) =>
+                  onEventBatch(projectionName, events, {
+                    tenantId,
+                    deliveryAttempt: delivery?.attempt,
+                    isDeliveryContinuation: delivery?.isContinuation,
+                  }),
+                )
             : undefined,
         coalesceMaxBatch,
         spanAttributes: (event: EventType) => ({
@@ -616,7 +615,7 @@ export class QueueManager<EventType extends Event = Event> {
         }),
       };
 
-      const facade = this.createFacade<EventType>(lane.queueType, projectionName, entry);
+      const facade = this.createFacade(lane.queueType, projectionName, jobLane);
       this.eventQueues.set(this.key(lane.queueType, projectionName), facade);
       if (lane.queueType === "stateProjection") {
         this.stateProjectionCount++;
@@ -716,20 +715,20 @@ export class QueueManager<EventType extends Event = Event> {
     cmdEntry: CommandRegistryEntry<EventType, Payload>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
   ): void {
-    const jobEntry = this.buildCommandJobEntry(cmdName, cmdEntry, storeEvents);
-    const baseFacade = this.createFacade<Record<string, unknown>>("command", cmdName, jobEntry);
+    const lane = this.buildCommandJobLane(cmdName, cmdEntry, storeEvents);
+    const baseFacade = this.createFacade("command", cmdName, lane);
     const validatingFacade = buildValidatingCommandFacade(cmdEntry, baseFacade, (identities) =>
       this.registerPreflightAggregateTargets(identities),
     );
     this.commandQueues.set(this.key("command", cmdName), validatingFacade);
   }
 
-  /** Builds the job-registry entry (group key, score, process/processBatch) for one command. */
-  private buildCommandJobEntry<Payload extends TenantScopedPayload>(
+  /** Builds the job lane (parse, group key, score, process/processBatch) for one command. */
+  private buildCommandJobLane<Payload extends TenantScopedPayload>(
     cmdName: string,
     cmdEntry: CommandRegistryEntry<EventType, Payload>,
     storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
-  ): JobRegistryEntry {
+  ): JobLane<Payload> {
     const rawDedup = resolveDeduplicationStrategy(
       cmdEntry.options.deduplication,
       (payload: Payload) => {
@@ -785,6 +784,8 @@ export class QueueManager<EventType extends Event = Event> {
     };
 
     return {
+      // The lane's parse is the command's only dispatch-time validation (§9, Alex 2026-09-27).
+      parse: (payload) => parseQueuedCommandPayload(commandProcessParams, payload),
       groupKeyFn: commandGroupKeyFn,
       getTenantId,
       preflightGroupKey:
@@ -795,8 +796,8 @@ export class QueueManager<EventType extends Event = Event> {
           : undefined,
       scoreFn: cmdEntry.options.serializeByAggregate
         ? () => nowInstant().epochMilliseconds
-        : (payload: Record<string, unknown>) => occurredAtScore(payload),
-      process: async (payload: Record<string, unknown>) => {
+        : (payload: Payload) => occurredAtScore(toRecord(payload)),
+      process: async (payload: Payload) => {
         await processCommand({ ...commandProcessParams, payload });
       },
       // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
@@ -804,7 +805,7 @@ export class QueueManager<EventType extends Event = Event> {
       // GroupQueue only drains same-`__jobName` siblings, so every payload
       // here is this command type. Left undefined otherwise (per-job path).
       processBatch: coalescesAppends
-        ? async (payloads: Record<string, unknown>[]) => {
+        ? async (payloads: Payload[]) => {
             await processCommandBatch({
               ...commandProcessParams,
               payloads,
@@ -862,7 +863,11 @@ export class QueueManager<EventType extends Event = Event> {
           : (payload: { event: EventType; foldState: unknown }) =>
               `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
-      const entry: JobRegistryEntry = {
+      const lane: JobLane<{ event: EventType; foldState: unknown }> = {
+        parse: (payload) => {
+          const { event, foldState } = reactorPayloadSchema.parse(payload);
+          return { event: this.parseEvent(event), foldState };
+        },
         groupKeyFn: subscriberGroupKeyFn,
         getTenantId,
         preflightGroupKey: customGroupKeyFn
@@ -892,10 +897,7 @@ export class QueueManager<EventType extends Event = Event> {
 
       // `reactor` is the physical GroupQueue segment for projection-subscriber
       // jobs: `<tenantId>/<fold|map>/<projection>/reactor/<name>`.
-      const facade = this.createFacade<{
-        event: EventType;
-        foldState: unknown;
-      }>("reactor", subscriberName, entry);
+      const facade = this.createFacade("reactor", subscriberName, lane);
       this.reactorQueues.set(this.key("reactor", subscriberName), facade);
       this.projectionSubscriberCount++;
     }
@@ -1005,6 +1007,7 @@ export class QueueManager<EventType extends Event = Event> {
    */
   registerJob<P extends Record<string, unknown>>({
     name,
+    parse,
     process,
     delay,
     deduplication,
@@ -1013,6 +1016,8 @@ export class QueueManager<EventType extends Event = Event> {
     spanAttributes,
   }: {
     name: string;
+    /** Reads a dequeued payload; the queue hands the job nothing it has not parsed (§9). */
+    parse: (payload: unknown) => P;
     process: (payload: P) => Promise<void>;
     delay?: number;
     deduplication?: DeduplicationConfig<P>;
@@ -1025,7 +1030,8 @@ export class QueueManager<EventType extends Event = Event> {
     }
 
     const getTenantId = (payload: P) => String(payload.tenantId);
-    const entry: JobRegistryEntry = {
+    const lane: JobLane<P> = {
+      parse,
       groupKeyFn: groupKeyFn
         ? this.buildGroupKey({
             jobPath: `job/${name}`,
@@ -1047,7 +1053,7 @@ export class QueueManager<EventType extends Event = Event> {
       spanAttributes,
     };
 
-    const facade = this.createFacade<P>("job", name, entry);
+    const facade = this.createFacade("job", name, lane);
     this.jobQueueClosers.set(this.key("job", name), () => facade.close());
     return facade;
   }

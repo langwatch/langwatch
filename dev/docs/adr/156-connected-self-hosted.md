@@ -286,6 +286,8 @@ statistics post keeps its payload, moves to the connect host when Connect is
 on, and stays off with `DISABLE_USAGE_STATS`. `app.langwatch.ai/api/track_usage`
 keeps working for older installs and for installs without Connect.
 
+New instance ids (and new licence ids) are KSUIDs; UUIDs and `lic-<uuid>` ids already minted keep working (Alex, 2026-09-27).
+
 What the registry keeps from a sync is the last report on the row
 (`lastSyncAt`, `lastSyncVersion`, `reportedMembers`, `reportedMembersLite`).
 The backoffice and the lead signals read it; a licensed install whose last sync

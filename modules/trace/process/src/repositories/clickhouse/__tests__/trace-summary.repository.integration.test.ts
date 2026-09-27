@@ -65,7 +65,6 @@ beforeAll(async () => {
   ch = await startMigratedTraceClickHouse();
   repo = TraceSummaryClickHouseRepository.create({
     resolveClient: async () => ch,
-    defaultRetentionDays: 30,
   });
 
   await ch.insert({
@@ -107,7 +106,6 @@ function recordingRepo(): {
   return {
     repo: TraceSummaryClickHouseRepository.create({
       resolveClient: async () => recordingClient,
-      defaultRetentionDays: 30,
     }),
     queries,
   };

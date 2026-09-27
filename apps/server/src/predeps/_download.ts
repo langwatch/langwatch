@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { Transform } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 import { nowInstant } from "@langwatch/time";
@@ -39,7 +39,7 @@ export async function downloadWithProgress({
     },
   });
 
-  await pipeline(res.body as unknown as NodeJS.ReadableStream, reporter, createWriteStream(tmp));
+  await pipeline(Readable.fromWeb(res.body), reporter, createWriteStream(tmp));
   // Final 100% update so the spinner doesn't get stuck mid-progress.
   task.output = `${prefix} ${formatMB(downloaded)}${total ? ` / ${totalLabel}` : ""}`;
 }

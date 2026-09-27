@@ -79,6 +79,12 @@ Feature: Windowed reads fall back on a leash, and the fallback is measured
 
   # ADR-068, point 3 — the rate-limited fallback ships as a separate change,
   # after the outcome counts above establish a per-table baseline for its limit.
+  @unit
+  Scenario: a process's windowed reads are counted on its metrics
+    Given a process that built its ClickHouse member
+    When a windowed read answers inside its window
+    Then clickhouse_windowed_read_total counts it by table and outcome
+
   @planned
   # Not yet implemented as of 2026-07-24 — this change measures the fallback so
   # its rate can be chosen from observed load; the token-bucket limiter and the

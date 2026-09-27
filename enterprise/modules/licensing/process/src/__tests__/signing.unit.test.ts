@@ -281,17 +281,8 @@ describe("generateLicenseId", () => {
     expect(id1).not.toBe(id2);
   });
 
-  it("produces IDs starting with lic- prefix", () => {
-    const id = generateLicenseId();
-
-    expect(id).toMatch(/^lic-/);
-  });
-
-  it("produces IDs of consistent format", () => {
-    const id = generateLicenseId();
-
-    // Format: lic-{uuid} or similar unique identifier
-    expect(id.length).toBeGreaterThan(4); // "lic-" + at least 1 character
+  it("mints a KSUID on the license resource, not main's lic-<uuid>", () => {
+    expect(generateLicenseId()).toMatch(/^license_[0-9A-Za-z]+$/);
   });
 
   it("produces 100 unique IDs without collision", () => {

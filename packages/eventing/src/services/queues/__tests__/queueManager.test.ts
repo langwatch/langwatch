@@ -13,6 +13,7 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
@@ -143,6 +144,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -183,6 +185,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -192,8 +195,7 @@ describe("QueueManager", () => {
       manager.initializeHandlerQueues({ h1: createMockEventHandlerDefinition("h1") }, vi.fn());
 
       const entry = globalJobRegistry.get("test-pipeline:handler:h1");
-      expect(entry?.groupKeyFn).toBeDefined();
-      expect(entry?.scoreFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
     });
 
     it("shared queue dispatches groupKey to correct entry", () => {
@@ -201,6 +203,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -217,14 +220,14 @@ describe("QueueManager", () => {
 
       // Handler job groupKey — hierarchical: tenantId/map/name/domainKey
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
-      const handlerGroupKey = handlerEntry?.groupKeyFn(event);
+      const handlerGroupKey = handlerEntry?.route(event).groupKey;
       expect(handlerGroupKey).toBe(
         `${tenantId}/map/h1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
 
       // Projection job groupKey — hierarchical: tenantId/fold/name/domainKey
       const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
-      const projectionGroupKey = projectionEntry?.groupKeyFn(event);
+      const projectionGroupKey = projectionEntry?.route(event).groupKey;
       expect(projectionGroupKey).toBe(
         `${tenantId}/fold/p1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -235,6 +238,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -252,7 +256,7 @@ describe("QueueManager", () => {
       );
 
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
-      const score = handlerEntry?.scoreFn(event);
+      const score = handlerEntry?.route(event).score;
       expect(score).toBe(42000);
     });
 
@@ -263,6 +267,7 @@ describe("QueueManager", () => {
       const handleEventCallback = vi.fn().mockResolvedValue(void 0);
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -277,7 +282,7 @@ describe("QueueManager", () => {
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const handlerEntry = globalJobRegistry.get("test-pipeline:handler:h1");
-      await handlerEntry?.process(event);
+      await handlerEntry?.read(event).run();
 
       expect(handleEventCallback).toHaveBeenCalledWith(
         "h1",
@@ -294,6 +299,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -308,7 +314,7 @@ describe("QueueManager", () => {
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
       const projectionEntry = globalJobRegistry.get("test-pipeline:projection:p1");
-      const attrs = projectionEntry?.spanAttributes?.(event);
+      const attrs = projectionEntry?.route(event).spanAttributes;
       expect(attrs).toEqual(
         expect.objectContaining({
           "projection.name": "p1",
@@ -322,6 +328,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -338,6 +345,7 @@ describe("QueueManager", () => {
   describe("initializeHandlerQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -357,6 +365,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -383,6 +392,7 @@ describe("QueueManager", () => {
       const mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -404,9 +414,9 @@ describe("QueueManager", () => {
         createTestEvent("two", aggregateType, tenantId),
       ];
 
-      await entry.processBatch!(events);
+      await entry.readBatch!(events).run();
 
-      expect(entry.coalesceMaxBatch).toBe(256);
+      expect(entry.route(events[0]).coalesceMaxBatch).toBe(256);
       expect(onBatch).toHaveBeenCalledWith("handler1", events, { tenantId });
     });
 
@@ -415,6 +425,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -445,6 +456,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -483,6 +495,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -514,6 +527,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -537,12 +551,9 @@ describe("QueueManager", () => {
       const sendOptions = (mockQueueProcessor.send as any).mock.calls[0]?.[1];
       expect(sendOptions?.deduplication).toBeDefined();
       // Call makeId with enriched payload to verify namespace prefix
-      const dedupId = sendOptions?.deduplication?.makeId?.({
-        ...event,
-        __pipelineName: "test-pipeline",
-        __jobType: "handler",
-        __jobName: "handler1",
-      });
+      const dedupId = sendOptions?.deduplication?.makeId?.(
+        (mockQueueProcessor.send as any).mock.calls[0]?.[0],
+      );
       expect(dedupId).toBe("test-pipeline/handler/handler1/custom-dedup-id");
     });
 
@@ -551,6 +562,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -575,6 +587,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -599,12 +612,9 @@ describe("QueueManager", () => {
       expect(typeof sendOptions?.deduplication?.makeId).toBe("function");
 
       // Verify the namespaced aggregate deduplication ID format
-      const dedupId = sendOptions?.deduplication?.makeId?.({
-        ...event,
-        __pipelineName: "test-pipeline",
-        __jobType: "handler",
-        __jobName: "handler1",
-      });
+      const dedupId = sendOptions?.deduplication?.makeId?.(
+        (mockQueueProcessor.send as any).mock.calls[0]?.[0],
+      );
       expect(dedupId).toBe(
         `test-pipeline/handler/handler1/${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -614,6 +624,7 @@ describe("QueueManager", () => {
   describe("initializeProjectionQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -633,6 +644,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -660,6 +672,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -690,6 +703,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -702,10 +716,10 @@ describe("QueueManager", () => {
       });
 
       const entry = globalJobRegistry.get("test-pipeline:projection:projection1");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
-      const groupKey = entry?.groupKeyFn(event);
+      const groupKey = entry?.route(event).groupKey;
       expect(groupKey).toBe(
         `${tenantId}/fold/projection1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -715,6 +729,7 @@ describe("QueueManager", () => {
   describe("initializeCommandQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -737,6 +752,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -777,6 +793,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -816,6 +833,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -852,6 +870,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -880,6 +899,7 @@ describe("QueueManager", () => {
   describe("initializeProjectionSubscriberQueues()", () => {
     it("does nothing when global queue is not provided", () => {
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
       });
@@ -897,6 +917,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -923,6 +944,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -957,6 +979,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -976,10 +999,10 @@ describe("QueueManager", () => {
       const entry = globalJobRegistry.get("test-pipeline:reactor:subscriber1");
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
-      const groupKey = entry?.groupKeyFn({
+      const groupKey = entry?.route({
         event,
         foldState: {},
-      });
+      }).groupKey;
       expect(groupKey).toBe(
         `${tenantId}/fold/traceSummary/reactor/subscriber1/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -990,6 +1013,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -1010,10 +1034,10 @@ describe("QueueManager", () => {
         55000,
       );
 
-      const score = entry?.scoreFn({
+      const score = entry?.route({
         event,
         foldState: {},
-      });
+      }).score;
       expect(score).toBe(55000);
     });
 
@@ -1022,6 +1046,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -1056,6 +1081,7 @@ describe("QueueManager", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,

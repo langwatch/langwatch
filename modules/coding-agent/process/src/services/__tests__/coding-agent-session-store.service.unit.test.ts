@@ -13,10 +13,10 @@ import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-s
 import {
   CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
   CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP,
-  CodingAgentSessionRowMapper,
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
 } from "../../eventing/coding-agent-session.projection.ts";
+import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
 import { EventingCodingAgentSessionStoreService } from "../coding-agent-session-store.service.ts";
 
 const tenantId = createTenantId("tenant-1");
@@ -39,7 +39,7 @@ function makeState(over: Partial<CodingAgentSessionState> = {}): CodingAgentSess
 }
 
 function makeRow(state: CodingAgentSessionState): CodingAgentSessionRow {
-  return CodingAgentSessionRowMapper.toRow({
+  return toCodingAgentSessionRow({
     state,
     tenantId: String(tenantId),
     sessionId: "session-1",

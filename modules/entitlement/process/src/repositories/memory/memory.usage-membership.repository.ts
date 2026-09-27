@@ -19,14 +19,6 @@ export class MemoryUsageMembershipRepository implements UsageMembershipRepositor
     return new MemoryUsageMembershipRepository(input.memory);
   }
 
-  async getMemberCount(organizationId: string): Promise<number> {
-    return this.#database.find(organizationId)?.memberCount ?? 0;
-  }
-
-  async getMembersLiteCount(organizationId: string): Promise<number> {
-    return this.#database.find(organizationId)?.membersLiteCount ?? 0;
-  }
-
   async findCurrentMonthCost(organizationId: string): Promise<number> {
     return this.#database.find(organizationId)?.currentMonthCost ?? 0;
   }

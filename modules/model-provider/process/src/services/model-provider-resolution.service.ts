@@ -72,12 +72,12 @@ export class ModelProviderResolutionService {
       });
     }
 
-    throw new ModelNotConfiguredError(
-      feature.key,
-      feature.role,
-      feature.displayName,
-      parsed.projectId,
-    );
+    throw new ModelNotConfiguredError({
+      featureKey: feature.key,
+      role: feature.role,
+      featureDisplayName: feature.displayName,
+      projectId: parsed.projectId,
+    });
   }
 
   async findAlternate(input: {
@@ -116,12 +116,12 @@ export class ModelProviderResolutionService {
       }
     }
 
-    throw new ModelNotConfiguredError(
-      feature.key,
-      feature.role,
-      feature.displayName,
-      parsed.projectId,
-    );
+    throw new ModelNotConfiguredError({
+      featureKey: feature.key,
+      role: feature.role,
+      featureDisplayName: feature.displayName,
+      projectId: parsed.projectId,
+    });
   }
 
   private feature(featureKey: string): ModelDefaultFeature {

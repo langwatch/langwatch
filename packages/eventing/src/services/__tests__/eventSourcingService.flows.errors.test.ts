@@ -12,6 +12,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Error Handling Flows", () => {
@@ -36,6 +37,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       eventStore.storeEvents = vi.fn().mockRejectedValue(storageError);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -58,6 +60,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       eventStore.storeEvents = vi.fn().mockRejectedValue(storageError);
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -99,6 +102,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -129,6 +133,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -158,6 +163,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -189,6 +195,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -216,6 +223,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -242,6 +250,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -275,6 +284,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -295,6 +305,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("service works with minimal configuration", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -311,6 +322,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("missing optional components don't cause errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -328,6 +340,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
     it("required components cause clear error messages", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

@@ -7,7 +7,6 @@ import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IdentityUnsupportedStorageQueryError,
 } from "@langwatch/identity-contract";
-import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -708,9 +707,8 @@ describe("better-auth over the identity storage adapter", () => {
         // constructed, and it is what added `providerId` beside the tokens.
         // Driving it here is the difference between pinning the fix and
         // pinning this test's guess about the fix.
-        const result = await handleOAuthUserInfo(
-          { context } as unknown as Parameters<typeof handleOAuthUserInfo>[0],
-          {
+        const result = await stack.auth.api.probeOAuthUserInfo({
+          body: {
             userInfo: {
               id: "sub-google-1",
               email: EMAIL,
@@ -726,7 +724,7 @@ describe("better-auth over the identity storage adapter", () => {
               refreshToken: "rt-rotated",
             },
           },
-        );
+        });
 
         // A refusal reaches here as a throw, so arriving at all is half the
         // claim; the session is the other half — this is a completed

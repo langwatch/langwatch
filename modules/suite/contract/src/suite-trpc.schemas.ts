@@ -205,6 +205,7 @@ export const suiteRunAllReceiptSchema = z.object({
 export const suiteRunPlanReceiptSchema = z.object({
   ...suiteRunAllReceiptSchema.shape,
   planName: z.string(),
+  planSlug: z.string(),
   created: z.boolean(),
 });
 

@@ -7,6 +7,7 @@ import type {
   UsageLimitWarning,
   UsageUnit,
 } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
@@ -87,7 +88,7 @@ export function createEntitlementTestApp(
     repositories?: EntitlementRepositories;
     members: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
-    dependencies?: Partial<{ users: UserApi }>;
+    dependencies?: Partial<{ users: UserApi; organizations: OrganizationApi }>;
     config?: EntitlementConfig;
   }>,
 ): EntitlementApp {
@@ -98,7 +99,14 @@ export function createEntitlementTestApp(
       counter: input.members.counter ?? TestUsageCounter.create(),
       warnings: input.members.warnings ?? TestUsageWarnings.create(),
     },
-    dependencies: { users: input.dependencies?.users ?? createEntitlementTestUsers() },
+    dependencies: {
+      users: input.dependencies?.users ?? createEntitlementTestUsers(),
+      organizations:
+        input.dependencies?.organizations ??
+        createApiFixture<OrganizationApi>({
+          countMemberSeats: async () => ({ fullMembers: 0, liteMembers: 0 }),
+        }),
+    },
     config: input.config,
   });
 }

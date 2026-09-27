@@ -214,7 +214,12 @@ function readActiveScope({
     organization: organization ? { id: organization.id, name: organization.name } : void 0,
     team: team ? { id: team.id, name: team.name } : void 0,
     project: project
-      ? { id: project.id, slug: project.slug, name: project.name ?? project.slug }
+      ? {
+          id: project.id,
+          slug: project.slug,
+          name: project.name ?? project.slug,
+          userLinkTemplate: project.userLinkTemplate ?? null,
+        }
       : void 0,
   };
 }

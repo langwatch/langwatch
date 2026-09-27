@@ -39,6 +39,50 @@ async function sha256OfFile(path: string): Promise<string> {
   return hash.digest("hex");
 }
 
+type PostgresDetection = Awaited<ReturnType<Predep["detect"]>>;
+
+/**
+ * Accepts any postgres major on PATH that reports a version: the app's prisma schema works on
+ * pg14+, so the pinned major is downloaded only when nothing is on PATH.
+ */
+async function detectSystemPostgres(): Promise<PostgresDetection | null> {
+  try {
+    const { stdout } = await execa("which", ["postgres"], { reject: false });
+    const path = stdout.trim();
+    if (!path) return null;
+    const v = await resolveVersion(path);
+    if (v && v.startsWith("postgres (PostgreSQL)")) {
+      return { installed: true, version: v, resolvedPath: path };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/** The sidecar is `<hex>  <filename>` (sha256sum's default); bare hex is tolerated too. */
+async function verifyTarballSha256({
+  url,
+  tmp,
+  platform,
+}: {
+  url: string;
+  tmp: string;
+  platform: string;
+}): Promise<void> {
+  const expectedRes = await fetch(`${url}.sha256`);
+  if (!expectedRes.ok) {
+    throw new Error(`postgres sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`);
+  }
+  const expected = (await expectedRes.text()).trim().split(/\s+/)[0]!;
+  const actual = await sha256OfFile(tmp);
+  if (expected !== actual) {
+    throw new Error(
+      `postgres sha256 mismatch for ${platform}: expected ${expected}, got ${actual}. Refusing to install — the tarball at ${url} may be tampered or partially downloaded.`,
+    );
+  }
+}
+
 export function makePostgresPredep(development: LocalOrchestratorDevelopmentConfig): Predep {
   return {
     id: "postgres",
@@ -62,27 +106,12 @@ export function makePostgresPredep(development: LocalOrchestratorDevelopmentConf
             "LANGWATCH_FORCE_BUNDLED_POSTGRES=1 — skipping system postgres; bundled tarball will be downloaded",
         };
       }
-      try {
-        const { stdout } = await execa("which", ["postgres"], { reject: false });
-        const path = stdout.trim();
-        if (path) {
-          const v = await resolveVersion(path);
-          // Accept any postgres major on PATH that reports a version. The
-          // langwatch app's prisma schema works on pg14+, so we don't force
-          // the user to also install pg${PG_MAJOR} when their distro/brew
-          // already provides pg14/15/16/17/18. We only download our pinned
-          // major when nothing is on PATH.
-          if (v && v.startsWith("postgres (PostgreSQL)")) {
-            return { installed: true, version: v, resolvedPath: path };
-          }
+      return (
+        (await detectSystemPostgres()) ?? {
+          installed: false,
+          reason: "postgres not on PATH or in ~/.langwatch/bin/postgres",
         }
-      } catch {
-        // ignore
-      }
-      return {
-        installed: false,
-        reason: "postgres not on PATH or in ~/.langwatch/bin/postgres",
-      };
+      );
     },
 
     async install({ platform, paths, task }) {
@@ -93,21 +122,7 @@ export function makePostgresPredep(development: LocalOrchestratorDevelopmentConf
       await downloadWithProgress({ url, tmp, task, prefix: `downloading postgres ${PG_VERSION}` });
 
       task.output = "verifying sha256";
-      const expectedRes = await fetch(`${url}.sha256`);
-      if (!expectedRes.ok) {
-        throw new Error(
-          `postgres sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`,
-        );
-      }
-      // sidecar format: "<hex>  <filename>\n" (sha256sum default), tolerate
-      // bare hex too in case the publish workflow ever drops the filename.
-      const expected = (await expectedRes.text()).trim().split(/\s+/)[0]!;
-      const actual = await sha256OfFile(tmp);
-      if (expected !== actual) {
-        throw new Error(
-          `postgres sha256 mismatch for ${platform}: expected ${expected}, got ${actual}. Refusing to install — the tarball at ${url} may be tampered or partially downloaded.`,
-        );
-      }
+      await verifyTarballSha256({ url, tmp, platform });
 
       task.output = "extracting";
       // Tarball layout: bin/, lib/, share/, include/ rooted at the tarball

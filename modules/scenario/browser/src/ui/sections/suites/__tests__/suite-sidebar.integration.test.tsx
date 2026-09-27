@@ -8,7 +8,6 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ExternalSetSummary } from "@langwatch/scenario-contract";
-import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +16,7 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
+import type { SimulationSuite } from "../../../../behavior/scenario-api.ts";
 import {
   ALL_RUNS_ID,
   toExternalSetSelection,
@@ -28,7 +28,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
+type RunPlan = SimulationSuite & { kind: "run_plan" };
+
+function makeSuite(overrides: Partial<RunPlan> = {}): RunPlan {
   return {
     id: "suite_1",
     projectId: "project_1",
@@ -44,8 +46,8 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     simulatorModel: null,
     judgeModel: null,
     archivedAt: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     ...overrides,
   };
 }

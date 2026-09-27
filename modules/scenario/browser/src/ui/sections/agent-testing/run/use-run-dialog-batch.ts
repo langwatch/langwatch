@@ -4,13 +4,13 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback } from "react";
 import { flushSync } from "react-dom";
 
 import { api } from "../../../../behavior/scenario-api.ts";
 import { type RunAttempt, useRunAttempt } from "../../../../behavior/suites/use-run-attempt.ts";
+import { useModelProvidersSettings } from "../../../../behavior/use-model-providers-settings.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { writeScenarioTarget } from "../../use-scenario-target.ts";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";

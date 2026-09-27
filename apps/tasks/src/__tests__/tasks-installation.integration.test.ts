@@ -104,6 +104,12 @@ async function bootTasks() {
         redis: null,
         publicBaseUrl: config.process.baseHost,
         serviceVersion: "test",
+        // No collector: rum answers not configured unless the test names one.
+        telemetryExporter: {
+          endpoint: void 0,
+          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
+            build({}),
+        },
         nodeEnvironment: config.process.nodeEnvironment,
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
@@ -146,10 +152,10 @@ describe("the tasks process installation", () => {
         "report-schedule-backfill",
         "stripe-prices-sync",
         "dataset-content-backfill",
+        "demo-data",
         "model-registry-sync",
         "process-manager-purge",
         "stalled-runs-backfill",
-        "seed-demo",
         "topic-clustering-run",
       ]);
     } finally {

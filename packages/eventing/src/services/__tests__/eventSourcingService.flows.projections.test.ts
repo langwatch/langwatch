@@ -12,6 +12,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Projection Flows", () => {
@@ -40,6 +41,7 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -66,6 +68,7 @@ describe("EventSourcingService - Projection Flows", () => {
     it("throws when projection name not found", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -85,6 +88,7 @@ describe("EventSourcingService - Projection Flows", () => {
     it("throws when no projections configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -117,6 +121,7 @@ describe("EventSourcingService - Projection Flows", () => {
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -143,6 +148,7 @@ describe("EventSourcingService - Projection Flows", () => {
       (foldStore.get as ReturnType<typeof vi.fn>).mockResolvedValue({ kind: "empty" });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -162,6 +168,7 @@ describe("EventSourcingService - Projection Flows", () => {
     it("throws when projection name not found", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -181,6 +188,7 @@ describe("EventSourcingService - Projection Flows", () => {
     it("throws when no projections configured", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -201,6 +209,7 @@ describe("EventSourcingService - Projection Flows", () => {
     it("returns all registered fold projection names", () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -231,6 +240,7 @@ describe("EventSourcingService - Projection Flows", () => {
       ];
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -255,6 +265,7 @@ describe("EventSourcingService - Projection Flows", () => {
       ];
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -282,6 +293,7 @@ describe("EventSourcingService - Projection Flows", () => {
       ];
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

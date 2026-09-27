@@ -11,7 +11,6 @@ import { scenarioChildBundle } from "@langwatch/scenario-child";
 import { secretLogRedactPaths, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { Task, TaskCatalogue } from "@langwatch/task";
 
-import { clearStalePendingSsoSetup } from "./clear-stale-pending-sso-setup.ts";
 import { clickhouseMigrate } from "./clickhouse-migrate.ts";
 import {
   resolveTasksConfig,
@@ -34,7 +33,6 @@ const tasks = new Map<string, (input: TaskInput) => Promise<void>>([
   ["lwql-provision", lwqlProvision],
   ["lwql-render-access-config", lwqlRenderAccessConfig],
   ["system-migrations-pass", systemMigrationsPass],
-  ["clear-stale-pending-sso-setup", clearStalePendingSsoSetup],
   ["storage-seed", storageSeed],
 ]);
 

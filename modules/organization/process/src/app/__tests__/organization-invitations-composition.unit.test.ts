@@ -22,10 +22,8 @@ import {
 import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
 import { InviteService } from "../../services/invite.service.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
-import {
-  ServerOrganizationApp,
-  type ServerOrganizationAppDependencies,
-} from "../organization.app.ts";
+import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
+import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
 const BASE_HOST = "https://app.langwatch.test";
@@ -314,7 +312,7 @@ describe("given a deployment that composed no invitation service", () => {
   describe("when an admin asks to create invitations", () => {
     /** @scenario "A deployment with no invitation service refuses by name" */
     it("refuses with the named capability error rather than crashing", async () => {
-      const app = ServerOrganizationApp.createForTesting({
+      const app = organizationAppForTesting({
         dependencies: {
           organizations: createApiFixture<ServerOrganizationAppDependencies["organizations"]>(),
           membership: createApiFixture<ServerOrganizationAppDependencies["membership"]>(),

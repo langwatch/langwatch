@@ -93,6 +93,153 @@ function resolveEventSource(
   return fromGlobal;
 }
 
+/** The observer one subscription reports to: tRPC's, as the link hands it over. */
+interface SseSubscriptionObserver<TRouter extends AnyRouter> {
+  next(value: { result: { type: "started" } | { type: "data"; data: unknown } }): void;
+  error(error: TRPCClientError<TRouter>): void;
+  complete(): void;
+}
+
+/** What one subscription needs from the link's options and its operation. */
+interface SseSubscriptionInput<TRouter extends AnyRouter> {
+  /** Built on every connect, as each attempt encodes the input afresh. */
+  buildUrl: () => URL;
+  transformer: SseFrameTransformer;
+  maxReconnectAttempts: number;
+  reconnectDelay: number;
+  eventSourceOptions: { withCredentials?: boolean };
+  EventSourceCtor: SseEventSourceConstructor;
+  observer: SseSubscriptionObserver<TRouter>;
+}
+
+/** One live subscription: its source, its reconnect schedule, and whether it is over. */
+class SseSubscription<TRouter extends AnyRouter> {
+  private source: SseEventSourceLike | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempts = 0;
+  private closed = false;
+  private startedSent = false;
+
+  constructor(private readonly input: SseSubscriptionInput<TRouter>) {}
+
+  close(): void {
+    if (this.closed) return;
+    this.closed = true;
+    this.clearReconnectTimer();
+    this.source?.close();
+    this.source = null;
+  }
+
+  connect(): void {
+    if (this.closed) return;
+    this.clearReconnectTimer();
+
+    this.source?.close();
+    this.source = null;
+    const source = new this.input.EventSourceCtor(
+      this.input.buildUrl().toString(),
+      this.input.eventSourceOptions,
+    );
+    this.source = source;
+
+    source.onopen = () => this.onOpen();
+    source.onmessage = (event) => this.onMessage(event.data);
+    source.onerror = () => this.onError();
+  }
+
+  private clearReconnectTimer(): void {
+    if (!this.reconnectTimer) return;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  }
+
+  private fail(message: string): void {
+    this.input.observer.error(TRPCClientError.from<TRouter>(new Error(message)));
+    this.close();
+  }
+
+  private onOpen(): void {
+    this.reconnectAttempts = 0;
+    if (this.closed || this.startedSent) return;
+    this.startedSent = true;
+    this.input.observer.next({ result: { type: "started" } });
+  }
+
+  private onMessage(raw: string): void {
+    if (this.closed) return;
+    try {
+      this.onFrame(raw);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.fail(`SSE message parsing failed: ${detail}`);
+    }
+  }
+
+  private onFrame(raw: string): void {
+    const parsed = this.input.transformer.parse(raw);
+
+    switch (classifySseFrame(parsed)) {
+      case "connected":
+        return;
+      case "complete":
+        this.input.observer.complete();
+        this.close();
+        return;
+      case "protocol-error":
+        this.fail(
+          isObject(parsed) && typeof parsed.message === "string" ? parsed.message : "SSE Error",
+        );
+        return;
+      case "data":
+        this.input.observer.next({ result: { type: "data", data: parsed as unknown } });
+    }
+  }
+
+  private onError(): void {
+    if (this.closed) return;
+
+    this.source?.close();
+    this.source = null;
+
+    const { maxReconnectAttempts, reconnectDelay } = this.input;
+    if (this.reconnectAttempts >= maxReconnectAttempts) {
+      this.fail(`SSE connection failed after ${maxReconnectAttempts} attempts`);
+      return;
+    }
+
+    this.reconnectAttempts += 1;
+    const delay = reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    this.reconnectTimer = setTimeout(() => {
+      if (!this.closed) this.connect();
+    }, delay);
+  }
+}
+
+/** The procedure's URL: the base path, the op's path, and its encoded input. */
+function subscriptionUrl({
+  url,
+  path,
+  input,
+  transformer,
+  transformPath,
+}: {
+  url: string;
+  path: string;
+  input: unknown;
+  transformer: SseFrameTransformer;
+  transformPath: (path: string) => string;
+}): URL {
+  const base = new URL(url);
+  const basePath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
+  const opPath = transformPath(path).replace(/^\//, "");
+  base.pathname = `${basePath}${opPath}`;
+
+  if (input !== void 0) {
+    base.searchParams.set("input", transformer.stringify(input));
+  }
+  return base;
+}
+
 /**
  * The link. Subscriptions are handled; everything else is handed to the next
  * link untouched, so this composes under a `splitLink` or on its own.
@@ -121,117 +268,18 @@ export function sseSubscriptionLink<TRouter extends AnyRouter = AnyRouter>(
       if (op.type !== "subscription") return next(op);
 
       return observable((observer) => {
-        const EventSourceCtor = resolveEventSource(eventSource);
-        let source: SseEventSourceLike | null = null;
-        let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-        let reconnectAttempts = 0;
-        let closed = false;
-        let startedSent = false;
-
-        const clearReconnectTimer = () => {
-          if (!reconnectTimer) return;
-          clearTimeout(reconnectTimer);
-          reconnectTimer = null;
-        };
-
-        const close = () => {
-          if (closed) return;
-          closed = true;
-          clearReconnectTimer();
-          source?.close();
-          source = null;
-        };
-
-        const buildUrl = (): URL => {
-          const base = new URL(url);
-          const basePath = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
-          const opPath = transformPath(op.path).replace(/^\//, "");
-          base.pathname = `${basePath}${opPath}`;
-
-          if (op.input !== void 0) {
-            base.searchParams.set("input", transformer.stringify(op.input));
-          }
-          return base;
-        };
-
-        const onFrame = (raw: string) => {
-          const parsed = transformer.parse(raw);
-
-          switch (classifySseFrame(parsed)) {
-            case "connected":
-              return;
-            case "complete":
-              observer.complete();
-              close();
-              return;
-            case "protocol-error": {
-              const message =
-                isObject(parsed) && typeof parsed.message === "string"
-                  ? parsed.message
-                  : "SSE Error";
-              observer.error(TRPCClientError.from<TRouter>(new Error(message)));
-              close();
-              return;
-            }
-            case "data":
-              observer.next({ result: { type: "data", data: parsed as unknown } });
-          }
-        };
-
-        const connect = () => {
-          if (closed) return;
-          clearReconnectTimer();
-
-          source?.close();
-          source = null;
-          source = new EventSourceCtor(buildUrl().toString(), eventSourceOptions);
-
-          source.onopen = () => {
-            reconnectAttempts = 0;
-            if (closed || startedSent) return;
-            startedSent = true;
-            observer.next({ result: { type: "started" } });
-          };
-
-          source.onmessage = (event) => {
-            if (closed) return;
-            try {
-              onFrame(event.data);
-            } catch (error) {
-              const detail = error instanceof Error ? error.message : String(error);
-              observer.error(
-                TRPCClientError.from<TRouter>(new Error(`SSE message parsing failed: ${detail}`)),
-              );
-              close();
-            }
-          };
-
-          source.onerror = () => {
-            if (closed) return;
-
-            source?.close();
-            source = null;
-
-            if (reconnectAttempts >= maxReconnectAttempts) {
-              observer.error(
-                TRPCClientError.from<TRouter>(
-                  new Error(`SSE connection failed after ${maxReconnectAttempts} attempts`),
-                ),
-              );
-              close();
-              return;
-            }
-
-            reconnectAttempts += 1;
-            const delay = reconnectDelay * Math.pow(2, reconnectAttempts - 1);
-            reconnectTimer = setTimeout(() => {
-              if (!closed) connect();
-            }, delay);
-          };
-        };
-
-        connect();
-        return close;
+        const subscription = new SseSubscription<TRouter>({
+          buildUrl: () =>
+            subscriptionUrl({ url, path: op.path, input: op.input, transformer, transformPath }),
+          transformer,
+          maxReconnectAttempts,
+          reconnectDelay,
+          eventSourceOptions,
+          EventSourceCtor: resolveEventSource(eventSource),
+          observer,
+        });
+        subscription.connect();
+        return () => subscription.close();
       });
     };
 }

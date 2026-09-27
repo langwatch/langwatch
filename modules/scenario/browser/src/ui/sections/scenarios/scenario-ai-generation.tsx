@@ -12,7 +12,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { createLogger } from "@langwatch/observability/browser";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -22,6 +21,7 @@ import {
   classifyGenerationError,
   reportableGenerationFailure,
 } from "../../../behavior/scenarios/classify-generation-error.ts";
+import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import {
   type GeneratedScenario,

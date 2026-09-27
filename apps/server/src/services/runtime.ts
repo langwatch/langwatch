@@ -1,5 +1,5 @@
 // julia's lane: orchestrator that implements RuntimeApi.
-// Wired up by the CLI via dynamic import — see shared/runtime-placeholder.ts.
+// Wired up by the CLI through its static import of `runtime`.
 
 import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
 import type {
@@ -98,56 +98,20 @@ const runtimeImpl: RuntimeApi = {
     // app describes exactly the install this process just built.
     const features = resolveEffectiveFeatures(ctx.envFile);
     // Assistant is optional; boots before app tier so app knows the truth.
-    let isLangyRunnable = features.isLangyEnabled;
-    let langyHandle: SupervisedHandle | null = null;
-    if (isLangyRunnable) {
-      const binary = ctx.predeps.aigateway?.resolvedPath;
-      isLangyRunnable = !!binary && (await monobinarySupportsLangyagent(binary));
-      if (!isLangyRunnable) {
-        bus.emit({
-          type: "log",
-          service: "langyagent",
-          stream: "stderr",
-          line: "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically.",
-        });
-      }
-    }
-    if (isLangyRunnable) {
-      try {
-        langyHandle = await startLangyagent(ctx, bus, {
-          ...envFromFile,
-          ...ctx.userEnv,
-        });
-        handles.push(langyHandle);
-      } catch (err) {
-        isLangyRunnable = false;
-        bus.emit({
-          type: "log",
-          service: "langyagent",
-          stream: "stderr",
-          line: `langy assistant disabled: it failed to start (${err instanceof Error ? err.message : String(err)}). Everything else continues without it.`,
-        });
-      }
-    }
+    const isLangyRunnable = await startLangyWhenRunnable({
+      ctx,
+      bus,
+      isLangyEnabled: features.isLangyEnabled,
+      env: { ...envFromFile, ...ctx.userEnv },
+      handles,
+    });
     const effective = { ...features, isLangyEnabled: isLangyRunnable };
     const childEnv: Record<string, string> = {
       ...envFromFile,
       ...ctx.userEnv,
       ...featureEnv(effective),
     };
-    if (!effective.isLangyEnabled) {
-      // With the assistant off, the app must not think it exists: an agent
-      // URL with no agent behind it turns every send into a hang, and the
-      // forced rollout flag would render the panel. The .env keeps its lines
-      // (they are the user's knobs); only the running processes lose them.
-      delete childEnv.LANGY_AGENT_URL;
-      const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
-        .split(",")
-        .map((f) => f.trim())
-        .filter((f) => f && f !== "release_langy_enabled");
-      if (forced.length > 0) childEnv.FEATURE_FLAG_FORCE_ENABLE = forced.join(",");
-      else delete childEnv.FEATURE_FLAG_FORCE_ENABLE;
-    }
+    if (!effective.isLangyEnabled) hideLangyFrom(childEnv);
 
     // Use allSettled not all: partial boot must not leak handles.
     const results = await Promise.allSettled([
@@ -204,6 +168,63 @@ async function stopHandles(handles: { stop(): Promise<void> }[]): Promise<void> 
       // Swallow — we still want to stop the rest.
     }
   }
+}
+
+/**
+ * Starts the assistant when it is enabled and the installed ai-gateway binary carries it; any
+ * other outcome is logged and leaves it off, and everything else boots without it.
+ */
+async function startLangyWhenRunnable({
+  ctx,
+  bus,
+  isLangyEnabled,
+  env,
+  handles,
+}: {
+  ctx: RuntimeContext;
+  bus: EventBus;
+  isLangyEnabled: boolean;
+  env: Record<string, string>;
+  handles: SupervisedHandle[];
+}): Promise<boolean> {
+  if (!isLangyEnabled) return false;
+  const binary = ctx.predeps.aigateway?.resolvedPath;
+  if (!binary || !(await monobinarySupportsLangyagent(binary))) {
+    bus.emit({
+      type: "log",
+      service: "langyagent",
+      stream: "stderr",
+      line: "langy assistant disabled: the installed ai-gateway binary predates it. The next release's binary includes it and will be picked up automatically.",
+    });
+    return false;
+  }
+  try {
+    handles.push(await startLangyagent(ctx, bus, env));
+    return true;
+  } catch (err) {
+    bus.emit({
+      type: "log",
+      service: "langyagent",
+      stream: "stderr",
+      line: `langy assistant disabled: it failed to start (${err instanceof Error ? err.message : String(err)}). Everything else continues without it.`,
+    });
+    return false;
+  }
+}
+
+/**
+ * With the assistant off, the app must not think it exists: an agent URL with no agent behind it
+ * hangs every send, and the forced rollout flag would render the panel. The .env keeps its lines
+ * (they are the user's knobs); only the running processes lose them.
+ */
+function hideLangyFrom(childEnv: Record<string, string>): void {
+  delete childEnv.LANGY_AGENT_URL;
+  const forced = (childEnv.FEATURE_FLAG_FORCE_ENABLE ?? "")
+    .split(",")
+    .map((f) => f.trim())
+    .filter((f) => f && f !== "release_langy_enabled");
+  if (forced.length > 0) childEnv.FEATURE_FLAG_FORCE_ENABLE = forced.join(",");
+  else delete childEnv.FEATURE_FLAG_FORCE_ENABLE;
 }
 
 function toServiceHandle(h: SupervisedHandle): ServiceHandle {

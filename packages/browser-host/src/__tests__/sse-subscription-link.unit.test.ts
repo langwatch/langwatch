@@ -59,11 +59,12 @@ function channelRecorder(): {
   opened: FakeEventSource[];
 } {
   const opened: FakeEventSource[] = [];
-  const ctor = function (this: unknown, url: string, init?: { withCredentials?: boolean }) {
-    const source = new FakeEventSource(url, init);
-    opened.push(source);
-    return source;
-  } as unknown as SseEventSourceConstructor;
+  const ctor: SseEventSourceConstructor = class extends FakeEventSource {
+    constructor(url: string, init?: { withCredentials?: boolean }) {
+      super(url, init);
+      opened.push(this);
+    }
+  };
   return { ctor, opened };
 }
 

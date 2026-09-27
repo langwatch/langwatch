@@ -275,10 +275,6 @@ const DEAD_COPY_BACKLOG = new Set<string>([
   "gateway_provider_bindings_gone",
   "health_check_failed",
   "prompt_playground_chat_unavailable",
-  "rum_ingest_disabled",
-  "rum_payload_invalid",
-  "rum_payload_too_large",
-  "rum_rate_limited",
   "saved_workbench_charts_disabled_for_playground",
   "model_default_user_key_required",
   /**

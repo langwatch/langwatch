@@ -9,6 +9,15 @@ type DeleteManyDelegate = {
   deleteMany: (args?: { where?: unknown }) => Promise<unknown>;
 };
 
+function isDeleteManyDelegate(value: unknown): value is DeleteManyDelegate {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "deleteMany" in value &&
+    typeof value.deleteMany === "function"
+  );
+}
+
 /**
  * Model names from the generated client's TypeMap, which is the supported
  * way to reach per-operation argument types. Extracting `where` from the
@@ -198,10 +207,8 @@ export async function cleanupTestRows(
   });
 
   for (const { model, where } of runnable) {
-    const delegate = (prisma as unknown as Record<string, unknown>)[model] as
-      | DeleteManyDelegate
-      | undefined;
-    if (!delegate || typeof delegate.deleteMany !== "function") {
+    const delegate: unknown = Reflect.get(prisma, model);
+    if (!isDeleteManyDelegate(delegate)) {
       problems.push(`${model} is not a Prisma delegate with deleteMany`);
       continue;
     }

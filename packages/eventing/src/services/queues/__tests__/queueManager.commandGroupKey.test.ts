@@ -13,6 +13,8 @@ import {
   createTestAggregateType,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
+  createTestEvent,
 } from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
@@ -99,6 +101,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -117,7 +120,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       );
 
       const entry = globalJobRegistry.get("test-pipeline:command:recordResult");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       const payload = {
         tenantId: String(tenantId),
@@ -128,7 +131,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         occurredAt: 1000,
       };
 
-      const groupKey = entry?.groupKeyFn(payload);
+      const groupKey = entry?.route(payload).groupKey;
       expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:exp1:run1:item:42`);
     });
   });
@@ -139,6 +142,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -157,7 +161,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       );
 
       const entry = globalJobRegistry.get("test-pipeline:command:startRun");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       const payload = {
         tenantId: String(tenantId),
@@ -165,7 +169,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         occurredAt: 1000,
       };
 
-      const groupKey = entry?.groupKeyFn(payload);
+      const groupKey = entry?.route(payload).groupKey;
       expect(groupKey).toBe(`${tenantId}/command/startRun/${aggregateType}:exp1:run1`);
     });
   });
@@ -176,6 +180,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -207,7 +212,7 @@ describe("QueueManager.initializeCommandQueues with getGroupKey", () => {
         occurredAt: 1000,
       };
 
-      const groupKey = entry?.groupKeyFn(payload);
+      const groupKey = entry?.route(payload).groupKey;
       expect(groupKey).toBe(`${tenantId}/command/recordResult/${aggregateType}:custom:exp1:run1`);
     });
   });
@@ -222,6 +227,7 @@ describe("QueueManager migration preflight targets", () => {
     queue.registerPreflightGroups = vi.fn().mockResolvedValue(void 0);
     const registry = new Map<string, JobRegistryEntry>();
     const manager = new QueueManager({
+      parseEvent: parseTestEvent,
       aggregateType,
       pipelineName: "test-pipeline",
       globalQueue: queue,
@@ -298,6 +304,7 @@ describe("QueueManager migration preflight targets", () => {
       }
     });
     const manager = new QueueManager({
+      parseEvent: parseTestEvent,
       aggregateType,
       pipelineName: "test-pipeline",
       globalQueue: queue,
@@ -357,6 +364,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
     const globalJobRegistry = new Map<string, JobRegistryEntry>();
     const { logger, lines } = createTestLogger();
     const manager = new QueueManager({
+      parseEvent: parseTestEvent,
       aggregateType,
       pipelineName: "test-pipeline",
       globalQueue: createMockSharedQueue(),
@@ -388,9 +396,12 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
         );
 
         const entry = globalJobRegistry.get("test-pipeline:command:hot");
-        expect(entry?.coalesceMaxBatch).toBe(200);
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(200);
         expect(entry?.coalesceMaxBytes).toBe(1024);
-        expect(entry?.processBatch).toBeDefined();
+        expect(entry?.readBatch).toBeDefined();
       });
     });
   });
@@ -413,8 +424,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
         );
 
         const entry = globalJobRegistry.get("test-pipeline:command:cold");
-        expect(entry?.processBatch).toBeUndefined();
-        expect(entry?.coalesceMaxBatch).toBeUndefined();
+        expect(entry?.readBatch).toBeUndefined();
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(1);
       });
     });
   });
@@ -586,8 +600,11 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
         );
 
         const entry = globalJobRegistry.get("test-pipeline:command:hot");
-        expect(entry?.processBatch).toBeDefined();
-        expect(entry?.coalesceMaxBatch).toBe(bound);
+        expect(entry?.readBatch).toBeDefined();
+        expect(
+          entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+            .coalesceMaxBatch,
+        ).toBe(64);
       });
 
       it("does not emit the un-coalesced visibility record", () => {
@@ -650,7 +667,7 @@ describe("QueueManager.initializeCommandQueues append coalescing", () => {
           "test-pipeline",
         );
 
-        expect(globalJobRegistry.get("test-pipeline:command:cold")?.processBatch).toBeUndefined();
+        expect(globalJobRegistry.get("test-pipeline:command:cold")?.readBatch).toBeUndefined();
       });
     });
   });
@@ -676,6 +693,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -699,17 +717,14 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       manager.initializeHandlerQueues(handlers, vi.fn());
 
       const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
-      expect(entry?.groupKeyFn).toBeDefined();
+      expect(entry?.route).toBeDefined();
 
       const event = {
-        tenantId,
-        aggregateType,
-        aggregateId: "exp1:run1",
+        ...createTestEvent("exp1:run1", aggregateType, tenantId),
         data: { runId: "run1", index: 5 },
-        createdAt: 1000,
       };
 
-      const groupKey = entry?.groupKeyFn(event);
+      const groupKey = entry?.route(event).groupKey;
       expect(groupKey).toBe(`${tenantId}/map/resultStorage/result:run1:item:5`);
     });
   });
@@ -720,6 +735,7 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -740,14 +756,9 @@ describe("QueueManager.initializeHandlerQueues with groupKeyFn", () => {
 
       const entry = globalJobRegistry.get("test-pipeline:handler:resultStorage");
 
-      const event = {
-        tenantId,
-        aggregateType,
-        aggregateId: "exp1:run1",
-        createdAt: 1000,
-      };
+      const event = createTestEvent("exp1:run1", aggregateType, tenantId);
 
-      const groupKey = entry?.groupKeyFn(event);
+      const groupKey = entry?.route(event).groupKey;
       expect(groupKey).toBe(`${tenantId}/map/resultStorage/${aggregateType}:exp1:run1`);
     });
   });

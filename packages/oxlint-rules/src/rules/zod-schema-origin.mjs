@@ -219,7 +219,7 @@ class ZodSchemaResolver {
     this.root = resolve(context.cwd);
   }
 
-  imported(source, name, from, seen) {
+  imported({ source, name, from, seen }) {
     if (source === "zod") {
       if (["z", "default", "*"].includes(name)) {
         return "zod";
@@ -229,7 +229,7 @@ class ZodSchemaResolver {
     }
 
     if (name === "*") {
-      return (member, next) => this.imported(source, member, from, next);
+      return (member, next) => this.imported({ source, name: member, from, seen: next });
     }
 
     const target = sourceFile(source, from, this.root);
@@ -249,17 +249,17 @@ class ZodSchemaResolver {
       return void 0;
     }
 
-    return this.exported(name, module, target, new Set(seen).add(key));
+    return this.exported({ name, module, target, seen: new Set(seen).add(key) });
   }
 
-  exported(name, module, target, seen) {
+  exported({ name, module, target, seen }) {
     const exported = module.exports.get(name);
     if (exported) {
-      return this.descriptor(exported, module, target, seen);
+      return this.descriptor({ item: exported, module, from: target, seen });
     }
 
     for (const source of module.stars) {
-      const origin = this.imported(source, name, target, seen);
+      const origin = this.imported({ source, name, from: target, seen });
       if (origin) {
         return origin;
       }
@@ -268,33 +268,38 @@ class ZodSchemaResolver {
     return void 0;
   }
 
-  descriptor(item, module, from, seen) {
+  descriptor({ item, module, from, seen }) {
     if (!item) {
       return void 0;
     }
 
     if (item.source) {
-      return this.imported(item.source, item.name, from, seen);
+      return this.imported({ source: item.source, name: item.name, from, seen });
     }
 
     if (item.local) {
-      return this.local(item.local, module, from, seen);
+      return this.local({ name: item.local, module, from, seen });
     }
 
     return expressionOrigin(
       item.expression,
-      (node, next) => this.local(node.name, module, from, next),
+      (node, next) => this.local({ name: node.name, module, from, seen: next }),
       seen,
     );
   }
 
-  local(name, module, from, seen) {
+  local({ name, module, from, seen }) {
     const key = `${from}:local:${name}`;
     if (seen.has(key)) {
       return void 0;
     }
 
-    return this.descriptor(module.bindings.get(name), module, from, new Set(seen).add(key));
+    return this.descriptor({
+      item: module.bindings.get(name),
+      module,
+      from,
+      seen: new Set(seen).add(key),
+    });
   }
 
   binding(node, seen) {
@@ -317,12 +322,12 @@ class ZodSchemaResolver {
         return void 0;
       }
 
-      return this.imported(
-        declaration.source.value,
-        importName(definition.node),
-        this.filename,
-        next,
-      );
+      return this.imported({
+        source: declaration.source.value,
+        name: importName(definition.node),
+        from: this.filename,
+        seen: next,
+      });
     }
 
     if (definition?.type !== "Variable" || definition.parent.kind !== "const") {

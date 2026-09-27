@@ -17,7 +17,7 @@ import {
   VersionBadge,
 } from "@langwatch/prompt-browser-kit";
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
+import { renderSourceTypeIcon, useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
@@ -436,6 +436,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
         <Box paddingX={4}>
           <FormVariablesSection
+            renderSourceIcon={renderSourceTypeIcon}
             title="Variables"
             showMappings={hasSources}
             availableSources={availableSources}

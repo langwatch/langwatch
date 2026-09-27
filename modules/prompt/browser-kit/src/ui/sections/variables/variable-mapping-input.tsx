@@ -1,13 +1,12 @@
 import { Box, HStack, Input, Portal, Tag, Text, VStack } from "@chakra-ui/react";
-import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit";
 import type {
   AvailableSource,
   FieldMapping,
   NestedField,
   SourceType,
 } from "@langwatch/workflow-contract";
-import { Check, ChevronRight, Database, Type } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronRight, Type } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 
@@ -23,7 +22,11 @@ export type {
   SourceType,
 } from "@langwatch/workflow-contract";
 
+export type RenderSourceIcon = (type: SourceType) => ReactNode;
+
 type VariableMappingInputProps = {
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
   /** Current mapping (source or value) */
   mapping?: FieldMapping;
   /** Callback when mapping changes */
@@ -97,16 +100,6 @@ const findFieldByName = (fields: NestedField[], name: string): NestedField | und
 // Source Type Icons
 // ============================================================================
 
-const SourceTypeIconComponent = ({ type }: { type: SourceType }) => {
-  // Dataset is not a ComponentType, so handle it separately
-  if (type === "dataset") {
-    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
-  }
-
-  // Use ComponentIcon for all DSL component types
-  return <ComponentIcon type={type} size="xs" />;
-};
-
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -120,6 +113,7 @@ export const VariableMappingInput = ({
   isMissing = false,
   optionalHighlighting = false,
   inputTestId,
+  renderSourceIcon,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -585,7 +579,7 @@ export const VariableMappingInput = ({
               variant="subtle"
               data-testid="source-mapping-tag"
             >
-              <SourceTypeIconComponent type={sourceInfo.source.type} />
+              {renderSourceIcon?.(sourceInfo.source.type)}
               <Tag.Label fontFamily="mono" fontSize="12px">
                 {sourceInfo.source.id !== "trace"
                   ? `${sourceInfo.source.name || sourceInfo.source.id}.${sourceInfo.path.join(".")}`
@@ -616,7 +610,7 @@ export const VariableMappingInput = ({
                   variant="subtle"
                   data-testid={`path-segment-tag-${index}`}
                 >
-                  {index === 0 && source && <SourceTypeIconComponent type={source.type} />}
+                  {index === 0 && source && renderSourceIcon?.(source.type)}
                   <Tag.Label fontFamily="mono" fontSize="12px">
                     {segment}
                   </Tag.Label>
@@ -765,7 +759,7 @@ export const VariableMappingInput = ({
                         borderRadius="4px"
                         marginBottom={1}
                       >
-                        <SourceTypeIconComponent type={source.type} />
+                        {renderSourceIcon?.(source.type)}
                         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
                           {source.name}
                         </Text>

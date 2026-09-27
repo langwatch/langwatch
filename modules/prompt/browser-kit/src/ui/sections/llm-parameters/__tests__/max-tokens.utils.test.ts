@@ -16,80 +16,80 @@ const DEFAULT_MODEL = findLatestOpenAIChatFlagship()[0] ?? "openai/gpt-5";
 describe("buildModelChangeValues", () => {
   describe("when called with a model name", () => {
     it("returns the model name in the result", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.model).toBe(DEFAULT_MODEL);
     });
 
     it("handles full model paths", () => {
-      const result = buildModelChangeValues("openai/gpt-5-mini");
+      const result = buildModelChangeValues({ newModel: "openai/gpt-5-mini" });
       expect(result.model).toBe("openai/gpt-5-mini");
     });
 
     it("handles empty string model", () => {
-      const result = buildModelChangeValues("");
+      const result = buildModelChangeValues({ newModel: "" });
       expect(result.model).toBe("");
     });
   });
 
   describe("when setting slider parameter defaults", () => {
     it("sets temperature to registry default (1)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.temperature).toBe(1);
     });
 
     it("sets topP to registry default (1)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL }) as Record<string, unknown>;
       expect(result.topP).toBe(1);
     });
 
     it("sets frequencyPenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL }) as Record<string, unknown>;
       expect(result.frequencyPenalty).toBe(0);
     });
 
     it("sets presencePenalty to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL) as Record<string, unknown>;
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL }) as Record<string, unknown>;
       expect(result.presencePenalty).toBe(0);
     });
 
     it("sets seed to registry default (0)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.seed).toBe(0);
     });
 
     it("leaves maxTokens undefined without model metadata", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.maxTokens).toBeUndefined();
     });
   });
 
   describe("when setting select parameter defaults", () => {
     it("sets reasoning to registry default (medium)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.reasoning).toBe("medium");
     });
 
     it("sets verbosity to registry default (medium)", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.verbosity).toBe("medium");
     });
   });
 
   describe("when clearing snake_case variants", () => {
     it("explicitly sets max_tokens key to undefined", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(result.max_tokens).toBeUndefined();
     });
 
     it("includes max_tokens key in result", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       expect(Object.hasOwn(result, "max_tokens")).toBe(true);
     });
   });
 
   describe("when staying in sync with parameterRegistry", () => {
     it("includes all registered parameters in result", () => {
-      const result = buildModelChangeValues(DEFAULT_MODEL);
+      const result = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       const registeredParams = parameterRegistry.getAllNames();
 
       for (const param of registeredParams) {
@@ -103,7 +103,10 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: metadata,
+      });
       expect(result.maxTokens).toBe(16384);
     });
 
@@ -111,7 +114,10 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 16384,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: metadata,
+      });
       expect(result.max_tokens).toBe(16384);
     });
 
@@ -119,13 +125,19 @@ describe("buildModelChangeValues", () => {
       const metadata = {
         maxCompletionTokens: 128000,
       } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-5.2", undefined, metadata);
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5.2",
+        newModelMetadata: metadata,
+      });
       expect(result.maxTokens).toBe(128000);
     });
 
     it("uses contextLength when maxCompletionTokens not available", () => {
       const metadata = { contextLength: 8192 } as ModelMetadataForFrontend;
-      const result = buildModelChangeValues("openai/gpt-5-mini", undefined, metadata);
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: metadata,
+      });
       expect(result.maxTokens).toBe(8192);
     });
   });
@@ -140,13 +152,12 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5-mini", maxTokens: 32768 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5.2",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5.2",
+        newModelMetadata: newMetadata,
         previousValues,
-        previousMetadata,
-      );
+        previousModelMetadata: previousMetadata,
+      });
 
       expect(result.maxTokens).toBe(128000);
     });
@@ -160,13 +171,12 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5-mini",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: newMetadata,
         previousValues,
-        previousMetadata,
-      );
+        previousModelMetadata: previousMetadata,
+      });
 
       expect(result.maxTokens).toBe(32768);
     });
@@ -180,13 +190,12 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5-mini", maxTokens: 8000 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5.2",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5.2",
+        newModelMetadata: newMetadata,
         previousValues,
-        previousMetadata,
-      );
+        previousModelMetadata: previousMetadata,
+      });
 
       expect(result.maxTokens).toBe(8000);
     });
@@ -200,13 +209,12 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 50000 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5-mini",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: newMetadata,
         previousValues,
-        previousMetadata,
-      );
+        previousModelMetadata: previousMetadata,
+      });
 
       expect(result.maxTokens).toBe(32768);
     });
@@ -220,13 +228,12 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5.2", max_tokens: 128000 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5-mini",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: newMetadata,
         previousValues,
-        previousMetadata,
-      );
+        previousModelMetadata: previousMetadata,
+      });
 
       expect(result.maxTokens).toBe(32768);
     });
@@ -237,13 +244,11 @@ describe("buildModelChangeValues", () => {
       } as ModelMetadataForFrontend;
       const previousValues = { model: "openai/gpt-5.2", maxTokens: 128000 };
 
-      const result = buildModelChangeValues(
-        "openai/gpt-5-mini",
-        undefined,
-        newMetadata,
+      const result = buildModelChangeValues({
+        newModel: "openai/gpt-5-mini",
+        newModelMetadata: newMetadata,
         previousValues,
-        undefined,
-      );
+      });
 
       expect(result.maxTokens).toBe(32768);
     });
@@ -289,13 +294,13 @@ describe("normalizeMaxTokens", () => {
 
   describe("when integrating with buildModelChangeValues", () => {
     it("preserves maxTokens from model change", () => {
-      const afterModelChange = buildModelChangeValues(DEFAULT_MODEL);
+      const afterModelChange = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       const afterTokenUpdate = normalizeMaxTokens(afterModelChange, 8000);
       expect(afterTokenUpdate.maxTokens).toBe(8000);
     });
 
     it("preserves model from model change", () => {
-      const afterModelChange = buildModelChangeValues(DEFAULT_MODEL);
+      const afterModelChange = buildModelChangeValues({ newModel: DEFAULT_MODEL });
       const afterTokenUpdate = normalizeMaxTokens(afterModelChange, 8000);
       expect(afterTokenUpdate.model).toBe(DEFAULT_MODEL);
     });

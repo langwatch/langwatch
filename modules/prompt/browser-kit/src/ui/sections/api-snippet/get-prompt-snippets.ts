@@ -1,5 +1,3 @@
-import { exampleParameterValue } from "@langwatch/workflow-browser-kit";
-
 import type { Snippet } from "./openapi-snippet.types.ts";
 
 /**
@@ -40,12 +38,21 @@ const STRING_EXAMPLES: [RegExp, string][] = [
   [/id$|^id|_id_/, "abc123"],
 ];
 
+/** The evaluate snippet's example values, typed per variable type. */
+const EXAMPLE_VALUES = {
+  str: "example",
+  float: 0.5,
+  int: 42,
+  bool: true,
+  image: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
+} as const;
+
 function exampleStringFor(identifier: string): string {
   const name = identifier.toLowerCase();
   for (const [pattern, value] of STRING_EXAMPLES) {
     if (pattern.test(name)) return value;
   }
-  return String(exampleParameterValue("str"));
+  return EXAMPLE_VALUES.str;
 }
 
 /**
@@ -56,20 +63,20 @@ function exampleStringFor(identifier: string): string {
 function exampleValueFor({ identifier, type }: PromptSnippetVariable): ExampleValue {
   switch (type) {
     case "float":
-      return exampleParameterValue("float") as number;
+      return EXAMPLE_VALUES.float;
     case "bool":
-      return exampleParameterValue("bool") as boolean;
+      return EXAMPLE_VALUES.bool;
     case "image":
-      return exampleParameterValue("image") as string;
+      return EXAMPLE_VALUES.image;
     case "list":
     case "list[str]":
       return [exampleStringFor(identifier)];
     case "list[float]":
-      return [exampleParameterValue("float") as number];
+      return [EXAMPLE_VALUES.float];
     case "list[int]":
-      return [exampleParameterValue("int") as number];
+      return [EXAMPLE_VALUES.int];
     case "list[bool]":
-      return [exampleParameterValue("bool") as boolean];
+      return [EXAMPLE_VALUES.bool];
     case "dict":
       return { key: "value" };
     case "chat_messages":

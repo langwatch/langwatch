@@ -8,6 +8,7 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
@@ -51,7 +52,7 @@ describe("ProjectionRegistry", () => {
   describe("registerFoldProjection()", () => {
     describe("when projection is registered", () => {
       it("registers successfully", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
 
         expect(() => registry.registerFoldProjection(fold)).not.toThrow();
@@ -60,7 +61,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when projection name is duplicate", () => {
       it("throws ConfigurationError", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold1 = createMockFoldProjectionDefinition("sameName");
         const fold2 = createMockFoldProjectionDefinition("sameName");
 
@@ -72,7 +73,7 @@ describe("ProjectionRegistry", () => {
 
   describe("registerMapProjection()", () => {
     it("registers successfully", () => {
-      const registry = new ProjectionRegistry();
+      const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
       const mapProj = createMockMapProjectionDefinition("myMap");
 
       expect(() => registry.registerMapProjection(mapProj)).not.toThrow();
@@ -80,7 +81,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when projection name is duplicate", () => {
       it("throws ConfigurationError", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const map1 = createMockMapProjectionDefinition("sameName");
         const map2 = createMockMapProjectionDefinition("sameName");
 
@@ -93,7 +94,7 @@ describe("ProjectionRegistry", () => {
   describe("initialize()", () => {
     describe("when called twice without close", () => {
       it("throws ConfigurationError", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
@@ -108,7 +109,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when called after close", () => {
       it("re-initializes successfully", async () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
@@ -124,7 +125,7 @@ describe("ProjectionRegistry", () => {
   describe("dispatch()", () => {
     describe("when not initialized", () => {
       it("logs warning and drops events", async () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const events = [
           createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         ];
@@ -136,7 +137,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when initialized with fold projection", () => {
       it("dispatches events to projections via queues", async () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
 
         registry.registerFoldProjection(fold);
@@ -159,7 +160,7 @@ describe("ProjectionRegistry", () => {
   describe("registerSubscriber()", () => {
     describe("when fold exists", () => {
       it("registers successfully", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
@@ -170,7 +171,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when fold does not exist", () => {
       it("throws immediately", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const subscriber = createMockSubscriber("mySubscriber");
 
         expect(() => registry.registerSubscriber("missingFold", subscriber)).toThrow(
@@ -181,7 +182,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when subscriber name is duplicate", () => {
       it("throws ConfigurationError", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
 
@@ -199,7 +200,7 @@ describe("ProjectionRegistry", () => {
   describe("hasProjections()", () => {
     describe("when subscribers are registered alongside their folds", () => {
       it("returns true", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
         registry.registerSubscriber("myFold", createMockSubscriber("mySubscriber"));
@@ -210,7 +211,7 @@ describe("ProjectionRegistry", () => {
 
     describe("when nothing is registered", () => {
       it("returns false", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         expect(registry.hasProjections).toBe(false);
       });
     });
@@ -219,7 +220,7 @@ describe("ProjectionRegistry", () => {
   describe("when initializing with registered subscribers", () => {
     describe("when subscribers are registered", () => {
       it("creates subscriber queues", () => {
-        const registry = new ProjectionRegistry();
+        const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
         const fold = createMockFoldProjectionDefinition("myFold");
         registry.registerFoldProjection(fold);
         registry.registerSubscriber("myFold", createMockSubscriber("mySubscriber"));
@@ -232,7 +233,7 @@ describe("ProjectionRegistry", () => {
 
   describe("close()", () => {
     it("closes queue manager when initialized", async () => {
-      const registry = new ProjectionRegistry();
+      const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
       const fold = createMockFoldProjectionDefinition("myFold");
       registry.registerFoldProjection(fold);
 
@@ -243,7 +244,7 @@ describe("ProjectionRegistry", () => {
     });
 
     it("does not throw when not initialized", async () => {
-      const registry = new ProjectionRegistry();
+      const registry = new ProjectionRegistry({ parseEvent: parseTestEvent });
       await expect(registry.close()).resolves.not.toThrow();
     });
   });

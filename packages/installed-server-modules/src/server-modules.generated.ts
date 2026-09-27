@@ -15,6 +15,7 @@ import { dashboardServer } from "@langwatch/dashboard-process";
 import { dataPrivacyServer } from "@langwatch/data-privacy-process";
 import { dataRetentionServer } from "@langwatch/data-retention-process";
 import { datasetServer } from "@langwatch/dataset-process";
+import { demoDataServer } from "@langwatch/enterprise-demo-data-process";
 import { enterpriseGatewayServer } from "@langwatch/enterprise-gateway-process";
 import { enterpriseOpsServer } from "@langwatch/enterprise-ops-process";
 import { entitlementServer } from "@langwatch/entitlement-process";
@@ -44,11 +45,12 @@ import { presenceServer } from "@langwatch/presence-process";
 import { projectServer } from "@langwatch/project-process";
 import { promptServer } from "@langwatch/prompt-process";
 import { roleServer } from "@langwatch/role-process";
+import { rumServer } from "@langwatch/rum-process";
 import { saasServer } from "@langwatch/enterprise-saas-process";
+import { sampleAgentsServer } from "@langwatch/sample-agents-process";
 import { scenarioServer } from "@langwatch/scenario-process";
 import { scimServer } from "@langwatch/enterprise-scim-process";
 import { secretServer } from "@langwatch/secret-process";
-import { seedDemoServer } from "@langwatch/enterprise-seed-demo-process";
 import { shareServer } from "@langwatch/share-process";
 import { ssoServer } from "@langwatch/enterprise-sso-process";
 import { storedObjectServer } from "@langwatch/stored-object-process";
@@ -75,6 +77,7 @@ export const serverModules = [
   dataPrivacyServer,
   dataRetentionServer,
   datasetServer,
+  demoDataServer,
   enterpriseGatewayServer,
   enterpriseOpsServer,
   entitlementServer,
@@ -104,11 +107,12 @@ export const serverModules = [
   projectServer,
   promptServer,
   roleServer,
+  rumServer,
   saasServer,
+  sampleAgentsServer,
   scenarioServer,
   scimServer,
   secretServer,
-  seedDemoServer,
   shareServer,
   ssoServer,
   storedObjectServer,

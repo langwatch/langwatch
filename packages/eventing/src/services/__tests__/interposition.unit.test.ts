@@ -16,6 +16,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 // ---------------------------------------------------------------------------
@@ -56,6 +57,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("lean-dispatch");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -88,6 +90,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
 
       // mapDef.eventTypes must include the test event type to trigger dispatch
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -121,6 +124,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       const eventStore = createMockEventStore<Event>();
       const mapDef = createMockMapProjectionDefinition("lean-throw");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -165,6 +169,7 @@ describe("given EventSourcingService is configured with a map projection", () =>
       });
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

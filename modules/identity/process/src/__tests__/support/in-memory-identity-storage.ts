@@ -3,6 +3,7 @@ import {
   IdentityIdentifierNotFoundError,
   isLiveIdentifierState,
 } from "@langwatch/identity-contract";
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
 import type {
   IdentityAccountRow,
@@ -18,8 +19,8 @@ interface StoredCredential {
   userId: string;
   providerId: string;
   secrets: IdentityAccountSecrets;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }
 
 const EMPTY_SECRETS = {
@@ -44,7 +45,7 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
     private readonly heads: InMemoryHeads,
     private readonly isFinalized: (userId: string) => boolean,
     private readonly accountRows: Record<string, unknown>[],
-    private readonly now: () => Date = () => new Date(),
+    private readonly now: () => Instant = nowInstant,
   ) {}
 
   async findByUser({ userId }: { userId: string }): Promise<IdentityAccountRow[]> {
@@ -253,8 +254,10 @@ export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolv
       issuer: identifier.issuer,
       accountId: identifier.providerAccountId ?? identifier.value ?? "",
       ...secrets,
-      createdAt: credential?.createdAt ?? new Date(identifier.attachedAtMs),
-      updatedAt: credential?.updatedAt ?? new Date(identifier.attachedAtMs),
+      createdAt:
+        credential?.createdAt ?? Temporal.Instant.fromEpochMilliseconds(identifier.attachedAtMs),
+      updatedAt:
+        credential?.updatedAt ?? Temporal.Instant.fromEpochMilliseconds(identifier.attachedAtMs),
     };
   }
 }

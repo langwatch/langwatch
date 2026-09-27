@@ -10,11 +10,9 @@ import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  ServerOrganizationApp,
-  type ServerOrganizationAppDependencies,
-} from "../organization.app.ts";
+import { type ServerOrganizationAppDependencies } from "../organization.app.ts";
 import type { OrganizationPlanGate } from "../organization.members.ts";
+import { organizationAppForTesting } from "./support/organization-app-for-testing.ts";
 
 const ORGANIZATION_ID = "org-1";
 const TEAM = {
@@ -70,7 +68,7 @@ function application(options: { enterprise: boolean }) {
     findUserOrgRoleByTeamId: vi.fn(async () => "MEMBER" as const),
   };
 
-  const app = ServerOrganizationApp.createForTesting({
+  const app = organizationAppForTesting({
     dependencies: {
       organizations:
         createApiFixture<ServerOrganizationAppDependencies["organizations"]>(organizations),

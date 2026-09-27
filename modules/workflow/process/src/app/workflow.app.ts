@@ -1,4 +1,5 @@
 import { AgentApi } from "@langwatch/agent-contract";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
   AuthzApi,
   ProjectPermissionDeniedError,
@@ -16,8 +17,9 @@ import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
 import { reads, type MembersRead } from "@langwatch/process-stores/members";
-import type { Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
@@ -70,6 +72,11 @@ import {
   workflowConfig,
   type WorkflowServerConfig,
   type WorkflowUsageCount,
+  WorkflowCallerUnauthenticatedError,
+  LlmModelNotSetError,
+  WorkflowOptimizationRemovedError,
+  WorkflowStudioEventInvalidError,
+  workflowStudioRestEventSchema,
 } from "@langwatch/workflow-contract";
 
 import { UnconfiguredWorkflowNlpRuntimeAdapter } from "../channels/http/http.workflow-nlp-runtime.channel.ts";
@@ -83,6 +90,11 @@ import {
 } from "../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
+import {
+  DISPATCHABLE_STUDIO_EVENT_TYPES,
+  findPostedJson,
+  studioFailureFrame,
+} from "../rules/workflow-studio-event.rules.ts";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { StudioEventPreparerService } from "../services/studio-event-preparer.service.ts";
 import { WorkflowAgentMappingService } from "../services/workflow-agent-mapping.service.ts";
@@ -99,6 +111,8 @@ import { WorkflowStudioDispatchService } from "../services/workflow-studio-dispa
 import { ModelProviderWorkflowStudioDslService } from "../services/workflow-studio-dsl.service.ts";
 import { WorkflowStudioVersionService } from "../services/workflow-studio-version.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
+
+const logger = createLogger("langwatch:workflows");
 
 /** Whether one person may act on a project other than the scoped one. */
 export interface WorkflowPermissionProbe {
@@ -724,7 +738,13 @@ export class WorkflowApp implements WorkflowApi {
   }
 
   /** Starts one evaluation run of a committed version. */
-  triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted> {
+  async triggerEvaluation({
+    callerMayReadRuns,
+    ...input
+  }: WorkflowEvaluationRequest & {
+    callerMayReadRuns: boolean;
+  }): Promise<WorkflowEvaluationStarted> {
+    if (!callerMayReadRuns) throw new ApiKeyPermissionDeniedError("evaluations:view");
     return this.#members.evaluations.trigger(input);
   }
 
@@ -768,9 +788,10 @@ export class WorkflowApp implements WorkflowApi {
 
   async completeCode(input: {
     projectId: string;
-    userId: string;
+    userId: string | undefined;
     body: WorkflowRestEnvelope;
   }): Promise<WorkflowCodeCompletionResponse> {
+    if (input.userId === undefined) throw new WorkflowCallerUnauthenticatedError();
     const permitted = await this.#members.permissions.has({
       userId: input.userId,
       projectId: input.projectId,
@@ -800,6 +821,66 @@ export class WorkflowApp implements WorkflowApi {
 
   reportStudioFailure(error: unknown, context: { projectId: string }): void {
     this.#members.signals.failed(error, context);
+  }
+
+  /**
+   * The editor's posted event, checked and prepared the way the door always has, answered as
+   * the engine's events. The body is forwarded as sent: the schema is only the 400 gate, since
+   * parsing would strip the node payload keys the engine reads back out.
+   */
+  async streamStudioEvent({
+    body,
+    userId,
+  }: {
+    body: string;
+    userId: string | undefined;
+  }): Promise<AsyncIterable<StudioServerEvent>> {
+    const [posted] = findPostedJson(body);
+    const validated = posted ? workflowStudioRestEventSchema.safeParse(posted) : undefined;
+    if (!posted || !validated?.success) throw new WorkflowStudioEventInvalidError();
+
+    const projectId = validated.data.projectId;
+    const eventWithoutEnvs = posted.event as StudioClientEvent;
+    logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
+
+    if (userId === undefined) throw new WorkflowCallerUnauthenticatedError();
+    const permitted = await this.hasProjectPermission({
+      userId,
+      projectId,
+      permission: "workflows:manage",
+    });
+    if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
+
+    const message = await this.#preparedForDispatch({ event: eventWithoutEnvs, projectId });
+    if (!DISPATCHABLE_STUDIO_EVENT_TYPES.has(message.type)) {
+      throw new WorkflowStudioEventInvalidError(`Unknown event type on server: ${message.type}`);
+    }
+    // Optimization was DSPy-only; stop events still pass so a started run can be cancelled.
+    if (message.type === "execute_optimization") throw new WorkflowOptimizationRemovedError();
+
+    return studioEventsOf({
+      start: (onEvent) => this.postStudioEvent({ projectId, event: message, onEvent }),
+      failureFrame: (error) =>
+        studioFailureFrame({ error, message, finishedAtMs: nowInstant().epochMilliseconds }),
+    });
+  }
+
+  /**
+   * A graph that could not be prepared: a still-preparing dataset or a node with no model are
+   * the caller's to fix and rethrow as they are; anything else is reported first.
+   */
+  async #preparedForDispatch(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent> {
+    try {
+      return await this.prepareStudioEvent(input);
+    } catch (error) {
+      if (isCallerFixable(error)) throw error;
+      logger.error({ error, projectId: input.projectId }, "error");
+      this.reportStudioFailure(error, { projectId: input.projectId });
+      throw error;
+    }
   }
 
   /**
@@ -1237,4 +1318,63 @@ export interface WorkflowStudioDsl {
  */
 export interface WorkflowAgentMapping {
   recompute(input: { projectId: string; workflowId: string; dsl: StudioWorkflow }): Promise<void>;
+}
+
+/** Matched on the handled CODE: the dataset module's own class is not this module's to name. */
+function isCallerFixable(error: unknown): boolean {
+  if (error instanceof LlmModelNotSetError) return true;
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "dataset_not_ready"
+  );
+}
+
+/**
+ * A run's events as they arrive. A `done` keeps the stream open one more second so a trailing
+ * frame still reaches the editor; the run settling ends it either way, and a failure becomes
+ * one last frame.
+ */
+async function* studioEventsOf({
+  start,
+  failureFrame,
+}: {
+  start: (onEvent: (event: StudioServerEvent) => void) => Promise<void>;
+  failureFrame: (error: unknown) => StudioServerEvent;
+}): AsyncGenerator<StudioServerEvent> {
+  const queue: StudioServerEvent[] = [];
+  let closed = false;
+  let wake: (() => void) | undefined;
+  const notify = () => {
+    wake?.();
+    wake = undefined;
+  };
+  const close = () => {
+    closed = true;
+    notify();
+  };
+
+  void start((event) => {
+    if (closed) return;
+    queue.push(event);
+    notify();
+    if (event.type === "done") setTimeout(close, 1000);
+  })
+    .catch((error: unknown) => {
+      logger.error({ error }, "Error handling message");
+      if (!closed) queue.push(failureFrame(error));
+    })
+    .finally(close);
+
+  while (!closed || queue.length > 0) {
+    const next = queue.shift();
+    if (next) {
+      yield next;
+      continue;
+    }
+    await new Promise<void>((resolve) => {
+      wake = resolve;
+    });
+  }
 }

@@ -29,12 +29,11 @@ import {
   useSuiteForm,
 } from "@langwatch/suite-browser-kit";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
-import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { FormServerError } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
+import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useArchivedItemsResolution } from "../../../behavior/suites/use-archived-items-resolution.ts";
 import { useSuiteRunMutation } from "../../../behavior/suites/use-suite-run-mutation.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";

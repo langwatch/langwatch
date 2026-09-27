@@ -11,10 +11,6 @@ import {
   type PlanProviderUser,
   type RoleChangeType,
 } from "@langwatch/entitlement-contract";
-import {
-  PrismaUsageMembershipRepository,
-  type UsageMembershipRepository,
-} from "@langwatch/entitlement-process";
 import { HandledError } from "@langwatch/handled-error";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
@@ -29,7 +25,9 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant } from "@langwatch/time";
 
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type { OrganizationSeatRepository } from "../repositories/organization-seat.repository.ts";
 import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
+import { PrismaOrganizationSeatRepository } from "../repositories/prisma/prisma.organization-seat.repository.ts";
 import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
@@ -49,6 +47,10 @@ import type {
   OrganizationInviteRateLimit,
   OrganizationInviteSeatCensus,
   OrganizationInvitations,
+  OrganizationInvitationsCreateInput,
+  OrganizationInvitationsListing,
+  OrganizationInvitationsResent,
+  OrganizationInvitationsStatusFacts,
   OrganizationInvitesCreated,
   OrganizationInviteWithOrganization,
   OrganizationJoinRequests,
@@ -70,7 +72,7 @@ type OrganizationSeatAnswer = Readonly<{
 class EntitlementOrganizationSeatLicense {
   static create(options: {
     plans: Pick<EntitlementApi, "getActivePlan">;
-    memberships: UsageMembershipRepository;
+    memberships: OrganizationSeatRepository;
   }): EntitlementOrganizationSeatLicense {
     return new EntitlementOrganizationSeatLicense(options);
   }
@@ -78,7 +80,7 @@ class EntitlementOrganizationSeatLicense {
   private constructor(
     private readonly options: {
       plans: Pick<EntitlementApi, "getActivePlan">;
-      memberships: UsageMembershipRepository;
+      memberships: OrganizationSeatRepository;
     },
   ) {}
 
@@ -170,11 +172,11 @@ class EntitlementOrganizationSeatLicense {
 /** The seat census an invitation is validated against: the SAME membership counts the seat
  * licence above reads, narrowed to what {@link InviteService} asks of it. */
 class EntitlementOrganizationInviteSeatCensus implements OrganizationInviteSeatCensus {
-  static create(memberships: UsageMembershipRepository): EntitlementOrganizationInviteSeatCensus {
+  static create(memberships: OrganizationSeatRepository): EntitlementOrganizationInviteSeatCensus {
     return new EntitlementOrganizationInviteSeatCensus(memberships);
   }
 
-  private constructor(private readonly memberships: UsageMembershipRepository) {}
+  private constructor(private readonly memberships: OrganizationSeatRepository) {}
 
   getMemberCount(organizationId: string): Promise<number> {
     return this.memberships.getMemberCount(organizationId);
@@ -246,9 +248,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     },
   ) {}
 
-  create(
-    input: Parameters<OrganizationInvitations["create"]>[0],
-  ): Promise<OrganizationInvitesCreated> {
+  create(input: OrganizationInvitationsCreateInput): Promise<OrganizationInvitesCreated> {
     return this.options.invites.createInvites({
       organizationId: input.organizationId,
       invites: input.invites.map((invite) => ({
@@ -275,7 +275,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
 
   resend(
     input: Readonly<{ organizationId: string; inviteId: string }>,
-  ): ReturnType<InviteService["resendInvite"]> {
+  ): Promise<OrganizationInvitationsResent> {
     return this.options.invites.resendInvite(input);
   }
 
@@ -307,7 +307,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     await this.options.invites.approvePaymentPendingInvites(input);
   }
 
-  list(input: Readonly<{ organizationId: string }>): ReturnType<InviteService["listInvites"]> {
+  list(input: Readonly<{ organizationId: string }>): Promise<OrganizationInvitationsListing[]> {
     return this.options.invites.listInvites(input);
   }
 
@@ -368,7 +368,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return InviteService.maskInvitedAddress(email);
   }
 
-  displayStatus(invite: Parameters<OrganizationInvitations["displayStatus"]>[0]): string {
+  displayStatus(invite: OrganizationInvitationsStatusFacts): string {
     return resolveInviteDisplayStatus(invite);
   }
 
@@ -582,7 +582,7 @@ function organizationInvitations(input: {
   const invites = InviteService.create({
     invites: repository,
     seats: EntitlementOrganizationInviteSeatCensus.create(
-      PrismaUsageMembershipRepository.create(input.prisma),
+      PrismaOrganizationSeatRepository.create(input.prisma),
     ),
     plans: input.entitlement,
     grants: input.permissions,
@@ -637,8 +637,9 @@ export function buildOrganizationInfrastructure(input: {
     prompts: LoggedOrganizationPromptSeed.create({ processName: input.processName, logger }),
     seats: EntitlementOrganizationSeatLicense.create({
       plans: dependencies.entitlement,
-      memberships: PrismaUsageMembershipRepository.create(prisma),
+      memberships: PrismaOrganizationSeatRepository.create(prisma),
     }),
+    seatCounts: PrismaOrganizationSeatRepository.create(prisma),
     invitations: organizationInvitations({
       prisma,
       redis: input.redis,

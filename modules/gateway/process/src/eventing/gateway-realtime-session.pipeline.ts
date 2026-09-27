@@ -2,7 +2,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -37,7 +36,7 @@ export const gatewayRealtimeSessionEventing = defineEventingModule({
 // sweep spans every tenant, so the aggregate is `global` like the other maintenance pipelines.
 export function buildGatewayRealtimeSessionMaintenancePipeline(
   reconcile: GatewayRealtimeSessionReconcileDeps,
-): StaticPipelineDefinition<Event> {
+): StaticPipelineDefinition<never> {
   return definePipeline({
     name: GATEWAY_REALTIME_SESSION_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

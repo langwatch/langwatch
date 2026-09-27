@@ -10,10 +10,9 @@ import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import type { Scenario } from "@langwatch/scenario-contract";
 import { useCallback, useMemo } from "react";
 
-import { api } from "../../../../behavior/scenario-api.ts";
+import { api, type Scenario } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import { CaseModal } from "./case-modal.tsx";

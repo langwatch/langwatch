@@ -4,7 +4,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -34,7 +33,7 @@ export function buildIngestionPullReconcile({
   bootedAt = nowInstant().epochMilliseconds,
 }: EventingSetup<unknown, Pick<GovernanceApp, "reconcileIngestionPulls">> & {
   bootedAt?: number;
-}): StaticPipelineDefinition<Event> {
+}): StaticPipelineDefinition<never> {
   return definePipeline({
     name: INGESTION_PULL_RECONCILE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

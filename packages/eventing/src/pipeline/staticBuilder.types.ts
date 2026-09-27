@@ -87,7 +87,10 @@ export interface StaticPipelineDefinition<
   aggregate: AggregateDefinition;
 
   /** The contract's event schemas by type, declared with `.withEvents` (ARCHITECTURE §9). */
-  eventSchemas?: ReadonlyMap<string, PipelineEventSchema>;
+  eventSchemas: ReadonlyMap<string, PipelineEventSchema>;
+
+  /** Parses a queued event with the schema its pipeline declared for its type (§9). */
+  parseEvent: (value: unknown) => EventType;
 
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;

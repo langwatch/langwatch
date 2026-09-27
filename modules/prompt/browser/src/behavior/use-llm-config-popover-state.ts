@@ -149,13 +149,12 @@ export function useLlmConfigPopoverState<Output extends DefaultOutput>({
       onChange(withParam({ values, paramName, value })),
     handleModelChange: (model: string) =>
       onChange(
-        buildModelChangeValues(
-          model,
-          undefined,
-          modelMetadata?.[model],
-          values,
-          currentModelMetadata,
-        ),
+        buildModelChangeValues({
+          newModel: model,
+          newModelMetadata: modelMetadata?.[model],
+          previousValues: values,
+          previousModelMetadata: currentModelMetadata,
+        }),
       ),
     isStructuredOutputsEnabled: structuredOutputs.isEnabled,
     handleStructuredOutputsToggle: structuredOutputs.toggle,

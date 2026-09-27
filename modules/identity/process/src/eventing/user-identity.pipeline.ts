@@ -246,8 +246,7 @@ export function composeIdentityPipeline({
 
 export const identityPipelineEventing = defineEventingModule({
   pipeline: IDENTITY_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<IdentityRepositories, IdentityApp>) =>
-    app.identityPipeline({ participation }),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.identityPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: IDENTITY_PIPELINE_NAME, commands }),
 });

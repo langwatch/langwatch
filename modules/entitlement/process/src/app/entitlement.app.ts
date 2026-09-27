@@ -23,7 +23,7 @@ import {
   type PricingModel,
   PlanLimitExceededError,
 } from "@langwatch/entitlement-contract";
-import type { Event, StaticPipelineDefinition } from "@langwatch/eventing";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -119,7 +119,7 @@ type EntitlementDependencies = EntitlementSetup["dependencies"];
  * directory alone. `license` is consumed once, by `create`, to build
  * {@link EntitlementInfrastructure} — a hand-built test app needs no license source.
  */
-type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "users" | "organizations">;
 
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
@@ -160,6 +160,7 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
       membership: repositories.membership,
+      seats: dependencies.organizations,
       counter: members.counter,
       plans: this.#plans,
     });
@@ -266,7 +267,7 @@ export class EntitlementApp implements EntitlementApiContract {
   /** The daily warning sweep this module's worker hosts, over the warning it composed. */
   usageWarningEventingPipeline(deps: {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
-  }): StaticPipelineDefinition<Event> {
+  }): StaticPipelineDefinition<never> {
     return buildUsageWarningPipeline({
       sweep: () => this.#warnings.sweep(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,

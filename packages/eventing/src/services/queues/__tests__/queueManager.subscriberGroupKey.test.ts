@@ -7,6 +7,7 @@ import {
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
@@ -41,6 +42,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -62,7 +64,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const entry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
-      const groupKey = entry?.groupKeyFn({ event, foldState: {} });
+      const groupKey = entry?.route({ event, foldState: {} }).groupKey;
       expect(groupKey).toBe(
         `${tenantId}/fold/traceSummary/reactor/evaluationTrigger/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -75,6 +77,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -96,7 +99,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const entry = globalJobRegistry.get("test-pipeline:reactor:spanStorageBroadcast");
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
 
-      const groupKey = entry?.groupKeyFn({ event, foldState: {} });
+      const groupKey = entry?.route({ event, foldState: {} }).groupKey;
       expect(groupKey).toBe(
         `${tenantId}/map/spanStorage/reactor/spanStorageBroadcast/${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`,
       );
@@ -109,6 +112,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -137,7 +141,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
         data: { runId: "run-42" },
       };
 
-      const groupKey = entry?.groupKeyFn({ event, foldState: {} });
+      const groupKey = entry?.route({ event, foldState: {} }).groupKey;
       expect(groupKey).toBe(`${tenantId}/fold/traceSummary/reactor/customSubscriber/custom:run-42`);
     });
   });
@@ -148,6 +152,7 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
       const manager = new QueueManager({
+        parseEvent: parseTestEvent,
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
@@ -178,8 +183,8 @@ describe("QueueManager.initializeProjectionSubscriberQueues with hierarchical gr
       const evalTriggerEntry = globalJobRegistry.get("test-pipeline:reactor:evaluationTrigger");
       const customSyncEntry = globalJobRegistry.get("test-pipeline:reactor:customEvalSync");
 
-      const evalKey = evalTriggerEntry?.groupKeyFn(payload);
-      const syncKey = customSyncEntry?.groupKeyFn(payload);
+      const evalKey = evalTriggerEntry?.route(payload).groupKey;
+      const syncKey = customSyncEntry?.route(payload).groupKey;
 
       // Same aggregate, different subscribers → different group keys (no FIFO contention)
       expect(evalKey).not.toBe(syncKey);

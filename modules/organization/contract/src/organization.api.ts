@@ -157,6 +157,9 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
  */
 export type OrganizationInviteValidation = "strict" | "lenient";
 
+/** An organization's seats: full and lite members, live invitations included. */
+export type OrganizationMemberSeats = Readonly<{ fullMembers: number; liteMembers: number }>;
+
 /** One invitation batch as a transport asks for it, with the mode it chose. */
 export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
   Readonly<{ validation: OrganizationInviteValidation }>;
@@ -276,6 +279,8 @@ export interface OrganizationApi {
   }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
+  /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
+  getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
   /** A self-hosted licence customer: the organization and its first team, marked. */
   createSelfHostedCustomer(input: { name: string }): Promise<{ id: string; name: string }>;
@@ -605,6 +610,11 @@ export interface OrganizationApi {
   cancelPaymentPendingInvites(
     input: Readonly<{ organizationId: string; subscriptionIds: readonly string[] }>,
   ): Promise<void>;
+  /**
+   * The seats an organization holds: full and lite members, live invitations
+   * included, disabled memberships excluded. The one count a licence and a plan read.
+   */
+  countMemberSeats(input: Readonly<{ organizationId: string }>): Promise<OrganizationMemberSeats>;
   /** Opens the invitations a completed seat checkout paid for, as main's billing webhook did. */
   approvePaymentPendingInvites(
     input: Readonly<{ subscriptionId: string; organizationId: string }>,

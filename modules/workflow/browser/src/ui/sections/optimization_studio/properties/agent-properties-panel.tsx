@@ -165,8 +165,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // The node's DSL snapshot is the canonical in-workflow state: it is
   // available synchronously (the record fetch is not) and it is what
   // the engine executes. The record is the library baseline.
-  const agentType = agentData?.type ?? node.data.agentType;
-  const dbName = agentData?.name ?? "";
+  const { agentType, dbName, savedName } = agentIdentity(agentData, node.data);
   const dbConfig = agentData?.config;
 
   // Local config from node data (unsaved changes)
@@ -177,38 +176,49 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     defaultValues: { name: localConfig?.name ?? node.data.name ?? dbName },
   });
 
-  // ---- HTTP state ----
-  const httpSnapshot = readHttpSnapshot(node.data);
-  const httpConfig = agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
-  const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
-
-  const initialHttp = initialHttpDraft({ localSettings, httpSnapshot, httpConfig });
-  const [url, setUrl] = useState(initialHttp.url);
-  const [method, setMethod] = useState<HttpMethod>(initialHttp.method);
-  const [bodyTemplate, setBodyTemplate] = useState(initialHttp.bodyTemplate);
-  const [outputPath, setOutputPath] = useState(initialHttp.outputPath);
-  const [headers, setHeaders] = useState<HttpHeader[]>(initialHttp.headers);
-  const [auth, setAuth] = useState<HttpAuth | undefined>(initialHttp.auth);
-  const httpSetters = useMemo(
-    () => ({ setUrl, setMethod, setBodyTemplate, setOutputPath, setHeaders, setAuth }),
-    [],
+  // Debounced persist of config changes to localConfig
+  const persistLocalSettings = useDebouncedCallback(
+    (settings: Record<string, unknown>) => {
+      setNode({
+        id: node.id,
+        data: {
+          localConfig: {
+            name: form.getValues("name"),
+            settings,
+          },
+        },
+      });
+    },
+    300,
+    { trailing: true },
   );
-  // ---- Code state ----
-  const codeSnapshot = readCodeSnapshot(node.data);
-  const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
-  const [code, setCode] = useState(initialCode({ localSettings, codeSnapshot, codeConfig }));
+
+  const localSettings = localConfig?.settings as Record<string, unknown> | undefined;
+  const draftSources = {
+    nodeData: node.data,
+    agentType,
+    dbConfig,
+    localSettings,
+    persist: persistLocalSettings,
+  };
+  const { draft, httpSetters, handlers } = useAgentHttpDraft(draftSources);
+  const { url, method, bodyTemplate, outputPath, headers, auth } = draft;
+  const {
+    handleUrlChange,
+    handleMethodChange,
+    handleBodyTemplateChange,
+    handleOutputPathChange,
+    handleAuthChange,
+    handleHeadersChange,
+  } = handlers;
+  const { code, setCode } = useAgentCodeDraft(draftSources);
 
   const applyAgentToEditorState = useCallback(
     (agent: NonNullable<typeof agentData>) => {
       form.reset({ name: agent.name });
-      if (agent.type === "http") {
-        const config = getHttpConfig(agent.config);
-        applyHttpDraft({ ...config, url: config.url || "" }, httpSetters);
-      } else if (agent.type === "code") {
-        setCode(getCodeFromConfig(agent.config));
-      }
+      applyAgentConfigToDraft({ agent, httpSetters, setCode });
     },
-    [form, httpSetters],
+    [form, httpSetters, setCode],
   );
 
   // Outer updates: apply the library record into the editor/DSL only when
@@ -236,25 +246,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentSignature, localConfig?.settings]);
 
-  // Debounced persist of config changes to localConfig
-  const persistLocalSettings = useDebouncedCallback(
-    (settings: Record<string, unknown>) => {
-      setNode({
-        id: node.id,
-        data: {
-          localConfig: {
-            name: form.getValues("name"),
-            settings,
-          },
-        },
-      });
-    },
-    300,
-    { trailing: true },
-  );
-
   // Watch name changes
-  const savedName = agentData?.name ?? node.data.name ?? "";
   const debouncedSetLocalConfig = useDebouncedCallback(
     (formValues: { name?: string }) =>
       persistNameDraft({ name: formValues.name, savedName, localConfig, nodeId: node.id, setNode }),
@@ -270,50 +262,6 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     });
     return () => subscription.unsubscribe();
   }, [form, debouncedSetLocalConfig]);
-
-  const handleUrlChange = useCallback((newUrl: string) => setUrl(newUrl), []);
-  const handleMethodChange = useCallback((newMethod: HttpMethod) => setMethod(newMethod), []);
-  const handleBodyTemplateChange = useCallback((newBody: string) => setBodyTemplate(newBody), []);
-  const handleOutputPathChange = useCallback((newPath: string) => setOutputPath(newPath), []);
-  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => setAuth(newAuth), []);
-  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => setHeaders(newHeaders), []);
-
-  // Track HTTP changes for localConfig persistence. Baseline = the
-  // node's DSL snapshot (what is saved in this workflow), falling back
-  // to the record while a snapshot-less node loads.
-  useEffect(() => {
-    if (agentType !== "http") return;
-    trackHttpDraft({
-      nodeData: node.data,
-      agentConfig: agentData?.config,
-      draft: { url, method, bodyTemplate, outputPath, headers, auth },
-      persist: persistLocalSettings,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    url,
-    method,
-    bodyTemplate,
-    outputPath,
-    headers,
-    auth,
-    agentType,
-    agentData,
-    node.data.parameters,
-    persistLocalSettings,
-  ]);
-
-  // Track Code changes for localConfig persistence
-  useEffect(() => {
-    if (agentType !== "code") return;
-    trackCodeDraft({
-      nodeData: node.data,
-      agentConfig: agentData?.config,
-      code,
-      persist: persistLocalSettings,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, agentType, agentData, node.data.parameters, persistLocalSettings]);
 
   // Build mapping data from workflow graph
   const availableSources = useMemo(
@@ -362,15 +310,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
 
   const handleInputsChange = useCallback(
     (newVariables: Variable[]) => {
-      const existingInputs = node.data.inputs ?? [];
-      const newInputs: DslField[] = newVariables.map((v) => {
-        const existing = existingInputs.find((i) => i.identifier === v.identifier);
-        return {
-          identifier: v.identifier,
-          type: v.type as DslField["type"],
-          ...(existing?.value != null ? { value: existing.value } : {}),
-        };
-      });
+      const newInputs = inputsFromVariables(newVariables, node.data.inputs ?? []);
       setNode({ id: node.id, data: { inputs: newInputs } });
       updateNodeInternals(node.id);
     },
@@ -488,6 +428,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
     debouncedSetLocalConfig,
     persistLocalSettings,
     httpSetters,
+    setCode,
   ]);
 
   const hasLocalChanges = !!localConfig;
@@ -505,36 +446,13 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // Register footer
   const footerContent = useMemo(
     () => (
-      <HStack width="full">
-        {hasLocalChanges && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDiscard}
-            data-testid="agent-discard-button"
-          >
-            Discard
-          </Button>
-        )}
-        <Spacer />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSave}
-          loading={updateMutation.isPending}
-          data-testid="agent-save-button"
-        >
-          Save
-        </Button>
-        <Button
-          colorPalette="blue"
-          size="sm"
-          onClick={handleApply}
-          data-testid="agent-apply-button"
-        >
-          Apply
-        </Button>
-      </HStack>
+      <AgentFooter
+        hasLocalChanges={hasLocalChanges}
+        onDiscard={handleDiscard}
+        onSave={handleSave}
+        isSaving={updateMutation.isPending}
+        onApply={handleApply}
+      />
     ),
     [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
@@ -871,4 +789,186 @@ function AgentCodeSection({ code, setCode }: { code: string; setCode: (code: str
       />
     </>
   );
+}
+
+type AgentDraftSources = {
+  nodeData: AgentComponent;
+  agentType: string | undefined;
+  dbConfig: AgentRecordConfig;
+  localSettings: Record<string, unknown> | undefined;
+  persist: (settings: Record<string, unknown>) => void;
+};
+
+/** The HTTP agent's editable draft, persisted to the node as a local draft when it drifts. */
+function useAgentHttpDraft({
+  nodeData,
+  agentType,
+  dbConfig,
+  localSettings,
+  persist,
+}: AgentDraftSources) {
+  // ---- HTTP state ----
+  const httpSnapshot = readHttpSnapshot(nodeData);
+  const httpConfig = agentType === "http" && dbConfig ? getHttpConfig(dbConfig) : undefined;
+
+  const initialHttp = initialHttpDraft({ localSettings, httpSnapshot, httpConfig });
+  const [url, setUrl] = useState(initialHttp.url);
+  const [method, setMethod] = useState<HttpMethod>(initialHttp.method);
+  const [bodyTemplate, setBodyTemplate] = useState(initialHttp.bodyTemplate);
+  const [outputPath, setOutputPath] = useState(initialHttp.outputPath);
+  const [headers, setHeaders] = useState<HttpHeader[]>(initialHttp.headers);
+  const [auth, setAuth] = useState<HttpAuth | undefined>(initialHttp.auth);
+  const httpSetters = useMemo(
+    () => ({ setUrl, setMethod, setBodyTemplate, setOutputPath, setHeaders, setAuth }),
+    [],
+  );
+  const handleUrlChange = useCallback((newUrl: string) => setUrl(newUrl), []);
+  const handleMethodChange = useCallback((newMethod: HttpMethod) => setMethod(newMethod), []);
+  const handleBodyTemplateChange = useCallback((newBody: string) => setBodyTemplate(newBody), []);
+  const handleOutputPathChange = useCallback((newPath: string) => setOutputPath(newPath), []);
+  const handleAuthChange = useCallback((newAuth: HttpAuth | undefined) => setAuth(newAuth), []);
+  const handleHeadersChange = useCallback((newHeaders: HttpHeader[]) => setHeaders(newHeaders), []);
+
+  // Track HTTP changes for localConfig persistence. Baseline = the
+  // node's DSL snapshot (what is saved in this workflow), falling back
+  // to the record while a snapshot-less node loads.
+  useEffect(() => {
+    if (agentType !== "http") return;
+    trackHttpDraft({
+      nodeData,
+      agentConfig: dbConfig,
+      draft: { url, method, bodyTemplate, outputPath, headers, auth },
+      persist,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    url,
+    method,
+    bodyTemplate,
+    outputPath,
+    headers,
+    auth,
+    agentType,
+    dbConfig,
+    nodeData.parameters,
+    persist,
+  ]);
+
+  return {
+    draft: { url, method, bodyTemplate, outputPath, headers, auth },
+    httpSetters,
+    handlers: {
+      handleUrlChange,
+      handleMethodChange,
+      handleBodyTemplateChange,
+      handleOutputPathChange,
+      handleAuthChange,
+      handleHeadersChange,
+    },
+  };
+}
+
+/** The code agent's editable source, persisted to the node as a local draft when it drifts. */
+function useAgentCodeDraft({
+  nodeData,
+  agentType,
+  dbConfig,
+  localSettings,
+  persist,
+}: AgentDraftSources) {
+  // ---- Code state ----
+  const codeSnapshot = readCodeSnapshot(nodeData);
+  const codeConfig = agentType === "code" && dbConfig ? dbConfig : undefined;
+  const [code, setCode] = useState(initialCode({ localSettings, codeSnapshot, codeConfig }));
+
+  // Track Code changes for localConfig persistence
+  useEffect(() => {
+    if (agentType !== "code") return;
+    trackCodeDraft({
+      nodeData,
+      agentConfig: dbConfig,
+      code,
+      persist,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, agentType, dbConfig, nodeData.parameters, persist]);
+
+  return { code, setCode };
+}
+
+function inputsFromVariables(variables: Variable[], existingInputs: DslField[]): DslField[] {
+  return variables.map((v) => {
+    const existing = existingInputs.find((i) => i.identifier === v.identifier);
+    return {
+      identifier: v.identifier,
+      type: v.type as DslField["type"],
+      ...(existing?.value != null ? { value: existing.value } : {}),
+    };
+  });
+}
+
+function AgentFooter({
+  hasLocalChanges,
+  onDiscard,
+  onSave,
+  isSaving,
+  onApply,
+}: {
+  hasLocalChanges: boolean;
+  onDiscard: () => void;
+  onSave: () => void;
+  isSaving: boolean;
+  onApply: () => void;
+}) {
+  return (
+    <HStack width="full">
+      {hasLocalChanges && (
+        <Button variant="outline" size="sm" onClick={onDiscard} data-testid="agent-discard-button">
+          Discard
+        </Button>
+      )}
+      <Spacer />
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onSave}
+        loading={isSaving}
+        data-testid="agent-save-button"
+      >
+        Save
+      </Button>
+      <Button colorPalette="blue" size="sm" onClick={onApply} data-testid="agent-apply-button">
+        Apply
+      </Button>
+    </HStack>
+  );
+}
+
+/** The record when loaded, else the node's own snapshot of it. */
+function agentIdentity(
+  agentData: { type?: string; name?: string } | undefined,
+  nodeData: AgentComponent,
+) {
+  return {
+    agentType: agentData?.type ?? nodeData.agentType,
+    dbName: agentData?.name ?? "",
+    savedName: agentData?.name ?? nodeData.name ?? "",
+  };
+}
+
+function applyAgentConfigToDraft({
+  agent,
+  httpSetters,
+  setCode,
+}: {
+  agent: { type?: string; config: NonNullable<AgentRecordConfig> };
+  httpSetters: Parameters<typeof applyHttpDraft>[1];
+  setCode: (code: string) => void;
+}) {
+  if (agent.type === "http") {
+    const config = getHttpConfig(agent.config);
+    applyHttpDraft({ ...config, url: config.url || "" }, httpSetters);
+  } else if (agent.type === "code") {
+    setCode(getCodeFromConfig(agent.config));
+  }
 }

@@ -1,10 +1,10 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import { useCallback, useState } from "react";
 
 import { api } from "../../behavior/scenario-api.ts";
+import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
 import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run.ts";
 import type { ScenarioFailureAction } from "../../model/scenario-host.ts";
 import type { TargetValue } from "../../model/scenario-target.ts";

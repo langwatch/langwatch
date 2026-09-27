@@ -18,7 +18,7 @@ import { z } from "zod";
 
 import { scopeTraceFilterToTable } from "../../rules/trace-facet-scope.rules.ts";
 import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
-import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString } from "./clickhouse.trace-row.mapper.ts";
 
 const TABLE_NAME = "trace_summaries" as const;

@@ -17,7 +17,7 @@ import type { EmailDelivery } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import { AuthApp } from "../auth.app.ts";
@@ -176,8 +176,11 @@ describe("when the born-finalized entrance is reached", () => {
   });
 });
 
+/** Mounted means initialised too: plugin init (OIDC discovery) settles inside the test. */
 async function mountedProviderIds(app: AuthApp): Promise<string[]> {
-  const { options } = await app.betterAuth();
+  const auth = await app.betterAuth();
+  await auth.$context;
+  const { options } = auth;
   const genericOAuth = options.plugins?.find((plugin) => plugin.id === "generic-oauth");
   const configs = (genericOAuth?.options as { config?: { providerId: string }[] } | undefined)
     ?.config;
@@ -187,7 +190,27 @@ async function mountedProviderIds(app: AuthApp): Promise<string[]> {
   ];
 }
 
+const AUTH0_DISCOVERY_URL = "https://tenant.auth0.test/.well-known/openid-configuration";
+
+/** The discovery document the generic-OAuth plugin fetches while it initialises. */
+function answerDiscovery(): void {
+  const realFetch = globalThis.fetch;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (url !== AUTH0_DISCOVERY_URL) return realFetch(input, init);
+    return Response.json({
+      issuer: "https://tenant.auth0.test/",
+      authorization_endpoint: "https://tenant.auth0.test/authorize",
+      token_endpoint: "https://tenant.auth0.test/oauth/token",
+      userinfo_endpoint: "https://tenant.auth0.test/userinfo",
+    });
+  });
+}
+
 describe("given enterprise SSO answers the deployment's sign-in providers", () => {
+  beforeEach(answerDiscovery);
+  afterEach(() => vi.restoreAllMocks());
+
   it.each([
     {
       provider: "google",
@@ -212,7 +235,7 @@ describe("given enterprise SSO answers the deployment's sign-in providers", () =
             providerId: "auth0",
             clientId: "a",
             clientSecret: "s",
-            discoveryUrl: "https://tenant.auth0.test/.well-known/openid-configuration",
+            discoveryUrl: AUTH0_DISCOVERY_URL,
           },
         ],
       },

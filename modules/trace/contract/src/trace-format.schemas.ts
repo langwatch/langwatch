@@ -772,15 +772,15 @@ export type TrackEventRESTParamsValidator = z.infer<typeof trackEventRESTParamsV
 
 export type DatasetSpan =
   | (Omit<BaseSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
-      params: Record<string, any>;
+      params: Record<string, unknown>;
       model?: string | null;
     })
   | (Omit<LLMSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
-      params: Record<string, any>;
+      params: Record<string, unknown>;
       model?: string | null;
     })
   | (Omit<RAGSpan, "project_id" | "trace_id" | "id" | "timestamps" | "metrics" | "params"> & {
-      params: Record<string, any>;
+      params: Record<string, unknown>;
       model?: string | null;
     });
 

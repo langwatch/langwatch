@@ -2,7 +2,7 @@ import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract
 /** Guard scope ranking and prototype-chain safety (#5837 AC3). */
 import { describe, expect, it } from "vitest";
 
-import { makeProvider } from "./model-provider.test-helpers.ts";
+import { makeProvider, storedRow } from "./model-provider.test-helpers.ts";
 
 describe("given a project-scoped row and an organization-scoped row that both define the same model id", () => {
   describe("when display names are built across both rows", () => {
@@ -74,16 +74,11 @@ describe("given a project-scoped row and a row whose scope tier is not one `rank
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_6" }],
         customModels: [{ modelId: "nova-6", displayName: "Trusted Name", mode: "chat" }],
       });
-      const unknownTierRow = makeProvider({
+      const unknownTierRow = storedRow({
         provider: "vendorO",
         enabled: true,
         id: "aaa-unknown",
-        scopes: [
-          {
-            scopeType: "WORKSPACE" as unknown as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: "ws_6",
-          },
-        ],
+        scopes: [{ scopeType: "WORKSPACE" }],
         customModels: [{ modelId: "nova-6", displayName: "Unranked Name", mode: "chat" }],
       });
 
@@ -106,16 +101,11 @@ describe("given a project-scoped row and a row whose scope tier names an inherit
         scopes: [{ scopeType: "PROJECT", scopeId: "proj_8" }],
         customModels: [{ modelId: "photon-9", displayName: "Scoped Winner", mode: "chat" }],
       });
-      const prototypeTierRow = makeProvider({
+      const prototypeTierRow = storedRow({
         provider: "vendorR",
         enabled: true,
         id: "aaa-prototype",
-        scopes: [
-          {
-            scopeType: "toString" as unknown as "ORGANIZATION" | "TEAM" | "PROJECT",
-            scopeId: "proto_8",
-          },
-        ],
+        scopes: [{ scopeType: "toString" }],
         customModels: [{ modelId: "photon-9", displayName: "Prototype Leak", mode: "chat" }],
       });
 

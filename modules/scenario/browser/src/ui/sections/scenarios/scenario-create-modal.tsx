@@ -1,9 +1,9 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { useModelProvidersSettings } from "@langwatch/model-provider-browser/surfaces/model-provider-settings";
 import { useCallback } from "react";
 
 import { api } from "../../../behavior/scenario-api.ts";
+import { useModelProvidersSettings } from "../../../behavior/use-model-providers-settings.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { generateScenarioWithAI } from "../../../model/scenario-generation.ts";
 import { storePromptForScenario } from "../../../model/scenario-prompt-storage.ts";

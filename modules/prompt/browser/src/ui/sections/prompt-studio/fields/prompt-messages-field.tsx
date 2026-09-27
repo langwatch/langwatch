@@ -6,6 +6,7 @@ import {
   type Variable,
 } from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -108,6 +109,7 @@ function MessageContent({
       name={`version.configData.messages.${idx}.content`}
       render={({ field: controllerField }) => (
         <PromptTextAreaWithVariables
+          renderSourceIcon={renderSourceTypeIcon}
           variables={shared.availableFields}
           otherNodesFields={shared.otherNodesFields}
           availableSources={shared.availableSources}

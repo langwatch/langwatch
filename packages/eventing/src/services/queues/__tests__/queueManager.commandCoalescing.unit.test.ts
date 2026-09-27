@@ -8,7 +8,11 @@ import { sealCommandClass } from "../../../commands/sealedCommand.ts";
 import type { CommandType } from "../../../domain/commandType.ts";
 import type { Event } from "../../../domain/types.ts";
 import type { EventSourcedQueueProcessor } from "../../../queues/index.ts";
-import { createTestAggregateType, TEST_CONSTANTS } from "../../__tests__/testHelpers.ts";
+import {
+  createTestAggregateType,
+  TEST_CONSTANTS,
+  parseTestEvent,
+} from "../../__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../queueManager.ts";
 import { QueueManager } from "../queueManager.ts";
 
@@ -55,6 +59,7 @@ function sharedQueue(): EventSourcedQueueProcessor<any> {
 function registryFor(): Map<string, JobRegistryEntry> {
   const globalJobRegistry = new Map<string, JobRegistryEntry>();
   const manager = new QueueManager({
+    parseEvent: parseTestEvent,
     aggregateType: createTestAggregateType(),
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
     globalQueue: sharedQueue() as never,
@@ -86,7 +91,7 @@ describe("QueueManager command append coalescing", () => {
       const entry = registryFor().get(`${TEST_CONSTANTS.PIPELINE_NAME}:command:recordCorrelation`);
 
       expect(entry).toBeDefined();
-      expect(entry?.processBatch).toBeDefined();
+      expect(entry?.readBatch).toBeDefined();
     });
   });
 
@@ -96,8 +101,11 @@ describe("QueueManager command append coalescing", () => {
       const entry = registryFor().get(`${TEST_CONSTANTS.PIPELINE_NAME}:command:addAnnotation`);
 
       expect(entry).toBeDefined();
-      expect(entry?.processBatch).toBeUndefined();
-      expect(entry?.coalesceMaxBatch).toBeUndefined();
+      expect(entry?.readBatch).toBeUndefined();
+      expect(
+        entry?.route({ tenantId: "tenant-1", aggregateId: "aggregate-1", occurredAt: 1 })
+          .coalesceMaxBatch,
+      ).toBe(1);
     });
   });
 });

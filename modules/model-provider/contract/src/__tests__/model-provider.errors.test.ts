@@ -175,12 +175,12 @@ describe("model provider handled errors", () => {
         httpStatus: 404,
       });
       expectHandledWire(
-        new ModelNotConfiguredError(
-          "analytics.topic_clustering_embeddings",
-          "EMBEDDINGS",
-          "Topic clustering embeddings",
-          "project_abc",
-        ),
+        new ModelNotConfiguredError({
+          featureKey: "analytics.topic_clustering_embeddings",
+          role: "EMBEDDINGS",
+          featureDisplayName: "Topic clustering embeddings",
+          projectId: "project_abc",
+        }),
         {
           code: "model_not_configured",
           message:

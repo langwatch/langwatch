@@ -10,13 +10,13 @@ import {
 import { z } from "zod";
 
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "../trace-summary-projection.repository.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 
@@ -189,22 +189,16 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      defaultRetentionDays: number;
     },
   ) {}
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    defaultRetentionDays: number;
   }): TraceSummaryClickHouseRepository {
     return new TraceSummaryClickHouseRepository(options);
   }
 
-  async upsert(
-    data: TraceSummaryData,
-    tenantId: string,
-    retentionDays = this.options.defaultRetentionDays,
-  ): Promise<void> {
+  async upsert(data: TraceSummaryData, tenantId: string, retentionDays: number): Promise<void> {
     EventUtils.validateTenantId({ tenantId }, "TraceSummaryClickHouseRepository.upsert");
 
     const projectionId = createTraceSummaryProjectionId({
@@ -243,7 +237,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     entries: {
       data: TraceSummaryData;
       tenantId: string;
-      retentionDays?: number;
+      retentionDays: number;
     }[],
   ): Promise<void> {
     if (entries.length === 0) return;
@@ -594,13 +588,13 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     tenantId,
     projectionId,
     version,
-    retentionDays = this.options.defaultRetentionDays,
+    retentionDays,
   }: {
     data: TraceSummaryData;
     tenantId: string;
     projectionId: string;
     version: string;
-    retentionDays?: number;
+    retentionDays: number;
   }): ClickHouseSummaryWriteRecord {
     return {
       ProjectionId: projectionId,
@@ -670,7 +664,6 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    defaultRetentionDays: number;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
       TraceSummaryClickHouseRepository.create(options),

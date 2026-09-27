@@ -22,7 +22,7 @@ import {
 
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { computeSpanCost } from "../../rules/trace-span-cost-matching.rules.ts";
-import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
  * `Date`s: the ClickHouse driver serialises a `Date` into a `DateTime64(3)`

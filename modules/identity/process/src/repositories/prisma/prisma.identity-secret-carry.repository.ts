@@ -5,19 +5,7 @@ import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
 } from "../../services/identity-secret-carry.service.ts";
-
-/**
- * The `Account` row's secret columns, by the canonical name `AccountCredential` stores them under.
- * The legacy table is NextAuth's, so four of the six are renamed across the copy.
- */
-const CARRIED_COLUMNS = {
-  password: "password",
-  accessToken: "access_token",
-  refreshToken: "refresh_token",
-  idToken: "id_token",
-  accessTokenExpiresAt: "expires_at",
-  scope: "scope",
-} as const;
+import { toCredentialColumns, toInstant } from "./prisma.account-credential.mapper.ts";
 
 interface LegacyAccountRow {
   id: string;
@@ -111,7 +99,7 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
           id: accountId,
           userId,
           provider: providerId,
-          ...secrets,
+          ...toCredentialColumns(secrets),
           createdAt: new Date(createdAtMs),
           updatedAt: new Date(updatedAtMs),
         },
@@ -134,16 +122,18 @@ export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryR
       where: { id: accountId },
       // The `Account` row's own `updatedAt` rides along, so the comparison
       // settles at equal and the next pass writes nothing.
-      data: { ...secrets, updatedAt: new Date(updatedAtMs) },
+      data: { ...toCredentialColumns(secrets), updatedAt: new Date(updatedAtMs) },
     });
   }
 }
 
 function secretsOf(account: LegacyAccountRow): IdentityAccountSecrets {
-  return Object.fromEntries(
-    Object.entries(CARRIED_COLUMNS).map(([canonical, column]) => [
-      canonical,
-      account[column as keyof LegacyAccountRow] ?? null,
-    ]),
-  ) as IdentityAccountSecrets;
+  return {
+    password: account.password,
+    accessToken: account.access_token,
+    refreshToken: account.refresh_token,
+    idToken: account.id_token,
+    accessTokenExpiresAt: toInstant(account.expires_at),
+    scope: account.scope,
+  };
 }

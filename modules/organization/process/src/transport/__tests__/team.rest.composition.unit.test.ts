@@ -8,7 +8,7 @@ import type { Project } from "@langwatch/project-contract";
 import { Temporal, toDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { ServerOrganizationApp } from "../../app/organization.app.ts";
+import { organizationAppForTesting } from "../../app/__tests__/support/organization-app-for-testing.ts";
 import type {
   OrganizationGrantCache,
   OrganizationPromptSeed,
@@ -252,7 +252,7 @@ function application() {
     },
   });
 
-  const app = ServerOrganizationApp.createForTesting({
+  const app = organizationAppForTesting({
     dependencies: {
       organizations,
       membership,

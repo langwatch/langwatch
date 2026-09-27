@@ -8,7 +8,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -28,7 +27,7 @@ export const USAGE_WARNING_PIPELINE_NAME = "entitlement_usage_warning";
 
 export function buildUsageWarningPipeline(
   deps: Omit<UsageWarningSweepRunDeps, "now">,
-): StaticPipelineDefinition<Event> {
+): StaticPipelineDefinition<never> {
   return definePipeline({
     name: USAGE_WARNING_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

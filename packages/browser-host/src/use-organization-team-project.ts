@@ -6,7 +6,13 @@
 import { createContext, useContext, useMemo } from "react";
 
 /** The project the reader is standing in, as every family reads it. */
-export type UiHostProject = { id: string; name: string; slug: string };
+export type UiHostProject = {
+  id: string;
+  name: string;
+  slug: string;
+  /** A Mustache template turning a `user_id` into a link, when the project set one. */
+  userLinkTemplate?: string | null;
+};
 
 export type UiHostOrganization = { id: string; name?: string };
 

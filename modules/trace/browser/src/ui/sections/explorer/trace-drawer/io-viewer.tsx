@@ -8,14 +8,14 @@ import {
   collectChatTextLeaves,
   type ConversationTurn,
   extractInlineBlocks,
-  parseContentBlocks,
   parseJSON,
   VIRTUALIZE_AT,
 } from "@langwatch/trace-contract/transcript";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
+import { panelChatMessages } from "../../../../model/transcript/panel-messages.ts";
 import { groupMessagesIntoTurns } from "../../../../model/transcript/turns.ts";
 import { safePrettyJson } from "../../../elements/explorer/trace-drawer/json-highlight.tsx";
 import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
@@ -64,37 +64,11 @@ export function ioContainerChrome({
   return { flush, innerPadding };
 }
 
-interface IOViewerProps {
-  label: string;
-  content: string;
-  /**
-   * "input" renders the full chat history (all messages, all roles, tool calls inline).
-   */
-  mode?: "input" | "output";
-  /**
-   * When provided, the panel header offers to comment on this field and, where a
-   * suggestion can correct it, to suggest what it should have said.
-   */
-  traceId?: string;
-  /**
-   * Span this IOViewer is rendering.
-   */
-  spanId?: string;
-  /** Span type — `llm` enables the Playground affordance. */
-  spanType?: string;
-}
-
-export const IOViewer = memo(function IOViewer({
-  label,
-  content: originalContent,
-  mode = "input",
-  traceId,
-  spanId,
-  spanType,
-}: IOViewerProps) {
-  // Translate-to-English swaps the content feeding the whole viewer pipeline, so every
-  // format (pretty/chat/json/markdown) renders the translated variant; Copy follows
-  // what's displayed.
+/**
+ * The panel's content, swapped for its translation while translate-to-English
+ * is on, so every format renders the translated variant and Copy follows it.
+ */
+function useTranslatedContent(originalContent: string) {
   const originalChatMessages = useMemo(
     () => coerceToChatMessages(parseJSON(originalContent)),
     [originalContent],
@@ -129,6 +103,122 @@ export const IOViewer = memo(function IOViewer({
     originalContent,
   ]);
 
+  return { translation, content };
+}
+
+/** What a collapsed panel says about itself: its message count, or its length. */
+function summaryOf({ messages, content }: { messages: ChatMessage[] | null; content: string }) {
+  if (!messages) return `${content.length.toLocaleString()} chars`;
+  return `${messages.length} ${messages.length === 1 ? "message" : "messages"}`;
+}
+
+function IOViewerHeading({
+  label,
+  collapsed,
+  summary,
+  onToggle,
+}: {
+  label: string;
+  collapsed: boolean;
+  summary: string;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={onToggle}
+        aria-label={collapsed ? "Expand" : "Collapse"}
+        padding={0}
+        minWidth="auto"
+        height="auto"
+      >
+        <Icon as={collapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
+      </Button>
+      <HStack
+        gap={2}
+        flex={collapsed ? 1 : undefined}
+        flexShrink={0}
+        cursor="pointer"
+        onClick={onToggle}
+      >
+        <Text
+          textStyle="2xs"
+          fontWeight="bold"
+          color="fg"
+          letterSpacing="wide"
+          textTransform="uppercase"
+        >
+          {label}
+        </Text>
+        {collapsed && (
+          <Text textStyle="2xs" color="fg.muted">
+            {summary}
+          </Text>
+        )}
+      </HStack>
+    </>
+  );
+}
+
+function ShowRemainingButton({
+  expanded,
+  remainingChars,
+  onClick,
+}: {
+  expanded: boolean;
+  remainingChars: number;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="xs"
+      variant="plain"
+      color="blue.fg"
+      padding={0}
+      height="auto"
+      marginTop={1}
+      onClick={onClick}
+    >
+      {expanded ? "Show less" : `Show remaining ${(remainingChars / 1000).toFixed(0)}K chars`}
+    </Button>
+  );
+}
+
+interface IOViewerProps {
+  label: string;
+  content: string;
+  /**
+   * "input" renders the full chat history (all messages, all roles, tool calls inline).
+   */
+  mode?: "input" | "output";
+  /**
+   * When provided, the panel header offers to comment on this field and, where a
+   * suggestion can correct it, to suggest what it should have said.
+   */
+  traceId?: string;
+  /**
+   * Span this IOViewer is rendering.
+   */
+  spanId?: string;
+  /** Span type — `llm` enables the Playground affordance. */
+  spanType?: string;
+}
+
+export const IOViewer = memo(function IOViewer({
+  label,
+  content: originalContent,
+  mode = "input",
+  traceId,
+  spanId,
+  spanType,
+}: IOViewerProps) {
+  // Translate-to-English swaps the content feeding the whole viewer pipeline, so every
+  // format (pretty/chat/json/markdown) renders the translated variant; Copy follows
+  // what's displayed.
+  const { translation, content } = useTranslatedContent(originalContent);
+
   // Which part of the trace a comment left on this panel is about: the span's
   // field when the viewer is rendering a span, the trace's own field otherwise.
   const fieldAnchor = useMemo<TraceAnchor | null>(
@@ -146,29 +236,10 @@ export const IOViewer = memo(function IOViewer({
 
   // Input panel gets the full conversation history sent to the model this turn — user messages,
   // system/developer prompts, and every prior assistant operation.
-  const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
-    if (!allChatMessages) return [];
-    const all = allChatMessages;
-    if (mode === "output") {
-      let lastUserIdx = -1;
-      for (let i = all.length - 1; i >= 0; i--) {
-        const msg = all[i]!;
-        if (msg.role !== "user") continue;
-        const blocks = parseContentBlocks(msg.content);
-        const hasText = blocks.some((b) => b.kind === "text");
-        if (hasText) {
-          lastUserIdx = i;
-          break;
-        }
-      }
-      return lastUserIdx >= 0 ? all.slice(lastUserIdx + 1) : all;
-    }
-    let end = all.length;
-    while (end > 0 && all[end - 1]!.role === "assistant") {
-      end--;
-    }
-    return all.slice(0, end);
-  }, [allChatMessages, mode]);
+  const chatMessagesToRender = useMemo(
+    () => (allChatMessages ? panelChatMessages({ messages: allChatMessages, mode }) : []),
+    [allChatMessages, mode],
+  );
 
   // Group raw messages into logical turns: user prose vs assistant operation
   // chains (which absorb thinking, tool_use, tool_result wrappers from
@@ -189,14 +260,10 @@ export const IOViewer = memo(function IOViewer({
     setExpanded,
     collapsed,
     setCollapsed,
-    engaged,
     engagedRef,
   } = useIOViewerState({ mode });
 
-  const collapsedSummary =
-    isChat && allChatMessages
-      ? `${allChatMessages.length} ${allChatMessages.length === 1 ? "message" : "messages"}`
-      : `${content.length.toLocaleString()} chars`;
+  const collapsedSummary = summaryOf({ messages: allChatMessages, content });
 
   const isLong = content.length - TRUNCATE_AT > TRUNCATE_TAIL_MIN;
   const displayContent = !isLong || expanded ? content : content.slice(0, TRUNCATE_AT) + "...";
@@ -233,64 +300,15 @@ export const IOViewer = memo(function IOViewer({
     isVirtualizingChat,
   });
 
-  // Track whether the preview box's content actually exceeds its visible height. The
-  // "Click to interact" scrim only makes sense when there's hidden content to reveal —
-  // otherwise it's noise on a one-line input.
-  const previewBoxRef = useRef<HTMLDivElement>(null);
-  // Value intentionally unread — the effect re-runs measurement on resize/
-  // scroll; the overflow flag itself isn't surfaced yet.
-  const [, setHasOverflow] = useState(false);
-  useEffect(() => {
-    const el = previewBoxRef.current;
-    if (!el) {
-      setHasOverflow(false);
-      return;
-    }
-    const measure = () => {
-      setHasOverflow(el.scrollHeight - el.clientHeight > 1);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [displayContent, format, isVirtualizingChat, engaged, expanded, chatLayout, markdownSubmode]);
-
   return (
     <Box>
       <HStack marginBottom={1} gap={2}>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand" : "Collapse"}
-          padding={0}
-          minWidth="auto"
-          height="auto"
-        >
-          <Icon as={collapsed ? LuChevronRight : LuChevronDown} boxSize={3} color="fg.muted" />
-        </Button>
-        <HStack
-          gap={2}
-          flex={collapsed ? 1 : undefined}
-          flexShrink={0}
-          cursor="pointer"
-          onClick={() => setCollapsed((c) => !c)}
-        >
-          <Text
-            textStyle="2xs"
-            fontWeight="bold"
-            color="fg"
-            letterSpacing="wide"
-            textTransform="uppercase"
-          >
-            {label}
-          </Text>
-          {collapsed && (
-            <Text textStyle="2xs" color="fg.muted">
-              {collapsedSummary}
-            </Text>
-          )}
-        </HStack>
+        <IOViewerHeading
+          label={label}
+          collapsed={collapsed}
+          summary={collapsedSummary}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
         <IOViewerToolbar
           label={label}
           collapsed={collapsed}
@@ -324,7 +342,6 @@ export const IOViewer = memo(function IOViewer({
                 content gets breathing room while the scrollbar hugs
                 the outer edge. */}
             <Box
-              ref={previewBoxRef}
               bg={flushOuter ? "transparent" : "bg.subtle"}
               borderRadius={flushOuter ? "0" : "md"}
               borderWidth={flushOuter ? "0" : "1px"}
@@ -374,19 +391,11 @@ export const IOViewer = memo(function IOViewer({
           </Box>
 
           {isLong && (
-            <Button
-              size="xs"
-              variant="plain"
-              color="blue.fg"
-              padding={0}
-              height="auto"
-              marginTop={1}
+            <ShowRemainingButton
+              expanded={expanded}
+              remainingChars={content.length - TRUNCATE_AT}
               onClick={() => setExpanded((e) => !e)}
-            >
-              {expanded
-                ? "Show less"
-                : `Show remaining ${((content.length - TRUNCATE_AT) / 1000).toFixed(0)}K chars`}
-            </Button>
+            />
           )}
 
           {/* Corrections already suggested for this output, read back where the

@@ -9,7 +9,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 
 import type { AuthApp } from "../app/auth.app.ts";
@@ -30,7 +29,7 @@ export const SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME = "sign_in_lock_maintenance"
 export function buildSignInLockMaintenance({
   repositories,
   processStore,
-}: EventingSetup<Pick<AuthRepositories, "signInLocks">, unknown>): StaticPipelineDefinition<Event> {
+}: EventingSetup<Pick<AuthRepositories, "signInLocks">, unknown>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),

@@ -55,11 +55,12 @@ function transport(bodies: unknown[] = []): Wiring {
   const requests: string[] = [];
   const queue = [...bodies];
 
-  const eventSource = function (url: string, init?: { withCredentials?: boolean }) {
-    const channel = new FakeChannel(url, init);
-    channels.push(channel);
-    return channel;
-  } as unknown as SseEventSourceConstructor;
+  const eventSource: SseEventSourceConstructor = class extends FakeChannel {
+    constructor(url: string, init?: { withCredentials?: boolean }) {
+      super(url, init);
+      channels.push(this);
+    }
+  };
 
   const fetch = (async (input: RequestInfo | URL) => {
     requests.push(requestUrl(input));

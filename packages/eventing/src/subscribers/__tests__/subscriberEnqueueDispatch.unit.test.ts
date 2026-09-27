@@ -16,6 +16,7 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventSourcingService } from "../../services/eventSourcingService.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
@@ -30,6 +31,7 @@ function makeQueueManager() {
   // so the router runs the subscriber inline — the seam still applies the
   // enqueue filter, and the handler sees the staged payload.
   return new QueueManager<Event>({
+    parseEvent: parseTestEvent,
     aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
   });
@@ -310,6 +312,7 @@ describe("subscriber enqueue-time contract", () => {
         };
         const handle = vi.fn().mockResolvedValue(void 0);
         const service = new EventSourcingService<Event>({
+          parseEvent: parseTestEvent,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
           aggregateType,
           allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

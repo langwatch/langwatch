@@ -46,6 +46,8 @@ export const serverModuleMembers = {
   project: ["encryption", "logger"],
   prompt: ["logger", "publicBaseUrl", "rateLimiter"],
   role: ["prisma"],
+  rum: ["logger", "telemetryExporter"],
+  "sample-agents": ["logger", "publicBaseUrl"],
   scenario: ["clickhouse", "encryption", "idempotency", "isSaas", "nlpCodeBlockTimeoutSeconds", "nlpServiceUrl", "nodeEnvironment", "publicBaseUrl", "rateLimiter", "redis", "scenarioChildBundle"],
   secret: ["encryption"],
   share: ["redis"],
@@ -57,6 +59,7 @@ export const serverModuleMembers = {
   webhook: ["isSaas", "rateLimiter", "redis"],
   workflow: ["encryption", "prisma"],
   billing: ["isSaas", "mail", "nodeEnvironment", "publicBaseUrl"],
+  "demo-data": [],
   "enterprise-ops": [],
   "enterprise-gateway": ["isSaas"],
   governance: ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"],
@@ -64,6 +67,5 @@ export const serverModuleMembers = {
   "managed-provider": [],
   saas: ["isSaas"],
   scim: [],
-  "seed-demo": [],
   sso: ["isSaas", "logger", "publicBaseUrl"],
 } as const;

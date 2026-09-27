@@ -9,7 +9,7 @@ import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import { fromDate } from "@langwatch/time";
+import { Temporal, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
 import { api, type RouterOutputs } from "../../../../behavior/scenario-api.ts";
@@ -111,7 +111,7 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
         name: scenario.name,
         labels: scenario.labels,
         testSuiteId: scenario.testSuiteId,
-        createdAt: fromDate(scenario.createdAt),
+        createdAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(scenario.createdAt)),
         lastUpdatedById: scenario.lastUpdatedById,
         version: scenario.version,
       })),

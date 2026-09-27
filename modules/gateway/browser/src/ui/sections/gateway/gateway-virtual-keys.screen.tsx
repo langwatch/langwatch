@@ -162,7 +162,7 @@ function VirtualKeysPage() {
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
-  const allRows = listQuery.data ?? [];
+  const allRows = useMemo(() => listQuery.data ?? [], [listQuery.data]);
   // A disabled key belongs with the live ones: it is paused, not finished,
   // and it used to appear in neither tab, which left the only route to it a
   // link somebody had kept. Revoked is the one terminal state, so it keeps

@@ -124,7 +124,12 @@ export {
   UnknownTenantError,
 } from "./tenancy.ts";
 export type { TenantGuardOptions, TenantScopeViolation } from "./tenantGuard.ts";
-export type { StatementLogSink, StatementMetrics, StatementOutcome } from "./statementReporting.ts";
+export {
+  StatementReporter,
+  type StatementLogSink,
+  type StatementMetrics,
+  type StatementOutcome,
+} from "./statementReporting.ts";
 export type { VendorQueryType } from "./statementShape.ts";
 export type { VendorClientResilienceOptions, VendorStatementClient } from "./vendorClient.ts";
 export {
@@ -172,9 +177,10 @@ export {
   type ClickHouseSchemaLockOptions,
 } from "./schema-lock.ts";
 
-/** Every time-partitioned table's prunable columns — the one map the
- * trace-server cold-scan detector and the analytics-server JOIN bound guard
- * both read, so they can't drift apart. */
+/** Every time-partitioned table's prunable columns — the one map the cold-scan
+ * detector and the analytics-server JOIN bound guard both read, so they can't
+ * drift apart. */
+export { detectColdScan } from "./coldScanDetector.ts";
 export { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
 
 /** The partition-window read policy (ADR-068): one hinted attempt, a graceful

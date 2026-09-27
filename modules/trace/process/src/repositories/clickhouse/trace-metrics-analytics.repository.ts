@@ -9,7 +9,7 @@ import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,
 } from "../trace-analytics-projection.repository.ts";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const analyticsRecordRowsSchema = z.array(z.record(z.string(), z.unknown()));
 
@@ -94,7 +94,6 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
-      defaultRetentionDays: number;
     },
   ) {
     super();
@@ -102,18 +101,17 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
-    defaultRetentionDays: number;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
   }
 
   async upsert({
     row,
-    retentionDays = this.options.defaultRetentionDays,
+    retentionDays,
     appliedEventIds,
   }: {
     row: TraceAnalyticsRow;
-    retentionDays?: number;
+    retentionDays: number;
     appliedEventIds?: readonly string[];
   }): Promise<void> {
     EventUtils.validateTenantId(
@@ -151,7 +149,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   override async upsertBatch(
     entries: {
       row: TraceAnalyticsRow;
-      retentionDays?: number;
+      retentionDays: number;
       appliedEventIds?: readonly string[];
     }[],
   ): Promise<void> {
@@ -177,7 +175,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
         values: entries.map(({ row, retentionDays, appliedEventIds }) =>
           TraceAnalyticsClickHouseRepository.toClickHouseRecord(
             row,
-            retentionDays ?? this.options.defaultRetentionDays,
+            retentionDays,
             appliedEventIds,
           ),
         ),

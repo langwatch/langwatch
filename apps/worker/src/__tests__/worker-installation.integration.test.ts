@@ -105,6 +105,12 @@ async function bootWorker({ live = false }: { live?: boolean } = {}) {
         redis: null,
         publicBaseUrl: config.process.baseHost,
         serviceVersion: "test",
+        // No collector: rum answers not configured unless the test names one.
+        telemetryExporter: {
+          endpoint: void 0,
+          withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
+            build({}),
+        },
         nodeEnvironment: config.process.nodeEnvironment,
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,

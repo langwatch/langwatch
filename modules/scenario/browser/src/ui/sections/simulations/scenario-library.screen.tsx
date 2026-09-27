@@ -6,12 +6,11 @@ import { HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import type { Scenario } from "@langwatch/scenario-contract";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
+import { api, type Scenario } from "../../../behavior/scenario-api.ts";
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
 import { useNewScenarioFlow } from "../../../behavior/use-new-scenario-flow.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";

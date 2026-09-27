@@ -1,6 +1,6 @@
 /**
  * Partition columns enabling ClickHouse pruning for time-partitioned tables.
- * Kept in sync by trace-cold-scan-detector.service.unit.test.ts.
+ * Kept in sync with the migrations by coldScanDetector.coverage.unit.test.ts.
  */
 export const TIME_PARTITIONED_TABLES = {
   stored_spans: ["StartTime"],

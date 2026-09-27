@@ -7,7 +7,7 @@
 
 import type {
   AtomOutcome,
-  ResultAtom,
+  ResultAtomResponse as ResultAtom,
   ResultsGroupBy,
   RunParameterValues,
 } from "@langwatch/scenario-contract";

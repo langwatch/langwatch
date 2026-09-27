@@ -4,6 +4,7 @@
  */
 import { nowInstant } from "@langwatch/time";
 
+import { convertInlineToRowRecords } from "./dataset-conversion.ts";
 import type { DatasetColumn, DatasetReference, EvaluationsV3State } from "./types.ts";
 
 type DatasetsEdit = Pick<EvaluationsV3State, "datasets"> | EvaluationsV3State;
@@ -256,3 +257,67 @@ export const withoutSelectedRows = ({
     ui: clearedRowSelection(state.ui),
   };
 };
+
+type DrawerDataset = {
+  datasetId: string;
+  name: string;
+  columnTypes: { name: string; type: string }[];
+};
+
+const columnsFrom = (columnTypes: DrawerDataset["columnTypes"]): DatasetColumn[] =>
+  columnTypes.map((col, index) => ({
+    id: `${col.name}_${index}`,
+    name: col.name,
+    type: col.type as DatasetColumn["type"],
+  }));
+
+/**
+ * An inline dataset turned, in place, into a reference to the saved dataset it
+ * became — in place rather than remove-then-add, which duplicated datasets.
+ */
+export const savedDatasetUpdate = (saved: DrawerDataset): Partial<DatasetReference> => ({
+  type: "saved",
+  name: saved.name,
+  datasetId: saved.datasetId,
+  inline: undefined,
+  columns: columnsFrom(saved.columnTypes),
+});
+
+/**
+ * A dataset's columns as edited in the drawer. Inline values follow their column
+ * by name, and a new column starts empty; a saved dataset was already saved by
+ * the drawer, so only the local reference changes.
+ */
+export const editedDatasetUpdate = ({
+  dataset,
+  edited,
+  rowCount,
+}: {
+  dataset: DatasetReference;
+  edited: DrawerDataset;
+  rowCount: number;
+}): Partial<DatasetReference> => {
+  const columns = columnsFrom(edited.columnTypes);
+  if (dataset.type !== "inline") {
+    return { name: edited.name, columns, datasetId: edited.datasetId };
+  }
+  const oldRecords = dataset.inline?.records ?? {};
+  const records = Object.fromEntries(
+    columns.map((column) => {
+      const oldColumn = dataset.columns.find((c) => c.name === column.name);
+      const oldValues = oldColumn ? oldRecords[oldColumn.id] : undefined;
+      return [column.id, oldValues ?? Array<string>(rowCount).fill("")];
+    }),
+  );
+  return { name: edited.name, columns, inline: { columns, records } };
+};
+
+/** What the edit drawer opens with: the columns, and an inline dataset's rows for mapping. */
+export const datasetEditDraft = (dataset: DatasetReference) => ({
+  datasetId: dataset.type === "saved" ? dataset.datasetId : undefined,
+  name: dataset.name,
+  columnTypes: dataset.columns.map((col) => ({ name: col.name, type: col.type })),
+  ...(dataset.type === "inline" && dataset.inline
+    ? { datasetRecords: convertInlineToRowRecords(dataset.inline.columns, dataset.inline.records) }
+    : {}),
+});

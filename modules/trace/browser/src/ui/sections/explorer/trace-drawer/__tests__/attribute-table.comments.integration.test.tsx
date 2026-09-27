@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
 }));
 
+vi.mock(
+  "../../../../../behavior/lent-annotation-form.tsx",
+  () => import("../../../__tests__/lent-annotation-form.stand-in.tsx"),
+);
+
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1" },

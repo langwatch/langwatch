@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   type TraceClusteringSampleCounts,
   TraceClusteringSampleRepository,
   type TraceClusteringSampleRow,
 } from "../trace-clustering-sample.repository.ts";
+import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 
 const countsRowsSchema = z.array(
   z.object({

@@ -71,6 +71,370 @@ type TargetCellContentProps = {
   hasAnyTargetOutputs?: boolean;
 };
 
+function OutputSkeleton() {
+  return (
+    <VStack align="stretch" gap={1}>
+      <Skeleton height="14px" width="80%" />
+      <Skeleton height="14px" width="60%" />
+    </VStack>
+  );
+}
+
+/** A failed cell: registry copy for the code; the engine's raw words only on request (ADR-045). */
+function CellFailure({
+  failure,
+  isOpen,
+  isErrorExpanded,
+  isErrorOverflowing,
+  setIsErrorExpanded,
+}: {
+  failure: NonNullable<ReturnType<typeof describeCellFailure>>;
+  isOpen: boolean;
+  isErrorExpanded: boolean;
+  isErrorOverflowing: boolean;
+  setIsErrorExpanded: (expanded: boolean) => void;
+}) {
+  return (
+    <Box position="relative">
+      <HStack
+        gap={2}
+        p={2}
+        bg="red.subtle"
+        borderRadius="md"
+        color="red.fg"
+        fontSize="13px"
+        align="start"
+        cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
+        onClick={() => setIsErrorExpanded(true)}
+        onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
+      >
+        <Box flexShrink={0} paddingTop={0.5}>
+          <LuCircleAlert size={16} />
+        </Box>
+        <VStack align="start" gap={0.5}>
+          <Text
+            lineClamp={isOpen ? undefined : 2}
+            userSelect="text"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+          >
+            {parseLLMError(failure.title).message}
+          </Text>
+          {failure.description && (
+            <Text fontSize="12px" color="fg.muted" userSelect="text">
+              {failure.description}
+            </Text>
+          )}
+          {/* The engine's own words, for the person debugging the target
+              they built — on request (the expanded cell), never as the
+              headline. See ADR-045. */}
+          {isOpen && failure.raw && failure.raw !== failure.title && (
+            <Text
+              fontSize="12px"
+              opacity={0.7}
+              userSelect="text"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+            >
+              {parseLLMError(failure.raw).message}
+            </Text>
+          )}
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
+
+function TruncatedText({ text, isTruncated }: { text: string; isTruncated: boolean }) {
+  return (
+    <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
+      {text}
+      {isTruncated && (
+        <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+          (truncated)
+        </Box>
+      )}
+    </Text>
+  );
+}
+
+/** The expanded output: scrollable, with no height cap. */
+function ExpandedOutput({
+  displayOutput,
+  isTruncated,
+}: {
+  displayOutput: string;
+  isTruncated: boolean;
+}) {
+  return (
+    <VStack flex={1} overflowY="auto" minHeight={0} align="start">
+      <Text fontSize="11px" color="fg.muted" fontWeight="700" textTransform="uppercase">
+        Output
+      </Text>
+      <TruncatedText text={displayOutput} isTruncated={isTruncated} />
+    </VStack>
+  );
+}
+
+/** The collapsed output: capped in height, fading out when it overflows. */
+function CollapsedOutput({
+  outputRef,
+  displayOutput,
+  isTruncated,
+  isOverflowing,
+  onExpand,
+}: {
+  outputRef: React.RefObject<HTMLDivElement | null>;
+  displayOutput: string;
+  isTruncated: boolean;
+  isOverflowing: boolean;
+  onExpand: () => void;
+}) {
+  return (
+    <Box position="relative">
+      <VStack
+        ref={outputRef}
+        maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
+        overflow="hidden"
+        cursor={isOverflowing ? "pointer" : undefined}
+        onClick={isOverflowing ? onExpand : undefined}
+        align="start"
+      >
+        <TruncatedText text={displayOutput} isTruncated={isTruncated} />
+      </VStack>
+
+      {/* Fade overlay for overflowing content */}
+      {isOverflowing && (
+        <Box
+          position="absolute"
+          bottom={0}
+          left={"-10px"}
+          right={"-10px"}
+          height="40px"
+          cursor="pointer"
+          onClick={onExpand}
+          className="cell-fade-overlay"
+          css={{
+            background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
+            "tr:hover &": {
+              background: "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
+            },
+            // Selected row takes priority over hover
+            "tr[data-selected='true'] &": {
+              background:
+                "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
+            },
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+/** A cell's evaluator chips, and the button that adds another (on hover once some exist). */
+function CellEvaluatorChips({
+  inExpandedView,
+  chipEvaluators,
+  evaluatorResults,
+  missingMappingsSet,
+  isEvaluatorRunning,
+  hasTargetOutput,
+  hasAnyTargetOutputs,
+  target,
+  onEdit,
+  onRemove,
+  onRerunEvaluator,
+  onRunEvaluatorOnAllRows,
+  onAddEvaluator,
+}: {
+  inExpandedView: boolean;
+  chipEvaluators: EvaluatorConfig[];
+  evaluatorResults: TargetCellContentProps["evaluatorResults"];
+  missingMappingsSet: Set<string>;
+  isEvaluatorRunning?: (evaluatorId: string) => boolean;
+  hasTargetOutput: boolean;
+  hasAnyTargetOutputs?: boolean;
+  target: TargetConfig;
+  onEdit: (evaluator: EvaluatorConfig) => void;
+  onRemove: (evaluatorId: string) => void;
+  onRerunEvaluator?: (evaluatorId: string) => void;
+  onRunEvaluatorOnAllRows?: (evaluatorId: string) => void;
+  onAddEvaluator?: () => void;
+}) {
+  return (
+    <HStack flexWrap="wrap" gap={1.5}>
+      {chipEvaluators.map((evaluator: EvaluatorConfig) => {
+        const chipProps = {
+          evaluator,
+          result: evaluatorResults[evaluator.id],
+          hasMissingMappings: missingMappingsSet.has(evaluator.id),
+          isRunning: isEvaluatorRunning?.(evaluator.id) ?? false,
+          hasTargetOutput,
+          hasAnyTargetOutputs,
+          targetType: target.type,
+          onEdit: () => onEdit(evaluator),
+          onRemove: () => onRemove(evaluator.id),
+          onRerun: onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined,
+          onRunOnAllRows: onRunEvaluatorOnAllRows
+            ? () => onRunEvaluatorOnAllRows(evaluator.id)
+            : undefined,
+        };
+        return <EvaluatorChip key={evaluator.id} {...chipProps} />;
+      })}
+      <Button
+        size="xs"
+        variant="outline"
+        color="fg.muted"
+        fontWeight="500"
+        onClick={(e) => {
+          e.stopPropagation();
+          onAddEvaluator?.();
+        }}
+        justifyContent="flex-start"
+        data-testid={`add-evaluator-button-${target.id}`}
+        // When evaluators exist, show on hover only (unless in expanded view)
+        className={chipEvaluators.length > 0 && !inExpandedView ? "cell-action-btn" : undefined}
+        opacity={chipEvaluators.length > 0 && !inExpandedView ? 0 : 1}
+        transition="opacity 0.15s"
+      >
+        <LuPlus />
+        {chipEvaluators.length === 0 && <Text>Add evaluator</Text>}
+      </Button>
+    </HStack>
+  );
+}
+
+/** A cell's hover actions: latency, trace, copy, then run or stop. */
+function CellActionButtons({
+  inExpandedView,
+  targetId,
+  duration,
+  traceId,
+  rawOutput,
+  hasCopied,
+  isLoading,
+  onViewTrace,
+  onCopy,
+  onRunCell,
+  onStopCell,
+  onCloseExpanded,
+}: {
+  inExpandedView: boolean;
+  targetId: string;
+  duration: number | null | undefined;
+  traceId: string | null | undefined;
+  rawOutput: string;
+  hasCopied: boolean;
+  isLoading: boolean | undefined;
+  onViewTrace: () => void;
+  onCopy: () => void;
+  onRunCell?: () => void;
+  onStopCell?: () => void;
+  onCloseExpanded: () => void;
+}) {
+  // Running from the expanded view closes it.
+  const runOrStop = () => {
+    if (isLoading && onStopCell) {
+      onStopCell();
+      return;
+    }
+    onRunCell?.();
+    if (inExpandedView) onCloseExpanded();
+  };
+  return (
+    <HStack
+      position="absolute"
+      top={-1}
+      right={-1}
+      gap={0.5}
+      zIndex={1}
+      className={inExpandedView ? undefined : "cell-action-btn"}
+      opacity={inExpandedView ? 1 : 0}
+      transition="opacity 0.15s"
+      bg={inExpandedView ? "transparent" : "bg.subtle"}
+      borderRadius="md"
+      paddingLeft={2}
+      paddingRight={0.5}
+    >
+      {/* Latency display - shows when duration is available */}
+      {duration !== null && duration !== undefined && (
+        <Tooltip
+          content={`Latency: ${formatLatency(duration)}`}
+          positioning={{ placement: "top" }}
+          openDelay={100}
+        >
+          <Text
+            fontSize="11px"
+            color="fg.muted"
+            whiteSpace="nowrap"
+            px={1}
+            data-testid={`latency-${targetId}`}
+          >
+            {formatLatency(duration)}
+          </Text>
+        </Tooltip>
+      )}
+      {/* Trace link button - left of copy button */}
+      {traceId && (
+        <Tooltip content="View trace" positioning={{ placement: "top" }} openDelay={100}>
+          <Button
+            size="xs"
+            variant="ghost"
+            _hover={{ bg: "bg.emphasized" }}
+            onClick={onViewTrace}
+            data-testid={`trace-link-${targetId}`}
+          >
+            <LuListTree />
+          </Button>
+        </Tooltip>
+      )}
+      {traceId && <TraceIdPeek traceId={traceId} />}
+      {/* Copy button - shows when there's output */}
+      {rawOutput && (
+        <Tooltip
+          content={hasCopied ? "Copied!" : "Copy to clipboard"}
+          positioning={{ placement: "top" }}
+          openDelay={100}
+        >
+          <Button
+            size="xs"
+            variant="ghost"
+            _hover={{ bg: "bg.emphasized" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCopy();
+            }}
+            data-testid={`copy-output-${targetId}`}
+          >
+            {hasCopied ? <LuCheck /> : <LuCopy />}
+          </Button>
+        </Tooltip>
+      )}
+      {/* Run/Stop cell button */}
+      {onRunCell && (
+        <Tooltip
+          content={isLoading ? "Stop execution" : "Run this cell"}
+          positioning={{ placement: "top" }}
+          openDelay={100}
+        >
+          <Button
+            size="xs"
+            variant="ghost"
+            _hover={{ bg: "bg.emphasized" }}
+            onClick={(e) => {
+              e.stopPropagation();
+              runOrStop();
+            }}
+            data-testid={`run-cell-${targetId}`}
+          >
+            {isLoading ? <LuSquare size={12} /> : <LuPlay size={12} />}
+          </Button>
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}
+
 export function TargetCellContent({
   target,
   output,
@@ -162,15 +526,15 @@ export function TargetCellContent({
   useEscapeKey({ enabled: isOutputExpanded, onEscape: handleCloseExpanded });
 
   // Calculate which evaluators have missing mappings for this target
-  const missingMappingsSet = useMemo(() => {
-    const missing = new Set<string>();
-    for (const evaluator of evaluators) {
-      if (evaluatorHasMissingMappings(evaluator, activeDatasetId, target.id)) {
-        missing.add(evaluator.id);
-      }
-    }
-    return missing;
-  }, [evaluators, activeDatasetId, target.id]);
+  const missingMappingsSet = useMemo(
+    () =>
+      new Set(
+        evaluators
+          .filter((evaluator) => evaluatorHasMissingMappings(evaluator, activeDatasetId, target.id))
+          .map((evaluator) => evaluator.id),
+      ),
+    [evaluators, activeDatasetId, target.id],
+  );
 
   // Use shared utility for consistent output formatting
   // Handles the "single output key" unwrap rule:
@@ -182,150 +546,37 @@ export function TargetCellContent({
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
   const displayOutput = isTruncated ? rawOutput.slice(0, MAX_DISPLAY_CHARS) : rawOutput;
 
-  // Render output content - can be collapsed or expanded
   const renderOutput = (expanded: boolean) => {
-    // Loading state - show skeleton whenever this cell is being executed
-    // This includes re-running cells that already have content
-    if (isLoading) {
-      return (
-        <VStack align="stretch" gap={1}>
-          <Skeleton height="14px" width="80%" />
-          <Skeleton height="14px" width="60%" />
-        </VStack>
-      );
-    }
-
-    // Error state - the registry's copy for the code, never the raw string
+    // A skeleton whenever this cell is executing, re-runs of filled cells included.
+    if (isLoading) return <OutputSkeleton />;
     if (failure) {
-      const isOpen = expanded || isErrorExpanded;
       return (
-        <Box position="relative">
-          <HStack
-            gap={2}
-            p={2}
-            bg="red.subtle"
-            borderRadius="md"
-            color="red.fg"
-            fontSize="13px"
-            align="start"
-            cursor={isErrorOverflowing && !isErrorExpanded ? "pointer" : undefined}
-            onClick={() => setIsErrorExpanded(true)}
-            onDoubleClick={isErrorOverflowing ? () => setIsErrorExpanded(false) : undefined}
-          >
-            <Box flexShrink={0} paddingTop={0.5}>
-              <LuCircleAlert size={16} />
-            </Box>
-            <VStack align="start" gap={0.5}>
-              <Text
-                lineClamp={isOpen ? undefined : 2}
-                userSelect="text"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {parseLLMError(failure.title).message}
-              </Text>
-              {failure.description && (
-                <Text fontSize="12px" color="fg.muted" userSelect="text">
-                  {failure.description}
-                </Text>
-              )}
-              {/* The engine's own words, for the person debugging the target
-                  they built — on request (the expanded cell), never as the
-                  headline. See ADR-045. */}
-              {isOpen && failure.raw && failure.raw !== failure.title && (
-                <Text
-                  fontSize="12px"
-                  opacity={0.7}
-                  userSelect="text"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-word"
-                >
-                  {parseLLMError(failure.raw).message}
-                </Text>
-              )}
-            </VStack>
-          </HStack>
-        </Box>
+        <CellFailure
+          failure={failure}
+          isOpen={expanded || isErrorExpanded}
+          isErrorExpanded={isErrorExpanded}
+          isErrorOverflowing={isErrorOverflowing}
+          setIsErrorExpanded={setIsErrorExpanded}
+        />
       );
     }
-
-    // Normal output - with fade effect when collapsed, scrollable when expanded
-    if (displayOutput) {
-      if (expanded) {
-        // Expanded view - scrollable, no max height
-        return (
-          <VStack flex={1} overflowY="auto" minHeight={0} align="start">
-            <Text fontSize="11px" color="fg.muted" fontWeight="700" textTransform="uppercase">
-              Output
-            </Text>
-            <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
-              {displayOutput}
-              {isTruncated && (
-                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
-                  (truncated)
-                </Box>
-              )}
-            </Text>
-          </VStack>
-        );
-      }
-
-      // Collapsed view - with max-height and fade
+    if (!displayOutput) {
       return (
-        <Box position="relative">
-          <VStack
-            ref={outputRef}
-            maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
-            overflow="hidden"
-            cursor={isOverflowing ? "pointer" : undefined}
-            onClick={isOverflowing ? handleExpandOutput : undefined}
-            align="start"
-          >
-            <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
-              {displayOutput}
-              {isTruncated && (
-                <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
-                  (truncated)
-                </Box>
-              )}
-            </Text>
-          </VStack>
-
-          {/* Fade overlay for overflowing content */}
-          {isOverflowing && (
-            <Box
-              position="absolute"
-              bottom={0}
-              left={"-10px"}
-              right={"-10px"}
-              height="40px"
-              cursor="pointer"
-              onClick={handleExpandOutput}
-              className="cell-fade-overlay"
-              css={{
-                background:
-                  "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-panel))",
-                "tr:hover &": {
-                  background:
-                    "linear-gradient(to bottom, transparent, var(--chakra-colors-bg-subtle))",
-                },
-                // Selected row takes priority over hover
-                "tr[data-selected='true'] &": {
-                  background:
-                    "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-subtle))",
-                },
-              }}
-            />
-          )}
-        </Box>
+        <Text fontSize="13px" color="fg.subtle">
+          No output yet
+        </Text>
       );
     }
-
-    // No output yet
-    return (
-      <Text fontSize="13px" color="fg.subtle">
-        No output yet
-      </Text>
+    return expanded ? (
+      <ExpandedOutput displayOutput={displayOutput} isTruncated={isTruncated} />
+    ) : (
+      <CollapsedOutput
+        outputRef={outputRef}
+        displayOutput={displayOutput}
+        isTruncated={isTruncated}
+        isOverflowing={isOverflowing}
+        onExpand={handleExpandOutput}
+      />
     );
   };
 
@@ -339,51 +590,28 @@ export function TargetCellContent({
   );
 
   const renderEvaluatorChips = (inExpandedView: boolean) => (
-    <HStack flexWrap="wrap" gap={1.5}>
-      {chipEvaluators.map((evaluator: EvaluatorConfig) => {
-        const chipProps = {
+    <CellEvaluatorChips
+      inExpandedView={inExpandedView}
+      chipEvaluators={chipEvaluators}
+      evaluatorResults={evaluatorResults}
+      missingMappingsSet={missingMappingsSet}
+      isEvaluatorRunning={isEvaluatorRunning}
+      hasTargetOutput={output !== undefined && output !== null}
+      hasAnyTargetOutputs={hasAnyTargetOutputs}
+      target={target}
+      onEdit={(evaluator) =>
+        openEvaluatorEditor({
           evaluator,
-          result: evaluatorResults[evaluator.id],
-          hasMissingMappings: missingMappingsSet.has(evaluator.id),
-          isRunning: isEvaluatorRunning?.(evaluator.id) ?? false,
-          hasTargetOutput: output !== undefined && output !== null,
-          hasAnyTargetOutputs,
-          targetType: target.type,
-          onEdit: () =>
-            openEvaluatorEditor({
-              evaluator,
-              target,
-              targetName,
-              isCodeEvaluator: codeEvaluatorIds.has(evaluator.id),
-            }),
-          onRemove: () => removeEvaluator(evaluator.id),
-          onRerun: onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined,
-          onRunOnAllRows: onRunEvaluatorOnAllRows
-            ? () => onRunEvaluatorOnAllRows(evaluator.id)
-            : undefined,
-        };
-        return <EvaluatorChip key={evaluator.id} {...chipProps} />;
-      })}
-      <Button
-        size="xs"
-        variant="outline"
-        color="fg.muted"
-        fontWeight="500"
-        onClick={(e) => {
-          e.stopPropagation();
-          onAddEvaluator?.();
-        }}
-        justifyContent="flex-start"
-        data-testid={`add-evaluator-button-${target.id}`}
-        // When evaluators exist, show on hover only (unless in expanded view)
-        className={chipEvaluators.length > 0 && !inExpandedView ? "cell-action-btn" : undefined}
-        opacity={chipEvaluators.length > 0 && !inExpandedView ? 0 : 1}
-        transition="opacity 0.15s"
-      >
-        <LuPlus />
-        {chipEvaluators.length === 0 && <Text>Add evaluator</Text>}
-      </Button>
-    </HStack>
+          target,
+          targetName,
+          isCodeEvaluator: codeEvaluatorIds.has(evaluator.id),
+        })
+      }
+      onRemove={removeEvaluator}
+      onRerunEvaluator={onRerunEvaluator}
+      onRunEvaluatorOnAllRows={onRunEvaluatorOnAllRows}
+      onAddEvaluator={onAddEvaluator}
+    />
   );
 
   // Copy output to clipboard with feedback
@@ -395,106 +623,21 @@ export function TargetCellContent({
     }
   }, [rawOutput]);
 
-  // Render action buttons (latency, trace, copy, then run)
   const renderActionButtons = (inExpandedView: boolean) => (
-    <HStack
-      position="absolute"
-      top={-1}
-      right={-1}
-      gap={0.5}
-      zIndex={1}
-      className={inExpandedView ? undefined : "cell-action-btn"}
-      opacity={inExpandedView ? 1 : 0}
-      transition="opacity 0.15s"
-      bg={inExpandedView ? "transparent" : "bg.subtle"}
-      borderRadius="md"
-      paddingLeft={2}
-      paddingRight={0.5}
-    >
-      {/* Latency display - shows when duration is available */}
-      {duration !== null && duration !== undefined && (
-        <Tooltip
-          content={`Latency: ${formatLatency(duration)}`}
-          positioning={{ placement: "top" }}
-          openDelay={100}
-        >
-          <Text
-            fontSize="11px"
-            color="fg.muted"
-            whiteSpace="nowrap"
-            px={1}
-            data-testid={`latency-${target.id}`}
-          >
-            {formatLatency(duration)}
-          </Text>
-        </Tooltip>
-      )}
-      {/* Trace link button - left of copy button */}
-      {traceId && (
-        <Tooltip content="View trace" positioning={{ placement: "top" }} openDelay={100}>
-          <Button
-            size="xs"
-            variant="ghost"
-            _hover={{ bg: "bg.emphasized" }}
-            onClick={handleViewTrace}
-            data-testid={`trace-link-${target.id}`}
-          >
-            <LuListTree />
-          </Button>
-        </Tooltip>
-      )}
-      {traceId && <TraceIdPeek traceId={traceId} />}
-      {/* Copy button - shows when there's output */}
-      {rawOutput && (
-        <Tooltip
-          content={hasCopied ? "Copied!" : "Copy to clipboard"}
-          positioning={{ placement: "top" }}
-          openDelay={100}
-        >
-          <Button
-            size="xs"
-            variant="ghost"
-            _hover={{ bg: "bg.emphasized" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopyOutput();
-            }}
-            data-testid={`copy-output-${target.id}`}
-          >
-            {hasCopied ? <LuCheck /> : <LuCopy />}
-          </Button>
-        </Tooltip>
-      )}
-      {/* Run/Stop cell button */}
-      {onRunCell && (
-        <Tooltip
-          content={isLoading ? "Stop execution" : "Run this cell"}
-          positioning={{ placement: "top" }}
-          openDelay={100}
-        >
-          <Button
-            size="xs"
-            variant="ghost"
-            _hover={{ bg: "bg.emphasized" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isLoading && onStopCell) {
-                onStopCell();
-              } else {
-                onRunCell();
-                // Close expanded view when running
-                if (inExpandedView) {
-                  handleCloseExpanded();
-                }
-              }
-            }}
-            data-testid={`run-cell-${target.id}`}
-          >
-            {isLoading ? <LuSquare size={12} /> : <LuPlay size={12} />}
-          </Button>
-        </Tooltip>
-      )}
-    </HStack>
+    <CellActionButtons
+      inExpandedView={inExpandedView}
+      targetId={target.id}
+      duration={duration}
+      traceId={traceId}
+      rawOutput={rawOutput}
+      hasCopied={hasCopied}
+      isLoading={isLoading}
+      onViewTrace={handleViewTrace}
+      onCopy={handleCopyOutput}
+      onRunCell={onRunCell}
+      onStopCell={onStopCell}
+      onCloseExpanded={handleCloseExpanded}
+    />
   );
 
   return (

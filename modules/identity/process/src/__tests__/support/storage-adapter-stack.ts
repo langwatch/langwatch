@@ -6,6 +6,9 @@ import {
 import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
+import { createAuthEndpoint } from "better-auth/api";
+import { handleOAuthUserInfo } from "better-auth/oauth2";
+import { z } from "zod";
 
 import { type IdentityBirth } from "../../app/identity.members.ts";
 import type { IdentityUsersRepository } from "../../repositories/identity-users.repository.ts";
@@ -73,6 +76,39 @@ const passkeySchemaPlugin: BetterAuthPlugin = {
   },
 };
 
+/** One OAuth sign-in's payload, as better-auth's callback hands it to `handleOAuthUserInfo`. */
+const oauthUserInfoBodySchema = z.object({
+  userInfo: z.object({
+    id: z.string(),
+    email: z.string(),
+    emailVerified: z.boolean(),
+    name: z.string(),
+    image: z.string().nullable(),
+  }),
+  account: z.object({
+    providerId: z.string(),
+    issuer: z.string(),
+    accountId: z.string(),
+    accessToken: z.string(),
+    refreshToken: z.string(),
+  }),
+});
+
+/**
+ * Runs better-auth's own `handleOAuthUserInfo` inside a real endpoint context, so a suite drives
+ * the sign-in token refresh the library constructs rather than a hand-built stand-in for it.
+ */
+const oauthUserInfoProbePlugin = {
+  id: "oauth-user-info-probe",
+  endpoints: {
+    probeOAuthUserInfo: createAuthEndpoint(
+      "/test/oauth-user-info",
+      { method: "POST", body: oauthUserInfoBodySchema, metadata: { SERVER_ONLY: true } },
+      (ctx) => handleOAuthUserInfo(ctx, ctx.body),
+    ),
+  },
+} satisfies BetterAuthPlugin;
+
 /**
  * One `betterAuth()` shape for both stacks, differing only in the engine.
  * Sharing the literal keeps their inferred `Auth<Options>` types the same,
@@ -86,7 +122,7 @@ function authOver(
     baseURL: "http://localhost:3000",
     secret: "test-secret-test-secret-test-secret",
     database,
-    plugins: [passkeySchemaPlugin],
+    plugins: [passkeySchemaPlugin, oauthUserInfoProbePlugin],
     emailAndPassword: { enabled: true },
     ...(databaseHooks === undefined ? {} : { databaseHooks }),
   });

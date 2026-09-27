@@ -6,7 +6,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type Projection,
   type StaticPipelineDefinition,
@@ -22,7 +21,7 @@ import {
 
 /** The roll-up's one command, typed so the registered sender keeps its payload. */
 export type BillingReportingDefinition = StaticPipelineDefinition<
-  Event,
+  never,
   Record<string, Projection>,
   { name: "reportUsageForMonth"; payload: ReportUsageForMonthCommandData }
 >;

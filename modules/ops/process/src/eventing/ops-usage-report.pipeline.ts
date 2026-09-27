@@ -4,7 +4,6 @@ import {
   definePipeline,
   type EventingSetup,
   type StaticPipelineDefinition,
-  type Event,
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
@@ -22,7 +21,7 @@ export const USAGE_REPORT_PIPELINE_NAME = "ops_usage_report";
  */
 export function buildOpsUsageReportPipeline(
   deps: UsageReportRunDeps,
-): StaticPipelineDefinition<Event> {
+): StaticPipelineDefinition<never> {
   return definePipeline({
     name: USAGE_REPORT_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
@@ -36,7 +35,7 @@ export function buildOpsUsageReportPipeline(
 export function buildUsageReport({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<OpsApp, "sendUsageReport">>): StaticPipelineDefinition<Event> {
+}: EventingSetup<unknown, Pick<OpsApp, "sendUsageReport">>): StaticPipelineDefinition<never> {
   return buildOpsUsageReportPipeline({
     send: () => app.sendUsageReport(),
     deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),

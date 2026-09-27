@@ -1,25 +1,24 @@
-import { Button, HStack, Spacer, Spinner, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spacer, Spinner } from "@chakra-ui/react";
+import type { UiEvaluatorEditorValues } from "@langwatch/browser-host/declarations";
 import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import DynamicZodForm from "@langwatch/evaluator-browser/dynamic-zod-form";
-import { EvaluatorEditorContent } from "@langwatch/evaluator-browser/evaluator-editor-content";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorsSchema,
-  getEvaluatorDefaultSettings,
+  evaluatorSettingsSchemaFor,
 } from "@langwatch/evaluator-contract";
-import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_EMBEDDINGS_MODEL, useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-browser-kit";
 import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 
+import {
+  EvaluatorSettingsForm,
+  StudioEvaluatorEditor,
+} from "../../../../behavior/lent-evaluator.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
-import { useAvailableEvaluators } from "../../../../behavior/use-available-evaluators.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   applyMappingChange,
@@ -130,16 +129,6 @@ function DbEvaluatorForm({
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
     : undefined;
 
-  const settingsSchema = useMemo(() => {
-    if (!evaluatorType) return undefined;
-    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
-  }, [evaluatorType]);
-
-  const hasSettings =
-    !!settingsSchema &&
-    settingsSchema instanceof z.ZodObject &&
-    Object.keys(settingsSchema.shape).length > 0;
-
   const effectiveEvaluatorDef = useMemo(() => {
     const fields = evaluator?.fields;
     if (fields && fields.length > 0) {
@@ -165,12 +154,11 @@ function DbEvaluatorForm({
 
   // Unsaved changes live on the node, so they win over the saved evaluator.
   const localConfig = node.data.localConfig;
-  const form = useForm<{ name: string; settings: Record<string, unknown> }>({
-    defaultValues: {
-      name: localConfig?.name ?? dbName,
-      settings: localConfig?.settings ?? dbSettings,
-    },
+  const valuesRef = useRef<UiEvaluatorEditorValues>({
+    name: localConfig?.name ?? dbName,
+    settings: localConfig?.settings ?? dbSettings,
   });
+  const [editorGeneration, setEditorGeneration] = useState(0);
 
   // Watch form changes and persist to node.data.localConfig (debounced to
   // avoid flooding the store on every keystroke).
@@ -198,14 +186,13 @@ function DbEvaluatorForm({
     { trailing: true },
   );
 
-  useEffect(() => {
-    const subscription = form.watch((formValues) => {
-      if (formValues.name !== undefined && formValues.settings !== undefined) {
-        debouncedSetLocalConfig(formValues);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, debouncedSetLocalConfig]);
+  const handleEditorChange = useCallback(
+    (values: UiEvaluatorEditorValues) => {
+      valuesRef.current = values;
+      debouncedSetLocalConfig(values);
+    },
+    [debouncedSetLocalConfig],
+  );
 
   // Build mappingsConfig from workflow graph
   const availableSources = useMemo(
@@ -255,7 +242,7 @@ function DbEvaluatorForm({
 
   const handleSave = useCallback(() => {
     if (!project?.id || !evaluatorType) return;
-    const formValues = form.getValues();
+    const formValues = valuesRef.current;
     updateMutation.mutate(
       {
         id: evaluatorId,
@@ -273,22 +260,14 @@ function DbEvaluatorForm({
         },
       },
     );
-  }, [
-    project?.id,
-    evaluatorId,
-    evaluatorType,
-    form,
-    updateMutation,
-    setNode,
-    node.id,
-    refetchEvaluator,
-  ]);
+  }, [project?.id, evaluatorId, evaluatorType, updateMutation, setNode, node.id, refetchEvaluator]);
 
   const handleDiscard = useCallback(() => {
     debouncedSetLocalConfig.cancel();
-    form.reset({ name: dbName, settings: dbSettings });
+    valuesRef.current = { name: dbName, settings: dbSettings };
+    setEditorGeneration((generation) => generation + 1);
     setNode({ id: node.id, data: { localConfig: undefined } });
-  }, [form, dbName, dbSettings, setNode, node.id, debouncedSetLocalConfig]);
+  }, [dbName, dbSettings, setNode, node.id, debouncedSetLocalConfig]);
 
   const hasLocalChanges = !!localConfig;
 
@@ -331,17 +310,16 @@ function DbEvaluatorForm({
   useRegisterDrawerFooter(footerContent);
 
   return (
-    <EvaluatorEditorContent
+    <StudioEvaluatorEditor
+      key={editorGeneration}
       evaluatorType={evaluatorType}
       description={evaluatorDef?.description}
       isWorkflowEvaluator={isWorkflowEvaluator}
       workflow={workflow}
-      form={form}
-      settingsSchema={settingsSchema}
-      hasSettings={hasSettings}
-      effectiveEvaluatorDef={effectiveEvaluatorDef}
-      mappingsConfig={mappingsConfig}
-      variant="studio"
+      fields={effectiveEvaluatorDef}
+      initialValues={valuesRef.current}
+      onChange={handleEditorChange}
+      mappings={mappingsConfig}
     />
   );
 }
@@ -351,132 +329,58 @@ function DbEvaluatorForm({
 // ---------------------------------------------------------------------------
 
 function InlineEvaluatorPanel({ node }: { node: Node<Evaluator> }) {
-  const { project } = useOrganizationTeamProject();
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
-  // Cascade-resolved defaults so the inline evaluator form mirrors
-  // the project's configured providers (claude-opus, gemini-pro…)
-  // instead of falling back to the DEFAULT_MODEL literal.
-  const resolvedDefaultModel = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
-
-  const settingsFromParameters = Object.fromEntries(
-    (node.data.parameters ?? []).map(({ identifier, value }) => [identifier, value]),
-  );
-  const form = useForm({
-    defaultValues: {
-      settings: settingsFromParameters,
-    },
-  });
-
   const evaluator = node.data.evaluator;
-
-  const schema =
-    evaluator && evaluator in AVAILABLE_EVALUATORS
-      ? evaluatorsSchema.shape[evaluator as EvaluatorTypes]?.shape.settings
-      : undefined;
-
-  const availableEvaluators = useAvailableEvaluators();
-
-  useEffect(() => {
-    if (!evaluator || !availableEvaluators || !(evaluator in availableEvaluators)) return;
-    if (node.data.parameters) return;
-
-    const evaluatorDefinition = availableEvaluators[evaluator as EvaluatorTypes];
-
-    const setDefaultSettings = (defaultValues: object, prefix: string) => {
-      if (!defaultValues) return;
-
-      Object.entries(defaultValues).forEach(([key, value]) => {
-        if (typeof value === "object" && !Array.isArray(value) && value !== null) {
-          setDefaultSettings(value, `${prefix}.${key}`);
-        } else {
-          //@ts-expect-error: runtime-built path not a literal form field
-          form.setValue(`${prefix}.${key}`, value);
-        }
-      });
-    };
-
-    setDefaultSettings(
-      getEvaluatorDefaultSettings(
-        evaluatorDefinition,
-        {
-          defaultModel: resolvedDefaultModel.data?.model ?? null,
-          embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? null,
-        },
-        {
-          defaultModel: DEFAULT_MODEL,
-          embeddingsModel: DEFAULT_EMBEDDINGS_MODEL,
-        },
+  const initialSettings = useMemo(
+    () =>
+      Object.fromEntries(
+        (node.data.parameters ?? []).map(({ identifier, value }) => [identifier, value]),
       ),
-      "settings",
-    );
+    // Seeds the form once; later writes flow from the form to the node.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [evaluator, resolvedDefaultModel.data?.model, resolvedDefaultEmbeddings.data?.model]);
+    [],
+  );
 
-  const onSubmit = useCallback(
-    (data: { settings: Record<string, unknown> }) => {
+  const writeParameters = useCallback(
+    (settings: Record<string, unknown>) => {
       setNode({
         id: node.id,
         data: {
-          parameters: Object.entries(data.settings).map(
-            ([identifier, value]) =>
-              ({
-                identifier,
-                type: "str",
-                value: value,
-              }) as Field,
+          parameters: Object.entries(settings).map(
+            ([identifier, value]) => ({ identifier, type: "str", value }) as Field,
           ),
         },
       });
     },
     [node.id, setNode],
   );
-
-  const handleSubmit_ = useCallback(() => {
-    void form.handleSubmit(onSubmit)();
-  }, [form, onSubmit]);
-
-  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {
+  const writeParametersDebounced = useDebouncedCallback(writeParameters, 100, {
     leading: true,
     trailing: false,
   });
 
-  useEffect(() => {
-    const subscription = form.watch(() => {
-      handleSubmitDebounced();
-    });
-
-    return () => subscription.unsubscribe();
-  }, [form, handleSubmitDebounced]);
-
-  const hasEvaluatorFields =
-    evaluator && schema instanceof z.ZodObject && Object.keys(schema.shape).length > 0;
+  const hasEvaluatorFields = !!evaluator && hasSettingsFields(evaluator);
 
   return (
-    <BasePropertiesPanel node={node} hideParameters={!!hasEvaluatorFields}>
-      {hasEvaluatorFields && schema && (
-        <FormProvider {...form}>
-          <VStack width="full" gap={3}>
-            <DynamicZodForm
-              schema={schema}
-              evaluatorType={evaluator as EvaluatorTypes}
-              prefix="settings"
-              errors={form.formState.errors.settings}
-              variant="studio"
-            />
-          </VStack>
-        </FormProvider>
+    <BasePropertiesPanel node={node} hideParameters={hasEvaluatorFields}>
+      {hasEvaluatorFields && (
+        <EvaluatorSettingsForm
+          evaluatorType={evaluator}
+          initialSettings={initialSettings}
+          applyDefaults={!node.data.parameters}
+          onChange={writeParametersDebounced}
+        />
       )}
     </BasePropertiesPanel>
+  );
+}
+
+function hasSettingsFields(evaluatorType: string): boolean {
+  const lookup = evaluatorSettingsSchemaFor(evaluatorType);
+  return (
+    lookup.found &&
+    lookup.schema instanceof z.ZodObject &&
+    Object.keys(lookup.schema.shape).length > 0
   );
 }
 

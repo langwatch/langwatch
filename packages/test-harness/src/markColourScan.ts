@@ -157,96 +157,85 @@ function coloursOf(
   return { values: [], resolved: false };
 }
 
+type SiteScan = Readonly<{
+  source: SourceFile;
+  declarations: ReturnType<typeof stringDeclarations>;
+  sites: MarkColourSite[];
+}>;
+
+function pushColourSites(
+  scan: SiteScan,
+  { role, value, node }: { role: string; value: Expression; node: Node },
+): void {
+  const { values, resolved } = coloursOf(value, scan.declarations);
+
+  for (const found of values) {
+    scan.sites.push({ kind: "literal", role, value: found, line: lineOf(scan.source, node) });
+  }
+
+  if (!resolved) {
+    scan.sites.push({
+      kind: "unresolved",
+      role,
+      text: textOf(scan.source, node),
+      line: lineOf(scan.source, node),
+    });
+  }
+}
+
+function recordMarkRole(
+  scan: SiteScan,
+  { role, value, node }: { role: string; value: Expression | undefined; node: Node },
+): void {
+  if (!MARK_ROLES.has(role) || !value) return;
+  pushColourSites(scan, { role, value, node });
+}
+
+/** `<Line stroke="..." />` and `<Line stroke={...} />` alike. */
+function sitesFromAttribute(scan: SiteScan, node: Node): void {
+  if (!isNamedJsxAttribute(node)) return;
+
+  const initializer = node.initializer;
+  if (!initializer) return;
+
+  if (isStringLiteral(initializer)) {
+    recordMarkRole(scan, { role: node.name.text, value: initializer, node });
+  } else if (isJsxExpression(initializer) && initializer.expression) {
+    recordMarkRole(scan, { role: node.name.text, value: initializer.expression, node });
+  }
+}
+
+/** `{ stroke: "..." }`, the form a shared theme constant takes. */
+function sitesFromProperty(scan: SiteScan, node: Node): void {
+  if (isNamedPropertyAssignment(node)) {
+    recordMarkRole(scan, { role: node.name.text, value: node.initializer, node });
+  }
+}
+
+/**
+ * `export const CHART_SPARK_STROKE = "..."` — a mark colour that touches no attribute in the file
+ * declaring it, because its consumers import it. The role is the declaration's own name, so it
+ * skips the attribute vocabulary check.
+ */
+function sitesFromDeclaration(scan: SiteScan, node: Node): void {
+  if (!isMarkNameDeclaration(node)) return;
+  pushColourSites(scan, { role: node.name.text, value: node.initializer, node });
+}
+
 /**
  * Every place this file paints a mark, with the colour where one can be read
  * statically and an explicit admission where it cannot.
  */
 export function markColourSites(source: SourceFile): MarkColourSite[] {
-  const declarations = stringDeclarations(source);
-  const sites: MarkColourSite[] = [];
-
-  const record = (role: string, value: Expression | undefined, node: Node) => {
-    if (!MARK_ROLES.has(role) || !value) return;
-
-    const { values, resolved } = coloursOf(value, declarations);
-
-    for (const found of values) {
-      sites.push({
-        kind: "literal",
-        role,
-        value: found,
-        line: lineOf(source, node),
-      });
-    }
-
-    if (!resolved) {
-      sites.push({
-        kind: "unresolved",
-        role,
-        text: textOf(source, node),
-        line: lineOf(source, node),
-      });
-    }
-  };
-
-  /** `<Line stroke="..." />` and `<Line stroke={...} />` alike. */
-  const fromAttribute = (node: Node): void => {
-    if (!isNamedJsxAttribute(node)) return;
-
-    const initializer = node.initializer;
-    if (!initializer) return;
-
-    if (isStringLiteral(initializer)) {
-      record(node.name.text, initializer, node);
-    } else if (isJsxExpression(initializer) && initializer.expression) {
-      record(node.name.text, initializer.expression, node);
-    }
-  };
-
-  /** `{ stroke: "..." }`, the form a shared theme constant takes. */
-  const fromProperty = (node: Node): void => {
-    if (isNamedPropertyAssignment(node)) {
-      record(node.name.text, node.initializer, node);
-    }
-  };
-
-  /**
-   * `export const CHART_SPARK_STROKE = "..."` — a mark colour that touches no attribute in the file
-   * declaring it, because its consumers import it. The role is the declaration's own name. Bypasses
-   * `record`, whose role check is the attribute vocabulary rather than this one.
-   */
-  const fromDeclaration = (node: Node): void => {
-    if (!isMarkNameDeclaration(node)) return;
-
-    const role = node.name.text;
-    const { values, resolved } = coloursOf(node.initializer, declarations);
-
-    for (const found of values) {
-      sites.push({
-        kind: "literal",
-        role,
-        value: found,
-        line: lineOf(source, node),
-      });
-    }
-
-    if (!resolved) {
-      sites.push({
-        kind: "unresolved",
-        role,
-        text: textOf(source, node),
-        line: lineOf(source, node),
-      });
-    }
-  };
+  const scan: SiteScan = { source, declarations: stringDeclarations(source), sites: [] };
 
   const visit = (node: Node): void => {
-    fromAttribute(node);
-    fromProperty(node);
-    fromDeclaration(node);
+    sitesFromAttribute(scan, node);
+    sitesFromProperty(scan, node);
+    sitesFromDeclaration(scan, node);
     node.forEachChild(visit);
   };
 
   visit(source);
-  return sites;
+  return scan.sites;
 }

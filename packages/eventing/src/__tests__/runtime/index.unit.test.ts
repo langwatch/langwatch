@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import type { AggregateType } from "../../domain/aggregateType.ts";
-import type { Event, Projection } from "../../domain/types.ts";
+import { type Event, EventSchema, type Projection } from "../../domain/types.ts";
 import type { EventSourcingPipelineDefinition } from "../../pipeline/types.ts";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
@@ -10,6 +11,7 @@ import { EventSourcingPipeline } from "../../runtimePipeline.ts";
 import {
   createMockEventStore,
   createTestAggregateType,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventSourcingService } from "../../services/eventSourcingService.ts";
 
@@ -30,6 +32,7 @@ describe("EventSourcingPipeline", () => {
   describe("constructor()", () => {
     it("creates instance with correct name property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "test-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -43,6 +46,7 @@ describe("EventSourcingPipeline", () => {
 
     it("creates instance with correct aggregateType property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "test-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -56,6 +60,7 @@ describe("EventSourcingPipeline", () => {
 
     it("creates instance with service property", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "test-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -86,6 +91,7 @@ describe("EventSourcingPipeline", () => {
       };
 
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "test-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -103,6 +109,7 @@ describe("EventSourcingPipeline", () => {
   describe("when given edge case inputs", () => {
     it("works with minimal definition containing only required fields", () => {
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "minimal-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -135,6 +142,7 @@ describe("EventSourcingPipeline", () => {
       };
 
       const definition: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "full-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -151,13 +159,13 @@ describe("EventSourcingPipeline", () => {
     });
 
     it("works with generic EventType", () => {
-      interface TestEvent extends Event {
-        data: { test: string };
-      }
+      const testEventSchema = EventSchema.extend({ data: z.object({ test: z.string() }) });
+      type TestEvent = z.infer<typeof testEventSchema>;
 
       const testEventStore = createMockEventStore<TestEvent>();
 
       const definition: EventSourcingPipelineDefinition<TestEvent> = {
+        parseEvent: (value) => testEventSchema.parse(value),
         name: "test-pipeline",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -177,6 +185,7 @@ describe("EventSourcingPipeline", () => {
 
       const definition: EventSourcingPipelineDefinition<Event, { testProjection: TestProjection }> =
         {
+          parseEvent: parseTestEvent,
           name: "test-pipeline",
           aggregateType,
           allowedEventTypes: ["test.event"],
@@ -191,6 +200,7 @@ describe("EventSourcingPipeline", () => {
 
     it("creates different service instances for different pipelines", () => {
       const definition1: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "pipeline-1",
         aggregateType,
         allowedEventTypes: ["test.event"],
@@ -198,6 +208,7 @@ describe("EventSourcingPipeline", () => {
       };
 
       const definition2: EventSourcingPipelineDefinition<Event> = {
+        parseEvent: parseTestEvent,
         name: "pipeline-2",
         aggregateType,
         allowedEventTypes: ["test.event"],

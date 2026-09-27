@@ -34,9 +34,10 @@ import {
   ConfigurationError,
   QueueError,
   QueueTenantMismatchError,
+  ValidationError,
 } from "./services/errorHandling.ts";
+import { JOB_ROUTING_FIELD, type JobTenants, readJobRouting } from "./services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "./services/queues/queueManager.ts";
-import { resolveCoalesceMaxBatch } from "./services/queues/queueManager.ts";
 import type { EventStore } from "./stores/eventStore.types.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
@@ -80,7 +81,7 @@ export interface EventSourcingOptions {
    */
   participation?: EventingParticipation;
   /** The runtime's own maintenance pipelines, installed once where the role drains. */
-  maintenance?: () => readonly StaticPipelineDefinition[];
+  maintenance?: () => readonly StaticPipelineDefinition<never>[];
 }
 
 /**
@@ -134,7 +135,7 @@ export class EventSourcing {
   private readonly _processStore?: ProcessStore;
   private readonly _processManagerMode: "run" | "producer-only";
   private readonly _participation?: EventingParticipation;
-  private readonly _maintenance?: () => readonly StaticPipelineDefinition[];
+  private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
   private _processRuntimeInstance?: ProcessRuntime;
   /** The process managers this producer registered and will not run. */
   private readonly _unrunProcessManagers = new Set<string>();
@@ -155,7 +156,9 @@ export class EventSourcing {
     this._participation = options.participation;
     this._maintenance = options.maintenance;
 
-    this.projectionRegistry = new ProjectionRegistry<Event>();
+    this.projectionRegistry = new ProjectionRegistry<Event>({
+      parseEvent: (value) => this.parseRegisteredEvent(value),
+    });
     options.configureGlobalProjections?.(this.projectionRegistry);
   }
 
@@ -241,8 +244,24 @@ export class EventSourcing {
   }
 
   /** The blob and process-manager sweeps this runtime was built with; none if it drains nothing. */
-  maintenancePipelines(): readonly StaticPipelineDefinition[] {
+  maintenancePipelines(): readonly StaticPipelineDefinition<never>[] {
     return this._maintenance?.() ?? [];
+  }
+
+  /** A queued event parsed with the schema of whichever registered pipeline declares its type. */
+  private parseRegisteredEvent(value: unknown): Event {
+    const type =
+      typeof value === "object" && value !== null && "type" in value ? value.type : undefined;
+    const owner = this._definitions.find((definition) =>
+      definition.aggregate.events.some((event) => event.type === type),
+    );
+    if (!owner) {
+      throw new ValidationError({
+        reason: "No registered pipeline declares this queued event's type",
+        field: "type",
+      });
+    }
+    return owner.open((definition): Event => definition.parseEvent(value));
   }
 
   /** Returns the static definitions captured during register() calls. */
@@ -430,6 +449,7 @@ export class EventSourcing {
       ...serviceOptions,
       globalQueue: this._globalQueue,
       globalJobRegistry: this._globalJobRegistry,
+      parseEvent: definition.parseEvent,
       metadata: definition.metadata,
       globalRegistry: this.projectionRegistry,
       executionTarget: this._executionTarget,
@@ -444,9 +464,9 @@ export class EventSourcing {
     const commandProcessors = pipeline.service.getCommandQueues();
     const dispatchers = Object.fromEntries(commandProcessors);
 
-    const result = Object.assign(pipeline, {
-      commands: dispatchers,
-    });
+    const result: RegisteredPipeline<EventType, ProjectionTypes> & {
+      commands: typeof dispatchers;
+    } = Object.assign(pipeline, { commands: dispatchers });
 
     this.pipelines.set(definition.metadata.name, result);
     return result as ReturnType;
@@ -575,7 +595,13 @@ export class EventSourcing {
       logger.debug({ registryKey }, "No handler registered for job");
       return null;
     }
-    const { __pipelineName: _p, __jobType: _t, __jobName: _n, ...clean } = payload;
+    const {
+      __pipelineName: _p,
+      __jobType: _t,
+      __jobName: _n,
+      [JOB_ROUTING_FIELD]: _r,
+      ...clean
+    } = payload;
     return { entry, clean };
   }
 
@@ -631,18 +657,15 @@ export class EventSourcing {
    * the job was misrouted. Refuse non-retryably so the queue dead-letters it.
    */
   private assertTenantRoutingConsistency({
-    entry,
-    clean,
+    tenants,
     payload,
     queueName,
   }: {
-    entry: JobRegistryEntry;
-    clean: Record<string, unknown>;
+    tenants: JobTenants;
     payload: Record<string, unknown>;
     queueName: string;
   }): void {
-    const payloadTenant = String(entry.getTenantId(clean));
-    const groupTenant = entry.groupKeyFn(clean).split("/")[0] ?? "";
+    const { payloadTenant, groupTenant } = tenants;
     if (payloadTenant === groupTenant) return;
     const identity = EventSourcing.jobIdentity(payload);
     logger.error(
@@ -707,22 +730,15 @@ export class EventSourcing {
   }
 
   private globalQueueGroupKey(payload: Record<string, unknown>): string {
-    const result = this.lookupEntry(payload);
-    if (!result) return "__unknown__";
-    return result.entry.groupKeyFn(result.clean);
+    return readJobRouting(payload)?.groupKey ?? "__unknown__";
   }
 
   private globalQueueScore(payload: Record<string, unknown>): number {
-    const result = this.lookupEntry(payload);
-    if (!result) return nowInstant().epochMilliseconds;
-    return result.entry.scoreFn(result.clean);
+    return readJobRouting(payload)?.score ?? nowInstant().epochMilliseconds;
   }
 
   private globalQueueSpanAttributes(payload: Record<string, unknown>) {
-    const result = this.lookupEntry(payload);
-    if (!result) return {};
-    if (!result.entry.spanAttributes) return {};
-    return result.entry.spanAttributes(result.clean);
+    return readJobRouting(payload)?.spanAttributes ?? {};
   }
 
   private async processGlobalQueuePayload(
@@ -734,33 +750,21 @@ export class EventSourcing {
     if (!result) {
       this.rejectUnroutableJob(payload, queueName);
     }
-    this.assertTenantRoutingConsistency({
-      entry: result.entry,
-      clean: result.clean,
-      payload,
-      queueName,
-    });
-    // Forward the delivery. Dropping it here silently pinned
-    // `deliveryAttempt` at 1 for every registry entry, which disabled the
-    // fold store's merge-on-retry applied-id handling in the running
-    // system (#6578) — the entries forward it, this wrapper was the only
-    // point of loss.
-    await result.entry.process(result.clean, delivery);
+    const job = result.entry.read(result.clean);
+    this.assertTenantRoutingConsistency({ tenants: job, payload, queueName });
+    // Forward the delivery. Dropping it here silently pinned `deliveryAttempt` at 1 for every
+    // registry entry, which disabled the fold store's merge-on-retry handling (#6578).
+    await job.run(delivery);
   }
 
   private globalQueueCoalesceMaxBatch(payload: Record<string, unknown>): number {
-    const result = this.lookupEntry(payload);
-    if (!result) return 1;
-    // `clean`, not `payload`: a resolver sees the same shape the handler
-    // will, without this queue's routing metadata.
-    return resolveCoalesceMaxBatch(result.entry, result.clean);
+    // Decided at send from the typed value; a job queued before routing moved to send folds alone.
+    return readJobRouting(payload)?.coalesceMaxBatch ?? 1;
   }
 
   private globalQueueCoalesceMaxBytes(payload: Record<string, unknown>): number | undefined {
-    // Resolve the same way as coalesceMaxBatch: per-job via routing meta.
     // undefined falls back to the GroupQueue's DEFAULT_COALESCE_MAX_BYTES.
-    const result = this.lookupEntry(payload);
-    return result?.entry.coalesceMaxBytes;
+    return this.lookupEntry(payload)?.entry.coalesceMaxBytes;
   }
 
   private async processGlobalQueueBatch(
@@ -770,39 +774,37 @@ export class EventSourcing {
   ): Promise<void> {
     if (payloads.length === 0) return;
     // Reject unroutable payloads upfront so lookupEntry returns only non-null.
-    // The tenant gate runs here for every payload, before any batch or
-    // per-item dispatch: a misrouted job must never reach its handler, alone
-    // or folded into a coalesced batch.
     const routed = payloads.map((payload) => {
       const result = this.lookupEntry(payload);
       if (!result) this.rejectUnroutableJob(payload, queueName);
-      this.assertTenantRoutingConsistency({
-        entry: result.entry,
-        clean: result.clean,
-        payload,
-        queueName,
-      });
-      return result;
+      return { ...result, payload };
     });
 
-    // A coalesced batch is always one group → one registry entry. Guard
-    // against a mixed batch (should never happen — the GroupQueue only
-    // coalesces same-group jobs — but a stray payload must never be
-    // misrouted to the wrong handler) and fall back to per-item processing.
+    // Every payload is read and tenant-gated before any runs: a misrouted job must never reach
+    // its handler, alone or folded into a coalesced batch. A mixed batch (the GroupQueue only
+    // coalesces one group, so it should never happen) runs per item.
     const firstEntry = routed[0]?.entry;
-    const batchHandler = firstEntry?.processBatch;
-    if (!batchHandler || !routed.every((r) => r.entry === firstEntry)) {
-      for (const result of routed) {
-        await result.entry.process(result.clean, delivery);
-      }
+    const readBatch = firstEntry?.readBatch;
+    if (!readBatch || !routed.every((r) => r.entry === firstEntry)) {
+      const jobs = routed.map((r) => {
+        const job = r.entry.read(r.clean);
+        this.assertTenantRoutingConsistency({ tenants: job, payload: r.payload, queueName });
+        return job;
+      });
+      for (const job of jobs) await job.run(delivery);
       return;
     }
 
-    // Forward the delivery — see the `process` wrapper above (#6578).
-    await batchHandler(
-      routed.map((r) => r.clean),
-      delivery,
-    );
+    const batch = readBatch(routed.map((r) => r.clean));
+    batch.jobs.forEach((tenants, index) => {
+      this.assertTenantRoutingConsistency({
+        tenants,
+        payload: routed[index]?.payload ?? {},
+        queueName,
+      });
+    });
+    // Forward the delivery — see the single-job path (#6578).
+    await batch.run(delivery);
   }
 
   private logDisabledWarning(context: { pipeline?: string; command?: string }): void {

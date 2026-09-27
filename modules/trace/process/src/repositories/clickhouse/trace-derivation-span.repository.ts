@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
 import { fullSpanRowsSchema, mapChRowToNormalized } from "./stored-span-row.mapper.ts";
 
@@ -201,7 +201,7 @@ export class TraceDerivationSpanClickHouseRepository {
     const partition =
       window === null
         ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+        : "AND t.StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const client = await this.options.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -228,9 +228,9 @@ export class TraceDerivationSpanClickHouseRepository {
             argMax(ScopeVersion, UpdatedAt) AS ScopeVersion,
             argMax(Cost, UpdatedAt) AS Cost,
             argMax(NonBilledCost, UpdatedAt) AS NonBilledCost
-          FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
-            AND TraceId = {traceId:String}
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.TraceId = {traceId:String}
             ${partition}
           GROUP BY SpanId
         )

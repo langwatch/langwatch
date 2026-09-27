@@ -1,4 +1,4 @@
-import type { IntentSpec, ProcessManagerApplier, WakeHandler, Event } from "@langwatch/eventing";
+import type { IntentSpec, ProcessManagerApplier, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
 import { isUsageReportDue } from "../rules/usage-report-schedule.rules.ts";
@@ -40,7 +40,7 @@ export const usageReportWake: WakeHandler<UsageReportScheduleState, UsageReportI
 };
 
 /** One instance for the whole install: the report describes the install, not a tenant. */
-export function usageReportPM(deps: UsageReportRunDeps): ProcessManagerApplier<Event> {
+export function usageReportPM(deps: UsageReportRunDeps): ProcessManagerApplier<never> {
   return (pm) =>
     pm
       .state(usageReportScheduleStateSchema, { lastReportAt: null })

@@ -1,11 +1,15 @@
-import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { ColorfulBlockIcon, ComponentIcon } from "@langwatch/workflow-browser-kit";
-import type { ComponentType } from "@langwatch/workflow-contract";
-import { Database, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { AvailableSource, FieldType, SourceType } from "./variable-mapping-input.tsx";
+import { MenuQueryHeader } from "./menu-query-header.tsx";
+import type {
+  AvailableSource,
+  FieldType,
+  RenderSourceIcon,
+  SourceType,
+} from "./variable-mapping-input.tsx";
 import { VariableTypeBadge, VariableTypeIcon } from "./variable-type/index.ts";
 
 // ============================================================================
@@ -21,6 +25,8 @@ export type SelectedField = {
 };
 
 type VariableInsertMenuProps = {
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
   /** Whether the menu is open */
   isOpen: boolean;
   /** Position for the menu (absolute coordinates) */
@@ -55,13 +61,6 @@ type VariableInsertMenuProps = {
 // Source Type Icon
 // ============================================================================
 
-const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
-  if (type === "dataset") {
-    return <ColorfulBlockIcon color="blue.solid" size="xs" icon={<Database size={12} />} />;
-  }
-  return <ComponentIcon type={type as ComponentType} size="xs" />;
-};
-
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -84,6 +83,7 @@ export const VariableInsertMenu = ({
   onCreateVariable,
   onClose,
   triggerRef,
+  renderSourceIcon,
 }: VariableInsertMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -215,12 +215,6 @@ export const VariableInsertMenu = ({
     onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
   }, [highlightedIndex, flattenedOptions.length, onHighlightChange]);
 
-  // Attach keyboard handlers to parent (via ref or expose)
-  // Actually, the parent will handle keyboard events and call these
-
-  // Track current field index for highlighting
-  let currentFieldIndex = 0;
-
   return (
     <Popover.Root
       open={isOpen}
@@ -259,149 +253,193 @@ export const VariableInsertMenu = ({
         // Prevent popover from closing when clicking inside
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Search input (editable) or Query display (readonly) */}
-        {onQueryChange ? (
-          <Box padding={2} borderBottom="1px solid" borderColor="border.muted">
-            <Input
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setIsKeyboardNav(true);
-                  onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
-                } else if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setIsKeyboardNav(true);
-                  onHighlightChange(Math.max(highlightedIndex - 1, 0));
-                } else if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSelect(highlightedIndex);
-                } else if (e.key === "Escape") {
-                  e.preventDefault();
-                  onClose();
-                }
-              }}
-              placeholder="Search variables..."
-              size="sm"
-              variant="outline"
-            />
-          </Box>
-        ) : (
-          query && (
-            <Box
-              padding={2}
-              borderBottom="1px solid"
-              borderColor="border.muted"
-              background="bg.subtle"
-            >
-              <Text fontSize="sm" color="fg.muted" fontFamily="mono">
-                {`{{${query}`}
-              </Text>
-            </Box>
-          )
-        )}
-
-        {/* Options List */}
-        <Box maxHeight="280px" overflowY="auto">
-          {flattenedOptions.length === 0 ? (
-            <Box padding={3}>
-              <Text fontSize="sm" color="fg.muted">
-                No matching fields found
-              </Text>
-              {onCreateVariable && !query && (
-                <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-                  Type a name to create a new variable
-                </Text>
-              )}
-            </Box>
-          ) : (
-            <VStack align="stretch" gap={0} padding={1}>
-              {filteredSources.map((source, sourceIndex) => (
-                <Box key={source.id}>
-                  {/* Source Header */}
-                  <HStack
-                    paddingX={2}
-                    paddingY={1}
-                    gap={2}
-                    background="bg.subtle"
-                    borderRadius="4px"
-                    marginBottom={1}
-                    marginTop={sourceIndex > 0 ? 2 : 0}
-                  >
-                    <SourceTypeIconSmall type={source.type} />
-                    <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                      {source.name}
-                    </Text>
-                  </HStack>
-
-                  {/* Fields */}
-                  {source.fields.map((field) => {
-                    const optionIndex = currentFieldIndex++;
-                    const isHighlighted = optionIndex === highlightedIndex;
-
-                    return (
-                      <HStack
-                        key={`${source.id}-${field.name}`}
-                        paddingX={3}
-                        paddingY={2}
-                        gap={2}
-                        cursor="pointer"
-                        borderRadius="4px"
-                        background={isHighlighted ? "blue.50" : undefined}
-                        onMouseMove={() => {
-                          if (isKeyboardNav || highlightedIndex !== optionIndex) {
-                            setIsKeyboardNav(false);
-                            onHighlightChange(optionIndex);
-                          }
-                        }}
-                        onClick={() => handleSelect(optionIndex)}
-                      >
-                        <VariableTypeIcon type={field.type} size={12} />
-                        <Text fontSize="13px" fontFamily="mono" flex={1}>
-                          {field.name}
-                        </Text>
-                        <VariableTypeBadge type={field.type} size="xs" />
-                      </HStack>
-                    );
-                  })}
-                </Box>
-              ))}
-
-              {/* Create Variable Option - shown LAST */}
-              {canCreateVariable && (
-                <HStack
-                  paddingX={3}
-                  paddingY={2}
-                  gap={2}
-                  cursor="pointer"
-                  borderRadius="4px"
-                  background={highlightedIndex === createOptionIndex ? "blue.50" : undefined}
-                  onMouseMove={() => {
-                    if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
-                      setIsKeyboardNav(false);
-                      onHighlightChange(createOptionIndex);
-                    }
-                  }}
-                  borderTop="1px solid"
-                  borderColor="border.muted"
-                  marginTop={filteredSources.length > 0 ? 2 : 0}
-                  onClick={() => onCreateVariable?.(normalizedQuery)}
-                >
-                  <Plus size={12} color="var(--chakra-colors-blue-500)" />
-                  <Text fontSize="13px" color="blue.600">
-                    Create variable "{`{{${normalizedQuery}}}`}"
-                  </Text>
-                </HStack>
-              )}
-            </VStack>
-          )}
-        </Box>
+        <MenuQueryHeader
+          query={query}
+          readOnlyText={`{{${query}`}
+          placeholder="Search variables..."
+          onQueryChange={onQueryChange}
+          inputRef={searchInputRef}
+          onMove={(delta) => {
+            setIsKeyboardNav(true);
+            onHighlightChange(
+              delta > 0
+                ? Math.min(highlightedIndex + 1, flattenedOptions.length - 1)
+                : Math.max(highlightedIndex - 1, 0),
+            );
+          }}
+          onEnter={() => handleSelect(highlightedIndex)}
+          onEscape={onClose}
+        />
+        <MenuOptions
+          filteredSources={filteredSources}
+          optionCount={flattenedOptions.length}
+          highlightedIndex={highlightedIndex}
+          isKeyboardNav={isKeyboardNav}
+          setIsKeyboardNav={setIsKeyboardNav}
+          onHighlightChange={onHighlightChange}
+          onSelectIndex={handleSelect}
+          createOptionIndex={createOptionIndex}
+          normalizedQuery={normalizedQuery}
+          query={query}
+          onCreateVariable={onCreateVariable}
+          renderSourceIcon={renderSourceIcon}
+        />
       </Popover.Content>
     </Popover.Root>
   );
 };
+
+type MenuOptionsProps = {
+  filteredSources: AvailableSource[];
+  optionCount: number;
+  highlightedIndex: number;
+  isKeyboardNav: boolean;
+  setIsKeyboardNav: (value: boolean) => void;
+  onHighlightChange: (index: number) => void;
+  onSelectIndex: (index: number) => void;
+  createOptionIndex: number;
+  normalizedQuery: string;
+  query: string;
+  onCreateVariable?: (name: string) => void;
+  renderSourceIcon?: RenderSourceIcon;
+};
+
+function MenuOptions(props: MenuOptionsProps) {
+  const { filteredSources, optionCount, query, onCreateVariable } = props;
+  if (optionCount === 0) {
+    return (
+      <Box maxHeight="280px" overflowY="auto">
+        <Box padding={3}>
+          <Text fontSize="sm" color="fg.muted">
+            No matching fields found
+          </Text>
+          {onCreateVariable && !query && (
+            <Text fontSize="xs" color="fg.subtle" marginTop={1}>
+              Type a name to create a new variable
+            </Text>
+          )}
+        </Box>
+      </Box>
+    );
+  }
+  const firstIndexOf = filteredSources.map((_, sourceIndex) =>
+    filteredSources.slice(0, sourceIndex).reduce((sum, source) => sum + source.fields.length, 0),
+  );
+  return (
+    <Box maxHeight="280px" overflowY="auto">
+      <VStack align="stretch" gap={0} padding={1}>
+        {filteredSources.map((source, sourceIndex) => (
+          <MenuSourceGroup
+            key={source.id}
+            {...props}
+            source={source}
+            sourceIndex={sourceIndex}
+            firstIndex={firstIndexOf[sourceIndex] ?? 0}
+          />
+        ))}
+        <MenuCreateOption {...props} />
+      </VStack>
+    </Box>
+  );
+}
+
+function highlightOnMove({
+  optionIndex,
+  highlightedIndex,
+  isKeyboardNav,
+  setIsKeyboardNav,
+  onHighlightChange,
+}: Pick<
+  MenuOptionsProps,
+  "highlightedIndex" | "isKeyboardNav" | "setIsKeyboardNav" | "onHighlightChange"
+> & {
+  optionIndex: number;
+}): void {
+  if (isKeyboardNav || highlightedIndex !== optionIndex) {
+    setIsKeyboardNav(false);
+    onHighlightChange(optionIndex);
+  }
+}
+
+function MenuSourceGroup({
+  source,
+  sourceIndex,
+  firstIndex,
+  renderSourceIcon,
+  onSelectIndex,
+  ...highlight
+}: MenuOptionsProps & { source: AvailableSource; sourceIndex: number; firstIndex: number }) {
+  return (
+    <Box>
+      <HStack
+        paddingX={2}
+        paddingY={1}
+        gap={2}
+        background="bg.subtle"
+        borderRadius="4px"
+        marginBottom={1}
+        marginTop={sourceIndex > 0 ? 2 : 0}
+      >
+        {renderSourceIcon?.(source.type)}
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          {source.name}
+        </Text>
+      </HStack>
+      {source.fields.map((field, fieldIndex) => {
+        const optionIndex = firstIndex + fieldIndex;
+        return (
+          <HStack
+            key={`${source.id}-${field.name}`}
+            paddingX={3}
+            paddingY={2}
+            gap={2}
+            cursor="pointer"
+            borderRadius="4px"
+            background={optionIndex === highlight.highlightedIndex ? "blue.50" : undefined}
+            onMouseMove={() => highlightOnMove({ ...highlight, optionIndex })}
+            onClick={() => onSelectIndex(optionIndex)}
+          >
+            <VariableTypeIcon type={field.type} size={12} />
+            <Text fontSize="13px" fontFamily="mono" flex={1}>
+              {field.name}
+            </Text>
+            <VariableTypeBadge type={field.type} size="xs" />
+          </HStack>
+        );
+      })}
+    </Box>
+  );
+}
+
+function MenuCreateOption({
+  createOptionIndex,
+  normalizedQuery,
+  onCreateVariable,
+  filteredSources,
+  ...highlight
+}: MenuOptionsProps) {
+  if (createOptionIndex < 0) return null;
+  return (
+    <HStack
+      paddingX={3}
+      paddingY={2}
+      gap={2}
+      cursor="pointer"
+      borderRadius="4px"
+      background={highlight.highlightedIndex === createOptionIndex ? "blue.50" : undefined}
+      onMouseMove={() => highlightOnMove({ ...highlight, optionIndex: createOptionIndex })}
+      borderTop="1px solid"
+      borderColor="border.muted"
+      marginTop={filteredSources.length > 0 ? 2 : 0}
+      onClick={() => onCreateVariable?.(normalizedQuery)}
+    >
+      <Plus size={12} color="var(--chakra-colors-blue-500)" />
+      <Text fontSize="13px" color="blue.600">
+        Create variable "{`{{${normalizedQuery}}}`}"
+      </Text>
+    </HStack>
+  );
+}
 
 // Export helper to get option count for parent component
 export const getMenuOptionCount = (

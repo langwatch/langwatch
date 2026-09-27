@@ -1,4 +1,3 @@
-import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 /**
  * The `/api/workflows` CRUD family, dated, as the public API publishes it. The
  * Studio's own two doors are a separate family the process mounts ahead of
@@ -177,14 +176,13 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       })
       .withMiddleware(projectRestFacts, workflowEvaluationRunCeiling)
       .handle(async ({ app, input, scope }, project, mayReadRuns) => {
-        if (!mayReadRuns) throw new ApiKeyPermissionDeniedError("evaluations:view");
-
         logger.info(
           { projectId: scope.id, workflowId: input.id },
           "Triggering workflow evaluation via API",
         );
 
         const started = await app.triggerEvaluation({
+          callerMayReadRuns: mayReadRuns,
           projectId: scope.id,
           projectSlug: project.projectSlug,
           workflowId: input.id,

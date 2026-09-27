@@ -163,22 +163,10 @@ export const FilterSidebar: React.FC = () => {
       const oldIndex = orderedKeys.indexOf(String(active.id));
       const newIndex = orderedKeys.indexOf(String(over.id));
       if (oldIndex < 0 || newIndex < 0) return;
-      const reorderedVisible = arrayMove(orderedKeys, oldIndex, newIndex);
-      // Preserve any hidden keys' relative positions: walk the full
-      // saved order, replacing the visible-key slots with the new
-      // sequence in turn. Keys that weren't in the saved order yet get
-      // appended at the end.
-      const visibleSet = new Set(reorderedVisible);
-      const next: string[] = [];
-      const visibleQueue = [...reorderedVisible];
-      for (const key of orderedKeysAll) {
-        if (visibleSet.has(key)) {
-          const nextVisible = visibleQueue.shift();
-          if (nextVisible) next.push(nextVisible);
-        } else {
-          next.push(key);
-        }
-      }
+      const next = mergeVisibleOrder({
+        reorderedVisible: arrayMove(orderedKeys, oldIndex, newIndex),
+        orderedKeysAll,
+      });
       setSectionOrder(next);
     },
     [orderedKeys, orderedKeysAll, setSectionOrder],
@@ -197,48 +185,12 @@ export const FilterSidebar: React.FC = () => {
     setAllExpanded(next);
   }, [allExpanded, orderedKeys, setAllSectionsOpen]);
 
-  // Sidebar keyboard shortcuts — one per header button.
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't fire sidebar shortcuts while the trace drawer is open — the
-      // sidebar stays mounted underneath it, so `x`/`r`/`c`/`e` would
-      // otherwise act behind the drawer (and `c`/`r` collide with the
-      // drawer's own shortcuts). Mirrors the page-level shortcut guards.
-      if (useDrawerStore.getState().isOpen) return;
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const target = e.target;
-      const isTypingTarget =
-        target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
-      if (isTypingTarget) {
-        return;
-      }
-      const key = e.key.toLowerCase();
-      if (key === "c") {
-        e.preventDefault();
-        setFacetManagerOpen(true);
-      } else if (key === "e") {
-        e.preventDefault();
-        handleToggleAll();
-      } else if (key === "x" && hasActiveFilters) {
-        e.preventDefault();
-        clearAllFilters();
-      } else if (key === "r" && canResetToLens) {
-        e.preventDefault();
-        revertLens(activeLensId);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    setFacetManagerOpen,
-    handleToggleAll,
-    hasActiveFilters,
-    clearAllFilters,
-    canResetToLens,
-    revertLens,
-    activeLensId,
-  ]);
+  useSidebarShortcuts({
+    c: () => setFacetManagerOpen(true),
+    e: handleToggleAll,
+    x: hasActiveFilters ? () => clearAllFilters() : undefined,
+    r: canResetToLens ? () => revertLens(activeLensId) : undefined,
+  });
 
   const renderSection = useCallback(
     ({
@@ -335,66 +287,12 @@ export const FilterSidebar: React.FC = () => {
           right-side affordances can change (Configure popover may grow,
           expand-all toggle, etc.) without the close button drifting.
           Other actions cluster on the right. */}
-      <HStack
-        flexShrink={0}
-        minHeight="36px"
-        paddingX={2}
-        borderBottomWidth="1px"
-        borderColor="border"
-        bg={{ base: "bg.subtle", _dark: "bg.surface" }}
-        gap={1}
-        align="center"
-        justify="space-between"
-      >
-        <Tooltip
-          positioning={{ placement: "bottom" }}
-          content={
-            <HStack gap={1.5}>
-              <Text>Hide filters sidebar</Text>
-              <Kbd>{"["}</Kbd>
-            </HStack>
-          }
-        >
-          <IconButton
-            aria-label="Hide filters sidebar"
-            size="2xs"
-            variant="ghost"
-            color="fg.subtle"
-            onClick={toggleSidebar}
-          >
-            <PanelLeftClose size={14} />
-          </IconButton>
-        </Tooltip>
-        <HStack gap={1} align="center">
-          {/* Clear-all/Reset-to-lens mount only while there's something to act on, with a soft
-              halo ring (blue for active filters, orange for the lens draft) to stay noticeable. */}
-          {hasActiveFilters && (
-            <Tooltip
-              positioning={{ placement: "bottom" }}
-              content={
-                <HStack gap={1.5}>
-                  <Text>Clear all filters</Text>
-                  <Kbd>X</Kbd>
-                </HStack>
-              }
-            >
-              <IconButton
-                aria-label="Clear all filters"
-                size="2xs"
-                variant="ghost"
-                color="blue.fg"
-                boxShadow="0 0 0 2px var(--chakra-colors-blue-subtle)"
-                _hover={{ bg: "blue.subtle", color: "blue.fg" }}
-                onClick={() => clearAllFilters()}
-              >
-                <FilterX size={14} />
-              </IconButton>
-            </Tooltip>
-          )}
-          {/* "Reset to lens" was moved OUT of the sidebar into the lens bar
-              (LensTabs), where it sits right next to the draft lens tab — a
-              clearer home than buried among the sidebar's filter chrome. The
-              `r` shortcut + `revertLens` stay wired here for keyboard users. */}
+      <SidebarHeader
+        onHide={toggleSidebar}
+        onClearAll={hasActiveFilters ? () => clearAllFilters() : undefined}
+        allExpanded={allExpanded}
+        onToggleAll={handleToggleAll}
+        facetManager={
           <FacetManagerPopover
             orderedKeysAll={orderedKeysAll}
             sectionByKey={sectionByKey}
@@ -409,27 +307,8 @@ export const FilterSidebar: React.FC = () => {
             triggerLabel="Configure"
             showCount={showConfigureCount}
           />
-          <Tooltip
-            positioning={{ placement: "bottom" }}
-            content={
-              <HStack gap={1.5}>
-                <Text>{allExpanded ? "Collapse all sections" : "Expand all sections"}</Text>
-                <Kbd>E</Kbd>
-              </HStack>
-            }
-          >
-            <IconButton
-              aria-label={allExpanded ? "Collapse all sections" : "Expand all sections"}
-              size="2xs"
-              variant="ghost"
-              color="fg.subtle"
-              onClick={handleToggleAll}
-            >
-              {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
-            </IconButton>
-          </Tooltip>
-        </HStack>
-      </HStack>
+        }
+      />
       {/* The same number the pagination line shows, from the same read, so the
           sidebar can never claim more or fewer rows than the table. It gets a
           row of its own: the header's buttons leave no room for it, and while
@@ -539,6 +418,159 @@ export const FilterSidebar: React.FC = () => {
     </VStack>
   );
 };
+
+/**
+ * The header bar. The hide toggle anchors on the left so it never drifts as the
+ * right-hand actions come and go; clear-all mounts only while there is a filter.
+ */
+function SidebarHeader({
+  onHide,
+  onClearAll,
+  allExpanded,
+  onToggleAll,
+  facetManager,
+}: {
+  onHide: () => void;
+  onClearAll?: () => void;
+  allExpanded: boolean;
+  onToggleAll: () => void;
+  facetManager: React.ReactNode;
+}) {
+  return (
+    <HStack
+      flexShrink={0}
+      minHeight="36px"
+      paddingX={2}
+      borderBottomWidth="1px"
+      borderColor="border"
+      bg={{ base: "bg.subtle", _dark: "bg.surface" }}
+      gap={1}
+      align="center"
+      justify="space-between"
+    >
+      <Tooltip
+        positioning={{ placement: "bottom" }}
+        content={
+          <HStack gap={1.5}>
+            <Text>Hide filters sidebar</Text>
+            <Kbd>{"["}</Kbd>
+          </HStack>
+        }
+      >
+        <IconButton
+          aria-label="Hide filters sidebar"
+          size="2xs"
+          variant="ghost"
+          color="fg.subtle"
+          onClick={onHide}
+        >
+          <PanelLeftClose size={14} />
+        </IconButton>
+      </Tooltip>
+      <HStack gap={1} align="center">
+        {/* Clear-all/Reset-to-lens mount only while there's something to act on, with a soft
+          halo ring (blue for active filters, orange for the lens draft) to stay noticeable. */}
+        {onClearAll && (
+          <Tooltip
+            positioning={{ placement: "bottom" }}
+            content={
+              <HStack gap={1.5}>
+                <Text>Clear all filters</Text>
+                <Kbd>X</Kbd>
+              </HStack>
+            }
+          >
+            <IconButton
+              aria-label="Clear all filters"
+              size="2xs"
+              variant="ghost"
+              color="blue.fg"
+              boxShadow="0 0 0 2px var(--chakra-colors-blue-subtle)"
+              _hover={{ bg: "blue.subtle", color: "blue.fg" }}
+              onClick={onClearAll}
+            >
+              <FilterX size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
+        {/* "Reset to lens" was moved OUT of the sidebar into the lens bar
+          (LensTabs), where it sits right next to the draft lens tab — a
+          clearer home than buried among the sidebar's filter chrome. The
+          `r` shortcut + `revertLens` stay wired here for keyboard users. */}
+        {facetManager}
+        <Tooltip
+          positioning={{ placement: "bottom" }}
+          content={
+            <HStack gap={1.5}>
+              <Text>{allExpanded ? "Collapse all sections" : "Expand all sections"}</Text>
+              <Kbd>E</Kbd>
+            </HStack>
+          }
+        >
+          <IconButton
+            aria-label={allExpanded ? "Collapse all sections" : "Expand all sections"}
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            onClick={onToggleAll}
+          >
+            {allExpanded ? <ChevronsDownUp size={14} /> : <ChevronsUpDown size={14} />}
+          </IconButton>
+        </Tooltip>
+      </HStack>
+    </HStack>
+  );
+}
+
+/** Whether a key press lands in a field the reader is typing into. */
+function isTypingTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof HTMLElement &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  );
+}
+
+/**
+ * The sidebar's single-key shortcuts, one per header action; an action left
+ * undefined is off. They stay quiet while the trace drawer is open over the
+ * sidebar, with a modifier held, or while the reader types.
+ */
+function useSidebarShortcuts(actions: Record<string, (() => void) | undefined>) {
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (useDrawerStore.getState().isOpen) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+      const action = actionsRef.current[e.key.toLowerCase()];
+      if (!action) return;
+      e.preventDefault();
+      action();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+}
+
+/**
+ * The full saved order with the visible keys replaced, slot by slot, by their
+ * new sequence, so hidden keys keep their places.
+ */
+function mergeVisibleOrder({
+  reorderedVisible,
+  orderedKeysAll,
+}: {
+  reorderedVisible: string[];
+  orderedKeysAll: string[];
+}): string[] {
+  const visible = new Set(reorderedVisible);
+  const queue = [...reorderedVisible];
+  return orderedKeysAll.flatMap((key) => {
+    if (!visible.has(key)) return [key];
+    const nextVisible = queue.shift();
+    return nextVisible ? [nextVisible] : [];
+  });
+}
 
 /**
  * Lightweight ghost rendered in the DragOverlay while the user is dragging a section.

@@ -201,7 +201,7 @@ export const DEFAULT_COALESCE_MAX_BYTES = 4 * 1024 * 1024;
  * `__pipelineName`/`__jobType`/`__jobName`; anything else could collide with
  * the GQ2 content hash and clobber on decode (ADR-029), so it's rejected here.
  */
-const CALLER_RESERVED_KEYS = new Set(["__pipelineName", "__jobType", "__jobName"]);
+const CALLER_RESERVED_KEYS = new Set(["__pipelineName", "__jobType", "__jobName", "__routing"]);
 
 function assertNoReservedKeys(
   payload: Record<string, unknown>,

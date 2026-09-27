@@ -5,10 +5,12 @@ import {
   parseSpanReferencedPayload,
   SPAN_REFERENCED_PAYLOAD_TYPE,
   type SpanReceivedEvent,
+  spanReceivedEventSchema,
 } from "../index.ts";
 
-const makeEvent = (startTimeUnixNano: unknown): SpanReceivedEvent =>
-  ({
+/** A span_received event as the wire delivers it, parsed through the event's own schema. */
+const makeEvent = (startTimeUnixNano: string | number): SpanReceivedEvent =>
+  spanReceivedEventSchema.parse({
     id: "evt_01",
     aggregateId: "trace_01",
     aggregateType: "trace",
@@ -19,13 +21,20 @@ const makeEvent = (startTimeUnixNano: unknown): SpanReceivedEvent =>
     version: "2026-07-24",
     data: {
       span: {
+        traceId: "trace_01",
         spanId: "span_01",
         name: "synthetic span",
+        kind: 0,
         startTimeUnixNano,
-        attributes: { "synthetic.attribute": "value" },
+        endTimeUnixNano: startTimeUnixNano,
+        attributes: [{ key: "synthetic.attribute", value: { stringValue: "value" } }],
       },
+      resource: null,
+      instrumentationScope: null,
+      piiRedactionLevel: "DISABLED",
     },
-  }) as unknown as SpanReceivedEvent;
+    metadata: { spanId: "span_01", traceId: "trace_01" },
+  });
 
 describe("given a span_received event staged as a reference", () => {
   describe("when the wire start time is unparseable", () => {

@@ -43,7 +43,11 @@ import {
   useTargetNames,
 } from "../../../../behavior/experiments-v3/use-target-name.ts";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
-import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
+import type {
+  ComparisonEvaluatorConfig,
+  DatasetReference,
+  TargetConfig,
+} from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 import { TargetSummary } from "./target-summary.tsx";
@@ -51,10 +55,9 @@ import { TargetSummary } from "./target-summary.tsx";
 /**
  * The icon a column header shows per agent type.
  */
-const AGENT_TYPE_ICONS: Record<
-  AgentTypeEnum,
-  { testId: string; icon: React.ComponentType<{ size?: number }> }
-> = {
+type IconType = React.ComponentType<{ size?: number }>;
+
+const AGENT_TYPE_ICONS: Record<AgentTypeEnum, { testId: string; icon: IconType }> = {
   code: { testId: "icon-code", icon: LuCode },
   signature: { testId: "icon-code", icon: LuCode },
   http: { testId: "icon-globe", icon: LuGlobe },
@@ -108,6 +111,144 @@ function resolveVariantTargets<T extends { id: string }>(
   return variantIds.map((id) => allTargets.find((t) => t.id === id));
 }
 
+/** Whether a target carries an unsaved prompt or evaluator draft. */
+const hasUnpublishedDraft = (target: TargetConfig | undefined): boolean =>
+  (target?.type === "prompt" && !!target.localPromptConfig) ||
+  (target?.type === "evaluator" && !!target.localEvaluatorConfig);
+
+/**
+ * The rows a target's header counts: an inline dataset's non-empty rows, a saved
+ * one's loaded records, or (before those load, after a refresh) the persisted outputs.
+ */
+const nonEmptyRowCountOf = ({
+  activeDataset,
+  targetOutputs,
+}: {
+  activeDataset: DatasetReference | undefined;
+  targetOutputs: unknown[] | undefined;
+}): number => {
+  if (activeDataset?.type === "inline" && activeDataset.inline?.records) {
+    const rows = transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records);
+    return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row)).length;
+  }
+  if (activeDataset?.type === "saved" && activeDataset.savedRecords) {
+    return activeDataset.savedRecords.length;
+  }
+  return targetOutputs?.length ?? 0;
+};
+
+/**
+ * The header's summary numbers over the rows that count. While this target runs,
+ * that is only its executing cells, so a one-cell run shows 0/1 rather than 0/N.
+ */
+const useTargetHeaderAggregates = ({
+  target,
+  targetComparison,
+  isRunning,
+}: {
+  target: TargetConfig;
+  targetComparison: ComparisonEvaluatorConfig | undefined;
+  isRunning: boolean;
+}) => {
+  const { results, evaluators, activeDataset } = useEvaluationsV3Store((state) => ({
+    results: state.results,
+    evaluators: state.evaluators,
+    activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
+  }));
+  const nonEmptyRowCount = useMemo(
+    () => nonEmptyRowCountOf({ activeDataset, targetOutputs: results.targetOutputs[target.id] }),
+    [activeDataset, results.targetOutputs, target.id],
+  );
+  const executingCount =
+    results.executingCells && isRunning
+      ? countCellsForTarget(results.executingCells, target.id, nonEmptyRowCount)
+      : 0;
+  const effectiveRowCount = executingCount > 0 ? executingCount : nonEmptyRowCount;
+
+  const aggregates = useMemo(
+    () =>
+      target.type === "evaluator" && targetComparison
+        ? computeComparisonColumnTargetAggregate(
+            { id: target.id, comparison: targetComparison },
+            results,
+            effectiveRowCount,
+          )
+        : computeTargetAggregates({
+            targetId: target.id,
+            results,
+            evaluators,
+            rowCount: effectiveRowCount,
+          }),
+    [target, targetComparison, results, evaluators, effectiveRowCount],
+  );
+  const comparisonAggregate = useMemo(
+    () =>
+      targetComparison
+        ? computeComparisonTargetAggregate(target, results, effectiveRowCount)
+        : null,
+    [target, targetComparison, results, effectiveRowCount],
+  );
+  // Summarised once there are results, errors, cost, or a run in progress.
+  const hasAggregates =
+    aggregates.completedRows > 0 ||
+    aggregates.errorRows > 0 ||
+    aggregates.totalCost !== null ||
+    results.status === "running";
+
+  return { aggregates, comparisonAggregate, hasAggregates, evaluators };
+};
+
+/** Whether a prompt target is pinned to a version older than its latest. */
+const useShowsOlderVersion = (target: TargetConfig): boolean => {
+  const isPrompt = target.type === "prompt";
+  const { latestVersion } = useLatestPromptVersion({
+    configId: isPrompt ? target.promptId : undefined,
+    currentVersion: isPrompt ? target.promptVersionNumber : undefined,
+    // One instance per always-mounted target column: no live refetch storm (#5585).
+    isLiveRefetchEnabled: false,
+  });
+  return (
+    isPrompt &&
+    target.promptVersionNumber !== undefined &&
+    target.promptVersionNumber !== latestVersion
+  );
+};
+
+/** The header's accent: purple for a comparison, green for prompts and evaluators, else cyan. */
+const targetColorOf = (target: TargetConfig): string => {
+  if (target.type === "evaluator" && isComparisonEvaluator(target)) return "purple.emphasized";
+  if (target.type === "prompt" || target.type === "evaluator") return "green.emphasized";
+  return "cyan.emphasized";
+};
+
+/**
+ * The target's type icon, wrapped so tests can find it (lucide icons drop data-testid).
+ * A comparison uses Swords, a workflow the workflow icon, an untyped agent code.
+ */
+function TargetTypeIcon({ target }: { target: TargetConfig }) {
+  const [testId, Icon] = targetIconOf(target);
+  return (
+    <span data-testid={testId}>
+      <Icon size={12} />
+    </span>
+  );
+}
+
+const targetIconOf = (target: TargetConfig): [string, IconType] => {
+  if (target.type === "prompt") return ["icon-file", LuFileText];
+  if (target.type === "evaluator") {
+    return isComparisonEvaluator(target)
+      ? ["icon-comparison", Swords]
+      : ["icon-evaluator", LuCircleCheck];
+  }
+  if (target.type === "workflow") return ["icon-workflow", LuWorkflow];
+  if (target.type === "agent" && target.agentType) {
+    const { testId, icon } = AGENT_TYPE_ICONS[target.agentType];
+    return [testId, icon];
+  }
+  return ["icon-code", LuCode];
+};
+
 /**
  * Header component for target columns in the evaluations table. Shows target name with
  * icon, a play button, and a dropdown menu on click.
@@ -123,22 +264,11 @@ export const TargetHeader = memo(function TargetHeader({
   onStop,
   isRunning = false,
 }: TargetHeaderProps) {
-  // First check if prop has localPromptConfig or localEvaluatorConfig (for direct prop usage)
-  const propHasUnpublished =
-    (target.type === "prompt" && !!target.localPromptConfig) ||
-    (target.type === "evaluator" && !!target.localEvaluatorConfig);
-
-  // Subscribe to this target's unpublished state from store.
-  const storeHasUnpublished = useEvaluationsV3Store((state) => {
-    const currentTarget = state.targets.find((r) => r.id === target.id);
-    if (!currentTarget) return false;
-    if (currentTarget.type === "prompt" && !!currentTarget.localPromptConfig) return true;
-    if (currentTarget.type === "evaluator" && !!currentTarget.localEvaluatorConfig) return true;
-    return false;
-  });
-
-  // Use prop value if available, otherwise use store value
-  const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
+  // The prop's own draft, or the store's live one for this target.
+  const storeHasUnpublished = useEvaluationsV3Store((state) =>
+    hasUnpublishedDraft(state.targets.find((r) => r.id === target.id)),
+  );
+  const hasUnpublishedChanges = hasUnpublishedDraft(target) || storeHasUnpublished;
 
   // Check if there are missing mappings for the active dataset
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
@@ -199,175 +329,16 @@ export const TargetHeader = memo(function TargetHeader({
     return disambiguateNames(allTargetNames)[index] || targetName;
   }, [allTargets, allTargetNames, target.id, targetName]);
 
-  // Get results, evaluators, and dataset for computing aggregates
-  const { results, evaluators, activeDataset } = useEvaluationsV3Store((state) => ({
-    results: state.results,
-    evaluators: state.evaluators,
-    activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
-  }));
-
-  // Count non-empty rows (empty rows are skipped during execution)
-  // Handles both inline and saved datasets, with fallback to persisted results
-  const nonEmptyRowCount = useMemo(() => {
-    // For inline datasets, count non-empty rows
-    if (activeDataset?.type === "inline" && activeDataset.inline?.records) {
-      const rows = transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records);
-      return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row)).length;
-    }
-
-    // For saved datasets, use savedRecords count when available
-    if (activeDataset?.type === "saved" && activeDataset.savedRecords) {
-      return activeDataset.savedRecords.length;
-    }
-
-    // Fallback: If we have persisted results for this target, use that to infer row count
-    // This handles the page refresh scenario where savedRecords hasn't loaded yet
-    const targetOutputs = results.targetOutputs[target.id];
-    if (targetOutputs && targetOutputs.length > 0) {
-      return targetOutputs.length;
-    }
-
-    return 0;
-  }, [
-    activeDataset?.type,
-    activeDataset?.inline?.records,
-    activeDataset?.savedRecords,
-    results.targetOutputs,
-    target.id,
-  ]);
-
-  // When THIS target is executing, use the count from executingCells
-  // This ensures partial executions show correct progress (e.g., 0/1 for single cell)
-  const effectiveRowCount = useMemo(() => {
-    if (results.executingCells && isRunning) {
-      // Count cells being executed for this specific target
-      const maxRowIndex = nonEmptyRowCount; // Max possible row index
-      const cellCount = countCellsForTarget(results.executingCells, target.id, maxRowIndex);
-      // Only use cell count if this target actually has cells executing
-      if (cellCount > 0) {
-        return cellCount;
-      }
-    }
-    // When not running or no cells for this target, use the full non-empty row count
-    return nonEmptyRowCount;
-  }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
-
-  // Compute aggregate statistics using effective row count.
-  const aggregates = useMemo(
-    () =>
-      target.type === "evaluator" && targetComparison
-        ? computeComparisonColumnTargetAggregate(
-            { id: target.id, comparison: targetComparison },
-            results,
-            effectiveRowCount,
-          )
-        : computeTargetAggregates({
-            targetId: target.id,
-            results,
-            evaluators,
-            rowCount: effectiveRowCount,
-          }),
-    [target, targetComparison, results, evaluators, effectiveRowCount],
-  );
-
-  const comparisonAggregate = useMemo(() => {
-    if (!targetComparison) return null;
-    return computeComparisonTargetAggregate(target, results, effectiveRowCount);
-  }, [target, targetComparison, results, effectiveRowCount]);
-
-  // Show aggregates only when we have results or errors or running
-  const hasAggregates =
-    aggregates.completedRows > 0 ||
-    aggregates.errorRows > 0 ||
-    aggregates.totalCost !== null ||
-    results.status === "running";
-
-  // Get the latest version for this prompt (to determine if target is at "latest")
-  const { latestVersion } = useLatestPromptVersion({
-    configId: target.type === "prompt" ? target.promptId : undefined,
-    currentVersion: target.type === "prompt" ? target.promptVersionNumber : undefined,
-    // One instance per target column, all always mounted — same N-mounted
-    // storm shape as the prompt tab labels (#5585).
-    isLiveRefetchEnabled: false,
+  const { comparisonAggregate, aggregates, hasAggregates, evaluators } = useTargetHeaderAggregates({
+    target,
+    targetComparison,
+    isRunning,
   });
 
-  // Check if this target is effectively at "latest" version
-  // (either has no pinned version, or pinned version matches latest)
-  const isAtLatestVersion =
-    target.type === "prompt" &&
-    (target.promptVersionNumber === undefined || target.promptVersionNumber === latestVersion);
-
-  // Show version badge if pinned to an older version.
-  const showVersionBadge =
-    target.type === "prompt" && target.promptVersionNumber !== undefined && !isAtLatestVersion;
+  const showVersionBadge = useShowsOlderVersion(target);
 
   // Controlled menu state to prevent closing on re-renders
   const [menuOpen, setMenuOpen] = useState(false);
-
-  // Determine icon based on target type
-  // Note: Lucide icons don't forward data-testid, so we wrap in span for testing
-  const getTargetIcon = () => {
-    if (target.type === "prompt") {
-      return (
-        <span data-testid="icon-file">
-          <LuFileText size={12} />
-        </span>
-      );
-    }
-    if (target.type === "evaluator") {
-      // Comparison column-targets use the Swords icon (matching their picker
-      // cards) so the column reads as "a comparison between columns" rather
-      // than a generic evaluator. The Trophy is reserved for declaring the
-      // winner of a comparison — the verdict cell and the "Won" badge below.
-      if (isComparisonEvaluator(target)) {
-        return (
-          <span data-testid="icon-comparison">
-            <Swords size={12} />
-          </span>
-        );
-      }
-      return (
-        <span data-testid="icon-evaluator">
-          <LuCircleCheck size={12} />
-        </span>
-      );
-    }
-    // A workflow target runs a whole Studio workflow, not a single node, so
-    // it gets the workflow icon rather than reading as raw code.
-    if (target.type === "workflow") {
-      return (
-        <span data-testid="icon-workflow">
-          <LuWorkflow size={12} />
-        </span>
-      );
-    }
-    if (target.type === "agent" && target.agentType) {
-      const { testId, icon: AgentIcon } = AGENT_TYPE_ICONS[target.agentType];
-      return (
-        <span data-testid={testId}>
-          <AgentIcon size={12} />
-        </span>
-      );
-    }
-    // An agent target that names no type is code, the oldest agent shape.
-    return (
-      <span data-testid="icon-code">
-        <LuCode size={12} />
-      </span>
-    );
-  };
-
-  const getTargetColor = () => {
-    // Pairwise column-targets render in purple to match the picker card and
-    // signal "comparison" at a glance.
-    if (target.type === "evaluator" && isComparisonEvaluator(target)) {
-      return "purple.emphasized";
-    }
-    if (target.type === "prompt" || target.type === "evaluator") {
-      return "green.emphasized";
-    }
-    return "cyan.emphasized";
-  };
 
   const editLabel = `Edit ${targetTypeNoun(target.type)}`;
 
@@ -414,9 +385,9 @@ export const TargetHeader = memo(function TargetHeader({
             data-target-name={headerName}
           >
             <ColorfulBlockIcon
-              color={getTargetColor()}
+              color={targetColorOf(target)}
               size="xs"
-              icon={getTargetIcon()}
+              icon={<TargetTypeIcon target={target} />}
               // Align icon with text for evaluators.
               marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />

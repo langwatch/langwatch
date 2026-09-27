@@ -6,6 +6,7 @@ import { newSsoAuthenticationActivityId } from "../../rules/sso-connection-id.ru
 import { EventingIdentityHistoryRepository } from "../eventing/eventing.identity-history.repository.ts";
 import type {
   IdentityMigrationRepositories,
+  IdentityPipelineRepositories,
   IdentityRepositories,
 } from "../identity.repositories.ts";
 import { PrismaIdentityBackfillRepository } from "./prisma.identity-backfill.repository.ts";
@@ -131,5 +132,28 @@ export function identityMigrationRepositoriesOverPrisma(
     secretCarry: PrismaIdentitySecretCarryRepository.create(database),
     newborn: PrismaIdentityNewbornRepository.create(database),
     ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
+  };
+}
+
+/** The identity pipeline's rows over one client, for a process that sends its commands. */
+export function identityPipelineRepositoriesOverPrisma({
+  database,
+  eventing,
+}: {
+  database: PrismaClient;
+  eventing: Pick<EventSourcing, "getEventStore">;
+}): IdentityPipelineRepositories {
+  const reservations = PrismaIdentityReservationRepository.create(database);
+  return {
+    heads: PrismaIdentityHeadsRepository.create(database),
+    users: PrismaIdentityUsersRepository.create(database),
+    reservations,
+    mfaEnrollment: PrismaMfaEnrollmentRepository.create(database),
+    identityProjection: PrismaIdentityProjectionRepository.create({
+      prisma: database,
+      reservations,
+    }),
+    mfaProjection: PrismaMfaEnrollmentProjectionRepository.create(database),
+    identityHistory: EventingIdentityHistoryRepository.create({ eventing }),
   };
 }

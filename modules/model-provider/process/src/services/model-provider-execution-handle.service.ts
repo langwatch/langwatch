@@ -123,25 +123,26 @@ async function disabledProviderError({
     });
   const alternateProviderKey = alternate?.model.split("/")[0] ?? null;
 
-  return new ModelProviderDisabledError(
+  return new ModelProviderDisabledError({
     featureKey,
-    resolved.feature.displayName,
-    resolved.feature.role,
+    featureDisplayName: resolved.feature.displayName,
+    role: resolved.feature.role,
     projectId,
-    resolved.scope,
-    resolved.model,
+    resolvedScope: resolved.scope,
+    resolvedModel: resolved.model,
     providerKey,
-    alternate && alternate.scope !== null && alternate.scope !== "project"
-      ? {
-          scope: alternate.scope,
-          model: alternate.model,
-          providerKey: alternateProviderKey ?? "",
-          providerEnabled: Boolean(
-            alternateProviderKey && modelProviders[alternateProviderKey]?.enabled,
-          ),
-        }
-      : null,
-  );
+    alternate:
+      alternate && alternate.scope !== null && alternate.scope !== "project"
+        ? {
+            scope: alternate.scope,
+            model: alternate.model,
+            providerKey: alternateProviderKey ?? "",
+            providerEnabled: Boolean(
+              alternateProviderKey && modelProviders[alternateProviderKey]?.enabled,
+            ),
+          }
+        : null,
+  });
 }
 
 /**

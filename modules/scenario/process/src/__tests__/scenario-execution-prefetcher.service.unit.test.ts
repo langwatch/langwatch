@@ -1081,12 +1081,12 @@ describe("prefetchWithFixture, when handling errors", () => {
           context: defaultContext,
           target: { type: "prompt", referenceId: "prompt_123" },
           deps: depsWhoseResolverThrows(
-            new ModelNotConfiguredError(
-              "scenarios.agent_under_test",
-              "DEFAULT",
-              "Agent under test",
-              "project_123",
-            ),
+            new ModelNotConfiguredError({
+              featureKey: "scenarios.agent_under_test",
+              role: "DEFAULT",
+              featureDisplayName: "Agent under test",
+              projectId: "project_123",
+            }),
           ),
         });
 

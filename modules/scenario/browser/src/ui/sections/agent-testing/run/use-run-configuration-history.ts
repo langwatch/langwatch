@@ -4,7 +4,8 @@
  * @see specs/features/agent-testing/run-configuration-history.feature
  */
 
-import { fromDate } from "@langwatch/time";
+import { parseSuiteTargets } from "@langwatch/suite-contract";
+import { Temporal, toEpochMs } from "@langwatch/time";
 import { useMemo } from "react";
 
 import { api } from "../../../../behavior/scenario-api.ts";
@@ -47,7 +48,14 @@ export function useRunConfigurationHistory({
     if (!scope || !entries) return [];
     const configurations = entries.map((entry) => ({
       ...entry,
-      lastRunAt: entry.lastRunAt === null ? null : fromDate(entry.lastRunAt),
+      configuration: {
+        ...entry.configuration,
+        targets: parseSuiteTargets(entry.configuration.targets),
+      },
+      lastRunAt:
+        entry.lastRunAt === null
+          ? null
+          : Temporal.Instant.fromEpochMilliseconds(toEpochMs(entry.lastRunAt)),
     }));
     return configurationsForScope({ entries: configurations, scope });
   }, [entries, scope]);

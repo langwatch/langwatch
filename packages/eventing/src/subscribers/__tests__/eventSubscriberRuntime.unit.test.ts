@@ -24,8 +24,10 @@ import {
   createTestEventStoreReadContext,
   createTestTenantId,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "../../services/__tests__/testHelpers.ts";
 import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import { readJobRouting } from "../../services/queues/jobLane.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
 
@@ -41,6 +43,7 @@ function createMemoryGlobalQueue(registry: Map<string, JobRegistryEntry>) {
       __pipelineName: pipelineName,
       __jobType: jobType,
       __jobName: jobName,
+      __routing: _routing,
       ...clean
     } = payload;
     if (
@@ -58,11 +61,10 @@ function createMemoryGlobalQueue(registry: Map<string, JobRegistryEntry>) {
     name: "test-global-queue",
     process: async (payload) => {
       const resolved = lookup(payload);
-      if (resolved) await resolved.entry.process(resolved.clean);
+      if (resolved) await resolved.entry.read(resolved.clean).run();
     },
     spanAttributes: (payload) => {
-      const resolved = lookup(payload);
-      return resolved?.entry.spanAttributes?.(resolved.clean) ?? {};
+      return readJobRouting(payload)?.spanAttributes ?? {};
     },
   });
 }
@@ -124,6 +126,7 @@ describe("event-subscriber runtime boundary", () => {
       };
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -187,6 +190,7 @@ describe("event-subscriber runtime boundary", () => {
       };
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -210,7 +214,7 @@ describe("event-subscriber runtime boundary", () => {
       // queue does on retry: re-run the subscriber's registry entry.
       const subscriberEntry = registry.get("test-pipeline:subscriber:conversationProcess");
       expect(subscriberEntry).toBeDefined();
-      await subscriberEntry!.process(event);
+      await subscriberEntry!.read(event).run();
 
       expect(handled).toHaveLength(2); // subscriber retried and succeeded
       expect(applied).toHaveLength(1); // projection NOT reapplied by the retry
@@ -278,6 +282,7 @@ describe("event-subscriber runtime boundary", () => {
       };
 
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

@@ -253,11 +253,11 @@ function BudgetsPage() {
                     window instead of scrolling into view. Focusable so the
                     scroll is reachable from the keyboard alone. */}
                 <Card.Body
+                  as="section"
                   paddingY={0}
                   paddingX={0}
                   overflowX="auto"
                   tabIndex={0}
-                  role="region"
                   aria-label="Budgets table"
                 >
                   <Table.Root variant="line" size="md" width="full">

@@ -27,6 +27,8 @@ import type {
   CodingAgentSessionsListInput,
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput,
+  CodingAgentSessionEventsPage,
+  CodingAgentSessionEventsPageInput,
 } from "./coding-agent.ts";
 
 export type CodingAgentCallerScope =
@@ -94,6 +96,10 @@ export interface CodingAgentApi {
     events: CodingAgentSessionEvent[];
     nextCursor: CodingAgentSessionCursor | null;
   }>;
+  /** A session's events page: the window checked, the opaque cursor decoded and re-encoded. */
+  readSessionEventsPage(
+    input: CodingAgentSessionEventsPageInput,
+  ): Promise<CodingAgentSessionEventsPage>;
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;

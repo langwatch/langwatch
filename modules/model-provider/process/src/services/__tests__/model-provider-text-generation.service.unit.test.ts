@@ -77,7 +77,12 @@ describe("ModelProviderTextGenerationService", () => {
   it("lets an unconfigured model refuse on its own terms", async () => {
     const { generate, resolve } = harness();
     resolve.mockRejectedValue(
-      new ModelNotConfiguredError(request.featureKey, "FAST", "Commit messages", "project_1"),
+      new ModelNotConfiguredError({
+        featureKey: request.featureKey,
+        role: "FAST",
+        featureDisplayName: "Commit messages",
+        projectId: "project_1",
+      }),
     );
 
     await expect(generate(request)).rejects.toMatchObject({ code: "model_not_configured" });

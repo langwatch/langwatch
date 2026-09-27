@@ -113,6 +113,8 @@ export interface MemoryProjectRow {
   name: string;
   slug: string;
   apiKey: string;
+  /** The stored LangWatchQL key; absent reads as none. */
+  lwqlKey?: string;
   teamId: string;
   isPersonal: boolean;
   ownerUserId: string | null;

@@ -1,3 +1,5 @@
+import { nowInstant } from "@langwatch/time";
+
 /**
  * The guard every Node executable installs before loading its real entry.
  * A missing module deep in that graph fails at ESM link time, before any
@@ -59,7 +61,7 @@ function writeFatal(service: string, event: string, error: unknown): void {
     process.stderr.write(
       `${JSON.stringify({
         level: "fatal",
-        time: new Date().toISOString(),
+        time: nowInstant().toString({ fractionalSecondDigits: 3 }),
         service,
         msg: event,
         error: { type: typeof error, message: String(error) },

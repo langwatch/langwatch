@@ -233,12 +233,12 @@ describe("createTopicClusteringRunHandler", () => {
       const runClusteringPage = vi
         .fn()
         .mockRejectedValue(
-          new ModelNotConfiguredError(
-            "analytics.topic_clustering_llm",
-            "FAST",
-            "Topic clustering",
-            "project-1",
-          ),
+          new ModelNotConfiguredError({
+            featureKey: "analytics.topic_clustering_llm",
+            role: "FAST",
+            featureDisplayName: "Topic clustering",
+            projectId: "project-1",
+          }),
         );
       const run = createTopicClusteringRunHandler(
         makeDeps({
@@ -432,12 +432,12 @@ describe("run outcome metrics (ADR-054)", () => {
           runClusteringPage: vi
             .fn()
             .mockRejectedValue(
-              new ModelNotConfiguredError(
-                "analytics.topic_clustering_llm",
-                "FAST",
-                "Topic clustering",
-                "project-1",
-              ),
+              new ModelNotConfiguredError({
+                featureKey: "analytics.topic_clustering_llm",
+                role: "FAST",
+                featureDisplayName: "Topic clustering",
+                projectId: "project-1",
+              }),
             ),
           commands,
           classifyError: () => ({

@@ -5,11 +5,11 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { SuiteRunConfirmationDialog } from "@langwatch/suite-browser-kit";
-import type { Suite as SimulationSuite } from "@langwatch/suite-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { SimulationSuite } from "../../scenario-api.ts";
 import { useRunSuite } from "../use-run-suite.ts";
 
 const mocks = vi.hoisted(() => ({
@@ -65,8 +65,8 @@ function buildSuite(): SimulationSuite {
     kind: "run_plan",
     scope: null,
     archivedAt: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
   };
 }
 

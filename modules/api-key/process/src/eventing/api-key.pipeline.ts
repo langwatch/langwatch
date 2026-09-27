@@ -8,7 +8,6 @@ import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
-  type Event,
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -80,7 +79,7 @@ export interface AgentSandboxMaintenancePipelineDeps {
 export function buildAgentSandboxMaintenancePipeline({
   sandboxKeyReap,
   cliLoginKeyReap,
-}: AgentSandboxMaintenancePipelineDeps): StaticPipelineDefinition<Event> {
+}: AgentSandboxMaintenancePipelineDeps): StaticPipelineDefinition<never> {
   return definePipeline({
     name: "agent_sandbox_maintenance",
     aggregate: defineAggregate({

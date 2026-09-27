@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EventSourcing } from "../../eventSourcing.ts";
 import type { EventSourcedQueueDefinition } from "../../queues/index.ts";
+import { parseTestJobPayload } from "../../services/__tests__/testHelpers.ts";
+import { sealJobLane } from "../../services/queues/jobLane.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const captured: {
@@ -33,6 +35,7 @@ function createWithEntry() {
   });
   void eventSourcing.globalQueue;
   const entry = {
+    parse: parseTestJobPayload,
     process: vi.fn().mockResolvedValue(undefined),
     processBatch: vi.fn().mockResolvedValue(undefined),
     // The tenant gate reads both: group key's first segment must equal the
@@ -45,7 +48,7 @@ function createWithEntry() {
   };
   eventSourcing.globalJobRegistry.set(
     `${ROUTING.__pipelineName}:${ROUTING.__jobType}:${ROUTING.__jobName}`,
-    entry,
+    sealJobLane(entry, (id) => id),
   );
   return { eventSourcing, entry };
 }

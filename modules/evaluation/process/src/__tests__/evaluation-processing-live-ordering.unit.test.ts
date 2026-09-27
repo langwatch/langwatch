@@ -4,7 +4,13 @@ import type {
   EvaluationProcessingEvent,
   EvaluationStartedEvent,
 } from "@langwatch/evaluation-contract";
-import { EVALUATION_PROCESSING_EVENT_TYPES } from "@langwatch/evaluation-contract";
+import {
+  EVALUATION_PROCESSING_EVENT_TYPES,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+} from "@langwatch/evaluation-contract";
 import {
   createTenantId,
   type EventSourcedQueueProcessor,
@@ -16,6 +22,7 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory, QueueManager } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
@@ -28,6 +35,15 @@ import {
 } from "../services/evaluation-processing.service.ts";
 
 const tenantId = createTenantId("project-1");
+
+const evaluationEventSchema = z.discriminatedUnion("type", [
+  evaluationScheduledEventSchema,
+  evaluationStartedEventSchema,
+  evaluationCompletedEventSchema,
+  evaluationReportedEventSchema,
+]);
+const parseEvaluationEvent = (value: unknown): EvaluationProcessingEvent =>
+  evaluationEventSchema.parse(value);
 
 const quietAutomations: EvaluationAutomationReactions = {
   handleEvaluationTriggerMatch: () => Promise.resolve(),
@@ -121,6 +137,7 @@ describe("evaluation processing live FIFO", () => {
   it("groups one evaluation together, separates other evaluations, and scores by accepted order", () => {
     const registry = new Map<string, JobRegistryEntry>();
     new EventSourcingService<EvaluationProcessingEvent>({
+      parseEvent: parseEvaluationEvent,
       pipelineName: "evaluation_processing",
       aggregateType: "evaluation",
       allowedEventTypes: EVALUATION_PROCESSING_EVENT_TYPES,
@@ -165,18 +182,21 @@ describe("evaluation processing live FIFO", () => {
       occurredAt: 9_500,
     });
 
-    expect(runEntry?.groupKeyFn(firstAccepted)).toBe(
-      runEntry?.groupKeyFn(laterAcceptedButBackdated),
+    expect(runEntry?.route(firstAccepted).groupKey).toBe(
+      runEntry?.route(laterAcceptedButBackdated).groupKey,
     );
-    expect(runEntry?.groupKeyFn(firstAccepted)).not.toBe(runEntry?.groupKeyFn(otherEvaluation));
-    expect(runEntry?.scoreFn(firstAccepted)).toBe(1_000);
-    expect(runEntry?.scoreFn(laterAcceptedButBackdated)).toBe(2_000);
-    expect(analyticsEntry?.scoreFn(laterAcceptedButBackdated)).toBe(2_000);
+    expect(runEntry?.route(firstAccepted).groupKey).not.toBe(
+      runEntry?.route(otherEvaluation).groupKey,
+    );
+    expect(runEntry?.route(firstAccepted).score).toBe(1_000);
+    expect(runEntry?.route(laterAcceptedButBackdated).score).toBe(2_000);
+    expect(analyticsEntry?.route(laterAcceptedButBackdated).score).toBe(2_000);
   });
 
   it("serializes different lifecycle commands for one evaluation while leaving other evaluations independent", () => {
     const registry = new Map<string, JobRegistryEntry>();
     const manager = new QueueManager({
+      parseEvent: parseEvaluationEvent,
       aggregateType: "evaluation",
       pipelineName: "evaluation_processing",
       globalQueue: sharedQueue(),
@@ -205,28 +225,31 @@ describe("evaluation processing live FIFO", () => {
     const commandPayload = (evaluationId: string) => ({
       tenantId,
       evaluationId,
+      evaluatorId: "evaluator-1",
+      evaluatorType: "langevals/exact_match",
+      status: "processed" as const,
       occurredAt: 1_000,
     });
 
-    expect(startEntry?.groupKeyFn(commandPayload("eval-random-a"))).toBe(
-      completeEntry?.groupKeyFn(commandPayload("eval-random-a")),
+    expect(startEntry?.route(commandPayload("eval-random-a")).groupKey).toBe(
+      completeEntry?.route(commandPayload("eval-random-a")).groupKey,
     );
-    expect(startEntry?.groupKeyFn(commandPayload("eval-random-a"))).not.toBe(
-      completeEntry?.groupKeyFn(commandPayload("eval-random-b")),
+    expect(startEntry?.route(commandPayload("eval-random-a")).groupKey).not.toBe(
+      completeEntry?.route(commandPayload("eval-random-b")).groupKey,
     );
 
     const now = vi.spyOn(Date, "now").mockReturnValueOnce(10_000).mockReturnValueOnce(20_000);
     expect(
-      startEntry?.scoreFn({
+      startEntry?.route({
         ...commandPayload("eval-random-a"),
         occurredAt: 99_000,
-      }),
+      }).score,
     ).toBe(10_000);
     expect(
-      completeEntry?.scoreFn({
+      completeEntry?.route({
         ...commandPayload("eval-random-a"),
         occurredAt: 500,
-      }),
+      }).score,
     ).toBe(20_000);
     now.mockRestore();
   });

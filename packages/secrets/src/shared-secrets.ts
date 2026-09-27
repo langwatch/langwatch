@@ -16,7 +16,10 @@ export const gatewayInternalSecret = Secret.load("LW_GATEWAY_INTERNAL_SECRET", {
 /** The hash pepper: gateway peppers virtual keys with it, governance its ingestion secrets. */
 export const virtualKeyPepper = Secret.load("LW_VIRTUAL_KEY_PEPPER", { optional: true });
 
-/** The platform's own OpenAI key: model-provider dispatches on it, evaluation reads it. */
+/**
+ * The platform's own OpenAI key: model-provider dispatches on it, evaluation
+ * reads it, sample-agents' demo bot spends it.
+ */
 export const openAiApiKey = Secret.load("OPENAI_API_KEY", { optional: true });
 
 /** Each sign-in provider's client secret: auth mounts them, sso reports whether one mounted. */

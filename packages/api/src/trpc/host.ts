@@ -13,6 +13,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
+import type { TrpcContract, TrpcContractKind } from "../contract/trpc-contract.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
@@ -31,9 +32,9 @@ import {
   TrpcRootDefinition,
   type TrpcErrorCausePayload,
   type TrpcFactBinding,
-  type TrpcMountOptions,
   type TrpcRoot,
   type TrpcRuntime,
+  type TrpcRouterDeclaration,
   type TrpcRuntimeMembers,
 } from "./runtime.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
@@ -148,6 +149,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   readonly #root: TrpcRoot<TrpcRequestContext>;
   readonly #runtime: TrpcRuntime<TrpcRequestContext>;
   readonly #namespaces: Record<string, TrpcNamespace> = {};
+  /** Each mounted procedure's declared kind, by its dotted path. */
+  readonly #procedureKinds = new Map<string, TrpcContractKind>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
   #composed: AnyTRPCRouter | undefined;
 
@@ -207,15 +210,10 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       throw new Error("The tRPC root was composed; a namespace can no longer be mounted on it.");
     }
 
-    const mount = this.#runtime.mount.bind(this.#runtime) as unknown as (
-      declaration: MountableTransport,
-      app: (ctx: TrpcRequestContext) => unknown,
-      options?: TrpcMountOptions<TrpcRequestContext>,
-    ) => TrpcNamespace;
+    const trpcDeclaration = asTrpcRouterDeclaration(declaration);
+    const namespace = trpcDeclaration.namespace;
 
-    const namespace = namespaceOf(declaration);
-
-    const mounted = mount(declaration, () => app(), {
+    const mounted = this.#runtime.mount(trpcDeclaration, () => app(), {
       facts: [
         ...this.#processFacts(),
         ...((options?.facts ?? []) as readonly TrpcFactBinding<TrpcRequestContext>[]),
@@ -223,6 +221,9 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     });
 
     this.#namespaces[namespace] = mounted;
+    for (const [name, member] of Object.entries(trpcDeclaration.contract.members)) {
+      this.#procedureKinds.set(`${namespace}.${name}`, member.kind);
+    }
 
     return mounted;
   }
@@ -243,13 +244,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
    * asks BEFORE it builds a caller, because a path it will not serve should
    * cost neither a session nor a context.
    */
-  procedureTypeAt(path: string): "query" | "mutation" | "subscription" | undefined {
-    const procedures: Record<string, { _def?: { type?: unknown } } | undefined> =
-      this.router._def.procedures;
-
-    const type = procedures[path]?._def?.type;
-
-    return type === "query" || type === "mutation" || type === "subscription" ? type : void 0;
+  procedureTypeAt(path: string): TrpcContractKind | undefined {
+    return this.#procedureKinds.get(path);
   }
 
   /** One request, resolved into the context every procedure reads. */
@@ -409,15 +405,33 @@ function throttleOf(config: {
   };
 }
 
-/** The wire name a tRPC declaration carries, or the wiring bug that it carries none. */
-function namespaceOf(declaration: MountableTransport): string {
-  if (
-    "namespace" in declaration &&
-    typeof declaration.namespace === "string" &&
-    declaration.namespace.length > 0
-  ) {
-    return declaration.namespace;
+/** A tRPC declaration as the kernel hands it over, or the wiring bug that it is not one. */
+function asTrpcRouterDeclaration(
+  declaration: MountableTransport,
+): TrpcRouterDeclaration<unknown, TrpcContract> {
+  if (!isTrpcRouterDeclaration(declaration)) {
+    throw new Error("A declaration that is not a tRPC router reached the tRPC surface.");
   }
+  if (declaration.namespace.length === 0) {
+    throw new Error("A tRPC declaration reached the tRPC surface with no namespace.");
+  }
+  return declaration;
+}
 
-  throw new Error("A tRPC declaration reached the tRPC surface with no namespace.");
+function isTrpcRouterDeclaration(
+  value: MountableTransport,
+): value is TrpcRouterDeclaration<unknown, TrpcContract> {
+  return (
+    "protocol" in value &&
+    value.protocol === "trpc" &&
+    "namespace" in value &&
+    typeof value.namespace === "string" &&
+    "router" in value &&
+    typeof value.router === "function" &&
+    "contract" in value &&
+    typeof value.contract === "object" &&
+    value.contract !== null &&
+    "members" in value.contract &&
+    typeof value.contract.members === "object"
+  );
 }

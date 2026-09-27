@@ -1,4 +1,4 @@
-import { MemberNotFoundError } from "@langwatch/organization-contract";
+import { MemberNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 /**
  * The membership half's rules, over doubled ports.
@@ -23,6 +23,7 @@ const mockCheckLimit = vi.fn();
 const mockAssertRoleChangeAllowed = vi.fn();
 const mockRevokeAllBrowserSessions = vi.fn();
 const mockCreateAndAssign = vi.fn();
+const mockGetProvisioningSummaryById = vi.fn();
 const mockStandingFor = vi.fn<OrganizationTestArrivals["standingFor"]>(async () => ({
   testing: false,
 }));
@@ -42,7 +43,7 @@ describe("OrganizationMembershipService", () => {
     createAndAssign: mockCreateAndAssign,
     createForProvisioning: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),
-    getProvisioningSummaryById: vi.fn(),
+    getProvisioningSummaryById: mockGetProvisioningSummaryById,
     deleteProvisionedOrganization: vi.fn(),
     markSelfHostedCustomer: vi.fn(),
     findSelfHostedCustomers: vi.fn(),
@@ -796,6 +797,29 @@ describe("OrganizationMembershipService", () => {
         expect(mockRepo.updateTeamMemberRole).toHaveBeenCalledWith(
           expect.objectContaining({ customRoleId: undefined }),
         );
+      });
+    });
+  });
+
+  describe("when the provisioning door reads one organization", () => {
+    describe("given the organization exists", () => {
+      it("answers its provisioning summary", async () => {
+        const summary = { id: "org-1", name: "Acme", slug: "acme", createdAt: nowInstant() };
+        mockGetProvisioningSummaryById.mockResolvedValue(summary);
+
+        await expect(service.getProvisioningSummary("org-1")).resolves.toBe(summary);
+      });
+    });
+
+    describe("given no organization has the id", () => {
+      it("refuses with the provisioning door's not_found", async () => {
+        mockGetProvisioningSummaryById.mockRejectedValue(
+          new OrganizationNotFoundError("org-missing"),
+        );
+
+        await expect(service.getProvisioningSummary("org-missing")).rejects.toMatchObject({
+          code: "not_found",
+        });
       });
     });
   });

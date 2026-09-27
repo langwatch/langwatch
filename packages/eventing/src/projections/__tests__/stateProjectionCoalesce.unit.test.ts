@@ -3,7 +3,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
-import { createTestTenantId, TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
+import {
+  createTestTenantId,
+  TEST_CONSTANTS,
+  parseTestEvent,
+  createTestAggregateType,
+  createTestEvent,
+} from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
 import { QueueManager } from "../../services/queues/queueManager.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
@@ -36,6 +42,7 @@ describe("state projection coalescing wiring", () => {
 
     beforeEach(() => {
       queueManager = new QueueManager<Event>({
+        parseEvent: parseTestEvent,
         aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
       });
@@ -80,6 +87,7 @@ describe("state projection coalescing wiring", () => {
     it("puts the limit and a processBatch on the registry entry, and omits processBatch for the default of one", () => {
       const registry = new Map<string, JobRegistryEntry>();
       const queueManager = new QueueManager<Event>({
+        parseEvent: parseTestEvent,
         aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         globalQueue: {} as never,
@@ -96,11 +104,15 @@ describe("state projection coalescing wiring", () => {
       );
 
       const batched = registry.get(`${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:batched`);
-      expect(batched?.coalesceMaxBatch).toBe(500);
-      expect(batched?.processBatch).toBeDefined();
+      expect(
+        batched?.route(
+          createTestEvent("aggregate-1", createTestAggregateType(), createTestTenantId()),
+        ).coalesceMaxBatch,
+      ).toBe(500);
+      expect(batched?.readBatch).toBeDefined();
 
       const single = registry.get(`${TEST_CONSTANTS.PIPELINE_NAME}:stateProjection:oneAtATime`);
-      expect(single?.processBatch).toBeUndefined();
+      expect(single?.readBatch).toBeUndefined();
     });
   });
 });

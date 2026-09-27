@@ -1177,9 +1177,6 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../modules/api-key/contract
-      '@langwatch/auth-process':
-        specifier: workspace:*
-        version: link:../../modules/auth/process
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../modules/authz/contract
@@ -2373,6 +2370,68 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  enterprise/modules/demo-data/contract:
+    dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/kernel
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  enterprise/modules/demo-data/process:
+    dependencies:
+      '@langwatch/enterprise-demo-data-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../../packages/eventing
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/kernel
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../../packages/process-stores
+      '@langwatch/task':
+        specifier: workspace:*
+        version: link:../../../../packages/task
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../../packages/time
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../../packages/api-fixture
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   enterprise/modules/enterprise-gateway/contract:
     dependencies:
       '@langwatch/api':
@@ -2993,9 +3052,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
-      '@langwatch/entitlement-process':
-        specifier: workspace:*
-        version: link:../../../../modules/entitlement/process
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
@@ -3011,6 +3067,12 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../../packages/ksuid
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -3447,68 +3509,6 @@ importers:
       nanoid:
         specifier: ^6.0.0
         version: 6.0.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  enterprise/modules/seed-demo/contract:
-    dependencies:
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../../../packages/config
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-
-  enterprise/modules/seed-demo/process:
-    dependencies:
-      '@langwatch/enterprise-seed-demo-contract':
-        specifier: workspace:*
-        version: link:../contract
-      '@langwatch/eventing':
-        specifier: workspace:*
-        version: link:../../../../packages/eventing
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
-      '@langwatch/organization-contract':
-        specifier: workspace:*
-        version: link:../../../../modules/organization/contract
-      '@langwatch/process-stores':
-        specifier: workspace:*
-        version: link:../../../../packages/process-stores
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../../../packages/task
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../../../../packages/time
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
-      '@langwatch/test-harness':
-        specifier: workspace:*
-        version: link:../../../../packages/test-harness
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../../../packages/vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -7102,6 +7102,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/scenario-contract':
+        specifier: workspace:*
+        version: link:../../scenario/contract
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -10893,9 +10896,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
-      '@langwatch/entitlement-process':
-        specifier: workspace:*
-        version: link:../../entitlement/process
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -11668,9 +11668,6 @@ importers:
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/workflow-browser-kit':
-        specifier: workspace:*
-        version: link:../../workflow/browser-kit
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../../workflow/contract
@@ -11926,6 +11923,163 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  modules/rum/contract:
+    dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../packages/kernel
+      '@langwatch/react-rum':
+        specifier: workspace:*
+        version: link:../../../packages/react-rum
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/rum/process:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../packages/kernel
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../packages/observability
+      '@langwatch/react-rum':
+        specifier: workspace:*
+        version: link:../../../packages/react-rum
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
+      '@langwatch/rum-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/sample-agents/contract:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../packages/kernel
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  modules/sample-agents/process:
+    dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../../../packages/kernel
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
+      '@langwatch/process-stores':
+        specifier: workspace:*
+        version: link:../../../packages/process-stores
+      '@langwatch/sample-agents-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/api-fixture':
+        specifier: workspace:*
+        version: link:../../../packages/api-fixture
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../../packages/vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   modules/scenario/browser:
     dependencies:
       '@chakra-ui/react':
@@ -11976,9 +12130,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/experiment-browser':
-        specifier: workspace:*
-        version: link:../../experiment/browser
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -12009,6 +12160,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -15493,6 +15647,9 @@ importers:
       '@langwatch/enterprise-billing-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/billing/process
+      '@langwatch/enterprise-demo-data-process':
+        specifier: workspace:*
+        version: link:../../enterprise/modules/demo-data/process
       '@langwatch/enterprise-gateway-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/enterprise-gateway/process
@@ -15514,9 +15671,6 @@ importers:
       '@langwatch/enterprise-scim-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/process
-      '@langwatch/enterprise-seed-demo-process':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/seed-demo/process
       '@langwatch/enterprise-sso-process':
         specifier: workspace:*
         version: link:../../enterprise/modules/sso/process
@@ -15595,6 +15749,12 @@ importers:
       '@langwatch/role-process':
         specifier: workspace:*
         version: link:../../modules/role/process
+      '@langwatch/rum-process':
+        specifier: workspace:*
+        version: link:../../modules/rum/process
+      '@langwatch/sample-agents-process':
+        specifier: workspace:*
+        version: link:../../modules/sample-agents/process
       '@langwatch/scenario-process':
         specifier: workspace:*
         version: link:../../modules/scenario/process

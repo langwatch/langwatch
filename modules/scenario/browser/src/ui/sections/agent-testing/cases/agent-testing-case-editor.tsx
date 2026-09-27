@@ -5,9 +5,9 @@
  */
 
 import { setFlowCallbacks } from "@langwatch/browser-host/drawer";
-import type { Scenario } from "@langwatch/scenario-contract";
 import { useCallback, useState, useEffect } from "react";
 
+import type { Scenario } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { readScenarioTarget } from "../../use-scenario-target.ts";
 import type { RunDialogSubject } from "../run/run-dialog-types.ts";

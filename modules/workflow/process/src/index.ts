@@ -108,16 +108,16 @@ export type {
   SaveStudioWorkflowVersionInput,
   WorkflowStudioVersionServiceOptions,
 } from "./services/workflow-studio-version.service.ts";
-export { AwsNlpLambdaFleetChannel } from "./channels/aws/aws.nlp-lambda-fleet.channel.ts";
+export { AwsNlpLambdaFleetChannel } from "./channels/aws.nlp-lambda-fleet.channel.ts";
 export type { NlpLambdaCleanupReport } from "./services/nlp-lambda-cleanup.service.ts";
 export type {
   StudioLambdaConfig,
   StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
 export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./channels/nlp-lambda.channel.ts";
-export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws/aws.nlp-lambda-stream-invoke.channel.ts";
-export { AwsNlpLambdaArnResolverChannel } from "./channels/aws/aws.nlp-lambda-arn-resolver.channel.ts";
+export { AwsNlpLambdaStreamInvokeChannel } from "./channels/aws.nlp-lambda-stream-invoke.channel.ts";
+export { AwsNlpLambdaArnResolverChannel } from "./channels/aws.nlp-lambda-arn-resolver.channel.ts";
 export {
   LambdaWorkflowStudioStreamChannel,
   type LambdaWorkflowStudioStreamOptions,
-} from "./channels/aws/aws.lambda-workflow-studio-stream.channel.ts";
+} from "./channels/aws.lambda-workflow-studio-stream.channel.ts";

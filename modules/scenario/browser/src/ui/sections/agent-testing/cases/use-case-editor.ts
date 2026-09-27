@@ -16,11 +16,10 @@ import {
   type ScenarioFieldValues,
   type ScenarioParameterDefinition,
   type SuiteFieldDefinition,
-  type Scenario,
 } from "@langwatch/scenario-contract";
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { api } from "../../../../behavior/scenario-api.ts";
+import { api, type Scenario } from "../../../../behavior/scenario-api.ts";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
 import {
   formatParameterLine,

@@ -23,7 +23,6 @@
   "dependencies": {
     "@langwatch/analytics-process": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
-    "@langwatch/auth-process": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-process": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",

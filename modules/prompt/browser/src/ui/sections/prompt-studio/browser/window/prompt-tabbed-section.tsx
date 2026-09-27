@@ -2,6 +2,7 @@ import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type LayoutMode, type Variable, VariablesSection } from "@langwatch/prompt-browser-kit";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
@@ -260,6 +261,7 @@ export function PromptTabbedSection({
               Variables are substituted into the prompt template at runtime.
             </Text>
             <VariablesSection
+              renderSourceIcon={renderSourceTypeIcon}
               variables={variables}
               onChange={handleVariablesChange}
               values={localVariableValues}

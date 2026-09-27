@@ -11,6 +11,7 @@ export {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  type RenderSourceIcon,
   type SourceType,
   VariableMappingInput,
 } from "./variable-mapping-input.tsx";

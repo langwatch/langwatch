@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import {
@@ -49,7 +50,7 @@ export class TraceExportDownloadService {
       userId,
       publiclyShared: false,
     });
-    const exportId = crypto.randomUUID();
+    const exportId = generate("export").toString();
     const slot = await this.#bounds.acquireExportSlot({ projectId: request.projectId, exportId });
     const lease = TraceExportDownloadLease.create(slot);
 

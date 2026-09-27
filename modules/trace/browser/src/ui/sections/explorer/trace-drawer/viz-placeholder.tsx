@@ -2,7 +2,7 @@ import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/reac
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useMemo, useRef } from "react";
 import {
   LuChartGantt,
   LuChevronDown,
@@ -19,6 +19,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import type { VizTab } from "../../../../behavior/drawer.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useVizHeight } from "../../../../behavior/explorer/trace-drawer/use-viz-height.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 // PeerCursorOverlay used to wrap just the viz pane (scoped to the
 // active viz tab). It was lifted to the drawer level (TraceDrawerShell)
@@ -66,12 +67,6 @@ interface VizPlaceholderProps {
    */
   paneLayout?: "horizontal" | "vertical";
 }
-
-const MIN_HEIGHT = 80;
-const DEFAULT_HEIGHT = 250;
-const EXPANDED_HEIGHT = 480;
-const MAX_HEIGHT = 700;
-const STORAGE_KEY = "langwatch:traces-v2:viz-height";
 
 function VizTabPresenceDot({ traceId, panel }: { traceId: string; panel: VizTab }) {
   const peers = usePresenceStore(
@@ -155,15 +150,205 @@ const TABS: VizTabDef[] = [
   },
 ];
 
-function getStoredHeight(): number {
-  if (typeof window === "undefined") return DEFAULT_HEIGHT;
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return DEFAULT_HEIGHT;
-  const parsed = parseInt(stored, 10);
-  if (Number.isNaN(parsed)) return DEFAULT_HEIGHT;
-  if (parsed === 0) return 0;
-  if (parsed >= MIN_HEIGHT && parsed <= MAX_HEIGHT) return parsed;
-  return DEFAULT_HEIGHT;
+/**
+ * The tab row. When the container is too narrow for every tab, the ones that
+ * would clip fold into an overflow menu after the visible tabs.
+ */
+function VizTabStrip({
+  vizTab,
+  traceId,
+  onVizTabChange,
+}: {
+  vizTab: VizTab;
+  traceId: string | null;
+  onVizTabChange: (tab: VizTab) => void;
+}) {
+  const tabScrollerRef = useRef<HTMLDivElement>(null);
+  const tabIds = useMemo(() => TABS.map((t) => t.value), []);
+  const hiddenTabIds = useOverflowVisibility({
+    scrollerRef: tabScrollerRef,
+    items: tabIds,
+    activeId: vizTab,
+    // Just enough headroom for the overflow trigger (~22px); more folded tabs
+    // that visibly fit.
+    reservePx: 26,
+  });
+
+  return (
+    <HStack ref={tabScrollerRef} gap={0} overflowX="hidden" flexWrap="nowrap" flex="1" minWidth={0}>
+      {TABS.map((tab) => (
+        <VizTabButton
+          key={tab.value}
+          tab={tab}
+          traceId={traceId}
+          isActive={vizTab === tab.value}
+          isHidden={hiddenTabIds.has(tab.value)}
+          onSelect={onVizTabChange}
+        />
+      ))}
+      {/* Pushes the overflow trigger to the far right, so it reads as the row's control. */}
+      <Box flex={1} minWidth={0} />
+      <OverflowMenu
+        items={TABS.filter((t) => hiddenTabIds.has(t.value)).map((t) => ({
+          id: t.value,
+          label: t.label,
+          content: (
+            <HStack gap={1.5} flex={1} color={`${t.palette}.fg`}>
+              <VizTabContent tab={t} traceId={traceId} />
+            </HStack>
+          ),
+        }))}
+        activeId={vizTab}
+        onSelect={(id) => {
+          const tab = TABS.find((t) => t.value === id);
+          if (tab) onVizTabChange(tab.value);
+        }}
+        ariaLabel="Show more viz tabs"
+      />
+    </HStack>
+  );
+}
+
+function VizTabButton({
+  tab,
+  traceId,
+  isActive,
+  isHidden,
+  onSelect,
+}: {
+  tab: VizTabDef;
+  traceId: string | null;
+  isActive: boolean;
+  isHidden: boolean;
+  onSelect: (tab: VizTab) => void;
+}) {
+  const activeBg = `${tab.palette}.subtle`;
+  return (
+    <Tooltip content={tab.description} positioning={{ placement: "top" }} openDelay={400}>
+      <Flex
+        as="button"
+        data-overflow-id={tab.value}
+        align="center"
+        gap={1.5}
+        paddingX={2}
+        paddingY={1}
+        marginY={1}
+        borderRadius="md"
+        cursor="pointer"
+        // Light mode: inactive tabs are neutral grey, so the strip does not read
+        // as a wall of saturated colour on the muted surface.
+        color={isActive ? `${tab.palette}.fg` : { base: "fg.muted", _dark: `${tab.palette}.fg` }}
+        bg={isActive ? activeBg : "transparent"}
+        flexShrink={0}
+        whiteSpace="nowrap"
+        display={isHidden ? "none" : "flex"}
+        _hover={{ bg: isActive ? activeBg : "bg.muted" }}
+        transition="background 0.15s ease"
+        onClick={() => onSelect(tab.value)}
+        fontWeight={isActive ? "600" : "500"}
+      >
+        <VizTabContent tab={tab} traceId={traceId} />
+      </Flex>
+    </Tooltip>
+  );
+}
+
+/** Cycles the stand-alone panel: minimised, default, expanded. */
+function ResizeCycleButton({
+  isMinimized,
+  isExpanded,
+  onClick,
+}: {
+  isMinimized: boolean;
+  isExpanded: boolean;
+  onClick: () => void;
+}) {
+  const expandedLabel = isExpanded ? "Minimize" : "Expand";
+  const expandedIcon = isExpanded ? LuMinus : LuChevronUp;
+  const label = isMinimized ? "Show" : expandedLabel;
+  const icon = isMinimized ? LuChevronDown : expandedIcon;
+  return (
+    <HStack gap={1.5}>
+      <Tooltip content={label} positioning={{ placement: "top" }}>
+        <Flex
+          as="button"
+          align="center"
+          justify="center"
+          width="24px"
+          height="24px"
+          borderRadius="md"
+          cursor="pointer"
+          color="fg.muted"
+          _hover={{ bg: "bg.muted", color: "fg" }}
+          transition="all 0.15s ease"
+          onClick={onClick}
+        >
+          <Icon as={icon} boxSize={3.5} />
+        </Flex>
+      </Tooltip>
+    </HStack>
+  );
+}
+
+/**
+ * Brings the hidden detail pane back without selecting a span. Selecting one
+ * reopens it too; this is the escape for seeing the trace summary again.
+ */
+function ShowDetailsButton({
+  paneLayout,
+  onClick,
+}: {
+  paneLayout?: "horizontal" | "vertical";
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip content="Show details" positioning={{ placement: "top" }}>
+      <Flex
+        as="button"
+        align="center"
+        justify="center"
+        width="28px"
+        marginX={1}
+        cursor="pointer"
+        color="fg.muted"
+        _hover={{ bg: "bg.muted", color: "fg" }}
+        borderRadius="md"
+        alignSelf="center"
+        height="26px"
+        flexShrink={0}
+        // Above the collapsed pane's resize hit-zone (z-index 2 in PaneResizeBar).
+        position="relative"
+        zIndex={3}
+        aria-label="Show details"
+        onClick={onClick}
+      >
+        <Icon
+          as={paneLayout === "horizontal" ? LuPanelRightOpen : LuPanelBottomOpen}
+          boxSize={3.5}
+        />
+      </Flex>
+    </Tooltip>
+  );
+}
+
+function ResizeHandle({ onStart }: { onStart: (e: React.MouseEvent | React.TouchEvent) => void }) {
+  return (
+    <Flex
+      align="center"
+      justify="center"
+      height="12px"
+      cursor="row-resize"
+      color="fg.subtle"
+      _hover={{ color: "fg.muted", bg: "bg.subtle/60" }}
+      transition="all 0.15s ease"
+      onMouseDown={onStart}
+      onTouchStart={onStart}
+      userSelect="none"
+      flexShrink={0}
+    >
+      <Icon as={LuGripHorizontal} boxSize={3.5} />
+    </Flex>
+  );
 }
 
 export function VizPlaceholder({
@@ -182,12 +367,12 @@ export function VizPlaceholder({
   // up the selected + last-used prompt span ids, which is enough to flag
   // prompt-bearing spans in the waterfall without loading full span
   // params just for an icon.
-  const promptSpanIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (trace?.selectedPromptSpanId) ids.add(trace.selectedPromptSpanId);
-    if (trace?.lastUsedPromptSpanId) ids.add(trace.lastUsedPromptSpanId);
-    return ids;
-  }, [trace?.selectedPromptSpanId, trace?.lastUsedPromptSpanId]);
+  const selectedPromptSpanId = trace?.selectedPromptSpanId;
+  const lastUsedPromptSpanId = trace?.lastUsedPromptSpanId;
+  const promptSpanIds = useMemo(
+    () => new Set([selectedPromptSpanId, lastUsedPromptSpanId].filter((id): id is string => !!id)),
+    [selectedPromptSpanId, lastUsedPromptSpanId],
+  );
 
   // When the detail pane is hidden, surface a "Show details" affordance
   // in the viz tab row so the user can bring it back without having to
@@ -197,142 +382,9 @@ export function VizPlaceholder({
   const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
 
-  // Overflow detection for the viz tab row — when the container is
-  // narrow enough that some tabs would clip, they get folded into a
-  // single overflow menu rendered after the visible tabs.
-  const tabScrollerRef = useRef<HTMLDivElement>(null);
-  const tabIds = useMemo(() => TABS.map((t) => t.value), []);
-  const hiddenTabIds = useOverflowVisibility({
-    scrollerRef: tabScrollerRef,
-    items: tabIds,
-    activeId: vizTab,
-    // Just enough headroom to fit the overflow trigger (~22px). The
-    // earlier 40px reserve was over-aggressive: tabs that visibly fit
-    // were still being folded into the menu because we were holding back
-    // a much larger margin than the trigger actually needs.
-    reservePx: 26,
-  });
-
-  const [height, setHeight] = useState(getStoredHeight);
-  const isDragging = useRef(false);
-  const dragStartY = useRef(0);
-  const dragStartHeight = useRef(0);
-
-  // The previous "Click to interact" scrim is gone — the new pane
-  // layout (TraceDrawerShell + react-resizable-panels) gives each viz
-  // its own scroll container, so wheel events naturally scope to the
-  // pane the cursor is over. No need for an opt-in overlay.
-  const vizEngagedRef = useRef<HTMLDivElement>(null);
+  const viz = useVizHeight({ fillParent, hasData: spans.length > 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // In fillParent mode the parent <Panel> owns sizing, so the local
-  // minimize/collapse states are irrelevant — the viz simply fills the
-  // available space. We coerce them to false so all the conditional
-  // rendering below behaves as if the panel were at its normal height.
-  const isMinimized = fillParent ? false : height === 0;
-  const isCollapsed = fillParent ? false : !isMinimized && height <= MIN_HEIGHT + 20;
-  const isExpanded = height >= EXPANDED_HEIGHT;
-  const expandedLabel = isExpanded ? "Minimize" : "Expand";
-  const resizeLabel = isMinimized ? "Show" : expandedLabel;
-  const ExpandedIcon = isExpanded ? LuMinus : LuChevronUp;
-  const ResizeIcon = isMinimized ? LuChevronDown : ExpandedIcon;
-
-  const heightTransition = isDragging.current ? "none" : "height 0.2s ease";
-
-  const persistHeight = useCallback((h: number) => {
-    localStorage.setItem(STORAGE_KEY, String(h));
-  }, []);
-
-  // When span data arrives but the user previously minimized the panel,
-  // restore the default height so the visualisation is always visible
-  // alongside the chrome — the panel is the primary affordance for the
-  // viz, not an opt-in surface.
-  const hasData = spans.length > 0;
-  useEffect(() => {
-    // In fillParent mode the parent <Panel> owns sizing — touching the
-    // local height (and persisting it) would silently clobber the
-    // user's preference for the next standalone (non-pane) render.
-    if (fillParent) return;
-    if (hasData && height === 0) {
-      setHeight(DEFAULT_HEIGHT);
-      persistHeight(DEFAULT_HEIGHT);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasData, fillParent]);
-
-  const handleVizTabChange = useCallback(
-    (tab: VizTab) => {
-      // Span list filter state had its own scoped reset here. With the
-      // tab removed there's nothing to reset; just forward.
-      onVizTabChange(tab);
-    },
-    [onVizTabChange],
-  );
-
-  const handleCycleSize = useCallback(() => {
-    setHeight((prev) => {
-      let next: number;
-      if (prev === 0) {
-        next = DEFAULT_HEIGHT;
-      } else if (prev < EXPANDED_HEIGHT) {
-        next = EXPANDED_HEIGHT;
-      } else {
-        next = 0;
-      }
-      persistHeight(next);
-      return next;
-    });
-  }, [persistHeight]);
-
-  const handleExpandFromCollapsed = useCallback(() => {
-    if (isCollapsed || isMinimized) {
-      setHeight(DEFAULT_HEIGHT);
-      persistHeight(DEFAULT_HEIGHT);
-    }
-  }, [isCollapsed, isMinimized, persistHeight]);
-
-  // Resize handle drag
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent | React.TouchEvent) => {
-      e.preventDefault();
-      isDragging.current = true;
-      dragStartY.current = "touches" in e ? e.touches[0]!.clientY : e.clientY;
-      dragStartHeight.current = height;
-      document.body.style.cursor = "row-resize";
-      document.body.style.userSelect = "none";
-    },
-    [height],
-  );
-
-  useEffect(() => {
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      if (!isDragging.current) return;
-      const clientY = "touches" in e ? e.touches[0]!.clientY : e.clientY;
-      const delta = clientY - dragStartY.current;
-      const raw = dragStartHeight.current + delta;
-      const next = raw < MIN_HEIGHT / 2 ? 0 : Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, raw));
-      setHeight(next);
-    };
-
-    const handleEnd = () => {
-      if (!isDragging.current) return;
-      isDragging.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      persistHeight(height);
-    };
-
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleEnd);
-    window.addEventListener("touchmove", handleMove);
-    window.addEventListener("touchend", handleEnd);
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleEnd);
-      window.removeEventListener("touchmove", handleMove);
-      window.removeEventListener("touchend", handleEnd);
-    };
-  }, [height, persistHeight]);
+  const traceId = trace?.traceId ?? null;
 
   return (
     <Box
@@ -358,158 +410,44 @@ export function VizPlaceholder({
           align="stretch"
           justify="space-between"
           paddingX={2}
-          borderBottomWidth={isMinimized ? "0px" : "1px"}
+          borderBottomWidth={viz.isMinimized ? "0px" : "1px"}
           borderColor="border"
           bg={{ base: "bg.surface", _dark: "bg.panel" }}
           flexShrink={0}
           minHeight="38px"
           data-spotlight="viz-tabs"
         >
-          <HStack
-            ref={tabScrollerRef}
-            gap={0}
-            overflowX="hidden"
-            flexWrap="nowrap"
-            flex="1"
-            minWidth={0}
-          >
-            {TABS.map((tab) => {
-              const isActive = vizTab === tab.value;
-              const isHidden = hiddenTabIds.has(tab.value);
-              return (
-                <Tooltip
-                  key={tab.value}
-                  content={tab.description}
-                  positioning={{ placement: "top" }}
-                  openDelay={400}
-                >
-                  <Flex
-                    as="button"
-                    data-overflow-id={tab.value}
-                    align="center"
-                    gap={1.5}
-                    paddingX={2}
-                    paddingY={1}
-                    marginY={1}
-                    borderRadius="md"
-                    cursor="pointer"
-                    // Light mode: inactive tabs render in neutral grey so the strip
-                    // doesn't read as a wall of saturated colour against the otherwise
-                    // muted light surface.
-                    color={
-                      isActive
-                        ? `${tab.palette}.fg`
-                        : { base: "fg.muted", _dark: `${tab.palette}.fg` }
-                    }
-                    bg={isActive ? `${tab.palette}.subtle` : "transparent"}
-                    flexShrink={0}
-                    whiteSpace="nowrap"
-                    display={isHidden ? "none" : "flex"}
-                    _hover={{
-                      bg: isActive ? `${tab.palette}.subtle` : "bg.muted",
-                    }}
-                    transition="background 0.15s ease"
-                    onClick={() => handleVizTabChange(tab.value)}
-                    fontWeight={isActive ? "600" : "500"}
-                  >
-                    <VizTabContent tab={tab} traceId={trace?.traceId ?? null} />
-                  </Flex>
-                </Tooltip>
-              );
-            })}
-            {/* Spacer pushes the overflow trigger to the far right of
-                the tab row so it doesn't glue to the last visible tab.
-                Reads as "kebab menu = tab-row controls", not "kebab menu
-                = appendix to the rightmost tab". */}
-            <Box flex={1} minWidth={0} />
-            <OverflowMenu
-              items={TABS.filter((t) => hiddenTabIds.has(t.value)).map((t) => ({
-                id: t.value,
-                label: t.label,
-                // Mirror the in-row tab rendering so the dropdown row
-                // carries the same icon + label + shortcut + presence
-                // dot the user would have seen on the tab itself.
-                content: (
-                  <HStack gap={1.5} flex={1} color={`${t.palette}.fg`}>
-                    <VizTabContent tab={t} traceId={trace?.traceId ?? null} />
-                  </HStack>
-                ),
-              }))}
-              activeId={vizTab}
-              onSelect={(id) => handleVizTabChange(id as VizTab)}
-              ariaLabel="Show more viz tabs"
-            />
-          </HStack>
-
+          <VizTabStrip vizTab={vizTab} traceId={traceId} onVizTabChange={onVizTabChange} />
           {!fillParent && (
-            <HStack gap={1.5}>
-              <Tooltip content={resizeLabel} positioning={{ placement: "top" }}>
-                <Flex
-                  as="button"
-                  align="center"
-                  justify="center"
-                  width="24px"
-                  height="24px"
-                  borderRadius="md"
-                  cursor="pointer"
-                  color="fg.muted"
-                  _hover={{ bg: "bg.muted", color: "fg" }}
-                  transition="all 0.15s ease"
-                  onClick={handleCycleSize}
-                >
-                  <Icon as={ResizeIcon} boxSize={3.5} />
-                </Flex>
-              </Tooltip>
-            </HStack>
+            <ResizeCycleButton
+              isMinimized={viz.isMinimized}
+              isExpanded={viz.isExpanded}
+              onClick={viz.cycleSize}
+            />
           )}
           {fillParent && detailCollapsed && (
-            <Tooltip content="Show details" positioning={{ placement: "top" }}>
-              <Flex
-                as="button"
-                align="center"
-                justify="center"
-                width="28px"
-                marginX={1}
-                cursor="pointer"
-                color="fg.muted"
-                _hover={{ bg: "bg.muted", color: "fg" }}
-                borderRadius="md"
-                alignSelf="center"
-                height="26px"
-                flexShrink={0}
-                // When the detail pane is collapsed-to-zero against the resize handle
-                // on this edge, the handle's 6px hit-zone overlay (`z-index: 2` in
-                // PaneResizeBar) sits on top of this button.
-                position="relative"
-                zIndex={3}
-                aria-label="Show details"
-                onClick={() => togglePaneCollapsed("spanDetail")}
-              >
-                <Icon
-                  as={paneLayout === "horizontal" ? LuPanelRightOpen : LuPanelBottomOpen}
-                  boxSize={3.5}
-                />
-              </Flex>
-            </Tooltip>
+            <ShowDetailsButton
+              paneLayout={paneLayout}
+              onClick={() => togglePaneCollapsed("spanDetail")}
+            />
           )}
         </Flex>
 
         {/* Visualization content */}
-        {!isMinimized && (
+        {!viz.isMinimized && (
           <Box
-            ref={vizEngagedRef}
-            height={fillParent ? undefined : `${height}px`}
+            height={fillParent ? undefined : `${viz.height}px`}
             flex={fillParent ? 1 : undefined}
             minHeight={0}
             overflow={fillParent ? "auto" : "hidden"}
-            transition={fillParent ? undefined : heightTransition}
-            onClick={isCollapsed ? handleExpandFromCollapsed : undefined}
-            cursor={isCollapsed ? "pointer" : "default"}
+            transition={fillParent ? undefined : viz.heightTransition}
+            onClick={viz.isCollapsed ? viz.expandFromCollapsed : undefined}
+            cursor={viz.isCollapsed ? "pointer" : "default"}
             position="relative"
             style={fillParent ? { overflowAnchor: "none" } : undefined}
           >
             <VizBody
-              isCollapsed={isCollapsed}
+              isCollapsed={viz.isCollapsed}
               isLoading={isLoading}
               onClearSpan={onClearSpan}
               onSelectSpan={onSelectSpan}
@@ -527,25 +465,8 @@ export function VizPlaceholder({
           </Box>
         )}
 
-        {/* Resize handle — only in stand-alone (legacy) mode; the new
-            pane layout uses <PanelResizeHandle> instead. */}
-        {!fillParent && !isMinimized && (
-          <Flex
-            align="center"
-            justify="center"
-            height="12px"
-            cursor="row-resize"
-            color="fg.subtle"
-            _hover={{ color: "fg.muted", bg: "bg.subtle/60" }}
-            transition="all 0.15s ease"
-            onMouseDown={handleResizeStart}
-            onTouchStart={handleResizeStart}
-            userSelect="none"
-            flexShrink={0}
-          >
-            <Icon as={LuGripHorizontal} boxSize={3.5} />
-          </Flex>
-        )}
+        {/* Stand-alone mode only; the pane layout resizes through <PanelResizeHandle>. */}
+        {!fillParent && !viz.isMinimized && <ResizeHandle onStart={viz.resizeStart} />}
       </Box>
     </Box>
   );

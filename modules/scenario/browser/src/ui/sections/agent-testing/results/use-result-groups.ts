@@ -6,7 +6,7 @@
 import type { Period, PeriodMode } from "@langwatch/analytics-browser-kit";
 import type {
   CodeScenario,
-  ResultAtom,
+  ResultAtomResponse as ResultAtom,
   ResultGroup,
   ResultTotals,
   RunTarget,

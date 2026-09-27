@@ -10,12 +10,12 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { api, type RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
 import { Switch } from "@langwatch/design-system/switch";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorsSchema,
+  evaluatorSettingsSchemaFor,
   getEvaluatorDefaultSettings,
 } from "@langwatch/evaluator-contract";
 import { ComparisonConfigForm } from "@langwatch/experiment-browser/comparison-config-form";
@@ -259,30 +259,20 @@ export function useEvaluatorEditorController(
     ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
     : undefined;
 
-  const effectiveEvaluatorDef = useMemo(() => {
-    const fields = evaluatorQuery.data?.fields;
-    if (fields && fields.length > 0) {
-      const requiredFields = fields.filter((f) => !f.optional).map((f) => f.identifier);
-      const optionalFields = fields.filter((f) => f.optional).map((f) => f.identifier);
-      return { requiredFields, optionalFields };
-    }
-    return evaluatorDef;
-  }, [evaluatorQuery.data?.fields, evaluatorDef]);
+  const effectiveEvaluatorDef = useMemo(
+    () => effectiveFieldsOf(evaluatorQuery.data?.fields, evaluatorDef),
+    [evaluatorQuery.data?.fields, evaluatorDef],
+  );
 
-  const settingsSchema = useMemo(() => {
-    if (!evaluatorType) return undefined;
-    return evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
-  }, [evaluatorType]);
+  const settingsSchema = useMemo(() => settingsSchemaOf(evaluatorType), [evaluatorType]);
 
   const defaultSettings = useResolvedDefaultSettings({ evaluatorDef, project, isOpen });
 
-  const forceUserToDecideAName = Boolean(
-    evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match",
-  );
+  const forceUserToDecideAName = mustChooseName(evaluatorType);
 
   const form = useForm<EvaluatorFormValues>({
     defaultValues: {
-      name: forceUserToDecideAName ? "" : (evaluatorDef?.name ?? ""),
+      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
       settings: defaultSettings,
     },
   });
@@ -299,7 +289,7 @@ export function useEvaluatorEditorController(
     const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
     if (didInitializeCreateFormRef.current === key) return;
     form.reset({
-      name: forceUserToDecideAName ? "" : evaluatorDef.name,
+      name: defaultNameFor(evaluatorDef, forceUserToDecideAName),
       settings: defaultSettings,
     });
     didInitializeCreateFormRef.current = key;
@@ -311,30 +301,15 @@ export function useEvaluatorEditorController(
   const initializedForEvaluatorRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (evaluatorQuery.data) {
-      const config = evaluatorQuery.data.config as {
-        settings?: Record<string, unknown>;
-      } | null;
-      const savedValues: EvaluatorFormValues = {
-        name: evaluatorQuery.data.name,
-        settings: config?.settings ?? {},
-      };
-      savedFormValuesRef.current = savedValues;
-
-      // Only reset form on first data load for this evaluator, not on refetches
-      if (initializedForEvaluatorRef.current !== evaluatorQuery.data.id) {
-        initializedForEvaluatorRef.current = evaluatorQuery.data.id;
-        const formValues: EvaluatorFormValues = initialLocalConfig
-          ? {
-              name: initialLocalConfig.name,
-              settings: initialLocalConfig.settings ?? savedValues.settings,
-            }
-          : savedValues;
-
-        form.reset(formValues);
-        setHasUnsavedChanges(!!initialLocalConfig);
-      }
-    }
+    const evaluator = evaluatorQuery.data;
+    if (!evaluator) return;
+    const savedValues = savedValuesOf(evaluator);
+    savedFormValuesRef.current = savedValues;
+    // Only reset form on first data load for this evaluator, not on refetches
+    if (initializedForEvaluatorRef.current === evaluator.id) return;
+    initializedForEvaluatorRef.current = evaluator.id;
+    form.reset(openingValues(savedValues, initialLocalConfig));
+    setHasUnsavedChanges(!!initialLocalConfig);
   }, [evaluatorQuery.data, form, initialLocalConfig]);
 
   const debouncedUpdateLocalConfig = useMemo(
@@ -352,20 +327,18 @@ export function useEvaluatorEditorController(
   useEffect(() => {
     const subscription = form.watch((formValues) => {
       const isUnsaved = differsFromSaved(formValues, savedFormValuesRef.current);
-
       setHasUnsavedChanges(isUnsaved);
-
-      if (onLocalConfigChangeRef.current) {
-        if (isUnsaved) {
-          debouncedUpdateLocalConfig({
-            name: formValues.name ?? "",
-            settings: formValues.settings as Record<string, unknown> | undefined,
-          });
-        } else {
-          debouncedUpdateLocalConfig.cancel();
-          onLocalConfigChangeRef.current(undefined);
-        }
+      const onLocalConfigChange = onLocalConfigChangeRef.current;
+      if (!onLocalConfigChange) return;
+      if (isUnsaved) {
+        debouncedUpdateLocalConfig({
+          name: formValues.name ?? "",
+          settings: formValues.settings as Record<string, unknown> | undefined,
+        });
+        return;
       }
+      debouncedUpdateLocalConfig.cancel();
+      onLocalConfigChange(undefined);
     });
 
     return () => {
@@ -378,22 +351,15 @@ export function useEvaluatorEditorController(
     onSuccess: (evaluator) => {
       void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
       onLocalConfigChangeRef.current?.(undefined);
-      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
-      const handledNavigation = freshOnSave?.({
-        id: evaluator.id,
-        name: evaluator.name,
-        evaluatorType,
+      navigateAfterSave({
+        saved: { id: evaluator.id, name: evaluator.name, evaluatorType },
+        onSave,
+        goBack,
+        onClose,
       });
-      if (handledNavigation) return;
-      if (getDrawerStack().length > 1) {
-        goBack();
-      } else {
-        onClose();
-      }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
-      showErrorToast({ error, fallbackTitle: "Couldn't create evaluator" });
+      reportSaveError({ error, form, fallbackTitle: "Couldn't create evaluator" });
     },
   });
 
@@ -413,21 +379,15 @@ export function useEvaluatorEditorController(
         settings: config?.settings ?? {},
       };
       setHasUnsavedChanges(false);
-      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
-      const handledNavigation = freshOnSave?.({
-        id: evaluator.id,
-        name: evaluator.name,
+      navigateAfterSave({
+        saved: { id: evaluator.id, name: evaluator.name },
+        onSave,
+        goBack,
+        onClose,
       });
-      if (handledNavigation) return;
-      if (getDrawerStack().length > 1) {
-        goBack();
-      } else {
-        onClose();
-      }
     },
     onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
-      showErrorToast({ error, fallbackTitle: "Couldn't save evaluator" });
+      reportSaveError({ error, form, fallbackTitle: "Couldn't save evaluator" });
     },
   });
 
@@ -438,64 +398,21 @@ export function useEvaluatorEditorController(
   // orchestrator skips it), so gate Save/Apply on it. Filter empty slots,
   // not array length: a folded legacy pairwise config always returns a
   // 2-element array even with an unset slot.
-  const hasEnoughVariants =
-    !isComparisonEvaluatorType(evaluatorType) || comparison.variants.filter(Boolean).length >= 2;
-  const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
+  const isValid = isEditorValid({ name, evaluatorType, comparison });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
-
-    // For existing workflow evaluators, persist name changes via mutation
-    if (evaluatorId && isPersistedEvaluator) {
-      const formValues = form.getValues();
-      const newName = formValues.name.trim();
-      const nameChanged = newName !== (evaluatorQuery.data?.name?.trim() ?? "");
-
-      if (nameChanged) {
-        updateMutation.mutate({
-          id: evaluatorId,
-          projectId: project.id,
-          name: newName,
-        });
-      } else {
-        const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
-        const handledNavigation = freshOnSave?.({
-          id: evaluatorId,
-          name: evaluatorQuery.data?.name ?? "",
-        });
-        if (handledNavigation) return;
-        if (getDrawerStack().length > 1) {
-          goBack();
-        } else {
-          onClose();
-        }
-      }
-      return;
-    }
-
-    if (!evaluatorType) return;
-
-    const formValues = form.getValues();
-    const config = {
+    submitEvaluator({
+      projectId: project.id,
+      evaluatorId,
       evaluatorType,
-      settings: formValues.settings,
-    };
-
-    if (evaluatorId) {
-      updateMutation.mutate({
-        id: evaluatorId,
-        projectId: project.id,
-        name: formValues.name.trim(),
-        config,
-      });
-    } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: formValues.name.trim(),
-        type: "evaluator",
-        config,
-      });
-    }
+      isPersistedEvaluator,
+      values: form.getValues(),
+      savedName: evaluatorQuery.data?.name,
+      create: createMutation.mutate,
+      update: updateMutation.mutate,
+      afterUnchanged: (saved) => navigateAfterSave({ saved, onSave, goBack, onClose }),
+    });
   }, [
     project?.id,
     evaluatorId,
@@ -512,23 +429,14 @@ export function useEvaluatorEditorController(
   ]);
 
   const handleClose = useCallback(() => {
-    if (hasUnsavedChanges) {
-      if (onLocalConfigChange) {
-        // Mirror handleApply: flush the trailing debounced update so the
-        // parent gets the last edits before unmount cancels the pending call.
-        debouncedUpdateLocalConfig.flush();
-        onClose();
-        return;
-      }
-      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
-        return;
-      }
-    }
-    if (canGoBack) {
-      goBack();
-    } else {
-      onClose();
-    }
+    closeEditor({
+      hasUnsavedChanges,
+      keepsDraft: !!onLocalConfigChange,
+      flushDraft: () => debouncedUpdateLocalConfig.flush(),
+      canGoBack,
+      goBack,
+      onClose,
+    });
   }, [
     hasUnsavedChanges,
     onLocalConfigChange,
@@ -562,19 +470,11 @@ export function useEvaluatorEditorController(
     debouncedUpdateLocalConfig.flush();
   }, [debouncedUpdateLocalConfig]);
 
-  const hasSettings =
-    settingsSchema instanceof z.ZodObject && Object.keys(settingsSchema.shape).length > 0;
+  const hasSettings = hasSettingsFields(settingsSchema);
 
   const title = evaluatorDef?.name ?? evaluatorQuery.data?.name ?? "Configure Evaluator";
 
-  const workflowCard = evaluatorQuery.data?.workflowId
-    ? {
-        workflowId: evaluatorQuery.data.workflowId,
-        workflowName: evaluatorQuery.data.workflowName,
-        workflowIcon: evaluatorQuery.data.workflowIcon,
-        updatedAt: evaluatorQuery.data.updatedAt,
-      }
-    : undefined;
+  const workflowCard = workflowCardOf(evaluatorQuery.data);
 
   return {
     form,
@@ -998,4 +898,203 @@ function useResolvedDefaultSettings({
     resolvedDefaultEmbeddings.data?.model,
   ]);
   return defaultSettings;
+}
+
+/** A flow callback that handled navigation wins; otherwise step back, or close the last drawer. */
+function navigateAfterSave({
+  saved,
+  onSave,
+  goBack,
+  onClose,
+}: {
+  saved: { id: string; name: string; evaluatorType?: string };
+  onSave: EvaluatorEditorDrawerProps["onSave"];
+  goBack: () => void;
+  onClose: () => void;
+}) {
+  const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+  if (freshOnSave?.(saved)) return;
+  if (getDrawerStack().length > 1) {
+    goBack();
+  } else {
+    onClose();
+  }
+}
+
+/** A comparison with fewer than two variants judges nothing, so it cannot be saved. */
+function isEditorValid({
+  name,
+  evaluatorType,
+  comparison,
+}: {
+  name: string | undefined;
+  evaluatorType: string | undefined;
+  comparison: ComparisonEvaluatorConfig;
+}): boolean {
+  const hasEnoughVariants =
+    !isComparisonEvaluatorType(evaluatorType) || comparison.variants.filter(Boolean).length >= 2;
+  return !!name && name.trim().length > 0 && hasEnoughVariants;
+}
+
+function workflowCardOf(
+  evaluator: RouterOutputs["evaluators"]["getById"] | undefined,
+): EvaluatorEditorController["workflowCard"] {
+  if (!evaluator?.workflowId) return undefined;
+  return {
+    workflowId: evaluator.workflowId,
+    workflowName: evaluator.workflowName,
+    workflowIcon: evaluator.workflowIcon,
+    updatedAt: evaluator.updatedAt,
+  };
+}
+
+type EvaluatorMutate<Input> = (input: Input) => void;
+
+/**
+ * A persisted evaluator only renames (or just navigates when unchanged); any other evaluator is
+ * created or updated with its settings.
+ */
+function submitEvaluator({
+  projectId,
+  evaluatorId,
+  evaluatorType,
+  isPersistedEvaluator,
+  values,
+  savedName,
+  create,
+  update,
+  afterUnchanged,
+}: {
+  projectId: string;
+  evaluatorId: string | undefined;
+  evaluatorType: string | undefined;
+  isPersistedEvaluator: boolean;
+  values: EvaluatorFormValues;
+  savedName: string | undefined;
+  create: EvaluatorMutate<{
+    projectId: string;
+    name: string;
+    type: "evaluator";
+    config: { evaluatorType: string; settings: Record<string, unknown> };
+  }>;
+  update: EvaluatorMutate<{
+    id: string;
+    projectId: string;
+    name: string;
+    config?: { evaluatorType: string; settings: Record<string, unknown> };
+  }>;
+  afterUnchanged: (saved: { id: string; name: string }) => void;
+}) {
+  const name = values.name.trim();
+  if (evaluatorId && isPersistedEvaluator) {
+    if (name !== (savedName?.trim() ?? "")) {
+      update({ id: evaluatorId, projectId, name });
+    } else {
+      afterUnchanged({ id: evaluatorId, name: savedName ?? "" });
+    }
+    return;
+  }
+  if (!evaluatorType) return;
+  const config = { evaluatorType, settings: values.settings };
+  if (evaluatorId) {
+    update({ id: evaluatorId, projectId, name, config });
+  } else {
+    create({ projectId, name, type: "evaluator", config });
+  }
+}
+
+/** A drawer holding a draft flushes it and closes; otherwise unsaved edits ask first. */
+function closeEditor({
+  hasUnsavedChanges,
+  keepsDraft,
+  flushDraft,
+  canGoBack,
+  goBack,
+  onClose,
+}: {
+  hasUnsavedChanges: boolean;
+  keepsDraft: boolean;
+  flushDraft: () => void;
+  canGoBack: boolean;
+  goBack: () => void;
+  onClose: () => void;
+}) {
+  if (hasUnsavedChanges && keepsDraft) {
+    flushDraft();
+    onClose();
+    return;
+  }
+  if (
+    hasUnsavedChanges &&
+    !window.confirm("You have unsaved changes. Are you sure you want to close?")
+  ) {
+    return;
+  }
+  if (canGoBack) {
+    goBack();
+  } else {
+    onClose();
+  }
+}
+
+function effectiveFieldsOf(
+  fields: { identifier: string; optional?: boolean }[] | undefined,
+  evaluatorDef: { requiredFields: string[]; optionalFields: string[] } | undefined,
+) {
+  if (!fields || fields.length === 0) return evaluatorDef;
+  return {
+    requiredFields: fields.filter((f) => !f.optional).map((f) => f.identifier),
+    optionalFields: fields.filter((f) => f.optional).map((f) => f.identifier),
+  };
+}
+
+function savedValuesOf(evaluator: { name: string; config: unknown }): EvaluatorFormValues {
+  const config = evaluator.config as { settings?: Record<string, unknown> } | null;
+  return { name: evaluator.name, settings: config?.settings ?? {} };
+}
+
+/** A local draft the caller kept wins over the saved evaluator. */
+function openingValues(
+  savedValues: EvaluatorFormValues,
+  initialLocalConfig: LocalEvaluatorConfig | undefined,
+): EvaluatorFormValues {
+  if (!initialLocalConfig) return savedValues;
+  return {
+    name: initialLocalConfig.name,
+    settings: initialLocalConfig.settings ?? savedValues.settings,
+  };
+}
+
+function settingsSchemaOf(evaluatorType: string | undefined) {
+  if (!evaluatorType) return undefined;
+  const lookup = evaluatorSettingsSchemaFor(evaluatorType);
+  return lookup.found ? lookup.schema : undefined;
+}
+
+function hasSettingsFields(settingsSchema: unknown): boolean {
+  return settingsSchema instanceof z.ZodObject && Object.keys(settingsSchema.shape).length > 0;
+}
+
+/** LLM-judged evaluators (bar answer-match) make the user name the check themselves. */
+function mustChooseName(evaluatorType: string | undefined): boolean {
+  return Boolean(
+    evaluatorType?.startsWith("langevals/llm_") && evaluatorType !== "langevals/llm_answer_match",
+  );
+}
+
+function defaultNameFor(evaluatorDef: { name: string } | undefined, mustChoose: boolean): string {
+  return mustChoose ? "" : (evaluatorDef?.name ?? "");
+}
+
+function reportSaveError({
+  error,
+  form,
+  fallbackTitle,
+}: {
+  error: unknown;
+  form: Parameters<typeof applyHandledErrorToForm>[0]["form"];
+  fallbackTitle: string;
+}) {
+  if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
+  showErrorToast({ error, fallbackTitle });
 }

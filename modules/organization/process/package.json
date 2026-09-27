@@ -38,7 +38,6 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
-    "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",

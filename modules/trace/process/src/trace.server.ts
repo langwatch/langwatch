@@ -7,8 +7,8 @@ import {
 } from "./app/trace-composition.build.ts";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceProcessingEventing } from "./eventing/trace-processing.pipeline.ts";
+import type { TraceClickHouseResolver } from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
-import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
 import type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 import type { TracePayloadReaderRepository } from "./repositories/trace-payload-reader.repository.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";

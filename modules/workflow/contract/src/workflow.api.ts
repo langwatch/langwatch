@@ -223,8 +223,10 @@ export interface WorkflowApi {
   run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
   /** Runs one public synchronous REST door with its named refusals. */
   runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
-  /** Starts one evaluation run of a committed version through the evaluations pipeline. */
-  triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
+  /** Starts one evaluation run of a committed version, unless the caller may not read runs. */
+  triggerEvaluation(
+    input: WorkflowEvaluationRequest & { callerMayReadRuns: boolean },
+  ): Promise<WorkflowEvaluationStarted>;
 
   // -- the Studio's own graph ------------------------------------------------
 
@@ -257,9 +259,19 @@ export interface WorkflowApi {
   /** One Monaco completion for the editor, over whichever model answers it. */
   completeCode(input: {
     projectId: string;
-    userId: string;
+    /** Absent when no one is signed in, which is refused. */
+    userId: string | undefined;
     body: WorkflowRestEnvelope;
   }): Promise<WorkflowCodeCompletionResponse>;
+  /**
+   * The Studio editor's posted event, checked and prepared, answered as the engine's events. A
+   * `done` keeps the stream open one more second so a trailing frame still reaches the editor.
+   */
+  streamStudioEvent(input: {
+    body: string;
+    /** Absent when no one is signed in, which is refused. */
+    userId: string | undefined;
+  }): Promise<AsyncIterable<StudioServerEvent>>;
   /** Opens one studio run and streams the engine's events back through `onEvent`. */
   postStudioEvent(input: {
     projectId: string;

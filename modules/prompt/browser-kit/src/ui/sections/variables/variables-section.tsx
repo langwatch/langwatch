@@ -9,6 +9,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  type RenderSourceIcon,
   VariableMappingInput,
 } from "./variable-mapping-input.tsx";
 import { FieldTypeSelect, TYPE_LABELS, VariableTypeIcon } from "./variable-type/index.ts";
@@ -73,6 +74,8 @@ export type VariablesSectionProps = {
   disabledMappings?: Set<string>;
   /** Disable mapping input */
   isMappingDisabled?: boolean;
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
 };
 
 // ============================================================================
@@ -99,6 +102,7 @@ export const VariablesSection = ({
   variableInfo = {},
   disabledMappings = new Set(),
   isMappingDisabled = false,
+  renderSourceIcon,
 }: VariablesSectionProps) => {
   // Default showAddButton to canAddRemove if not specified
   const shouldShowAddButton = showAddButton ?? canAddRemove;
@@ -199,51 +203,28 @@ export const VariablesSection = ({
         )}
       </HStack>
 
-      {/* Variables List */}
-      {variables.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle">
-          No variables defined
-        </Text>
-      ) : (
-        <VStack align="stretch" gap={2}>
-          {variables.map((variable) => {
-            const isLocked = lockedVariables.has(variable.identifier);
-            const infoTooltip = variableInfo[variable.identifier];
-            const isMappingDisabled_internal =
-              isMappingDisabled || disabledMappings.has(variable.identifier);
-
-            return (
-              <VariableRow
-                key={variable.identifier}
-                variable={variable}
-                mapping={mappings[variable.identifier]}
-                availableSources={availableSources}
-                showMappings={showMappings}
-                canRemove={canAddRemove && !isLocked}
-                readOnly={readOnly || isLocked}
-                isEditing={editingId === variable.identifier}
-                isMissing={missingMappingIds.has(variable.identifier)}
-                optionalHighlighting={optionalHighlighting}
-                onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
-                onEndEdit={() => setEditingId(null)}
-                onUpdate={(updates) => handleUpdateVariable(variable.identifier, updates)}
-                onRemove={() => handleRemoveVariable(variable.identifier)}
-                onMappingChange={
-                  onMappingChange
-                    ? (mapping) => onMappingChange(variable.identifier, mapping)
-                    : undefined
-                }
-                defaultValue={values[variable.identifier]}
-                onDefaultValueChange={
-                  onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
-                }
-                infoTooltip={infoTooltip}
-                isMappingDisabled={isMappingDisabled_internal}
-              />
-            );
-          })}
-        </VStack>
-      )}
+      <VariableList
+        variables={variables}
+        mappings={mappings}
+        availableSources={availableSources}
+        values={values}
+        showMappings={showMappings}
+        canAddRemove={canAddRemove}
+        readOnly={readOnly}
+        missingMappingIds={missingMappingIds}
+        optionalHighlighting={optionalHighlighting}
+        lockedVariables={lockedVariables}
+        variableInfo={variableInfo}
+        disabledMappings={disabledMappings}
+        isMappingDisabled={isMappingDisabled}
+        onMappingChange={onMappingChange}
+        onValueChange={onValueChange}
+        editingId={editingId}
+        setEditingId={setEditingId}
+        onUpdate={handleUpdateVariable}
+        onRemove={handleRemoveVariable}
+        renderSourceIcon={renderSourceIcon}
+      />
 
       {/* Validation error for missing mappings */}
       {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
@@ -254,6 +235,100 @@ export const VariablesSection = ({
     </VStack>
   );
 };
+
+type VariableListProps = Required<
+  Pick<
+    VariablesSectionProps,
+    | "variables"
+    | "mappings"
+    | "availableSources"
+    | "values"
+    | "showMappings"
+    | "canAddRemove"
+    | "readOnly"
+    | "missingMappingIds"
+    | "optionalHighlighting"
+    | "lockedVariables"
+    | "variableInfo"
+    | "disabledMappings"
+    | "isMappingDisabled"
+  >
+> &
+  Pick<VariablesSectionProps, "onMappingChange" | "onValueChange" | "renderSourceIcon"> & {
+    editingId: string | null;
+    setEditingId: (identifier: string | null) => void;
+    onUpdate: (identifier: string, updates: Partial<Variable>) => boolean;
+    onRemove: (identifier: string) => void;
+  };
+
+function VariableList({
+  variables,
+  mappings,
+  availableSources,
+  values,
+  showMappings,
+  canAddRemove,
+  readOnly,
+  missingMappingIds,
+  optionalHighlighting,
+  lockedVariables,
+  variableInfo,
+  disabledMappings,
+  isMappingDisabled,
+  onMappingChange,
+  onValueChange,
+  editingId,
+  setEditingId,
+  onUpdate,
+  onRemove,
+  renderSourceIcon,
+}: VariableListProps) {
+  return variables.length === 0 ? (
+    <Text fontSize="13px" color="fg.subtle">
+      No variables defined
+    </Text>
+  ) : (
+    <VStack align="stretch" gap={2}>
+      {variables.map((variable) => {
+        const isLocked = lockedVariables.has(variable.identifier);
+        const infoTooltip = variableInfo[variable.identifier];
+        const isMappingDisabled_internal =
+          isMappingDisabled || disabledMappings.has(variable.identifier);
+
+        return (
+          <VariableRow
+            key={variable.identifier}
+            variable={variable}
+            mapping={mappings[variable.identifier]}
+            availableSources={availableSources}
+            showMappings={showMappings}
+            canRemove={canAddRemove && !isLocked}
+            readOnly={readOnly || isLocked}
+            isEditing={editingId === variable.identifier}
+            isMissing={missingMappingIds.has(variable.identifier)}
+            optionalHighlighting={optionalHighlighting}
+            onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
+            onEndEdit={() => setEditingId(null)}
+            onUpdate={(updates) => onUpdate(variable.identifier, updates)}
+            onRemove={() => onRemove(variable.identifier)}
+            onMappingChange={
+              onMappingChange
+                ? (mapping) => onMappingChange(variable.identifier, mapping)
+                : undefined
+            }
+            defaultValue={values[variable.identifier]}
+            onDefaultValueChange={
+              onValueChange ? (value) => onValueChange(variable.identifier, value) : undefined
+            }
+            infoTooltip={infoTooltip}
+            isMappingDisabled={isMappingDisabled_internal}
+            renderSourceIcon={renderSourceIcon}
+          />
+        );
+      })}
+    </VStack>
+  );
+}
 
 // ============================================================================
 // Variable Row Component
@@ -294,6 +369,8 @@ type VariableRowProps = {
   infoTooltip?: string;
   /** Whether the mapping input is disabled (shows info instead) */
   isMappingDisabled?: boolean;
+  /** Draws a source's icon; the consumer owns the icon set. */
+  renderSourceIcon?: RenderSourceIcon;
 };
 
 const VariableRow = ({
@@ -315,6 +392,7 @@ const VariableRow = ({
   onDefaultValueChange,
   infoTooltip,
   isMappingDisabled = false,
+  renderSourceIcon,
 }: VariableRowProps) => {
   const [editValue, setEditValue] = useState(variable.identifier);
   const [hasError, setHasError] = useState(false);
@@ -423,6 +501,7 @@ const VariableRow = ({
                 isMissing={isMissing}
                 optionalHighlighting={optionalHighlighting}
                 inputTestId={`mapping-input-${variable.identifier}`}
+                renderSourceIcon={renderSourceIcon}
               />
             </Box>
           ) : (

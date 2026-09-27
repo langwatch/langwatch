@@ -115,8 +115,8 @@ export class TestGithubService implements GithubApi {
     return [];
   }
 
-  async mintTurnToken(): Promise<GithubTurnToken | null> {
-    return null;
+  async findTurnTokens(): Promise<GithubTurnToken[]> {
+    return [];
   }
 
   async coversRepository(): Promise<boolean> {

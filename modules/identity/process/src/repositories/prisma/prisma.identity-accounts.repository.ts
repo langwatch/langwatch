@@ -3,12 +3,14 @@ import {
   LIVE_IDENTIFIER_STATES,
 } from "@langwatch/identity-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccounts,
 } from "../../rules/identity-storage.rules.ts";
+import { toColumnValue, toInstant } from "./prisma.account-credential.mapper.ts";
 
 /** The `Identifier` columns an assembled account row is built from. */
 interface LinkedIdentifierRow {
@@ -69,7 +71,7 @@ function credentialData(secrets: IdentityAccountSecrets): Record<string, unknown
   return Object.fromEntries(
     CREDENTIAL_COLUMNS.filter((column) => column in secrets).map((column) => [
       column,
-      secrets[column] ?? null,
+      toColumnValue(secrets[column]),
     ]),
   );
 }
@@ -78,7 +80,10 @@ function accountMirrorData(secrets: IdentityAccountSecrets): Record<string, unkn
   return Object.fromEntries(
     Object.entries(ACCOUNT_MIRROR_COLUMNS)
       .filter(([field]) => field in secrets)
-      .map(([field, column]) => [column, secrets[field as keyof IdentityAccountSecrets] ?? null]),
+      .map(([field, column]) => [
+        column,
+        toColumnValue(secrets[field as keyof IdentityAccountSecrets]),
+      ]),
   );
 }
 
@@ -289,8 +294,8 @@ function toAccountRow({
     // account's subject is the mailbox, which is the identifier value.
     accountId: identifier.providerAccountId ?? identifier.value ?? "",
     ...secretsOf(credential),
-    createdAt: credential?.createdAt ?? identifier.attachedAt,
-    updatedAt: credential?.updatedAt ?? identifier.attachedAt,
+    createdAt: fromDate(credential?.createdAt ?? identifier.attachedAt),
+    updatedAt: fromDate(credential?.updatedAt ?? identifier.attachedAt),
   };
 }
 
@@ -300,8 +305,8 @@ function secretsOf(credential: CredentialRow | null): Required<IdentityAccountSe
     accessToken: credential?.accessToken ?? null,
     refreshToken: credential?.refreshToken ?? null,
     idToken: credential?.idToken ?? null,
-    accessTokenExpiresAt: credential?.accessTokenExpiresAt ?? null,
-    refreshTokenExpiresAt: credential?.refreshTokenExpiresAt ?? null,
+    accessTokenExpiresAt: toInstant(credential?.accessTokenExpiresAt),
+    refreshTokenExpiresAt: toInstant(credential?.refreshTokenExpiresAt),
     scope: credential?.scope ?? null,
   };
 }

@@ -12,6 +12,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
+  parseTestEvent,
 } from "./testHelpers.ts";
 
 describe("EventSourcingService - Recovery Flows", () => {
@@ -33,6 +34,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       eventStore = EventStoreMemory.createForTesting<Event>();
       mapDef = createMockMapProjectionDefinition("handler");
       service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -158,6 +160,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const foldDef = createMockFoldProjectionDefinition("projection");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
@@ -194,6 +197,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       const eventStore = EventStoreMemory.createForTesting<Event>();
       const mapDef = createMockMapProjectionDefinition("handler");
       const service = new EventSourcingService({
+        parseEvent: parseTestEvent,
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],

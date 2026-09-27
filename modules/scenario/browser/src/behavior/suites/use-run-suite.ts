@@ -13,15 +13,10 @@ import {
   type RunParameterValues,
   type ScenarioParameterDefinition,
 } from "@langwatch/scenario-contract";
-import {
-  targetLabelOf,
-  parseSuiteTargets,
-  type Suite as SimulationSuite,
-  type SuiteRunResult,
-} from "@langwatch/suite-contract";
+import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
 import { useCallback, useMemo, useRef, useState } from "react";
 
-import { api } from "../scenario-api.ts";
+import { api, type SimulationSuite, type RouterOutputs } from "../scenario-api.ts";
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";
 import { useRunAttempt } from "./use-run-attempt.ts";
@@ -157,7 +152,7 @@ function notifyRunScheduled({
   onEditRunPlan,
   onViewRun,
 }: {
-  result: SuiteRunResult;
+  result: RouterOutputs["suites"]["run"];
   onEditRunPlan: () => void;
   onViewRun: (() => void) | undefined;
 }): void {

@@ -10,6 +10,7 @@ import {
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { toaster } from "@langwatch/design-system/toaster";
 import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
@@ -62,7 +63,13 @@ function RunButton() {
 }
 
 function mount() {
-  const capabilities = { feedback: BrowserUiFeedback.create() } as unknown as UiCapabilities;
+  const capabilities: UiCapabilities = {
+    ...createUiCapabilitiesFromHost({
+      route: () => ({ params: {}, query: {} }),
+      navigate: () => undefined,
+    }),
+    feedback: BrowserUiFeedback.create(),
+  };
 
   return render(
     <ChakraProvider value={defaultSystem}>

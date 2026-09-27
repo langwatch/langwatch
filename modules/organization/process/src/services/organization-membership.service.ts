@@ -8,7 +8,7 @@ import {
  * The organization surface the canonical contract does not carry: membership,
  * seats, role cascades, provisioning and the audit trail.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
   SsoTestArrivalCannotCreateOrganizationError,
   type SsoTestArrivalStanding,
@@ -369,6 +369,13 @@ export class OrganizationMembershipService {
       if (HandledError.isHandled(error) && error.code === "organization_not_found") return null;
       throw error;
     }
+  }
+
+  /** One organization's provisioning summary; an unknown id answers the door's `not_found`. */
+  async getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary> {
+    const summary = await this.findProvisioningSummary(organizationId);
+    if (!summary) throw new NotFoundError("not_found", "Organization", organizationId);
+    return summary;
   }
 
   /**

@@ -7,7 +7,7 @@ import {
   type ExposedSurface,
   type TransportPeers,
 } from "@langwatch/kernel";
-import { resourceAttributesFrom } from "@langwatch/observability/node";
+import { otlpHeadersFrom, resourceAttributesFrom } from "@langwatch/observability/node";
 import {
   MEMBER_NAMES,
   hostedMembers,
@@ -19,6 +19,7 @@ import type { PipelineParticipation } from "@langwatch/process-stores/pipelines"
 import type { SecretsResolver } from "@langwatch/secrets";
 import { z } from "zod";
 
+import { observabilityOwner } from "./observability-owner.ts";
 import {
   ApiProcessComposition,
   TasksProcessComposition,
@@ -122,6 +123,11 @@ export class ProcessServer implements ProcessBoot {
     const secrets = this.resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets));
     let members: ProcessMemberSource | undefined;
     try {
+      const telemetryExporter = await this.resolver
+        .scopeTo(observabilityOwner.name, Object.values(observabilityOwner.secrets))
+        .into(observabilityOwner.secrets.otlpHeaders, (rawHeaders) =>
+          telemetryExporterOf({ observability: this.config.observability, rawHeaders }),
+        );
       const opened = await openProcessStores({
         name: this.server.name,
         config,
@@ -181,6 +187,8 @@ export class ProcessServer implements ProcessBoot {
               // to the product reads it here rather than declaring `BASE_HOST`.
               publicBaseUrl: this.settings.baseHost,
               serviceVersion: serviceVersionOf(this.config.observability),
+              // Observability's OTLP collector, for the module still forwarding to it (rum).
+              telemetryExporter,
               nodeEnvironment: this.settings.nodeEnvironment,
               isSaas: this.settings.isSaas ?? false,
               nlpServiceUrl: this.settings.nlpServiceUrl,
@@ -239,6 +247,30 @@ export function serviceVersionOf(observability: unknown): string {
   if (explicit) return explicit;
   const attribute = resourceAttributesFrom(settings.resourceAttributes)["service.version"];
   return attribute || "unknown";
+}
+
+const exporterSettings = z.object({ otlpEndpoint: z.string().optional() });
+
+/** OTLP collector headers, applied inside a build and never handed out as a value (ADR-132). */
+type TelemetryExporterHeaders = <Out>(
+  build: (headers: Readonly<Record<string, string>>) => Out,
+) => Out;
+
+/** Where this process exports OTLP, as observability owns it: `OTEL_EXPORTER_OTLP_*`. */
+type TelemetryExporter = Readonly<{
+  endpoint: string | undefined;
+  withHeaders: TelemetryExporterHeaders;
+}>;
+
+export function telemetryExporterOf({
+  observability,
+  rawHeaders,
+}: Readonly<{ observability: unknown; rawHeaders: string | undefined }>): TelemetryExporter {
+  const headers = otlpHeadersFrom(rawHeaders);
+  return {
+    endpoint: exporterSettings.parse(observability ?? {}).otlpEndpoint,
+    withHeaders: (build) => build(headers),
+  };
 }
 
 const processSettings = z.object({

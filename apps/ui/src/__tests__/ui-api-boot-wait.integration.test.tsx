@@ -6,6 +6,8 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, renderHook, waitFor } from "@testing-library/react";
+import { createTRPCUntypedClient, type TRPCLink } from "@trpc/client";
+import { observable } from "@trpc/server/observable";
 import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +25,7 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
   },
 }));
 
+import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import { UI_SESSION_QUERY_KEY, type UiAuthClient } from "@langwatch/auth-browser/session";
 import {
   useBrowserUiSession,
@@ -126,12 +129,22 @@ class RecordingFeedback extends UiFeedback {
   }
 }
 
-const answeringTransport = {
-  query: (path: string) =>
-    path === UI_ORGANIZATIONS_PROCEDURE
-      ? Promise.resolve(ACME)
-      : Promise.resolve({ permissions: [], enabled: false }),
-} as unknown as UiFeatureApiTransport;
+const answeringLink: TRPCLink<RouterFromMap<ModuleApiMap>> =
+  () =>
+  ({ op }) =>
+    observable((observer) => {
+      observer.next({
+        result: {
+          type: "data",
+          data: op.path === UI_ORGANIZATIONS_PROCEDURE ? ACME : { permissions: [], enabled: false },
+        },
+      });
+      observer.complete();
+    });
+
+const answeringTransport: UiFeatureApiTransport = createTRPCUntypedClient({
+  links: [answeringLink],
+});
 
 const ROUTE_PATHS = ["/", "/auth/signin", "/:project/traces"];
 

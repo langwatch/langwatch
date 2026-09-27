@@ -18,12 +18,13 @@ export function isOverengineeringFile(file) {
 /**
  * The findings of one policy for the file under the cursor.
  *
- * @param {object} context The oxlint rule context.
- * @param {import("../classify.mjs").FileClassification} file
- * @param {string} policy
- * @param {object} program The `Program` node the rule's visitor was handed.
+ * @param {object} input
+ * @param {object} input.context The oxlint rule context.
+ * @param {import("../classify.mjs").FileClassification} input.file
+ * @param {string} input.policy
+ * @param {object} input.program The `Program` node the rule's visitor was handed.
  */
-export function reportsFor(context, file, policy, program) {
+export function reportsFor({ context, file, policy, program }) {
   let findings = findingsByProgram.get(program);
   if (!findings) {
     findings = overengineeringFindings({
