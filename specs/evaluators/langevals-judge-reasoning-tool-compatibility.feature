@@ -111,6 +111,26 @@ Feature: Evaluator judge reasoning and tool compatibility
     When the evaluator reads the answer
     Then the request is sent once more with a reminder to call the function
 
+  # Claude Sonnet 5 sometimes writes the rest of its call inside the first
+  # text field ("...</reasoning><parameter name=\"result\">true"), leaving the
+  # verdict field out. The verdict is never read out of that text: the judge
+  # is asked once more, and both calls are billed.
+  @unit
+  Scenario: A judge that writes its verdict inside another field is asked once more
+    Given an evaluator model that calls the verdict function
+    And its call leaves out a required field, written as markup inside the reasoning
+    When the evaluator reads the answer
+    Then the request is sent once more with a reminder that every field is its own argument
+    And the evaluation reaches a verdict from the second call
+    And the cost covers both calls
+
+  @unit
+  Scenario: A judge whose call stays incomplete after the reminder fails with a clear error
+    Given an evaluator model whose verdict function call leaves out a required field twice
+    When the evaluator reads the answer
+    Then no third request is sent
+    And the evaluation fails with an error naming the missing field
+
   @unit
   Scenario: A judge that never calls its function fails with a clear error
     Given an evaluator model that answers without a usable call to the verdict function

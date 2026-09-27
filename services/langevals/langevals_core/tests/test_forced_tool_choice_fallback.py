@@ -173,6 +173,94 @@ def test_judge_that_never_calls_the_function_fails_clearly(provider):
     assert "without calling the function" in str(raised.value)
 
 
+# Captured from anthropic/claude-sonnet-5 on an llm_boolean judge call.
+LEAKED_VERDICT_ARGUMENTS = json.dumps(
+    {
+        "reasoning": "No internal tool names are listed. The condition for returning "
+        'false is not met, so return true.</reasoning>\n<parameter name="result">true'
+    }
+)
+
+
+def with_usage(response, prompt_tokens: int, completion_tokens: int):
+    response.usage = SimpleNamespace(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+    )
+    return response
+
+
+# @scenario "A judge that writes its verdict inside another field is asked once more"
+def test_call_with_the_verdict_inside_reasoning_is_asked_once_more(provider):
+    provider.answers = [
+        with_usage(tool_response(arguments=LEAKED_VERDICT_ARGUMENTS), 1000, 80),
+        with_usage(tool_response(arguments='{"reasoning": "r", "result": true}'), 1100, 40),
+    ]
+
+    response = litellm.completion(**judge_request())
+
+    assert [r["tool_choice"] for r in provider.requests] == [FORCED, FORCED]
+    reminder = provider.requests[1]["messages"][-1]
+    assert reminder["role"] == "user"
+    assert "`evaluation`" in reminder["content"]
+    assert "reasoning, result" in reminder["content"]
+    assert provider.requests[1]["messages"][:-1] == judge_request()["messages"]
+    assert read_tool_call_arguments(response, "evaluation", ["result"])["result"] is True
+    assert (response.usage.prompt_tokens, response.usage.completion_tokens) == (2100, 120)
+    assert response.usage.total_tokens == 2220
+
+
+# @scenario "A judge that writes its verdict inside another field is asked once more"
+@pytest.mark.anyio
+async def test_call_with_the_verdict_inside_reasoning_is_asked_once_more_when_awaited(provider):
+    provider.answers = [
+        tool_response(arguments=LEAKED_VERDICT_ARGUMENTS),
+        tool_response(arguments='{"reasoning": "r", "result": false}'),
+    ]
+
+    response = await litellm.acompletion(**judge_request())
+
+    assert len(provider.requests) == 2
+    assert read_tool_call_arguments(response, "evaluation", ["result"])["result"] is False
+
+
+# @scenario "A judge that writes its verdict inside another field is asked once more"
+def test_incomplete_call_under_auto_gets_the_reminder(provider):
+    provider.refusal = Exception(BEDROCK_FORCED_TOOL_REFUSAL)
+    provider.answers = [
+        tool_response(arguments=LEAKED_VERDICT_ARGUMENTS),
+        tool_response(arguments='{"reasoning": "r", "result": true}'),
+    ]
+
+    response = litellm.completion(**judge_request())
+
+    assert [r["tool_choice"] for r in provider.requests] == [FORCED, "auto", "auto"]
+    assert read_tool_call_arguments(response, "evaluation", ["result"])["result"] is True
+
+
+# @scenario "A judge whose call stays incomplete after the reminder fails with a clear error"
+@pytest.mark.parametrize("arguments", [LEAKED_VERDICT_ARGUMENTS, "{not json"])
+def test_call_incomplete_twice_fails_naming_the_field(provider, arguments):
+    provider.answers = [tool_response(arguments=arguments), tool_response(arguments=arguments)]
+
+    response = litellm.completion(**judge_request())
+
+    assert len(provider.requests) == 2
+    with pytest.raises(JudgeAnswerError) as raised:
+        read_tool_call_arguments(response, "evaluation", ["reasoning", "result"], model=MODEL)
+    assert MODEL in str(raised.value)
+
+
+def test_complete_call_and_refusals_are_not_asked_again(provider):
+    provider.answers = [tool_response(), prose_response("", finish_reason="content_filter")]
+
+    litellm.completion(**judge_request())
+    litellm.completion(**judge_request())
+
+    assert len(provider.requests) == 2
+
+
 # @scenario "A refusal that is not about the forced function call reaches the caller untouched"
 @pytest.mark.parametrize(
     "request_overrides, refusal",
