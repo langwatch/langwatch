@@ -92,9 +92,12 @@ jobs:
             ${{ runner.os }}-mcp-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'mcp/typescript/tsconfig.json') }}-
             ${{ runner.os }}-mcp-tsbuildinfo-
 
-      # Build mode: the tsconfig references the evaluator contract, egress,
-      # handled-error and redaction, whose declarations a plain `--project`
-      # run expects already built (TS6305 on a fresh checkout).
+      # Build mode: the referenced packages' declarations do not exist on a
+      # fresh checkout (TS6305). Their graph reaches eventing and observability,
+      # which import the built SDK and the generated Prisma client.
+      - name: Generate Prisma client and build the SDK
+        run: pnpm --filter @langwatch/prisma-client prisma:generate && node dev/scripts/ensure-built.mjs langwatch
+
       - name: Run typecheck
         run: pnpm -w exec tsc -b mcp/typescript
 
