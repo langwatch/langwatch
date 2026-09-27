@@ -115,6 +115,43 @@ export class WorkflowPermissionDeniedError extends HandledError {
   }
 }
 
+/** A Studio door reached with no signed-in caller. */
+export class WorkflowCallerUnauthenticatedError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "You must be logged in to access this endpoint.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "WorkflowCallerUnauthenticatedError";
+  }
+}
+
+/** A Studio event the server cannot accept: not a valid event document, or an unknown type. */
+export class WorkflowStudioEventInvalidError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor(message = "Invalid body") {
+    super("validation_error", message, { httpStatus: 400, fault: "customer" });
+    this.name = "WorkflowStudioEventInvalidError";
+  }
+}
+
+/** Optimization ran on DSPy, which the engine dropped; stop events still pass. */
+export class WorkflowOptimizationRemovedError extends HandledError {
+  declare readonly code: "workflow_optimization_removed";
+
+  constructor() {
+    super(
+      "workflow_optimization_removed",
+      "Optimization is no longer supported. The Optimize feature relied on DSPy, which has been removed.",
+      { httpStatus: 410, fault: "customer" },
+    );
+    this.name = "WorkflowOptimizationRemovedError";
+  }
+}
+
 /** The workflow was never copied from anywhere, so there is nothing to sync from. */
 export class WorkflowNotACopyError extends HandledError {
   declare readonly code: "workflow_not_a_copy";

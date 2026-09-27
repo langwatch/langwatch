@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { LambdaWebAdapterStreamService } from "../lambda-web-adapter-stream.service.ts";
+import { LambdaWebAdapterFraming } from "../aws.lambda-workflow-studio-stream.channel.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -19,7 +19,7 @@ function framed(prelude: string, body: string): Uint8Array {
   return frame;
 }
 
-function readAll(stream: LambdaWebAdapterStreamService, chunks: Uint8Array[]): string {
+function readAll(stream: LambdaWebAdapterFraming, chunks: Uint8Array[]): string {
   return chunks.map((chunk) => decoder.decode(stream.read(chunk))).join("");
 }
 
@@ -29,7 +29,7 @@ describe("the Lambda Web Adapter response stream", () => {
   describe("given a stream that begins with a JSON prelude and eight zero bytes", () => {
     /** @scenario "Studio stream payloads retain Lambda Web Adapter behavior" */
     it("passes on only the bytes after the prelude", () => {
-      const stream = LambdaWebAdapterStreamService.create();
+      const stream = LambdaWebAdapterFraming.create();
 
       const forwarded = readAll(stream, [
         framed('{"statusCode":200,"headers":{},"cookies":[]}', SSE_BODY),
@@ -46,7 +46,7 @@ describe("the Lambda Web Adapter response stream", () => {
      */
     /** @scenario "Studio stream payloads retain Lambda Web Adapter behavior" */
     it("buffers a prelude split across chunks before passing anything on", () => {
-      const stream = LambdaWebAdapterStreamService.create();
+      const stream = LambdaWebAdapterFraming.create();
       const whole = framed('{"statusCode":422,"headers":{}}', SSE_BODY);
 
       const first = decoder.decode(stream.read(whole.slice(0, 12)));
@@ -59,7 +59,7 @@ describe("the Lambda Web Adapter response stream", () => {
 
     /** @scenario "Studio stream payloads retain Lambda Web Adapter behavior" */
     it("keeps the legacy 200 default when the prelude is not readable JSON", () => {
-      const stream = LambdaWebAdapterStreamService.create();
+      const stream = LambdaWebAdapterFraming.create();
 
       const forwarded = readAll(stream, [framed('{"statusCode": ', SSE_BODY)]);
 
@@ -71,7 +71,7 @@ describe("the Lambda Web Adapter response stream", () => {
   describe("given a stream that carries no separator at all", () => {
     /** @scenario "Studio stream payloads retain Lambda Web Adapter behavior" */
     it("completes without passing on the bytes it buffered", () => {
-      const stream = LambdaWebAdapterStreamService.create();
+      const stream = LambdaWebAdapterFraming.create();
 
       const forwarded = readAll(stream, [
         encoder.encode('{"statusCode":200,'),

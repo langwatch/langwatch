@@ -18,9 +18,6 @@
       "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/auth/process/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {

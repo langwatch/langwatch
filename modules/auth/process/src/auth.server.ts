@@ -4,6 +4,7 @@ import { defineServerModule } from "@langwatch/kernel";
 import { AuthApp } from "./app/auth.app.ts";
 import { authEventing } from "./eventing/auth.pipeline.ts";
 import { authRepositories } from "./repositories/auth-repositories.registry.ts";
+import { ClearStalePendingSsoSetupTask } from "./tasks/clear-stale-pending-sso-setup.task.ts";
 import { authCliDeviceFlowRest } from "./transport/auth-cli-device-flow.rest.ts";
 import { authRest } from "./transport/auth.rest.ts";
 import { authRequestHeadersFact, authTrpcTransport } from "./transport/auth.trpc.ts";
@@ -18,6 +19,9 @@ export const authServer = defineServerModule("auth")
   .withApp(AuthApp)
   .withTransports(authTrpcTransport, signInSecurityTrpcTransport, authCliDeviceFlowRest, authRest)
   .withEventing(authEventing)
+  .withTasks(({ members }) => [
+    ClearStalePendingSsoSetupTask.create({ database: () => members.prisma }),
+  ])
   .withTransportFacts(() => [
     bindTrpcFact(
       authRequestHeadersFact,

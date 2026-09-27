@@ -1177,9 +1177,6 @@ importers:
       '@langwatch/api-key-contract':
         specifier: workspace:*
         version: link:../../modules/api-key/contract
-      '@langwatch/auth-process':
-        specifier: workspace:*
-        version: link:../../modules/auth/process
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../modules/authz/contract

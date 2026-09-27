@@ -557,6 +557,11 @@ const presentations = {
     describe: () =>
       "It has no source workflow to sync from. Copy it from the workflow you want to follow instead.",
   },
+  workflow_optimization_removed: {
+    title: "Optimization is no longer available",
+    describe: () =>
+      "The Optimize feature was retired. You can still run and evaluate your workflow as before.",
+  },
   workflow_has_no_copies: {
     title: "Nothing has been copied from this workflow",
     describe: () => "There's nothing to push changes to yet.",
