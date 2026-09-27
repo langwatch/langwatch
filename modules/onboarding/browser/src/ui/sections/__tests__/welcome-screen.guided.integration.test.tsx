@@ -269,6 +269,38 @@ describe("WelcomeScreen in the guided variant", () => {
     registerExperiment.mockReset();
   });
 
+  describe("when the tailor step opens", () => {
+    /** @scenario "The tailor step starts with nothing selected and expands for a company" */
+    it("starts with nothing selected and asks the company questions once Company is picked", async () => {
+      await reachTailorStep();
+      for (const name of ["Company", "Clients", "Myself"]) {
+        expect(usageRadio(name)).not.toBeChecked();
+      }
+      expect(next()).toBeDisabled();
+      expect(screen.queryByText("What is your phone number?")).not.toBeInTheDocument();
+
+      await userEvent.click(usageRadio("Company"));
+      expect(usageRadio("Company")).toBeChecked();
+      expect(await screen.findByText("What is your phone number?")).toBeInTheDocument();
+      expect(screen.getByText("How large is your company?")).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Cloud" })).toBeInTheDocument();
+      expect(next()).toBeDisabled();
+    });
+
+    /** @scenario "A company cannot leave the tailor step before its size and deploy plan are picked" */
+    it("keeps Next disabled for a company until the size and the deploy plan are picked", async () => {
+      await reachTailorStep();
+      await userEvent.click(usageRadio("Company"));
+      expect(next()).toBeDisabled();
+
+      await userEvent.click(await screen.findByRole("radio", { name: "1-10" }));
+      expect(next()).toBeDisabled();
+
+      await userEvent.click(screen.getByRole("radio", { name: "Cloud" }));
+      expect(next()).toBeEnabled();
+    });
+  });
+
   describe("when the tailor step is left", () => {
     /** @scenario "Leaving the tailor step creates the organization and the project with the variant recorded" */
     /** @scenario "the welcome flow registers the experiment property as soon as the organization is created" */

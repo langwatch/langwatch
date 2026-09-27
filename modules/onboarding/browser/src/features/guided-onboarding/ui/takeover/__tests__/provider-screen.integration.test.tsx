@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
+ * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -26,11 +27,11 @@ vi.mock("@langwatch/model-provider-browser/edit-model-provider-form", () => ({
 
 import { ProviderScreen } from "../provider-screen.tsx";
 
-function renderScreen(onSkip = vi.fn()) {
+function renderScreen(onSkip = vi.fn(), picksCount = 1) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ProviderScreen
-        picksCount={1}
+        picksCount={picksCount}
         organizationId="org_1"
         projectId="project_1"
         fading={false}
@@ -52,7 +53,6 @@ describe("ProviderScreen", () => {
     cleanup();
   });
 
-  /** @scenario "the provider screen types its line and announces it was viewed" */
   it("types the line and announces the screen was viewed", async () => {
     renderScreen();
     await waitFor(
@@ -62,7 +62,6 @@ describe("ProviderScreen", () => {
     expect(emitMock).toHaveBeenCalledWith("viewed", "provider");
   }, 10000);
 
-  /** @scenario "picking a mark switches the connect panel to that provider" */
   it("switches the credential panel to the picked provider", async () => {
     renderScreen();
     screen.getByText("Anthropic").click();
@@ -70,7 +69,6 @@ describe("ProviderScreen", () => {
     await waitFor(() => expect(screen.getByTestId("stub-form")).toHaveTextContent("anthropic"));
   });
 
-  /** @scenario "skip guided tour asks once before letting go" */
   it("asks before skipping, then records the skip and calls onSkip", async () => {
     const onSkip = vi.fn();
     renderScreen(onSkip);
@@ -79,5 +77,52 @@ describe("ProviderScreen", () => {
     screen.getByText("Skip anyway").click();
     await waitFor(() => expect(skipMock).toHaveBeenCalled());
     await waitFor(() => expect(onSkip).toHaveBeenCalled());
+  });
+
+  /** @scenario Langy says "that up" for one pick and "those up" for several */
+  it("says that up for one pick and those up for several", async () => {
+    const { unmount } = renderScreen(vi.fn(), 1);
+    await waitFor(
+      () =>
+        expect(screen.getByTestId("provider-line")).toHaveTextContent(
+          "Awesome! I'll help you set that up.",
+        ),
+      { timeout: 8000 },
+    );
+    unmount();
+    renderScreen(vi.fn(), 2);
+    await waitFor(
+      () =>
+        expect(screen.getByTestId("provider-line")).toHaveTextContent(
+          "Awesome! I'll help you set those up.",
+        ),
+      { timeout: 8000 },
+    );
+  }, 20000);
+
+  /** @scenario "Skip Guided Tour asks the user to confirm" */
+  it("asks once, with the two choices", async () => {
+    renderScreen();
+    screen.getByText("Skip Guided Tour").click();
+    const dialog = await screen.findByRole("dialog");
+    expect(emitMock).toHaveBeenCalledWith("clicked", "skip_tour");
+    expect(dialog).toHaveTextContent("Are you sure sure?");
+    expect(dialog).toHaveTextContent("It's much easier to get Langy to setup everything for you.");
+    expect(within(dialog).getByText("Skip anyway")).toBeInTheDocument();
+    expect(within(dialog).getByText("Keep the guide")).toBeInTheDocument();
+  });
+
+  /** @scenario "Keep the guide closes the dialog" */
+  it("keeps the guide and closes the dialog", async () => {
+    const onSkip = vi.fn();
+    renderScreen(onSkip);
+    screen.getByText("Skip Guided Tour").click();
+    const dialog = await screen.findByRole("dialog");
+    within(dialog).getByText("Keep the guide").click();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(onSkip).not.toHaveBeenCalled();
+    expect(skipMock).not.toHaveBeenCalled();
+    expect(emitMock).toHaveBeenCalledWith("confirmed", "kept_guide");
+    expect(screen.getByTestId("provider-line")).toBeInTheDocument();
   });
 });
