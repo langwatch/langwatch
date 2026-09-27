@@ -1,22 +1,35 @@
-import { filterFieldsEnum } from "@langwatch/analytics-contract";
+import {
+  type AnalyticsChartGroup,
+  type AnalyticsChartMetric,
+  analyticsChartGroupSchema,
+  analyticsChartMetricSchema,
+  analyticsChartSeriesSchema,
+  analyticsChartTimeseriesSchema,
+} from "@langwatch/analytics-contract";
 import { z } from "zod";
 
 import {
   type AggregationTypes,
   type AnalyticsGroup,
   type AnalyticsMetric,
-  aggregationTypesEnum,
   allAggregationTypes,
   numericAggregationTypes,
   type PipelineAggregationTypes,
   type PipelineFields,
   percentileAggregationTypes,
-  pipelineAggregationTypesEnum,
-  pipelineFieldsEnum,
   sharedFiltersInputSchema,
 } from "./analytics-vocabulary.ts";
 import { formatMilliseconds } from "./format-milliseconds.ts";
 import { formatMoney } from "./format-money.ts";
+
+type GroupOf<Name extends string> = Name extends `${infer Group}.${string}` ? Group : never;
+type KeyOf<Name extends string, Group extends string> = Name extends `${Group}.${infer Key}`
+  ? Key
+  : never;
+/** One entry per contract name, grouped by its prefix: no name missing, none extra. */
+type RegistryOf<Name extends string, Entry> = {
+  [Group in GroupOf<Name>]: { [Key in KeyOf<Name, Group>]: Entry };
+};
 
 const numericMetricDefaults: Pick<AnalyticsMetric, "format" | "allowedAggregations"> = {
   format: "0.[0]a",
@@ -237,19 +250,13 @@ export const analyticsMetrics = {
       allowedAggregations: ["avg"],
     },
   },
-} satisfies Record<string, Record<string, AnalyticsMetric>>;
+} satisfies RegistryOf<AnalyticsChartMetric, AnalyticsMetric>;
 
 export type AnalyticsMetricsGroupsEnum = keyof typeof analyticsMetrics;
 
-export type FlattenAnalyticsMetricsEnum = {
-  [T in AnalyticsMetricsGroupsEnum]: `${T}.${string & keyof (typeof analyticsMetrics)[T]}`;
-}[AnalyticsMetricsGroupsEnum];
+export type FlattenAnalyticsMetricsEnum = AnalyticsChartMetric;
 
-export const flattenAnalyticsMetricsEnum = Object.keys(analyticsMetrics).flatMap((key) =>
-  Object.keys(analyticsMetrics[key as AnalyticsMetricsGroupsEnum]).map((subkey) =>
-    [key, subkey].join("."),
-  ),
-) as [FlattenAnalyticsMetricsEnum, ...FlattenAnalyticsMetricsEnum[]];
+export const flattenAnalyticsMetricsEnum = analyticsChartMetricSchema.options;
 
 export const analyticsPipelines: {
   [K in PipelineFields]: { label: string; field: string };
@@ -339,58 +346,36 @@ export const analyticsGroups = {
   error: {
     has_error: { label: "Contains Error" },
   },
-} satisfies Record<string, Record<string, AnalyticsGroup>>;
+} satisfies RegistryOf<AnalyticsChartGroup, AnalyticsGroup>;
 
 export type AnalyticsGroupsGroupsEnum = keyof typeof analyticsGroups;
 
-export type FlattenAnalyticsGroupsEnum = {
-  [T in AnalyticsGroupsGroupsEnum]: `${T}.${string & keyof (typeof analyticsGroups)[T]}`;
-}[AnalyticsGroupsGroupsEnum];
+export type FlattenAnalyticsGroupsEnum = AnalyticsChartGroup;
 
-export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap((key) =>
-  Object.keys(analyticsGroups[key as AnalyticsGroupsGroupsEnum]).map((subkey) =>
-    [key, subkey].join("."),
-  ),
-) as [FlattenAnalyticsGroupsEnum, ...FlattenAnalyticsGroupsEnum[]];
+export const flattenAnalyticsGroupsEnum = analyticsChartGroupSchema.options;
 
+const metricsByGroup: Readonly<Record<string, Readonly<Record<string, AnalyticsMetric>>>> =
+  analyticsMetrics;
+const groupsByName: Readonly<Record<string, Readonly<Record<string, AnalyticsGroup>>>> =
+  analyticsGroups;
+
+/** The metric a name reads, or none for a name the registry does not hold. */
 export const getMetric = (
   groupMetric: FlattenAnalyticsMetricsEnum,
 ): AnalyticsMetric | undefined => {
-  const [group, metric_] = groupMetric.split(".") as [AnalyticsMetricsGroupsEnum, string];
-  // Optional chaining on the group lookup: an unknown group (not just an
-  // unknown metric within a known group) returns undefined here rather than
-  // throwing a raw TypeError at the caller.
-  return (analyticsMetrics[group] as any)?.[metric_];
+  const [group = "", metric = ""] = groupMetric.split(".");
+  return metricsByGroup[group]?.[metric];
 };
 
+/** The grouping a name reads; the registry holds every name the contract declares. */
 export const getGroup = (groupMetric: FlattenAnalyticsGroupsEnum): AnalyticsGroup => {
-  const [group, field] = groupMetric.split(".") as [AnalyticsGroupsGroupsEnum, string];
-  return (analyticsGroups[group] as any)[field];
+  const [group = "", field = ""] = groupMetric.split(".");
+  const found = groupsByName[group]?.[field];
+  if (!found) throw new Error(`the analytics registry holds no group named ${groupMetric}`);
+  return found;
 };
 
-export const seriesInput = z.object({
-  metric: z.enum(flattenAnalyticsMetricsEnum),
-  key: z.optional(z.string()),
-  subkey: z.optional(z.string()),
-  aggregation: aggregationTypesEnum,
-  pipeline: z.optional(
-    z.object({
-      field: pipelineFieldsEnum,
-      aggregation: pipelineAggregationTypesEnum,
-    }),
-  ),
-  filters: z.optional(
-    z.partialRecord(
-      filterFieldsEnum,
-      z.union([
-        z.array(z.string()),
-        z.record(z.string(), z.array(z.string())),
-        z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-      ]),
-    ),
-  ),
-  asPercent: z.optional(z.boolean()),
-});
+export const seriesInput = analyticsChartSeriesSchema;
 
 export type SeriesInputType = z.infer<typeof seriesInput>;
 
@@ -413,14 +398,7 @@ export function isZeroWhenAbsentSeries(series: SeriesInputType): boolean {
   );
 }
 
-export const timeseriesSeriesInput = z.object({
-  query: z.optional(z.string()),
-  series: z.array(seriesInput),
-  groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
-  groupByKey: z.optional(z.string()),
-  timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
-  timeZone: z.string(),
-});
+export const timeseriesSeriesInput = analyticsChartTimeseriesSchema;
 
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;
 

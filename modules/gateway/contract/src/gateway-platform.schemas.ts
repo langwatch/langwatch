@@ -3,6 +3,7 @@
  * lower_snake_case in and out — the stored SCREAMING_SNAKE is Prisma's
  * convention, not a contract; `toWireEnum`/`toStoredEnum` translate both ways.
  */
+import { fromDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { USD_DISPLAY_STRING_FORMAT } from "./gateway.money.ts";
@@ -224,6 +225,9 @@ export const gatewayBudgetWireSchema = z.object({
   name: z.string().min(1).max(128).optional(),
 });
 
+/** A key's expiry: the same date the wire has always accepted, read as an instant. */
+const expiresAtWireSchema = z.coerce.date().transform(fromDate);
+
 export const gatewayCreateVirtualKeySchema = z.object({
   name: z.string().min(1).max(128),
   description: z.string().optional(),
@@ -234,7 +238,7 @@ export const gatewayCreateVirtualKeySchema = z.object({
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: gatewayRoutingModeWireSchema.optional(),
-  expires_at: z.coerce.date().optional(),
+  expires_at: expiresAtWireSchema.optional(),
   budget: gatewayBudgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
   external_id: externalIdSchema.nullable().optional(),
@@ -249,7 +253,7 @@ export const gatewayUpdateVirtualKeySchema = z.object({
   trace_project_id: z.string().nullable().optional(),
   routing_policy_id: z.string().nullable().optional(),
   routing_mode: gatewayRoutingModeWireSchema.optional(),
-  expires_at: z.coerce.date().nullable().optional(),
+  expires_at: expiresAtWireSchema.nullable().optional(),
   budget: gatewayBudgetWireSchema.nullable().optional(),
   config: virtualKeyConfigSchema.partial().optional(),
   external_id: externalIdSchema.nullable().optional(),

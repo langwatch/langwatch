@@ -9,13 +9,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  getGroup,
-  getMetric,
-  type timeseriesSeriesInput,
-  type Unpacked,
-} from "@langwatch/analytics-browser-kit";
+import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
+import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import { nowInstant } from "@langwatch/time";
@@ -47,7 +43,6 @@ import type {
   NameType,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
-import type { z } from "zod";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
@@ -74,45 +69,9 @@ import { ChartTooltip } from "../elements/chart-tooltip.tsx";
 import { Delayed } from "../elements/delayed.tsx";
 import { SummaryMetric } from "../elements/summary-metric.tsx";
 
-type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
-  name: string;
-  colorSet: RotatingColorSet;
-  increaseIs?: "good" | "bad" | "neutral";
-  noDataUrl?: string;
-};
+export type { CustomGraphInput };
 
-export type CustomGraphInput = {
-  startDate?: number;
-  endDate?: number;
-  graphId: string;
-  filters?: Record<FilterField, string[] | Record<string, string[]>>;
-  /** Trace origins the graph leaves out, whatever filters the page carries. */
-  excludeOrigins?: string[];
-  graphType:
-    | "line"
-    | "bar"
-    | "horizontal_bar"
-    | "stacked_bar"
-    | "area"
-    | "stacked_area"
-    | "scatter"
-    | "pie"
-    | "donnut"
-    | "summary"
-    | "monitor_graph";
-  series: Series[];
-  groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
-  groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
-  includePrevious: boolean;
-  timeScale: "full" | number;
-  connected?: boolean;
-  height?: number;
-  excludeUnknownBuckets?: boolean;
-  monitorGraph?: {
-    disabled?: boolean;
-    isGuardrail?: boolean;
-  };
-};
+type Series = CustomGraphInput["series"][number];
 
 /**
  * The charted read, as the shaping helpers below take it: stated

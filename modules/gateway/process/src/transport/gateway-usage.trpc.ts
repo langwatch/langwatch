@@ -4,7 +4,7 @@
  * the membership filter inside it is the check, declared as such.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { GatewayApi, gatewayUsageTrpc, VirtualKeyNotFoundError } from "@langwatch/gateway-contract";
+import { GatewayApi, gatewayUsageTrpc } from "@langwatch/gateway-contract";
 import { type Instant, Temporal, toEpochMs } from "@langwatch/time";
 
 /** The window a caller asked for, as the usage reader takes it. */
@@ -50,15 +50,11 @@ export const gatewayUsageTrpcTransport = defineTrpcRouter(GatewayApi, gatewayUsa
   .handle(async ({ app, input, actor }) => {
     // Same visibility rule as virtualKeys.get: a key the caller cannot see is
     // indistinguishable from one that does not exist.
-    const vk = await app.findVirtualKeyById(input.virtualKeyId, input.organizationId);
-    if (!vk) throw new VirtualKeyNotFoundError();
-
-    const visible = await app.isVirtualKeyVisible({
+    await app.getVisibleVirtualKeyForUser({
       organizationId: input.organizationId,
+      id: input.virtualKeyId,
       userId: actor.id,
-      virtualKey: vk,
     });
-    if (!visible) throw new VirtualKeyNotFoundError();
 
     return app.usageSummaryForVirtualKey({
       organizationId: input.organizationId,

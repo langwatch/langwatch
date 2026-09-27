@@ -59,6 +59,7 @@ import type {
   GatewayUsageSummary,
   GatewayVirtualKeyUsageSummary,
   VirtualKeyCamelDtoResponse,
+  VirtualKeySpendThisMonth,
 } from "./gateway.responses.ts";
 import type {
   GatewayVirtualKeyRecord,
@@ -66,7 +67,10 @@ import type {
   VirtualKeyWithScopes,
 } from "./gateway.rows.ts";
 import type { VirtualKeyConfig } from "./virtual-key-config.ts";
-import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
+import type {
+  VirtualKeyApiApplicableBudgetsInput,
+  VirtualKeyBudgetInput,
+} from "./virtual-key.schemas.ts";
 
 /**
  * The REST credential a project door presented, as this module is told about
@@ -524,6 +528,8 @@ export interface GatewayApi extends GatewayInternalProtocol {
     id: string;
     organizationId: string;
   }): Promise<GatewayBudgetDetail | null>;
+  /** The budget's detail; throws the handled 404 when this organization holds none by that id. */
+  getBudgetDetail(input: { id: string; organizationId: string }): Promise<GatewayBudgetDetail>;
   createBudget(input: CreateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   updateBudget(input: UpdateGatewayBudgetInput): Promise<GatewayBudgetResource>;
   archiveBudget(input: ArchiveGatewayBudgetInput): Promise<GatewayBudgetResource>;
@@ -812,6 +818,23 @@ export interface GatewayApi extends GatewayInternalProtocol {
   }): Promise<GatewayApplicableBudget[]>;
   /** Whether a person belongs to this organization. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+  /**
+   * The budgets an existing key (as stored, if the caller sees it) or a draft (if the caller may
+   * manage every scope in it) would run under; a draft's principal must be an organization member.
+   */
+  listApplicableBudgetsForSelection(input: {
+    selection: VirtualKeyApiApplicableBudgetsInput;
+    userId: string;
+    caller: GatewayCaller;
+  }): Promise<GatewayApplicableBudget[]>;
+  /**
+   * This month's spend and direct budget for every key the person sees; refused where the
+   * deployment has no spend source, rather than a $0.00 indistinguishable from no spend.
+   */
+  listVirtualKeySpendThisMonth(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<VirtualKeySpendThisMonth>;
 
   /**
    * Appends one confirmed outcome the caller priced itself. The spine takes

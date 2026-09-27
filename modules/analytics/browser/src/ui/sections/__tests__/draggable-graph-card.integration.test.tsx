@@ -81,8 +81,16 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 );
 
 const BUILDER_PAYLOAD = {
+  graphId: "custom",
   graphType: "line",
-  series: [{ name: "p95 latency", key: "latency", aggregation: "p95" }],
+  series: [
+    {
+      name: "p95 latency",
+      metric: "performance.completion_time",
+      colorSet: "greenTones",
+      aggregation: "p95",
+    },
+  ],
   includePrevious: false,
   timeScale: "full",
 };
@@ -90,16 +98,18 @@ const BUILDER_PAYLOAD = {
 function renderCard({
   kind,
   granularitySeconds,
+  payload = BUILDER_PAYLOAD,
 }: {
   kind?: string | null;
   granularitySeconds?: LangWatchQLGranularityStep | null;
+  payload?: Record<string, unknown>;
 } = {}) {
   return render(
     <DraggableGraphCard
       graph={{
         id: "graph_1",
         name: "p95 latency",
-        graph: BUILDER_PAYLOAD,
+        graph: payload,
         filters: {},
         gridColumn: 0,
         gridRow: 0,
@@ -137,6 +147,13 @@ describe("a dashboard grid card", () => {
       renderCard({ kind: "builder" });
 
       expect(screen.getByRole("button", { name: /Add alert/ })).toBeInTheDocument();
+    });
+
+    it("says so rather than drawing a builder graph it cannot read", () => {
+      renderCard({ kind: "builder", payload: { graphType: "line", series: [{ key: "latency" }] } });
+
+      expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
+      expect(screen.getByText(/cannot draw/)).toBeInTheDocument();
     });
 
     it("draws the builder renderer for a row carrying no kind at all", () => {

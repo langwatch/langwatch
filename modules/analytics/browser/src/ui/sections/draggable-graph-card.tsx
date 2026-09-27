@@ -1,10 +1,11 @@
 import { Box, Card } from "@chakra-ui/react";
 import type { LangWatchQLGranularityStep, FilterField } from "@langwatch/analytics-contract";
+import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 
 import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
 import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
-import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
+import { CustomGraph } from "./custom-graph.tsx";
 import { DashboardWidgetFrame } from "./dashboard-widget-frame.tsx";
 import { DashboardWidgetInPlaceEditor } from "./dashboard-widget-in-place-editor.tsx";
 import { GraphCardHeader } from "./graph-card-header.tsx";
@@ -233,11 +234,16 @@ function GraphCardChartArea({
     );
   }
 
+  const input = customGraphInputSchema.safeParse(graph.graph);
+  if (!input.success) {
+    return <Box padding={4}>This chart was saved in a shape the dashboard cannot draw.</Box>;
+  }
+
   return (
     <CustomGraph
       key={graph.id}
       input={{
-        ...(graph.graph as CustomGraphInput),
+        ...input.data,
         // Height follows the card's row span.
         height: chartHeightPx(graph.rowSpan),
       }}
