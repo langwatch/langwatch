@@ -1,5 +1,5 @@
 /** Error suggestions by code, filling the gap until backend sends them. */
-import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
+import type { LangWatchHandledErrorShape } from "@langwatch/langy-contract/cards/handled-error";
 
 /** The fallback advice for one code. */
 export interface ErrorExplanation {
@@ -129,7 +129,9 @@ export const fallbackSuggestionsFor = (code: string): ErrorExplanation | undefin
  * platform didn't send them. Server-sent advice always wins: it's written
  * next to the code that raised the failure, so it's only ever more specific.
  */
-export const withFallbackSuggestions = (domain: CliHandledError): CliHandledError => {
+export const withFallbackSuggestions = (
+  domain: LangWatchHandledErrorShape,
+): LangWatchHandledErrorShape => {
   if (domain.suggestions?.length && domain.docUrl) return domain;
 
   const fallback = fallbackSuggestionsFor(domain.code);

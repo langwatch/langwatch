@@ -1,7 +1,7 @@
 import {
   parseHandledError,
-  type CliHandledError,
-  type CliHandledErrorReason,
+  type LangWatchHandledErrorShape,
+  type LangWatchHandledErrorReason,
 } from "@langwatch/langy-contract/cards/handled-error";
 
 /**
@@ -31,7 +31,7 @@ export class LangWatchHandledError extends Error {
   /** A clickable link to the logs for that trace, when the route sent one. */
   readonly logsUrl: string | undefined;
   /** The failure behind the failure, when the route sent the chain. */
-  readonly reasons: CliHandledErrorReason[] | undefined;
+  readonly reasons: LangWatchHandledErrorReason[] | undefined;
   /** Whether the platform explicitly marked this failure safe to retry. */
   readonly retryable: boolean;
   /** What the user can DO about it, when the platform sent next steps. */
@@ -56,7 +56,7 @@ export class LangWatchHandledError extends Error {
     operation,
     message,
   }: {
-    handled: CliHandledError;
+    handled: LangWatchHandledErrorShape;
     body: unknown;
     operation?: string;
     message: string;

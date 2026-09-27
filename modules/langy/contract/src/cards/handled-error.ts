@@ -7,16 +7,16 @@
  * Recursive, and named by kind only: the platform masks anything it did not
  * raise itself as `{ code: "unknown" }` rather than leaking an internal message.
  */
-export interface CliHandledErrorReason {
+export interface LangWatchHandledErrorReason {
   kind: string;
   /** Whether retrying this underlying failure unchanged may succeed. */
   retryable: boolean;
   meta?: Record<string, unknown>;
-  reasons?: CliHandledErrorReason[];
+  reasons?: LangWatchHandledErrorReason[];
 }
 
 /** A failure, read back into the structure the platform originally gave it. */
-export interface CliHandledError {
+export interface LangWatchHandledErrorShape {
   /** The platform's serialisable discriminant, e.g. `dataset_not_found`. */
   code: string;
   /**
@@ -47,7 +47,7 @@ export interface CliHandledError {
   /** A clickable link to the logs for that trace, when the route sent one. */
   logsUrl?: string;
   /** The reason chain, when the route sent it. Same availability as `traceId`. */
-  reasons?: CliHandledErrorReason[];
+  reasons?: LangWatchHandledErrorReason[];
   /**
    * What the user can DO about it — the platform's own next steps.
    * This is the remediation channel ADR-045 added for exactly this consumer —
@@ -82,7 +82,7 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const isString = (value: unknown): value is string => typeof value === "string";
 
 /** The reason chain, defensively: anything without a code is not a reason. */
-const asReasons = (value: unknown): CliHandledErrorReason[] | undefined => {
+const asReasons = (value: unknown): LangWatchHandledErrorReason[] | undefined => {
   if (!Array.isArray(value)) return undefined;
 
   const reasons = value
@@ -133,7 +133,7 @@ interface ErrorBody {
   traceId?: string;
   traceUrl?: string;
   logsUrl?: string;
-  reasons?: CliHandledErrorReason[];
+  reasons?: LangWatchHandledErrorReason[];
   suggestions?: string[];
   docUrl?: string;
 }
@@ -318,7 +318,7 @@ const TERMINAL_STATUSES = new Set([401, 402, 403, 404, 410]);
  * the platform NAMED. An members failure is ours and transient by default, and a status
  * we read off a proxy's error page is not a verdict the platform reached.
  */
-export const isTerminalFailure = (error: CliHandledError): boolean =>
+export const isTerminalFailure = (error: LangWatchHandledErrorShape): boolean =>
   error.isHandled && TERMINAL_STATUSES.has(error.httpStatus);
 
 /**
@@ -400,8 +400,8 @@ const fallbackMessage = ({ status, body }: { status: number; body: unknown }): s
 };
 
 /**
- * Read an HTTP failure back into a {@link CliHandledError}. A body in the platform's error
- * shape that came back BELOW 500 is a true domain error and keeps its code.
+ * Read an HTTP failure back into a {@link LangWatchHandledErrorShape}. A body in the platform's
+ * error shape that came back BELOW 500 is a true domain error and keeps its code.
  */
 export const parseHandledError = ({
   status,
@@ -409,7 +409,7 @@ export const parseHandledError = ({
 }: {
   status: number;
   body: unknown;
-}): CliHandledError => {
+}): LangWatchHandledErrorShape => {
   const parsed = asErrorBody(body);
 
   if (!parsed) {
@@ -426,7 +426,7 @@ export const parseHandledError = ({
 
   return {
     code: parsed.code,
-    // Deprecated back-compat alias — see CliHandledError.kind.
+    // Deprecated back-compat alias — see LangWatchHandledErrorShape.kind.
     kind: parsed.code,
     message: parsed.message ?? parsed.code,
     httpStatus: status,
@@ -453,7 +453,7 @@ export const parseHandledError = ({
  */
 export interface CliErrorDocument {
   ok: false;
-  error: CliHandledError & {
+  error: LangWatchHandledErrorShape & {
     /**
      * Whether retrying — with the same arguments or with different ones — can possibly change
      * the answer. See {@link isTerminalFailure}.
@@ -463,7 +463,7 @@ export interface CliErrorDocument {
 }
 
 /** Build the `--format json` failure document. */
-export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => ({
+export const toCliErrorDocument = (error: LangWatchHandledErrorShape): CliErrorDocument => ({
   ok: false,
   error: { ...error, terminal: isTerminalFailure(error) },
 });
@@ -472,7 +472,9 @@ export const toCliErrorDocument = (error: CliHandledError): CliErrorDocument => 
  * Read a CLI failure document back; `other` when the output is not one, rather than a throw:
  * stdout may hold a card, a human table, or nothing at all, and none of those is an error document.
  */
-export type CliErrorDocumentRead = { kind: "error"; error: CliHandledError } | { kind: "other" };
+export type CliErrorDocumentRead =
+  | { kind: "error"; error: LangWatchHandledErrorShape }
+  | { kind: "other" };
 
 export const readCliErrorDocument = (output: unknown): CliErrorDocumentRead => {
   const document = typeof output === "string" ? safeParseJson(output) : asRecord(output);
@@ -488,7 +490,7 @@ export const readCliErrorDocument = (output: unknown): CliErrorDocumentRead => {
     kind: "error",
     error: {
       code,
-      // Deprecated back-compat alias — see CliHandledError.kind.
+      // Deprecated back-compat alias — see LangWatchHandledErrorShape.kind.
       kind: code,
       message: typeof error.message === "string" ? error.message : code,
       httpStatus: typeof error.httpStatus === "number" ? error.httpStatus : 0,
@@ -524,14 +526,14 @@ const safeParseJson = (value: string): unknown => {
  */
 const asAlreadyReadHandledError = (
   outer: Record<string, unknown> | null,
-): CliHandledError | null => {
+): LangWatchHandledErrorShape | null => {
   if (!outer || outer.isLangWatchHandledError !== true) return null;
   const code = [outer.code, outer.kind].find(isString) ?? null;
   if (code === null) return null;
 
   return {
     code,
-    // Deprecated back-compat alias — see CliHandledError.kind.
+    // Deprecated back-compat alias — see LangWatchHandledErrorShape.kind.
     kind: code,
     message: typeof outer.message === "string" ? outer.message : code,
     httpStatus: typeof outer.httpStatus === "number" ? outer.httpStatus : 0,
@@ -567,7 +569,7 @@ const statusOf = (value: Record<string, unknown> | null): number => {
  * The same reading, for an error that was THROWN rather than returned — the shape the SDK's
  * service layer raises.
  */
-export const handledErrorFromThrown = (error: unknown): CliHandledError => {
+export const handledErrorFromThrown = (error: unknown): LangWatchHandledErrorShape => {
   const outer = asRecord(error);
 
   // The SDK's HTTP layer may have read this already, into a richer structure than

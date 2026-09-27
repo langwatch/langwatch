@@ -20,8 +20,8 @@ export {
   LangWatchApiError,
 } from "./internal/api/errors";
 export type {
-  CliHandledError as LangWatchHandledErrorShape,
-  CliHandledErrorReason as LangWatchHandledErrorReason,
+  LangWatchHandledErrorShape,
+  LangWatchHandledErrorReason,
 } from "@langwatch/langy-contract/cards/handled-error";
 
 // Experiments API exports

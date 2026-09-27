@@ -14,7 +14,8 @@ import {
   type ChatRichContent,
 } from "../../../internal/generated/types/tracer";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
-import type { LangWatchSpan } from "../../span";
+import { ATTR_LANGWATCH_INPUT } from "../../semconv/attributes";
+import { processSpanInputOutput, type LangWatchSpan } from "../../span";
 import { getLangWatchTracer } from "../../tracer";
 
 type RunKind = "llm" | "chat" | "chain" | "tool" | "retriever";
@@ -473,33 +474,41 @@ function convertFromLangChainMessage(message: BaseMessage & { id?: string[] }): 
     content = JSON.stringify(message.content);
   }
 
-  const functionCall = (message as any).additional_kwargs;
+  const functionCall = message.additional_kwargs;
 
   return {
     role,
     content,
-    ...(functionCall && typeof functionCall === "object" && Object.keys(functionCall).length > 0
+    ...(functionCall &&
+    typeof functionCall === "object" &&
+    Object.keys(functionCall).length > 0 &&
+    isFunctionCallShaped(functionCall)
       ? { function_call: functionCall }
       : {}),
   };
 }
 
+/** All of `additional_kwargs` travels as `function_call`; its name/arguments must be strings. */
+function isFunctionCallShaped<T extends object>(
+  kwargs: T,
+): kwargs is T & { name?: string; arguments?: string } {
+  const isOptionalString = (value: unknown) => value === undefined || typeof value === "string";
+  return (
+    isOptionalString(Reflect.get(kwargs, "name")) &&
+    isOptionalString(Reflect.get(kwargs, "arguments"))
+  );
+}
+
+/** A `{ type, value }` input keeps its declared type, as `span.setInput(type, value)` would. */
 function setRunInput(span: LangWatchSpan, input: unknown) {
-  const i: any = input as any;
-  let handledTypedInput = false;
-  if (i) {
-    if (typeof i === "object") {
-      if ("type" in i) {
-        if ("value" in i) {
-          span.setInput(i.type, i.value);
-          handledTypedInput = true;
-        }
-      }
-    }
+  if (input && typeof input === "object" && "type" in input && "value" in input) {
+    span.setAttribute(
+      ATTR_LANGWATCH_INPUT,
+      JSON.stringify(processSpanInputOutput(input.type, input.value)),
+    );
+    return;
   }
-  if (!handledTypedInput) {
-    span.setInput(i);
-  }
+  span.setInput(input);
 }
 
 function className(serialized?: Serialized): string {
