@@ -2,7 +2,7 @@ import { SimulationRunStatus as ScenarioRunStatus } from "@langwatch/scenario-co
 import { describe, expect, it } from "vitest";
 
 import { getAdaptivePollingInterval } from "../model/get-adaptive-polling-interval.ts";
-import { makeScenarioRunData } from "./test-helpers.ts";
+import { makeScenarioRunData } from "../model/run-history-fixtures.ts";
 
 describe("getAdaptivePollingInterval()", () => {
   describe("when run data contains rows with PENDING or IN_PROGRESS status", () => {

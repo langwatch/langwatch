@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RunRow } from "../ui/sections/run-row.tsx";
 import { cssRulesForElement } from "./emotion-test-css.ts";
-import { makeBatchRun, makeScenarioRunData, makeSummary } from "./test-helpers.ts";
+import { makeBatchRun, makeScenarioRunData, makeSummary } from "../model/run-history-fixtures.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

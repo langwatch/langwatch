@@ -7,8 +7,9 @@ import {
   SimulationVerdict as Verdict,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
-import type { BatchRun, BatchRunSummary } from "../model/run-history-transforms.ts";
+import type { BatchRun, BatchRunSummary } from "./run-history-transforms.ts";
 
 export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
   return {
@@ -25,7 +26,7 @@ export function makeScenarioRunData(overrides: Partial<ScenarioRunData> = {}): S
       unmetCriteria: [],
     },
     messages: [],
-    timestamp: Date.now(),
+    timestamp: nowInstant().epochMilliseconds,
     durationInMs: 2300,
     ...overrides,
   };
@@ -38,7 +39,7 @@ export function makeBatchRun(overrides: Partial<BatchRun> = {}): BatchRun {
     groupLabel: batchRunId,
     groupType: "none",
     batchRunId,
-    timestamp: Date.now() - 2 * 60 * 60 * 1000,
+    timestamp: nowInstant().epochMilliseconds - 2 * 60 * 60 * 1000,
     scenarioRuns: [
       makeScenarioRunData(),
       makeScenarioRunData({

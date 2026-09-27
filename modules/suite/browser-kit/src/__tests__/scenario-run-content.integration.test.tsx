@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunContent } from "../ui/sections/scenario-run-content.tsx";
-import { makeScenarioRunData } from "./test-helpers.ts";
+import { makeScenarioRunData } from "../model/run-history-fixtures.ts";
 
 vi.mock("../ui/elements/runs/scenario-grid-card.tsx", () => ({
   ScenarioGridCard: ({

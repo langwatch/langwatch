@@ -7,7 +7,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RunSummaryCounts } from "../ui/elements/runs/run-summary-counts.tsx";
-import { makeSummary } from "./test-helpers.ts";
+import { makeSummary } from "../model/run-history-fixtures.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
