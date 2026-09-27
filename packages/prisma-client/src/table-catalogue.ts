@@ -1,166 +1,166 @@
 // Generated from prisma/schema.prisma by scripts/generate-table-catalogue.mjs.
 export const prismaTableCatalogue = {
-  Account: "Account",
-  AccountCredential: "AccountCredential",
-  Session: "Session",
-  User: "User",
-  VerificationToken: "VerificationToken",
-  Identifier: "Identifier",
-  IdentifierReservation: "IdentifierReservation",
-  IdentityProjectionCursor: "IdentityProjectionCursor",
-  TwoFactor: "TwoFactor",
-  SignInAttemptLock: "SignInAttemptLock",
-  Passkey: "Passkey",
-  MfaEnrollment: "MfaEnrollment",
-  SsoConnection: "SsoConnection",
-  SsoConnectionRegistrationSlot: "SsoConnectionRegistrationSlot",
-  SsoConnectionReproofCursor: "SsoConnectionReproofCursor",
-  SsoCredential: "SsoCredential",
-  SsoVerifiedDomain: "SsoVerifiedDomain",
-  SsoVerifiedDomainHolder: "SsoVerifiedDomainHolder",
-  SsoAuthenticationActivity: "SsoAuthenticationActivity",
-  SsoProvider: "SsoProvider",
-  SsoBreakGlassBinding: "SsoBreakGlassBinding",
-  SsoActivationRecoveryReservation: "SsoActivationRecoveryReservation",
-  JoinRequest: "JoinRequest",
-  TeamUser: "TeamUser",
-  OrganizationUser: "OrganizationUser",
-  Team: "Team",
-  Organization: "Organization",
-  IssuedLicense: "IssuedLicense",
-  ActivationCode: "ActivationCode",
-  ConnectedBillingAccount: "ConnectedBillingAccount",
-  ConnectedCreditGrant: "ConnectedCreditGrant",
-  ConnectedInvoice: "ConnectedInvoice",
-  ScimRequestLog: "ScimRequestLog",
-  ScimToken: "ScimToken",
-  ScimExternalId: "ScimExternalId",
-  ScimUserResource: "ScimUserResource",
-  ScimDirectoryUser: "ScimDirectoryUser",
-  ScimSyncState: "ScimSyncState",
-  Project: "Project",
-  Department: "Department",
-  DepartmentMembershipHistory: "DepartmentMembershipHistory",
-  PlatformToolPolicy: "PlatformToolPolicy",
-  OrganizationInvite: "OrganizationInvite",
-  Monitor: "Monitor",
-  Cost: "Cost",
-  Topic: "Topic",
-  Dataset: "Dataset",
-  DatasetRecord: "DatasetRecord",
-  Dashboard: "Dashboard",
-  SavedView: "SavedView",
-  CustomGraph: "CustomGraph",
-  BatchEvaluation: "BatchEvaluation",
-  Trigger: "Trigger",
-  WebhookEndpoint: "WebhookEndpoint",
-  WebhookEndpointDelivery: "WebhookEndpointDelivery",
-  Experiment: "Experiment",
-  ExperimentVersion: "ExperimentVersion",
-  Annotation: "Annotation",
-  ModelProvider: "ModelProvider",
-  ModelProviderScope: "ModelProviderScope",
-  ModelDefaultConfig: "ModelDefaultConfig",
-  ModelDefaultConfigScope: "ModelDefaultConfigScope",
-  GithubInstallation: "GithubInstallation",
-  GithubPullRequest: "GithubPullRequest",
-  GithubBranchPullRequestCheck: "GithubBranchPullRequestCheck",
-  LangyConversationProjection: "LangyConversationProjection",
-  LangyTurnRequest: "LangyTurnRequest",
-  LangyActiveTurn: "LangyActiveTurn",
-  LangyConversationTurnProjection: "LangyConversationTurnProjection",
-  LangyMessageProjection: "LangyMessageProjection",
-  ProjectSecret: "ProjectSecret",
-  TriggerSent: "TriggerSent",
-  EmailSuppression: "EmailSuppression",
-  AnnotationScore: "AnnotationScore",
-  AnnotationQueue: "AnnotationQueue",
-  AnnotationQueueMembers: "AnnotationQueueMembers",
-  AnnotationQueueScores: "AnnotationQueueScores",
-  AnnotationQueueItem: "AnnotationQueueItem",
-  ShareLink: "ShareLink",
-  PinnedTrace: "PinnedTrace",
-  TraceEditOverlay: "TraceEditOverlay",
-  RetentionPolicy: "RetentionPolicy",
-  DataPrivacyPolicy: "DataPrivacyPolicy",
-  CustomLLMModelCost: "CustomLLMModelCost",
-  Workflow: "Workflow",
-  WorkflowVersion: "WorkflowVersion",
-  AuditLog: "AuditLog",
-  LlmPromptConfig: "LlmPromptConfig",
-  LlmPromptConfigVersion: "LlmPromptConfigVersion",
-  PromptTagAssignment: "PromptTagAssignment",
-  PromptTag: "PromptTag",
-  Analytics: "Analytics",
-  CustomRole: "CustomRole",
-  Notification: "Notification",
-  Agent: "Agent",
-  Evaluator: "Evaluator",
-  Scenario: "Scenario",
-  ScenarioVersion: "ScenarioVersion",
-  SimulationSuite: "SimulationSuite",
-  Subscription: "Subscription",
-  Invoice: "Invoice",
-  InvoiceItem: "InvoiceItem",
-  Group: "Group",
-  GroupMembership: "GroupMembership",
-  RoleBinding: "RoleBinding",
-  Grant: "Grant",
-  GrantUsage: "GrantUsage",
-  Role: "Role",
-  ApiKey: "ApiKey",
-  ProjectActiveDay: "ProjectActiveDay",
-  BillingMeterCheckpoint: "BillingMeterCheckpoint",
-  VirtualKey: "VirtualKey",
-  VirtualKeyScope: "VirtualKeyScope",
-  RoutingPolicy: "RoutingPolicy",
-  RoutingPolicyScope: "RoutingPolicyScope",
-  GatewayGuardrail: "GatewayGuardrail",
-  IngestionSource: "IngestionSource",
-  AnomalyRule: "AnomalyRule",
-  AnomalyAlert: "AnomalyAlert",
-  AiToolEntry: "AiToolEntry",
-  AiToolEntryTeam: "AiToolEntryTeam",
-  AiToolEntryDepartment: "AiToolEntryDepartment",
-  IngestionTemplate: "IngestionTemplate",
-  GatewayConnectUpstream: "GatewayConnectUpstream",
-  GatewayBudget: "GatewayBudget",
-  GatewayBudgetBucketBoundary: "GatewayBudgetBucketBoundary",
-  GatewayBudgetLedger: "GatewayBudgetLedger",
-  GatewayChangeEvent: "GatewayChangeEvent",
-  GatewayCacheRule: "GatewayCacheRule",
-  FeatureFlag: "FeatureFlag",
-  FeatureFlagExperimentSetting: "FeatureFlagExperimentSetting",
-  ProcessManagerInstance: "ProcessManagerInstance",
-  ProcessManagerInbox: "ProcessManagerInbox",
-  ProcessManagerOutbox: "ProcessManagerOutbox",
-  ProcessManagerOutboxAttempt: "ProcessManagerOutboxAttempt",
-  TopicClusteringRunProjection: "TopicClusteringRunProjection",
-  TopicModelProjection: "TopicModelProjection",
-  TopicClusteringRunHistoryProjection: "TopicClusteringRunHistoryProjection",
-  IngestionPullRunProjection: "IngestionPullRunProjection",
-  ScheduledJob: "ScheduledJob",
-  BugReport: "BugReport",
-  IdempotencyReceipt: "IdempotencyReceipt",
-  GatewayRealtimeSession: "GatewayRealtimeSession",
-  SystemMigrationTenantState: "SystemMigrationTenantState",
-  SystemMigrationEnrollment: "SystemMigrationEnrollment",
-  StoredObject: "StoredObject",
-  DiscoveredPerson: "DiscoveredPerson",
-  DiscoveredAgent: "DiscoveredAgent",
-  IdentityMatch: "IdentityMatch",
-  GovernanceTenantHistory: "GovernanceTenantHistory",
-  ErasedIdentifierSuppression: "ErasedIdentifierSuppression",
-  IdentityMatchSuggestion: "IdentityMatchSuggestion",
-  ConnectedSeatChange: "ConnectedSeatChange",
-  ConnectedStatement: "ConnectedStatement",
-  InstanceIdentity: "InstanceIdentity",
-  SelfHostedInstance: "SelfHostedInstance",
-  SelfHostedInstanceReport: "SelfHostedInstanceReport",
+  "Account": "Account",
+  "AccountCredential": "AccountCredential",
+  "Session": "Session",
+  "User": "User",
+  "VerificationToken": "VerificationToken",
+  "Identifier": "Identifier",
+  "IdentifierReservation": "IdentifierReservation",
+  "IdentityProjectionCursor": "IdentityProjectionCursor",
+  "TwoFactor": "TwoFactor",
+  "SignInAttemptLock": "SignInAttemptLock",
+  "Passkey": "Passkey",
+  "MfaEnrollment": "MfaEnrollment",
+  "SsoConnection": "SsoConnection",
+  "SsoConnectionRegistrationSlot": "SsoConnectionRegistrationSlot",
+  "SsoConnectionReproofCursor": "SsoConnectionReproofCursor",
+  "SsoCredential": "SsoCredential",
+  "SsoVerifiedDomain": "SsoVerifiedDomain",
+  "SsoVerifiedDomainHolder": "SsoVerifiedDomainHolder",
+  "SsoAuthenticationActivity": "SsoAuthenticationActivity",
+  "SsoProvider": "SsoProvider",
+  "SsoBreakGlassBinding": "SsoBreakGlassBinding",
+  "SsoActivationRecoveryReservation": "SsoActivationRecoveryReservation",
+  "JoinRequest": "JoinRequest",
+  "TeamUser": "TeamUser",
+  "OrganizationUser": "OrganizationUser",
+  "Team": "Team",
+  "Organization": "Organization",
+  "IssuedLicense": "IssuedLicense",
+  "ActivationCode": "ActivationCode",
+  "ConnectedBillingAccount": "ConnectedBillingAccount",
+  "ConnectedCreditGrant": "ConnectedCreditGrant",
+  "ConnectedInvoice": "ConnectedInvoice",
+  "ScimRequestLog": "ScimRequestLog",
+  "ScimToken": "ScimToken",
+  "ScimExternalId": "ScimExternalId",
+  "ScimUserResource": "ScimUserResource",
+  "ScimDirectoryUser": "ScimDirectoryUser",
+  "ScimSyncState": "ScimSyncState",
+  "Project": "Project",
+  "Department": "Department",
+  "DepartmentMembershipHistory": "DepartmentMembershipHistory",
+  "PlatformToolPolicy": "PlatformToolPolicy",
+  "OrganizationInvite": "OrganizationInvite",
+  "Monitor": "Monitor",
+  "Cost": "Cost",
+  "Topic": "Topic",
+  "Dataset": "Dataset",
+  "DatasetRecord": "DatasetRecord",
+  "Dashboard": "Dashboard",
+  "SavedView": "SavedView",
+  "CustomGraph": "CustomGraph",
+  "BatchEvaluation": "BatchEvaluation",
+  "Trigger": "Trigger",
+  "WebhookEndpoint": "WebhookEndpoint",
+  "WebhookEndpointDelivery": "WebhookEndpointDelivery",
+  "Experiment": "Experiment",
+  "ExperimentVersion": "ExperimentVersion",
+  "Annotation": "Annotation",
+  "ModelProvider": "ModelProvider",
+  "ModelProviderScope": "ModelProviderScope",
+  "ModelDefaultConfig": "ModelDefaultConfig",
+  "ModelDefaultConfigScope": "ModelDefaultConfigScope",
+  "GithubInstallation": "GithubInstallation",
+  "GithubPullRequest": "GithubPullRequest",
+  "GithubBranchPullRequestCheck": "GithubBranchPullRequestCheck",
+  "LangyConversationProjection": "LangyConversationProjection",
+  "LangyTurnRequest": "LangyTurnRequest",
+  "LangyActiveTurn": "LangyActiveTurn",
+  "LangyConversationTurnProjection": "LangyConversationTurnProjection",
+  "LangyMessageProjection": "LangyMessageProjection",
+  "ProjectSecret": "ProjectSecret",
+  "TriggerSent": "TriggerSent",
+  "EmailSuppression": "EmailSuppression",
+  "AnnotationScore": "AnnotationScore",
+  "AnnotationQueue": "AnnotationQueue",
+  "AnnotationQueueMembers": "AnnotationQueueMembers",
+  "AnnotationQueueScores": "AnnotationQueueScores",
+  "AnnotationQueueItem": "AnnotationQueueItem",
+  "ShareLink": "ShareLink",
+  "PinnedTrace": "PinnedTrace",
+  "TraceEditOverlay": "TraceEditOverlay",
+  "RetentionPolicy": "RetentionPolicy",
+  "DataPrivacyPolicy": "DataPrivacyPolicy",
+  "CustomLLMModelCost": "CustomLLMModelCost",
+  "Workflow": "Workflow",
+  "WorkflowVersion": "WorkflowVersion",
+  "AuditLog": "AuditLog",
+  "LlmPromptConfig": "LlmPromptConfig",
+  "LlmPromptConfigVersion": "LlmPromptConfigVersion",
+  "PromptTagAssignment": "PromptTagAssignment",
+  "PromptTag": "PromptTag",
+  "Analytics": "Analytics",
+  "CustomRole": "CustomRole",
+  "Notification": "Notification",
+  "Agent": "Agent",
+  "Evaluator": "Evaluator",
+  "Scenario": "Scenario",
+  "ScenarioVersion": "ScenarioVersion",
+  "SimulationSuite": "SimulationSuite",
+  "Subscription": "Subscription",
+  "Invoice": "Invoice",
+  "InvoiceItem": "InvoiceItem",
+  "Group": "Group",
+  "GroupMembership": "GroupMembership",
+  "RoleBinding": "RoleBinding",
+  "Grant": "Grant",
+  "GrantUsage": "GrantUsage",
+  "Role": "Role",
+  "ApiKey": "ApiKey",
+  "ProjectActiveDay": "ProjectActiveDay",
+  "BillingMeterCheckpoint": "BillingMeterCheckpoint",
+  "VirtualKey": "VirtualKey",
+  "VirtualKeyScope": "VirtualKeyScope",
+  "RoutingPolicy": "RoutingPolicy",
+  "RoutingPolicyScope": "RoutingPolicyScope",
+  "GatewayGuardrail": "GatewayGuardrail",
+  "IngestionSource": "IngestionSource",
+  "AnomalyRule": "AnomalyRule",
+  "AnomalyAlert": "AnomalyAlert",
+  "AiToolEntry": "AiToolEntry",
+  "AiToolEntryTeam": "AiToolEntryTeam",
+  "AiToolEntryDepartment": "AiToolEntryDepartment",
+  "IngestionTemplate": "IngestionTemplate",
+  "GatewayConnectUpstream": "GatewayConnectUpstream",
+  "GatewayBudget": "GatewayBudget",
+  "GatewayBudgetBucketBoundary": "GatewayBudgetBucketBoundary",
+  "GatewayBudgetLedger": "GatewayBudgetLedger",
+  "GatewayChangeEvent": "GatewayChangeEvent",
+  "GatewayCacheRule": "GatewayCacheRule",
+  "FeatureFlag": "FeatureFlag",
+  "FeatureFlagExperimentSetting": "FeatureFlagExperimentSetting",
+  "ProcessManagerInstance": "ProcessManagerInstance",
+  "ProcessManagerInbox": "ProcessManagerInbox",
+  "ProcessManagerOutbox": "ProcessManagerOutbox",
+  "ProcessManagerOutboxAttempt": "ProcessManagerOutboxAttempt",
+  "TopicClusteringRunProjection": "TopicClusteringRunProjection",
+  "TopicModelProjection": "TopicModelProjection",
+  "TopicClusteringRunHistoryProjection": "TopicClusteringRunHistoryProjection",
+  "IngestionPullRunProjection": "IngestionPullRunProjection",
+  "ScheduledJob": "ScheduledJob",
+  "BugReport": "BugReport",
+  "IdempotencyReceipt": "IdempotencyReceipt",
+  "GatewayRealtimeSession": "GatewayRealtimeSession",
+  "SystemMigrationTenantState": "SystemMigrationTenantState",
+  "SystemMigrationEnrollment": "SystemMigrationEnrollment",
+  "StoredObject": "StoredObject",
+  "DiscoveredPerson": "DiscoveredPerson",
+  "DiscoveredAgent": "DiscoveredAgent",
+  "IdentityMatch": "IdentityMatch",
+  "GovernanceTenantHistory": "GovernanceTenantHistory",
+  "ErasedIdentifierSuppression": "ErasedIdentifierSuppression",
+  "IdentityMatchSuggestion": "IdentityMatchSuggestion",
+  "ConnectedSeatChange": "ConnectedSeatChange",
+  "ConnectedStatement": "ConnectedStatement",
+  "InstanceIdentity": "InstanceIdentity",
+  "SelfHostedInstance": "SelfHostedInstance",
+  "SelfHostedInstanceReport": "SelfHostedInstanceReport"
 } as const;
 
 export const prismaModelFieldCatalogue = {
-  Account: [
+  "Account": [
     "id",
     "userId",
     "type",
@@ -178,9 +178,9 @@ export const prismaModelFieldCatalogue = {
     "password",
     "user",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  AccountCredential: [
+  "AccountCredential": [
     "id",
     "userId",
     "user",
@@ -193,9 +193,9 @@ export const prismaModelFieldCatalogue = {
     "refreshTokenExpiresAt",
     "scope",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Session: [
+  "Session": [
     "id",
     "sessionToken",
     "userId",
@@ -212,9 +212,9 @@ export const prismaModelFieldCatalogue = {
     "impersonationExpiresAt",
     "lastSeenAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  User: [
+  "User": [
     "id",
     "name",
     "email",
@@ -275,10 +275,17 @@ export const prismaModelFieldCatalogue = {
     "anomalyRulesCreated",
     "pinnedTraces",
     "traceEditOverlaysCreated",
-    "traceEditOverlaysUpdated",
+    "traceEditOverlaysUpdated"
   ],
-  VerificationToken: ["id", "identifier", "token", "expires", "createdAt", "updatedAt"],
-  Identifier: [
+  "VerificationToken": [
+    "id",
+    "identifier",
+    "token",
+    "expires",
+    "createdAt",
+    "updatedAt"
+  ],
+  "Identifier": [
     "id",
     "userId",
     "provider",
@@ -296,19 +303,25 @@ export const prismaModelFieldCatalogue = {
     "detachedAt",
     "lastUsedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  IdentifierReservation: ["normalizedValue", "userId", "identifierId", "commandId", "createdAt"],
-  IdentityProjectionCursor: [
+  "IdentifierReservation": [
+    "normalizedValue",
+    "userId",
+    "identifierId",
+    "commandId",
+    "createdAt"
+  ],
+  "IdentityProjectionCursor": [
     "userId",
     "lastEventId",
     "acceptedAt",
     "occurredAt",
     "projectionVersion",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  TwoFactor: [
+  "TwoFactor": [
     "id",
     "userId",
     "user",
@@ -318,9 +331,9 @@ export const prismaModelFieldCatalogue = {
     "failedVerificationCount",
     "lockedUntil",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SignInAttemptLock: [
+  "SignInAttemptLock": [
     "id",
     "identifierHash",
     "failedCount",
@@ -329,9 +342,9 @@ export const prismaModelFieldCatalogue = {
     "heldForReview",
     "userId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Passkey: [
+  "Passkey": [
     "id",
     "name",
     "publicKey",
@@ -344,9 +357,9 @@ export const prismaModelFieldCatalogue = {
     "transports",
     "aaguid",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  MfaEnrollment: [
+  "MfaEnrollment": [
     "userId",
     "enrollmentId",
     "method",
@@ -364,9 +377,9 @@ export const prismaModelFieldCatalogue = {
     "acceptedAt",
     "projectionVersion",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SsoConnection: [
+  "SsoConnection": [
     "id",
     "organizationId",
     "type",
@@ -399,38 +412,51 @@ export const prismaModelFieldCatalogue = {
     "projectionVersion",
     "createdAt",
     "updatedAt",
-    "reproofCursor",
+    "reproofCursor"
   ],
-  SsoConnectionRegistrationSlot: [
+  "SsoConnectionRegistrationSlot": [
     "organizationId",
     "kind",
     "connectionId",
     "replacesConnectionId",
     "commandId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SsoConnectionReproofCursor: ["connectionId", "lastReproofAt", "connection"],
-  SsoCredential: [
+  "SsoConnectionReproofCursor": [
+    "connectionId",
+    "lastReproofAt",
+    "connection"
+  ],
+  "SsoCredential": [
     "id",
     "organizationId",
     "connectionId",
     "kind",
     "ciphertext",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SsoVerifiedDomain: ["domain", "organizationId", "holders"],
-  SsoVerifiedDomainHolder: ["domain", "connectionId", "organizationId", "ownership"],
-  SsoAuthenticationActivity: [
+  "SsoVerifiedDomain": [
+    "domain",
+    "organizationId",
+    "holders"
+  ],
+  "SsoVerifiedDomainHolder": [
+    "domain",
+    "connectionId",
+    "organizationId",
+    "ownership"
+  ],
+  "SsoAuthenticationActivity": [
     "id",
     "organizationId",
     "connectionId",
     "userId",
     "authenticatedAt",
-    "providerAccountId",
+    "providerAccountId"
   ],
-  SsoProvider: [
+  "SsoProvider": [
     "id",
     "issuer",
     "oidcConfig",
@@ -438,9 +464,9 @@ export const prismaModelFieldCatalogue = {
     "userId",
     "providerId",
     "organizationId",
-    "domain",
+    "domain"
   ],
-  SsoBreakGlassBinding: [
+  "SsoBreakGlassBinding": [
     "id",
     "organizationId",
     "userId",
@@ -450,10 +476,15 @@ export const prismaModelFieldCatalogue = {
     "supersededAt",
     "renewedFromId",
     "warnedDays",
-    "createdAt",
+    "createdAt"
   ],
-  SsoActivationRecoveryReservation: ["commandId", "organizationId", "connectionId", "createdAt"],
-  JoinRequest: [
+  "SsoActivationRecoveryReservation": [
+    "commandId",
+    "organizationId",
+    "connectionId",
+    "createdAt"
+  ],
+  "JoinRequest": [
     "id",
     "userId",
     "organizationId",
@@ -470,9 +501,9 @@ export const prismaModelFieldCatalogue = {
     "acceptedAt",
     "projectionVersion",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  TeamUser: [
+  "TeamUser": [
     "userId",
     "teamId",
     "role",
@@ -481,9 +512,9 @@ export const prismaModelFieldCatalogue = {
     "user",
     "team",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  OrganizationUser: [
+  "OrganizationUser": [
     "userId",
     "organizationId",
     "role",
@@ -494,9 +525,9 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "disabledAt",
     "pendingSsoGrantId",
-    "membershipStamp",
+    "membershipStamp"
   ],
-  Team: [
+  "Team": [
     "id",
     "name",
     "slug",
@@ -512,9 +543,9 @@ export const prismaModelFieldCatalogue = {
     "ownerUser",
     "ingestionSources",
     "aiToolEntryTeams",
-    "departmentId",
+    "departmentId"
   ],
-  Organization: [
+  "Organization": [
     "id",
     "name",
     "phoneNumber",
@@ -582,9 +613,9 @@ export const prismaModelFieldCatalogue = {
     "ingestionTemplates",
     "githubInstallations",
     "githubPullRequests",
-    "githubBranchPrChecks",
+    "githubBranchPrChecks"
   ],
-  IssuedLicense: [
+  "IssuedLicense": [
     "id",
     "licenseId",
     "tokenHash",
@@ -619,9 +650,9 @@ export const prismaModelFieldCatalogue = {
     "reportedMembersLite",
     "virtualKeyId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ActivationCode: [
+  "ActivationCode": [
     "id",
     "codeHash",
     "codeHint",
@@ -643,9 +674,9 @@ export const prismaModelFieldCatalogue = {
     "revokedById",
     "createdById",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ConnectedBillingAccount: [
+  "ConnectedBillingAccount": [
     "id",
     "organizationId",
     "organization",
@@ -664,9 +695,9 @@ export const prismaModelFieldCatalogue = {
     "pendingRenewal",
     "createdById",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ConnectedCreditGrant: [
+  "ConnectedCreditGrant": [
     "id",
     "accountId",
     "stripeCreditGrantId",
@@ -674,9 +705,9 @@ export const prismaModelFieldCatalogue = {
     "kind",
     "termEndsAt",
     "expiresAt",
-    "createdAt",
+    "createdAt"
   ],
-  ConnectedInvoice: [
+  "ConnectedInvoice": [
     "id",
     "accountId",
     "stripeInvoiceId",
@@ -687,9 +718,9 @@ export const prismaModelFieldCatalogue = {
     "paidOutOfBandAt",
     "termStartsAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ScimRequestLog: [
+  "ScimRequestLog": [
     "id",
     "organizationId",
     "organization",
@@ -699,9 +730,9 @@ export const prismaModelFieldCatalogue = {
     "status",
     "reason",
     "detail",
-    "occurredAt",
+    "occurredAt"
   ],
-  ScimToken: [
+  "ScimToken": [
     "id",
     "organizationId",
     "organization",
@@ -710,9 +741,9 @@ export const prismaModelFieldCatalogue = {
     "hashScheme",
     "description",
     "createdAt",
-    "lastUsedAt",
+    "lastUsedAt"
   ],
-  ScimExternalId: [
+  "ScimExternalId": [
     "organizationId",
     "id",
     "connectionId",
@@ -720,9 +751,9 @@ export const prismaModelFieldCatalogue = {
     "userId",
     "user",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ScimUserResource: [
+  "ScimUserResource": [
     "organizationId",
     "userId",
     "user",
@@ -731,10 +762,14 @@ export const prismaModelFieldCatalogue = {
     "active",
     "deletedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ScimDirectoryUser: ["organizationId", "connectionId", "userId"],
-  ScimSyncState: [
+  "ScimDirectoryUser": [
+    "organizationId",
+    "connectionId",
+    "userId"
+  ],
+  "ScimSyncState": [
     "id",
     "connectionId",
     "organizationId",
@@ -748,9 +783,9 @@ export const prismaModelFieldCatalogue = {
     "acceptedAt",
     "projectionVersion",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Project: [
+  "Project": [
     "id",
     "name",
     "slug",
@@ -813,28 +848,35 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "langyEgressAllowlist",
     "lastCodingAgentSessionAt",
-    "lastCodingAgentPullRequestAt",
+    "lastCodingAgentPullRequestAt"
   ],
-  Department: ["id", "organizationId", "name", "createdAt", "updatedAt", "archivedAt"],
-  DepartmentMembershipHistory: [
+  "Department": [
+    "id",
+    "organizationId",
+    "name",
+    "createdAt",
+    "updatedAt",
+    "archivedAt"
+  ],
+  "DepartmentMembershipHistory": [
     "id",
     "organizationId",
     "userId",
     "departmentId",
     "validFrom",
     "validTo",
-    "createdAt",
+    "createdAt"
   ],
-  PlatformToolPolicy: [
+  "PlatformToolPolicy": [
     "id",
     "organizationId",
     "toolSlug",
     "allowVk",
     "allowOtelDirect",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  OrganizationInvite: [
+  "OrganizationInvite": [
     "id",
     "email",
     "inviteCode",
@@ -851,9 +893,9 @@ export const prismaModelFieldCatalogue = {
     "acceptedByUserId",
     "acceptedViaIdentifierId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Monitor: [
+  "Monitor": [
     "id",
     "projectId",
     "project",
@@ -873,9 +915,9 @@ export const prismaModelFieldCatalogue = {
     "level",
     "threadIdleTimeout",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Cost: [
+  "Cost": [
     "id",
     "projectId",
     "project",
@@ -887,9 +929,9 @@ export const prismaModelFieldCatalogue = {
     "currency",
     "createdAt",
     "updatedAt",
-    "extraInfo",
+    "extraInfo"
   ],
-  Topic: [
+  "Topic": [
     "id",
     "projectId",
     "project",
@@ -903,9 +945,9 @@ export const prismaModelFieldCatalogue = {
     "automaticallyGenerated",
     "lastEventId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Dataset: [
+  "Dataset": [
     "id",
     "projectId",
     "project",
@@ -929,9 +971,9 @@ export const prismaModelFieldCatalogue = {
     "rowCount",
     "sizeBytes",
     "chunkCount",
-    "chunkOffsets",
+    "chunkOffsets"
   ],
-  DatasetRecord: [
+  "DatasetRecord": [
     "id",
     "datasetId",
     "dataset",
@@ -939,10 +981,19 @@ export const prismaModelFieldCatalogue = {
     "project",
     "entry",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Dashboard: ["id", "projectId", "project", "name", "order", "createdAt", "updatedAt", "graphs"],
-  SavedView: [
+  "Dashboard": [
+    "id",
+    "projectId",
+    "project",
+    "name",
+    "order",
+    "createdAt",
+    "updatedAt",
+    "graphs"
+  ],
+  "SavedView": [
     "id",
     "projectId",
     "project",
@@ -955,9 +1006,9 @@ export const prismaModelFieldCatalogue = {
     "order",
     "kind",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  CustomGraph: [
+  "CustomGraph": [
     "id",
     "projectId",
     "project",
@@ -974,9 +1025,9 @@ export const prismaModelFieldCatalogue = {
     "colSpan",
     "rowSpan",
     "trigger",
-    "TriggerSent",
+    "TriggerSent"
   ],
-  BatchEvaluation: [
+  "BatchEvaluation": [
     "id",
     "experimentId",
     "experiment",
@@ -994,9 +1045,9 @@ export const prismaModelFieldCatalogue = {
     "dataset",
     "evaluation",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Trigger: [
+  "Trigger": [
     "id",
     "name",
     "projectId",
@@ -1024,9 +1075,9 @@ export const prismaModelFieldCatalogue = {
     "TriggerSent",
     "webhookDeliveries",
     "customGraphId",
-    "customGraph",
+    "customGraph"
   ],
-  WebhookEndpoint: [
+  "WebhookEndpoint": [
     "id",
     "organizationId",
     "organization",
@@ -1053,9 +1104,9 @@ export const prismaModelFieldCatalogue = {
     "archivedAt",
     "createdAt",
     "updatedAt",
-    "deliveries",
+    "deliveries"
   ],
-  WebhookEndpointDelivery: [
+  "WebhookEndpointDelivery": [
     "id",
     "channel",
     "organizationId",
@@ -1074,9 +1125,9 @@ export const prismaModelFieldCatalogue = {
     "response",
     "outcome",
     "firedAt",
-    "createdAt",
+    "createdAt"
   ],
-  Experiment: [
+  "Experiment": [
     "id",
     "name",
     "type",
@@ -1091,9 +1142,9 @@ export const prismaModelFieldCatalogue = {
     "batchEvaluations",
     "workbenchState",
     "monitor",
-    "workbenchVersion",
+    "workbenchVersion"
   ],
-  ExperimentVersion: [
+  "ExperimentVersion": [
     "id",
     "experimentId",
     "projectId",
@@ -1107,9 +1158,9 @@ export const prismaModelFieldCatalogue = {
     "state",
     "schemaVersion",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Annotation: [
+  "Annotation": [
     "id",
     "projectId",
     "project",
@@ -1125,9 +1176,9 @@ export const prismaModelFieldCatalogue = {
     "expectedOutput",
     "anchorKind",
     "anchorId",
-    "anchorPath",
+    "anchorPath"
   ],
-  ModelProvider: [
+  "ModelProvider": [
     "id",
     "name",
     "provider",
@@ -1152,27 +1203,34 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "scopes",
-    "organizationId",
+    "organizationId"
   ],
-  ModelProviderScope: [
+  "ModelProviderScope": [
     "id",
     "modelProviderId",
     "modelProvider",
     "scopeType",
     "scopeId",
-    "createdAt",
+    "createdAt"
   ],
-  ModelDefaultConfig: [
+  "ModelDefaultConfig": [
     "id",
     "config",
     "authorId",
     "createdAt",
     "updatedAt",
     "scopes",
-    "organizationId",
+    "organizationId"
   ],
-  ModelDefaultConfigScope: ["id", "configId", "config", "scopeType", "scopeId", "createdAt"],
-  GithubInstallation: [
+  "ModelDefaultConfigScope": [
+    "id",
+    "configId",
+    "config",
+    "scopeType",
+    "scopeId",
+    "createdAt"
+  ],
+  "GithubInstallation": [
     "id",
     "installationId",
     "organizationId",
@@ -1184,9 +1242,9 @@ export const prismaModelFieldCatalogue = {
     "repositories",
     "suspendedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  GithubPullRequest: [
+  "GithubPullRequest": [
     "id",
     "organizationId",
     "organization",
@@ -1206,9 +1264,9 @@ export const prismaModelFieldCatalogue = {
     "mappedAt",
     "lastCheckedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  GithubBranchPullRequestCheck: [
+  "GithubBranchPullRequestCheck": [
     "id",
     "organizationId",
     "organization",
@@ -1222,9 +1280,9 @@ export const prismaModelFieldCatalogue = {
     "attempts",
     "lastRequestedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  LangyConversationProjection: [
+  "LangyConversationProjection": [
     "id",
     "projectId",
     "ConversationId",
@@ -1249,9 +1307,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  LangyTurnRequest: [
+  "LangyTurnRequest": [
     "id",
     "projectId",
     "userId",
@@ -1262,9 +1320,9 @@ export const prismaModelFieldCatalogue = {
     "leaseOwner",
     "leaseExpiresAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  LangyActiveTurn: [
+  "LangyActiveTurn": [
     "id",
     "projectId",
     "conversationId",
@@ -1275,9 +1333,9 @@ export const prismaModelFieldCatalogue = {
     "leaseOwner",
     "leaseExpiresAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  LangyConversationTurnProjection: [
+  "LangyConversationTurnProjection": [
     "id",
     "projectId",
     "ConversationId",
@@ -1295,9 +1353,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  LangyMessageProjection: [
+  "LangyMessageProjection": [
     "id",
     "projectId",
     "ConversationId",
@@ -1308,9 +1366,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "CreatedAt",
-    "UpdatedAt",
+    "UpdatedAt"
   ],
-  ProjectSecret: [
+  "ProjectSecret": [
     "id",
     "projectId",
     "project",
@@ -1321,9 +1379,9 @@ export const prismaModelFieldCatalogue = {
     "updatedById",
     "updatedBy",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  TriggerSent: [
+  "TriggerSent": [
     "id",
     "triggerId",
     "traceId",
@@ -1335,10 +1393,18 @@ export const prismaModelFieldCatalogue = {
     "resolvedAt",
     "openIncidentKey",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  EmailSuppression: ["id", "projectId", "project", "email", "triggerId", "reason", "createdAt"],
-  AnnotationScore: [
+  "EmailSuppression": [
+    "id",
+    "projectId",
+    "project",
+    "email",
+    "triggerId",
+    "reason",
+    "createdAt"
+  ],
+  "AnnotationScore": [
     "id",
     "name",
     "projectId",
@@ -1352,9 +1418,9 @@ export const prismaModelFieldCatalogue = {
     "options",
     "defaultValue",
     "global",
-    "AnnotationQueueScores",
+    "AnnotationQueueScores"
   ],
-  AnnotationQueue: [
+  "AnnotationQueue": [
     "id",
     "name",
     "slug",
@@ -1365,16 +1431,21 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "AnnotationQueueScores",
-    "AnnotationQueueItems",
+    "AnnotationQueueItems"
   ],
-  AnnotationQueueMembers: ["annotationQueueId", "userId", "user", "annotationQueue"],
-  AnnotationQueueScores: [
+  "AnnotationQueueMembers": [
+    "annotationQueueId",
+    "userId",
+    "user",
+    "annotationQueue"
+  ],
+  "AnnotationQueueScores": [
     "annotationQueueId",
     "annotationScoreId",
     "annotationScore",
-    "annotationQueue",
+    "annotationQueue"
   ],
-  AnnotationQueueItem: [
+  "AnnotationQueueItem": [
     "id",
     "annotationQueueId",
     "annotationQueue",
@@ -1388,9 +1459,9 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "doneAt",
     "markedForDatasetAt",
-    "project",
+    "project"
   ],
-  ShareLink: [
+  "ShareLink": [
     "id",
     "token",
     "resourceType",
@@ -1405,9 +1476,9 @@ export const prismaModelFieldCatalogue = {
     "maxViews",
     "viewCount",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  PinnedTrace: [
+  "PinnedTrace": [
     "id",
     "projectId",
     "project",
@@ -1416,9 +1487,9 @@ export const prismaModelFieldCatalogue = {
     "user",
     "source",
     "reason",
-    "createdAt",
+    "createdAt"
   ],
-  TraceEditOverlay: [
+  "TraceEditOverlay": [
     "id",
     "projectId",
     "project",
@@ -1429,9 +1500,9 @@ export const prismaModelFieldCatalogue = {
     "updatedById",
     "updatedBy",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  RetentionPolicy: [
+  "RetentionPolicy": [
     "id",
     "organizationId",
     "scopeType",
@@ -1439,9 +1510,9 @@ export const prismaModelFieldCatalogue = {
     "category",
     "retentionDays",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  DataPrivacyPolicy: [
+  "DataPrivacyPolicy": [
     "id",
     "organizationId",
     "scopeType",
@@ -1449,9 +1520,9 @@ export const prismaModelFieldCatalogue = {
     "personalOnly",
     "config",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  CustomLLMModelCost: [
+  "CustomLLMModelCost": [
     "id",
     "organizationId",
     "scopeType",
@@ -1465,9 +1536,9 @@ export const prismaModelFieldCatalogue = {
     "cacheCreationCostPerToken",
     "cacheCreation1hCostPerToken",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Workflow: [
+  "Workflow": [
     "id",
     "projectId",
     "project",
@@ -1492,9 +1563,9 @@ export const prismaModelFieldCatalogue = {
     "copiedFrom",
     "copiedWorkflows",
     "agents",
-    "evaluators",
+    "evaluators"
   ],
-  WorkflowVersion: [
+  "WorkflowVersion": [
     "id",
     "version",
     "commitMessage",
@@ -1512,9 +1583,9 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "dsl",
     "WorkflowAsLatestVersion",
-    "WorkflowAsCurrentVersion",
+    "WorkflowAsCurrentVersion"
   ],
-  AuditLog: [
+  "AuditLog": [
     "id",
     "createdAt",
     "userId",
@@ -1530,9 +1601,9 @@ export const prismaModelFieldCatalogue = {
     "targetKind",
     "targetId",
     "before",
-    "after",
+    "after"
   ],
-  LlmPromptConfig: [
+  "LlmPromptConfig": [
     "id",
     "handle",
     "name",
@@ -1547,9 +1618,9 @@ export const prismaModelFieldCatalogue = {
     "copiedFrom",
     "copiedPrompts",
     "versions",
-    "versionTags",
+    "versionTags"
   ],
-  LlmPromptConfigVersion: [
+  "LlmPromptConfigVersion": [
     "id",
     "version",
     "commitMessage",
@@ -1562,9 +1633,9 @@ export const prismaModelFieldCatalogue = {
     "runtimeParameters",
     "createdAt",
     "projectId",
-    "versionTags",
+    "versionTags"
   ],
-  PromptTagAssignment: [
+  "PromptTagAssignment": [
     "id",
     "configId",
     "config",
@@ -1578,9 +1649,9 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "createdBy",
     "updatedById",
-    "updatedBy",
+    "updatedBy"
   ],
-  PromptTag: [
+  "PromptTag": [
     "id",
     "organizationId",
     "organization",
@@ -1591,9 +1662,9 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "createdBy",
     "updatedById",
-    "updatedBy",
+    "updatedBy"
   ],
-  Analytics: [
+  "Analytics": [
     "id",
     "projectId",
     "project",
@@ -1602,9 +1673,9 @@ export const prismaModelFieldCatalogue = {
     "numericValue",
     "stringValue",
     "boolValue",
-    "createdAt",
+    "createdAt"
   ],
-  CustomRole: [
+  "CustomRole": [
     "id",
     "organizationId",
     "organization",
@@ -1615,9 +1686,9 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "assignedUsers",
-    "roleBindings",
+    "roleBindings"
   ],
-  Notification: [
+  "Notification": [
     "id",
     "organizationId",
     "organization",
@@ -1626,9 +1697,9 @@ export const prismaModelFieldCatalogue = {
     "metadata",
     "createdAt",
     "updatedAt",
-    "sentAt",
+    "sentAt"
   ],
-  Agent: [
+  "Agent": [
     "id",
     "projectId",
     "project",
@@ -1647,9 +1718,9 @@ export const prismaModelFieldCatalogue = {
     "lastSeenAt",
     "archivedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Evaluator: [
+  "Evaluator": [
     "id",
     "projectId",
     "project",
@@ -1666,9 +1737,9 @@ export const prismaModelFieldCatalogue = {
     "gatewayGuardrails",
     "archivedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Scenario: [
+  "Scenario": [
     "id",
     "projectId",
     "project",
@@ -1691,9 +1762,9 @@ export const prismaModelFieldCatalogue = {
     "lastUpdatedBy",
     "archivedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ScenarioVersion: [
+  "ScenarioVersion": [
     "id",
     "scenarioId",
     "scenario",
@@ -1704,9 +1775,9 @@ export const prismaModelFieldCatalogue = {
     "changeDescription",
     "snapshot",
     "schemaVersion",
-    "createdAt",
+    "createdAt"
   ],
-  SimulationSuite: [
+  "SimulationSuite": [
     "id",
     "projectId",
     "project",
@@ -1726,9 +1797,9 @@ export const prismaModelFieldCatalogue = {
     "testSuiteScenarios",
     "archivedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Subscription: [
+  "Subscription": [
     "id",
     "organizationId",
     "plan",
@@ -1757,9 +1828,9 @@ export const prismaModelFieldCatalogue = {
     "maxCustomGraphs",
     "maxAutomations",
     "organization",
-    "invoices",
+    "invoices"
   ],
-  Invoice: [
+  "Invoice": [
     "id",
     "subscriptionId",
     "totalAmount",
@@ -1769,10 +1840,18 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "subscription",
-    "lineItems",
+    "lineItems"
   ],
-  InvoiceItem: ["id", "invoiceId", "description", "amount", "createdAt", "updatedAt", "invoice"],
-  Group: [
+  "InvoiceItem": [
+    "id",
+    "invoiceId",
+    "description",
+    "amount",
+    "createdAt",
+    "updatedAt",
+    "invoice"
+  ],
+  "Group": [
     "id",
     "organizationId",
     "organization",
@@ -1784,10 +1863,16 @@ export const prismaModelFieldCatalogue = {
     "members",
     "roleBindings",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  GroupMembership: ["userId", "groupId", "user", "group", "createdAt"],
-  RoleBinding: [
+  "GroupMembership": [
+    "userId",
+    "groupId",
+    "user",
+    "group",
+    "createdAt"
+  ],
+  "RoleBinding": [
     "id",
     "organizationId",
     "organization",
@@ -1803,9 +1888,9 @@ export const prismaModelFieldCatalogue = {
     "scopeType",
     "scopeId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Grant: [
+  "Grant": [
     "id",
     "organizationId",
     "principalType",
@@ -1826,18 +1911,18 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "revokedAt",
-    "revokedReason",
+    "revokedReason"
   ],
-  GrantUsage: [
+  "GrantUsage": [
     "grantId",
     "organizationId",
     "projectId",
     "viewCount",
     "lastViewedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  Role: [
+  "Role": [
     "id",
     "organizationId",
     "name",
@@ -1847,9 +1932,9 @@ export const prismaModelFieldCatalogue = {
     "occurredAt",
     "createdAt",
     "updatedAt",
-    "deletedAt",
+    "deletedAt"
   ],
-  ApiKey: [
+  "ApiKey": [
     "id",
     "name",
     "description",
@@ -1871,10 +1956,15 @@ export const prismaModelFieldCatalogue = {
     "ingestionTemplateId",
     "createdByDeviceLabel",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ProjectActiveDay: ["id", "projectId", "day", "createdAt"],
-  BillingMeterCheckpoint: [
+  "ProjectActiveDay": [
+    "id",
+    "projectId",
+    "day",
+    "createdAt"
+  ],
+  "BillingMeterCheckpoint": [
     "id",
     "organizationId",
     "billingMonth",
@@ -1882,9 +1972,9 @@ export const prismaModelFieldCatalogue = {
     "lastReportedTotal",
     "pendingReportedTotal",
     "consecutiveFailures",
-    "updatedAt",
+    "updatedAt"
   ],
-  VirtualKey: [
+  "VirtualKey": [
     "id",
     "organizationId",
     "name",
@@ -1919,10 +2009,17 @@ export const prismaModelFieldCatalogue = {
     "connectServices",
     "licenseTokenHash",
     "licenseInstanceId",
-    "licenseExpiresAt",
+    "licenseExpiresAt"
   ],
-  VirtualKeyScope: ["id", "virtualKeyId", "virtualKey", "scopeType", "scopeId", "createdAt"],
-  RoutingPolicy: [
+  "VirtualKeyScope": [
+    "id",
+    "virtualKeyId",
+    "virtualKey",
+    "scopeType",
+    "scopeId",
+    "createdAt"
+  ],
+  "RoutingPolicy": [
     "id",
     "organizationId",
     "organization",
@@ -1940,17 +2037,17 @@ export const prismaModelFieldCatalogue = {
     "updatedById",
     "updatedBy",
     "virtualKeys",
-    "scopes",
+    "scopes"
   ],
-  RoutingPolicyScope: [
+  "RoutingPolicyScope": [
     "id",
     "routingPolicyId",
     "routingPolicy",
     "scopeType",
     "scopeId",
-    "createdAt",
+    "createdAt"
   ],
-  GatewayGuardrail: [
+  "GatewayGuardrail": [
     "id",
     "projectId",
     "project",
@@ -1966,9 +2063,9 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "createdBy",
     "updatedById",
-    "updatedBy",
+    "updatedBy"
   ],
-  IngestionSource: [
+  "IngestionSource": [
     "id",
     "organizationId",
     "organization",
@@ -1995,9 +2092,9 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "createdById",
-    "createdBy",
+    "createdBy"
   ],
-  AnomalyRule: [
+  "AnomalyRule": [
     "id",
     "organizationId",
     "organization",
@@ -2015,9 +2112,9 @@ export const prismaModelFieldCatalogue = {
     "updatedAt",
     "createdById",
     "createdBy",
-    "alerts",
+    "alerts"
   ],
-  AnomalyAlert: [
+  "AnomalyAlert": [
     "id",
     "organizationId",
     "organization",
@@ -2035,9 +2132,9 @@ export const prismaModelFieldCatalogue = {
     "destinationStatus",
     "detectedAt",
     "acknowledgedAt",
-    "resolvedAt",
+    "resolvedAt"
   ],
-  AiToolEntry: [
+  "AiToolEntry": [
     "id",
     "organizationId",
     "organization",
@@ -2057,11 +2154,22 @@ export const prismaModelFieldCatalogue = {
     "createdById",
     "updatedById",
     "teams",
-    "departments",
+    "departments"
   ],
-  AiToolEntryTeam: ["id", "entryId", "teamId", "entry", "team"],
-  AiToolEntryDepartment: ["id", "entryId", "departmentId", "entry"],
-  IngestionTemplate: [
+  "AiToolEntryTeam": [
+    "id",
+    "entryId",
+    "teamId",
+    "entry",
+    "team"
+  ],
+  "AiToolEntryDepartment": [
+    "id",
+    "entryId",
+    "departmentId",
+    "entry"
+  ],
+  "IngestionTemplate": [
     "id",
     "organizationId",
     "organization",
@@ -2078,16 +2186,16 @@ export const prismaModelFieldCatalogue = {
     "createdAt",
     "updatedAt",
     "createdById",
-    "updatedById",
+    "updatedById"
   ],
-  GatewayConnectUpstream: [
+  "GatewayConnectUpstream": [
     "organizationId",
     "baseUrl",
     "encryptedToken",
     "instanceId",
-    "updatedAt",
+    "updatedAt"
   ],
-  GatewayBudget: [
+  "GatewayBudget": [
     "id",
     "organizationId",
     "scopeType",
@@ -2113,9 +2221,9 @@ export const prismaModelFieldCatalogue = {
     "createdBy",
     "ledgerEntries",
     "bucketBoundaries",
-    "managedByVirtualKeyId",
+    "managedByVirtualKeyId"
   ],
-  GatewayBudgetBucketBoundary: [
+  "GatewayBudgetBucketBoundary": [
     "id",
     "organizationId",
     "budgetId",
@@ -2123,9 +2231,9 @@ export const prismaModelFieldCatalogue = {
     "bucketScopeId",
     "periodStartedAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  GatewayBudgetLedger: [
+  "GatewayBudgetLedger": [
     "id",
     "budgetId",
     "budget",
@@ -2142,9 +2250,9 @@ export const prismaModelFieldCatalogue = {
     "model",
     "durationMs",
     "status",
-    "occurredAt",
+    "occurredAt"
   ],
-  GatewayChangeEvent: [
+  "GatewayChangeEvent": [
     "revision",
     "organizationId",
     "organization",
@@ -2155,9 +2263,9 @@ export const prismaModelFieldCatalogue = {
     "projectId",
     "project",
     "payload",
-    "createdAt",
+    "createdAt"
   ],
-  GatewayCacheRule: [
+  "GatewayCacheRule": [
     "id",
     "organizationId",
     "name",
@@ -2170,19 +2278,26 @@ export const prismaModelFieldCatalogue = {
     "archivedAt",
     "createdAt",
     "updatedAt",
-    "createdById",
+    "createdById"
   ],
-  FeatureFlag: ["key", "enabled", "rules", "lastEditedBy", "createdAt", "updatedAt"],
-  FeatureFlagExperimentSetting: [
+  "FeatureFlag": [
+    "key",
+    "enabled",
+    "rules",
+    "lastEditedBy",
+    "createdAt",
+    "updatedAt"
+  ],
+  "FeatureFlagExperimentSetting": [
     "flagKey",
     "subjectType",
     "subjectId",
     "enabled",
     "changedByUserId",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ProcessManagerInstance: [
+  "ProcessManagerInstance": [
     "id",
     "processName",
     "projectId",
@@ -2192,9 +2307,9 @@ export const prismaModelFieldCatalogue = {
     "state",
     "revision",
     "nextWakeAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ProcessManagerInbox: [
+  "ProcessManagerInbox": [
     "id",
     "processName",
     "projectId",
@@ -2202,9 +2317,9 @@ export const prismaModelFieldCatalogue = {
     "tenantId",
     "sourceEventId",
     "sourceEventKey",
-    "consumedAt",
+    "consumedAt"
   ],
-  ProcessManagerOutbox: [
+  "ProcessManagerOutbox": [
     "id",
     "processName",
     "projectId",
@@ -2224,9 +2339,9 @@ export const prismaModelFieldCatalogue = {
     "dispatchedAt",
     "createdAt",
     "updatedAt",
-    "attemptLog",
+    "attemptLog"
   ],
-  ProcessManagerOutboxAttempt: [
+  "ProcessManagerOutboxAttempt": [
     "id",
     "outboxId",
     "projectId",
@@ -2236,9 +2351,9 @@ export const prismaModelFieldCatalogue = {
     "errorType",
     "errorMessage",
     "retryAfterMs",
-    "outbox",
+    "outbox"
   ],
-  TopicClusteringRunProjection: [
+  "TopicClusteringRunProjection": [
     "id",
     "projectId",
     "LastRequestedAt",
@@ -2263,9 +2378,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  TopicModelProjection: [
+  "TopicModelProjection": [
     "id",
     "projectId",
     "CreatedAt",
@@ -2273,9 +2388,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  TopicClusteringRunHistoryProjection: [
+  "TopicClusteringRunHistoryProjection": [
     "id",
     "projectId",
     "Runs",
@@ -2284,9 +2399,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  IngestionPullRunProjection: [
+  "IngestionPullRunProjection": [
     "id",
     "sourceId",
     "projectId",
@@ -2319,9 +2434,9 @@ export const prismaModelFieldCatalogue = {
     "OccurredAt",
     "AcceptedAt",
     "LastEventId",
-    "ProjectionVersion",
+    "ProjectionVersion"
   ],
-  ScheduledJob: [
+  "ScheduledJob": [
     "id",
     "projectId",
     "targetType",
@@ -2335,9 +2450,9 @@ export const prismaModelFieldCatalogue = {
     "lastError",
     "active",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  BugReport: [
+  "BugReport": [
     "id",
     "createdAt",
     "source",
@@ -2350,9 +2465,9 @@ export const prismaModelFieldCatalogue = {
     "contactEmail",
     "cliVersion",
     "linkedProjectId",
-    "metadata",
+    "metadata"
   ],
-  IdempotencyReceipt: [
+  "IdempotencyReceipt": [
     "id",
     "scopeId",
     "key",
@@ -2362,9 +2477,9 @@ export const prismaModelFieldCatalogue = {
     "responseBody",
     "createdAt",
     "heartbeatAt",
-    "expiresAt",
+    "expiresAt"
   ],
-  GatewayRealtimeSession: [
+  "GatewayRealtimeSession": [
     "id",
     "projectId",
     "organizationId",
@@ -2382,19 +2497,24 @@ export const prismaModelFieldCatalogue = {
     "traceId",
     "vendorCostRaw",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SystemMigrationTenantState: [
+  "SystemMigrationTenantState": [
     "migrationName",
     "tenantId",
     "status",
     "report",
     "occurredAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SystemMigrationEnrollment: ["organizationId", "migrationName", "enrolledByUserId", "createdAt"],
-  StoredObject: [
+  "SystemMigrationEnrollment": [
+    "organizationId",
+    "migrationName",
+    "enrolledByUserId",
+    "createdAt"
+  ],
+  "StoredObject": [
     "tenantId",
     "id",
     "status",
@@ -2417,9 +2537,9 @@ export const prismaModelFieldCatalogue = {
     "source",
     "legacyFingerprint",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  DiscoveredPerson: [
+  "DiscoveredPerson": [
     "id",
     "organizationId",
     "provider",
@@ -2435,9 +2555,9 @@ export const prismaModelFieldCatalogue = {
     "suspendedAt",
     "suspendedReason",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  DiscoveredAgent: [
+  "DiscoveredAgent": [
     "id",
     "organizationId",
     "provider",
@@ -2447,9 +2567,9 @@ export const prismaModelFieldCatalogue = {
     "firstSeenAt",
     "lastSeenAt",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  IdentityMatch: [
+  "IdentityMatch": [
     "id",
     "organizationId",
     "discoveredPersonId",
@@ -2457,19 +2577,31 @@ export const prismaModelFieldCatalogue = {
     "evidenceKind",
     "validFrom",
     "validTo",
-    "createdAt",
+    "createdAt"
   ],
-  GovernanceTenantHistory: ["id", "organizationId", "tenantId", "firstUsedAt", "lastUsedAt"],
-  ErasedIdentifierSuppression: ["id", "organizationId", "provider", "identifierHash", "erasedAt"],
-  IdentityMatchSuggestion: [
+  "GovernanceTenantHistory": [
+    "id",
+    "organizationId",
+    "tenantId",
+    "firstUsedAt",
+    "lastUsedAt"
+  ],
+  "ErasedIdentifierSuppression": [
+    "id",
+    "organizationId",
+    "provider",
+    "identifierHash",
+    "erasedAt"
+  ],
+  "IdentityMatchSuggestion": [
     "id",
     "organizationId",
     "discoveredPersonId",
     "userId",
     "score",
-    "computedAt",
+    "computedAt"
   ],
-  ConnectedSeatChange: [
+  "ConnectedSeatChange": [
     "id",
     "licenseId",
     "accountId",
@@ -2481,10 +2613,15 @@ export const prismaModelFieldCatalogue = {
     "stripeInvoiceId",
     "state",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  ConnectedStatement: ["id", "accountId", "month", "sentAt"],
-  InstanceIdentity: [
+  "ConnectedStatement": [
+    "id",
+    "accountId",
+    "month",
+    "sentAt"
+  ],
+  "InstanceIdentity": [
     "id",
     "instanceId",
     "createdAt",
@@ -2492,9 +2629,9 @@ export const prismaModelFieldCatalogue = {
     "lastReportError",
     "optionalMetricsOptOut",
     "hostnameOptOut",
-    "startupNoticeAcknowledgedSchemaVersion",
+    "startupNoticeAcknowledgedSchemaVersion"
   ],
-  SelfHostedInstance: [
+  "SelfHostedInstance": [
     "id",
     "instanceId",
     "firstSeenAt",
@@ -2517,588 +2654,588 @@ export const prismaModelFieldCatalogue = {
     "lastUnknownFields",
     "raisedSignals",
     "createdAt",
-    "updatedAt",
+    "updatedAt"
   ],
-  SelfHostedInstanceReport: [
+  "SelfHostedInstanceReport": [
     "id",
     "instanceId",
     "receivedAt",
     "version",
     "reportSchemaVersion",
     "unknownFields",
-    "payload",
-  ],
+    "payload"
+  ]
 } as const;
 
 export const prismaRelationCatalogue = {
-  Account: {
-    user: "User",
-  },
-  AccountCredential: {
-    user: "User",
-  },
-  Session: {
-    user: "User",
-  },
-  User: {
-    accounts: "Account",
-    accountCredentials: "AccountCredential",
-    sessions: "Session",
-    twoFactors: "TwoFactor",
-    passkeys: "Passkey",
-    teamMemberships: "TeamUser",
-    orgMemberships: "OrganizationUser",
-    scimUserResources: "ScimUserResource",
-    Annotation: "Annotation",
-    shareLinks: "ShareLink",
-    Workflow: "Workflow",
-    WorkflowVersion: "WorkflowVersion",
-    annotationQueues: "AnnotationQueueMembers",
-    assignedQueueItems: "AnnotationQueueItem",
-    createdQueueItems: "AnnotationQueueItem",
-    llmPromptConfigVersions: "LlmPromptConfigVersion",
-    scenarios: "Scenario",
-    inviteRequests: "OrganizationInvite",
-    secretsCreated: "ProjectSecret",
-    secretsUpdated: "ProjectSecret",
-    savedViews: "SavedView",
-    versionTagsCreated: "PromptTagAssignment",
-    versionTagsUpdated: "PromptTagAssignment",
-    promptTagsCreated: "PromptTag",
-    promptTagsUpdated: "PromptTag",
-    groupMemberships: "GroupMembership",
-    roleBindings: "RoleBinding",
-    scimExternalIds: "ScimExternalId",
-    apiKeys: "ApiKey",
-    gatewayBudgetsCreated: "GatewayBudget",
-    principalVirtualKeys: "VirtualKey",
-    personalTeams: "Team",
-    personalProjects: "Project",
-    routingPoliciesCreated: "RoutingPolicy",
-    routingPoliciesUpdated: "RoutingPolicy",
-    gatewayGuardrailsCreated: "GatewayGuardrail",
-    gatewayGuardrailsUpdated: "GatewayGuardrail",
-    ingestionSourcesCreated: "IngestionSource",
-    anomalyRulesCreated: "AnomalyRule",
-    pinnedTraces: "PinnedTrace",
-    traceEditOverlaysCreated: "TraceEditOverlay",
-    traceEditOverlaysUpdated: "TraceEditOverlay",
-  },
-  VerificationToken: {},
-  Identifier: {},
-  IdentifierReservation: {},
-  IdentityProjectionCursor: {},
-  TwoFactor: {
-    user: "User",
-  },
-  SignInAttemptLock: {},
-  Passkey: {
-    user: "User",
-  },
-  MfaEnrollment: {},
-  SsoConnection: {
-    reproofCursor: "SsoConnectionReproofCursor",
-  },
-  SsoConnectionRegistrationSlot: {},
-  SsoConnectionReproofCursor: {
-    connection: "SsoConnection",
-  },
-  SsoCredential: {},
-  SsoVerifiedDomain: {
-    holders: "SsoVerifiedDomainHolder",
-  },
-  SsoVerifiedDomainHolder: {
-    ownership: "SsoVerifiedDomain",
-  },
-  SsoAuthenticationActivity: {},
-  SsoProvider: {},
-  SsoBreakGlassBinding: {},
-  SsoActivationRecoveryReservation: {},
-  JoinRequest: {},
-  TeamUser: {
-    assignedRole: "CustomRole",
-    user: "User",
-    team: "Team",
-  },
-  OrganizationUser: {
-    user: "User",
-    organization: "Organization",
-  },
-  Team: {
-    members: "TeamUser",
-    organization: "Organization",
-    projects: "Project",
-    ownerUser: "User",
-    ingestionSources: "IngestionSource",
-    aiToolEntryTeams: "AiToolEntryTeam",
-  },
-  Organization: {
-    members: "OrganizationUser",
-    teams: "Team",
-    webhookEndpoints: "WebhookEndpoint",
-    OrganizationInvite: "OrganizationInvite",
-    CustomRoles: "CustomRole",
-    notifications: "Notification",
-    subscriptions: "Subscription",
-    scimTokens: "ScimToken",
-    scimRequestLog: "ScimRequestLog",
-    promptTags: "PromptTag",
-    groups: "Group",
-    roleBindings: "RoleBinding",
-    apiKeys: "ApiKey",
-    issuedLicenses: "IssuedLicense",
-    connectedBilling: "ConnectedBillingAccount",
-    gatewayChangeEvents: "GatewayChangeEvent",
-    routingPolicies: "RoutingPolicy",
-    ingestionSources: "IngestionSource",
-    anomalyRules: "AnomalyRule",
-    anomalyAlerts: "AnomalyAlert",
-    aiToolEntries: "AiToolEntry",
-    ingestionTemplates: "IngestionTemplate",
-    githubInstallations: "GithubInstallation",
-    githubPullRequests: "GithubPullRequest",
-    githubBranchPrChecks: "GithubBranchPullRequestCheck",
-  },
-  IssuedLicense: {
-    organization: "Organization",
-  },
-  ActivationCode: {},
-  ConnectedBillingAccount: {
-    organization: "Organization",
-  },
-  ConnectedCreditGrant: {},
-  ConnectedInvoice: {},
-  ScimRequestLog: {
-    organization: "Organization",
-  },
-  ScimToken: {
-    organization: "Organization",
-  },
-  ScimExternalId: {
-    user: "User",
-  },
-  ScimUserResource: {
-    user: "User",
-  },
-  ScimDirectoryUser: {},
-  ScimSyncState: {},
-  Project: {
-    team: "Team",
-    checks: "Monitor",
-    costs: "Cost",
-    topics: "Topic",
-    datasets: "Dataset",
-    datasetRecords: "DatasetRecord",
-    customGraphs: "CustomGraph",
-    dashboards: "Dashboard",
-    batchEvaluations: "BatchEvaluation",
-    triggers: "Trigger",
-    experiments: "Experiment",
-    annotations: "Annotation",
-    projectSecrets: "ProjectSecret",
-    TriggerSent: "TriggerSent",
-    webhookDeliveries: "WebhookEndpointDelivery",
-    annotationScores: "AnnotationScore",
-    shareLinks: "ShareLink",
-    workflows: "Workflow",
-    WorkflowVersion: "WorkflowVersion",
-    AnnotationQueue: "AnnotationQueue",
-    AnnotationQueueItem: "AnnotationQueueItem",
-    llmPromptConfigs: "LlmPromptConfig",
-    analytics: "Analytics",
-    notifications: "Notification",
-    agents: "Agent",
-    evaluators: "Evaluator",
-    scenarios: "Scenario",
-    suiteConfigurations: "SimulationSuite",
-    savedViews: "SavedView",
-    gatewayGuardrails: "GatewayGuardrail",
-    gatewayChangeEvents: "GatewayChangeEvent",
-    pinnedTraces: "PinnedTrace",
-    traceEditOverlays: "TraceEditOverlay",
-    emailSuppressions: "EmailSuppression",
-    ownerUser: "User",
-  },
-  Department: {},
-  DepartmentMembershipHistory: {},
-  PlatformToolPolicy: {},
-  OrganizationInvite: {
-    organization: "Organization",
-    requestedByUser: "User",
-  },
-  Monitor: {
-    project: "Project",
-    experiment: "Experiment",
-    evaluator: "Evaluator",
-  },
-  Cost: {
-    project: "Project",
-  },
-  Topic: {
-    project: "Project",
-    parent: "Topic",
-    subtopics: "Topic",
-  },
-  Dataset: {
-    project: "Project",
-    datasetRecords: "DatasetRecord",
-    batchEvaluations: "BatchEvaluation",
-  },
-  DatasetRecord: {
-    dataset: "Dataset",
-    project: "Project",
-  },
-  Dashboard: {
-    project: "Project",
-    graphs: "CustomGraph",
-  },
-  SavedView: {
-    project: "Project",
-    user: "User",
-  },
-  CustomGraph: {
-    project: "Project",
-    dashboard: "Dashboard",
-    trigger: "Trigger",
-    TriggerSent: "TriggerSent",
-  },
-  BatchEvaluation: {
-    experiment: "Experiment",
-    project: "Project",
-    dataset: "Dataset",
-  },
-  Trigger: {
-    project: "Project",
-    TriggerSent: "TriggerSent",
-    webhookDeliveries: "WebhookEndpointDelivery",
-    customGraph: "CustomGraph",
-  },
-  WebhookEndpoint: {
-    organization: "Organization",
-    deliveries: "WebhookEndpointDelivery",
-  },
-  WebhookEndpointDelivery: {
-    endpoint: "WebhookEndpoint",
-    project: "Project",
-    trigger: "Trigger",
-  },
-  Experiment: {
-    project: "Project",
-    workflow: "Workflow",
-    batchEvaluations: "BatchEvaluation",
-    monitor: "Monitor",
-  },
-  ExperimentVersion: {},
-  Annotation: {
-    project: "Project",
-    user: "User",
-  },
-  ModelProvider: {
-    scopes: "ModelProviderScope",
-  },
-  ModelProviderScope: {
-    modelProvider: "ModelProvider",
-  },
-  ModelDefaultConfig: {
-    scopes: "ModelDefaultConfigScope",
-  },
-  ModelDefaultConfigScope: {
-    config: "ModelDefaultConfig",
-  },
-  GithubInstallation: {
-    organization: "Organization",
-  },
-  GithubPullRequest: {
-    organization: "Organization",
-  },
-  GithubBranchPullRequestCheck: {
-    organization: "Organization",
-  },
-  LangyConversationProjection: {},
-  LangyTurnRequest: {},
-  LangyActiveTurn: {},
-  LangyConversationTurnProjection: {},
-  LangyMessageProjection: {},
-  ProjectSecret: {
-    project: "Project",
-    createdBy: "User",
-    updatedBy: "User",
-  },
-  TriggerSent: {
-    customGraph: "CustomGraph",
-    project: "Project",
-    trigger: "Trigger",
-  },
-  EmailSuppression: {
-    project: "Project",
-  },
-  AnnotationScore: {
-    project: "Project",
-    AnnotationQueueScores: "AnnotationQueueScores",
-  },
-  AnnotationQueue: {
-    project: "Project",
-    members: "AnnotationQueueMembers",
-    AnnotationQueueScores: "AnnotationQueueScores",
-    AnnotationQueueItems: "AnnotationQueueItem",
-  },
-  AnnotationQueueMembers: {
-    user: "User",
-    annotationQueue: "AnnotationQueue",
-  },
-  AnnotationQueueScores: {
-    annotationScore: "AnnotationScore",
-    annotationQueue: "AnnotationQueue",
-  },
-  AnnotationQueueItem: {
-    annotationQueue: "AnnotationQueue",
-    user: "User",
-    createdByUser: "User",
-    project: "Project",
-  },
-  ShareLink: {
-    project: "Project",
-    user: "User",
-  },
-  PinnedTrace: {
-    project: "Project",
-    user: "User",
-  },
-  TraceEditOverlay: {
-    project: "Project",
-    createdBy: "User",
-    updatedBy: "User",
-  },
-  RetentionPolicy: {},
-  DataPrivacyPolicy: {},
-  CustomLLMModelCost: {},
-  Workflow: {
-    project: "Project",
-    latestVersion: "WorkflowVersion",
-    currentVersion: "WorkflowVersion",
-    versions: "WorkflowVersion",
-    publishedBy: "User",
-    experiments: "Experiment",
-    copiedFrom: "Workflow",
-    copiedWorkflows: "Workflow",
-    agents: "Agent",
-    evaluators: "Evaluator",
-  },
-  WorkflowVersion: {
-    author: "User",
-    project: "Project",
-    workflow: "Workflow",
-    parent: "WorkflowVersion",
-    children: "WorkflowVersion",
-    WorkflowAsLatestVersion: "Workflow",
-    WorkflowAsCurrentVersion: "Workflow",
-  },
-  AuditLog: {},
-  LlmPromptConfig: {
-    project: "Project",
-    copiedFrom: "LlmPromptConfig",
-    copiedPrompts: "LlmPromptConfig",
-    versions: "LlmPromptConfigVersion",
-    versionTags: "PromptTagAssignment",
-  },
-  LlmPromptConfigVersion: {
-    author: "User",
-    config: "LlmPromptConfig",
-    versionTags: "PromptTagAssignment",
-  },
-  PromptTagAssignment: {
-    config: "LlmPromptConfig",
-    version: "LlmPromptConfigVersion",
-    promptTag: "PromptTag",
-    createdBy: "User",
-    updatedBy: "User",
-  },
-  PromptTag: {
-    organization: "Organization",
-    assignments: "PromptTagAssignment",
-    createdBy: "User",
-    updatedBy: "User",
-  },
-  Analytics: {
-    project: "Project",
-  },
-  CustomRole: {
-    organization: "Organization",
-    assignedUsers: "TeamUser",
-    roleBindings: "RoleBinding",
-  },
-  Notification: {
-    organization: "Organization",
-    project: "Project",
-  },
-  Agent: {
-    project: "Project",
-    workflow: "Workflow",
-    copiedFrom: "Agent",
-    copiedAgents: "Agent",
-  },
-  Evaluator: {
-    project: "Project",
-    workflow: "Workflow",
-    copiedFrom: "Evaluator",
-    copiedEvaluators: "Evaluator",
-    monitors: "Monitor",
-    gatewayGuardrails: "GatewayGuardrail",
-  },
-  Scenario: {
-    project: "Project",
-    testSuite: "SimulationSuite",
-    versions: "ScenarioVersion",
-    lastUpdatedBy: "User",
-  },
-  ScenarioVersion: {
-    scenario: "Scenario",
-  },
-  SimulationSuite: {
-    project: "Project",
-    testSuiteScenarios: "Scenario",
-  },
-  Subscription: {
-    organization: "Organization",
-    invoices: "Invoice",
-  },
-  Invoice: {
-    subscription: "Subscription",
-    lineItems: "InvoiceItem",
-  },
-  InvoiceItem: {
-    invoice: "Invoice",
-  },
-  Group: {
-    organization: "Organization",
-    members: "GroupMembership",
-    roleBindings: "RoleBinding",
-  },
-  GroupMembership: {
-    user: "User",
-    group: "Group",
-  },
-  RoleBinding: {
-    organization: "Organization",
-    user: "User",
-    group: "Group",
-    apiKey: "ApiKey",
-    customRole: "CustomRole",
-  },
-  Grant: {},
-  GrantUsage: {},
-  Role: {},
-  ApiKey: {
-    user: "User",
-    organization: "Organization",
-    roleBindings: "RoleBinding",
-  },
-  ProjectActiveDay: {},
-  BillingMeterCheckpoint: {},
-  VirtualKey: {
-    principalUser: "User",
-    scopes: "VirtualKeyScope",
-    ledgerEntries: "GatewayBudgetLedger",
-    routingPolicy: "RoutingPolicy",
-  },
-  VirtualKeyScope: {
-    virtualKey: "VirtualKey",
-  },
-  RoutingPolicy: {
-    organization: "Organization",
-    createdBy: "User",
-    updatedBy: "User",
-    virtualKeys: "VirtualKey",
-    scopes: "RoutingPolicyScope",
-  },
-  RoutingPolicyScope: {
-    routingPolicy: "RoutingPolicy",
-  },
-  GatewayGuardrail: {
-    project: "Project",
-    evaluator: "Evaluator",
-    createdBy: "User",
-    updatedBy: "User",
-  },
-  IngestionSource: {
-    organization: "Organization",
-    team: "Team",
-    createdBy: "User",
-  },
-  AnomalyRule: {
-    organization: "Organization",
-    createdBy: "User",
-    alerts: "AnomalyAlert",
-  },
-  AnomalyAlert: {
-    organization: "Organization",
-    rule: "AnomalyRule",
-  },
-  AiToolEntry: {
-    organization: "Organization",
-    teams: "AiToolEntryTeam",
-    departments: "AiToolEntryDepartment",
-  },
-  AiToolEntryTeam: {
-    entry: "AiToolEntry",
-    team: "Team",
-  },
-  AiToolEntryDepartment: {
-    entry: "AiToolEntry",
-  },
-  IngestionTemplate: {
-    organization: "Organization",
-  },
-  GatewayConnectUpstream: {},
-  GatewayBudget: {
-    createdBy: "User",
-    ledgerEntries: "GatewayBudgetLedger",
-    bucketBoundaries: "GatewayBudgetBucketBoundary",
-  },
-  GatewayBudgetBucketBoundary: {
-    budget: "GatewayBudget",
-  },
-  GatewayBudgetLedger: {
-    budget: "GatewayBudget",
-    virtualKey: "VirtualKey",
-  },
-  GatewayChangeEvent: {
-    organization: "Organization",
-    project: "Project",
-  },
-  GatewayCacheRule: {},
-  FeatureFlag: {},
-  FeatureFlagExperimentSetting: {},
-  ProcessManagerInstance: {},
-  ProcessManagerInbox: {},
-  ProcessManagerOutbox: {
-    attemptLog: "ProcessManagerOutboxAttempt",
-  },
-  ProcessManagerOutboxAttempt: {
-    outbox: "ProcessManagerOutbox",
-  },
-  TopicClusteringRunProjection: {},
-  TopicModelProjection: {},
-  TopicClusteringRunHistoryProjection: {},
-  IngestionPullRunProjection: {},
-  ScheduledJob: {},
-  BugReport: {},
-  IdempotencyReceipt: {},
-  GatewayRealtimeSession: {},
-  SystemMigrationTenantState: {},
-  SystemMigrationEnrollment: {},
-  StoredObject: {},
-  DiscoveredPerson: {},
-  DiscoveredAgent: {},
-  IdentityMatch: {},
-  GovernanceTenantHistory: {},
-  ErasedIdentifierSuppression: {},
-  IdentityMatchSuggestion: {},
-  ConnectedSeatChange: {},
-  ConnectedStatement: {},
-  InstanceIdentity: {},
-  SelfHostedInstance: {},
-  SelfHostedInstanceReport: {},
+  "Account": {
+    "user": "User"
+  },
+  "AccountCredential": {
+    "user": "User"
+  },
+  "Session": {
+    "user": "User"
+  },
+  "User": {
+    "accounts": "Account",
+    "accountCredentials": "AccountCredential",
+    "sessions": "Session",
+    "twoFactors": "TwoFactor",
+    "passkeys": "Passkey",
+    "teamMemberships": "TeamUser",
+    "orgMemberships": "OrganizationUser",
+    "scimUserResources": "ScimUserResource",
+    "Annotation": "Annotation",
+    "shareLinks": "ShareLink",
+    "Workflow": "Workflow",
+    "WorkflowVersion": "WorkflowVersion",
+    "annotationQueues": "AnnotationQueueMembers",
+    "assignedQueueItems": "AnnotationQueueItem",
+    "createdQueueItems": "AnnotationQueueItem",
+    "llmPromptConfigVersions": "LlmPromptConfigVersion",
+    "scenarios": "Scenario",
+    "inviteRequests": "OrganizationInvite",
+    "secretsCreated": "ProjectSecret",
+    "secretsUpdated": "ProjectSecret",
+    "savedViews": "SavedView",
+    "versionTagsCreated": "PromptTagAssignment",
+    "versionTagsUpdated": "PromptTagAssignment",
+    "promptTagsCreated": "PromptTag",
+    "promptTagsUpdated": "PromptTag",
+    "groupMemberships": "GroupMembership",
+    "roleBindings": "RoleBinding",
+    "scimExternalIds": "ScimExternalId",
+    "apiKeys": "ApiKey",
+    "gatewayBudgetsCreated": "GatewayBudget",
+    "principalVirtualKeys": "VirtualKey",
+    "personalTeams": "Team",
+    "personalProjects": "Project",
+    "routingPoliciesCreated": "RoutingPolicy",
+    "routingPoliciesUpdated": "RoutingPolicy",
+    "gatewayGuardrailsCreated": "GatewayGuardrail",
+    "gatewayGuardrailsUpdated": "GatewayGuardrail",
+    "ingestionSourcesCreated": "IngestionSource",
+    "anomalyRulesCreated": "AnomalyRule",
+    "pinnedTraces": "PinnedTrace",
+    "traceEditOverlaysCreated": "TraceEditOverlay",
+    "traceEditOverlaysUpdated": "TraceEditOverlay"
+  },
+  "VerificationToken": {},
+  "Identifier": {},
+  "IdentifierReservation": {},
+  "IdentityProjectionCursor": {},
+  "TwoFactor": {
+    "user": "User"
+  },
+  "SignInAttemptLock": {},
+  "Passkey": {
+    "user": "User"
+  },
+  "MfaEnrollment": {},
+  "SsoConnection": {
+    "reproofCursor": "SsoConnectionReproofCursor"
+  },
+  "SsoConnectionRegistrationSlot": {},
+  "SsoConnectionReproofCursor": {
+    "connection": "SsoConnection"
+  },
+  "SsoCredential": {},
+  "SsoVerifiedDomain": {
+    "holders": "SsoVerifiedDomainHolder"
+  },
+  "SsoVerifiedDomainHolder": {
+    "ownership": "SsoVerifiedDomain"
+  },
+  "SsoAuthenticationActivity": {},
+  "SsoProvider": {},
+  "SsoBreakGlassBinding": {},
+  "SsoActivationRecoveryReservation": {},
+  "JoinRequest": {},
+  "TeamUser": {
+    "assignedRole": "CustomRole",
+    "user": "User",
+    "team": "Team"
+  },
+  "OrganizationUser": {
+    "user": "User",
+    "organization": "Organization"
+  },
+  "Team": {
+    "members": "TeamUser",
+    "organization": "Organization",
+    "projects": "Project",
+    "ownerUser": "User",
+    "ingestionSources": "IngestionSource",
+    "aiToolEntryTeams": "AiToolEntryTeam"
+  },
+  "Organization": {
+    "members": "OrganizationUser",
+    "teams": "Team",
+    "webhookEndpoints": "WebhookEndpoint",
+    "OrganizationInvite": "OrganizationInvite",
+    "CustomRoles": "CustomRole",
+    "notifications": "Notification",
+    "subscriptions": "Subscription",
+    "scimTokens": "ScimToken",
+    "scimRequestLog": "ScimRequestLog",
+    "promptTags": "PromptTag",
+    "groups": "Group",
+    "roleBindings": "RoleBinding",
+    "apiKeys": "ApiKey",
+    "issuedLicenses": "IssuedLicense",
+    "connectedBilling": "ConnectedBillingAccount",
+    "gatewayChangeEvents": "GatewayChangeEvent",
+    "routingPolicies": "RoutingPolicy",
+    "ingestionSources": "IngestionSource",
+    "anomalyRules": "AnomalyRule",
+    "anomalyAlerts": "AnomalyAlert",
+    "aiToolEntries": "AiToolEntry",
+    "ingestionTemplates": "IngestionTemplate",
+    "githubInstallations": "GithubInstallation",
+    "githubPullRequests": "GithubPullRequest",
+    "githubBranchPrChecks": "GithubBranchPullRequestCheck"
+  },
+  "IssuedLicense": {
+    "organization": "Organization"
+  },
+  "ActivationCode": {},
+  "ConnectedBillingAccount": {
+    "organization": "Organization"
+  },
+  "ConnectedCreditGrant": {},
+  "ConnectedInvoice": {},
+  "ScimRequestLog": {
+    "organization": "Organization"
+  },
+  "ScimToken": {
+    "organization": "Organization"
+  },
+  "ScimExternalId": {
+    "user": "User"
+  },
+  "ScimUserResource": {
+    "user": "User"
+  },
+  "ScimDirectoryUser": {},
+  "ScimSyncState": {},
+  "Project": {
+    "team": "Team",
+    "checks": "Monitor",
+    "costs": "Cost",
+    "topics": "Topic",
+    "datasets": "Dataset",
+    "datasetRecords": "DatasetRecord",
+    "customGraphs": "CustomGraph",
+    "dashboards": "Dashboard",
+    "batchEvaluations": "BatchEvaluation",
+    "triggers": "Trigger",
+    "experiments": "Experiment",
+    "annotations": "Annotation",
+    "projectSecrets": "ProjectSecret",
+    "TriggerSent": "TriggerSent",
+    "webhookDeliveries": "WebhookEndpointDelivery",
+    "annotationScores": "AnnotationScore",
+    "shareLinks": "ShareLink",
+    "workflows": "Workflow",
+    "WorkflowVersion": "WorkflowVersion",
+    "AnnotationQueue": "AnnotationQueue",
+    "AnnotationQueueItem": "AnnotationQueueItem",
+    "llmPromptConfigs": "LlmPromptConfig",
+    "analytics": "Analytics",
+    "notifications": "Notification",
+    "agents": "Agent",
+    "evaluators": "Evaluator",
+    "scenarios": "Scenario",
+    "suiteConfigurations": "SimulationSuite",
+    "savedViews": "SavedView",
+    "gatewayGuardrails": "GatewayGuardrail",
+    "gatewayChangeEvents": "GatewayChangeEvent",
+    "pinnedTraces": "PinnedTrace",
+    "traceEditOverlays": "TraceEditOverlay",
+    "emailSuppressions": "EmailSuppression",
+    "ownerUser": "User"
+  },
+  "Department": {},
+  "DepartmentMembershipHistory": {},
+  "PlatformToolPolicy": {},
+  "OrganizationInvite": {
+    "organization": "Organization",
+    "requestedByUser": "User"
+  },
+  "Monitor": {
+    "project": "Project",
+    "experiment": "Experiment",
+    "evaluator": "Evaluator"
+  },
+  "Cost": {
+    "project": "Project"
+  },
+  "Topic": {
+    "project": "Project",
+    "parent": "Topic",
+    "subtopics": "Topic"
+  },
+  "Dataset": {
+    "project": "Project",
+    "datasetRecords": "DatasetRecord",
+    "batchEvaluations": "BatchEvaluation"
+  },
+  "DatasetRecord": {
+    "dataset": "Dataset",
+    "project": "Project"
+  },
+  "Dashboard": {
+    "project": "Project",
+    "graphs": "CustomGraph"
+  },
+  "SavedView": {
+    "project": "Project",
+    "user": "User"
+  },
+  "CustomGraph": {
+    "project": "Project",
+    "dashboard": "Dashboard",
+    "trigger": "Trigger",
+    "TriggerSent": "TriggerSent"
+  },
+  "BatchEvaluation": {
+    "experiment": "Experiment",
+    "project": "Project",
+    "dataset": "Dataset"
+  },
+  "Trigger": {
+    "project": "Project",
+    "TriggerSent": "TriggerSent",
+    "webhookDeliveries": "WebhookEndpointDelivery",
+    "customGraph": "CustomGraph"
+  },
+  "WebhookEndpoint": {
+    "organization": "Organization",
+    "deliveries": "WebhookEndpointDelivery"
+  },
+  "WebhookEndpointDelivery": {
+    "endpoint": "WebhookEndpoint",
+    "project": "Project",
+    "trigger": "Trigger"
+  },
+  "Experiment": {
+    "project": "Project",
+    "workflow": "Workflow",
+    "batchEvaluations": "BatchEvaluation",
+    "monitor": "Monitor"
+  },
+  "ExperimentVersion": {},
+  "Annotation": {
+    "project": "Project",
+    "user": "User"
+  },
+  "ModelProvider": {
+    "scopes": "ModelProviderScope"
+  },
+  "ModelProviderScope": {
+    "modelProvider": "ModelProvider"
+  },
+  "ModelDefaultConfig": {
+    "scopes": "ModelDefaultConfigScope"
+  },
+  "ModelDefaultConfigScope": {
+    "config": "ModelDefaultConfig"
+  },
+  "GithubInstallation": {
+    "organization": "Organization"
+  },
+  "GithubPullRequest": {
+    "organization": "Organization"
+  },
+  "GithubBranchPullRequestCheck": {
+    "organization": "Organization"
+  },
+  "LangyConversationProjection": {},
+  "LangyTurnRequest": {},
+  "LangyActiveTurn": {},
+  "LangyConversationTurnProjection": {},
+  "LangyMessageProjection": {},
+  "ProjectSecret": {
+    "project": "Project",
+    "createdBy": "User",
+    "updatedBy": "User"
+  },
+  "TriggerSent": {
+    "customGraph": "CustomGraph",
+    "project": "Project",
+    "trigger": "Trigger"
+  },
+  "EmailSuppression": {
+    "project": "Project"
+  },
+  "AnnotationScore": {
+    "project": "Project",
+    "AnnotationQueueScores": "AnnotationQueueScores"
+  },
+  "AnnotationQueue": {
+    "project": "Project",
+    "members": "AnnotationQueueMembers",
+    "AnnotationQueueScores": "AnnotationQueueScores",
+    "AnnotationQueueItems": "AnnotationQueueItem"
+  },
+  "AnnotationQueueMembers": {
+    "user": "User",
+    "annotationQueue": "AnnotationQueue"
+  },
+  "AnnotationQueueScores": {
+    "annotationScore": "AnnotationScore",
+    "annotationQueue": "AnnotationQueue"
+  },
+  "AnnotationQueueItem": {
+    "annotationQueue": "AnnotationQueue",
+    "user": "User",
+    "createdByUser": "User",
+    "project": "Project"
+  },
+  "ShareLink": {
+    "project": "Project",
+    "user": "User"
+  },
+  "PinnedTrace": {
+    "project": "Project",
+    "user": "User"
+  },
+  "TraceEditOverlay": {
+    "project": "Project",
+    "createdBy": "User",
+    "updatedBy": "User"
+  },
+  "RetentionPolicy": {},
+  "DataPrivacyPolicy": {},
+  "CustomLLMModelCost": {},
+  "Workflow": {
+    "project": "Project",
+    "latestVersion": "WorkflowVersion",
+    "currentVersion": "WorkflowVersion",
+    "versions": "WorkflowVersion",
+    "publishedBy": "User",
+    "experiments": "Experiment",
+    "copiedFrom": "Workflow",
+    "copiedWorkflows": "Workflow",
+    "agents": "Agent",
+    "evaluators": "Evaluator"
+  },
+  "WorkflowVersion": {
+    "author": "User",
+    "project": "Project",
+    "workflow": "Workflow",
+    "parent": "WorkflowVersion",
+    "children": "WorkflowVersion",
+    "WorkflowAsLatestVersion": "Workflow",
+    "WorkflowAsCurrentVersion": "Workflow"
+  },
+  "AuditLog": {},
+  "LlmPromptConfig": {
+    "project": "Project",
+    "copiedFrom": "LlmPromptConfig",
+    "copiedPrompts": "LlmPromptConfig",
+    "versions": "LlmPromptConfigVersion",
+    "versionTags": "PromptTagAssignment"
+  },
+  "LlmPromptConfigVersion": {
+    "author": "User",
+    "config": "LlmPromptConfig",
+    "versionTags": "PromptTagAssignment"
+  },
+  "PromptTagAssignment": {
+    "config": "LlmPromptConfig",
+    "version": "LlmPromptConfigVersion",
+    "promptTag": "PromptTag",
+    "createdBy": "User",
+    "updatedBy": "User"
+  },
+  "PromptTag": {
+    "organization": "Organization",
+    "assignments": "PromptTagAssignment",
+    "createdBy": "User",
+    "updatedBy": "User"
+  },
+  "Analytics": {
+    "project": "Project"
+  },
+  "CustomRole": {
+    "organization": "Organization",
+    "assignedUsers": "TeamUser",
+    "roleBindings": "RoleBinding"
+  },
+  "Notification": {
+    "organization": "Organization",
+    "project": "Project"
+  },
+  "Agent": {
+    "project": "Project",
+    "workflow": "Workflow",
+    "copiedFrom": "Agent",
+    "copiedAgents": "Agent"
+  },
+  "Evaluator": {
+    "project": "Project",
+    "workflow": "Workflow",
+    "copiedFrom": "Evaluator",
+    "copiedEvaluators": "Evaluator",
+    "monitors": "Monitor",
+    "gatewayGuardrails": "GatewayGuardrail"
+  },
+  "Scenario": {
+    "project": "Project",
+    "testSuite": "SimulationSuite",
+    "versions": "ScenarioVersion",
+    "lastUpdatedBy": "User"
+  },
+  "ScenarioVersion": {
+    "scenario": "Scenario"
+  },
+  "SimulationSuite": {
+    "project": "Project",
+    "testSuiteScenarios": "Scenario"
+  },
+  "Subscription": {
+    "organization": "Organization",
+    "invoices": "Invoice"
+  },
+  "Invoice": {
+    "subscription": "Subscription",
+    "lineItems": "InvoiceItem"
+  },
+  "InvoiceItem": {
+    "invoice": "Invoice"
+  },
+  "Group": {
+    "organization": "Organization",
+    "members": "GroupMembership",
+    "roleBindings": "RoleBinding"
+  },
+  "GroupMembership": {
+    "user": "User",
+    "group": "Group"
+  },
+  "RoleBinding": {
+    "organization": "Organization",
+    "user": "User",
+    "group": "Group",
+    "apiKey": "ApiKey",
+    "customRole": "CustomRole"
+  },
+  "Grant": {},
+  "GrantUsage": {},
+  "Role": {},
+  "ApiKey": {
+    "user": "User",
+    "organization": "Organization",
+    "roleBindings": "RoleBinding"
+  },
+  "ProjectActiveDay": {},
+  "BillingMeterCheckpoint": {},
+  "VirtualKey": {
+    "principalUser": "User",
+    "scopes": "VirtualKeyScope",
+    "ledgerEntries": "GatewayBudgetLedger",
+    "routingPolicy": "RoutingPolicy"
+  },
+  "VirtualKeyScope": {
+    "virtualKey": "VirtualKey"
+  },
+  "RoutingPolicy": {
+    "organization": "Organization",
+    "createdBy": "User",
+    "updatedBy": "User",
+    "virtualKeys": "VirtualKey",
+    "scopes": "RoutingPolicyScope"
+  },
+  "RoutingPolicyScope": {
+    "routingPolicy": "RoutingPolicy"
+  },
+  "GatewayGuardrail": {
+    "project": "Project",
+    "evaluator": "Evaluator",
+    "createdBy": "User",
+    "updatedBy": "User"
+  },
+  "IngestionSource": {
+    "organization": "Organization",
+    "team": "Team",
+    "createdBy": "User"
+  },
+  "AnomalyRule": {
+    "organization": "Organization",
+    "createdBy": "User",
+    "alerts": "AnomalyAlert"
+  },
+  "AnomalyAlert": {
+    "organization": "Organization",
+    "rule": "AnomalyRule"
+  },
+  "AiToolEntry": {
+    "organization": "Organization",
+    "teams": "AiToolEntryTeam",
+    "departments": "AiToolEntryDepartment"
+  },
+  "AiToolEntryTeam": {
+    "entry": "AiToolEntry",
+    "team": "Team"
+  },
+  "AiToolEntryDepartment": {
+    "entry": "AiToolEntry"
+  },
+  "IngestionTemplate": {
+    "organization": "Organization"
+  },
+  "GatewayConnectUpstream": {},
+  "GatewayBudget": {
+    "createdBy": "User",
+    "ledgerEntries": "GatewayBudgetLedger",
+    "bucketBoundaries": "GatewayBudgetBucketBoundary"
+  },
+  "GatewayBudgetBucketBoundary": {
+    "budget": "GatewayBudget"
+  },
+  "GatewayBudgetLedger": {
+    "budget": "GatewayBudget",
+    "virtualKey": "VirtualKey"
+  },
+  "GatewayChangeEvent": {
+    "organization": "Organization",
+    "project": "Project"
+  },
+  "GatewayCacheRule": {},
+  "FeatureFlag": {},
+  "FeatureFlagExperimentSetting": {},
+  "ProcessManagerInstance": {},
+  "ProcessManagerInbox": {},
+  "ProcessManagerOutbox": {
+    "attemptLog": "ProcessManagerOutboxAttempt"
+  },
+  "ProcessManagerOutboxAttempt": {
+    "outbox": "ProcessManagerOutbox"
+  },
+  "TopicClusteringRunProjection": {},
+  "TopicModelProjection": {},
+  "TopicClusteringRunHistoryProjection": {},
+  "IngestionPullRunProjection": {},
+  "ScheduledJob": {},
+  "BugReport": {},
+  "IdempotencyReceipt": {},
+  "GatewayRealtimeSession": {},
+  "SystemMigrationTenantState": {},
+  "SystemMigrationEnrollment": {},
+  "StoredObject": {},
+  "DiscoveredPerson": {},
+  "DiscoveredAgent": {},
+  "IdentityMatch": {},
+  "GovernanceTenantHistory": {},
+  "ErasedIdentifierSuppression": {},
+  "IdentityMatchSuggestion": {},
+  "ConnectedSeatChange": {},
+  "ConnectedStatement": {},
+  "InstanceIdentity": {},
+  "SelfHostedInstance": {},
+  "SelfHostedInstanceReport": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;
