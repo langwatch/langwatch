@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // curatedCreate is a hand-written create body for an operation whose handler
@@ -18,11 +20,24 @@ import (
 // what it creates. captureUnder files the created id as if a create at that
 // collection path had answered, for a create whose own path names the wrong
 // resource (POST /api/run-plans/run creates a run plan, not a "run").
+//
+// bucket and idField pin the created id where the collection path would
+// misname it (a widget id the item routes call {widgetId}; a control request
+// nested under "request"). credentials files response fields as credentials
+// that side minted (side-credentials.go), and after runs once the create has
+// been sent on both sides.
 type curatedCreate struct {
 	key          string
 	body         any
 	captureUnder string
+	bucket       string
+	idField      string
+	credentials  map[string]string
+	after        func(*probeEngine)
 }
+
+// langyWorkspace is the folder a connected local Langy session shares.
+var langyWorkspace = map[string]any{"root": "/tmp/apidiff-workspace", "name": "apidiff-workspace", "os": "linux"}
 
 // curatedCreates run first, in this order: every prerequisite precedes what
 // needs it (evaluator before monitor, scenario and agent before suite, suite
@@ -42,7 +57,7 @@ var curatedCreates = []curatedCreate{
 	}},
 	{key: "POST /api/scenarios"},
 	{key: "POST /api/scenario-events", body: map[string]any{
-		"type": "SCENARIO_RUN_STARTED", "timestamp": 1767225600000,
+		"type": "SCENARIO_RUN_STARTED", "timestamp": "{{now}}",
 		"scenarioId": "{{scenarioid}}", "scenarioRunId": "{{const:scenariorunid}}",
 		"batchRunId": "{{const:batchrunid}}", "scenarioSetId": "{{const:scenariosetid}}",
 		"metadata": map[string]any{"name": "apidiff scenario run"},
@@ -64,7 +79,7 @@ var curatedCreates = []curatedCreate{
 	{key: "POST /api/webhooks/v1/endpoints", body: map[string]any{
 		"destination_kind": "http", "url": synthURI,
 		"enabled_events": []any{"gateway.request.completed"},
-	}},
+	}, after: (*probeEngine).emitGatewaySpend},
 	{key: "POST /api/model-defaults", body: map[string]any{
 		"config": map[string]any{"DEFAULT": "openai/gpt-5-mini"},
 		"scopes": []any{map[string]any{"scopeType": "PROJECT", "scopeId": "{{const:projectid}}"}},
@@ -79,7 +94,9 @@ var curatedCreates = []curatedCreate{
 	{key: "POST /api/groups/{groupId}/bindings", body: map[string]any{
 		"role": "VIEWER", "scopeType": "PROJECT", "scopeId": "{{const:projectid}}",
 	}},
-	{key: "PUT /api/model-providers/{provider}"},
+	{key: "PUT /api/model-providers/{provider}", body: map[string]any{
+		"enabled": true, "customKeys": map[string]any{"OPENAI_API_KEY": "sk-apidiff-throwaway"},
+	}},
 	{key: "POST /api/annotations/trace/{id}", captureUnder: "/api/annotations", body: map[string]any{
 		"comment": "apidiff annotation", "isThumbsUp": true,
 	}},
@@ -91,14 +108,52 @@ var curatedCreates = []curatedCreate{
 		"name":       "apidiff chart",
 		"definition": map[string]any{"version": 1, "sql": "SELECT 1 AS value"},
 	}},
-	{key: "POST /api/projects/{projectId}/analytics/dashboard-widgets", body: map[string]any{
+	{key: "POST /api/projects/{projectId}/analytics/dashboard-widgets", bucket: "widgetid", body: map[string]any{
 		"name": "apidiff widget", "code": "export default function Widget() { return null; }",
 		"queries": []any{map[string]any{"name": "q", "sql": "SELECT 1 AS value"}},
 	}},
 	{key: "POST /api/instant-evals", body: map[string]any{
-		"name": "apidiff instant eval", "target": "traces", "sql": "SELECT trace_id FROM traces",
-		"start": synthDateTime, "end": "2026-01-02T00:00:00Z", "limit": 1,
+		"name": "apidiff instant eval", "sql": "SELECT TraceId, eval(TraceName, 'The trace is named apidiff') AS named FROM traces",
+		"start": "{{window:from}}", "end": "{{window:to}}", "limit": 1,
 		"questions": []any{map[string]any{"id": "q1", "kind": "boolean", "instructions": "Is the answer polite?"}},
+	}},
+	// Langy, in the order a connected local session lives: a turn, the
+	// request to share a folder, its approval (a session key), the folder's
+	// registration (an instance token), a local call and a question the
+	// worker asks, the folder's poll and frames, and last the turn's result.
+	{key: "POST /api/langy/conversations", body: map[string]any{
+		"messages":       []any{map[string]any{"role": "user", "content": "apidiff question"}},
+		"idempotencyKey": "apidiff-turn-1",
+	}},
+	{key: "POST /api/langy/local/requests", captureUnder: "/api/langy/control/requests", bucket: "requestid", idField: "request.id",
+		body: map[string]any{"conversationId": "{{conversationid}}"}},
+	{key: "GET /api/langy/control/requests"},
+	{key: "POST /api/langy/control/requests/{requestId}/approve", credentials: map[string]string{"sessionKey": credLangySession},
+		body: map[string]any{"workspace": langyWorkspace}},
+	{key: "POST /api/langy/control/connect/register", credentials: map[string]string{"instanceToken": credLangyInstance},
+		body: map[string]any{
+			"protocol": 1, "type": "register",
+			"cli":       map[string]any{"name": "langwatch", "version": "0.0.0-apidiff"},
+			"instance":  map[string]any{"id": "apidiff-instance", "hostname": "apidiff", "username": "apidiff", "pid": 1, "startedAt": "2026-01-01T00:00:00Z"},
+			"workspace": langyWorkspace,
+		}},
+	{key: "POST /api/langy/local/calls", body: map[string]any{
+		"conversationId": "{{conversationid}}", "turnId": "{{turnid}}",
+		"tool": "local_ls", "params": map[string]any{"path": "."},
+	}},
+	{key: "POST /api/langy/waits", body: map[string]any{
+		"conversationId": "{{conversationid}}", "turnId": "{{turnid}}", "kind": "question",
+		"questions": []any{map[string]any{"question": "apidiff?", "options": []any{map[string]any{"label": "yes"}}}},
+	}},
+	{key: "GET /api/langy/control/connect/poll"},
+	{key: "POST /api/langy/control/connect/frames", body: map[string]any{
+		"frames": []any{map[string]any{"protocol": 1, "type": "ack", "callId": "{{callid}}"}},
+	}},
+	{key: "GET /api/langy/local/calls/{id}"},
+	{key: "GET /api/langy/waits/{id}"},
+	{key: "POST /api/internal/langy/turn/{turnId}/result", body: map[string]any{
+		"projectId": "{{const:projectid}}", "conversationId": "{{conversationid}}",
+		"status": "completed", "text": "apidiff answer",
 	}},
 }
 
@@ -189,6 +244,12 @@ func fillPlaceholder(text string, symbols *SymbolTable) (any, string) {
 		return text, ""
 	}
 	name := strings.TrimSuffix(strings.TrimPrefix(text, "{{"), "}}")
+	if name == "now" {
+		return time.Now().UnixMilli(), ""
+	}
+	if bound, ok := strings.CutPrefix(name, "window:"); ok {
+		return windowISO(bound)
+	}
 	if constant, ok := strings.CutPrefix(name, "const:"); ok {
 		value, found := SeededConstants[constant]
 		if !found {
@@ -200,6 +261,17 @@ func fillPlaceholder(text string, symbols *SymbolTable) (any, string) {
 		return value, ""
 	}
 	return nil, name
+}
+
+// windowISO renders one bound of the run window as an ISO timestamp, for the
+// bodies that take a range as dates rather than epoch milliseconds.
+func windowISO(bound string) (any, string) {
+	millis := map[string]string{"from": synthFromMillis, "to": synthToMillis}[bound]
+	parsed, err := strconv.ParseInt(millis, 10, 64)
+	if err != nil {
+		return nil, "window:" + bound
+	}
+	return time.UnixMilli(parsed).UTC().Format(time.RFC3339), ""
 }
 
 // curatedBodies fills one curated body for both sides; missing names the side

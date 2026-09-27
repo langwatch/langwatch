@@ -29,6 +29,11 @@ type Keys struct {
 	ScimKey     string
 	ProjectKeyB string
 	ProjectKeyC string
+	// Run mode only: the widget fixture project's key and the shared secrets
+	// the Langy agent stub and the gateway's signed door are configured with.
+	WidgetProjectKey      string
+	LangyInternalSecret   string
+	GatewayInternalSecret string
 }
 
 // SideResult is one side's outcome for one probe case.
@@ -132,6 +137,7 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		ctx: ctx, options: options, client: client,
 		symbolsA: NewSymbolTable(), symbolsB: NewSymbolTable(),
 		ownerIDs: map[string]*sideIDs{}, statusDiffs: map[string]bool{},
+		credsA: sideCredentials{}, credsB: sideCredentials{},
 	}
 
 	selected := probeOrder(SelectOperations(operations, options.Filter))
@@ -146,8 +152,8 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	probed := 0
 	for index := range selected {
 		operation := selected[index]
-		if excluded(operation.Path, options.ExcludePrefixes) {
-			engine.progress("skip %s %s (excluded prefix) [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
+		if skip := notProbed(operation, options.ExcludePrefixes); skip != "" {
+			engine.progress("skip %s %s (%s) [%d/%d]\n", operation.Method, operation.Path, skip, index+1, len(selected))
 			continue
 		}
 		engine.progress("probe %s %s [%d/%d]\n", operation.Method, operation.Path, index+1, len(selected))
@@ -180,6 +186,19 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 		Suppressed:       engine.suppressed,
 		CredentialChecks: checks,
 	}
+}
+
+// notProbed names why an operation is left out of the run entirely, without
+// a finding: an excluded prefix, or a ruled-retired REST operation, which is
+// removed rather than refused and so has nothing left to compare.
+func notProbed(operation Operation, excludePrefixes []string) string {
+	switch {
+	case excluded(operation.Path, excludePrefixes):
+		return "excluded prefix"
+	case RetiredRestOperation(operation.Path):
+		return "ruled retired"
+	}
+	return ""
 }
 
 // SelectOperations filters the union by method and path prefix and applies
@@ -311,6 +330,10 @@ type probeEngine struct {
 	// gatedOps are the operations the main pass saw the Enterprise gate
 	// refuse on either side, keyed by operationKeyOf. See entitlement.go.
 	gatedOps map[string]Operation
+	// credsA and credsB are what each side minted for itself during the run
+	// (side-credentials.go).
+	credsA sideCredentials
+	credsB sideCredentials
 }
 
 // sideIDs holds one operation's owner-visible IDs, per side.
@@ -342,6 +365,7 @@ type probeCase struct {
 	bodyB    any
 	perSide  bool
 	captures string
+	curated  *curatedCreate
 }
 
 func (engine *probeEngine) probeOperation(operation Operation) []Finding {
@@ -351,10 +375,12 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 	if unresolved != nil {
 		return []Finding{*unresolved}
 	}
+	engine.retargetWidgetProject(operation, &paramsA, &paramsB)
 	cases, refused := engine.casesFor(operation)
 	if refused != "" {
 		return []Finding{skippedFinding(operation, refused)}
 	}
+	headersA, headersB := engine.sideHeaders(operation, headers)
 
 	if blocked, ok := engine.guardSelfDestruction(operation, paramsA, paramsB); ok {
 		return blocked
@@ -364,19 +390,17 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 	// values its OWN instance minted.
 	pathA, pathB := operation.SidePaths()
 	target := probeTarget{
-		pathA:   substitutePath(pathA, paramsA.pathValues, operation.Path),
-		pathB:   substitutePath(pathB, paramsB.pathValues, operation.Path),
-		queryA:  paramsA.query,
-		queryB:  paramsB.query,
-		headers: headers,
+		pathA:    substitutePath(pathA, paramsA.pathValues, operation.Path),
+		pathB:    substitutePath(pathB, paramsB.pathValues, operation.Path),
+		queryA:   paramsA.query,
+		queryB:   paramsB.query,
+		headersA: headersA,
+		headersB: headersB,
 	}
 	findings := make([]Finding, 0)
 	missingReported := false
 	for _, probeCase := range cases {
-		transcript := engine.runCase(operation, probeCase, target)
-		engine.transcripts = append(engine.transcripts, transcript)
-		engine.captureFrom(operation, probeCase, transcript)
-
+		transcript := engine.runAndRecord(operation, probeCase, target)
 		if !operation.InA || !operation.InB {
 			if reportsMissing(operation, missingReported) {
 				missingReported = true
@@ -388,6 +412,16 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		engine.recordGate(operation, transcript)
 	}
 	return findings
+}
+
+// runAndRecord runs one case, waits out a settled read, and files what the
+// answers taught the engine.
+func (engine *probeEngine) runAndRecord(operation Operation, probeCase probeCase, target probeTarget) Transcript {
+	transcript := engine.settleRead(operation, target, engine.runCase(operation, probeCase, target))
+	engine.transcripts = append(engine.transcripts, transcript)
+	engine.captureFrom(operation, probeCase, transcript)
+	engine.afterCurated(probeCase, transcript)
+	return transcript
 }
 
 // guardSelfDestruction keeps a destructive probe off the rows this run
@@ -416,8 +450,8 @@ func (engine *probeEngine) captureFrom(operation Operation, probeCase probeCase,
 	captureSucceeded(engine.symbolsA, capturePath, transcript.A)
 	captureSucceeded(engine.symbolsB, capturePath, transcript.B)
 	if probeCase.perSide {
-		pinCreated(engine.symbolsA, capturePath, transcript.A)
-		pinCreated(engine.symbolsB, capturePath, transcript.B)
+		probeCase.curated.pin(engine.symbolsA, capturePath, transcript.A)
+		probeCase.curated.pin(engine.symbolsB, capturePath, transcript.B)
 	}
 	engine.recordOwnerIDs(operation, probeCase, transcript)
 	engine.captureMutation(operation, probeCase, transcript)
@@ -549,11 +583,12 @@ func findFirstIDInSlice(values []any) (string, bool) {
 // probeTarget is one operation's resolved request target: per-side paths with
 // parameters substituted, required query parameters, and auth headers.
 type probeTarget struct {
-	pathA   string
-	pathB   string
-	queryA  url.Values
-	queryB  url.Values
-	headers map[string]string
+	pathA    string
+	pathB    string
+	queryA   url.Values
+	queryB   url.Values
+	headersA map[string]string
+	headersB map[string]string
 }
 
 // runCase executes one probe case against both sides in lockstep (A then B).
@@ -572,7 +607,7 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	}
 	request := probeRequest{
 		method:  operation.Method,
-		headers: target.headers,
+		headers: target.headersA,
 		body:    probeCase.body,
 	}
 	request.baseURL = engine.options.A
@@ -582,6 +617,7 @@ func (engine *probeEngine) runCase(operation Operation, probeCase probeCase, tar
 	if probeCase.perSide {
 		request.body = probeCase.bodyB
 	}
+	request.headers = target.headersB
 	request.baseURL = engine.options.B
 	request.path = target.pathB
 	request.query = target.queryB

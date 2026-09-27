@@ -118,13 +118,17 @@ func (engine *probeEngine) ownerTarget(operation Operation) (probeTarget, bool) 
 	if unresolvedA != "" || unresolvedB != "" {
 		return probeTarget{}, false
 	}
+	engine.retargetWidgetProject(operation, &paramsA, &paramsB)
 	pathA, pathB := operation.SidePaths()
+	headers := userBoundHeaders(operation, authHeaders(operation, engine.options.Schemes, engine.options.Keys), engine.options.Keys)
+	headersA, headersB := engine.sideHeaders(operation, headers)
 	return probeTarget{
-		pathA:   substitutePath(pathA, paramsA.pathValues, operation.Path),
-		pathB:   substitutePath(pathB, paramsB.pathValues, operation.Path),
-		queryA:  paramsA.query,
-		queryB:  paramsB.query,
-		headers: authHeaders(operation, engine.options.Schemes, engine.options.Keys),
+		pathA:    substitutePath(pathA, paramsA.pathValues, operation.Path),
+		pathB:    substitutePath(pathB, paramsB.pathValues, operation.Path),
+		queryA:   paramsA.query,
+		queryB:   paramsB.query,
+		headersA: headersA,
+		headersB: headersB,
 	}, true
 }
 
@@ -293,7 +297,7 @@ func (engine *probeEngine) permissionProbe(operation Operation) []Finding {
 			engine.progress("skip permission pass %s %s (a non-project credential cannot be swapped for a foreign one)\n", operation.Method, operation.Path)
 			return nil
 		}
-		target.headers = headers
+		target.headersA, target.headersB = headers, headers
 		transcript := engine.runCase(operation, probeCase{name: "permission-" + foreign.label}, target)
 		engine.transcripts = append(engine.transcripts, transcript)
 		transcripts = append(transcripts, transcript)
@@ -472,38 +476,44 @@ func emptyListOutcome(transcript Transcript) bool {
 	return emptyListBody(transcript.A.Body) && emptyListBody(transcript.B.Body)
 }
 
-// emptyListBody reports whether a JSON body holds arrays that are ALL empty
-// (and at least one exists), i.e. a list response with no items.
+// emptyListBody reports whether a JSON body is a list response with no items:
+// an empty top-level array, or an object whose top-level arrays are all empty
+// and which carries nothing but list metadata beside them (a cursor, a count,
+// a flag). An entity that merely holds an empty array field (a member's
+// teams, a scenario's criteria) has an identity or nested object of its own
+// and is not a list.
 func emptyListBody(body string) bool {
 	decoded, ok := decodeJSONBody(body)
 	if !ok || decoded == nil {
 		return false
 	}
-	arrays, nonEmpty := countArrays(decoded)
-	return arrays > 0 && nonEmpty == 0
+	switch typed := decoded.(type) {
+	case []any:
+		return len(typed) == 0
+	case map[string]any:
+		return emptyListObject(typed)
+	}
+	return false
 }
 
-// countArrays counts arrays and non-empty arrays recursively.
-func countArrays(value any) (arrays, nonEmpty int) {
-	switch typed := value.(type) {
-	case []any:
-		arrays++
-		if len(typed) > 0 {
-			nonEmpty++
-		}
-		for _, element := range typed {
-			childArrays, childNonEmpty := countArrays(element)
-			arrays += childArrays
-			nonEmpty += childNonEmpty
-		}
-	case map[string]any:
-		for _, key := range sortedKeys(typed) {
-			childArrays, childNonEmpty := countArrays(typed[key])
-			arrays += childArrays
-			nonEmpty += childNonEmpty
+func emptyListObject(object map[string]any) bool {
+	arrays := 0
+	for key, value := range object {
+		switch typed := value.(type) {
+		case []any:
+			if len(typed) > 0 {
+				return false
+			}
+			arrays++
+		case map[string]any:
+			return false
+		case string:
+			if isIDKey(key) {
+				return false
+			}
 		}
 	}
-	return arrays, nonEmpty
+	return arrays > 0
 }
 
 // containsID reports whether the ID appears anywhere in a decoded JSON body.
